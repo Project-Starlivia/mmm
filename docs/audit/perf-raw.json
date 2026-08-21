@@ -1,0 +1,409 @@
+{
+  "measuredAt": "2026-08-10T03:44:36.974Z",
+  "url": "http://localhost:5173",
+  "note": "vite dev サーバ上での計測。production build ではない。",
+  "results": [
+    {
+      "fixture": "baseline",
+      "inputChars": 5279,
+      "wallClockToFirstNodeMs": 192,
+      "boot": {
+        "firstMapPaint": 160,
+        "paints": {
+          "first-paint": 44,
+          "first-contentful-paint": 44
+        },
+        "domInteractive": 10,
+        "domContentLoaded": 160,
+        "loadEventEnd": 171,
+        "longtasks": [
+          [
+            57,
+            103
+          ]
+        ],
+        "mapNodes": 190,
+        "svgElements": 961,
+        "domNodes": 1265,
+        "heapMB": 10.1
+      },
+      "inputLatencyMs": {
+        "n": 41,
+        "p50": 9.3,
+        "p95": 16,
+        "max": 16.8,
+        "samples": 41,
+        "typed": 40
+      },
+      "mapMutationsWhileTyping": 4,
+      "panFrameMs": {
+        "n": 71,
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 16.8,
+        "over16ms": 4,
+        "over50ms": 0
+      },
+      "zoomFrameMs": {
+        "n": 71,
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 16.8,
+        "over16ms": 4,
+        "over50ms": 0
+      },
+      "hideShowFrameMs": {
+        "n": 53,
+        "p50": 16.7,
+        "p95": 16.7,
+        "max": 16.8,
+        "over16ms": 2,
+        "over50ms": 0
+      },
+      "afterEditing": {
+        "rounds": 150,
+        "heapMB": 10.1,
+        "domNodes": 1248,
+        "svgElements": 961,
+        "mapNodes": 190,
+        "detachedHint": "detached ノード数は heap snapshot が要るのでここでは測れない"
+      },
+      "consoleErrors": []
+    },
+    {
+      "fixture": "rich",
+      "inputChars": 79429,
+      "wallClockToFirstNodeMs": 208,
+      "boot": {
+        "firstMapPaint": 176,
+        "paints": {
+          "first-paint": 28,
+          "first-contentful-paint": 28
+        },
+        "domInteractive": 8,
+        "domContentLoaded": 176,
+        "loadEventEnd": 189,
+        "longtasks": [
+          [
+            55,
+            121
+          ]
+        ],
+        "mapNodes": 301,
+        "svgElements": 3616,
+        "domNodes": 3848,
+        "heapMB": 12.1
+      },
+      "inputLatencyMs": {
+        "n": 40,
+        "p50": 9.9,
+        "p95": 17.1,
+        "max": 21.3,
+        "samples": 40,
+        "typed": 40
+      },
+      "mapMutationsWhileTyping": 3,
+      "panFrameMs": {
+        "n": 72,
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 16.8,
+        "over16ms": 4,
+        "over50ms": 0
+      },
+      "zoomFrameMs": {
+        "n": 71,
+        "p50": 16.7,
+        "p95": 16.7,
+        "max": 16.8,
+        "over16ms": 3,
+        "over50ms": 0
+      },
+      "hideShowFrameMs": {
+        "n": 54,
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 16.8,
+        "over16ms": 4,
+        "over50ms": 0
+      },
+      "afterEditing": {
+        "rounds": 150,
+        "heapMB": 12.1,
+        "domNodes": 3838,
+        "svgElements": 3616,
+        "mapNodes": 301,
+        "detachedHint": "detached ノード数は heap snapshot が要るのでここでは測れない"
+      },
+      "consoleErrors": []
+    },
+    {
+      "fixture": "deep",
+      "inputChars": 23928,
+      "wallClockToFirstNodeMs": 161,
+      "boot": {
+        "firstMapPaint": 138,
+        "paints": {
+          "first-paint": 36,
+          "first-contentful-paint": 36
+        },
+        "domInteractive": 8,
+        "domContentLoaded": 138,
+        "loadEventEnd": 144,
+        "longtasks": [
+          [
+            51,
+            87
+          ]
+        ],
+        "mapNodes": 200,
+        "svgElements": 1011,
+        "domNodes": 1209,
+        "heapMB": 10.1
+      },
+      "inputLatencyMs": {
+        "n": 40,
+        "p50": 10.2,
+        "p95": 16.4,
+        "max": 17.3,
+        "samples": 40,
+        "typed": 40
+      },
+      "mapMutationsWhileTyping": 3,
+      "panFrameMs": {
+        "n": 71,
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 16.8,
+        "over16ms": 4,
+        "over50ms": 0
+      },
+      "zoomFrameMs": {
+        "n": 71,
+        "p50": 16.7,
+        "p95": 16.7,
+        "max": 16.8,
+        "over16ms": 3,
+        "over50ms": 0
+      },
+      "hideShowFrameMs": {
+        "n": 53,
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 16.8,
+        "over16ms": 3,
+        "over50ms": 0
+      },
+      "afterEditing": {
+        "rounds": 150,
+        "heapMB": 10.1,
+        "domNodes": 1155,
+        "svgElements": 1011,
+        "mapNodes": 200,
+        "detachedHint": "detached ノード数は heap snapshot が要るのでここでは測れない"
+      },
+      "consoleErrors": []
+    },
+    {
+      "fixture": "wide",
+      "inputChars": 55783,
+      "wallClockToFirstNodeMs": 285,
+      "boot": {
+        "firstMapPaint": 229,
+        "paints": {
+          "first-paint": 32,
+          "first-contentful-paint": 32
+        },
+        "domInteractive": 8,
+        "domContentLoaded": 230,
+        "loadEventEnd": 257,
+        "longtasks": [
+          [
+            52,
+            178
+          ]
+        ],
+        "mapNodes": 2001,
+        "svgElements": 10016,
+        "domNodes": 10326,
+        "heapMB": 14.5
+      },
+      "inputLatencyMs": {
+        "n": 40,
+        "p50": 17.5,
+        "p95": 22.1,
+        "max": 48.5,
+        "samples": 40,
+        "typed": 40
+      },
+      "mapMutationsWhileTyping": 3,
+      "panFrameMs": {
+        "n": 71,
+        "p50": 16.7,
+        "p95": 16.7,
+        "max": 16.8,
+        "over16ms": 1,
+        "over50ms": 0
+      },
+      "zoomFrameMs": {
+        "n": 71,
+        "p50": 16.7,
+        "p95": 16.7,
+        "max": 16.8,
+        "over16ms": 2,
+        "over50ms": 0
+      },
+      "hideShowFrameMs": {
+        "n": 54,
+        "p50": 16.7,
+        "p95": 16.7,
+        "max": 16.8,
+        "over16ms": 1,
+        "over50ms": 0
+      },
+      "afterEditing": {
+        "rounds": 150,
+        "heapMB": 14.5,
+        "domNodes": 10311,
+        "svgElements": 10016,
+        "mapNodes": 2001,
+        "detachedHint": "detached ノード数は heap snapshot が要るのでここでは測れない"
+      },
+      "consoleErrors": []
+    },
+    {
+      "fixture": "mixed",
+      "inputChars": 191883,
+      "wallClockToFirstNodeMs": 491,
+      "boot": {
+        "firstMapPaint": 401,
+        "paints": {
+          "first-paint": 36,
+          "first-contentful-paint": 36
+        },
+        "domInteractive": 12,
+        "domContentLoaded": 401,
+        "loadEventEnd": 450,
+        "longtasks": [
+          [
+            55,
+            345
+          ]
+        ],
+        "mapNodes": 5000,
+        "svgElements": 26051,
+        "domNodes": 26267,
+        "heapMB": 28
+      },
+      "inputLatencyMs": {
+        "n": 40,
+        "p50": 44.2,
+        "p95": 73.9,
+        "max": 82.6,
+        "samples": 40,
+        "typed": 40
+      },
+      "mapMutationsWhileTyping": 3,
+      "panFrameMs": {
+        "n": 71,
+        "p50": 16.7,
+        "p95": 16.7,
+        "max": 16.8,
+        "over16ms": 2,
+        "over50ms": 0
+      },
+      "zoomFrameMs": {
+        "n": 72,
+        "p50": 16.7,
+        "p95": 16.7,
+        "max": 16.8,
+        "over16ms": 3,
+        "over50ms": 0
+      },
+      "hideShowFrameMs": {
+        "n": 54,
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 16.8,
+        "over16ms": 6,
+        "over50ms": 0
+      },
+      "afterEditing": {
+        "rounds": 150,
+        "heapMB": 28,
+        "domNodes": 26318,
+        "svgElements": 26051,
+        "mapNodes": 5000,
+        "detachedHint": "detached ノード数は heap snapshot が要るのでここでは測れない"
+      },
+      "consoleErrors": []
+    },
+    {
+      "fixture": "fat",
+      "inputChars": 10039,
+      "wallClockToFirstNodeMs": 144,
+      "boot": {
+        "firstMapPaint": 121,
+        "paints": {
+          "first-paint": 36,
+          "first-contentful-paint": 36
+        },
+        "domInteractive": 6,
+        "domContentLoaded": 121,
+        "loadEventEnd": 127,
+        "longtasks": [
+          [
+            52,
+            69
+          ]
+        ],
+        "mapNodes": 3,
+        "svgElements": 26,
+        "domNodes": 168,
+        "heapMB": 10.1
+      },
+      "inputLatencyMs": {
+        "n": 40,
+        "p50": 3.7,
+        "p95": 16.1,
+        "max": 16.4,
+        "samples": 40,
+        "typed": 40
+      },
+      "mapMutationsWhileTyping": 3,
+      "panFrameMs": {
+        "n": 71,
+        "p50": 16.7,
+        "p95": 16.7,
+        "max": 16.7,
+        "over16ms": 0,
+        "over50ms": 0
+      },
+      "zoomFrameMs": {
+        "n": 71,
+        "p50": 16.7,
+        "p95": 16.7,
+        "max": 16.7,
+        "over16ms": 0,
+        "over50ms": 0
+      },
+      "hideShowFrameMs": {
+        "n": 54,
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 16.8,
+        "over16ms": 3,
+        "over50ms": 0
+      },
+      "afterEditing": {
+        "rounds": 150,
+        "heapMB": 10.1,
+        "domNodes": 191,
+        "svgElements": 26,
+        "mapNodes": 3,
+        "detachedHint": "detached ノード数は heap snapshot が要るのでここでは測れない"
+      },
+      "consoleErrors": []
+    }
+  ]
+}

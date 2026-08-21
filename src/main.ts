@@ -1,0 +1,763 @@
+// Orchestrator: single document model lives in the MoonBit core; both panes
+// mirror it (spec 4.2). Selection, focus, persistence and file I/O live
+// here, along with the glue that pure decision logic elsewhere (app/paste,
+// app/name, app/externalChange...) doesn't own: clipboard-paste dispatch,
+// drag & drop image path resolution, and the global keyboard shortcuts.
+
+// style.css は index.html の <link> で読む（FOUC を避けるため head 側）
+import { core, type EditOp, type NodeInfo, type Snapshot } from "./coreApi";
+import { MdEditor } from "./editor";
+import { MindMap, type MapHost } from "./mindmap";
+import { io, type Doc, type DocChange } from "./app/io";
+import { initAssets, mdPath } from "./app/assets";
+import { initExport } from "./app/export";
+import { initPanes } from "./app/panes";
+import { deriveName } from "./app/name";
+import { initTheme } from "./app/theme";
+import { load, store } from "./app/persist";
+import { decideExternalChange } from "./app/externalChange";
+import { decidePaste } from "./app/paste";
+import { showCodePopup, showDrawPopup, showLinkPopup } from "./popup";
+
+const $ = <T extends HTMLElement>(id: string): T => {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`missing element #${id}`);
+  return el as T;
+};
+
+const mdPane = $("md-pane");
+const mapPane = $("map-pane");
+const btnNew = $<HTMLButtonElement>("btn-new");
+const btnOpen = $<HTMLButtonElement>("btn-open");
+const btnSave = $<HTMLButtonElement>("btn-save");
+const btnUndo = $<HTMLButtonElement>("btn-undo");
+const btnRedo = $<HTMLButtonElement>("btn-redo");
+const elFilename = $("filename");
+const elDirty = $("dirty");
+const elLogo = $("logo");
+
+// ---------- app state ----------
+
+let nodes: NodeInfo[] = [];
+let byId = new Map<number, NodeInfo>();
+let selection = new Set<number>();
+let anchorId = -1;
+let sessionN = 0;
+/** loadText を呼ぶたびに進む世代番号。起動時の前回ファイル読み込みが、
+ * その間に New/Open/Drop で別の(空の)文書を開いていた場合まで
+ * 上書きしてしまわないためのガード。 */
+let docGen = 0;
+let savedText = "";
+/**
+ * 保存済みのファイル名。まだ保存していない文書では null で、名前は本文の
+ * 見出しから導出する（app/name.ts）。「無題」という状態は持たない。
+ * 実ファイルのパスは Rust 本体が持ち、ここは表示名だけを鏡写しにする。
+ */
+let savedName: string | null = null;
+
+
+// ---------- sync ----------
+
+type Origin = "cm" | "map" | "core" | "load";
+
+function applySnap(snap: Snapshot, origin: Origin): void {
+  nodes = snap.nodes;
+  byId = new Map(nodes.map((n) => [n.id, n]));
+  if (origin !== "cm" && origin !== "load") editor.applySets(snap.editSets);
+  // prune selection to surviving nodes
+  let selChanged = false;
+  for (const id of [...selection]) {
+    if (!byId.has(id)) {
+      selection.delete(id);
+      selChanged = true;
+    }
+  }
+  if (anchorId !== -1 && !byId.has(anchorId)) {
+    anchorId = selection.size ? [...selection][selection.size - 1] : -1;
+    selChanged = true;
+  }
+  // structural edits from elsewhere invalidate the typing-merge chain
+  if (origin !== "cm") editKind = "";
+  map.render();
+  if (selChanged) syncSelectionViews(false);
+  btnUndo.disabled = !snap.canUndo;
+  btnRedo.disabled = !snap.canRedo;
+  updateDirty();
+  showName();
+}
+
+function updateDirty(): void {
+  elDirty.hidden = core.getText() === savedText;
+}
+
+/** いまの文書の名前。保存済みならそのファイル名、まだなら本文から導く */
+function docName(): string {
+  return savedName ?? `${deriveName(nodes)}.md`;
+}
+
+/**
+ * 名乗りを出し直す。本文を打つそばからタイトルが変わる。
+ * タブは名前を持つ文書のときだけ名乗る（`filename.md - mmm`）。
+ * まっさらな文書に `empty.md` と名乗らせても何も伝わらない。
+ */
+function showName(): void {
+  const name = savedName ?? (nodes.length ? docName() : null);
+  document.title = name === null ? "mmm" : `${name} - mmm`;
+  // ファイル名欄は flash 中だけ別のことを言っている。終わったら戻る
+  if (flashTimer === -1) elFilename.textContent = docName();
+}
+
+function syncSelectionViews(reveal: boolean): void {
+  map.refreshSelection();
+  editor.highlight(
+    [...selection]
+      .map((id) => byId.get(id))
+      .filter((n): n is NodeInfo => !!n)
+      .map((n) => ({ from: n.hs, to: n.subEnd })),
+  );
+  if (reveal && anchorId !== -1) {
+    const n = byId.get(anchorId);
+    if (n) editor.reveal(n.hs);
+  }
+}
+
+function setSelection(ids: number[], anchor: number, reveal = true): void {
+  selection = new Set(ids);
+  anchorId = anchor;
+  syncSelectionViews(reveal);
+}
+
+/** Run a structural command; optionally focus / edit the resulting node. */
+function runCmd(
+  fn: () => Snapshot,
+  opts: { edit?: { tag: string } } = {},
+): void {
+  const snap = fn();
+  applySnap(snap, "map");
+  if (snap.focus !== -1 && byId.has(snap.focus)) {
+    setSelection([snap.focus], snap.focus);
+    map.ensureVisible(snap.focus);
+    if (opts.edit) map.beginEdit(snap.focus, opts.edit.tag);
+  }
+}
+
+// ---------- markdown pane -> core ----------
+
+let editTag = "";
+let editKind = "";
+let editPos = -1;
+
+function onUserEdits(edits: EditOp[], userEvent: string): void {
+  if (userEvent === "compose.end") {
+    editKind = ""; // next edit (compose or not) starts a fresh undo entry
+    return;
+  }
+  let tag = "";
+  if (userEvent === "input.type.compose") {
+    // IME: every composition update replaces the previous candidate text;
+    // keep ONE tag for the whole composition so undo treats it as one edit
+    if (editKind !== "compose") {
+      editTag = `t${++sessionN}`;
+      editKind = "compose";
+    }
+    tag = editTag;
+  } else if (edits.length === 1) {
+    const e = edits[0];
+    const pureInsert = e.from === e.to && e.insert.length > 0;
+    const pureDelete = e.insert === "" && e.to > e.from;
+    if (userEvent === "input.type" && pureInsert) {
+      if (editKind === "type" && e.from === editPos) {
+        tag = editTag;
+      } else {
+        tag = `t${++sessionN}`;
+      }
+      editKind = "type";
+      editTag = tag;
+      editPos = e.from + e.insert.length;
+    } else if (userEvent === "delete.backward" && pureDelete) {
+      if (editKind === "del" && e.to === editPos) {
+        tag = editTag;
+      } else {
+        tag = `t${++sessionN}`;
+      }
+      editKind = "del";
+      editTag = tag;
+      editPos = e.from;
+    } else {
+      editKind = "";
+    }
+  } else {
+    editKind = "";
+    tag = `t${++sessionN}`; // multi-cursor transaction: one undo entry
+  }
+  let delta = 0;
+  let snap: Snapshot | null = null;
+  for (const e of edits) {
+    snap = core.replaceText(e.from + delta, e.to + delta, e.insert, tag);
+    delta += e.insert.length - (e.to - e.from);
+  }
+  if (snap) applySnap(snap, "cm");
+}
+
+// ---------- mindmap host ----------
+
+const host: MapHost = {
+  nodes: () => nodes,
+  docText: () => core.getText(),
+  selection: () => selection,
+  anchor: () => anchorId,
+  setSelection: (ids, anchor, reveal) => setSelection(ids, anchor, reveal),
+  clearSelection: () => setSelection([], -1, false),
+
+  addChild(id) {
+    if (!byId.has(id)) return;
+    const tag = `s${++sessionN}`;
+    runCmd(() => core.addChild(id, tag), { edit: { tag } });
+  },
+  addSibling(id) {
+    if (!byId.has(id)) return;
+    const tag = `s${++sessionN}`;
+    runCmd(() => core.addSibling(id, tag), { edit: { tag } });
+  },
+  addSiblingBefore(id) {
+    if (!byId.has(id)) return;
+    const tag = `s${++sessionN}`;
+    runCmd(() => core.addSiblingBefore(id, tag), { edit: { tag } });
+  },
+  addParent(id) {
+    if (!byId.has(id)) return;
+    const tag = `s${++sessionN}`;
+    runCmd(() => core.addParent(id, tag), { edit: { tag } });
+  },
+  addRoot() {
+    const tag = `s${++sessionN}`;
+    runCmd(() => core.addRoot(tag), { edit: { tag } });
+  },
+  addSideEnd(left) {
+    const tag = `s${++sessionN}`;
+    runCmd(() => core.addSideEnd(left, tag), { edit: { tag } });
+  },
+  rename(id, label, tag) {
+    applySnap(core.renameNode(id, label, tag), "map");
+    // md ペイン側のハイライトは選択の範囲で描いている。ラベルの長さが
+    // 変わると範囲がずれるので、貼り直す
+    syncSelectionViews(false);
+  },
+  commitEdit() {
+    if (!map.isEditing()) return;
+    const id = map.editingId;
+    map.endEdit();
+    if (byId.has(id)) setSelection([id], id);
+  },
+  deleteSelection() {
+    if (selection.size === 0) return;
+    const snap = core.deleteNodes([...selection]);
+    applySnap(snap, "map");
+    if (snap.focus !== -1 && byId.has(snap.focus)) {
+      setSelection([snap.focus], snap.focus);
+      // 他のコマンドは runCmd 経由でここまでやる。削除だけ落ちていたので、
+      // 画面外のノードを消すと選択が画面外に置き去りになっていた
+      map.ensureVisible(snap.focus);
+    } else {
+      setSelection([], -1, false);
+    }
+  },
+  indentSelection() {
+    if (selection.size === 0) return;
+    applySnap(core.indentNodes([...selection]), "map");
+    syncSelectionViews(false);
+  },
+  outdentSelection() {
+    if (selection.size === 0) return;
+    applySnap(core.outdentNodes([...selection]), "map");
+    syncSelectionViews(false);
+  },
+  reorder(id, dir) {
+    runCmd(() => core.reorderNode(id, dir));
+  },
+  toggleHidden(id) {
+    runCmd(() => core.toggleHidden(id));
+  },
+  move(ids, target, pos, side) {
+    // pos 3 = A→B の線に落とした: ids が B の親になるよう割り込む
+    // pos 4 = ルート脇ゾーンに落とした: その側の末尾へ
+    //   （左が空のときだけコアが `---` を 1 本書く）
+    runCmd(() =>
+      pos === 3
+        ? core.moveAsParent(ids, target)
+        : pos === 4
+          ? core.moveSideEnd(ids, side === -1)
+          : core.moveNodes(ids, target, pos),
+    );
+  },
+  copySelection(cut) {
+    if (selection.size === 0) return;
+    const text = core.selectionText([...selection]);
+    void navigator.clipboard.writeText(text).catch(() => {});
+    if (cut) host.deleteSelection();
+  },
+  paste() {
+    // paste as CHILD of the focused node (mmm.md 課題); into an empty
+    // document the clip is inserted verbatim
+    if (anchorId === -1 && nodes.length > 0) return;
+    void (async () => {
+      // an image on the clipboard wins over text (mmm.md そのに: 画像配置)
+      //
+      // try で囲うのは**クリップボードを読むところだけ**。画像を置く処理まで
+      // 囲うと、フォルダ選択の失敗が「クリップボードが読めなかった」と
+      // 同じ扱いになり、黙ってテキスト経路へ落ちてしまう
+      let img: Blob | null = null;
+      try {
+        if (anchorId !== -1 && "read" in navigator.clipboard) {
+          for (const item of await navigator.clipboard.read()) {
+            const t = item.types.find((x) => x.startsWith("image/"));
+            if (t) {
+              img = await item.getType(t);
+              break;
+            }
+          }
+        }
+      } catch {
+        /* clipboard.read unavailable/denied → try the text path */
+      }
+      if (img) {
+        await pasteImage(img);
+        return;
+      }
+      const clip = await navigator.clipboard.readText();
+      const n0 = anchorId !== -1 ? (byId.get(anchorId) ?? null) : null;
+      if (anchorId !== -1 && !n0) return;
+      // 何を貼るか(URL/子ノード/子ツリー)の判定は app/paste.ts の純粋関数。
+      // ここは clipboard の I/O と、結果を core へ適用する側だけを持つ
+      const action = decidePaste(
+        clip,
+        n0 ? { rawDepth: n0.rawDepth } : null,
+        nodes.length > 0,
+      );
+      switch (action.kind) {
+        case "noop":
+          return;
+        case "link":
+          insertContentLine(anchorId, action.url);
+          return;
+        case "rootTree": {
+          // 空の文書: 先頭行をルート、残りをその子として立てる
+          const t0 = core.getText();
+          const pre = t0 === "" ? "" : t0.endsWith("\n") ? "\n" : "\n\n";
+          applySnap(
+            core.replaceText(t0.length, t0.length, pre + action.body + "\n", ""),
+            "map",
+          );
+          return;
+        }
+        case "children":
+          insertBlock(n0!.subEnd, action.body);
+          return;
+        case "block": {
+          const at = anchorId === -1 ? core.getText().length : n0!.subEnd;
+          insertBlock(at, action.body);
+          return;
+        }
+      }
+    })().catch(() => {});
+  },
+  imageUrl: (path) => assets.imageUrl(path),
+  addLink(id) {
+    if (!byId.has(id)) return;
+    void showLinkPopup().then((r) => {
+      if (r && byId.has(id)) {
+        insertContentLine(id, r.title === "" ? r.url : `[${r.title}](${r.url})`);
+      }
+      mapPane.focus();
+    });
+  },
+  addCode(id) {
+    if (!byId.has(id)) return;
+    void showCodePopup().then((r) => {
+      if (r && byId.has(id)) {
+        // a block that itself contains ``` gets a longer fence
+        const fence = r.code.includes("```") ? "````" : "```";
+        insertContentLine(id, `${fence}${r.lang}\n${r.code}\n${fence}`);
+      }
+      mapPane.focus();
+    });
+  },
+  addDrawing(id) {
+    if (!byId.has(id)) return;
+    void showDrawPopup().then(async (blob) => {
+      if (blob && byId.has(id)) {
+        const rel = await assets.saveToDisk(blob);
+        if (rel !== null && byId.has(id)) {
+          insertContentLine(id, `![](${rel})`);
+        }
+      }
+      mapPane.focus();
+    });
+  },
+  editRequested(id) {
+    if (!byId.has(id)) return;
+    setSelection([id], id);
+    const tag = `s${++sessionN}`;
+    map.beginEdit(id, tag);
+  },
+  undo: () => doUndo(),
+  redo: () => doRedo(),
+};
+
+// ---------- boot panes ----------
+
+const editor = new MdEditor(mdPane, onUserEdits);
+const map = new MindMap(mapPane, host);
+
+// ---------- 改行の正規化 (F-010) ----------
+//
+// アプリの中では常に LF に統一する。CodeMirror は読み込んだ文書の改行を
+// 内部で LF に正規化し、コアは受け取ったバイト列をそのまま持つ。両者に
+// 別々の改行を渡すと、CodeMirror が出す LF 基準のオフセットがコア側でずれ、
+// **打鍵が見当違いの位置に書き込まれて表示と保存内容が乖離する**。
+// 元の改行（CRLF）はネイティブ本体が読み書きの端で吸収するので、UI は
+// LF だけを見ていればよい。
+
+function loadText(text: string, name: string | null): void {
+  docGen++;
+  savedName = name;
+  assets.clear(); // image paths are relative to the (new) md
+  setSelection([], -1, false);
+  const snap = core.initDoc(text);
+  editor.setText(text);
+  applySnap(snap, "load"); // 名乗りもここで出る
+  map.fitView();
+}
+
+// ---------- undo / redo ----------
+
+function doUndo(): void {
+  applySnap(core.undo(), "core");
+  syncSelectionViews(false);
+}
+function doRedo(): void {
+  applySnap(core.redo(), "core");
+  syncSelectionViews(false);
+}
+btnUndo.addEventListener("click", doUndo);
+btnRedo.addEventListener("click", doRedo);
+
+// ---------- file I/O ----------
+
+/** 開いた文書を UI に載せる。パスは Rust が持つので、名前だけ受け取る。 */
+function applyDoc(doc: Doc): void {
+  savedText = doc.text;
+  loadText(doc.text, doc.name);
+}
+
+async function openFile(): Promise<void> {
+  try {
+    if (!(await confirmDiscard())) return;
+    const doc = await io.openDialog();
+    if (doc) applyDoc(doc);
+  } catch (err) {
+    console.error("open failed:", err);
+    flashFilename("読み込み失敗");
+  }
+}
+
+/**
+ * 保存。`asNew`（別名で保存）と、まだ名前の無い文書はダイアログを出す。
+ * ダイアログの初期値はいまの名前 — 保存済みならそのファイル名、まだなら
+ * 本文から導いたもの（app/name.ts）。改行の復元と temp→rename の
+ * アトミック書き込みはネイティブ本体（Rust）が担う。
+ */
+async function saveFile(asNew = false): Promise<void> {
+  const text = core.getText();
+  try {
+    if (asNew || savedName === null) {
+      const doc = await io.saveAs(docName(), text);
+      if (!doc) return; // キャンセル
+      savedName = doc.name; // ここで初めて名前が決まる
+      showName();
+    } else {
+      await io.save(text);
+    }
+    savedText = text;
+    updateDirty();
+  } catch (err) {
+    // パスを見失っていたら別名保存へ（通常はここに来ない）
+    if (err === "no-path") {
+      void saveFile(true);
+      return;
+    }
+    // 自分でキャンセルしたときは null が返るのでここには来ない。本当の失敗
+    // （文字コードで表せない・ロック・権限・容量）は黙ってはいけない。
+    // Rust の Err 文字列はそのまま出す（「Shift_JIS で表せない文字が…」等）
+    console.error("save failed:", err);
+    flashFilename(typeof err === "string" ? err : "保存失敗");
+  }
+}
+
+let flashTimer = -1;
+function flashFilename(msg: string, isError = true): void {
+  elFilename.textContent = `${docName()} \u2014 ${msg}`;
+  elFilename.classList.toggle("error", isError);
+  if (flashTimer !== -1) window.clearTimeout(flashTimer);
+  flashTimer = window.setTimeout(() => {
+    flashTimer = -1;
+    elFilename.classList.remove("error");
+    showName();
+  }, 4000);
+}
+
+/**
+ * 新しい文書。いまの文書は捨て、ネイティブ本体のパスと監視も手放す
+ * （残すと、未保存の新規文書に貼った画像が前の文書の隣に置かれる）。
+ */
+async function newFile(): Promise<void> {
+  try {
+    if (!(await confirmDiscard())) return;
+    await io.close();
+    savedText = "";
+    loadText("", null);
+    mapPane.focus();
+  } catch (err) {
+    console.error("new file failed:", err);
+    flashFilename("新規作成に失敗しました");
+  }
+}
+
+/**
+ * ディスク側が外部で変わったとき（別のエディタ・git など）。
+ * 自分の保存はネイティブ本体がハッシュ照合で弾くので、ここに来るのは本物の
+ * 外部変更だけ。未編集なら黙って追従し、編集中なら勝手に捨てず知らせるに留める。
+ */
+function onExternalChange(d: DocChange): void {
+  if (decideExternalChange(core.getText(), savedText) === "reload") {
+    savedText = d.text;
+    loadText(d.text, savedName);
+  } else {
+    flashFilename("ファイルが外部で変更されました（保存で上書き）");
+  }
+}
+
+async function confirmDiscard(): Promise<boolean> {
+  if (core.getText() === savedText) return true;
+  return io.confirm("未保存の変更があります。破棄して続行しますか？");
+}
+
+// ---------- images (mmm.md そのに: 画像配置 — local-first) ----------
+// 実装は app/assets.ts。ここは「いまのファイル」と描き直しを繋ぐだけ
+
+const assets = initAssets({
+  hasFile: () => savedName !== null,
+  warn: (m) => flashFilename(m),
+  refresh: () => map.render(),
+});
+
+/**
+ * `body` を独立した段落として `at` へ挿し込む。前後に必要なだけ空行を足し
+ * (直前が改行 0/1/2 個かで prefix を出し分け、直後が文書末でなければ改行
+ * 1 個を足す)、1 つの Snapshot として適用する。
+ */
+function insertBlock(at: number, body: string, tag = ""): void {
+  const text = core.getText();
+  let prefix = "";
+  if (at > 0 && text[at - 1] !== "\n") prefix = "\n\n";
+  else if (at >= 2 && text[at - 2] !== "\n") prefix = "\n";
+  const suffix = at !== text.length ? "\n" : "";
+  applySnap(core.replaceText(at, at, prefix + body + "\n" + suffix, tag), "map");
+}
+
+/** Append a line at the END of a node's own attached content (before its
+ * first child heading), as one undo entry. */
+function insertContentLine(id: number, line: string, tag = ""): void {
+  const n = byId.get(id);
+  if (!n) return;
+  const i = nodes.indexOf(n);
+  const at =
+    i + 1 < nodes.length && nodes[i + 1].hs < n.subEnd
+      ? nodes[i + 1].hs
+      : n.subEnd;
+  insertBlock(at, line, tag);
+}
+
+async function pasteImage(blob: Blob): Promise<void> {
+  const targetId = anchorId;
+  if (!byId.has(targetId)) return;
+  const rel = await assets.saveToDisk(blob);
+  if (rel !== null && byId.has(targetId)) {
+    insertContentLine(targetId, `![](${rel})`);
+  }
+}
+
+btnNew.addEventListener("click", () => void newFile());
+btnOpen.addEventListener("click", () => void openFile());
+btnSave.addEventListener("click", () => void saveFile());
+
+// 閉じたら未保存ぶんは戻らない（控えを持たない）。ここが唯一の防波堤。
+io.onCloseRequest(
+  () => core.getText() !== savedText,
+  "未保存の変更があります。破棄して終了しますか？",
+).catch((e) => flashFilename(`閉じる確認を登録できません: ${e}`));
+
+// ---------- drag & drop ----------
+//
+// ネイティブの D&D はファイルの**実パス**を渡す（ブラウザの File 中身ではなく）。
+// so md はパスで開き、画像は Rust に「複製せず指す / 複製する」を委ねられる。
+
+const IMG_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
+const MD_RE = /\.(md|markdown|txt)$/i;
+
+/** 落とされた画像 1 枚をノードへ。既に近くにあれば複製せず指す。 */
+async function dropImage(abs: string, id: number, tag: string): Promise<void> {
+  if (!byId.has(id)) return;
+  let rel = await io.relativize(abs);
+  // md の木の外（../ で出る・別ドライブ）なら、木の中へ複製する
+  if (rel === null || rel.startsWith("..")) {
+    const name = abs.split(/[\\/]/).pop() ?? "image";
+    try {
+      rel = await io.importImage(abs, name);
+    } catch (err) {
+      console.error("import image failed:", err);
+      flashFilename("画像を貼れませんでした");
+      return;
+    }
+  }
+  if (byId.has(id)) insertContentLine(id, `![](${mdPath(rel)})`, tag);
+}
+
+io.onDrop((p) => {
+  const md = p.paths.find((x) => MD_RE.test(x));
+  if (md) {
+    void (async () => {
+      if (!(await confirmDiscard())) return;
+      applyDoc(await io.openPath(md));
+    })().catch((err) => {
+      console.error("drop open failed:", err);
+      flashFilename("読み込み失敗");
+    });
+    return;
+  }
+  const imgs = p.paths.filter((x) => IMG_RE.test(x));
+  if (imgs.length === 0) return;
+  if (savedName === null) {
+    flashFilename("画像を貼るには先にファイルを保存してください");
+    return;
+  }
+  // 宛先はカーソルの下のノード。物理座標を CSS 座標へ均してから当てる
+  const dpr = window.devicePixelRatio || 1;
+  const id = map.nodeAt(p.position.x / dpr, p.position.y / dpr);
+  if (!byId.has(id)) {
+    flashFilename("画像はノードの上に落としてください");
+    return;
+  }
+  const tag = `d${++sessionN}`; // 何枚落としても Undo は 1 回
+  void (async () => {
+    for (const abs of imgs) await dropImage(abs, id, tag);
+  })().catch((err) => {
+    console.error("drop image failed:", err);
+    flashFilename("画像を貼れませんでした");
+  });
+}).catch((e) => flashFilename(`ドロップの監視を登録できません: ${e}`));
+
+// ---------- global shortcuts ----------
+
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
+    // モーダル（ポップアップ）が開いている間は引っ込む。この listener は
+    // capture なので、popup 側の stopPropagation では止められない —
+    // 裏の文書に Mod+Z が当たって、見えないところで undo されていた
+    if (document.querySelector(".popup-overlay")) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (!mod) return;
+    const key = e.key.toLowerCase();
+    if (key === "s") {
+      e.preventDefault();
+      void saveFile(e.shiftKey); // Shift = 別名で保存
+    } else if (key === "n" && e.altKey) {
+      // `Mod+N` はブラウザの「新規ウィンドウ」に吸われてページまで来ない
+      e.preventDefault();
+      void newFile();
+    } else if (key === "o") {
+      // in the map pane (incl. its label editor) Mod+O belongs to the map
+      // (the map consumes o/O regardless of Mod so this never fires there)
+      if (mapPane.contains(document.activeElement)) return;
+      e.preventDefault();
+      void openFile();
+    } else if (key === "/") {
+      e.preventDefault();
+      togglePane();
+    } else if (key === "z" || key === "y") {
+      if (map.isEditing()) return; // native input undo while label editing
+      e.preventDefault();
+      e.stopPropagation();
+      if (key === "y" || e.shiftKey) doRedo();
+      else doUndo();
+    }
+  },
+  { capture: true },
+);
+
+// ---------- pane / splitter / export / theme（実装は app/ 配下） ----------
+
+const { togglePane } = initPanes({
+  mdPane,
+  mapPane,
+  panesEl: $("panes"),
+  splitter: $("splitter"),
+  mdButton: $<HTMLButtonElement>("btn-view-md"),
+  mapButton: $<HTMLButtonElement>("btn-view-map"),
+  focusEditor: () => editor.focus(),
+});
+initExport({
+  map,
+  name: () => docName(),
+  notify: (msg, isError = true) => flashFilename(msg, isError),
+});
+initTheme({
+  logo: elLogo,
+  themeButton: $<HTMLButtonElement>("btn-theme"),
+  setEditorTheme: (dark) => editor.setTheme(dark),
+});
+
+// ---------- boot ----------
+
+// **本文の控えは持たない** — 持てば .md と二重の真実になる。覚えているのは
+// ファイルへの指し示しだけで、それはネイティブ本体（Rust）が app-config に
+// 持ち、起動時にディスクから読み直す。外部変更・削除もあちらが見張る。
+{
+  // この仕組みより前のセッションが置いていった localStorage を片付ける。
+  // 一度片付ければ二度と残っていないので、移行後の全起動で走らせ続けない
+  // ように 1 回きりの印を立てる。
+  const MIGRATED = "mmm.migrated";
+  if (load(MIGRATED) === null) {
+    for (const k of ["mmm.text", "mmm.savedText", "mmm.fileName", "mmm.eol", "mmm.panes", "mmm.edgeTune", "mmm.folderQuiet"]) {
+      try {
+        localStorage.removeItem(k);
+      } catch {
+        /* ignore */
+      }
+    }
+    store(MIGRATED, "1");
+  }
+  loadText("", null); // 空 = まだ何も無い。dirty も立たない
+  const bootGen = docGen;
+  void io
+    .startupDoc()
+    .then((doc) => {
+      // 読み終わるまでに打ち始めていたら、それを消してまで開かない。
+      // 同じ理由で、その間に New/Open/Drop で別の文書を開いていた場合も
+      // （それが空文書でも）上書きしない — その操作は必ず loadText を通るので
+      // docGen が進んでいるはず
+      if (doc && docGen === bootGen && core.getText() === "") applyDoc(doc);
+    })
+    .catch(() => {
+      flashFilename("前回のファイルを開けませんでした");
+    });
+  void io
+    .onDocChanged(onExternalChange)
+    .catch((e) => flashFilename(`外部変更の監視を登録できません: ${e}`));
+  void io
+    .onDocRemoved(() => flashFilename("ファイルが外部で削除されました"))
+    .catch((e) => flashFilename(`外部削除の監視を登録できません: ${e}`));
+}
+mapPane.focus();

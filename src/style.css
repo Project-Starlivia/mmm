@@ -1,0 +1,387 @@
+:root {
+  color-scheme: dark;
+  --bg: #15171c;
+  --panel: #1b1e24;
+  --ink: #dde2e9;
+  --ink-dim: #828a96;
+  --line: #2a2f38;
+  --accent: #5932ff;
+  --accent-soft: rgba(89, 50, 255, 0.2);
+  --node-bg: #232830;
+  --node-border: #3b424d;
+  --node-border-strong: #5d6673;
+  --edge: #4d5563;
+  --dot: #262b33;
+  --font: "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+  --mono: Consolas, "SF Mono", "Cascadia Code", Menlo, monospace;
+}
+
+:root.light {
+  color-scheme: light;
+  --bg: #f3f4f6;
+  --panel: #ffffff;
+  --ink: #1f2328;
+  --ink-dim: #6b7280;
+  --line: #e2e5ea;
+  --accent-soft: rgba(89, 50, 255, 0.12);
+  --node-bg: #ffffff;
+  --node-border: #cfd5dd;
+  --node-border-strong: #9aa4b1;
+  --edge: #b6bec9;
+  --dot: #dde1e7;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  user-select: none;
+  flex: none;
+}
+#logo {
+  width: 22px;
+  height: 22px;
+  display: block;
+  color: var(--accent);
+  cursor: pointer;
+}
+#logo:hover { filter: brightness(1.25); }
+#filename { color: var(--ink-dim); font-size: 13px; }
+#filename.error { color: #e5534b; }
+#dirty { color: var(--accent); font-size: 10px; }
+.spacer { flex: 1; }
+.sep { width: 1px; height: 18px; background: var(--line); }
+#topbar button {
+  font: inherit;
+  font-size: 13px;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+}
+#topbar button:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); }
+#topbar button:disabled { opacity: 0.4; cursor: default; }
+
+#panes { display: flex; flex: 1; min-height: 0; }
+.pane-off { display: none !important; }
+/* エクスポートの隣に置くコピー用の小ボタン（mmm.md その３:
+   export だけじゃなくコピーもほしい。Shift+クリックの隠し操作をやめる） */
+#topbar button.mini {
+  padding: 3px 6px;
+  margin-left: -6px;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+#topbar button.mini:hover:not(:disabled) { color: var(--ink); }
+
+/* トグルボタンは押されているかが見た目で分かること（mmm.md その３）。
+   ON = アクセント色で塗って枠を立てる / OFF = 沈んだ空枠 + 取り消し線 */
+#topbar button.toggle {
+  position: relative;
+  padding-left: 22px;
+}
+#topbar button.toggle::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 2px;
+  border: 1px solid var(--node-border-strong);
+  background: transparent;
+}
+#topbar button.toggle.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--ink);
+}
+#topbar button.toggle.on::before {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+#topbar button.toggle.off {
+  opacity: 0.6;
+  color: var(--ink-dim);
+  text-decoration: line-through;
+}
+
+#md-pane { flex: 0 0 var(--md-width, 42%); min-width: 200px; background: var(--panel); }
+#panes.no-map #md-pane { flex: 1; }
+#md-pane .cm-editor { height: 100%; font-size: 13.5px; }
+#md-pane .cm-editor.cm-focused { outline: none; }
+#md-pane .cm-scroller { font-family: var(--mono); line-height: 1.55; }
+#md-pane .cm-gutters { background: var(--panel); border-right: 1px solid var(--line); color: var(--ink-dim); }
+.cm-mmm-selected { background: var(--accent-soft); }
+
+#splitter {
+  flex: none;
+  width: 5px;
+  cursor: col-resize;
+  background: var(--line);
+  transition: background 0.15s;
+}
+#splitter:hover, #splitter.dragging { background: var(--accent); }
+
+#map-pane {
+  flex: 1;
+  min-width: 200px;
+  position: relative;
+  overflow: hidden;
+  outline: none;
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, var(--dot) 1px, transparent 1px);
+}
+#map-pane.pane-focused { box-shadow: inset 0 0 0 2px var(--accent-soft); }
+
+#map-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.edge {
+  fill: none;
+  stroke: var(--edge);
+  stroke-width: 1.7; /* mindmap.ts の render() が EDGE.width で毎回上書きする */
+  stroke-linecap: round;
+}
+
+.node rect.box {
+  fill: var(--node-bg);
+  stroke: var(--node-border);
+  stroke-width: 1.2;
+  rx: 8;
+}
+.node.root rect.box { stroke-width: 2; stroke: var(--node-border-strong); }
+.node text {
+  font-family: var(--font);
+  dominant-baseline: central;
+  user-select: none;
+}
+.node text.label {
+  /* font-size は mindmap.ts の rowOf() が属性で入れる（数字を2箇所に置かない） */
+  fill: var(--ink);
+  white-space: pre;
+}
+.node text.label.empty { fill: var(--ink-dim); }
+.node line.card-sep { stroke: var(--node-border); stroke-width: 1; }
+.node text.link-row {
+  font-size: 12px;
+  fill: var(--accent);
+}
+.node text.link-open {
+  font-size: 13px;
+  fill: var(--ink-dim);
+  cursor: pointer;
+}
+.node text.link-open:hover { fill: var(--accent); }
+.node image { pointer-events: none; }
+.node rect.img-ph {
+  fill: transparent;
+  stroke: var(--node-border);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.node text.img-name {
+  font-size: 11px;
+  fill: var(--ink-dim);
+}
+/* ---------- popups (code / drawing / link) ---------- */
+
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+}
+.popup {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  min-width: 380px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.popup-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.popup-body { display: flex; flex-direction: column; gap: 10px; }
+.popup-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-dim); }
+.popup-field input[type="text"],
+.popup-field textarea {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  outline: none;
+  min-width: 340px;
+}
+.popup-field textarea { font-family: var(--mono); resize: vertical; }
+.popup-field input:focus, .popup-field textarea:focus { border-color: var(--accent); }
+.popup-suffixed { display: flex; align-items: center; gap: 8px; }
+.popup-suffixed input[type="text"] { flex: 1; min-width: 300px; }
+.popup-suffix { font-size: 13px; color: var(--ink-dim); white-space: nowrap; }
+.popup-toolbar { display: flex; align-items: center; gap: 10px; }
+.popup-canvas {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: crosshair;
+  touch-action: none;
+  background: #fff;
+}
+.popup-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.popup-hint { flex: 1; font-size: 11px; color: var(--ink-dim); }
+.popup button, .popup-toolbar button {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+}
+.popup button:hover { background: var(--accent-soft); border-color: var(--accent); }
+.popup button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.node rect.code-bg { fill: var(--bg); stroke: var(--node-border); stroke-width: 1; }
+.node text.code-line {
+  font-family: "Cascadia Code", Consolas, "JetBrains Mono", monospace;
+  font-size: 11px;
+  fill: var(--ink);
+  white-space: pre;
+}
+.node.selected rect.box {
+  stroke: var(--accent);
+  stroke-width: 2;
+  fill: color-mix(in srgb, var(--accent) 16%, var(--node-bg));
+}
+.node.hidden-node { opacity: 0.45; }
+.node.hidden-node rect.box { stroke-dasharray: 4 3; }
+.node.hidden-node text.label { fill: var(--ink-dim); }
+.node.drop-child rect.box { stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 5 3; }
+.node.dragging { opacity: 0.35; }
+.node { cursor: default; }
+
+.plus-btn circle { fill: var(--accent); }
+.plus-btn line { stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+.plus-btn { cursor: pointer; }
+
+#drop-line {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+/* 挿入線だけだと「上の親の末尾」か「下の親の先頭」かが読めないので、
+   どちらの親につくのかを予告の曲線と親の枠で示す */
+#drop-hint {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  stroke-linecap: round;
+  opacity: 0.85;
+  pointer-events: none;
+}
+/* 線への割り込み（A→C→B）: その線だけを光らせる */
+.edge.drop-edge {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+.node.drop-parent rect.box {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+
+#rubber {
+  position: absolute;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  pointer-events: none;
+  display: none;
+}
+
+#node-editor {
+  position: absolute;
+  display: none;
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 0 10px;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  background: var(--node-bg);
+  color: var(--ink);
+  outline: none;
+  z-index: 10;
+}
+
+#ctx-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 180px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  padding: 4px;
+  display: none;
+  user-select: none;
+}
+#ctx-menu .item {
+  padding: 6px 12px;
+  border-radius: 5px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+#ctx-menu .item .key { color: var(--ink-dim); font-size: 11px; }
+#ctx-menu .item:hover { background: var(--accent-soft); }
+#ctx-menu .item.disabled { opacity: 0.4; pointer-events: none; }
+#ctx-menu hr { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
+
+#map-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-dim);
+  font-size: 13px;
+  pointer-events: none;
+  text-align: center;
+  line-height: 2;
+}
+

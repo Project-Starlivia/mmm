@@ -1,0 +1,198 @@
+<style>
+  :root {
+    --bg: #15171c; --panel: #1b1e24; --ink: #dde2e9; --ink-dim: #828a96;
+    --line: #2a2f38; --accent: #5932ff;
+    --node-bg: #232830; --node-border: #3b424d; --node-border-strong: #5d6673;
+    --edge: #4d5563;
+    --font: "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f3f4f6; --panel: #fff; --ink: #1f2328; --ink-dim: #6b7280;
+      --line: #e2e5ea; --node-bg: #fff; --node-border: #cfd5dd;
+      --node-border-strong: #9aa4b1; --edge: #b6bec9;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15171c; --panel: #1b1e24; --ink: #dde2e9; --ink-dim: #828a96;
+    --line: #2a2f38; --node-bg: #232830; --node-border: #3b424d;
+    --node-border-strong: #5d6673; --edge: #4d5563;
+  }
+  :root[data-theme="light"] {
+    --bg: #f3f4f6; --panel: #fff; --ink: #1f2328; --ink-dim: #6b7280;
+    --line: #e2e5ea; --node-bg: #fff; --node-border: #cfd5dd;
+    --node-border-strong: #9aa4b1; --edge: #b6bec9;
+  }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  .lead { color: var(--ink-dim); font-size: 13px; line-height: 1.7; margin: 0 0 20px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin: 0 0 16px; overflow: hidden; }
+  .head { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .name { font-size: 14px; font-weight: 600; }
+  .tag { font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 1px 6px; }
+  .desc { font-size: 12px; color: var(--ink-dim); }
+  .body { overflow-x: auto; }
+  svg { display: block; background: var(--bg); }
+  .edge { fill: none; stroke: var(--edge); stroke-width: 1.7; stroke-linecap: round; }
+  .box { fill: var(--node-bg); stroke: var(--node-border); stroke-width: 1.2; }
+  .box.root { stroke: var(--node-border-strong); stroke-width: 2; }
+  .lbl { font-family: var(--font); font-size: 13px; fill: var(--ink); dominant-baseline: central; }
+  .note { font-size: 12px; color: var(--ink-dim); line-height: 1.7; padding: 0 14px 12px; }
+  code { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font-size: 11px; }
+</style>
+
+<div class="wrap">
+  <h1>ノードをつなぐラインの候補</h1>
+  <p class="lead">
+    mmm のレイアウト規則（左右の水平展開のみ、親から子へ成長軸方向に伸びる）に沿った
+    サンプルで比較しています。右側 3 本・左側 2 本・段差の大きい子・真横に並ぶ子を
+    含めてあるので、差が出やすいはずです。<br>
+    <b>A が現在の実装</b>です。
+  </p>
+  <div id="out"></div>
+</div>
+
+<script>
+// ---- サンプルのレイアウト（world 座標。mmm の実際の配置規則に合わせてある） ----
+const NODES = [
+  { id: 1, x: -70,  y: -15, w: 140, h: 30, label: "ルート", root: true },
+  { id: 2, x: 130,  y: -95, w: 120, h: 30, label: "子ノード A", parent: 1, dir: 1 },
+  { id: 3, x: 130,  y: -15, w: 160, h: 30, label: "真横に並ぶ子", parent: 1, dir: 1 },
+  { id: 4, x: 130,  y: 65,  w: 100, h: 30, label: "子 C", parent: 1, dir: 1 },
+  { id: 5, x: 330,  y: -55, w: 90,  h: 30, label: "孫 1", parent: 3, dir: 1 },
+  { id: 6, x: 330,  y: -15, w: 130, h: 30, label: "孫 2（真横）", parent: 3, dir: 1 },
+  { id: 7, x: 330,  y: 25,  w: 80,  h: 30, label: "孫 3", parent: 3, dir: 1 },
+  { id: 8, x: -260, y: 25,  w: 130, h: 30, label: "左の子", parent: 1, dir: -1 },
+  { id: 9, x: -450, y: -5,  w: 110, h: 30, label: "左の孫 1", parent: 8, dir: -1 },
+  { id: 10,x: -450, y: 55,  w: 140, h: 30, label: "左の孫 2", parent: 8, dir: -1 },
+];
+const byId = new Map(NODES.map(n => [n.id, n]));
+
+/** 箱の縁の点（成長軸方向）。mmm の exitPoint と同じ考え方 */
+function exitPoint(b, dx, dy) {
+  const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+  if (dx === 0 && dy === 0) return { x: cx, y: cy };
+  const sx = dx !== 0 ? b.w / 2 / Math.abs(dx) : Infinity;
+  const sy = dy !== 0 ? b.h / 2 / Math.abs(dy) : Infinity;
+  const s = Math.min(sx, sy);
+  return { x: cx + dx * s, y: cy + dy * s };
+}
+
+const VARIANTS = [
+  {
+    key: "A", name: "現状（二次ベジェ・非対称）", tag: "いま これ",
+    desc: "制御点 = 成長軸 45% ＋ 兄弟軸 100%",
+    note: "親からは<b>斜めに出て</b>、子へは<b>水平に入る</b>。出口側だけ角度がつくので、子が多い親では扇形に広がって見える。真横に並ぶ子（孫 2）は直線になる。",
+    path(p, c, dir) {
+      const a = exitPoint(p, dir, 0), z = exitPoint(c, -dir, 0);
+      const du = (z.x - a.x) * dir, dv = z.y - a.y;
+      const qx = a.x + dir * du * 0.45, qy = a.y + dv;
+      return `M ${a.x} ${a.y} Q ${qx} ${qy}, ${z.x} ${z.y}`;
+    },
+  },
+  {
+    key: "B", name: "三次ベジェ・対称", tag: "定番",
+    desc: "制御点を両端で水平に 50%",
+    note: "親からも子へも<b>水平に出入りする</b> S 字。図表ツール（draw.io / React Flow など）で最も一般的。左右対称なので、扇形の広がりが出ず落ち着いて見える。",
+    path(p, c, dir) {
+      const a = exitPoint(p, dir, 0), z = exitPoint(c, -dir, 0);
+      const k = Math.abs(z.x - a.x) * 0.5;
+      return `M ${a.x} ${a.y} C ${a.x + dir * k} ${a.y}, ${z.x - dir * k} ${z.y}, ${z.x} ${z.y}`;
+    },
+  },
+  {
+    key: "C", name: "三次ベジェ・浅め", tag: "",
+    desc: "同上、制御点 30%",
+    note: "B より曲がりが中央に寄る。ノード間が近いときに<b>直線に近く</b>見えるので、密なマップだと軽い。",
+    path(p, c, dir) {
+      const a = exitPoint(p, dir, 0), z = exitPoint(c, -dir, 0);
+      const k = Math.abs(z.x - a.x) * 0.3;
+      return `M ${a.x} ${a.y} C ${a.x + dir * k} ${a.y}, ${z.x - dir * k} ${z.y}, ${z.x} ${z.y}`;
+    },
+  },
+  {
+    key: "D", name: "直線", tag: "",
+    desc: "縁から縁へ一直線",
+    note: "いちばん軽くて、親子関係が最短距離で分かる。ただし子が多いと放射状に見えて、階層の「段」が読みにくくなる。",
+    path(p, c, dir) {
+      const a = exitPoint(p, dir, 0), z = exitPoint(c, -dir, 0);
+      return `M ${a.x} ${a.y} L ${z.x} ${z.y}`;
+    },
+  },
+  {
+    key: "E", name: "直角（角丸）", tag: "",
+    desc: "水平 → 垂直 → 水平、角は 8px の丸み",
+    note: "階層の<b>段が最も読みやすい</b>。ファイルツリーや組織図の見え方。曲線より硬い印象になる。",
+    path(p, c, dir) {
+      const a = exitPoint(p, dir, 0), z = exitPoint(c, -dir, 0);
+      const midX = (a.x + z.x) / 2;
+      const r = Math.min(8, Math.abs(z.y - a.y) / 2, Math.abs(midX - a.x));
+      if (Math.abs(z.y - a.y) < 0.5) return `M ${a.x} ${a.y} L ${z.x} ${z.y}`;
+      const down = z.y > a.y ? 1 : -1;
+      return [
+        `M ${a.x} ${a.y}`,
+        `L ${midX - dir * r} ${a.y}`,
+        `Q ${midX} ${a.y}, ${midX} ${a.y + down * r}`,
+        `L ${midX} ${z.y - down * r}`,
+        `Q ${midX} ${z.y}, ${midX + dir * r} ${z.y}`,
+        `L ${z.x} ${z.y}`,
+      ].join(" ");
+    },
+  },
+  {
+    key: "F", name: "共通スパイン", tag: "",
+    desc: "親から短く出て、兄弟で 1 本の縦線を共有",
+    note: "兄弟が<b>1 本の幹にぶら下がって見える</b>ので、まとまりが強く出る。線の総量がいちばん少ない。markmap 的。",
+    spine: true,
+    path(p, c, dir) {
+      const a = exitPoint(p, dir, 0), z = exitPoint(c, -dir, 0);
+      const spineX = a.x + dir * 26;
+      const r = Math.min(8, Math.abs(z.y - a.y) / 2);
+      if (Math.abs(z.y - a.y) < 0.5) return `M ${a.x} ${a.y} L ${z.x} ${z.y}`;
+      const down = z.y > a.y ? 1 : -1;
+      return [
+        `M ${a.x} ${a.y}`,
+        `L ${spineX} ${a.y}`,
+        `L ${spineX} ${z.y - down * r}`,
+        `Q ${spineX} ${z.y}, ${spineX + dir * r} ${z.y}`,
+        `L ${z.x} ${z.y}`,
+      ].join(" ");
+    },
+  },
+];
+
+const PAD = 30;
+let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+for (const n of NODES) {
+  minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+  maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h);
+}
+const VB = [minX - PAD, minY - PAD, maxX - minX + PAD * 2, maxY - minY + PAD * 2];
+
+const esc = (s) => String(s).replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]));
+
+document.getElementById("out").innerHTML = VARIANTS.map((v) => {
+  const edges = NODES.filter((n) => n.parent).map((n) => {
+    const p = byId.get(n.parent);
+    return `<path class="edge" d="${v.path(p, n, n.dir)}"/>`;
+  }).join("");
+  const boxes = NODES.map((n) => `
+    <g transform="translate(${n.x} ${n.y})">
+      <rect class="box${n.root ? " root" : ""}" width="${n.w}" height="${n.h}" rx="8"/>
+      <text class="lbl" x="12" y="${n.h / 2}">${esc(n.label)}</text>
+    </g>`).join("");
+  return `
+  <div class="card">
+    <div class="head">
+      <span class="name">${v.key}. ${esc(v.name)}</span>
+      ${v.tag ? `<span class="tag">${esc(v.tag)}</span>` : ""}
+      <span class="desc">${esc(v.desc)}</span>
+    </div>
+    <div class="body">
+      <svg viewBox="${VB.join(" ")}" width="${VB[2]}" height="${VB[3]}">${edges}${boxes}</svg>
+    </div>
+    <div class="note">${v.note}</div>
+  </div>`;
+}).join("");
+</script>

@@ -1,0 +1,2342 @@
+{
+ "refactor": [
+  {
+   "file": "src/mindmap.ts",
+   "line": 1434,
+   "kind": "キャッシュの非対称",
+   "title": "edgeD だけ後片付けされず、折り畳み復帰でエッジが消える",
+   "detail": "消えたノードの片付けが node 側と edge 側で非対称。node 側 (1426-1433) は `nodeEls / nodeSig / nodeTf / nodeCls` を全部 delete しているのに、edge 側 (1434-1438) は\n\n    for (const [id, el] of this.edgeEls) {\n      if (seen.has(id)) continue;\n      el.remove();\n      this.edgeEls.delete(id);\n    }\n\nで `this.edgeD.delete(id)` を落としている。同じ render の中のもう一方の削除経路 (1251-1257、親が居なくなった枝) は `this.edgeEls.delete` と `this.edgeD.delete` を両方やっているので、書き忘れであることは明らか。\n\n実害がある。Shift+H で親を折り畳むと子孫は buried になりエッジ要素だけ消えるが、edgeD には旧 sig が残る。もう一度 Shift+H で戻すと文書テキストが元通り＝レイアウトも完全に元通りなので sig も一致し、1244 の `if (this.edgeD.get(n.id) !== sig)` が false になって、新しく作った空の <path> に `d` が一度も書かれない＝その部分木のエッジが全部消える。id が保たれることはコアで確認済み（hide→show で 1:root 2:a 3:a1 4:a2 5:b が同一 id のまま戻る）。修正は 1437 の隣に `this.edgeD.delete(id);` を足すだけ。",
+   "risk": "低",
+   "value": "大"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 1450,
+   "kind": "共通化",
+   "title": "束の縦範囲・側の端の計算が4か所に散り、1つは別ツリーを巻き込む",
+   "detail": "「側 × 束ごとの範囲」を、少しずつ違う規則で 4 回書いている。\n\n1. 1450-1478 区切り線用 `band`（key = `${side}|${n.group}`、y は側の全ノード、x は root 直下の子だけ）\n2. 1480-1490 `outer`（側ごとの最外 x）\n3. 1780-1796 `groupSlotAt` の `band`（1 とほぼ同じ形だが、entry の作成は `b.n.parent === this.rootId` のときだけ、加えて head を持つ）\n4. 2896-2915 ドロップ pos 4/5 の x0/x1/bottom（また側の全ノードを走査）\n\n1 と 3 は「側の束の縦範囲」という同じ概念なので、`bandsOf(side)` 1 本に寄せられる。\n\nついでに 1 と 2 にはバグがある。root より前に書かれたノード（別ツリー）は 1113 の `placeF(r, R_FRAME, ...)` を通るので 1044 で side=1 が入り、group も 0 のまま（コアで確認: `## pre` / `# root` / `## a` → pre は parent=-1, group=0）。結果、band `1|0` の y1 が画面下の別ツリーの底まで伸び、右側の区切り線が本来の位置よりはるか下に出る。`outer.get(1)` も別ツリーの右端に引っ張られて線の外端が伸びる。共通化するときに「root の子孫だけ」を条件に入れると直る。",
+   "risk": "中",
+   "value": "大"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 1131,
+   "kind": "死んだコード",
+   "title": "stems マップは書かれるだけで一度も読まれない",
+   "detail": "1131 の\n\n    const stems = new Map<string, { a: {x,y}; z: {x,y}; f: Frame }>();\n\nは 1184-1188 で set されるだけで、この関数内でも他ファイルでも読まれない（リポジトリ全体を grep しても mindmap.ts の 1131/1184 しか出ない）。「親→束の中間点」を線として描く実装の残骸。\n\n同じブロックに連鎖する死んだ部分が 2 つある:\n・1170 `const off = 0;` は定数 0 のまま 1180-1185 で使われるので、`e.x + f2.vx*off + f2.ux*half + f2.vx*(mv-base-off)` は `e.x + f2.ux*half + f2.vx*(mv-base)` と同じ。stems の `a` も結局 `e` そのもの。\n・1167 `for (const [bi, gid] of order.entries())` の `bi` は 1171 の `void bi;` で握り潰しているだけ。`for (const gid of order)` で足りる。\n\n3 つまとめて落とすと、この入れ子が 1 段浅くなる。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 1191,
+   "kind": "単純化",
+   "title": "sortedMates の再ソートは無意味、f2 は f のただの別名",
+   "detail": "1191-1198 の\n\n    const sortedMates = [...mates].sort((n1, n2) => {\n      const b1 = boxes.get(n1.id)!; const b2 = boxes.get(n2.id)!;\n      return (b1.x + b1.w/2)*f2.vx + (b1.y + b1.h/2)*f2.vy - (...);\n    });\n\nは、`mates = sorted.filter(n => n.group === gid)` (1168) の元になった `sorted` (1151) が既に同じキー `vOf` で昇順に並んでおり、filter は順序を保ち、比較関数も vOf と完全に同一（f2 は 1163 の `const f2 = f;` で f そのもの）。つまり安定ソートで並びは変わらない。`const sortedMates = mates;` に置換でき、1199 以降もそのまま動く。\n\nあわせて 1163 の `f2` も削除して f を直接使えばよい。1147-1150 に既に `vOf(id)` があるので、1175 の `mv +=` の式もそれを呼ぶだけにできる（同じ式が 1149 / 1175 / 1195-1196 の 3 か所に写経されている）。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 527,
+   "kind": "共通化",
+   "title": "(dx,dy)→(du,dv) のフレーム投影が7か所にベタ書き",
+   "detail": "`dx*f.ux + dy*f.uy` / `dx*f.vx + dy*f.vy` という同じ 2 行が、名前を変えて 7 か所に散っている:\n\n・527-528 edgeDraw の du/dv\n・535-536 edgeDraw の pull（pu/pv）\n・634-635 edgeHintPath の du/dv\n・1149 vOf、1175 mv、1195-1196 sortedMates の比較\n・1735-1736 edgeGeomOf の du/dv\n・2678-2679 updateDrop の local()\n\n`const projU = (f: Frame, dx: number, dy: number) => dx*f.ux + dy*f.uy;` と projV を module スコープに置けば全部が 1 行になる。逆変換（ローカル u,v → world）も 526 と 633 の `at` クロージャ、1746-1747 の edgePolyline、2948-2951 / 2962-2965 のドロップ線に同じ形で 4 回出ているので、`toWorldUV(a, f, u, v)` も一緒に切り出せる。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 1073,
+   "kind": "定数の重複",
+   "title": "既定フレーム {ux:1,uy:0,vx:0,vy:1} が7か所、R と R_FRAME は同一",
+   "detail": "`{ ux: 1, uy: 0, vx: 0, vy: 1 }` が 1073 (`R`)・1108 (`R_FRAME`)・1146・1222・1727・1962・2671 の 7 か所に直書きされている。特に 1073 と 1108 は同じ render() の中で同じ値に別名を 2 つ付けているだけ（`R` は placeSide 用、`R_FRAME` は別ツリー用）。\n\nmodule スコープに `const F_RIGHT: Frame = {...}` / `const F_LEFT: Frame = {...}` を置き、`?? F_RIGHT` のフォールバックは `private frameFor(id: number): Frame` 1 本にまとめる。updateDrop には既に同じものが `frame(id)` (2670-2671) というローカル関数で存在するので、それをメソッドに昇格させれば 1146 / 1222 / 1727 / 1962 / 2671 が全部それに置き換わる。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 1231,
+   "kind": "共通化",
+   "title": "エッジの始点・終点の計算が render と edgeGeomOf で二重定義",
+   "detail": "「親の縁 + 付け根のずらし → 子の縁」という同じ幾何が 2 か所にある:\n\n・render 内 1231-1240\n    const e = exitPoint(p, f.ux, f.uy);\n    const fan = fanOf.get(n.id) ?? 0;\n    edgeDraw({ x: e.x + f.vx*fan, y: e.y + f.vy*fan }, exitPoint(b, -f.ux, -f.uy), ...)\n・edgeGeomOf 1727-1737（exitPoint / fan / a / z / du / dv を丸ごと再計算）\n\n両者がズレると、当たり判定（findEdge 2699）と印の位置（midOfPolyline 2879）が描画とずれる。実際いま既にズレていて、render 側は `wpOf`（束ねの吸引点）を edgeDraw に渡すのに、edgePolyline 1745 は `edgeSegs(g.du, g.dv, 0)` を直に呼ぶので束ねを無視する。EDGE.bundle の既定が 0 なので今は表面化していないだけで、?tune で bundle を上げた瞬間に線と当たり判定が別物になる。render 側を edgeGeomOf 経由に一本化し、wpOf も edgeGeomOf の戻り値に含めるのが筋。",
+   "risk": "中",
+   "value": "中"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 1048,
+   "kind": "共通化",
+   "title": "箱の中心 (b.x+b.w/2, b.y+b.h/2) が10か所に写経されている",
+   "detail": "render 内には 1048-1051 に `centerOf(id)` があるのに、その外では毎回手で書いている:\n309（exitPoint 内）、1050、1149、1175、1195-1196、1854（centerOn）、2675（updateDrop の local）、2805-2806（root の dx/dy）、2828、2958。\n\n`const centerOf = (b: Box) => ({ x: b.x + b.w/2, y: b.y + b.h/2 });` を module スコープに出せば全部これで書ける。特に 2805-2811 は `local(rb, F_RIGHT)` を呼べばそのまま済む形（`hu = rb.w/2` / `hv = rb.h/2` は local() の hu/hv と同じ値）。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 1286,
+   "kind": "リネーム",
+   "title": "buried が同じ関数内で「id の集合」と「件数」の2つの意味",
+   "detail": "render() の 821 で\n\n    const buried = new Set<number>();   // 折り畳まれて消えるノードの id 集合\n\nと宣言しているのに、同じ render() の中の 1286 で\n\n    const buried = hiddenKids.get(n.id) ?? 0;   // 折り畳んだ子孫の件数\n\nと同名でシャドーイングしている。1287 の `this.contentSig(n, b, buried)` と 1555 の `contentSig(n, b, buried: number)`、1311 のツールチップも全部この「件数」のほう。読むときに 821 の Set と取り違える。\n\n件数側を `buriedCount`（または hiddenKids と揃えて `hiddenCount`）に、集合側を `buriedIds` に改名すると意味が一致する。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 2867,
+   "kind": "単純化",
+   "title": "nodeEls があるのに DOM の子要素を線形走査して id を探している",
+   "detail": "id → 要素の Map (`this.nodeEls`) を持っているのに、`for (const g of this.nodeLayer.children)` + `Number((g as SVGGElement).dataset.id) === ...` で全ノードを走査する箇所が 5 つある:\n\n・2641-2644 startDrag（subtree に含まれるものへ .dragging）\n・2840-2842 updateDrop（全部から drop-child / drop-parent を外す）\n・2867-2871 showHint（parentId に drop-parent）\n・2926-2930 / 2934-2938（rootId / target.id に drop-child）\n\n2867・2926・2934 は `this.nodeEls.get(id)?.classList.add(...)` の 1 行で済み、O(n) が O(1) になる。2641 も `for (const id of subtree) this.nodeEls.get(id)?.classList.add(\"dragging\")` と書ける。ポインタ移動のたびに走る経路なので、意味だけでなく速度にも効く。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 980,
+   "kind": "単純化",
+   "title": "widthOf/heightOf が1ノードにつき4回ずつ再計算される",
+   "detail": "980-983 の\n\n    const effU = (n, f) => widthOf(n)*Math.abs(f.ux) + heightOf(n)*Math.abs(f.uy);\n    const effV = (n, f) => widthOf(n)*Math.abs(f.vx) + heightOf(n)*Math.abs(f.vy);\n\nを、calcV が effV で 1 回 (999)、placeF が effU/effV で 2 回 (1010-1011)、さらに placeF が 1034-1035 で widthOf/heightOf を直接もう 1 回呼ぶ。1 ノードあたり widthOf 4 回・heightOf 4 回。widthOf は rows を走査して measure() を何度も呼ぶので、measure 側のキャッシュがあってもループと Math.min/max は毎回走る。\n\n`const size = new Map<number, {w:number,h:number}>()` を 1 枚用意して widthOf/heightOf をその読み出しにすれば、意味を変えずに 1/4 になる。1057-1058 の root の `rw`/`rh` も同じ経路に乗る。\n\nまた effU/effV は「箱の w,h をフレームに射影する」計算で、2680-2681 の `hu`/`hv`（local() の中）と同じ式の半分。共通の `projSize(w, h, f)` にできる。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 1092,
+   "kind": "単純化",
+   "title": "placeSide が boxes の挿入順に依存して新規 id を拾っている",
+   "detail": "1083 で `const before = boxes.size;` を取り、1092 で\n\n    const ids = [...boxes.keys()].slice(before);\n\nと「Map の挿入順 = 今回 placeF が入れた分」という前提で新規 id を回収している。動くが、(a) Map 全体をコピーする、(b) 同じ id が既に boxes にあると size が増えず添字がズレる、(c) 読み手に前提が見えない、の 3 点で脆い。\n\nplaceF に配列を渡して push させるか、`placeSide` 側で `const ids: number[] = []` を作って `placeF` の戻りで集めるほうが安全で意図も明示される。",
+   "risk": "中",
+   "value": "小"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 1980,
+   "kind": "死んだコード",
+   "title": "exitPoint 移設後の孤立した JSDoc が残っている",
+   "detail": "1980 の\n\n    /** Point where a ray from the box center toward (dx, dy) leaves the box. */\n\nの直後は空行と `// ---------- events ----------` (1982) で、何も宣言していない。説明対象は module スコープへ移った `exitPoint()` (303-316) で、そちらには日本語で同じ説明（「箱の縁の点（中心から (dx,dy) 方向へ出たところ）」）が既にある。削除して差し支えない。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 685,
+   "kind": "リネーム",
+   "title": "parentOf のコメント「?tune のハンドル用」が実態とズレている",
+   "detail": "685 の\n\n    private parentOf = new Map<number, number>(); // ?tune のハンドル用\n\nは今や tuner 専用ではない。1229 で毎 render 埋められ、2697 の findEdge（線へのドロップ候補の列挙）、2731-2732 の parentFor、2855 のドロップ先の親判定、1724 の edgeGeomOf が全部これを親の索引として使っている。実質「いま描かれているエッジの一覧（子 id → 親 id）」。コメントを実態に合わせるか、`edgeParent` に改名すると、visible/boxes を毎回引き直さずに済む理由も伝わる。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 330,
+   "kind": "リネーム",
+   "title": "edgeSegs の doc が引数名を cu2 と書いている（実際は cw）",
+   "detail": "330-331 の doc:\n\n    親 → 子 の経路をローカル座標で組み立てる。du = 成長軸方向の距離、\n    dv = 兄弟軸方向の段差、cu2 = 子の箱の長さ（下線用）。始点は常に (0,0)。\n\n実際のシグネチャは 332 の `edgeSegs(du: number, dv: number, cw: number)` で、`cu2` という引数は存在しない（旧名の残り）。同じ値は 515 の edgeDraw の doc では正しく `cw` と書かれている。doc 側を cw に直すだけ。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "src/mindmap.ts",
+   "line": 1966,
+   "kind": "定数の重複",
+   "title": "「箱のすぐ外」の距離が 14 と GAP.x/2 の2通りある",
+   "detail": "同じ「ノードの外縁から少し外」を別々の数字で書いている:\n\n・1966 `translate(${p.x + f.ux * 14} ${p.y + f.uy * 14})`（＋ボタン）\n・1973 `translate(${b.x - 14} ${b.y + b.h / 2})`（root の左＋ボタン。exitPoint を使わず手で -14）\n・2945-2946 `const lx = e.x + f.ux * (GAP.x / 2);`（子として落とすときの挿入線 = 22.5px）\n\nGAP のコメント (193-196) は「ドロップ判定や ＋ボタンの位置もここを見るので、数字を散らさず 1 か所に集めてある」と書いてあるのに、＋ボタンだけ 14 のまま散っている。GAP に `stub` のような項目を足して 3 か所ともそれを見るか、少なくとも 1973 を `exitPoint(b, -1, 0)` ベースに揃えると、左右の＋の位置が同じ規則で決まる。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 2750,
+   "kind": "分岐の誤り（バグ）",
+   "title": "Shift ドラッグ中は「いちばん近い」候補が選ばれない",
+   "detail": "updateDrop の箱候補ループ:\n\n```js\nif (dist < best) {\n  best = dist;\n  if (!preferEdge || !target) target = { id, pos };\n}\n```\n\n`target` は 2724 行の `if (preferEdge) target = findEdge();` で入りうるが、findEdge が null を返した場合（Shift を押しているが線が近くにない、よくある状態）target は null のまま。するとループ内で最初に `dist < best` を満たした候補が target に入り、以降はより近い候補が来ても `!target` が false なので **代入されない**。結果、Shift 中は文書順で最初に見つかった相手が選ばれる。これは 2726-2728 行のコメント「最初に見つかった相手ではなく『いちばん近い』相手を選ぶ。文書順で決めていたころは、親が違う子スタックの境目でどちらに倒れるかが実質その場の運になっていた」が直したはずの現象そのもの。さらに `best` は最近傍を追い続けるので、2757 行の `parentFor(target.id, target.pos)` から出す `rival`/`ambiguous` も target と噛み合わなくなる。\n\n直し方: findEdge の結果を別変数に持つ。\n```js\nconst edgeHit = preferEdge ? findEdge() : null;\nif (edgeHit) target = edgeHit;\n...\nif (dist < best) { best = dist; if (!edgeHit) target = { id, pos }; }\n...\nif (!target && !preferEdge) target = findEdge();   // 2836 行\n```\npreferEdge=false のとき、および preferEdge=true かつ線が取れたときは、現行と完全に同じ挙動になる。",
+   "risk": "中",
+   "value": "大"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 2656,
+   "kind": "責務の分離",
+   "title": "updateDrop 317 行を「判定（純関数）」と「描画」に割る",
+   "detail": "updateDrop は 2656-2972 の 317 行で、判定の段と DOM 書き込みが交互に現れる。段は既にコメント（2769-2776）で言語化されているので、そのまま関数境界にできる。\n\n判定側（this の読み取りだけ、DOM を触らない）:\n- 2692-2723 `findEdge()` … 線への割り込み（pos 3）\n- 2729-2763 箱の中／前後の帯（pos 0/1/2）+ `best` / `rival` / `ambiguous`\n- 2777-2797 外側ゾーン（pos 0）… NEAR / REACH\n- 2802-2820 ルートの空いている側（pos 0 or 4 + side）\n- 2825-2834 Ctrl の新しい束（pos 4/5）\n- 2836 取りこぼしの線判定\n\n描画側（2838-2971）:\n- `clearDropClasses()`（2840-2845）\n- pos 3 → `paintEdgeDrop`（2874-2893）\n- pos 4/5 → `paintNewGroupLine`（2894-2930）\n- pos 0 → `paintChild`（2931-2958）\n- pos 1/2 → `paintSibling`（2959-2971）\n- `showHint`（2856-2872）は pos 0 と 1/2 の共有\n\n振る舞いを保つための条件が 2 つある。(a) 判定側は `target` だけでなく `best`（2797 の `best > 0` ゲートに使う）と `ambiguous`（2763、showHint のゲート）も返すこと。(b) 段の適用順（後の段が前の段の target を上書きする条件つき代入）を変えないこと。この 2 つさえ守れば純粋な移動で済む。\n\nついでに 2670-2683 の `frame()` / `local()` はクロージャで `w` を掴んでいるだけなので、`private localOf(b, f, w)` の形の私有メソッドに出せば各段が独立して読める。",
+   "risk": "中",
+   "value": "大"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 1631,
+   "kind": "一時 class の除去漏れ（バグ）",
+   "title": "exportSvg の drop-edge 除去が必ず空振りしている",
+   "detail": "```js\nfor (const el of this.nodeLayer.querySelectorAll(\n  \".selected, .drop-child, .drop-parent, .drop-edge, .dragging\",\n)) { ... el.classList.remove(..., \"drop-edge\", ...) }\n```\n\n`drop-edge` が付くのは 2877 行の `this.edgeEls.get(target.id)?.classList.add(\"drop-edge\")` だけで、その要素は 1226 行 `this.edgeLayer.append(path)` の通り **edgeLayer** にいる。nodeLayer を走査してもヒットしないので、セレクタの `.drop-edge` は死んでいる。\n\n実害の経路: 1670 行の `inline(this.edgeLayer, edges)` は **元の要素の getComputedStyle** を読んでクローンに焼き込むので、書き出しの瞬間にエッジへ drop-edge が付いていれば style.css:338 `.edge.drop-edge { ... accent }` の色がそのまま SVG に固定される。ノード側の一時状態は落とすのにエッジ側だけ残る、という非対称。\n\n直し方: 走査を 2 レイヤに広げる。\n```js\nfor (const el of [\n  ...this.nodeLayer.querySelectorAll(\".selected, .drop-child, .drop-parent, .dragging\"),\n  ...this.edgeLayer.querySelectorAll(\".drop-edge\"),\n]) { ... }\n```\n1672 行の復元ループ（`for (const s of stripped) s.el.setAttribute(\"class\", s.cls)`）はそのままで通る。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 2361,
+   "kind": "到達しない枝（バグ）",
+   "title": "CapsLock 対策が片側だけ。Shift 併用で大文字コマンドが死ぬ",
+   "detail": "```js\nconst key =\n  !e.shiftKey && e.key.length === 1 && e.key >= \"A\" && e.key <= \"Z\"\n    ? e.key.toLowerCase()\n    : e.key;\n```\n\nこれは「CapsLock で Shift 無しの大文字が来る」方向だけを直している。逆方向（CapsLock ON + Shift）はブラウザが **小文字 + shiftKey=true** を報告するので正規化がスキップされ、`key` は小文字のまま。よって以下の大文字判定の枝に到達できない:\n\n- 2462 `key === \"H\"`（Shift+H 折り畳み）→ key=\"h\" となり 2545 行の hjkl 変換に落ちて **ArrowLeft 移動**になる（無言で別の操作）\n- 2424 `key === \"G\"` → key=\"g\" で誰も拾わず **無反応**\n- 2451 `key === \"C\"/\"D\"/\"L\"` → \"c\" は 2396 の `cc` 待ち、\"d\" は 2385 の `dd` 待ち、\"l\" は ArrowRight 移動になる\n- 2470 の `\"A\"` / `\"I\"` → キャレット位置が意図と変わる\n\n一方 2490 行の o/O だけは `if (e.shiftKey)` で分けているので CapsLock でも正しく動く。判定方法が 2 系統混在しているのが原因。\n\n直し方（o/O 側に統一）:\n```js\nconst base = e.key.length === 1 ? e.key.toLowerCase() : e.key;\nconst shift = e.shiftKey;\n```\nとして `key === \"H\"` → `base === \"h\" && shift`、`key === \"h\"`（移動）→ `base === \"h\" && !shift` のように書き換える。CapsLock+Shift の場合だけ挙動が変わる（=これが直したい差分）ので、そこは意図的な変更として扱うこと。",
+   "risk": "中",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 2663,
+   "kind": "リネーム（名前付き定数）",
+   "title": "pos 0..5 を名前付きにする（DropPos）",
+   "detail": "`pos` の 0..5 は mindmap.ts の中だけで 6 通りの意味を持ち、意味は 700-704 行の 1 行コメントと MapHost.move（37-41 行）の doc コメントに散っている。判定側（2745, 2794, 2831 …）と描画側（2874 `pos === 3`, 2894 `pos === 4 || pos === 5`, 2931 `pos === 0`）で数字が生で比較されるので、updateDrop を分割すると読めなくなる。\n\n提案（値は変えないので完全に振る舞い保存）:\n```ts\nconst DROP = {\n  child: 0, before: 1, after: 2,\n  asParent: 3, newGroup: 4, newGroupBefore: 5,\n} as const;\ntype DropPos = (typeof DROP)[keyof typeof DROP];\ntype DropTarget = { id: number; pos: DropPos; side?: 1 | -1 };\n```\nMapHost.move のシグネチャを `pos: DropPos` にしても、main.ts:372-384 の `pos === 3 ? ... : pos === 4 ? ... : core.moveNodes(ids, target, pos)` は数値リテラル比較のまま通り、最後の枝の 0|1|2 への絞り込みも効く（core.moveNodes は 0|1|2 を要求する）。\n\nあわせて `DropTarget` 型リテラルが 700-704（フィールド）と 2663-2667（ローカル）に手書きで 2 度書かれているのを 1 つにできる。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 2840,
+   "kind": "共通化",
+   "title": "nodeLayer.children の線形走査 6 箇所を nodeEls.get(id) に",
+   "detail": "`for (const g of this.nodeLayer.children)` が 2641 / 2840 / 2867 / 2926 / 2934 / 2980 の 6 箇所にある。うち 4 箇所（2867, 2926, 2934 と startDrag の 2641）は「特定の id の要素 1 つを探す」ためだけに全ノードを舐めて `Number((g as SVGGElement).dataset.id) === X` を比較している:\n\n```js\nfor (const g of this.nodeLayer.children) {\n  if (Number((g as SVGGElement).dataset.id) === parentId) g.classList.add(\"drop-parent\");\n}\n```\n\nすでに `this.nodeEls: Map<number, SVGGElement>` があり、1429 行の削除処理でも同期が保たれている（3086 行の refreshSelection はこちらを使っている）。全部 `this.nodeEls.get(parentId)?.classList.add(\"drop-parent\")` に置ける。updateDrop は pointermove ごとに走るので、ノード数 × 3 回/フレームの DOM 走査がそのまま消える。走査の対象集合は同じなので振る舞いは変わらない。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 2843,
+   "kind": "共通化",
+   "title": "drop 系 class の除去が 2 箇所に重複、startDrag だけ流儀が違う",
+   "detail": "同じ後片付けが 2 箇所にある。\n\nupdateDrop 2840-2845:\n```js\nfor (const g of this.nodeLayer.children) g.classList.remove(\"drop-child\", \"drop-parent\");\nfor (const p of this.edgeEls.values()) p.classList.remove(\"drop-edge\");\nthis.nodeCls.clear();\n```\nstopDragVisuals 2980-2984 はこれに `\"dragging\"` を足しただけの同じ処理。`private clearDropClasses(alsoDragging = false)` に括り出せる（付与と除去が 1 ファイル 1 箇所で対になっていることが読み取れるようになる）。\n\nあわせて 2641-2644 の startDrag だけは classList を直接触りながら `this.nodeCls` を捨てていない。2844 行と 2984 行のコメント「class を直接触るのでキャッシュを捨てる」という不変条件を破っている。今は render 側の cls 文字列（1275 行）が `dragging` を含むため結果的に辻褄が合っていて実害はないが、class 直接操作の入口を 1 つのヘルパに集約して必ず nodeCls を落とすようにすれば、この暗黙の依存が消える。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 2836,
+   "kind": "単純化",
+   "title": "findEdge が 1 回の pointermove で 2 回走る",
+   "detail": "2724 行 `if (preferEdge) target = findEdge();` と 2836 行 `if (!target) target = findEdge();`。preferEdge=true で findEdge が null を返した場合、2836 に到達したとき target は null なので **同じ入力でもう一度** findEdge が走る。間に `preferEdge` / `this.dragging` / `this.parentOf` / `w` のどれも変わらないので結果は必ず同じ null。\n\nfindEdge は 2697-2721 で全エッジについて `this.edgePolyline(id)`（= flattenSegs で 1 本あたり数十点をサンプリング）を作り直すため、これが pointermove ごとに 2 回走る。\n\n直し方は上の指摘 1 と同じ書き換えで済む: `const edgeHit = preferEdge ? findEdge() : null;` を先に取り、2836 を `if (!target && !preferEdge) target = findEdge();` にする。preferEdge=true のときは既に edgeHit で判定済みなので、結果は同一。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 2734,
+   "kind": "共通化",
+   "title": "updateDrop の全ノード走査 2 本が同じ前処理を繰り返す",
+   "detail": "2734-2752（箱の中／前後の帯）と 2783-2796（外側ゾーン）はどちらも\n```js\nfor (const id of this.order) {\n  if (this.dragging!.subtree.has(id)) continue;\n  const b = this.boxes.get(id);\n  if (!b) continue;\n  const f = frame(id);\n  const { du, dv, hu, hv } = local(b, f);\n```\nまで完全に同一で、そこから先の帯の条件だけが違う。2894-2905（pos 4/5 の横線の幅を出す `for (const id of this.order)`）も 3 本目の全走査。\n\n`private *dropCandidates(w)` のようなジェネレータで `{ id, b, f, du, dv, hu, hv }` を 1 回だけ回して両方のアキュムレータを更新すれば、文書順も保たれるので判定結果は同一になる（2797 行の `if (outTarget && best > 0 && ...)` はループ後の適用なので位置を変えなくてよい）。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 2078,
+   "kind": "責務の分離",
+   "title": "pointermove / pointerup が 4 つのモードを 1 関数に詰めている",
+   "detail": "pointermove（2078-2140）は panning / 矩形選択 / ドラッグ開始判定 / ドロップ更新の 4 モードを早期 return で並べている。うち矩形選択の本体 2085-2124（40 行）は、rubber の style 更新・world 変換・当たり判定・選択差分チェックまで全部インラインで、`private updateRubber(clientX, clientY)` にそのまま出せる。\n\n同様に pointerup（2142-2201）のクリック選択部 2172-2200（Shift 範囲 / Mod トグル / 単独）は `private applyClickSelection(id, e)` に出せる。この 3 分岐は onKeydown 側の Shift+↑↓ 拡張（2570-2582）と考え方が並ぶので、隣に置くと両方読みやすくなる。\n\nついでに 2101-2104 の\n```js\nconst w0 = this.toWorld(this.rubberStart.x + r.left, this.rubberStart.y + r.top);\n```\nは、pane 相対で保存した始点を client 座標に戻して再度 world に変換する往復。pointerdown（2072 行）で world 座標も一緒に持たせれば往復が消える（同じ値になるので振る舞いは変わらない）。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 2830,
+   "kind": "単純化",
+   "title": "groupSlotAt の戻り値を truthiness で判定している",
+   "detail": "```js\nconst slot = this.groupSlotAt(side, w.y);\ntarget = slot ? { id: slot, pos: 5, side } : { id: this.rootId, pos: 4, side };\n```\ngroupSlotAt（1780 行）の戻り値はノード id または null。id 0 が来ると null と同じ扱いになり「束の手前に割り込む（pos 5）」が「末尾に足す（pos 4）」に化ける。\n\n実際には core/doc.mbt:74 の `next_id: 1` により id は 1 始まりで 0 は配られないため現状は踏まない。ただし戻り値の型は `number | null` なので、`slot !== null` にしておくのが素直（振る舞いは今と同一）。同種の書き方は他に見当たらないので、ここだけの例外。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 2241,
+   "kind": "共通化",
+   "title": "plusBtn / plusBtnL の配線が side 以外まったく同じ",
+   "detail": "2241-2259 の 4 つのリスナは、`this.plusBtn` / `this.plusBtnL` と `needsSplitFor(this.hoverId, 1)` / `(..., -1)` が違うだけで残りは同一:\n```js\nbtn.addEventListener(\"pointerdown\", (e) => e.stopPropagation());\nbtn.addEventListener(\"click\", (e) => {\n  e.stopPropagation();\n  if (this.hoverId !== -1) this.host.addChild(this.hoverId, this.needsSplitFor(this.hoverId, side));\n});\n```\nコンストラクタに既にある `makePlus()`（730 行）と対になる `wirePlus(btn, side)` を bindEvents に置けば、左右で挙動が食い違う余地がなくなる。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/mindmap.ts",
+   "line": 2610,
+   "kind": "死んだコード",
+   "title": "onKeydown の細かい重複と到達しない判定",
+   "detail": "（1）2610 行 `if (next !== -1 && next !== undefined)`。`next` は `let next = -1` で number に確定し、代入は `?? -1` 付きの find か `cur.parent`（number）だけなので `undefined` にはならない。`next !== -1` だけで足りる。\n\n（2）2396-2399（`cc`）と 2405-2409（`s`）が同一の本体:\n```js\nthis.editClear = true;\nthis.host.editRequested(anchor);\n```\nガード `anchor !== -1 && sel.size <= 1` も同じ。`private substitute(anchor)` に括れる。\n\n（3）`anchor !== -1 && sel.size <= 1` というガードは 2396 / 2406 / 2452 / 2473 の 4 箇所に散っている。`const single = anchor !== -1 && sel.size <= 1;` を 2357 行あたりで 1 度作れば意図が読める。\n\n（4）2474 行と 2483 行に `if (nodes.length === 0) this.host.addRoot();` が重複している（Mod+Enter/i/a/A/I の枝と Enter の枝）。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/doc.mbt",
+   "line": 269,
+   "kind": "コメントと実装のずれ",
+   "title": "rebuild_nodes の doc コメントが「単一ルート・2つ目以降の # は無視」のまま",
+   "detail": "doc.mbt:269-271 の doc コメント: `/// Single-root model: only the FIRST depth-1 heading becomes a node /// (duplicates are ignored as structure); headings before the root form /// independent top-level trees of their own.`\n\n同じ関数の 18 行下、doc.mbt:287-291 に真逆のことが書いてある: 「2 つ目以降の `#` は『構造から外す』のをやめた（2026-08-12）。…いまは最初の `#` より前に書いたノードと同じ扱い＝親なしの別ツリーとして出す。」\n\n実測でも無視されていない。`# root/## a/# second/## b` → 4 ノード (`1/1/root/-1/0 | 2/2/a/1/0 | 3/1/second/-1/0 | 4/2/b/3/0`)。\n\n直し方: doc コメントを「深さ 1 の見出しはすべてノードになり、親を持たない独立ツリーの根になる。ルートより前の見出しも同じ」に書き換える。この 1 文が core で最も誤解を招く記述で、cmds.mbt の 3 か所の死んだ理由（別項）もここが源泉。",
+   "risk": "低",
+   "value": "大"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/api.mbt",
+   "line": 243,
+   "kind": "死んだコード",
+   "title": "abort_session が js/exports.mbt に無く、ブラウザから到達不能",
+   "detail": "api.mbt:243 `pub fn abort_session(tag : String) -> String` と doc.mbt:552 `fn do_abort(tag : String)` は実装もテスト（core_test.mbt:154 付近）も揃っているのに、js/exports.mbt に `#export_name(\"abortSession\")` のラッパが無い。api.mbt の pub 関数 22 個に対し js/exports.mbt は 21 個で、欠けているのはこれ 1 つだけ（引数の順序違いは全関数で無し）。\n\nsrc/coreApi.ts にも当然エントリが無く、リポジトリ全体で `abort`/`abortSession` の参照はゼロ。本来の想定用途である「編集セッションを Escape で取り消す」も繋がっていない: src/mindmap.ts:2309 は `if (e.key === \"Escape\" || e.key === \"Enter\") { this.host.commitEdit(); }` で、Escape も Enter も同じく commit する。\n\n二択で決めるべき: (a) js/exports.mbt + coreApi.ts に生やして Escape をキャンセルに繋ぐ（`s${n}` タグは main.ts:315,320,325,330,334 で既に振られているので配線だけで済む）、(b) abort_session / do_abort / Entry.tag のうち abort 専用の経路を消す。どちらにせよ今の「実装もテストもあるが誰も呼べない」状態は残さない。",
+   "risk": "低",
+   "value": "大"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/cmds.mbt",
+   "line": 571,
+   "kind": "共通化",
+   "title": "区切り行（---）を書く処理が 4 か所にあり、うち 2 か所は完全に同一",
+   "detail": "`---` の書き込みが 4 か所に散っている:\n\n1. cmds.mbt:90-95 (insert_heading_edit の split 分岐) — StringBuilder に積みつつ prefix_len を +3+br*2 する版\n2. cmds.mbt:564-577 (cmd_move_new_group)\n3. cmds.mbt:718-732 (cmd_move_new_group_before の sep >= 0 側)\n4. cmds.mbt:733-742 (cmd_move_new_group_before の sep < 0 側)\n\n2 と 3 は変数名 `i`/`j` を除いてバイト単位で同一:\n```\nlet hs = st.nodes[_].hs\nlet br = nl()\nlet sb = StringBuilder::new()\nif !preceded_by_blank(hs) { sb.write_string(br) }\nsb.write_string(\"---\"); sb.write_string(br); sb.write_string(br)\napply_sets([[Edit::{ from: hs, to: hs, insert: sb.to_string(), removed: \"\" }]], \"\")\n```\n\n直し方: `fn write_sep_at(at : Int, guard_blank : Bool) -> Unit` を 1 本立てて 2/3/4 を置き換える。1 は prefix_len を返す都合で丸ごとは共有できないが、少なくとも「`---` + br + br」を作る `fn sep_text() -> String` は共有でき、`3 + br.length() * 2` という手計算のマジックナンバー（cmds.mbt:94）を消せる。\n\n注意: 4 だけ `preceded_by_blank` のガードが無い。実測では move_block が挿入ブロックの後ろに br+br を付けるため sub_end の手前は常に空行になり、現状バグにはなっていない（`# r/## A/## B/## C` で C を A の前へ → `# r\\n\\n## C\\n\\n---\\n\\n## A\\n\\n## B\\n` と正しく出る）。共通化するならガードは常に通す方向で揃える。",
+   "risk": "低",
+   "value": "大"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/cmds.mbt",
+   "line": 677,
+   "kind": "単純化",
+   "title": "束の区切りを探す二重ループが nd.group で O(1) に置き換えられる（かつ束の先頭以外で逆の分岐を踏む）",
+   "detail": "cmds.mbt:677-692 が「head_hs2 より前にあって、あいだにノードが無い最大の区切り」を全 seps × 全 nodes の二重ループで探している。\n\nこれは既に計算済みの情報の再計算。doc.mbt:468-483 の compute_groups は「束の番号 = その位置より前にある有効な区切りの本数」なので、束の先頭ノードについては `st.seps[group - 1]` がまさにその区切りになる（あいだにノードがあればそのノードが同じ group を持ち先に来てしまうので、あいだが空なのは自動的に保証される）。同じ core の中で empty_bundle_sep_edits (cmds.mbt:624) は既に `let p = st.seps[g - 1]` という素直な引き方をしていて、同じ概念に 2 通りの求め方が同居している。\n\n直し方:\n```\nlet g = st.nodes[bi2].group\nlet sep = if g > 0 { st.seps[g - 1] } else { -1 }\n```\n\n併せて前提条件の抜けも見えてくる。before_id が束の先頭でないとループは -1 を返し、「相手が先頭の束」側（cmds.mbt:733-742）へ落ちる。実測: `# r/## A/### A1/---/## B/## C/---/## D` で D を C の前へ moveNewGroupBefore すると `## B\\n\\n## D\\n\\n---\\n\\n## C` になり、D は新しい束にならず B の束 (g1) に入り、C の方が押し出される。関数名（新しい束として置く）と結果が食い違う。\n\n現状 src/mindmap.ts:1780-1803 groupSlotAt が band.head（束の先頭）しか渡さないので露出していないが、暗黙の前提なので doc コメントに明記するか、`if st.nodes[bi2].group == 0 || 先頭でない` を早期 return で弾く。",
+   "risk": "中",
+   "value": "大"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/doc.mbt",
+   "line": 272,
+   "kind": "責務の分離",
+   "title": "rebuild_nodes が 179 行（272-450）。7 段に分けられる",
+   "detail": "doc.mbt:272-450 が 1 関数。中でやっていることは順に:\n\n1. 走査 (273-275): scan_lines + scan_doc、st.hide_regions への代入\n2. ルート探し (301-307): 最初の depth==1 の hs\n3. 区切りの有効判定 (308-327): raw_seps を条件 3/4/5 で絞り、seps と sep_head を作る\n4. 深さの読み替え (335-358): 束の先頭を基準 2 として eff[] を作る\n5. 範囲の打ち切り (363-414): (1) スタックで次の同深度以下まで、(2) 有効な区切りの手前まで縮める、(3) コメントマーカーの対を割らないよう切る\n6. ノード生成 (416-446): id 引き継ぎ、has_content 判定、Node 構築\n7. 親と束 (447-449): recompute_parents / compute_groups\n\n切り出し案（どれも入出力が閉じていて素直に抜ける）:\n- `fn valid_seps(heads, raw_seps, root_hs) -> (Array[Int], Array[Int])` ← 段 2+3\n- `fn effective_depths(heads, sep_head) -> Array[Int]` ← 段 4\n- `fn subtree_ends(heads, eff, seps, sep_head, regions, n) -> Array[Int]` ← 段 5（さらに (1)(2)(3) を 3 本に割ってもよい）\n\n段 5 の (3) が一番読みにくく（rs の前進と k のループの不変条件がコメントでしか保証されていない）、単独関数にすると狙って読める。分割後の rebuild_nodes は 30 行程度になる。\n\n注意: この関数は調査中（23:37）に別プロセスから書き換わっている。着手前に最新を読み直すこと。",
+   "risk": "中",
+   "value": "大"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/doc.mbt",
+   "line": 466,
+   "kind": "コメントと実装のずれ",
+   "title": "compute_groups の doc コメント「親ごとに 0 基点へ詰め直す」が実装に否定されている",
+   "detail": "doc.mbt:464-467 の doc コメント末尾: `/// sibling. Raw counts are then normalized per parent to dense 0-based /// indexes.`\n\n直後の本文コメント doc.mbt:469-474 がこれを明示的に取り消している: 「以前は親ごとに 0 から詰め直していたので、最初の子より前に置かれた区切りが吸収されて消えていた（『全部左に出す』が書けなかった原因）。束はルート直下だけの概念になったので、単純な通し番号でよい。」\n\n実装 (475-483) も単純な通し番号で、親ごとの正規化は無い。\n\n直し方: doc コメントの最後の 1 文を削り、「group = そのノードより前にある有効な区切りの本数（文書全体の通し番号。親ごとには詰めない）」に置き換える。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/cmds.mbt",
+   "line": 166,
+   "kind": "コメントと実装のずれ",
+   "title": "「2つ目以降の # は無視される」を根拠にした説明が cmds.mbt に 3 か所残っている",
+   "detail": "どれも既に無くなった仕様を理由として挙げている:\n\n- cmds.mbt:166 `// the root has no siblings (duplicate # is ignored): add a child`\n- cmds.mbt:195 `/// '#'. Depth-1 nodes cannot be wrapped (no duplicate roots).`\n- cmds.mbt:385 `// depth 2 stays put: outdenting to depth 1 would create a duplicate #`\n\n同じファイルの cmds.mbt:221-222 が正面から否定している: 「2 つ目以降の `#` も別ツリーとして出るようになったので、既にルートがあっても足せる（前は『構造から外れて消える』ため止めていた）」。\n\n実測でも 2 つ目の `#` は普通にノードになる（別項参照）。cmd_add_root は既に解禁済みで、cmd_add_sibling / cmd_add_parent / cmd_outdent の 3 つだけが古い理由のまま制限を残している。\n\n直し方はまず理由の書き換え（リスク 低）。「ルートを増やしたいときは Ctrl+Enter (addRoot) を使う、という UI 上の使い分け」など、今も有効な理由に差し替える。制限そのものを外すかどうかは振る舞いの変更なので別判断（そちらはリスク 中〜高）。core_test.mbt:282 の \"outdent stops at depth 2 (no duplicate roots)\" というテスト名も同じ古い言い回し。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/doc.mbt",
+   "line": 42,
+   "kind": "コメントと実装のずれ",
+   "title": "sub_end の打ち切り理由に「落とされた重複 #」が残り、現役の理由「有効な区切り行」が抜けている",
+   "detail": "2 か所に同じ古い記述:\n\n- doc.mbt:41-44 (Node.sub_end のコメント): `// heading with depth <= ours, but cut short by a boundary that must not be // swallowed: a dropped duplicate `#`, or a comment marker whose pair would // otherwise be split.`\n- doc.mbt:567-572 (recompute_parents のコメント): `// can be cut short by a boundary (a dropped duplicate root, or a comment // marker that would otherwise be split)`\n\n「落とされた重複 `#`」はもう存在しない（何も落とされない）。一方、実装 doc.mbt:377-384 の段 (2)「有効な区切り行はどのノードにも属さない。区切りの直後の見出しで終わっているノードだけを区切り行の手前まで縮める」という現役の打ち切り要因が、どちらのコメントにも書かれていない。\n\nsub_end は delete / copy / move / hide のすべてが依存する値なので、その範囲がどこで切れるかの一覧はここに正しく載っている必要がある。「(a) 次の同深度以下の見出し (b) 有効な区切り行 (c) 対を割ってしまうコメントマーカー」の 3 つに書き直す。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/cmds.mbt",
+   "line": 552,
+   "kind": "共通化",
+   "title": "normalize_selection から id 配列を作るループが 3 か所にコピーされている",
+   "detail": "同一の 4 行が 3 か所:\n\n- cmds.mbt:552-555 (cmd_move_new_group)\n- cmds.mbt:662-665 (cmd_move_new_group_before)\n- cmds.mbt:760-762 (move_steps、`let idxs = normalize_selection(ids)` を先に受けている分だけ形が違う)\n\n```\nlet order : Array[Int] = []\nfor k in normalize_selection(ids) {\n  order.push(st.nodes[k].id)\n}\n```\n\n添字（normalize_selection の戻り値）は直後の編集でずれるので id に変換しているという意図が 3 か所に散っていて、なぜ添字のまま使わないのかがどこにも書かれていない。\n\n直し方: doc.mbt の normalize_selection (604) の隣に `fn selected_ids(ids : Array[Int]) -> Array[Int]` を置き、3 か所を差し替える。「添字は編集で無効になるので id で持ち回る」というコメントもそこ 1 か所にまとめる。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/cmds.mbt",
+   "line": 519,
+   "kind": "共通化",
+   "title": "cmd_move 系 4 つで tx の開閉と focus の後始末が定型的に重複",
+   "detail": "cmd_move (519)、cmd_move_as_parent (532)、cmd_move_new_group (550)、cmd_move_new_group_before (656) の 4 つが同じ骨格を持つ:\n\n```\nbegin_tx(\"\")\n… (それぞれの本体)\ncommit_tx()\nif first_focus != -1 { st.focus = first_focus }\n```\n\n末尾 4 行は 4 か所すべてで完全に同一（cmds.mbt:522-525, 540-543, 580-583, 746-749）。さらに前半の「order を作る → empty_bundle_sep_edits → 空でなければ apply_sets」という 8 行も、cmd_move_new_group (552-559) と cmd_move_new_group_before (662-669) で完全に同一。\n\nMoonBit にクロージャを渡せるので `fn in_tx(body : () -> Int) -> Unit { begin_tx(\"\"); let f = body(); commit_tx(); if f != -1 { st.focus = f } }` の形にまとめられる。少なくとも前半 8 行は `fn prepare_group_move(ids) -> Array[Int]`（order を返しつつ掃除まで済ませる）に括れる。\n\n効果は行数より一貫性: commit_tx の後に focus を入れ直すのを 1 か所でも忘れると、snapshot() が focus を -1 に潰す（api.mbt:94）ため選択が飛ぶ。まとめれば忘れようがなくなる。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/cmds.mbt",
+   "line": 696,
+   "kind": "共通化",
+   "title": "cmd_move_new_group_before が move_steps の縮小コピーを持っている",
+   "detail": "cmds.mbt:696-714 のループが move_steps (cmds.mbt:766-802) と同じことをしている:\n\n- order を順に回して find_node\n- 自分の範囲内への移動を弾く（696-705 は `cursor >= nd.hs && cursor < nd.sub_end`、move_steps 側は `tn.hs >= nd.hs && tn.hs < nd.sub_end`）\n- move_block を呼ぶ\n- 直前に動かしたものの直後へアンカーを進める（cursor = sub_end / anchor_pos = 2）\n- first_focus を最初の 1 回だけ記録\n\n違いは、move_steps がアンカーを「ノード id + pos」で持つのに対し、こちらは生のオフセット `cursor` で持つ点だけ。オフセット版は move_block が返す新配置に依存していて、find_node(st.focus) → sub_end という同じ手順を手で書き直している。\n\n直し方: move_steps を `fn move_steps_at(ids, at : Int, depth : Int) -> Int`（オフセット指定版）と `fn move_steps(ids, target, pos)`（ノード指定版、内部でオフセットに解決してから前者を呼ぶ）に割り、cmd_move_new_group_before を前者に載せ替える。移動順序と focus の決め方が 1 か所になる。",
+   "risk": "中",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/doc.mbt",
+   "line": 292,
+   "kind": "死んだコード",
+   "title": "`let heads : Array[Heading] = all` が無意味な別名",
+   "detail": "doc.mbt:274 で `let (all, raw_seps, regions) = scan_doc(st.text, lines)` と受け、doc.mbt:292 で `let heads : Array[Heading] = all` と別名を付けているだけ。`all` はこの 1 行以外に登場しない。\n\nかつて `all` を絞り込んで `heads` を作っていた（2 つ目以降の `#` を落としていた）名残で、その絞り込みが 2026-08-12 に消えたときに束縛だけが残ったもの。直上の doc.mbt:276-285 のコメント（「Offsets that are NOT nodes but must still stop a subtree.」以下）も、その消えた絞り込みの説明として書かれている。\n\n直し方: 274 を `let (heads, raw_seps, regions) = ...` にして 292 を削除。276-285 のコメントは「コメントマーカー行はノードでないが範囲を切る」という現役の話だけが残るので、段 (3) (doc.mbt:385-388) の直前へ移す。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/doc.mbt",
+   "line": 393,
+   "kind": "リネーム",
+   "title": "ローカル変数 cc が同一パッケージの関数 cc を隠している",
+   "detail": "doc.mbt:393 `let cc = if c0 < 0 { n } else { c0 }` と doc.mbt:406 `let cc = if c1 < 0 { n } else { c1 }`。どちらも doc.mbt:7 の `fn cc(s : String, i : Int) -> Int`（core 全体で最も多用される文字取得ヘルパ）を隠す。\n\nこのブロックの中では cc(text, i) が書けない。段 (3) はコメントマーカーの対の判定という core で一番デリケートな箇所なので、後から手を入れる人が普通に踏む罠。\n\n直し方: `close_at` / `c_end` などに改名する（意味も明確になる）。cmds.mbt:601 の `let moving = fn(hs)` のようなローカル関数名は衝突していないので、この 2 行だけの問題。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/doc.mbt",
+   "line": 294,
+   "kind": "コメントと実装のずれ",
+   "title": "箇条書きが 3. 4. 5. から始まっていて 1. と 2. がどこにも無い",
+   "detail": "doc.mbt:294-300:\n```\n// 区切りが有効になる条件（残り 3 つ。直前が本文でないことは scan_doc 済み）:\n//   3. 次に来る非空白が見出しであること（本文が挟まればただの水平線）\n//   4. その見出しが `##` 以下であること（…）\n//   5. ルート（最初の `#`）が既に現れている位置にあること\n// 5 のおかげで front matter の `---` は自動的に落ちる（…）。2 連の `---` も 3 で最後の 1 本だけが残る。\n```\n\n条件 1 と 2 はこのファイルにも parser.mbt にも書かれていない。parser.mbt:99-104 と 197-223 に「フェンス外であること」「CommonMark の thematic break であること」「直前が本文行でないこと（setext 見出しの下線）」があり、これが 1/2/(残りの 1 つ) に相当すると読めるが、対応が推測でしかない。本文の「5 のおかげで」「3 で」という参照が効かなくなっている。\n\n直し方: 1 から振り直し、parser.mbt 側で判定している条件は「(1)-(3) は scan_doc / is_separator が済ませている（parser.mbt:99, 197）」と参照先を明示する。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/doc.mbt",
+   "line": 449,
+   "kind": "単純化",
+   "title": "compute_groups が st.seps と同じ配列を引数でも受け取っている",
+   "detail": "doc.mbt:329 で `st.seps = seps` と代入した直後、doc.mbt:449 で `compute_groups(seps)` と同じものを引数でも渡している。compute_groups (doc.mbt:468) の中では引数 `seps` しか見ていない。\n\n呼び出し元は rebuild_nodes の 1 か所だけ（core 全体で compute_groups の出現は定義と呼び出しの 2 回）なので、引数を落として本文で `st.seps` を読ませれば、「この 2 つは常に同じもの」という不変条件が型で消える。同じファイルの recompute_parents (doc.mbt:567) は既に引数なしで st を直接読む形になっていて、隣り合う 2 関数でスタイルが揃っていない。\n\n逆向き（st.seps への代入も compute_groups の中に寄せる）でもよい。どちらでも、代入と使用が 120 行離れている今の形よりは追いやすい。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/cmds.mbt",
+   "line": 692,
+   "kind": "死んだコード",
+   "title": "`let sep = sep2` という無意味な再束縛",
+   "detail": "cmds.mbt:677 で `let mut sep2 = -1`、677-691 のループで確定させ、cmds.mbt:692 で `let sep = sep2`。sep2 は 691 以降どこでも書き換わらないので、この 1 行は何もしていない。\n\nすぐ上に同じ趣旨の `bi` → `bi2`（cmds.mbt:657 と 671）があり、こちらは「掃除でオフセットが動くので取り直す」（670 のコメント）という実体のある取り直しなので紛らわしい。`sep2` という名前が bi/bi2 の対と対応しているように見えるが、対応する `sep` は存在しない（この関数の前半で sep を求めているのは 677-691 だけ）。\n\n直し方: ループの変数を最初から `sep` にして 692 を削除。別項の nd.group による置き換えを採るなら、この 15 行ごと消える。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/core/api.mbt",
+   "line": 249,
+   "kind": "リネーム",
+   "title": "selection_text_api の `_api` 接尾辞が名前衝突回避のためだけに漏れ出している",
+   "detail": "api.mbt:249 `pub fn selection_text_api(ids : Array[Int]) -> String { selection_text(ids) }` は、cmds.mbt:829 の private な `fn selection_text` との衝突を避けるためだけに `_api` が付いている。他の 21 個の pub 関数はどれも `cmd_xxx` を包む `xxx` という一貫した命名なのに、これだけ規則から外れる。\n\nさらに js/exports.mbt:126 側の関数名は `selection_text`（`_api` 無し）で `#export_name(\"selectionText\")`。api.mbt と js/exports.mbt が機械的な 1:1 対応であるという前提が、名前レベルでここだけ崩れている。\n\n直し方: cmds.mbt:829 の内部関数を `selection_md` / `subtree_text` などに改名し、api.mbt 側を `selection_text` に揃える。呼び出し元は cmds.mbt 内に無く api.mbt:250 の 1 か所だけ、core_test.mbt が `selection_text_api` を 12 回呼んでいるのでそこも一括置換になる。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 346,
+   "kind": "共通化 / バグ",
+   "title": "deleteSelection が runCmd の複製で、ensureVisible だけ落ちている",
+   "detail": "runCmd (232-243) は `applySnap → setSelection([focus],focus) → map.ensureVisible(focus)` の 3 手。deleteSelection (346-355) はその 1・2 だけを手書きで写していて `map.ensureVisible` が無い:\n```ts\nconst snap = core.deleteNodes([...selection]);\napplySnap(snap, \"map\");\nif (snap.focus !== -1 && byId.has(snap.focus)) {\n  setSelection([snap.focus], snap.focus);   // ← ensureVisible が無い\n} else { setSelection([], -1, false); }\n```\ncore の delete は実際に focus を返す(ハーネスで確認: `deleteNodes` → focus=3)。削除でレイアウトが詰まると新しい focus が画面外に出るのに、追加/移動/reorder/toggleHidden では必ず追従するマップが、削除のときだけ追従しない。修正は `runCmd(() => core.deleteNodes([...selection]))` に置き換え、focus==-1 のときだけ `setSelection([], -1, false)` を足す(applySnap の prune で selection は既に空になるので、この分岐すら省ける可能性が高い)。",
+   "risk": "低",
+   "value": "大"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/relevel.ts",
+   "line": 40,
+   "kind": "責務の分離 / バグ",
+   "title": "relevel が `---` の束規則を知らず、貼り付けで束が壊れる",
+   "detail": "main.ts:459 が `relevel(normalized, n.depth + 1)` で `#` の数だけをずらして貼るが、コアの記法では `---` が「ルート直下に新しい束を始める」ため、断片に `---` が含まれると以降が貼り付け先の子にならない。ハーネスで確認:\n`# R / ## T / ### T1` の T の下へ `# X / ## X1 / --- / ## Y` を depth+1 に relevel して挿入 →\n`R(d1) T(d2,p1) T1(d3,p2) X(d3,p2) X1(d4,p4) Y(d2,g1,p1)`\nつまり Y だけ T ではなく **R の子(別の束)**になる。relevel は `scanDepths` でフェンスは見ているが区切り行は素通し。対策は relevel 側で targetDepth>1 のとき有効な `---` 行を無効化する(空行にする/エスケープする)か、貼り付け前に main 側で弾くこと。仕様判断が要るので risk は中。",
+   "risk": "中",
+   "value": "大"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 305,
+   "kind": "責務の分離",
+   "title": "host オブジェクトが 207 行(305-511)。4 つの関心事が同居している",
+   "detail": "`const host: MapHost` は 305-511 の 207 行で、(a) 選択の橋渡し(306-311, 340-345)、(b) 構造コマンドの薄いラッパ(313-384 — ほぼ全部 `if (!byId.has(id)) return; const tag = ...; runCmd(...)` の 4 行パターン)、(c) クリップボード(385-469 — paste だけで 79 行、画像・URL・見出し無し・見出しありの 4 分岐)、(d) コンテンツ添付ポップアップ(471-502 — 3 つとも `if (!byId.has(id)) return; void showXPopup().then(r => { if (r && byId.has(id)) insertContentLine(...); mapPane.focus(); })` の同型)が並ぶ。(b) は `mk = (fn) => (id, split) => { if (!byId.has(id)) return; const tag = `s${++sessionN}`; runCmd(() => fn(id, tag, split), { edit: { tag } }); }` で 5 メソッドが 1 行ずつになる。(d) は `attach(id, popup, toLine)` 1 本に畳める。(c) は `clipboard.ts` として切り出せる(host からは `paste()` だけ見える)。また paste は 398 行目で `hasFs`(宣言は 587 行目)を前方参照しており、順序依存が既に発生している。",
+   "risk": "低",
+   "value": "大"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 62,
+   "kind": "共通化 / 定数の重複",
+   "title": "永続化キーが 2 ファイルに散在し、同じ try/catch が 7 箇所にコピーされている",
+   "detail": "LS_* 定数は main.ts:62-68 に 7 個、`mmm.edgeTune` だけ edge-tuner.ts:17 に別置き。書き込みは persistNow(106)/applyColor(147)/setEol(537)/loadText(565-566)/saveFile(669-670)/applyPaneVis(1018)/applyTheme(1177) の 7 箇所で、全部が\n```ts\ntry { localStorage.setItem(K, v); } catch { /* ignore */ }\n```\nという同一の 3 行に包まれている。読み出しは 1192/1196/1199/1207-1213 の起動ブロックに集中しており、書きは分散・読みは集中という非対称。`src/persist.ts` に `const KEYS = {...}` と `lsSet/lsGet` を置けば try/catch 7 個が消え、キーの一覧性も戻る。savedText と fileName は loadText と saveFile の 2 箇所で別々に書かれている(564-569 と 668-673)ので、これも `rememberFile(name, savedText)` に寄せられる。",
+   "risk": "低",
+   "value": "大"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 337,
+   "kind": "バグ / 単純化",
+   "title": "applySnap 直呼びの経路(rename / insertContentLine / paste)が syncSelectionViews を呼ばず、md ペインのハイライトが古いまま残る",
+   "detail": "applySnap は `if (selChanged) syncSelectionViews(false)` と、**選択メンバが変わったときしか**エディタのハイライトを引き直さない(200行目)。runCmd 経由は setSelection で必ず引き直すが、applySnap を直接呼ぶ 4 経路 — rename(338)、insertContentLine(819)、paste の見出し無し分岐(441)、paste の見出しあり分岐(467) — はどれも引き直さない。ハイライトは CodeMirror の `deco.map(tr.changes)` に任されるので、**範囲の末尾ちょうどへの挿入は取り込まれない**。insertContentLine は `at = n.subEnd`(または次の子の hs)=まさに範囲の末尾に挿入するため、L/C/D や画像貼り付けで追加した行は、マップ上は選択ノードの一部なのに md ペインのハイライトからだけ外れる。applySnap の末尾で「オフセットが動いたら必ず syncSelectionViews(false)」に統一するのが筋。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 232,
+   "kind": "バグ / 責務の分離",
+   "title": "複数選択の扱いが runCmd と indent/outdent で逆になっている(move で選択が 1 個に潰れる)",
+   "detail": "runCmd(232-243) は無条件に `setSelection([snap.focus], snap.focus)` で選択を 1 個に潰す。host.move(372-384) は複数 id を受けるのに runCmd を通すので、**3 個ドラッグして落とすと 1 個しか選択に残らない**。一方 indentSelection/outdentSelection(356-365) は snap.focus を無視して選択をそのまま保つ。同じ「複数選択に対する構造操作」で結果が真逆。runCmd に `keepSelection?: boolean` を足すか、`runCmd` を「focus を採る版」と「選択を保つ版」の 2 本に分けて、move は後者にするのが自然。",
+   "risk": "中",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 356,
+   "kind": "バグ(統一の罠)",
+   "title": "indent/outdent が snap.focus を捨てているのは F-004 の実質的な安全弁 — 安易に runCmd へ寄せると退行する",
+   "detail": "indentSelection/outdentSelection は `applySnap(...); syncSelectionViews(false);` だけで snap.focus を使わない。ハーネスで確認すると core は focus を返している: `# A / ## B / ## C` の C(id=3) に対し indentNodes → focus=3(正しい)、続けて outdentNodes([3]) → **focus=4**(別ノード)。これは既知の F-004(outdent が対象ノードの id を保存しない、C9b)がそのまま focus に出たもの。いま UI が focus を無視しているおかげで症状が見えていないだけなので、「runCmd に統一しよう」というリファクタをすると outdent 後に無関係なノードが選択されるバグが表に出る。統一するならコア側の F-004 を先に直すこと。この 1 行のコメントを main.ts に残す価値がある。",
+   "risk": "高",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 424,
+   "kind": "バグ / 単純化",
+   "title": "空(見出し 0 個)の文書に見出し無しテキストを貼ると何も起きない",
+   "detail": "paste の入口ガード(394)は `if (anchorId === -1 && nodes.length > 0) return;` で「空文書なら anchor 無しでも通す」意図。ところが見出し無し分岐(424-425)が\n```ts\nif (!hasHeadings(normalized)) {\n  if (anchorId === -1) return;   // ← 空文書がここで落ちる\n```\nと無条件に返すため、**見出しがまだ 1 つも無い文書にプレーンテキストを貼っても無反応**。見出しありの分岐(451-453)は `at = text.length` で空文書を扱えているので、対称にするなら空文書時は `# ` を付けて 1 行目をルートにする等の扱いが要る。ついでに 451-453 の `if (nodes.length > 0) return;` は入口ガード 394 と同じ条件の二重チェックで、片方は削れる。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 600,
+   "kind": "共通化",
+   "title": "ファイル読み込みの 3 経路 + 起動復元が同じ 4 手を別々に書いている",
+   "detail": "`savedText = adoptText(await f.text()); loadText(savedText, f.name); persistHandle();` が openFile の FS 分岐(606-609)、openFile の input 分岐(617-620)、drop ハンドラ(956-960)の 3 箇所に写経されている。さらに起動ブロック(1224-1227)は adoptText を使えないので `const toLf = (s) => s.replace(/\\r\\n?/g, \"\\n\")` という adoptText の中身だけを再実装している(setEol の判定順が違うため)。`async function adoptFile(handle: FileSystemFileHandle | null, f: File)` 1 本に寄せ、adoptText を `normalizeEol(raw)` と `setEol()` に割れば起動経路もそれを再利用できる。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 625,
+   "kind": "共通化",
+   "title": "AbortError を無視する例外処理が 3 箇所に複製されている",
+   "detail": "```ts\nif ((err as DOMException)?.name !== \"AbortError\") {\n  console.error(\"...:\", err);\n  flashFilename(\"...\");\n}\n```\nが openFile の catch(625-630)、saveFile の catch(674-681)、saveImageToDisk のフォルダ許可 catch(840-845)にそのまま 3 回。`function reportUnlessAbort(err: unknown, what: string, msg: string)` に括れる。saveImageToDisk の 910-914 だけは AbortError を握り潰さない(書き込み失敗は常に報告)ので、そこは意図的な差として残すこと。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 657,
+   "kind": "共通化 / 死んだコード",
+   "title": "saveFile が downloadBlob を再実装している(しかも両方 revokeObjectURL が早い)",
+   "detail": "1085-1091 に `downloadBlob(blob, name)` があるのに、saveFile の非 FS 分岐(657-665)が同じ `createElement(\"a\") → createObjectURL → click → revokeObjectURL` を手書きしている。`downloadBlob(new Blob([toFileEol(text)], { type: \"text/markdown\" }), fileName)` で 8 行が 1 行になる。加えて両方とも `a.click()` の直後に同期で `URL.revokeObjectURL(a.href)` していて、ブラウザによってはダウンロードが始まる前に URL が失効する。統合するついでに `setTimeout(() => URL.revokeObjectURL(url), 0)` にするのが安全。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 436,
+   "kind": "共通化",
+   "title": "「ブロックを挿入するときの前後改行合わせ」が 3 箇所で同一コピー",
+   "detail": "```ts\nlet prefix = \"\";\nif (at > 0 && text[at - 1] !== \"\\n\") prefix = \"\\n\\n\";\nelse if (at >= 2 && text[at - 2] !== \"\\n\") prefix = \"\\n\";\nconst suffix = at !== text.length ? \"\\n\" : \"\";\n```\nが paste の見出し無し分岐(436-440、変数名だけ pre/suf)、paste の見出しあり分岐(462-465)、insertContentLine(815-818)に 3 回。`function insertBlock(at: number, body: string, tag = \"\"): void` に括れば 3 箇所とも 1 行になり、`core.replaceText(at, at, ...)` + `applySnap(..., \"map\")` の呼び出しまで含めて共通化できる。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 856,
+   "kind": "共通化",
+   "title": "「WebP で書き出し、駄目なら PNG/元形式」の方針が 3 実装ある",
+   "detail": "(1) main.ts:857-871 は `createImageBitmap → OffscreenCanvas.convertToBlob({type:\"image/webp\"})`、失敗時は**元形式のまま**。(2) main.ts:1138-1145 は `cv.toBlob(\"image/webp\", .95)`、失敗時は **PNG** に落として拡張子も変える。(3) popup.ts:224-227 は `canvas.toDataURL(\"image/webp\", .92)`、失敗時は **PNG**。品質値も 0.92 / 0.95 / 0.92 とばらばら。`encodeImage(canvasOrBlob): Promise<{blob, ext}>` 1 本に寄せて品質定数も 1 箇所にすべき。特に (3) は data URL 経由 → atob → Uint8Array の手作業(228-233)まで抱えており、shell() の Collect を `() => T | Promise<T> | null` にすれば toBlob をそのまま使えて 10 行消える。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/coreApi.ts",
+   "line": 39,
+   "kind": "死んだコード / 対応漏れ",
+   "title": "core の pub API 22 個に対し JS export は 21 個 — abort_session が繋がっていない",
+   "detail": "core/api.mbt の `pub fn` は 22 個、core/js/exports.mbt の `#export_name` は 21 個。欠けているのは `abort_session(tag)`(api.mbt:243、実体は doc.mbt:534 の do_abort = 指定タグの undo エントリを 1 つ巻き戻す)。coreApi.ts にも当然無い。それ以外(initDoc〜selectionText)は名前・引数とも 1:1 で対応漏れ無し。UI は「編集中 Enter/Esc は確定、キャンセル無し」に決まっているので abort の用途が消えている可能性が高く、**コア側の死んだ API として削るか、ラベル編集の Esc キャンセルとして繋ぐか**を決めるべき。放置すると「コアにあるのに UI から呼べない」状態が続く。",
+   "risk": "低",
+   "value": "中"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 179,
+   "kind": "単純化 / 死んだコード",
+   "title": "Origin の \"core\" は \"map\" と完全に同義で、分岐が存在しない",
+   "detail": "`type Origin = \"cm\" | \"map\" | \"core\" | \"load\"` だが applySnap が origin を見るのは 2 箇所だけ: 184 の `origin !== \"cm\" && origin !== \"load\"`(applySets するか)と 198 の `origin !== \"cm\"`(typeKind をリセットするか)。真理値表は cm=(false,keep) / load=(false,reset) / map=(true,reset) / core=(true,reset) で、**core と map は完全一致**。4 値のうち実質 3 状態しかない。`applySnap(snap, { echoToEditor: boolean, fromEditor: boolean })` か、せめて \"core\" を廃して \"map\" に寄せると、読み手が「core と map で何が違うのか」を毎回追わなくて済む。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 728,
+   "kind": "リネーム",
+   "title": "assetSegs の名前と doc コメントが実装と食い違っている",
+   "detail": "コメントは「`path`(md からの相対、../ を含みうる)を許可フォルダ配下のセグメントに解決する。許可を出たら null」と書いてあるが、シグネチャは `assetSegs(dir: FileSystemDirectoryHandle)` で **path を受け取らない**。実際にしているのは「許可フォルダから見た md のあるフォルダのセグメント列を返す」だけ。コメントが説明している ../ の解決は呼び出し側 loadAsset の 747-755 にある。`mdDirSegs(dir)` にリネームし、コメントは 2 行に縮めるべき。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 1003,
+   "kind": "単純化 / 共通化",
+   "title": "ペイン周りに小さな重複が 3 つ(0 枚防止・panes 再取得・意味の無いペア配列)",
+   "detail": "(1) 「両方 off にはしない」規則が applyPaneVis の 1004 (`if (!v.md && !v.map) v = {md:true,map:true}`) と togglePaneVis の 1029-1031(隠した反対側を立てる)の 2 箇所にある。前者は後者の保険なので、規則を togglePaneVis 側 1 本に寄せるか applyPaneVis のみに寄せる。(2) 1065 の pointermove で毎回 `$(\"panes\").getBoundingClientRect()` と DOM を引き直しているが、同じ要素は 999 行目に `panesEl` として既にある(しかも pointerdown 時に 1 回取れば十分)。(3) 1048-1054 の `for (const [pane, el] of [[mdPane, mdPane], [mapPane, mapPane]] as const)` は pane と el が常に同一要素で、分割代入に意味が無い — `for (const el of [mdPane, mapPane])` で足りる。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/main.ts",
+   "line": 310,
+   "kind": "単純化",
+   "title": "host に無意味な再ラップが 2 つ、byId.has ガードの有無も不揃い",
+   "detail": "`setSelection: (ids, anchor, reveal) => setSelection(ids, anchor, reveal)`(310)と `imageUrl: (path) => imageUrl(path)`(470)は、どちらもプロパティ短縮記法 `setSelection,` / `imageUrl,` で同じ意味になる(オブジェクトリテラルの短縮は外側スコープの識別子を見るので自己参照にはならない)。また `clearSelection: () => setSelection([], -1, false)`(311)と同じ式が loadText(559)と deleteSelection(353)にも直書きされている。ガードも不揃いで、addChild/addSibling/addSiblingBefore/addParent/addLink/addCode/addDrawing/editRequested は `if (!byId.has(id)) return;` を持つのに reorder(366)・toggleHidden(369)・move(372)は持たない。基準を決めて揃えること。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/popup.ts",
+   "line": 220,
+   "kind": "死んだコード",
+   "title": "showDrawPopup の `void commit;` は使わない引数を黙らせるためだけの文",
+   "detail": "220 行目の `void commit; // committing a drawing goes through the 確定 ボタン / Mod+Enter` は実行時に何もしない。tsconfig は noUnusedParameters を入れていない(noUnusedLocals のみ)ので、そもそも `(body, commit) =>` から commit を落として `(body) =>` にすれば文ごと消える。ついでに白背景で塗る 2 行(178-179 と 189-190 が完全に同一)も `const fill = () => { ctx.fillStyle = \"#ffffff\"; ctx.fillRect(0,0,DRAW_W,DRAW_H); }` に括れる。",
+   "risk": "低",
+   "value": "小"
+  },
+  {
+   "file": "D:/1.atrium/mmm/src/editor.ts",
+   "line": 87,
+   "kind": "死んだコード / 単純化",
+   "title": "MdEditor.view が public だが外部利用ゼロ。ライト/ダークのテーマ定義もほぼ同一",
+   "detail": "`readonly view: EditorView`(87)は editor.ts 内でしか参照されておらず(main.ts / mindmap.ts / edge-tuner.ts のいずれからも `.view` アクセス無し)、`private view` にできる。また darkTweaks(29-40)と lightTweaks(42-53)は 5 セレクタ中 3 つが完全一致で、違うのは selectionBackground の 30%/22% と activeLine の rgba だけ。`const tweaks = (dark: boolean) => EditorView.theme({...}, { dark })` に畳めば 12 行が消え、片方だけ直して食い違う事故も防げる。",
+   "risk": "低",
+   "value": "小"
+  }
+ ],
+ "cases": [
+  {
+   "id": "H-01",
+   "title": "葉を hide → show",
+   "input": "# Root\\n\\n## A\\n\\n### A1\\n\\n#### A1a\\n\\n### A2\\n\\n## B\\n\\n### B1\\n\\n## C\\n  (id: 1=Root 2=A 3=A1 4=A1a 5=A2 6=B 7=B1 8=C)",
+   "operation": "initDoc(BASE); core.toggleHidden(4); core.toggleHidden(4)",
+   "expected": "hide で A1a の行だけが <!-- / --> に包まれ、hidden=true。show でテキストがバイト単位で原文に戻り、hidden=false。他ノードの depth/parent/group は不変。",
+   "actual": "hide 後: \"# Root\\n\\n## A\\n\\n### A1\\n\\n<!--\\n#### A1a\\n\\n-->\\n### A2\\n\\n...\" / 4:A1a[H]。show 後: 原文とバイト一致 (true)。他ノードの depth/parent/group すべて不変。id も 1..8 が保存された。",
+   "verdict": "正常",
+   "note": "往復可逆。id 保存も確認。"
+  },
+  {
+   "id": "H-02",
+   "title": "子を持つノードを hide → show",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3) /* A1: 子 A1a を持つ */; core.toggleHidden(3)",
+   "expected": "A1 のサブツリー [hs, subEnd) 全体が包まれ、A1 と A1a の両方が hidden=true。show で原文に戻る。",
+   "actual": "hide 後: \"...## A\\n\\n<!--\\n### A1\\n\\n#### A1a\\n\\n-->\\n### A2\\n\\n...\" / 3:A1[H] 4:A1a[H]。A1 の親 A(2) は非 hidden のまま、A の subEnd は区間を丸ごと含んだまま(親子が切れない)。show で原文とバイト一致。",
+   "verdict": "正常",
+   "note": "doc.mbt の規則(3)「マーカー対が範囲に丸ごと収まるときは範囲を切らない」が効いており、hide した子が親から外れない。"
+  },
+  {
+   "id": "H-03",
+   "title": "孫まである深いノードを hide → show",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(2) /* A: A1 > A1a と A2 を持つ */; core.toggleHidden(2)",
+   "expected": "A / A1 / A1a / A2 の 4 つが hidden=true。B, B1, C は巻き込まれない。show で原文に戻る。",
+   "actual": "hide 後: \"# Root\\n\\n<!--\\n## A\\n\\n### A1\\n\\n#### A1a\\n\\n### A2\\n\\n-->\\n## B\\n\\n...\" / 2:A[H] 3:A1[H] 4:A1a[H] 5:A2[H]、6:B 7:B1 8:C は非 hidden。show で原文とバイト一致。",
+   "verdict": "正常",
+   "note": "範囲が他ノードを巻き込んでいない。"
+  },
+  {
+   "id": "H-04",
+   "title": "hide したノードの中にあるノードを hide しようとする（入れ子）",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3) /* A1 を hide */; core.toggleHidden(4) /* 中の A1a に対して */",
+   "expected": "README「入れ子の Hide は不可」より、少なくとも A1a が単独で包まれることは無い。何も起きないか、明示された規則に従うか。",
+   "actual": "A1a は hidden=true なので toggle が「show」側に落ち、**囲っている A1 の領域ごとマーカーが外れた**。テキストは原文に完全復帰し、A1 も A1a も hidden=false になった。つまり「子孫に対する操作が祖先の状態を変えた」。",
+   "verdict": "仕様が未定義",
+   "note": "cmds.mbt のコメント「Showing removes the markers of the region containing the node」通りの意図的挙動だが、README には書かれていない。マップ上は hidden の子孫が描画されない(mindmap.ts:808-833)ので UI からは踏めず、実害は core API / 将来の MD ペイン経由に限られる。"
+  },
+  {
+   "id": "H-05",
+   "title": "hide したノードの親を hide する",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3) /* A1 */; core.toggleHidden(2) /* 親 A */",
+   "expected": "README「既にマーカーを含むサブツリーの Hide は無視される」より完全な no-op。テキストもツリーも不変。",
+   "actual": "テキスト完全不変 (true)。ノードも 3:A1[H] 4:A1a[H] のまま、A は非 hidden。祖父 Root(1) に対しても同じく no-op。",
+   "verdict": "正常",
+   "note": "仕様通り。ただし戻り値の snapshot は成功時と区別がつかず、UI にも「無視した」通知が無い(mindmap.ts:3036 は無条件に host.toggleHidden を呼ぶだけ)。ユーザーには「Shift+H が効かない」としか見えない。"
+  },
+  {
+   "id": "H-06",
+   "title": "hide したノードを削除する",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3); core.deleteNodes([3])",
+   "expected": "A1 のサブツリーが消え、それを包んでいた <!-- / --> も一緒に消える（マーカーはその hide 操作が作ったものであり、残しても指すものが無い）。",
+   "actual": "\"# Root\\n\\n## A\\n\\n<!--\\n-->\\n### A2\\n\\n## B\\n\\n### B1\\n\\n## C\\n\" — **空のコメント対 `<!--\\n-->` が残骸として残る**。ノード木からは A1/A1a が消えている。",
+   "verdict": "バグ",
+   "note": "マーカーはノード範囲 [hs, subEnd) の外(doc.mbt 規則 3 で subEnd が閉じマーカー手前に切られる)なので削除対象に入らない。残骸は GitHub 等では不可視なので気付けない。親 A(2) ごと削除した場合はマーカー対が範囲に丸ごと入るため残骸は出ない(H-06b)。"
+  },
+  {
+   "id": "H-06b",
+   "title": "hide した子を持つ親を削除する（対照群）",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3); core.deleteNodes([2]) /* 親 A */",
+   "expected": "A のサブツリーと、その中にある hide マーカー対がまとめて消える。",
+   "actual": "\"# Root\\n\\n## B\\n\\n### B1\\n\\n## C\\n\" — マーカーも含めて綺麗に消えた。残骸なし。",
+   "verdict": "正常",
+   "note": "H-06 が「マーカーが範囲外に落ちるとき」だけ壊れることの裏取り。"
+  },
+  {
+   "id": "H-06c",
+   "title": "残った空コメント対が、以降の hide を恒久的に殺す",
+   "input": "H-06 の結果テキスト \"# Root\\n\\n## A\\n\\n<!--\\n-->\\n### A2\\n\\n## B\\n\\n### B1\\n\\n## C\\n\"",
+   "operation": "（H-06 に続けて）core.toggleHidden(2) /* A */、core.toggleHidden(1) /* Root */、core.toggleHidden(5) /* A2 */",
+   "expected": "残骸が無ければ A も Root も hide できるはず。",
+   "actual": "toggleHidden(2) も toggleHidden(1) も **無変化(no-op)**。空領域のマーカーが両者の範囲内にあるため cmd_toggle_hidden の入れ子ガードに引っかかる。残骸の外にある A2(5) だけは hide できた。さらに hide+delete を 3 回繰り返すと \"# R\\n\\n<!--\\n-->\\n<!--\\n-->\\n<!--\\n-->\\n\" と残骸が累積し、Root は永久に hide できなくなる。",
+   "verdict": "バグ",
+   "note": "空領域にはノードが 1 つも属さないのでマップから選択できず、`toggleHidden` で消すこともできない。ユーザーは MD ペインで手で消すしかない。H-06 の実害はこれ。"
+  },
+  {
+   "id": "H-07a",
+   "title": "hide したノードを別の親へ move",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3); core.moveNodes([3], 6, 0) /* A1 を B の末尾の子へ */",
+   "expected": "hide は「そのサブツリーの状態」なので、移動先でも hidden=true のまま。移動元にマーカーの残骸を残さない。",
+   "actual": "\"# Root\\n\\n## A\\n\\n<!--\\n-->\\n### A2\\n\\n## B\\n\\n### B1\\n\\n### A1\\n\\n#### A1a\\n\\n## C\\n\" — **A1 は無言で hidden=false になり(展開され)、移動元に `<!--\\n-->` の残骸が残った**。",
+   "verdict": "バグ",
+   "note": "move_block が動かすのは [hs, subEnd) でマーカーを含まないため。マップ上は「折り畳んだノードをドラッグしたら勝手に開いた」ように見える。折り畳みノード自体はマップに描画され選択できる(mindmap.ts:816)ので UI から普通に踏める。"
+  },
+  {
+   "id": "H-07b",
+   "title": "hide したノードを前後へ move（兄弟の前へ / reorder）",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3); core.moveNodes([3], 8, 1) /* C の直前へ */  ／ 別セッションで core.reorderNode(3, 1) /* 次の兄弟と入替 */",
+   "expected": "同上。位置だけ変わり hidden 状態と原文の他部分は保たれる。",
+   "actual": "pos=1: \"...<!--\\n-->\\n### A2\\n\\n## B\\n\\n### B1\\n\\n## A1\\n\\n### A1a\\n\\n## C\\n\" — 展開 + 残骸。reorderNode(3,1): \"...<!--\\n-->\\n### A2\\n\\n### A1\\n\\n#### A1a\\n\\n## B\\n...\" — 同じく展開 + 残骸。",
+   "verdict": "バグ",
+   "note": "H-07a と同一原因。move 系すべてに出る。"
+  },
+  {
+   "id": "H-07c",
+   "title": "hide したノードを線への割り込みで move（moveAsParent）",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3); core.moveAsParent([3], 7) /* B→B1 の線に A1 を落とす */",
+   "expected": "A1 が B と B1 の間に入り、hidden=true のまま。移動元に残骸なし。",
+   "actual": "\"# Root\\n\\n## A\\n\\n<!--\\n-->\\n### A2\\n\\n## B\\n\\n### A1\\n\\n#### A1a\\n\\n#### B1\\n\\n## C\\n\" — 割り込み自体は正しい(B1 が A1 の子になった)が、**A1 は展開され、残骸 `<!--\\n-->` が残った**。",
+   "verdict": "バグ",
+   "note": "H-07a と同一原因。moveNewGroup / moveNewGroupBefore も同じ(下記 note)。moveNewGroup([3],1) → \"...<!--\\n-->\\n...## C\\n\\n---\\n\\n## A1\\n\\n### A1a\\n\"、moveNewGroupBefore([A1],B) → \"...<!--\\n-->\\n\\n---\\n\\n## A1\\n\\n---\\n\\n## B\\n...\"。"
+  },
+  {
+   "id": "H-08",
+   "title": "hide したノードを含む範囲をコピー",
+   "input": "同 BASE を A1(3) だけ hide した状態: \"# Root\\n\\n## A\\n\\n<!--\\n### A1\\n\\n#### A1a\\n\\n-->\\n### A2\\n\\n## B\\n\\n### B1\\n\\n## C\\n\"",
+   "operation": "core.selectionText([2]) / ([3]) / ([4]) / ([3,5]) / ([1])",
+   "expected": "コピー結果は選択サブツリーのテキストそのもの。hide 状態も「テキストが唯一の真実」なら一緒に運ばれるのが筋。",
+   "actual": "祖先 A を選択: \"## A\\n\\n<!--\\n### A1\\n\\n#### A1a\\n\\n-->\\n### A2\\n\" — マーカー込みで正しい。Root を選択: 全文どおり。しかし**hide したノード自身 A1 を選択すると \"### A1\\n\\n#### A1a\\n\" とマーカーが落ちる**。A1a 単独も \"#### A1a\\n\"。複数選択 [A1,A2] も \"### A1\\n\\n#### A1a\\n\\n### A2\\n\" でマーカーなし。",
+   "verdict": "仕様が未定義",
+   "note": "「祖先ごとコピーすると折り畳みが付いてくるが、折り畳みノード自体をコピーすると展開される」という非対称。貼り付け側は健全で、マーカーを含むクリップボードを replaceText で挿し込むと hidden 領域がちゃんと再構築された(新 id 9..12 で 10:A1[H] 11:A1a[H])。"
+  },
+  {
+   "id": "H-09",
+   "title": "hide したノードの兄弟を hide する（マーカーが隣接する）",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3) /* A1 */; core.toggleHidden(5) /* 兄弟 A2 */; その後 toggleHidden(3); toggleHidden(5)",
+   "expected": "2 つの独立した領域ができ、マーカーが `-->\\n<!--` と隣接しても取り違えない。片方ずつ show でき、両方 show すると原文に戻る。",
+   "actual": "\"...<!--\\n### A1\\n\\n#### A1a\\n\\n-->\\n<!--\\n### A2\\n\\n-->\\n## B\\n...\" / 3,4,5 が hidden。A1 だけ show → A2 の領域だけ残る。A2 も show → 原文とバイト一致 (true)。",
+   "verdict": "正常",
+   "note": "隣接マーカーの領域特定は正しい。束をまたいだ 2 領域(H-17)も同様に正常だった。"
+  },
+  {
+   "id": "H-09b",
+   "title": "hide した兄弟同士で indent すると親子にならない",
+   "input": "# Root\\n\\n## A\\n\\n### A1\\n\\n### A2\\n\\n## B\\n  (A1, A2 を両方 hide)",
+   "operation": "initDoc(MD); core.toggleHidden(A1); core.toggleHidden(A2); core.indentNodes([A2])",
+   "expected": "indent は A2 を直前の兄弟 A1 の子にする操作。A2 の parent が A1 になる。",
+   "actual": "見出しは `### A2` → `#### A2` に深くなったが、**parent は A(2) のまま**(A2: depth=4, parent=2)。深さ 2 の親に深さ 4 の子がぶら下がる。対照群(hide なしで同じ indent)では A2 の parent が正しく A1(3) になる。",
+   "verdict": "バグ",
+   "note": "A1 の subEnd が自分の閉じマーカー手前で切られるため、その後ろにある A2 は A1 のサブツリーに入れない。indent は「深さを +1 する」編集しか出さないので、hide 中は再親子付けに失敗する。"
+  },
+  {
+   "id": "H-10",
+   "title": "hide したノードを undo / redo",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3); core.undo(); core.redo(); core.toggleHidden(3); core.undo(); core.redo()",
+   "expected": "hide 1 回 = undo 1 回で原文に戻る。redo で hide 状態に戻る。show についても同様。delete/move で壊れた hide 状態も undo で完全復元される。",
+   "actual": "undo → 原文とバイト一致、hidden 全 false。redo → hide 状態と一致、3:A1[H] 4:A1a[H]。show の undo/redo も同様に対称。H-06(hide→delete) の undo で残骸ごと hide 状態が完全復元、H-07a(hide→move) の undo でも完全復元。",
+   "verdict": "正常",
+   "note": "undo/redo は全ケースでバイト単位に可逆だった。tag=\"\" なので隣の編集とマージもされない。"
+  },
+  {
+   "id": "H-11",
+   "title": "束（---）をまたぐ範囲を hide する",
+   "input": "# Root\\n\\n## A\\n\\n### A1\\n\\n---\\n\\n## B\\n\\n### B1\\n\\n---\\n\\n## C\\n\\n### C1\\n  (group: Root0 A0 A1-0 B1 B1-1 C2 C1-2)",
+   "operation": "initDoc(MD); core.toggleHidden(1) /* Root: 範囲が 2 本の --- をまたぐ */; core.toggleHidden(1)",
+   "expected": "文書全体が包まれ、全ノードが hidden=true。区切りの有効性(束の割り当て)は変わらない。show で原文に戻る。",
+   "actual": "\"<!--\\n# Root\\n\\n## A\\n\\n### A1\\n\\n---\\n\\n## B\\n\\n### B1\\n\\n---\\n\\n## C\\n\\n### C1\\n-->\\n\" — 全 7 ノードが hidden=true、group は 0,0,0,1,1,2,2 のまま不変。show で原文とバイト一致。",
+   "verdict": "正常",
+   "note": "`<!--` が root_hs より前に入るが、区切り有効条件 5「s_start >= root_hs」の相対順序は変わらないので束は保たれる。束の最後のノードを hide して `-->` が `---` の直前に来るケース(H-12c)も正常だった(is_text_line が `-->` を本文と見なさないため setext 誤判定も起きない)。"
+  },
+  {
+   "id": "H-12",
+   "title": "区切りの直後の見出し（束の先頭）を hide する",
+   "input": "# Root\\n\\n## A\\n\\n### A1\\n\\n---\\n\\n## B\\n\\n### B1\\n\\n---\\n\\n## C\\n\\n### C1\\n  (group: A=0, B/B1=1, C/C1=2)",
+   "operation": "initDoc(MD); core.toggleHidden(B) /* 2 番目の束の先頭 */",
+   "expected": "B のサブツリーだけが hidden になる。B が属する束、および後続の束の group（＝マップ左右の割り当て）は変わらない。",
+   "actual": "テキストは \"...### A1\\n\\n---\\n\\n<!--\\n## B\\n\\n### B1\\n\\n-->\\n---\\n\\n## C\\n\\n### C1\\n\"。**group が B:1→0、B1:1→0、C:2→1、C1:2→1 と全部ずれた**。mindmap.ts:1071 は `group % 2 === 0` で右／左を決めるので、**hide とは無関係な C と C1 がマップの反対側へ飛ぶ**。show で戻すと group も元に戻る(テキストはバイト一致)。",
+   "verdict": "バグ",
+   "note": "原因は doc.mbt の区切り有効条件「is_blank_range(区切りの次行, 次の見出しの hs)」。挿入された `<!--` 行が空白でないため、その `---` が区切りとして無効化される。最後の束の先頭 C を hide した場合も C:2→1 でずれる。同一の症状はリポジトリ内の実 .md ほぼ全部で再現する(下記 H-12c)。"
+  },
+  {
+   "id": "H-12b",
+   "title": "深く書かれた束の先頭（深さが読み替えられている見出し）を hide する",
+   "input": "# Root\\n\\n## A\\n\\n### A1\\n\\n---\\n\\n#### B\\n\\n##### B1\\n\\n---\\n\\n## C\\n  (`#### B` は区切り直後なので深さ 2 = ルート直下として読まれる。base: B d2 p=Root, B1 d3 p=B, C g2)",
+   "operation": "initDoc(MD); core.toggleHidden(B)",
+   "expected": "B のサブツリーが hidden になるだけ。B の depth(2) と parent(Root) は変わらない。",
+   "actual": "**B: depth 2→4、parent Root(1)→A1(3)。B1: depth 3→5。C: group 2→1。** つまり B と B1 が、別の束にある無関係な A1 の子として木にぶら下がる。show で完全に元へ戻る(テキストもバイト一致)。",
+   "verdict": "バグ",
+   "note": "H-12 と同一原因(区切りの無効化)だが、深さの読み替えが消える分こちらの方が破壊的。hidden 中の木がそのまま次のコマンドの入力になるので実害が出る → H-12c。"
+  },
+  {
+   "id": "H-12c",
+   "title": "束の先頭を hide した状態で無関係なノードを削除すると、別の束が消える",
+   "input": "H-12b と同じ入力・同じ hide 状態",
+   "operation": "（H-12b に続けて）core.deleteNodes([A]) /* 1 番目の束の A を削除 */",
+   "expected": "A と A1 だけが消える。B / B1 / 区切り `---` は無傷。",
+   "actual": "\"# Root\\n\\n---\\n\\n## C\\n\" — **A・A1 に加えて B・B1・1 本目の `---` まで消えた**。hide で A の subEnd が B/B1 を飲み込む位置(54)まで伸びていたため。undo では復元できる。",
+   "verdict": "バグ",
+   "note": "H-12/H-12b の実害。「範囲は他のノードを巻き込まない」原則の明確な違反で、無言のデータ消失。実ファイルでも再現: mmm.md の束の先頭「Hキー」を hide すると、Hキーと兄弟の「入力欄」「done」「カーブ」「選択中ノードのみの書き出し」など計 8 ノードが group 1→0 になり、マップの左から右へ飛ぶ。audit/ 配下の .md も DEBT.md 9件 / FINDINGS.md 10件 / MAP.md 7件 / rich.md 29件 / mixed.md 49件 の見出しで同じ group ずれが起きる。"
+  },
+  {
+   "id": "H-13a",
+   "title": "hide したノードに indent する",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(5) /* A2、直前の兄弟 A1 は非 hide */; core.indentNodes([5])",
+   "expected": "A2 の見出しが 1 段深くなり、hidden 状態は保たれ、マーカーは動かない。",
+   "actual": "\"...#### A1a\\n\\n<!--\\n#### A2\\n\\n-->\\n## B\\n...\" — `### A2` → `#### A2`、A2 は hidden=true のまま、parent も正しく A1(3) になった。直前の兄弟が無い A1(3) に対する indent は no-op で正常。",
+   "verdict": "正常",
+   "note": "領域の内側だけを書き換える indent は健全。直前の兄弟も hidden な場合だけ壊れる(H-09b)。"
+  },
+  {
+   "id": "H-13b",
+   "title": "hide したノードに outdent する",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3) /* A1 */; core.outdentNodes([3])",
+   "expected": "A1 が 1 段浅くなって Root の子になり、hidden=true のまま。移動元に残骸を残さない。",
+   "actual": "\"# Root\\n\\n## A\\n\\n<!--\\n-->\\n### A2\\n\\n## A1\\n\\n### A1a\\n\\n## B\\n...\" — **A1 は hidden=false になり(展開され)、`<!--\\n-->` の残骸が残った**。",
+   "verdict": "バグ",
+   "note": "outdent は内部で move_block を使ってブロックを動かすため H-07 系と同じ症状になる。indent(H-13a)は深さの書き換えだけなので無事、という非対称。"
+  },
+  {
+   "id": "H-14",
+   "title": "文書の最後のノードを hide する（末尾の改行）",
+   "input": "末尾の形を変えた 7 通り: \"# Root\\n\\n## A\\n\\n## C\" (末尾改行なし) / \"...## C\\n\" / \"...## C\\n\\n\" / CRLF 版 2 通り / \"...## C\\n\\n本文だけ\" / \"...## C\\n   \" (末尾空白)",
+   "operation": "各入力で initDoc(md); core.toggleHidden(最後のノード); core.toggleHidden(同)",
+   "expected": "閉じマーカーが必ず行頭に来て、show で元の末尾の形（改行の有無・個数・CRLF/LF・末尾空白）がバイト単位で復元される。",
+   "actual": "7 通りすべて往復でバイト一致 (true)。末尾改行なし → \"...<!--\\n## C\\n-->\"(末尾改行を増やさない)。末尾改行あり → \"...<!--\\n## C\\n-->\\n\"。CRLF 版は改行が全部 \\r\\n で統一される。hide 直後の hidden=true も確認。",
+   "verdict": "正常",
+   "note": "FINDINGS.md の F-007「末尾に改行が無い文書で hide→show すると末尾に改行が 1 つ増える」は**修正済み**。cmds.mbt が「閉じマーカーが改行で終わっているか」で足した改行を判別している。同様に F-011「閉じマーカーの厳密一致」も is_comment_open/close が 2 個以上のハイフンを受け付ける形に修正済み。"
+  },
+  {
+   "id": "H-15a",
+   "title": "hide 中のノードに子を追加する",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3) /* A1 */; core.addChild(3, \"\", false)",
+   "expected": "新しい子は A1 のサブツリーに属するので、領域の内側に入り hidden=true になるのが筋。",
+   "actual": "\"...<!--\\n### A1\\n\\n#### A1a\\n\\n#### \\n\\n-->\\n### A2\\n...\" — 新ノード id=9 が領域内、depth 4、parent 3、hidden=true。孫にあたる A1a(4) への addChild も同様(id=9, depth 5, parent 4, hidden)。",
+   "verdict": "仕様が未定義",
+   "note": "テキスト上は筋が通っているが、マップ上は「折り畳んだノードで子を追加したのに何も現れない」。README にも記述が無い。UI 側でガードするか、追加時に自動 show するかの判断が要る。"
+  },
+  {
+   "id": "H-15b",
+   "title": "hide 中のノードに兄弟を追加する",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(3) /* A1 */; core.addSibling(3, \"\", false)",
+   "expected": "A1 の兄弟は A1 のサブツリーではなく親 A に属する。したがって新ノードは `-->` の**外側**に置かれ、hidden=false であるべき。",
+   "actual": "\"...<!--\\n### A1\\n\\n#### A1a\\n\\n### \\n\\n-->\\n### A2\\n...\" — 新ノード id=9 が**領域の内側**に入り hidden=true になった。",
+   "verdict": "バグ",
+   "note": "挿入位置が A1.subEnd = 閉じマーカーの直前になるため。折り畳みノードを選んで Enter を押すと、見えないノードが 1 つ増える(選択も編集もできない)。H-15a と違い、範囲の意味からしても誤り。"
+  },
+  {
+   "id": "H-16",
+   "title": "見えているノードを hide 領域の中へ move する",
+   "input": "同 BASE、A1(3) を hide した状態",
+   "operation": "initDoc(BASE); core.toggleHidden(3); core.moveNodes([5], 3, 0) /* A2 を折り畳み中の A1 の末尾の子へ */",
+   "expected": "未定義。少なくとも「マップから消える」なら何らかの通知が要る。",
+   "actual": "\"...<!--\\n### A1\\n\\n#### A1a\\n\\n#### A2\\n\\n-->\\n## B\\n...\" — A2 が領域の内側に入り hidden=true になった。マップからは消える。",
+   "verdict": "仕様が未定義",
+   "note": "折り畳みノードは D&D のドロップ先として描画されている(mindmap.ts:816 で子孫だけを間引く)ので、ドラッグしたノードが落とした瞬間に消える。H-15b と同じクラスの UI 上の落とし穴。"
+  },
+  {
+   "id": "H-17",
+   "title": "別々の束にある 2 つのノードを hide する",
+   "input": "# Root\\n\\n## A\\n\\n### A1\\n\\n---\\n\\n## B\\n\\n### B1\\n\\n---\\n\\n## C\\n\\n### C1\\n",
+   "operation": "initDoc(MD); core.toggleHidden(A1); core.toggleHidden(C1); その後 両方 show",
+   "expected": "2 領域が独立に存在し、group は不変。両方 show で原文に戻る。",
+   "actual": "\"...<!--\\n### A1\\n\\n-->\\n---\\n\\n## B\\n...\\n---\\n\\n## C\\n\\n<!--\\n### C1\\n-->\\n\" / group は 0,0,0,1,1,2,2 のまま不変。両方 show で原文とバイト一致。",
+   "verdict": "正常",
+   "note": "束の先頭でないノードを hide する限り group はずれない。H-12 は「束の先頭であること」が条件。"
+  },
+  {
+   "id": "H-18",
+   "title": "存在しない id に対する toggleHidden",
+   "input": "同 BASE",
+   "operation": "initDoc(BASE); core.toggleHidden(999)",
+   "expected": "no-op。テキストもツリーも不変。",
+   "actual": "テキスト完全不変、ノード 8 個のまま。find_node が -1 を返して即 return。",
+   "verdict": "正常",
+   "note": "—"
+  },
+  {
+   "id": "H-19",
+   "title": "閉じていない <!-- が既にある文書で hide する",
+   "input": "# Root\\n\\n## A\\n\\n## B\\n\\n<!--\\n\\n## C\\n  (C は既に hidden=true、かつ parent=-1 で Root から切れている)",
+   "operation": "initDoc(MD); core.toggleHidden(A); core.toggleHidden(A)",
+   "expected": "A の hide/show が既存の未閉領域に干渉しない。往復で原文に戻る。",
+   "actual": "hide 後 \"# Root\\n\\n<!--\\n## A\\n\\n-->\\n## B\\n\\n<!--\\n\\n## C\\n\"、show で原文とバイト一致。C は終始 hidden=true / parent=-1。",
+   "verdict": "正常",
+   "note": "hide コマンド自体は干渉しない。ただし未閉 `<!--` があると Root の subEnd がそこで切られ、以降のノードが parent=-1 の別ツリーとして浮く(パーサ側の既存挙動、FINDINGS F-011 の残り火)。UI にはどこにも「閉じていない」表示が無い。"
+  },
+  {
+   "id": "H-20",
+   "title": "文書中に単独の --> がある状態で hide → show するとその行が壊れる",
+   "input": "# r\\n\\n## a\\n\\n-->\\n\\n## b\\n  (`-->` は開始マーカーの無いただの本文行。GitHub でも literal に表示される)",
+   "operation": "initDoc(MD); core.toggleHidden(a); core.toggleHidden(a)",
+   "expected": "hide→show でテキストが原文にバイト単位で戻る。ユーザーが書いた `-->` の行は動かない。",
+   "actual": "hide 後: \"# r\\n\\n<!--\\n## a\\n\\n-->\\n\\n-->\\n## b\\n\"（挿入した `-->` の手前に既存の `-->` があるので、領域は**既存の行で閉じてしまう**）。show 後: \"# r\\n\\n## a\\n\\n\\n-->\\n## b\\n\" — **ユーザーが書いた `-->` の行が削除され、ツールが挿入した `-->` が残った**。原文に戻らない。",
+   "verdict": "バグ",
+   "note": "cmd_toggle_hidden の show 側は「nd.hs を含む領域」の c_start を消すが、それが自分で入れたマーカーである保証が無い。ランダム文書 120 件のうち、マーカーを含まない文書では往復失敗 0/402 件、`<!--`/`-->` を含む文書では 278 件失敗。fixtures/gnarly.md・gnarly-crlf.md でも 1 件ずつ再現する。"
+  },
+  {
+   "id": "H-21",
+   "title": "既に hide されている文書を show → hide しても元のテキストに戻らない",
+   "input": "# r\\n\\n## c\\n\\n<!--\\n### 隠\\n-->\\n\\n## next\\n  (閉じマーカーの後ろに空行があるのが元の形。audit/fixtures/gnarly.md の「隠されたノード」と同じ形)",
+   "operation": "initDoc(MD); core.toggleHidden(隠); core.toggleHidden(隠)",
+   "expected": "show→hide も往復であり、テキストがバイト単位で元に戻る。",
+   "actual": "show: \"# r\\n\\n## c\\n\\n### 隠\\n\\n## next\\n\"（ここは正しい）。hide: \"# r\\n\\n## c\\n\\n<!--\\n### 隠\\n\\n-->\\n## next\\n\" — **`-->` の前後の空行が入れ替わり、原文と一致しない**。内容は保たれるが、開いた瞬間にファイルが dirty になる。2 回目以降は安定する(hide2 == hide1)。",
+   "verdict": "バグ",
+   "note": "往復不変が保証されているのは hide→show の向きだけで、show→hide の向きは保証されていない。原因は hide が閉じマーカーを常に subEnd(＝次の見出しの直前、つまり空行の後ろ)に置くこと。閉じマーカーの直前が空行なら手前に詰める、といった正規化が要る。`-->` の直後に空行が無い形(\"...\\n-->\\n## next\\n\")なら往復一致する。"
+  },
+  {
+   "id": "H-24",
+   "title": "hide したノードを含む複数選択を削除する",
+   "input": "# Root\\n\\n## A\\n\\n### A1\\n\\n### A2\\n\\n## B\\n  (A1 を hide)",
+   "operation": "initDoc(MD); core.toggleHidden(A1); core.deleteNodes([A1, A2])",
+   "expected": "A1・A2 とマーカーが消える。",
+   "actual": "\"# Root\\n\\n## A\\n\\n<!--\\n-->\\n## B\\n\" — 両ノードは消えたが `<!--\\n-->` の残骸が残る。",
+   "verdict": "バグ",
+   "note": "H-06 と同一原因。複数選択でも同じ。"
+  },
+  {
+   "id": "H-25",
+   "title": "回帰確認: 既知の失敗とされていた往復テスト",
+   "input": "リポジトリの audit/tests 一式（実 .md コーパス + ランダム文書）",
+   "operation": "cd D:/1.atrium/mmm && node --test \"audit/tests/*.test.mjs\"",
+   "expected": "C6 と C9b は既知の失敗、それ以外は通る。",
+   "actual": "**27 件すべて pass、fail 0**。C6「hide→show がテキストを元に戻す」も C9b「outdent は対象ノードの id を保存する」も通った。",
+   "verdict": "正常",
+   "note": "C6 が扱う文書は 6 通り（末尾改行あり/なし/子あり/本文つき/CRLF/**区切りの直前**）で、**「区切りの直後」＝束の先頭が入っていない**。H-12 のバグが素通りしているのはこの穴のため。また C6 は hide→show の向きしか見ておらず、H-21(show→hide) と H-20(既存 `-->` との衝突)も検出できない。"
+  },
+  {
+   "id": "D-01",
+   "title": "深い階層のノードを別の深い階層へ move（区切りなし）",
+   "input": "# Root\n\n## A\n\n### A1\n\n#### A1a\n\n### A2\n\n## B\n\n### B1\n\n#### B1a\n\n##### B1a1\n",
+   "operation": "initDoc(md); core.moveNodes([8], 4, 0)  // B1a(深さ4, 子B1a1あり) を A1a(深さ4) の子へ",
+   "expected": "B1a が深さ5（#####）、子の B1a1 が深さ6（######）になり、A1a の子として A2 の前に入る。id は 8/9 のまま",
+   "actual": "期待どおり。テキストは `#### A1a` の直後に `##### B1a` / `###### B1a1` が入り、id=8 d=5 p=4 / id=9 d=6 p=8。A2, B, B1 は元の深さのまま",
+   "verdict": "正常",
+   "note": "区切りが1本も無い文書では move_block の delta 計算（new_depth - nd.depth）が正しく働く。書かれた # の数と読み深さが一致しているため。"
+  },
+  {
+   "id": "D-02",
+   "title": "子を持つノードを本文ごと move（部分木が丸ごと動くか、順序が保たれるか）",
+   "input": "# Root\n\n## A\n\n本文A\n\n### A1\n\n本文A1\n\n#### A1a\n\n### A2\n\n## B\n\n### B1\n",
+   "operation": "initDoc(md); core.moveNodes([A], [B1], 0)  // A を B1 の子へ",
+   "expected": "A の部分木（本文A / A1 / 本文A1 / A1a / A2）が順序を保ったまま B1 の下へ移り、全員が2段深くなる",
+   "actual": "期待どおり。`#### A\\n\\n本文A\\n\\n##### A1\\n\\n本文A1\\n\\n###### A1a\\n\\n##### A2`。本文も同じ相対位置で追随し、A1→A1a→A2 の文書順も保存。id=2..5 全て保存",
+   "verdict": "正常",
+   "note": "move_block は [hs, sub_end) をそのまま切り出して差し込むので、見出しに紐づく本文（画像・表・コードフェンス含む）は自動的に付いてくる。"
+  },
+  {
+   "id": "D-03",
+   "title": "複数ノードをまとめて move（選択の順序、入れ子の正規化）",
+   "input": "# Root\n\n## A\n\n### A1\n\n#### A1a\n\n### A2\n\n## B\n\n### B1\n\n#### B1a\n\n##### B1a1\n",
+   "operation": "(a) core.moveNodes([A2, A1], B1, 0)  逆順で渡す / (b) core.moveNodes([A1, A2], B1, 0)  文書順 / (c) core.moveNodes([A, A1], B1, 0)  入れ子を含む選択",
+   "expected": "(a)(b) とも渡した順ではなく文書順（A1 → A2）で並ぶこと。(c) は A1 が A の中に含まれるので A だけが動き、A1 は A の子のまま付いてくること",
+   "actual": "(a)(b) とも同一結果: B1 の子として A1(d=4) → A1a(d=5) → A2(d=4) の順。渡した順序に依存しない。(c) は normalize_selection が A1 を捨て、A の部分木ごと1回だけ移動（A d=4 / A1 d=5 / A1a d=6 / A2 d=5）",
+   "verdict": "正常",
+   "note": "normalize_selection が範囲包含で重複を落とし文書順に並べ替える。move_steps は1つ動かすたび anchor を「直前に置いたノードの後ろ」に更新するので相対順序が保たれる。"
+  },
+  {
+   "id": "D-04",
+   "title": "自分の子孫へ move（拒否されるか）",
+   "input": "# Root\n\n## A\n\n### A1\n\n#### A1a\n\n### A2\n\n## B\n\n### B1\n\n#### B1a\n\n##### B1a1\n",
+   "operation": "(a) core.moveNodes([A], A1a, 0) 孫の子へ / (b) core.moveNodes([A], A1, 1) 自分の子の前へ / (c) core.moveNodes([A], A, 0) 自分自身の子へ",
+   "expected": "3つとも拒否され、テキストもツリーも変化しないこと",
+   "actual": "3つとも テキスト完全一致（変化なし）、ノード9個の id/depth/parent/group すべて不変。canUndo も立たない",
+   "verdict": "正常",
+   "note": "move_steps の `if tn.hs >= nd.hs && tn.hs < nd.sub_end { continue }` が効いている。範囲包含での判定なので親子チェーンをたどる必要がなく、確実。"
+  },
+  {
+   "id": "D-05",
+   "title": "束をまたぐ move（束番号が変わる、左右が入れ替わる）",
+   "input": "# Root\n\n## G0a\n\n### G0a1\n\n---\n\n## G1a\n\n### G1a1\n\n---\n\n## G2a\n\n---\n\n## G3a\n\n### G3a1\n",
+   "operation": "initDoc(md); core.moveNodes([G3a], [G1a], 2)  // 束3の G3a を束1の G1a の直後へ",
+   "expected": "G3a と G3a1 が束1に入り group=1 になる。G3a を始めていた3本目の `---` は役目を失うので消えるか、少なくとも文書末に裸で残らないこと",
+   "actual": "G3a/G3a1 は正しく group=1 に入るが、**3本目の `---` が文書末に取り残される**: 出力末尾が `## G2a\\n\\n---`。この `---` は次に見出しが来ないため無効な水平線として残り、markdown 上は `<hr>` として見える",
+   "verdict": "バグ",
+   "note": "cmd_move（moveNodes）は empty_bundle_sep_edits を一切呼ばない。呼ぶのは moveNewGroup / moveNewGroupBefore だけ。move 系4つの間で後片付けの挙動が食い違っている（cmds.mbt:519 cmd_move vs cmds.mbt:550 cmd_move_new_group）。"
+  },
+  {
+   "id": "D-06",
+   "title": "束の最後の1つを別の束へ move → 元の束の区切りが宙に浮く",
+   "input": "# Root\n\n## G0a\n\n### G0a1\n\n---\n\n## G1a\n\n### G1a1\n\n---\n\n## G2a\n\n---\n\n## G3a\n\n### G3a1\n",
+   "operation": "initDoc(md); core.moveNodes([G2a], [G0a], 0)  // 束2の唯一のノードを束0の子へ",
+   "expected": "束2が空になるので2本目の `---` が消え、G3a は group=2 のまま（左のまま）でいてほしい",
+   "actual": "`---` が残って `---\\n\\n---\\n\\n## G3a` と2本連続になる。連続した2本のうち有効なのは後ろ1本だけなので、**G3a の group が 3 → 2 に変わり、左右が反転する**（3=左 → 2=右）。文書には見えるゴミの `---` が残る",
+   "verdict": "バグ",
+   "note": "ユーザー報告「それ以降の順番が入れ替わったりレイアウトが崩れたりする」の直接原因のひとつ。mindmap.ts:1071 が `group % 2 === 0 ? 右 : 左` で左右を決めているため、束が1つ消えると以降の全束が反転する。moveAsParent も同じ経路（D-09b）。"
+  },
+  {
+   "id": "D-07",
+   "title": "区切りの直後の見出し（深さが読み替えられている）を束の外へ move",
+   "input": "# Root\n\n## A\n\n### A1\n\n---\n\n#### BH\n\n##### BH1\n\n###### BH1a\n",
+   "operation": "initDoc(md); core.moveNodes([BH1], [A1], 0)  // BH1（書き ##### / 読み深さ3）を A1（深さ3）の子へ",
+   "expected": "BH1 は深さ4（`####`）、BH1a は深さ5（`#####`）として A1 の下に入る",
+   "actual": "**深さが暴走する**。BH1 が深さ6（`######`）、BH1a が深さ7（`#######`）になる。BH ごと動かした D-07b では BH=6, BH1=7, BH1a=8 で `######## BH1a` まで出る。7個以上の `#` は CommonMark では見出しではないので、外部レンダラでは本文テキストとして表示される（mmm 自身のパーサだけが深さ7/8 として読む）",
+   "verdict": "バグ",
+   "note": "move_block（cmds.mbt:432付近）が `delta = new_depth - nd.depth` を **書かれた # の数に加算**する。nd.depth は束の読み替え後の実効深さなので、束の中（書き5 / 読み3）から外へ出すと delta=+1 が書きの5に足されて6になる。delta は「書かれた # の数」基準で計算しないと合わない。"
+  },
+  {
+   "id": "D-08",
+   "title": "移動先が「深さの読み替え」の対象になる位置のとき、書き込まれる # の数",
+   "input": "# Root\n\n## A\n\n### A1\n\n---\n\n#### BH\n\n##### BH1\n",
+   "operation": "initDoc(md); core.moveNodes([A1], [BH1], 0)  // A1（書き ### / 読み深さ3）を束の中の BH1（読み深さ3）の子へ",
+   "expected": "A1 が BH1 の子になる。束の基準が `#### BH`（shift=-2）なので、読み深さ4にするには `######` と書く必要がある",
+   "actual": "`#### A1` と書かれる（delta = 4-3 = +1 を書きの3に足しただけ）。束の中では `####` は読み深さ2になるので、**A1 は BH1 の子ではなく BH の兄弟（束の直下）になる**。ドロップ先が完全に無視された形",
+   "verdict": "バグ",
+   "note": "D-07 の裏返し。move_block が移動先の「束の基準深さ（shift）」を知らないまま # を書くため、束の内と外をまたぐ move は必ずずれる。"
+  },
+  {
+   "id": "D-08b",
+   "title": "delta=0 で # が書き換わらず、深さだけ変わる（最小・最悪ケース）",
+   "input": "# Root\n\n## A\n\n---\n\n#### BH\n\n##### BH1\n",
+   "operation": "initDoc(md); core.moveNodes([BH], [A], 2)  // 束1の先頭 BH（マップ上は深さ2）を、深さ2の A の直後の兄弟へ",
+   "expected": "BH は A の兄弟（深さ2、親=Root）になる。マップでは A の隣に並ぶ",
+   "actual": "**BH が A の子（深さ4）になる**。id=3 d=4 p=2。テキストは `## A\\n\\n#### BH\\n\\n##### BH1` で `#` の数は一切変わっていない（delta = 2-2 = 0 なので move_block が書き換えをしない）。束を抜けた瞬間に `####` がそのまま深さ4として読まれる。さらに `---` が末尾に取り残される",
+   "verdict": "バグ",
+   "note": "マップ上は両方とも深さ2に見えるので、ユーザーには「兄弟にドロップしたのに孫の位置に飛んだ」ように見える。ドロップ指示線が約束した位置と結果が食い違う典型例で、「レイアウトが崩れる」の体感に直結する。"
+  },
+  {
+   "id": "D-08c",
+   "title": "実ファイル mmm.md での D-08b 再現（ユーザーの手元で起きること）",
+   "input": "D:/1.atrium/mmm/mmm.md をそのまま（束1の中は `### Hキー` が読み深さ2、`#### hはvim…` が読み深さ3 …と書き≠読みのノードが8個ある）",
+   "operation": "initDoc(readFileSync('D:/1.atrium/mmm/mmm.md')); core.moveNodes([30 \"Hキー\"], 10 \"ショートカット\", 2)  // 「Hキー」を「ショートカット」の直後の兄弟へ",
+   "expected": "深さ2 / 親=1（ルート）。マップ上「ショートカット」の真下に同じ段で並ぶ",
+   "actual": "深さ3 / 親=10（「ショートカット」の子）。テキストは `## ショートカット` … `#### Mpでよくあるやつ` の後ろに `### Hキー` が入り、`ショートカット` の3人目の子になる。あわせて末尾の束1の `---` はそのまま残る",
+   "verdict": "バグ",
+   "note": "リポジトリ内の実 .md 20本を走査したところ、書き≠読みのノードを持つのは mmm.md だけ（8ノード）。ただしそれがまさにユーザーの作業ファイルなので、報告された症状はこの経路で日常的に踏まれている。"
+  },
+  {
+   "id": "D-09",
+   "title": "moveAsParent で、対象が束の先頭のとき",
+   "input": "# Root\n\n## A\n\n### A1\n\n---\n\n## B\n\n### B1\n",
+   "operation": "initDoc(md); core.moveAsParent([A1], [B])  // 束1の先頭 B の親として A1 を割り込ませる",
+   "expected": "A1 が `---` の後ろ（＝束1の先頭）に入って group=1 / 深さ2 になり、B と B1 が1段下がる",
+   "actual": "期待どおり。`---\\n\\n## A1\\n\\n### B\\n\\n#### B1`。A1 が新しい束1の先頭、B(d=3, p=A1), B1(d=4)。挿入位置が `---` の手前ではなく後ろ（tn.hs）なので束に正しく吸い込まれている",
+   "verdict": "正常",
+   "note": "pos=1 の挿入点が target.hs であることが、束の先頭への割り込みで偶然かつ正しく働く。undo も1回で戻る（cmd_move_as_parent が move と indent を同じ tx に積んでいる）。"
+  },
+  {
+   "id": "D-09b",
+   "title": "moveAsParent でも元の束の区切りが取り残される",
+   "input": "# Root\n\n## G0a\n\n---\n\n## G1a\n\n---\n\n## G2a\n\n---\n\n## G3a\n",
+   "operation": "initDoc(md); core.moveAsParent([G1a], [G3a])  // 束1の唯一のノードを、束3の G3a の親として割り込ませる",
+   "expected": "束1が空になるので1本目の `---` が消え、G2a は group=1、G1a/G3a は group=2 に落ち着く",
+   "actual": "`## G0a\\n\\n---\\n\\n---\\n\\n## G2a\\n\\n---\\n\\n## G1a\\n\\n### G3a`。1本目の `---` が残って2本連続になる。構造自体（G1a が G3a の親）は正しいが、ゴミの `---` が文書に残る",
+   "verdict": "バグ",
+   "note": "cmd_move_as_parent も empty_bundle_sep_edits を呼んでいない。D-05/D-06 と同じ欠落。moveNewGroup / moveNewGroupBefore だけが後片付けを持っている。"
+  },
+  {
+   "id": "D-10a",
+   "title": "moveNewGroupBefore で、対象が先頭の束のとき",
+   "input": "# Root\n\n## G0a\n\n---\n\n## G1a\n\n---\n\n## G2a\n\n---\n\n## G3a\n\n---\n\n## G4a\n\n## Zsrc\n",
+   "operation": "initDoc(md); core.moveNewGroupBefore([Zsrc], [G0a])  // 先頭の束の手前に新しい束として",
+   "expected": "Zsrc が group=0（右）になり、既存の束が1つずつ後ろにずれる。テキストは最小限の挿入",
+   "actual": "テキストは意図どおり最小限（`## Zsrc\\n\\n---\\n\\n## G0a\\n…`）。だが group が全部ずれるため **既存5束の左右がすべて反転する**: G0a 0(右)→1(左)、G1a 1(左)→2(右)、G2a 2(右)→3(左)、G3a 3(左)→4(右)、G4a 4(右)→5(左)。1回のドラッグでマップ全体が左右鏡像になる",
+   "verdict": "バグ",
+   "note": "ユーザー報告の症状そのもの。group が「その位置より前にある有効な区切りの本数」という通し番号で、mindmap.ts:1071 が `group % 2` で左右を決めているため、束を1つ挿入すると以降すべての偶奇が入れ替わる。テキストの編集は最小なのに、見た目だけが大崩れする。"
+  },
+  {
+   "id": "D-10b",
+   "title": "moveNewGroupBefore で、対象が途中の束のとき",
+   "input": "D-10a と同じ",
+   "operation": "initDoc(md); core.moveNewGroupBefore([Zsrc], [G2a])  // 束2の手前に新しい束として",
+   "expected": "Zsrc が group=2 に入り、G2a 以降が1つずつ後ろへ。挿入点より前（G0a, G1a）は不変",
+   "actual": "G0a 0(右) / G1a 1(左) は不変で正しい。しかし挿入点より後ろは全部反転: G2a 2(右)→3(左)、G3a 3(左)→4(右)、G4a 4(右)→5(左)。触っていない3束が左右を入れ替える",
+   "verdict": "バグ",
+   "note": "D-10a と同一原因。挿入点より前だけが守られる。ランダム文書300本での計測では moveNewGroupBefore の実移動 1385 件中 691 件（50%）、moveNewGroup は 1385 件中 740 件（53%）で「動かしていないノードの group 偶奇が変わる」現象が出た。"
+  },
+  {
+   "id": "D-10c",
+   "title": "moveNewGroupBefore で before_id が自分自身 / 自分の子のとき",
+   "input": "# Root\n\n## G0\n\n---\n\n## G1\n\n### G1c\n\n---\n\n## G2\n",
+   "operation": "(a) initDoc(md); core.moveNewGroupBefore([G1], [G1]) / (b) initDoc(md); core.moveNewGroupBefore([G1], [G1c])",
+   "expected": "どちらも退化した操作（すでに自分の束の先頭）なので何もしない（no-op）",
+   "actual": "(a)(b) とも同一の破壊: **G1 の束を作っていた `---` が削除される**。結果 `# Root\\n\\n## G0\\n\\n## G1\\n\\n### G1c\\n\\n---\\n\\n## G2`。G1/G1c が group 1(左)→0(右)、G2 が 2(右)→1(左) に落ちて全部反転。undo 1回では戻るが、ユーザーには何が起きたか分からない",
+   "verdict": "バグ",
+   "note": "cmd_move_new_group_before は先に empty_bundle_sep_edits で「空になる束」の `---` を消してから move_steps を回す。ところが移動先が自分の範囲内だと move_steps 側が `continue` で何もせず first_focus=-1 のまま終わり、新しい `---` を書き直す枝に入らない。削除だけが残る。UI 到達性は高い: mindmap.ts の Ctrl+ドラッグは groupSlotAt() が「ポインタがいる帯の先頭ノード」を返すので、自分の束の帯に落とせばそのまま (a) になる。"
+  },
+  {
+   "id": "D-10d",
+   "title": "moveNewGroupBefore で先頭の束かつ対象が移動ノードより深いとき",
+   "input": "# Root\n\n### Deep\n\n### Src\n",
+   "operation": "initDoc(md); core.moveNewGroupBefore([Src], [Deep])  // 区切りを持たない先頭の束の手前へ",
+   "expected": "Src が深さ2の新しい束0になり、Deep はその後ろに書かれる `---` によって束1へ押し出される（2束になる）",
+   "actual": "`# Root\\n\\n## Src\\n\\n### Deep\\n---\\n\\n`。**Deep が押し出されず Src の子になる**（p=Root → p=Src、深さ3のまま）。書かれた `---` は Deep の直後・空行なしで文書末に落ち、次に見出しが来ないので無効。束は1つのまま。ランダム文書での最小再現例（seed 36）も同型",
+   "verdict": "バグ",
+   "note": "sep<0 の枝は `---` の挿入位置を **移動後に取り直した st.nodes[j].sub_end** にしている。Src は深さ2に持ち上がった直後なので、その sub_end は深さ3の Deep を飲み込んだ位置になる。挿入点は「移動したブロックの末尾」ではなく「元の target.hs から数えた自分のブロックだけの末尾」を使うべき。あわせて、この枝だけ preceded_by_blank ガードが無いので `---` が直前行にくっつく（直前が本文行なら setext 見出しになる危険がある）。"
+  },
+  {
+   "id": "D-11",
+   "title": "move のあと id が保存されているか（rename で確かめる）",
+   "input": "# Root\n\n## A\n\n### A1\n\n#### A1a\n\n---\n\n## B\n",
+   "operation": "initDoc(md); core.moveNodes([A1], [B], 0); core.renameNode(A1, 'RENAMED', ''); core.renameNode(A1a, 'RENAMED2', '')",
+   "expected": "移動後も A1 / A1a の id で rename が届き、正しい見出しだけが書き換わる",
+   "actual": "期待どおり。`### RENAMED` / `#### RENAMED2` になり、他の行は無傷。id=3(A1), id=4(A1a) が移動をまたいで生存。束をまたぐ移動でも同じ",
+   "verdict": "正常",
+   "note": "move_block が移動前に (id, ブロック内の相対オフセット) を控え、挿入後に hs → node index の Map で id を貼り直しているため。C10a の対照群テストと整合。"
+  },
+  {
+   "id": "D-12",
+   "title": "move の undo / redo",
+   "input": "# Root\n\n## A\n\n### A1\n\n#### A1a\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "7種の move（moveNodes×2 / 複数選択 / moveAsParent / moveNewGroup / moveNewGroupBefore×2）それぞれについて 実行 → core.undo() → core.redo()",
+   "expected": "undo でテキストがバイト単位に原文へ戻り、id/depth/parent/group まで完全一致。redo で実行直後に一致。ドラッグ1回につき undo 1回",
+   "actual": "7種すべてで undo 後テキスト一致 true / ノード形状（id,label,depth,group,parent）一致 true、redo 後も一致 true。さらに undo 1回で canUndo が false になり、moveAsParent（move+indent）や moveNewGroup（後片付け+move+区切り挿入）も1エントリにまとまっている",
+   "verdict": "正常",
+   "note": "begin_tx/commit_tx で複数の apply_sets を1エントリに束ねる設計が効いている。D-10c のような破壊的な退化ケースでも、undo 1回で復旧できる点は救い。"
+  },
+  {
+   "id": "D-13",
+   "title": "空の文書・ルートだけの文書・本文だけの文書での move",
+   "input": "(a) \"\" / (b) \"# Root\\n\" / (c) \"hello\\n\"",
+   "operation": "各文書で moveNodes / moveNewGroup / moveNewGroupBefore / moveAsParent を、存在するノード id と存在しない id（99, 42）の両方で呼ぶ",
+   "expected": "例外を投げず、テキストを変えず、undo スタックも積まない",
+   "actual": "全20通りで 例外なし / テキスト完全一致 / canUndo=false。(a)(c) はノード0個のまま、(b) は Root 1個のまま",
+   "verdict": "正常",
+   "note": "find_node が -1 を返す経路と normalize_selection が空配列を返す経路の両方が守られている。存在しない id を渡しても安全。"
+  },
+  {
+   "id": "D-14",
+   "title": "ルート自身を move しようとする",
+   "input": "# Root\n\n## A\n\n### A1\n\n#### A1a\n\n### A2\n\n## B\n\n### B1\n\n#### B1a\n\n##### B1a1\n",
+   "operation": "initDoc(md); core.moveNodes([Root], [B], 0)  // ルートを B の子へ",
+   "expected": "拒否。テキストもツリーも不変",
+   "actual": "期待どおり拒否。テキスト完全一致、9ノードの id/depth/parent すべて不変",
+   "verdict": "正常",
+   "note": "B はルートの範囲 [hs, sub_end) の内側にいるので、D-04 と同じ「移動先が自分の中」判定で弾かれる。単一ルート文書ではルートの範囲が全体なので、moveNodes は構造上ルートを動かせない。"
+  },
+  {
+   "id": "D-14b",
+   "title": "moveAsParent の対象にルートを渡すとルートが差し替わる",
+   "input": "# Root\n\n## G0\n\n### G0c\n\n---\n\n## G1\n\n### G1c\n\n---\n\n## G2\n",
+   "operation": "initDoc(md); core.moveAsParent([G1c], [Root])  // ルートの「親」として割り込ませる",
+   "expected": "（仕様上どうあるべきか未定義。単一ルートモデルなので拒否が妥当に見える）",
+   "actual": "文書が丸ごと作り替わる。`# G1c\\n\\n## Root\\n\\n### G0\\n\\n#### G0c\\n\\n---\\n\\n### G1\\n…`。G1c が新しい `# ` ルートになり、元の Root が `## Root`（深さ2）へ降格、以下すべてが1段深くなる。undo 1回では正しく戻る",
+   "verdict": "仕様が未定義",
+   "note": "UI からの到達性は低いと見られる: pos=3 は findEdge() が返す「辺の子ノード」を target にする経路で、ルートには入ってくる辺が無い（mindmap.ts の edgeEls は子 id をキーにしている）。ただしコア API としては無防備なので、cmd_move_as_parent の冒頭で target が depth==1 なら return する防御を入れる価値がある。"
+  },
+  {
+   "id": "D-15",
+   "title": "折り畳み（hide）済みのノードを move する",
+   "input": "# Root\n\n## A\n\n### A1\n\n## B\n\n### B1\n  → core.toggleHidden(A) して `# Root\\n\\n<!--\\n## A\\n\\n### A1\\n\\n-->\\n## B\\n\\n### B1\\n` の状態から開始",
+   "operation": "core.moveNodes([A], [B], 0)  // 折り畳んだ A を B の子へ",
+   "expected": "折り畳み状態を保ったまま（hidden=true のまま）B の下へ移る。`<!--`/`-->` も一緒に動くか、少なくとも空のマーカー対が残らないこと",
+   "actual": "**折り畳みが勝手に解ける**（A も A1 も hidden=false になる）。さらに元の位置に空のマーカー対が残骸として残る: `# Root\\n\\n<!--\\n-->\\n## B\\n\\n### B1\\n\\n### A\\n\\n#### A1\\n`。ユーザーから見ると「畳んだ枝をドラッグしたら勝手に開いた」うえ、markdown に意味のないコメント対が溜まる",
+   "verdict": "バグ",
+   "note": "rebuild_nodes の (3) が `<!--`/`-->` を意図的にノード範囲 [hs, sub_end) の外に置いている（削除で対が割れないための設計）ため、move_block が本体だけを運びマーカーを置き去りにする。逆向き（D-15b: 隠れていない B を隠れた A1 の子へ落とす）は B と B1 が hidden=true になる — こちらは `-->` の内側に入るので結果としては筋が通るが、ドロップした枝がマップ上で畳まれた扱いになるので驚きはある。"
+  },
+  {
+   "id": "D-16",
+   "title": "【統計】ランダム文書でのドロップ先一致率（moveNodes の pos 0/1/2）",
+   "input": "randomDoc(seed) seed=1..400（区切り・コメント・フェンス・CRLF・深さ飛びを含む生成文書）。各文書につき最大6回、疑似乱数で選んだ src/target/pos で移動",
+   "operation": "core.moveNodes([src], target, pos) を実行し、pos==0 なら 移動後の parent == target、pos==1/2 なら parent == 元の target.parent かを検証",
+   "expected": "実際に移動が起きたすべてのケースで一致（ドロップ指示線が示した親に入る）",
+   "actual": "実移動 1335 件中 **107 件（8.0%）で親が食い違う**。内訳は 区切りを持つ文書 106 件 / 区切りを持たない文書 1 件（その1件も hide 領域が絡むケース）。つまり不一致はほぼ全部が束の深さ読み替えに由来する",
+   "verdict": "バグ",
+   "note": "D-07 / D-08 / D-08b の実地での発生率。区切りを使っている文書では約12回に1回、ドラッグが指示線と違う場所に着地する計算になる。"
+  },
+  {
+   "id": "D-17",
+   "title": "【統計】move が生成する 7個以上の `#`",
+   "input": "randomDoc(seed) seed=1..300、6種の move API（moveNodes 0/1/2, moveAsParent, moveNewGroup, moveNewGroupBefore）× 各6試行",
+   "operation": "各 move の前後で /^#{7,} /m にマッチする行数を数え、増えたケースをカウント",
+   "expected": "0件。深さ7以上の見出しは CommonMark に存在しないので書き出してはいけない",
+   "actual": "実移動 7689 件中 **171 件（2.2%）で 7個以上の `#` の行が新規に発生**。API 別: moveAsParent 47 / moveNodes(pos0) 44 / moveNewGroup 39 / moveNodes(pos1) 19 / moveNodes(pos2) 19 / moveNewGroupBefore 3。なお見出しの総数は 7689 件すべてで前後不変（ノードの消失・複製は無い）",
+   "verdict": "バグ",
+   "note": "mmm 自身のパーサは `####### X` を深さ7、`######## X` を深さ8 として読むので mmm 内では往復が成立してしまい、既存テスト（P1/P2）が拾えない。外部レンダラに渡した瞬間に本文テキストへ化ける。D-07 と同一原因。"
+  },
+  {
+   "id": "D-18",
+   "title": "【統計】動かしていないノードの左右反転と、宙に浮いた区切り／マーカー",
+   "input": "randomDoc(seed) seed=1..300、6種の move API × 各6試行",
+   "operation": "move の前後で (1) 移動対象の部分木に含まれないノードの group%2 が変わった件数、(2) 次の非空行が見出しでない `---`（＝無効な水平線）や空の `<!--`/`-->` 対が増えた件数を計測",
+   "expected": "(1) 0件（触っていない束の左右は動かないはず）、(2) 0件",
+   "actual": "左右反転: moveNewGroup 740/1385(53%)、moveNewGroupBefore 691/1385(50%)、moveNodes(pos0) 58/1225、moveNodes(pos1) 54/1196、moveNodes(pos2) 54/1182、moveAsParent 54/1316。宙に浮いた区切り／マーカー: moveNewGroupBefore 257/1385(19%)、moveNodes(pos1) 82、moveAsParent 82、moveNodes(pos0) 68、moveNodes(pos2) 68、moveNewGroup 33",
+   "verdict": "バグ",
+   "note": "ユーザー報告「単なる挿入だけでは、それ以降の順番が入れ替わったりレイアウトが崩れたりする」の定量化。束を新設する2つの API では **2回に1回** 無関係な束が左右反転する。根治は group%2 で左右を決めるのをやめ、束に「どちら側か」を持たせる（あるいは group を親ごとに詰め直さず、側の割り当てを既存の配置から引き継ぐ）ことになる。"
+  },
+  {
+   "id": "D-19",
+   "title": "束をまたぐ複数選択の move / moveNewGroup の target が非ルート",
+   "input": "# Root\n\n## G0\n\n### G0c\n\n---\n\n## G1\n\n### G1c\n\n---\n\n## G2\n",
+   "operation": "(a) core.moveNodes([G0c, G1c], G2, 0) 別々の束から2つ選んでまとめて移動 / (b) core.moveNewGroup([G2], G0) target にルート以外を渡す",
+   "expected": "(a) G0c → G1c の文書順を保って G2 の子に並ぶ / (b) 未定義（UI は pos=4 で常に rootId を渡す）",
+   "actual": "(a) 期待どおり: `## G2\\n\\n### G0c\\n\\n### G1c`、両方 group=2、順序保存。ただし G0/G1 の束は空にならないので `---` の取り残しは起きない。(b) `## G0\\n\\n### G0c\\n\\n---\\n\\n### G2\\n\\n---\\n\\n## G1`。G2 は `###` と書かれるが束の先頭なので読み深さ2になり、結果的にルート直下の束にはなる。ただし G1 が group 1(左) → 2(右) に反転",
+   "verdict": "正常",
+   "note": "(a) は正常。(b) は API 単体では意図が曖昧だが UI からは rootId しか来ない（main.ts:379）ので実害は無い。ただし `###` と書いて深さ2として読ませる、という結果が「たまたま束の読み替えで辻褄が合っている」状態なのは脆い。"
+  },
+  {
+   "id": "D-20",
+   "title": "取り残された `---` が後から生き返る（2手の副作用）",
+   "input": "# Root\n\n## G0\n\n---\n\n## G1\n\n---\n\n## G2\n",
+   "operation": "step1: core.moveNodes([G2], G0, 0)（束2を空にして `---` を取り残す） → step2: core.moveNodes([G2], G1, 2)（取り残された `---` の直後へ戻す）",
+   "expected": "step2 で G2 が元の位置に戻るなら、束の構成も元どおり（G0=0, G1=1, G2=2）",
+   "actual": "step1 後: `## G0\\n\\n### G2\\n\\n---\\n\\n## G1\\n\\n---`（末尾に無効な `---`）。step2 後: `## G0\\n\\n---\\n\\n## G1\\n\\n---\\n\\n## G2` で偶然きれいに復元される。ただし別のケース（末尾の `---` が残ったまま moveNewGroup を打つ）では `## G1c\\n\\n---` と重ならず、無効な `---` が末尾に居座り続けた",
+   "verdict": "バグ",
+   "note": "取り残された `---` は「次に見出しが来た瞬間に有効な区切りへ昇格する」ため、後続の操作の意味を目に見えない形で変える。今回は運良く復元したが、一般には「前の操作のゴミ」が後の挿入位置の束番号を1つずらす地雷になる。empty_bundle_sep_edits は st.seps（有効な区切り）しか見ないので、いったん無効化したゴミは永久に掃除されない。"
+  },
+  {
+   "id": "D-00",
+   "title": "前提の確認: 既存テストの状態",
+   "input": "リポジトリ現状（core/_build/js/release/build/js/js.js は cmds.mbt/doc.mbt と同じタイムスタンプで最新）",
+   "operation": "cd D:/1.atrium/mmm && node --test \"audit/tests/*.test.mjs\"（調査の前後2回）",
+   "expected": "C6 と C9b が既知の失敗、それ以外は成功（タスク指示の前提）",
+   "actual": "**27件すべて成功、失敗0件**。C6「hide→show がテキストを元に戻す」も C9b「[既知の失敗 F-004] outdent は対象ノードの id を保存する」も通っている（名前に既知失敗と書かれているだけで、現在は解消済み）。調査後の再実行も 27/27 成功で、本調査によるリポジトリの変更は無い",
+   "verdict": "正常",
+   "note": "本フェーズは読み取り専用で、ファイルの作成・編集・削除は一切していない。実験はすべて node --input-type=module -e のワンライナーで完結させた。なお既存テスト群は本レポートのバグ（束の深さ読み替えをまたぐ move、区切りの取り残し、左右反転）をどれも検出していない — C4/P2 は mmm 自身のパーサ基準の往復しか見ておらず、書かれた `#` の数の妥当性やドロップ先の一致は検証対象外のため。"
+  },
+  {
+   "id": "H-00",
+   "title": "前提: 既存テストのベースライン",
+   "input": "（リポジトリ現状のまま）",
+   "operation": "cd D:/1.atrium/mmm/core && PATH=\"$HOME/.moon/bin:$PATH\" moon test -p mmm-app/core / cd D:/1.atrium/mmm && node --test \"audit/tests/*.test.mjs\"",
+   "expected": "moon 全通過。往復テストは C6 と C9b が既知の失敗",
+   "actual": "moon: Total tests: 72, passed: 72, failed: 0。node --test: tests 27 / pass 27 / fail 0。**C6（hide→show がテキストを元に戻す）も C9b（outdent の id 保存）も通っている**",
+   "verdict": "正常",
+   "note": "ブリーフィングの「C6 と C9b は既知の失敗」は現在のツリーには当てはまらない（テスト側が直ったのか実装が直ったのかは未確認）。それ以外に落ちているものは無い。core/_build の JS 出力は doc.mbt/cmds.mbt より新しく、再ビルド不要だった（読み取り専用のためビルドはしていない）"
+  },
+  {
+   "id": "H-01",
+   "title": "条件1: フェンスの中の `---` は区切りにならない",
+   "input": "# R\n\n## A\n\n```\n---\n```\n\n## B\n",
+   "operation": "initDoc(md) のノード表",
+   "expected": "区切り無効。B は A と同じ束（group 0 = 右）",
+   "actual": "R g0 / A g0(右) [5,24) +content / B g0(右)。`~~~` フェンスでも同じ結果",
+   "verdict": "正常",
+   "note": "フェンスが閉じていない場合（\"# R\\n\\n## A\\n\\n```\\n---\\n\\n## B\\n\"）は `---` も `## B` も飲み込まれ、B がノードとして消える（A g0 の1ノードのみ）。フェンスの仕様であって split 固有ではないが、「区切りが黙って効かなくなる」経路として存在する"
+  },
+  {
+   "id": "H-02",
+   "title": "条件2: 直前が本文の行（setext 下線）なら無効",
+   "input": "# R\n\n## A\n\n本文\n---\n\n## B\n",
+   "operation": "initDoc(md)",
+   "expected": "無効。B は group 0(右)、`---` は A の本文の一部",
+   "actual": "B g0(右)、A=[5,19) で `---` 行を含み hasContent=true。期待通り",
+   "verdict": "正常",
+   "note": "空行を1つ挟むと（\"本文\\n\\n---\"）有効になり B は g1(左)。CommonMark の setext 規則と一致していて、README 条件2 の意図どおり"
+  },
+  {
+   "id": "H-03",
+   "title": "条件2: 直前が「本文でない行」なら有効（見出し / フェンス閉じ / `-->`）",
+   "input": "(a) # R\n\n## A\n---\n\n## B\n  (b) # R\n\n## A\n\n```\nx\n```\n---\n\n## B\n  (c) # R\n\n<!--\n## A\n-->\n---\n\n## B\n",
+   "operation": "initDoc(各md)",
+   "expected": "いずれも有効。B は group 1(左)",
+   "actual": "(a) B g1(左) / (b) B g1(左) / (c) B g1(左)。すべて期待通り",
+   "verdict": "正常",
+   "note": "(a) は「`# R` の直後に `---` を置く＝束0を空にして全部左に出す」書き方が実際に効くことの確認でもある（README の「先頭に --- を置くと全部左」はこの位置のこと。ファイルの1行目に置くのは条件5で落ちる → H-11）"
+  },
+  {
+   "id": "H-04",
+   "title": "条件2: 直前がリスト行やインデント本文でも「本文」扱いで無効",
+   "input": "# R\n\n## A\n\n- item\n---\n\n## B\n",
+   "operation": "initDoc(md)",
+   "expected": "CommonMark ではこれは水平線（setext 下線になれるのは段落の直後だけ）なので、区切りとして効いてほしい",
+   "actual": "無効。B g0(右)、`---` は A の本文に入る",
+   "verdict": "仕様が未定義",
+   "note": "is_text_line() は「空行・ATX見出し・区切り・フェンス開始・コメントマーカー以外はすべて本文」なので、リスト行・引用行・テーブル行・4スペースのコード行の直後も setext とみなして捨てる。md ペインで「リストや表の直後に `---` を書いたのに束にならない」経路。安全側の誤りだが README の 5 条件からは読み取れない"
+  },
+  {
+   "id": "H-05",
+   "title": "条件3: 次に来る非空白が本文なら無効（ただの水平線）",
+   "input": "# R\n\n## A\n\n---\n\nただの本文\n\n## B\n",
+   "operation": "initDoc(md)",
+   "expected": "無効。B は group 0(右)",
+   "actual": "B g0(右)、A=[5,23) が `---` と本文を含む。期待通り",
+   "verdict": "正常",
+   "note": "「次がフェンス」も同じく無効（\"---\\n\\n```ts\\n## fake\\n```\\n\\n## B\" → B g0）。フェンス内の見出しは heads に入らないので、区切りと次の実見出しの間にフェンス行が挟まって is_blank_range が false になる"
+  },
+  {
+   "id": "H-06",
+   "title": "条件3: 区切りと見出しの間が空白のみなら有効",
+   "input": "(a) # R\n\n## A\n\n---\n## B\n  (b) # R\n\n## A\n\n---\n\n\n\n## B\n  (c) # R\n\n## A\n\n---\n  \n\t\n## B\n",
+   "operation": "initDoc(各md)",
+   "expected": "3つとも有効（空行0本でも複数本でも、空白/タブだけの行でも）",
+   "actual": "(a)(b)(c) すべて B g1(左)。期待通り",
+   "verdict": "正常",
+   "note": "区切り直後に見出しがベタ付きでも有効。区切り行の後ろに末尾空白（\"---   \"）があっても有効"
+  },
+  {
+   "id": "H-07",
+   "title": "条件3: 連続した `---` は最後の1本だけ有効。効かない方は前のノードの範囲に入る",
+   "input": "# R\n\n## A\n\n---\n\n---\n\n## B\n",
+   "operation": "initDoc(md) → selectionText([A]) → deleteNodes([A])",
+   "expected": "最後の1本だけ有効（B は g1=左）。効かない `---` はどのノードの範囲にも属さず、コピー・削除に付いてこない",
+   "actual": "B g1(左) は正しいが、**A の範囲が [5,16) で1本目の `---` を含む**。copy(A) = \"## A\\n\\n---\\n\"、delete(A) は 1本目の `---` ごと消す（残テキスト \"# R\\n\\n---\\n\\n## B\\n\"）",
+   "verdict": "バグ",
+   "note": "doc.mbt の縮め処理は「sub[i] == 束の先頭見出しの hs なら seps[k] まで縮める」しか見ないので、有効な1本の手前にある無効な区切り行はノードの範囲に残る。README の「区切り行はどのノードの範囲にも属さない」に反する。コピーした md に `---` が混ざるため、貼り付け先で新しい束を作ってしまう可能性がある。この「死んだ `---`」は H-21〜H-31 の削除・移動でも自動的に生成される"
+  },
+  {
+   "id": "H-08",
+   "title": "条件4: 次の見出しが `#` なら無効",
+   "input": "# R\n\n## A\n\n---\n\n# R2\n\n## B\n",
+   "operation": "initDoc(md)",
+   "expected": "無効（`#` は常に別ツリーなので持ち上げる先が無い）",
+   "actual": "区切り無効。A=[5,16) が `---` を含む（hasContent=true）、R2 は depth1 の別ツリー、B は R2 の子。期待通り",
+   "verdict": "正常",
+   "note": "ここでも無効な `---` が A の範囲に入る（H-07 と同じ根）。`## A` をコピーすると `---` が付いてくる"
+  },
+  {
+   "id": "H-09",
+   "title": "条件4: 次が `###` なら有効で、ルート直下へ持ち上がる",
+   "input": "# R\n\n## A\n\n---\n\n### B\n",
+   "operation": "initDoc(md)",
+   "expected": "B は書かれた深さ3でも depth 2、parent=ルート、group 1(左)",
+   "actual": "B d=2 p=1 g=1(左)。期待通り",
+   "verdict": "正常",
+   "note": "この「読み替え」が起きた束の中では、後述のとおり addChild / addSibling / addParent / move が書き込む `#` の数を間違える（H-38, H-41）"
+  },
+  {
+   "id": "H-10",
+   "title": "条件5 / front matter: 最初の `#` より前の `---` は全部無効",
+   "input": "---\ntitle: x\ntags: [a]\n---\n\n# R\n\n## A\n\n---\n\n## B\n",
+   "operation": "initDoc(md)",
+   "expected": "front matter の2本は無効、本文中の1本だけ有効。A g0(右) / B g1(左)",
+   "actual": "R [28,49) / A g0(右) / B g1(左)。期待通り",
+   "verdict": "正常",
+   "note": "front matter の閉じが空行の後（\"title: x\\n\\n---\"）でも条件5で落ちる。front matter 内に `## x` があると、それがルート前の別ツリーとしてノード化されるが（\"---\\ntitle: x\\n## not heading?\\n---\" → depth2 p=-1 のノードが1個できる）、束の割り当てには影響しない"
+  },
+  {
+   "id": "H-11",
+   "title": "条件5: ルート（`#`）が無い文書では `---` が完全に無効",
+   "input": "## A\n\n---\n\n## B\n",
+   "operation": "initDoc(md)",
+   "expected": "README どおり無効",
+   "actual": "A / B とも depth2 parent=-1 の別ツリー、group はどちらも 0。A の範囲に `---` が入り hasContent=true",
+   "verdict": "正常",
+   "note": "「ファイルの1行目に `---` を置けば全部左に出る」は成り立たない（条件5で落ちる）。全部左にしたいなら `# ルート` の直後に置く必要がある（H-03a）。README の「先頭に `---` を置くと」は誤読しやすい表現"
+  },
+  {
+   "id": "H-12",
+   "title": "区切り記号の種類（`---` `***` `___` `- - -` `----------` ほか18種）",
+   "input": "# R\n\n## A\n\n<SEP>\n\n## B\n  の <SEP> を差し替え",
+   "operation": "initDoc(各md) して B.group を見る",
+   "expected": "CommonMark の thematic break と同じ判定",
+   "actual": "有効: \"---\" \"***\" \"___\" \"- - -\" \"----------\" \"* * * * *\" \"_ _ _\" \"  ---\" \"   ---\" \"---   \" \"___ _\" → すべて B g1(左)。無効: \"    ---\"(4スペース) \"- - \"(2本) \"--\" \"**\" \"-*-\" \"---x\" \"\\t---\"(タブ) → B g0(右)",
+   "verdict": "正常",
+   "note": "CommonMark と完全一致（記号3個以上・先頭スペース3つまで・間と後ろは空白のみ・記号の混在不可）。タブ始まりが無効なのも CommonMark（タブ=4スペース＝コードブロック）と一致"
+  },
+  {
+   "id": "H-13",
+   "title": "深さの読み替え: 束の先頭が `###` のとき、中は先頭基準の相対深さ",
+   "input": "# R\n\n## A\n\n---\n\n### B\n\n#### B1\n\n##### B2\n",
+   "operation": "initDoc(md)",
+   "expected": "B=2, B1=3, B2=4。B の親はルート",
+   "actual": "B d2 p=R g1(左) / B1 d3 p=B / B2 d4 p=B1。期待通り",
+   "verdict": "正常",
+   "note": "先頭が `####` でも同じ（\"#### B / ###### B1 / ##### B2\" → 2 / 4 / 3。深さ飛びはそのまま飛びとして残る）"
+  },
+  {
+   "id": "H-14",
+   "title": "深さの読み替え: 束の中に先頭より浅い見出しが出たら基準を取り直す",
+   "input": "(a) # R\n\n## A\n\n---\n\n### B\n\n#### B1\n\n## C\n\n### C1\n  (b) # R\n\n---\n\n#### B\n\n### C\n\n## D\n\n### D1\n",
+   "operation": "initDoc(各md)",
+   "expected": "(a) B=2, B1=3, C=2, C1=3。(b) B/C/D が全部 2、D1=3",
+   "actual": "(a) B d2 / B1 d3 / C d2(g1,左) / C1 d3。(b) B d2 / C d2 / D d2 / D1 d3。いずれも期待通り",
+   "verdict": "正常",
+   "note": "基準は下がる一方（一度浅くなったら束の終わりまで戻らない）。書かれた深さ 4→3→2 が全部 depth 2 に潰れるので、md ペインだけ見ていると階層があるように見えてマップでは兄弟、という食い違いが起きる。README の「束の中は先頭を基準にした相対の深さ」の範囲内ではある"
+  },
+  {
+   "id": "H-15",
+   "title": "束の中に `#` が来ると束（の深さ読み替え）が終わる",
+   "input": "# R\n\n---\n\n### B\n\n#### B1\n\n# R2\n\n### C\n\n#### C1\n",
+   "operation": "initDoc(md)",
+   "expected": "R2 以降は読み替え無し。C は depth 3 のまま R2 の子",
+   "actual": "B d2(g1,左,p=R) / B1 d3 / R2 d1 p=-1 / C d3 p=R2 / C1 d4。期待通り",
+   "verdict": "正常",
+   "note": "group の通し番号自体は `#` をまたいでも増え続ける（R2 も C も g1）が、ルートの子ではないので左右には影響しない"
+  },
+  {
+   "id": "H-16",
+   "title": "★hide: 束の先頭ノードを畳むと、その束の区切りが死んで以降が全部左右反転",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "toggleHidden(B) → もう一度 toggleHidden(B)",
+   "expected": "B が畳まれるだけ。A 右 / B 左 / C 右 は変わらない",
+   "actual": "畳んだ直後: A g0(右) / **B g0(右)** / **C g1(左)**。テキストは \"...---\\n\\n<!--\\n## B\\n\\n### B1\\n\\n-->\\n---\\n\\n## C\\n\"。もう一度押すと完全に元へ戻る（テキストもバイト一致）",
+   "verdict": "バグ",
+   "note": "★左右反転。`<!--` 行が `---` と `## B` の間に入るので条件3（次の非空白が見出し）が破れ、その区切りが無効化される。結果 B は前の束に吸収されて右へ飛び、それ以降の束が全部1つずつ繰り上がって左右が入れ替わる。A の範囲にも死んだ `---` が入る。最後の束の先頭を畳んだ場合も同様に、そのノード自身が右→左へ飛ぶ（C 単独で確認）。折り畳みは見た目を変えない操作のはずなので、影響がいちばん大きい"
+  },
+  {
+   "id": "H-17",
+   "title": "hide: 束の途中・最後のノード / ルート を畳んでも束は壊れない",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n## B2\n\n---\n\n## C\n",
+   "operation": "toggleHidden(A) / toggleHidden(B2) / toggleHidden(R) をそれぞれ別セッションで",
+   "expected": "どれも束の割り当ては不変",
+   "actual": "hide(A): A g0 B g1 B2 g1 C g2 のまま。hide(B2): 同じく不変（`-->` が `---` の直前に入るが `-->` は本文行ではないので条件2は破れない）。hide(R): 文書全体が `<!--` `-->` で包まれるが、コメント領域内の `---` も有効なまま数えられるので不変",
+   "verdict": "正常",
+   "note": "つまり壊れるのは「区切りの直後の見出し」を畳んだときだけ（H-16）。hide 範囲自体は正しく、有効な `---` はマーカーの外に残る"
+  },
+  {
+   "id": "H-18",
+   "title": "コピー: 有効な区切り行はノードの範囲に入らない",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "selectionText([A]) / selectionText([B]) / selectionText([A,B]) / selectionText([R])",
+   "expected": "個々のノードのコピーに `---` は付いてこない。ルートのコピーには全部入る",
+   "actual": "copy(A)=\"## A\\n\" / copy(B)=\"## B\\n\" / copy(A,B)=\"## A\\n\\n## B\\n\" / copy(R)= 文書全体（`---` 込み）。期待通り",
+   "verdict": "正常",
+   "note": "ルートは sub_end が EOF なので当然すべてを含む。削除も同じ範囲で動く（delete(B) 後も両方の `---` がテキストに残る）"
+  },
+  {
+   "id": "H-19",
+   "title": "コピー: 束の先頭ノードは「書かれた深さ」のままコピーされる",
+   "input": "# R\n\n## A\n\n---\n\n### B\n\n#### B1\n",
+   "operation": "selectionText([B])",
+   "expected": "マップ上は depth 2 なので、それに相当する md",
+   "actual": "\"### B\\n\\n#### B1\\n\"（書かれたまま）",
+   "verdict": "仕様が未定義",
+   "note": "貼り付け側（src の relevel）が相対深さを保って貼り直す設計なので実害は出にくいが、クリップボードの中身がマップの見た目（depth 2）と一致しない。外部エディタに貼ると1段深い"
+  },
+  {
+   "id": "H-20",
+   "title": "★delete: 束の唯一のノードを消すと `---` が残り、以降の束が全部左右反転",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "deleteNodes([B])",
+   "expected": "B が消え、A 右 / C 左 / D 右 …は保たれる（B の束が空になったなら区切りも片付く）",
+   "actual": "テキスト \"# R\\n\\n## A\\n\\n---\\n\\n---\\n\\n## C\\n\\n---\\n\\n## D\\n\"。**C が g2(右)→g1(左)、D が g3(左)→g2(右) と全部入れ替わる**。1本目の `---` は死んで A の範囲に入る",
+   "verdict": "バグ",
+   "note": "★左右反転。cmd_delete は empty_bundle_sep_edits を呼ばない（呼ぶのは cmd_move_new_group と cmd_move_new_group_before だけ）。\n\n【左右反転を起こす操作の一覧（すべて実測）】\n(1) 束の唯一のノードを Delete（このケース）\n(2) 束のノードを全部まとめて Delete（H-22）\n(3) 束の唯一のノードを普通のドラッグで他所へ移動（H-23）\n(4) Ctrl ドラッグ = moveNewGroup / moveNewGroupBefore で束を作り直す（H-24, H-25）\n(5) Mod+↑ / Mod+↓ で束の先頭ノードを並べ替え（H-27, H-28）\n(6) Ctrl+Enter / Ctrl+o = addSibling(split) を末尾以外で実行（H-29）\n(7) Ctrl+O = addSiblingBefore(split)（H-30）\n(8) Shift+H で束の先頭ノードを畳む（H-16）\n(9) md ペインで `---` を消す / 足す（H-34, H-35）\n(10) 死んだ `---` が残った状態で新しいノードを作る（H-33）\n共通の原因は「group ＝ その位置より前にある有効な区切りの本数」という通し番号で、末尾以外の束が1つ増減すると以降が全部ずれ、偶奇が反転する"
+  },
+  {
+   "id": "H-21",
+   "title": "delete: 束の先頭ノードだけを消しても、兄弟が残っていれば区切りは生きる",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n## C\n\n---\n\n## D\n",
+   "operation": "deleteNodes([B])",
+   "expected": "`---` は残り、C が束の先頭になる。番号はずれない",
+   "actual": "テキスト \"# R\\n\\n## A\\n\\n---\\n\\n## C\\n\\n---\\n\\n## D\\n\"。A g0(右) / C g1(左) / D g2(右)。期待通り",
+   "verdict": "正常",
+   "note": "「束の先頭ノードを削除したとき区切りは残るか」の答え: 残る。そして次の見出しが自動的にその束の先頭になる（読み替えの基準も新しい先頭で取り直される）"
+  },
+  {
+   "id": "H-22",
+   "title": "★delete: 束のノードを全部消すと空の束の `---` が残り、以降が反転",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n## C\n\n---\n\n## D\n",
+   "operation": "deleteNodes([B, C])",
+   "expected": "空になった束の `---` も片付き、D は g2(右)のまま",
+   "actual": "テキスト \"# R\\n\\n## A\\n\\n---\\n\\n---\\n\\n## D\\n\"。**D が g2(右)→g1(左)**。死んだ `---` は A の範囲に入る",
+   "verdict": "バグ",
+   "note": "★左右反転。H-20 と同じ根。空になった束の掃除がドラッグ経路にしか無い"
+  },
+  {
+   "id": "H-23",
+   "title": "delete: 最後の束の唯一のノードを消すと末尾に `---` が残る",
+   "input": "# R\n\n## A\n\n---\n\n## B\n",
+   "operation": "deleteNodes([B])",
+   "expected": "`---` も片付いて \"# R\\n\\n## A\\n\" になる",
+   "actual": "\"# R\\n\\n## A\\n\\n---\\n\" が残る。A の範囲が [5,15) で `---` を含み hasContent=true になる",
+   "verdict": "バグ",
+   "note": "末尾なので左右の反転は起きないが、(a) 保存した md にゴミの `---` が残る、(b) A をコピーすると `---` が付いてくる、(c) この状態で新規ノードを作ると死んだ `---` が生き返って逆側に出る（H-33）。hasContent=true になってもカード行は増えない（`---` はリンクにも画像にもコードにも該当しないため）ので、マップ上は無言で悪化する"
+  },
+  {
+   "id": "H-24",
+   "title": "★move（普通のドラッグ）: 束の唯一のノードを他所へ移すと `---` が残り、以降が反転",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "moveNodes([B], A, 0)  （B を A の子として落とす）",
+   "expected": "B が A の子になり、C 右 / D 左 は保たれる",
+   "actual": "テキスト \"# R\\n\\n## A\\n\\n### B\\n\\n---\\n\\n---\\n\\n## C\\n\\n---\\n\\n## D\\n\"。**C g2(右)→g1(左)、D g3(左)→g2(右)**",
+   "verdict": "バグ",
+   "note": "★左右反転。moveNodes（= Ctrl 無しのドラッグ、Tab/Shift+Tab のインデント経路も同系）は empty_bundle_sep_edits を呼ばない"
+  },
+  {
+   "id": "H-25",
+   "title": "★moveNewGroup（Ctrl ドラッグ）: 区切りは片付くが、以降の束番号はやはりずれる",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "moveNewGroup([B], R)",
+   "expected": "B が末尾の新しい束へ。C・D の左右は保たれてほしい",
+   "actual": "テキスト \"# R\\n\\n## A\\n\\n---\\n\\n## C\\n\\n---\\n\\n## D\\n\\n---\\n\\n## B\\n\"。空いた区切りは正しく掃除された。ただし **C g2(右)→g1(左)、D g3(左)→g2(右)**、B は g3(左)",
+   "verdict": "バグ",
+   "note": "★左右反転。掃除は効いているのに、中間の束が1つ減った時点で以降の偶奇が必ず反転する。番号を詰め直す設計そのものの帰結で、「束を1つ動かしただけで無関係な2つの束が左右に飛ぶ」"
+  },
+  {
+   "id": "H-26",
+   "title": "★moveNewGroupBefore（束と束の間へ Ctrl ドロップ）: 割り込み位置以降が全部ずれる",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "moveNewGroupBefore([D], B)  ／ moveNewGroupBefore([B], A)",
+   "expected": "割り込んだ束だけが増え、他は動かない",
+   "actual": "前者: A g0(右) / D g1(左) / **B g1→g2(右)** / **C g2→g3(左)**。後者（先頭の束の前へ）: **B g0(右)** / **A g0→g1(左)** / C g2(右)。テキストはどちらも正しい md",
+   "verdict": "バグ",
+   "note": "★左右反転。割り込み自体は正しく動くが、以降の束が全部 ±1 されて左右が入れ替わる"
+  },
+  {
+   "id": "H-27",
+   "title": "★reorder（Mod+↑）: 束の先頭ノードが束の壁を越えて前の束に飛び込む",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "reorderNode(B, -1)",
+   "expected": "束をまたぐ並べ替えは起きない（起きるなら区切りごと動く）",
+   "actual": "テキスト \"# R\\n\\n## B\\n\\n## A\\n\\n---\\n\\n---\\n\\n## C\\n\"。**B は g1(左)→g0(右)**、A は g0 のまま、**C は g2(右)→g1(左)**。死んだ `---` も1本残る",
+   "verdict": "バグ",
+   "note": "★左右反転。prev_sibling() は深さだけを見て group を見ないので、束の先頭の「前の兄弟」が前の束の最後のノードになる。Mod+↑ 一発で自分が反対側へ飛び、以降の束も全部反転し、テキストにゴミの `---` が残る"
+  },
+  {
+   "id": "H-28",
+   "title": "★reorder（Mod+↓）: 同じく束を越える",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "reorderNode(B, +1) ／ reorderNode(A, +1)",
+   "expected": "束の中だけで並べ替わる",
+   "actual": "reorder(B,+1): \"# R\\n\\n## A\\n\\n---\\n\\n---\\n\\n## C\\n\\n## B\\n\" → C g2(右)→g1(左)、B は C と同じ g1 に同居。reorder(A,+1): \"# R\\n\\n---\\n\\n## B\\n\\n## A\\n\\n---\\n\\n## C\\n\" → **A が g0(右)→g1(左) に飛び、束0が空になって右側が空っぽになる**",
+   "verdict": "バグ",
+   "note": "★左右反転。とくに後者は「右にあった唯一のノードを下へ1つ動かしただけで右側が消える」という派手な崩れ方をする"
+  },
+  {
+   "id": "H-29",
+   "title": "★addSibling(split=true)（Ctrl+Enter）を末尾以外で使うと以降の束が全部ずれる",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "addSibling(A, \"\", true)",
+   "expected": "A の直後に新しい束が1つ増える。B・C はそのまま",
+   "actual": "テキスト \"# R\\n\\n## A\\n\\n---\\n\\n## \\n\\n---\\n\\n## B\\n\\n---\\n\\n## C\\n\"。新ノード g1(左)、**B g1→g2(右)**、**C g2→g3(左)**",
+   "verdict": "バグ",
+   "note": "★左右反転。挿入位置は正しいが、以降の束の偶奇が全部変わる。末尾（addChild(R,split) / addSibling(C,split)）なら反転は起きない（H-31）"
+  },
+  {
+   "id": "H-30",
+   "title": "★addSiblingBefore(split=true)（Ctrl+O）は死んだ `---` を残し、相手を自分の束に巻き込む",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "addSiblingBefore(B, \"\", true)",
+   "expected": "B の上に新しい束が1つ増え、B は自分の束のまま",
+   "actual": "テキスト \"# R\\n\\n## A\\n\\n---\\n\\n---\\n\\n## \\n\\n## B\\n\\n---\\n\\n## C\\n\"。**`---` が2本連続して1本目が死ぬ**（A の範囲に入る）。新ノード g1(左) に **B も g1 として同居**（束は増えていない）、C は g2 のまま",
+   "verdict": "バグ",
+   "note": "挿入位置が「B の hs」＝既存の区切りの後ろなので、書いた `---` が既存の `---` の直後に来て自分自身を無効化する。cmd_move_new_group_before は「相手の区切りの手前に入れる」という補正を持っているのに、addSiblingBefore にはそれが無い"
+  },
+  {
+   "id": "H-31",
+   "title": "末尾に束を足すぶんには番号はずれない",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "addChild(R, \"\", true) ／ addSibling(C, \"\", true)",
+   "expected": "新しい束が末尾に1つ増えるだけ",
+   "actual": "どちらも \"...## C\\n\\n---\\n\\n## \\n\"。A g0(右) / B g1(左) / C g2(右) / 新 g3(左)。期待通り",
+   "verdict": "正常",
+   "note": "ルートのホバー `+` はこの経路（needsSplitFor で `---` を書くかどうかを決めてから addChild）。末尾に足す限り安全"
+  },
+  {
+   "id": "H-32",
+   "title": "split=true は「深さ2の見出しを作るとき」以外は無視される",
+   "input": "# R\n\n## A\n\n### A1\n\n#### A2\n",
+   "operation": "addChild/addSibling/addSiblingBefore/addParent を各ノードに split=true で",
+   "expected": "深さ2を作るときだけ `---` が書かれる",
+   "actual": "書かれた: addChild(R)=\"---\\n\\n## \" / addSibling(A) / addSibling(R)（=addChild にフォールバック）/ addParent(A)。書かれない: addChild(A)(→\"### \") / addChild(A1)(→\"#### \") / addSibling(A1)(→\"### \") / addSiblingBefore(A1) / addParent(A1)。すべて期待通り",
+   "verdict": "正常",
+   "note": "insert_heading_edit の `let split = want_split && depth == 2` のとおり。ただし判定に使う depth は「実効深さ」なので、読み替えが起きた束の中では書かれる `#` の数が実際とずれる（H-38）"
+  },
+  {
+   "id": "H-33",
+   "title": "★死んだ `---` の復活: 削除の後にノードを作ると、右に足したつもりが左に出る",
+   "input": "# R\n\n## A\n\n---\n\n## B\n",
+   "operation": "deleteNodes([B]) → addSibling(A, \"\", false)（= A で Enter。ルートの右 `+` = addChild(R, split=false) でも同じ）",
+   "expected": "新ノードは A と同じ束（g0 = 右）に出る。UI の needsSplitFor も「最後の子 A は g0(右) なので `---` は不要」と判断して split=false を渡す",
+   "actual": "テキスト \"# R\\n\\n## A\\n\\n---\\n\\n## \\n\"。**新ノードは g1(左)**。残っていた死んだ `---` が「次の非空白が見出し」になって生き返った",
+   "verdict": "バグ",
+   "note": "★左右反転。削除で残ったゴミの区切りが、後の無関係な操作で有効化される。UI 側（needsSplitFor）は「区切りを書かなければ番号は増えない」を前提にしているので、この状態では右 `+` が左にノードを作る"
+  },
+  {
+   "id": "H-34",
+   "title": "★md ペインで区切りを消す（replace_text）と深さが戻り、以降が反転",
+   "input": "# R\n\n## A\n\n---\n\n### B\n\n#### B1\n\n---\n\n## C\n",
+   "operation": "replaceText(11, 16, \"\", \"\")  （1本目の \"---\\n\\n\" を削除）",
+   "expected": "B の束が前の束に合流し、B は書かれた深さ3として読まれる",
+   "actual": "B d2→d3（親がルート→A）、B1 d3→d4、**C g2(右)→g1(左)**。テキスト \"# R\\n\\n## A\\n\\n### B\\n\\n#### B1\\n\\n---\\n\\n## C\\n\"",
+   "verdict": "正常",
+   "note": "★左右反転（ただし区切りを消したのだから合流は仕様どおり）。問題は C まで反対側へ飛ぶこと。md ペインで1行消しただけでマップの右半分と左半分が総入れ替えになる"
+  },
+  {
+   "id": "H-35",
+   "title": "md ペインで区切りを書き足したとき",
+   "input": "(a) # R\n\n## A\n\n本文1\n\n本文2\n\n## B\n（本文の間に挿入） (b) 同（`## B` の直前に挿入） (c) # R\n\n## A\n\n本文1\n\n## B\n（本文行の直後に挿入）",
+   "operation": "(a) replaceText(pos(本文2), 同, \"---\\n\\n\") (b) replaceText(pos(## B), 同, \"---\\n\\n\") (c) replaceText(本文1の次の改行の後, 同, \"---\\n\")",
+   "expected": "(a) ただの水平線 (b) 有効な区切り (c) setext なので水平線扱いされず区切りにもならない",
+   "actual": "(a) B g0(右) のまま (b) **B g0(右)→g1(左)** (c) B g0(右) のまま。すべて期待通り",
+   "verdict": "正常",
+   "note": "(b) は仕様どおりだが、後続の束があれば全部反転する（★）。(c) は CommonMark では `本文1` が h2 になる書き方で、mmm は setext 見出しを一切構造として読まないため md と GitHub の見え方が食い違う（README 条件2 が承知している既知の割り切り）"
+  },
+  {
+   "id": "H-36",
+   "title": "★読み替えが起きた束の中では addChild / addSibling / addSiblingBefore / addParent が `#` の数を間違える",
+   "input": "# R\n\n## A\n\n---\n\n### B\n\n#### B1\n\n#### B2\n",
+   "operation": "addChild(B1,\"\",false) / addSibling(B1,\"\",false) / addSiblingBefore(B1,\"\",false) / addParent(B1,\"\",false) / addChild(B,\"\",false) をそれぞれ別セッションで",
+   "expected": "それぞれ B1 の子 / B1 の弟 / B1 の兄 / B1 を包む親 になる",
+   "actual": "addChild(B1) → \"#### \" が書かれ **B1 の兄弟**になる（d3 p=B）。addSibling(B1) → \"### \" が書かれ **ルートの子**になり、しかも **B2 がその子になる**。addSiblingBefore(B1) → 同様にルートの子になり **B1 と B2 の両方を子に取る**。addParent(B1) → 新ノードがルートの子（d2）になり B1 は d4、B2 まで巻き込む。addChild(B) → \"### \" が書かれ **B の兄弟**（ルートの子）になる",
+   "verdict": "バグ",
+   "note": "insert_heading_edit は実効深さぶんの `#` を書くが、束の中の実効深さ＝書かれた深さ＋shift（この例では −1）なので、書いた瞬間に1段浅く読まれる。「子を作ったのに兄弟になる」「弟を作ったのに親になって次の兄弟を吸収する」まで起きる。束の先頭が `##` の普通の束では起きない（shift=0）。H-39 の indent で束の先頭を深くすると、この状態を自分で作れてしまう"
+  },
+  {
+   "id": "H-37",
+   "title": "★indent（Tab）を束の先頭ノードに掛けると、構造は何も変わらないのに `#` だけ増え続ける",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "indentNodes([B])  ／ 続けてもう一度 indentNodes([B])",
+   "expected": "束の先頭には前の兄弟が（同じ束の中には）居ないので、何も起きない",
+   "actual": "1回目: テキストが \"### B\" / \"#### B1\" に書き換わるが、ノードは A g0(右) / B d2 g1(左) / C g2(右) と**まったく同じ**。2回目: \"#### B\" / \"##### B\" になり、やはり構造は不変。何度でも増える",
+   "verdict": "バグ",
+   "note": "prev_sibling() が group を見ないので、前の束の最後のノード（A）を「前の兄弟」と判定して indent が成立してしまう。しかし B は束の先頭なので読み替えで depth 2 に戻され、見た目は 1px も動かない。副作用として (a) undo スタックが伸びる (b) 束が「読み替えあり」状態になり、以降その束の中での addChild/addSibling が H-36 のバグを踏む。indent(C)（最後の束の先頭）でも同じ"
+  },
+  {
+   "id": "H-38",
+   "title": "outdent と、束の先頭以外の indent は正しく動く",
+   "input": "# R\n\n## A\n\n---\n\n### B\n\n#### B1\n\n#### B2\n",
+   "operation": "outdentNodes([B2]) / indentNodes([B2]) / outdentNodes([B]) / indentNodes([B1])",
+   "expected": "outdent(B2)=depth3→2、indent(B2)=depth3→4、outdent(B)=何もしない（深さ2のガード）、indent(B1)=前の兄弟が無いので何もしない",
+   "actual": "outdent(B2) → \"### B2\" になり d2 p=ルート g1(左)。indent(B2) → \"##### B2\" で d4 p=B1。outdent(B) → テキストもノードも不変。indent(B1) → 不変。すべて期待通り",
+   "verdict": "正常",
+   "note": "outdent は「書かれた `#` を1つ減らす＝実効深さも1つ減る」で読み替えと整合しているので、束の中でも正しい。壊れるのは「新しい行を書く」系（H-36）と「束の先頭への indent」（H-37）だけ"
+  },
+  {
+   "id": "H-39",
+   "title": "★move も読み替え束を出入りするときに深さを間違える",
+   "input": "(a) # R\n\n## A\n\n### A1\n\n---\n\n### B\n\n#### B1\n  (b) # R\n\n## A\n\n---\n\n### B\n\n#### B1\n",
+   "operation": "(a) moveNodes([A1], B, 0)（読み替え束の中へ落とす） (b) moveNodes([B1], A, 0)（読み替え束から外へ出す）",
+   "expected": "(a) A1 が B の子（depth 3） (b) B1 が A の子（depth 3）",
+   "actual": "(a) \"### A1\" が書かれ、**A1 は B の子ではなくルートの子（d2 g1 左）**になる。(b) `#` の増減が 0 になるので \"#### B1\" のまま束の外に出て、**B1 は depth 4**（親は A だが深さが1段飛ぶ）",
+   "verdict": "バグ",
+   "note": "move_block の delta が実効深さ同士の差なので、束の shift のぶんだけずれる。H-36 と同じ根。Ctrl ドラッグ（moveNewGroup）を非ルートのノードに落とした場合も同種で、\"### C\" を書いて `---` を前に置くため、A の子にしたつもりのノードがルート直下の束の先頭になる（moveNewGroup([C], A) で確認: C が g1 のルート子、B は g1→g2 に反転）"
+  },
+  {
+   "id": "H-40",
+   "title": "コメント領域（hide）の中の `---` も有効な区切りとして数えられる",
+   "input": "# R\n\n## A\n\n<!--\n## X\n\n---\n\n## Y\n-->\n\n## B\n",
+   "operation": "initDoc(md)",
+   "expected": "折り畳みの内外で束の数え方が変わらない",
+   "actual": "A g0(右) / X g0(右, HIDDEN) / Y g1(左, HIDDEN) / **B g1(左)**（Y と同じ束）",
+   "verdict": "正常",
+   "note": "畳んだ枝が束を1つ消費するので、その後ろの可視ノードの左右がそれに従う。展開時と一致するので整合は取れている。ただし「畳んだ枝の中の見えない `---` のせいで B が左にある」状態は、マップだけ見ていると理由が分からない"
+  },
+  {
+   "id": "H-41",
+   "title": "CRLF / 末尾改行なしの文書",
+   "input": "(a) # R\r\n\r\n## A\r\n\r\n---\r\n\r\n## B\r\n  (b) # R\n\n## A\n\n---（末尾改行なし） (c) # R\n\n## A\n\n---\n\n## B（末尾改行なし）",
+   "operation": "initDoc(各md)、(a) はさらに addSibling(A,\"\",true)",
+   "expected": "CRLF でも判定は同じ。挿入される区切りも CRLF",
+   "actual": "(a) A g0(右) / B g1(左)、挿入後 \"...## A\\r\\n\\r\\n---\\r\\n\\r\\n## \\r\\n\\r\\n---\\r\\n\\r\\n## B\\r\\n\"。(b) 区切りは無効で A の範囲に入る。(c) B g1(左)。すべて期待通り",
+   "verdict": "正常",
+   "note": "scan_lines が \\r を行末から外し、nl() が文書の主たる改行を拾うので CRLF は一貫している"
+  },
+  {
+   "id": "H-42",
+   "title": "undo / redo は束の割り当てを完全に元へ戻す",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "deleteNodes([B]) → undo() → redo() → undo()、および toggleHidden(B) → toggleHidden(B)",
+   "expected": "テキストも group もバイト単位で往復する",
+   "actual": "delete 後 A g0/C g1/D g2 → undo で A g0/B g1/C g2/D g3 に戻りテキストも原文と完全一致 → redo で再び反転 → undo で再度完全一致。hide→show もテキスト完全一致",
+   "verdict": "正常",
+   "note": "つまり左右の反転は「戻せない壊れ方」ではない。ただしユーザから見ると、無関係な操作のたびにマップの左右が入れ替わり、undo でしか直せない"
+  },
+  {
+   "id": "H-43",
+   "title": "束の先頭が読み替えられている状態で、その束に有効な `---` を足したときの `#` の数",
+   "input": "# R\n\n## A\n\n---\n\n### B\n\n#### B1\n",
+   "operation": "addSibling(B, \"\", true)（B は書かれた深さ3・実効深さ2）",
+   "expected": "新しい束の先頭として深さ2相当の見出しが書かれる",
+   "actual": "\"...#### B1\\n\\n---\\n\\n## \\n\" と `##` が書かれる。新ノードは g2(右) で正しくルート直下",
+   "verdict": "正常",
+   "note": "split=true の判定も挿入も実効深さ2で行われるので、この経路だけは結果的に正しい（新しい束の先頭は base が自分自身になるため、書かれた深さが何であれ depth 2 に読まれる）。壊れるのは束の「中」に書き足すとき（H-36）"
+  },
+  {
+   "id": "H-44",
+   "title": "死んだ `---` を含むノードを hide / show しても往復する",
+   "input": "# R\n\n## A\n\n---\n\n---\n\n## B\n",
+   "operation": "toggleHidden(A) → toggleHidden(A)",
+   "expected": "マーカーの中に死んだ `---` が入るが、戻せば原文一致",
+   "actual": "hide 後 \"# R\\n\\n<!--\\n## A\\n\\n---\\n\\n-->\\n---\\n\\n## B\\n\"、A g0(右)/B g1(左) は不変。show で原文とバイト一致",
+   "verdict": "正常",
+   "note": "死んだ `---` が A の範囲に入っている（H-07）ぶん、マーカーがそれごと包む。区切りの本数は変わらないので左右は動かない"
+  },
+  {
+   "id": "H-45",
+   "title": "ルートを削除・コピーすると区切りが全部付いてくる",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "selectionText([R])",
+   "expected": "ルートの範囲は文書全体なので `---` を含む",
+   "actual": "\"# R\\n\\n## A\\n\\n---\\n\\n## B\\n\\n---\\n\\n## C\\n\" と全部含む",
+   "verdict": "正常",
+   "note": "ルートの sub_end は EOF で、区切りによる範囲の切り詰め（sub[i] == 束の先頭の hs の条件）が意図的にルートには効かないようになっている。README の「区切り行はどのノードの範囲にも属さない」はルート以外の話"
+  },
+  {
+   "id": "H-01",
+   "title": "edgeD だけが掃除されない — 消えて戻ったノードのエッジが d 無しで復活する",
+   "input": "# root\n\n## a\n\n### a1\n\n### a2\n\n## b\n",
+   "operation": "UI 再現手順: (1) a を選択して Shift+H で折り畳む → a1/a2 が地図から消える。(2) もう一度 Shift+H で戻す。→ a→a1 / a→a2 の線が出ない。\n別経路: (1) a1 を選択して dd で削除 (2) u で undo → a→a1 の線が出ない。\n\n実際に叩いたコマンド（id とテキストの復元を確認するため）:\ncd D:/1.atrium/mmm && node --input-type=module -e \"import {initDoc,getText,core,snap} from './audit/tests/_helpers.mjs'; ...toggleHidden(a)/toggleHidden(a) と deleteNodes([a1])/undo() を実行\"\n出力: hidden [1:root,2:a(h),3:a1(h),4:a2(h),5:b] / unhidden [1:root,2:a,3:a1,4:a2,5:b] / text restored: true。delete→undo でも 3:a1 が同じ id で復帰、text restored: true。",
+   "expected": "visible から外れたノードのキャッシュは全部そろって捨てられ、戻ってきたら d が書き直される。",
+   "actual": "src/mindmap.ts:1426-1439 の掃除ループが非対称。nodeEls の掃除は nodeSig / nodeTf / nodeCls も delete するのに、edgeEls の掃除は edgeD を delete しない:\n\n    for (const [id, el] of this.edgeEls) {\n      if (seen.has(id)) continue;\n      el.remove();\n      this.edgeEls.delete(id);\n    }\n\n再作成側（src/mindmap.ts:1223-1228）にも保険が無い。ノード側は `if (!g) { ... this.nodeSig.delete(n.id); // 新規なので必ず中身を作る }` と明示的に捨てているのに、エッジ側は\n\n    let path = this.edgeEls.get(n.id);\n    if (!path) { path = svgEl(\"path\", {class:\"edge\"}); this.edgeLayer.append(path); this.edgeEls.set(n.id, path); }\n\nだけで edgeD.delete が無い。結果、新品の <path> は d 属性を一度も持たないまま、直後の\n\n    if (this.edgeD.get(n.id) !== sig) { path.setAttribute(\"d\", g.d); ... }\n\nで「前回と同じ」と判定されて素通りする。d が無い path は何も描かない = 線が消える。\nsig は `fill|width|dash|d` で、d は edgeDraw(a, z, f, depth, seed=n.id, cw, wp) の純関数出力（src/mindmap.ts:516-580）。hide→show / delete→undo はテキストをバイト単位で復元する（上の実行で確認）ので、レイアウトも id も完全に同じ → sig も完全に同じ → 必ず素通りする。\n消えた線は、そのノードの位置が変わる編集が起きるまで戻らない（pan/zoom は viewport の transform なので d を変えない。edgeD.clear() は src/mindmap.ts:1715 の setEdgeParams と 1771 の setGaps、つまり ?tune のパネルからしか呼ばれない）。折り畳んだ部分木は丸ごと visible から外れるので、開き直すと子孫のエッジが全部消える。",
+   "verdict": "バグ",
+   "note": "この担当の中でいちばん実害が大きい。修正は edgeEls の掃除ループに this.edgeD.delete(id) を足すか、再作成時に this.edgeD.delete(n.id) を入れるかのどちらか（ノード側と同じ形にするなら後者が対称でよい）。なお hide→show の間に別の編集を挟んでレイアウトが変わっていれば sig が変わるので線は出る。「何もせず開き直したとき」に必ず出る。"
+  },
+  {
+   "id": "H-02",
+   "title": "別ツリー（ルート前の見出し / 2 つ目の # ）が束の区切り線の band に混ざる",
+   "input": "A（ありもしない区切り線が出る）:\n# root\n\n## a\n\n---\n\n## b\n\n# root2\n\n## r2a\n\nB（区切り線が本来と違う高さに出る）:\n## early\n\n# root\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n",
+   "operation": "UI 再現手順: 上の md を開くだけ（操作不要、初回描画で出る）。\n実際に叩いたコマンド（node.parent / group / depth の実値確認）:\ncd D:/1.atrium/mmm && node --input-type=module -e \"import {initDoc} from './audit/tests/_helpers.mjs'; console.log(JSON.stringify(initDoc(A).nodes.map(n=>({id:n.id,l:n.label,d:n.depth,p:n.parent,g:n.group}))))\"\n出力 A: [{root,d1,p-1,g0},{a,d2,p1,g0},{b,d2,p1,g1},{root2,d1,p-1,g1},{r2a,d2,p4,g1}]\n出力 B: [{early,d2,p-1,g0},{root,d1,p-1,g0},{a,d2,p2,g0},{b,d2,p2,g1},{c,d2,p2,g2}]",
+   "expected": "区切り線は「同じ側で縦に隣り合う束のあいだ」にだけ引かれる。A では右側の束が 1 つ（a）左側も 1 つ（b）なので 1 本も出ない。B では右側の束 0（a）と束 2（c）のあいだ、つまり a と c の中間の高さに 1 本だけ出る。",
+   "actual": "別ツリー（root 以外の tops）は src/mindmap.ts:1104-1112 で placeF(r, R_FRAME, 0, top) にかけられ、R_FRAME.ux=1 なので placeF 内の `this.sideOf.set(n.id, f.ux < -1e-6 ? -1 : 1)`（1044 行）で side=1（右）になる。一方で group は文書全体の通し番号なので、別ツリーも `---` の本数由来の group を持つ。\n区切り線の band 集計（src/mindmap.ts:1449-1478）は `key = ${side}|${n.group}` で、`direct = root !== null && n.parent === root.id` が偽のときは y0/y1 だけ広げて x0/x1 は Infinity/-Infinity のまま置く。別ツリーを除外する条件がどこにも無い。\n\nA の場合: band \"1|0\" = {a}（direct）、band \"1|1\" = {root2, r2a}（どちらも direct=false、x0=Infinity / x1=-Infinity）。右側の band が 2 つになるので 1495-1526 のループ（i=1）が走る。x0 = min(a.x, Infinity) = a.x、x1 = max(a.x+a.w, -Infinity) = a.x+a.w で両方とも有限なので `if (!Number.isFinite(x0) || !Number.isFinite(x1)) continue;` に引っかからない。→ 本体ツリーと下の別ツリーのあいだの空白に group-sep 線が 1 本描かれる。far は outer.get(1)（1479-1490、別ツリーの箱も含めた右端）＋12 まで伸びるので、無関係な別ツリーの幅まで線が伸びる。\n\nB の場合: early は side=1 / group=0 なので band \"1|0\" に a と同居する。別ツリーは maxBottom + GAP.root*2（1102 行）より下に置かれるので band \"1|0\".y1 は early の下端（かなり下）になる。sort は y0 基準（1497 行）で、\"1|0\".y0 = a.y（上）なので \"1|0\" が先頭、\"1|2\"（c）が次。y = (\"1|0\".y1 + \"1|2\".y0)/2 = (early の下端 + c の上端)/2 で、c よりずっと下に線が出る。",
+   "verdict": "バグ",
+   "note": "根本原因は 1 つ「別ツリーに side=1 を付けたまま、文書の group をそのまま束として扱っている」こと。band の集計と outer の集計の両方で、ルート配下（root まで親をたどれるノード）だけに絞れば A も B も直る。sepEls 自体のライフサイクル（key = `${side}|${i}` の付け替えと 1529-1533 の掃除）は毎レンダで座標を書き直しているので取り残しは無く、そちらは健全だった。"
+  },
+  {
+   "id": "H-03",
+   "title": "折り畳んだノードに子を足すと、入力欄が出ないまま空見出しだけが増える",
+   "input": "# root\n\n## a\n\n### a1\n\n## b\n",
+   "operation": "UI 再現手順: (1) a を選択して Shift+H（折り畳む） (2) a を選んだまま Tab を押す（または a にホバーして出る ＋ ボタンを押す）。\n実際に叩いたコマンド:\ncd D:/1.atrium/mmm && node --input-type=module -e \"...toggleHidden(a) のあと addChild(a.id,'t1',false)\"\n出力: テキストは \"# root\\n\\n<!--\\n## a\\n\\n### a1\\n\\n### \\n\\n-->\\n## b\\n\"、snap.focus=5、nodes に {id:5, label:'', parent:2, hidden:true} が入る。",
+   "expected": "折り畳んだノードに子を足したら、折り畳みが開くか、少なくとも入力欄が出て名前を付けられる。何も起きないなら文書も変えない。",
+   "actual": "新ノード（id 5）は `<!-- ... -->` の内側に入るので hidden=true。src/mindmap.ts:812-819 の collapsedUnder が真になり buried 側に落ちるので、visible にも this.order にも boxes にも入らない。\nsrc/main.ts:228-243 の runCmd は\n\n    if (snap.focus !== -1 && byId.has(snap.focus)) {\n      setSelection([snap.focus], snap.focus);\n      map.ensureVisible(snap.focus);\n      if (opts.edit) map.beginEdit(snap.focus, opts.edit.tag);\n    }\n\nで、byId は applySnap が snap.nodes 全部から作り直す（main.ts:182-183）ので buried なノードも byId.has で真になる。一方 map 側は全部 boxes 基準:\n  - ensureVisible（mindmap.ts:1861-1863）: `const b = this.boxes.get(id); if (!b) return;` → 黙って何もしない\n  - beginEdit（mindmap.ts:1879-1881）: `const b = this.boxes.get(id); if (!b) return;` → editingId は -1 のまま、入力欄も出ない\n地図の上では「a のバッジが +1 から +2 に増える」以外に何も起きず、文書には空の `### ` が書かれ、選択とアンカーは見えないノードを指したままになる。",
+   "verdict": "バグ",
+   "note": "Enter（addSibling）/ o / O / Shift+Tab（addParent）も同じ経路。beginEdit が黙って return する設計自体は安全側だが、呼ぶ側（runCmd）が「byId にあるか」でしか見ておらず「地図に出ているか」を見ていないのがズレの元。"
+  },
+  {
+   "id": "H-04",
+   "title": "見えないノードがアンカーになると sideOf が無いまま矢印移動が続く",
+   "input": "# root\n\n## a\n\n### a1\n\n### a2\n\n## b\n",
+   "operation": "UI 再現手順: (1) a1 を選択 (2) a を選び直して Shift+H で折り畳む（または H-03 の手順で見えない子を作る） (3) アンカーが見えないノードのまま ← → h l を押す。",
+   "expected": "見えないノードはアンカーにならない。なったとしても、移動先も見えないノードなら何も起きない。",
+   "actual": "sideOf / frameOf は毎レンダで作り直される（mindmap.ts:1053-1054 で new Map、以降 placeF とルートの分岐でしか set されない）ので、buried なノードには一切エントリが無い。ところが移動の分岐（mindmap.ts:2596）は\n\n    const side = this.sideOf.get(anchor) ?? 1;\n\nでフォールバックしてしまう。ここから先は `nodes`（＝buried も含む全ノード）を引くので:\n  - 2586-2594 の上下移動は `nodes.filter(n => n.parent === cur.parent)` で見えない兄弟も候補にする\n  - 2604-2607 の左右移動は `nodes.find(n => n.parent === anchor)` で見えない子へ進む\n最後の `this.host.setSelection([next], next); this.ensureVisible(next);` は、ensureVisible が boxes を引いて黙って return する（1861-1863）ので、画面は 1 ピクセルも動かないまま選択だけが見えないノードの間を渡り歩く。左右の判定はフォールバックで常に「右側」扱いになるので、左側の部分木を折り畳んだ場合は左右が逆になる。",
+   "verdict": "バグ",
+   "note": "H-03 と同じ「buried なノードが選択に残る」問題の別の出方。applySnap の選択の刈り込み（main.ts:186-196）は byId.has でしか見ていないので、buried になっただけのノードは選択に残り続ける。this.order（visible のみ）と selection（全ノード）の食い違いがそのまま出ている。"
+  },
+  {
+   "id": "H-05",
+   "title": "ドラッグ中に render() が走っても dragging.ids / subtree を作り直さない",
+   "input": "# root\n\n## a\n\n## b\n\n## c\n",
+   "operation": "UI 再現手順: (1) a を押したままドラッグを開始する（しきい値は 8px 相当、mindmap.ts:2133） (2) マウスは押したまま、キーボードで d d（または Delete）を押す (3) c の上でボタンを離す。\n実際に叩いたコマンド（コア側が不明 id をどう扱うか）:\ncd D:/1.atrium/mmm && node --input-type=module -e \"...deleteNodes([a.id]) のあと moveNodes([a.id],c.id,0) / moveAsParent / moveNewGroup\"\n出力: いずれも例外を投げず、テキストは無変化、focus=-1。",
+   "expected": "ドラッグ中に対象が消えたらドラッグを打ち切る（stopDragVisuals して drop しない）。",
+   "actual": "ドラッグ開始時に pane.focus() 済み（mindmap.ts:2059）なので、ドラッグ中のキー入力は pane の keydown → onKeydown に届く。onKeydown には `if (this.dragging) return;` のようなガードが無く（2360-2362 のガードは isEditing だけ）、dd / Delete / u / Enter / Tab がそのまま host に流れる。deleteSelection → applySnap → render() でノードが消えるが、this.dragging = { ids, subtree } は startDrag（2617-2645）で 1 度作られたきりで、render() も updateDrop() も作り直さない。\npointerup（2161-2172）は\n\n    const drop = this.dropTarget;\n    const ids = this.dragging.ids;\n    this.stopDragVisuals();\n    if (drop) this.host.move(ids, drop.id, drop.pos);\n\nで、ids の生存確認をしない。host.move（main.ts:372-384）も byId.has を見ない（他の addChild / addSibling などは全部 `if (!byId.has(id)) return;` を持っているのに、move だけ無い）。\n幸いコア側が不明 id を no-op にするので文書は壊れない（上の実行で確認）が、u で undo してからドロップした場合は ids も target も生きているので「undo した直後に意図しない move が適用される」。また subtree もそのままなので、ドラッグ中に消えたノードの id が「ドロップ先候補から除外」され続ける（2731-2734、2778-2781 の `if (this.dragging!.subtree.has(id)) continue;`）。",
+   "verdict": "バグ",
+   "note": "実害はコアの防御に救われていて限定的。ガードを入れるなら onKeydown 冒頭に dragging チェックを足すのがいちばん狭い直し方。なお非同期の render は main.ts:761 の loadAsset（画像サムネイルの読み込み完了）から必ず走る経路があり、これは初回 pointerdown（main.ts:785 の unlockAssets）を引き金にするので「ドラッグ開始と同時に render が走る」こと自体は日常的に起きる。ただし loadAsset はノード集合を変えないので、この経路単体では ids は腐らない。"
+  },
+  {
+   "id": "H-06",
+   "title": "ドラッグ中の render() でドロップ予告の class だけが消え、線は古い座標のまま残る",
+   "input": "# root\n\n## a\n\n![](./img.webp)\n\n## b\n",
+   "operation": "UI 再現手順: (1) 画像を含む md をフォルダ権限が prompt の状態で開く（サムネイルが未解決のプレースホルダで出る） (2) 最初の pointerdown でノードのドラッグを始める（この pointerdown が main.ts:785 の unlockAssets を発火させる） (3) 権限を許可すると loadAsset が解決して main.ts:761 の map.render() が走る (4) 指を動かさずにそのまま見る。",
+   "expected": "ドラッグ中に再描画が入っても、ドロップ予告（相手の輪・親の枠・挿入線）は出たままか、まとめて出し直される。",
+   "actual": "updateDrop は予告を class の直書きで出したうえで `this.nodeCls.clear()` する（mindmap.ts:2843-2845）。その状態で render() が走ると、各ノードの cls は node / root / link-card / hidden-node / selected / dragging からしか組み立てられず（1268-1279）、nodeCls が空なので必ず `g.setAttribute(\"class\", cls)` が実行され、drop-child / drop-parent が消える。\n一方 dropLine / dropHint は render() が一切触らないので、visibility=visible のまま古い world 座標で残る。edgeEls の drop-edge も残る（render がエッジに対して行うのは `path.classList.toggle(\"fill\", g.fill)` だけで、drop-edge は落ちない）。\n結果、再描画直後は「輪と親の枠だけ消えて、挿入線と光った線だけが残る」中途半端な表示になる。次の pointermove（または pointerup 直前の updateDrop、2163-2165）で出し直されるので、指を動かせば直る。",
+   "verdict": "バグ",
+   "note": "表示だけの問題で、ドロップ結果は pointerup で updateDrop をやり直すので正しい。ただし「レイアウトが変わる再描画」がドラッグ中に起きた場合（H-05 のキー入力経由）は、dropLine の座標がレイアウト変更前のもののまま残るので、指を動かさずに離すまでのあいだ嘘の位置を指し続ける。"
+  },
+  {
+   "id": "H-07",
+   "title": "exportSvg が sepLayer を含めないので、束の区切り線が書き出した SVG に出ない",
+   "input": "# root\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n",
+   "operation": "UI 再現手順: 上の md を開いて（右側に a と c の 2 束ができ、そのあいだに区切り線が出る）、SVG 書き出しを実行する。",
+   "expected": "画面に出ているものがそのまま出る。",
+   "actual": "viewport には sepLayer / edgeLayer / nodeLayer の 3 枚がぶら下がっている（mindmap.ts:723-731）が、exportSvg は edgeLayer と nodeLayer しか clone していない（1641-1642）し、最後の組み立ても\n\n    out.append(svgEl(\"rect\", {...fill: bgColor}), edges, nodesG);\n\n（1697-1707）で sepLayer が入らない。sepEls は sepLayer の中にしか存在しない（1519-1521）ので、区切り線は書き出しから丸ごと落ちる。\nついでに、書き出し前に一時的な class を剥がすループ（1629-1640）は `this.nodeLayer.querySelectorAll(\".selected, .drop-child, .drop-parent, .drop-edge, .dragging\")` と nodeLayer からしか集めていないが、.drop-edge が付くのは edgeLayer の path（2877）なので、ドラッグ中に書き出すと光ったままのエッジが出る。",
+   "verdict": "バグ",
+   "note": "どちらも 1 行ずつの取りこぼし。sepLayer を clone して inline() にかけ、out.append の先頭（rect の直後）に入れれば重なり順も画面と同じになる。"
+  },
+  {
+   "id": "H-08",
+   "title": "編集中のノードの箱が消えたとき、入力欄は古い位置に出たまま残る（到達経路は未確認）",
+   "input": "# root\n\n## a\n\n## b\n",
+   "operation": "UI 再現手順: 編集中（beginEdit 済み）に、そのノードを visible から外す再描画を起こす。→ この経路をコード上で見つけられなかった。ポインタ操作は pointerdown 冒頭の `if (this.isEditing()) this.host.commitEdit();`（mindmap.ts:2049）で必ず先に編集を閉じ、他ペインやボタンへのクリックは input の blur ハンドラ（2321-2323）が閉じる。キー入力は onKeydown 冒頭の `if (this.isEditing()) return;`（2340）で止まる。非同期に render を呼ぶのは main.ts:761 の loadAsset だけで、これはノードを消さない。",
+   "expected": "編集対象が消えたら入力欄も閉じる（endEdit する）。",
+   "actual": "positionEditor（mindmap.ts:1921-1926）は\n\n    if (this.editingId === -1) return;\n    const b = this.boxes.get(this.editingId);\n    if (!b) return;\n\nで、箱が無いときに「位置を更新しない」だけで、editor.style.display は \"block\" のまま、editingId も残る。positionEditor は applyTransform（789-799）からも呼ばれるので、この状態で pan / zoom すると入力欄だけが地図から取り残されて動かない。さらに commitEditorValue（1900-1904）は生存確認なしに `this.host.rename(this.editingId, ...)` を呼ぶ。host.rename（main.ts:337-339）も byId.has を見ない（他のコマンドは全部見ている）。",
+   "verdict": "仕様が未定義",
+   "note": "コードとしては明らかに片手落ち（他の !b ガードは ensureVisible / centerOn / updatePlus のように「今回は何もしない」で済む場所なのに、positionEditor だけは状態が残る場所にある）が、現在の呼び出しグラフでは到達経路を特定できなかったので「バグ」とは書かない。beginEdit / render / endEdit のどこかに新しい非同期経路（ファイル再読み込み、外部ペインからの適用など）が増えた瞬間に表面化する。"
+  },
+  {
+   "id": "H-09",
+   "title": "widthCache が無制限に伸びる",
+   "input": "# root\n\n## （ここに長い文字列を打ち込み続ける）\n",
+   "operation": "UI 再現手順: ノードのラベルを編集し続ける（1 打鍵ごとに rename → applySnap → render が走る）。",
+   "expected": "計測キャッシュに上限があるか、少なくとも文書に無くなった文字列は捨てられる。",
+   "actual": "src/mindmap.ts:249-258 の\n\n    const widthCache = new Map<string, number>();\n    function measure(font, text) { const key = font + \"\u0000\" + text; ... widthCache.set(key, w); }\n\nには上限も破棄も無い。render のたびに widthOf / heightOf / clipLabel / positionEditor が measure を呼び、編集中は打鍵ごとに「途中の文字列」が新しいキーとして積まれる。clipLabel（1568-1581）は二分探索で 1 回あたり log(len) 個の部分文字列キーを作るので、増え方はラベル長にも比例する。",
+   "verdict": "バグ",
+   "note": "正しさには影響せずメモリだけの問題なので優先度は低い。上限付き（LRU か、一定サイズを超えたら clear）にするだけで済む。"
+  },
+  {
+   "id": "H-10",
+   "title": "束の中間点の「幹」stems が計算されるだけで一度も読まれない",
+   "input": "# root\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n",
+   "operation": "コード読み。grep -n \"stems\" src/mindmap.ts の結果は宣言（1131）と書き込み（1184）の 2 箇所のみ。",
+   "expected": "計算した値はどこかで使われる（親から中間点までの幹を描く）か、計算しない。",
+   "actual": "src/mindmap.ts:1131 で宣言した `stems` は 1184 の stems.set(key, {a, z, f}) で埋められるだけで、読み出しが 1 箇所も無い。同じブロックで作る wpOf は 1230 の `const wp = wpOf.get(n.id);` で使われている。\nさらに既定値では wpOf も効かない: edgeDraw は `if (pull && EDGE.bundle > 0)`（549）で分岐し、EDGE.bundle の既定は 0（LOOK の定義、156 行）。edge0 を広げる条件も `GAP.x * (multi ? EDGE.stemSpan : 1)` で stemSpan の既定が 1（152 行）なので差が出ない。つまり 1126-1207 の中間点計算（fan ごとの sort と束ごとの平均）は既定設定では毎レンダ丸ごと無駄に走る。?tune で bundle > 0 にしたときだけ wpOf が効きはじめるが、そのときも幹の線は描かれない。",
+   "verdict": "仕様が未定義",
+   "note": "壊れているわけではなく「未完成のまま残っている」もの。ただし束の数だけ sort を回すので、大きい文書では毎打鍵ぶんの無駄になる。EDGE.spread > 0 のガード（1134）は残しつつ、中間点の計算全体を EDGE.bundle > 0 でも囲めば既定では走らなくなる。"
+  }
+ ],
+ "interactions": [
+  {
+   "id": "H-01",
+   "title": "基準ケース: 束が3つのときの左右",
+   "input": "# Root\n\n## A\n\n### A1\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "initDoc(md)",
+   "expected": "A=束0(右), B=束1(左), C=束2(右)",
+   "actual": "Root:g0 A:g0 A1:g0 B:g1 B1:g1 C:g2 → A=右, B=左, C=右",
+   "verdict": "正常",
+   "note": "以降の全ケースの対照群。左右は src/mindmap.ts:1071-1072 の `group % 2 === 0 ? 右 : 左` だけで決まる。main.ts に group を触る箇所は無いので、group が動けば必ず左右が動く。"
+  },
+  {
+   "id": "H-02",
+   "title": "【本命】束の先頭を hide すると、その区切りが無効になり以降の左右が全部入れ替わる",
+   "input": "# Root\n\n## A\n\n### A1\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "initDoc(md) → core.toggleHidden(id_of(\"B\"))  // B は束1の先頭",
+   "expected": "B とその子だけが折り畳まれ、束の数も左右も変わらない（A=右, B=左, C=右）",
+   "actual": "テキスト: \"# Root\\n\\n## A\\n\\n### A1\\n\\n---\\n\\n<!--\\n## B\\n\\n### B1\\n\\n-->\\n---\\n\\n## C\\n\"\nノード: A:g0 B:g0(hidden) B1:g0(hidden) C:g1\n→ B が左から右へ、C が右から左へ入れ替わった",
+   "verdict": "バグ",
+   "note": "「hide したら左右が入れ替わった」は再現する。原因は doc.mbt:rebuild_nodes の区切り有効条件3 `is_blank_range(s_next, heads[hp].hs)`。hide は `<!--\\n` を nd.hs のちょうど手前に差し込むので、1本目の `---` と `## B` の間に `<!--` 行が入り、空白でなくなって区切りが1本消える。区切りの本数がそのまま group の通し番号（doc.mbt:compute_groups）なので、以降の束が全部1つずつずれ、偶奇が反転する。hide したノード本人だけでなく、無関係な C まで巻き添えで反対側へ飛ぶのが致命的。"
+  },
+  {
+   "id": "H-03",
+   "title": "束が5つあるとき、真ん中を hide すると下流3つが全部反転",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n\n---\n\n## E\n",
+   "operation": "initDoc(md) → core.toggleHidden(id_of(\"B\"))",
+   "expected": "B のみ折り畳み。A右 B左 C右 D左 E右 は不変",
+   "actual": "前: A:g0R B:g1L C:g2R D:g3L E:g4R\n後: A:g0R B:g0R(hidden) C:g1L D:g2R E:g3L\n→ B/C/D/E の4ノードが一斉に反対側へ",
+   "verdict": "バグ",
+   "note": "H-02 と同じ原因。束が多いほど被害が大きい（1回の hide で下流の束すべてが反転）。ユーザーの言う「レイアウトが崩れる」の正体はこれで説明がつく。"
+  },
+  {
+   "id": "H-04",
+   "title": "最後の束の先頭を hide すると自分だけ反転",
+   "input": "# Root\n\n## A\n\n### A1\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "initDoc(md) → core.toggleHidden(id_of(\"C\"))",
+   "expected": "C が折り畳まれるだけ。C は右のまま",
+   "actual": "テキスト: \"...---\\n\\n<!--\\n## C\\n-->\\n\"\nノード: A:g0R B:g1L C:g1L(hidden)\n→ C が右から左へ移動",
+   "verdict": "バグ",
+   "note": "H-02 の最小形。折り畳んだ本人が画面の反対側へ飛ぶので、ユーザーから見ると「畳んだら消えた／飛んだ」に見える。"
+  },
+  {
+   "id": "H-05",
+   "title": "区切りの直前のノードを hide（範囲に区切りは入らない）",
+   "input": "# R\n\n## A\n\n### A1\n\n---\n\n## B\n",
+   "operation": "initDoc(md) → core.toggleHidden(id_of(\"A1\"))",
+   "expected": "区切りは無効化されず、左右不変",
+   "actual": "テキスト: \"# R\\n\\n## A\\n\\n<!--\\n### A1\\n\\n-->\\n---\\n\\n## B\\n\"\nopen@11 close@24 区切り行@28 → 区切りはマーカー範囲の外\nノード: A:g0R A1:g0R(hidden) B:g1L（不変）",
+   "verdict": "正常",
+   "note": "条件2の答え: 区切りの「直前」のノードを hide しても区切り行は範囲に含まれない。doc.mbt の (2) で、次の束の先頭で終わるノードの sub_end は区切り行の手前まで縮められているため。`-->` は必ず `---` より前に置かれる。"
+  },
+  {
+   "id": "H-06",
+   "title": "区切りの直後の束の、先頭でない子を hide",
+   "input": "# Root\n\n## A\n\n### A1\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "initDoc(md) → core.toggleHidden(id_of(\"B1\"))",
+   "expected": "左右不変",
+   "actual": "テキスト: \"...---\\n\\n## B\\n\\n<!--\\n### B1\\n\\n-->\\n---\\n\\n## C\\n\"\nノード: A:g0R B:g1L B1:g1L(hidden) C:g2R（不変）",
+   "verdict": "正常",
+   "note": "壊れるのは「束の先頭（＝区切りの直後の見出し）」を hide したときだけ。B1 のように束の2番目以降なら `<!--` が `---` と見出しの間に入らないので安全。この差がユーザーには全く見えないのが厄介。"
+  },
+  {
+   "id": "H-07",
+   "title": "束0の先頭（前に区切りが無い）を hide",
+   "input": "# Root\n\n## A\n\n### A1\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "initDoc(md) → core.toggleHidden(id_of(\"A\"))",
+   "expected": "左右不変",
+   "actual": "テキスト: \"# Root\\n\\n<!--\\n## A\\n\\n### A1\\n\\n-->\\n---\\n\\n## B\\n...\"\nノード: A:g0R(hidden) B:g1L C:g2R（不変）",
+   "verdict": "正常",
+   "note": "束0の前には区切りが無いので `<!--` が挟まる相手がいない。「一番上の束だけは畳んでも安全」という覚えにくい非対称ができている。"
+  },
+  {
+   "id": "H-08",
+   "title": "ルートを hide すると有効な区切り2本がマーカーの中に入る（条件1）",
+   "input": "# Root\n\n## A\n\n### A1\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "initDoc(md) → core.toggleHidden(id_of(\"Root\"))",
+   "expected": "（未定義）マーカーの中に入った区切りが無効化されるなら束は1つに潰れる",
+   "actual": "テキスト: \"<!--\\n# Root\\n\\n## A\\n\\n### A1\\n\\n---\\n\\n## B\\n\\n### B1\\n\\n---\\n\\n## C\\n-->\\n\"\nノード: A:g0R(hidden) B:g1L(hidden) C:g2R(hidden) → 束の数も左右も完全に不変",
+   "verdict": "正常",
+   "note": "条件1の答え: 束をまたぐ hide は「ルート（`#`）を hide したとき」だけ起きる。深さ2以上のノードは sub_end が必ず次の区切りの手前で切られる（doc.mbt の (2)）ので、有効な区切りを飲み込めない。飲み込まれた `---` は有効なまま（→ H-10）なので、この経路では左右は入れ替わらない。"
+  },
+  {
+   "id": "H-09",
+   "title": "2つ目のルートを hide して、有効な区切りを丸ごと包む",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n# R2\n\n## Y\n\n---\n\n## Z\n",
+   "operation": "initDoc(md) → core.toggleHidden(id_of(\"R2\"))",
+   "expected": "（未定義）",
+   "actual": "テキスト: \"# R\\n\\n## A\\n\\n---\\n\\n## B\\n\\n<!--\\n# R2\\n\\n## Y\\n\\n---\\n\\n## Z\\n-->\\n\"\n前: R:g0 A:g0 B:g1 R2:g1 Y:g1 Z:g2\n後: 全く同じ（Z:g2 のまま、hidden=true になっただけ）",
+   "verdict": "正常",
+   "note": "ルート以外で「有効な区切りを包める」唯一の経路（2つ目の `#`）。ここでも区切りは有効なまま。group はルート直下だけの概念のはずが、2つ目のルート自身にも group が付いていて（R2:g1）左右判定に混ざる点は別途要注意。"
+  },
+  {
+   "id": "H-10",
+   "title": "【条件5の答え】`<!--` の中に手書きした `---` は完全に有効な区切りとして働く",
+   "input": "# R\n\n## A\n\n<!--\n## B\n\n---\n\n## C\n-->\n\n## D\n",
+   "operation": "initDoc(md)  ／ 対照: initDoc(\"# R\\n\\n## A\\n\\n## B\\n\\n---\\n\\n## C\\n\\n## D\\n\")",
+   "expected": "（未定義）hide が「コメントアウトで無効化」なら、中の `---` も無効であってほしい",
+   "actual": "R:g0R A:g0R B:g0R(hidden) C:g1L(hidden) D:g1L\n対照（コメント無し）: R:g0R A:g0R B:g0R C:g1L D:g1L\n→ 完全に一致。コメントの中の `---` が、外にいる D の左右を決めている",
+   "verdict": "仕様が未定義",
+   "note": "parser.mbt:scan_doc は `is_separator` の判定を `in_comment` で一切ガードしていない（`is_comment_close` は `-->` の形しか見ないので `---` はすり抜けて seps に積まれる）。結果、レンダラでは見えないコメントアウト済みテキストの中の1行が、見えているノードを左に飛ばす。H-02 とは逆方向の不整合: マーカー「行」は区切りを殺すのに、マーカーの「中」は区切りを生かす。どちらの仕様を採るにせよ、この2つは同時には成立しない。"
+  },
+  {
+   "id": "H-11",
+   "title": "`-->` が `---` と見出しの間に入っても区切りは死ぬ",
+   "input": "# R\n\n## A\n\n<!--\n## B\n\n---\n-->\n\n## C\n",
+   "operation": "initDoc(md)  ／ 対照: H-10 の入力（`---` の後ろに見出しがある形）",
+   "expected": "（未定義）",
+   "actual": "R:g0R A:g0R B:g0R(hidden) C:g0R → 区切りが1本も成立せず C は右\n対照（H-10）: C:g1L\n→ 閉じマーカーでも同じく区切りが無効化される",
+   "verdict": "バグ",
+   "note": "H-02 の閉じマーカー版。原因も同じ `is_blank_range`。通常の toggleHidden ではこの配置は作られない（`-->` は必ず `---` の手前に置かれる）が、手書き・貼り付け・後述 H-24 のような編集で容易に到達する。修正は1か所で済む: 区切りと次の見出しの間の空白判定で、`<!--` / `-->` だけの行を空白扱いにする。"
+  },
+  {
+   "id": "H-12",
+   "title": "hide → show の往復で区切りの有効性が戻るか（条件6）",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "toggleHidden(B) → toggleHidden(C) → toggleHidden(B) → toggleHidden(C)、各段で group を記録",
+   "expected": "最後に元のテキストと元の左右に戻る",
+   "actual": "base   : A:g0R B:g1L C:g2R D:g3L\nhide B : A:g0R B:g0R* C:g1L D:g2R\nhide C : A:g0R B:g0R* C:g0R* D:g1L\nshow B : A:g0R B:g1L C:g1L* D:g2R\nshow C : A:g0R B:g1L C:g2R D:g3L  ／ getText()===md → true",
+   "verdict": "正常",
+   "note": "条件6の答え: 往復は可逆。テキストもバイト一致で戻り、区切りの有効性・左右も完全に復元される。壊れるのは「hide している間」だけ。ただし2つ畳むと D が g3→g1 と2段ずれるので、ずれは累積する。"
+  },
+  {
+   "id": "H-13",
+   "title": "hide の undo / redo",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "toggleHidden(B) → core.undo() → core.redo()",
+   "expected": "undo で完全に元に戻り、redo で hide 直後の状態に戻る",
+   "actual": "hide: A:g0R B:g0R* C:g1L D:g2R\nundo: A:g0R B:g1L C:g2R D:g3L, getText()===md → true\nredo: A:g0R B:g0R* C:g1L D:g2R",
+   "verdict": "正常",
+   "note": "undo/redo 側に問題は無い。左右のずれは undo で戻せるので、ユーザーの回避策は「Shift+H を取り消す」になる。"
+  },
+  {
+   "id": "H-14",
+   "title": "すでにマーカーを含む部分木の hide（入れ子）は no-op",
+   "input": "# R\n\n## A\n\n### A1\n\n---\n\n## B\n",
+   "operation": "toggleHidden(A1) → toggleHidden(A)  // 親を hide",
+   "expected": "入れ子 hide は禁止なので何も起きない",
+   "actual": "2回目の呼び出し後 getText() が変化せず（textSame=true）、ノードも A:g0R A1:g0R(hidden) B:g1L のまま",
+   "verdict": "正常",
+   "note": "cmds.mbt:cmd_toggle_hidden の hide_regions チェックが効いている。ただしユーザーには「Shift+H が無反応」としか見えず、理由のフィードバックは無い。"
+  },
+  {
+   "id": "H-15",
+   "title": "条件2の検証: マーカーと区切り行のオフセット関係",
+   "input": "# R\n\n## A\n\n### A1\n\n---\n\n## B\n",
+   "operation": "(a) toggleHidden(A1)  (b) toggleHidden(B)  (c) toggleHidden(A)、各々 `<!--` / `-->` / `---` の文字オフセットを比較",
+   "expected": "区切り行がマーカー範囲 (open, close) の内側に入るかどうかを確定させる",
+   "actual": "(a) open@11 close@24 sep@28 → 内側でない\n(b) open@24 close@34 sep@19 → 内側でない（sep がマーカーより前）\n(c) open@5  close@24 sep@28 → 内側でない\nいずれのケースでも sepInsideRegion=false",
+   "verdict": "正常",
+   "note": "条件2の答え: 深さ2以上のノードを hide する限り、区切り行がマーカーの中に入ることは無い。つまり「区切りを飲み込んだせいで無効になる」経路は存在せず、H-02 の原因は飲み込みではなく『開きマーカー行が `---` と見出しの間に割り込むこと』だと確定できる。"
+  },
+  {
+   "id": "H-16",
+   "title": "`---` が2連のとき、hide が無効な区切りを飲み込む",
+   "input": "# R\n\n## A\n\n---\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "initDoc(md)（A.subEnd=16、1本目の `---`@11 は A の範囲の中）→ toggleHidden(A)",
+   "expected": "左右不変（1本目はもともと無効な水平線）",
+   "actual": "テキスト: \"# R\\n\\n<!--\\n## A\\n\\n---\\n\\n-->\\n---\\n\\n## B\\n\\n---\\n\\n## C\\n\"\nノード: A:g0R(hidden) B:g1L C:g2R（不変）",
+   "verdict": "正常",
+   "note": "『2連の `---` は最後の1本だけ有効』の規則により1本目が無効なので、A の sub_end が1本目を越えて2本目まで伸び、hide が1本目を包み込む。包まれても有効性は変わらない（H-10 と整合）。"
+  },
+  {
+   "id": "H-17",
+   "title": "【条件4】hide 中のノードを move すると、マーカーが置き去りになり hide が解ける",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "toggleHidden(id_of(\"B\")) → core.moveNodes([id_of(\"B\")], id_of(\"A\"), 0)  // pos=0 = A の末子にする",
+   "expected": "B と B1 が hide のまま A の子（深さ3）へ移り、`<!--`/`-->` も一緒に付いていく",
+   "actual": "テキスト: \"# R\\n\\n## A\\n\\n---\\n\\n### B\\n\\n#### B1\\n\\n<!--\\n-->\\n---\\n\\n## C\\n\"\nノード: A:g0R B:g1L(hidden=false) B1:g1L C:g2R\n→ ①hidden が解けた ②空の `<!--`/`-->` が元の場所に取り残された ③`### B` が区切りの直後に置かれたため深さ2に読み替えられ、A の子ではなく A の兄弟（新しい束）になった",
+   "verdict": "バグ",
+   "note": "doc.mbt の (3) は「範囲がマーカー対を分断するときだけ切る」設計なので、hide されたノード自身の [hs, sub_end) は開きマーカーも閉じマーカーも含まない。move はその範囲だけを切り出すため、マーカーだけが残る。副作用が3つ同時に出る最悪ケース。ゴミ `<!--\\n-->` が残るのは delete でも同じ（H-27）だが、move はそれに加えて hide 状態と親子関係まで失う。"
+  },
+  {
+   "id": "H-18",
+   "title": "hide 中のノードを reorder しても同じくマーカーが置き去りになる",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "toggleHidden(id_of(\"B\")) → core.reorderNode(id_of(\"B\"), -1)",
+   "expected": "B が hide のまま1つ上へ",
+   "actual": "テキスト: \"# R\\n\\n## B\\n\\n## A\\n\\n---\\n\\n<!--\\n-->\\n---\\n\\n## C\\n\"\nノード: R:g0 B:g0R(hidden=false) A:g0R C:g1L\n→ B が hide 領域から抜け出して可視化、空マーカー対が残留",
+   "verdict": "バグ",
+   "note": "H-17 と同一原因。矢印キー操作でも起きるので踏みやすい。"
+  },
+  {
+   "id": "H-19",
+   "title": "hide 中のノードを moveNewGroup / moveNewGroupBefore しても同じ",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "(a) toggleHidden(B) → core.moveNewGroup([B], id_of(\"R\"))  (b) toggleHidden(B) → core.moveNewGroupBefore([B], id_of(\"A\"))",
+   "expected": "B が hide のまま新しい束として置かれる",
+   "actual": "(a) \"# R\\n\\n## A\\n\\n---\\n\\n<!--\\n-->\\n---\\n\\n## C\\n\\n---\\n\\n## B\\n\" → A:g0R C:g1L B:g2R、B は可視化\n(b) \"# R\\n\\n## B\\n\\n---\\n\\n## A\\n\\n---\\n\\n<!--\\n-->\\n---\\n\\n## C\\n\" → B:g0R A:g1L C:g2R、B は可視化・空マーカー残留",
+   "verdict": "バグ",
+   "note": "束のドラッグ＆ドロップ（マップ上で空いている側へ落とす操作）で発生する。ユーザーの主操作なので実害が大きい。"
+  },
+  {
+   "id": "H-20",
+   "title": "可視ノードを hide 中の束へ move すると黙って hide される",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "toggleHidden(id_of(\"B\")) → core.moveNodes([id_of(\"C\")], id_of(\"B\"), 0)",
+   "expected": "（未定義）",
+   "actual": "テキスト: \"# R\\n\\n## A\\n\\n---\\n\\n<!--\\n## B\\n\\n### B1\\n\\n### C\\n\\n-->\\n---\\n\"\nノード: A:g0R B:g0R(hidden) B1(hidden) C:g0R(hidden)\n→ C が hidden=true になりマップから消える。加えて末尾に行き場を失った `---` が1本残った",
+   "verdict": "仕様が未定義",
+   "note": "H-17〜19 と違いマーカーは正しく機能しているが、「畳んだ束に落としたらノードが消えた」ように見える。折り畳み中の束が drop 先として選べること自体を UI で塞ぐか、drop 時に自動で show するかの方針決めが要る。末尾の孤立 `---` は empty_bundle_sep_edits が moveNodes 経路では呼ばれないため（moveNewGroup だけが呼ぶ）。"
+  },
+  {
+   "id": "H-21",
+   "title": "【対照群】子が hide されている束を move するのは正しく動く",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "toggleHidden(id_of(\"B1\")) → core.moveNewGroup([id_of(\"B\")], id_of(\"R\"))",
+   "expected": "B の部分木がマーカーごと移動し、B1 は hide のまま",
+   "actual": "テキスト: \"# R\\n\\n## A\\n\\n---\\n\\n## C\\n\\n---\\n\\n## B\\n\\n<!--\\n### B1\\n\\n-->\\n\"\nノード: A:g0R C:g1L B:g2R B1:g2R(hidden) → マーカーが一緒に移動し hide 継続",
+   "verdict": "正常",
+   "note": "条件4の分岐点がはっきりした: マーカー対が『動かす範囲の内側に完全に収まっている』(= hide したのが子孫) なら正しい。壊れるのは『動かすノード自身が hide されている』(= マーカーが範囲の外にある) ときだけ。"
+  },
+  {
+   "id": "H-22",
+   "title": "子が hide されている束を reorder すると区切りが2本並んで残る",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "toggleHidden(id_of(\"B1\")) → core.reorderNode(id_of(\"B\"), -1)",
+   "expected": "B が B1 ごと1つ上へ移り、余分な区切りは残らない",
+   "actual": "テキスト: \"# R\\n\\n## B\\n\\n<!--\\n### B1\\n\\n-->\\n\\n## A\\n\\n---\\n\\n---\\n\\n## C\\n\"\nノード: R:g0 B:g0R B1:g0R(hidden) A:g0R C:g1L\n→ hide は保たれるが `---` が2本連続で残り、C は g2→g1 に",
+   "verdict": "バグ",
+   "note": "hide 固有ではなく reorder が空になった束の区切りを掃除しない問題（cmd_move_new_group にしかある empty_bundle_sep_edits が reorder 経路に無い）。2連の `---` は1本目が無効になるので破綻はしないが、テキストにゴミが溜まり、以後の編集で挙動が読めなくなる。"
+  },
+  {
+   "id": "H-23",
+   "title": "【条件7】hide したまま区切りを書き足すと、黙って無視される",
+   "input": "# R\n\n## A\n\n## B\n\n## C\n（区切り無し）",
+   "operation": "toggleHidden(id_of(\"B\")) → core.replaceText(indexOf(\"<!--\"), 同, \"---\\n\\n\", \"x\")  // `<!--` 行の直前に区切りを挿入",
+   "expected": "B から新しい束が始まり、B と C が左へ移る",
+   "actual": "テキスト: \"# R\\n\\n## A\\n\\n---\\n\\n<!--\\n## B\\n\\n-->\\n## C\\n\"\nノード: A:g0R B:g0R(hidden) C:g0R → 何も変わらない",
+   "verdict": "バグ",
+   "note": "H-02 の裏返し。マークダウン側で `---` を書いても、直後に `<!--` があるせいで条件3に落ちて区切りが成立しない。ユーザーから見ると「`---` を書いたのに束が分かれない」。修正点は H-11 と同じ1か所。"
+  },
+  {
+   "id": "H-24",
+   "title": "【条件7】hide 領域の中に区切りを書き足すと、束が本当に増えて左右が動く",
+   "input": "# R\n\n## A\n\n## B\n\n### B1\n\n## C\n（区切り無し）",
+   "operation": "toggleHidden(id_of(\"B\")) → core.replaceText(indexOf(\"### B1\"), 同, \"---\\n\\n\", \"x\")  // マーカーの内側に区切りを挿入",
+   "expected": "（未定義）コメントアウトされた領域の中の `---` は無視されてほしい",
+   "actual": "テキスト: \"# R\\n\\n## A\\n\\n<!--\\n## B\\n\\n---\\n\\n### B1\\n\\n-->\\n## C\\n\"\n前: A:g0R B:g0R(hidden) B1:g0R(hidden) C:g0R\n後: A:g0R B:g0R(hidden) B1:深さ3→2, g1L(hidden) C:g0R→g1L\n→ 見えないテキストの中の1行で B1 が束の先頭に昇格し、可視ノード C が右から左へ",
+   "verdict": "バグ",
+   "note": "H-10 の帰結が動的に現れた形。しかも depth まで 3→2 に読み替えられ、B1 が B の子から束の先頭（ルート直下）へ昇格している。ユーザーには『畳んである枝の中を触っただけで、関係ない C が反対側へ飛んだ』としか見えない。"
+  },
+  {
+   "id": "H-25",
+   "title": "【条件7】hide 中の束の手前にある区切りを消す",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "toggleHidden(id_of(\"B\")) → core.replaceText(indexOf(\"---\"), +5, \"\", \"x\")  // 1本目の \"---\\n\\n\" を削除",
+   "expected": "（すでに無効な区切りなので）左右不変",
+   "actual": "テキスト: \"# R\\n\\n<!--\\n## B\\n\\n-->\\n---\\n\\n## C\\n\"\nノード: A:g0R B:g0R(hidden) C:g1L（削除前と同一）",
+   "verdict": "正常",
+   "note": "hide 中は1本目がすでに死んでいるので、消しても表示は変わらない。ただし裏を返すと『show したときに戻るはずだった区切りが永久に失われる』——ユーザーは「効いていない `---` だから消した」つもりでも、show 後の左右は元に戻らなくなる。可逆性（H-12）が破れる唯一の経路。"
+  },
+  {
+   "id": "H-26",
+   "title": "【条件3】hide したノードを含む束の、束番号",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n",
+   "operation": "toggleHidden(各ノード) 後に snapshot の group を確認",
+   "expected": "hidden かどうかに関わらず、束番号は文書上の位置で決まる",
+   "actual": "束の先頭を hide した場合: そのノードの group は前の束に吸収されて -1 される（B: 1→0）。先頭以外を hide した場合: group は変わらない（B1 を hide しても B1:g1 のまま）。ルートを hide した場合: 全ノードが hidden=true になるだけで group は不変。",
+   "verdict": "バグ",
+   "note": "条件3の答え: 『hidden だから』束番号が変わるのではなく、『開きマーカー行が直前の区切りを殺すから』変わる。hidden ノードも group を持ち続け、mindmap.ts は hidden ノードも group % 2 で左右に配置する（hidden は折り畳み表示になるだけで、盤面からは消えない）ので、番号のずれはそのまま描画位置のずれになる。"
+  },
+  {
+   "id": "H-27",
+   "title": "hide 中のノードを delete すると空マーカー対がゴミとして残る",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "toggleHidden(id_of(\"B\")) → core.deleteNodes([id_of(\"B\")])",
+   "expected": "B と一緒に `<!--` / `-->` も消える",
+   "actual": "テキスト: \"# R\\n\\n## A\\n\\n---\\n\\n<!--\\n-->\\n---\\n\\n## C\\n\"\nノード: A:g0R C:g1L（束の数は正しく1減る）",
+   "verdict": "バグ",
+   "note": "doc.mbt のコメントによれば『閉じマーカーだけが範囲に入って孤児 `<!--` が残り、以降が全部隠れる』事故の対策として、マーカーを範囲から外した経緯がある。隠れる事故は解消したが、代わりに空の `<!--\\n-->` が必ず残る。しかもこのゴミは条件3を通じて『直前の `---` を殺す』効果を持ち続けるので、テキストを見ながら編集する人には理由の分からない罠になる。"
+  },
+  {
+   "id": "H-28",
+   "title": "束の先頭を2つ hide すると、ずれが累積する",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "toggleHidden(B) → toggleHidden(C)",
+   "expected": "D は g3（左）のまま",
+   "actual": "base: A:g0R B:g1L C:g2R D:g3L\nhide B: A:g0R B:g0R* C:g1L D:g2R\nhide C: A:g0R B:g0R* C:g0R* D:g1L\n→ D は左→右→左と2回動き、B と C は右側に積み上がって束0に合流",
+   "verdict": "バグ",
+   "note": "畳むたびに1本ずつ区切りが死ぬので、ずれは畳んだ束の数だけ累積する。マップ全体が片側に寄っていくため、ユーザーが『レイアウトが崩れる』と表現する見え方と一致する。"
+  },
+  {
+   "id": "H-29",
+   "title": "参考: テストスイートの現状（既知の失敗は解消済み）",
+   "input": "（リポジトリ現状のまま）",
+   "operation": "cd D:/1.atrium/mmm/core && PATH=\"$HOME/.moon/bin:$PATH\" moon test -p mmm-app/core ／ cd D:/1.atrium/mmm && node --test \"audit/tests/*.test.mjs\"",
+   "expected": "C6 と C9b が既知の失敗、それ以外は成功",
+   "actual": "core: Total tests: 72, passed: 72, failed: 0\n往復テスト: tests 27 / pass 27 / fail 0。C6「hide→show がテキストを元に戻す」も C9b「outdent は対象ノードの id を保存する」も成功している。",
+   "verdict": "正常",
+   "note": "申し送りの『C6 と C9b は既知の失敗』は現時点では当てはまらない（両方通る）。他に落ちているテストも無い。逆に言えば、H-02 の左右反転は既存のどのテストでも検出されていない——テストは hide→show の可逆性（H-12 相当）しか見ておらず、hide 中の group を検証していないため。回帰テストを足すならここ。"
+  },
+  {
+   "id": "H-01",
+   "title": "hide だけで後続の束番号が全部ずれ、無関係なノードの左右が入れ替わる（最重要・D&D 不要）",
+   "input": "# root\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "initDoc(md) → core.toggleHidden(B)  ※ B は g1（左）の唯一のメンバ",
+   "expected": "hide は B のサブツリーを `<!--`/`-->` で包むだけ。A=g0(右) / B=g1(左) / C=g2(右) は不変で、C の表示側も変わらない。",
+   "actual": "テキストは `## A\\n\\n---\\n\\n<!--\\n## B\\n\\n-->\\n---\\n\\n## C\\n`。区切り有効条件3「次に来る非空白が見出しであること」に `<!--` 行が引っかかり、B の前の `---` が**無効化**される。結果 B: g1(左)→**g0(右)**、C: g2(右)→**g1(左)**。Shift+H を押しただけで、触っていない C が右から左へ飛ぶ。もう一度 toggleHidden(B) すると元に戻る。ランダム文書 400 seed のファズでも、hide 実行 21 件のうち 9 件で他ノードの束番号が動き、その全件が左右反転だった。",
+   "verdict": "バグ",
+   "note": "根本原因は doc.mbt rebuild_nodes の `if hp >= hn || !is_blank_range(s_next, heads[hp].hs) { continue }`。区切りの直後に来た `<!--` を「本文」とみなしている。マーカー行を空白扱いにするか、hide 時にマーカーを `---` の前に置く（＝区切りごと包む）のどちらかが要る。**hide が束の先頭ノードに当たると必ず起きる**ので再現性は 100%。"
+  },
+  {
+   "id": "H-02",
+   "title": "hide 中のノードを別の束へ move すると hide が黙って外れ、空マーカーが残る",
+   "input": "# root\n\n## A\n\n### A1\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "toggleHidden(A) → core.moveNodes([A], B, 0)（A を B の子へ）",
+   "expected": "A のサブツリーが B の子へ移り、A は hide のまま（折り畳まれた状態）。マーカーは A と一緒に移動する。",
+   "actual": "`# root\\n\\n<!--\\n-->\\n---\\n\\n## B\\n\\n### A\\n\\n#### A1\\n\\n---\\n\\n## C\\n`。A/A1 は hidden=false になり **hide 状態が消失**。元の場所に空の `<!--`\\n`-->` が残る。さらに残骸のせいで root が hasContent=true になり、マップ上のルートに存在しないはずの本文カードが付く。undo は 1 回でテキスト・束・hide とも完全復元。",
+   "verdict": "バグ",
+   "note": "hidden ノードの range は doc.mbt の (3) でマーカーの手前／直前に切られるため [hs,sub_end) にマーカーが入らない。move_block はその range しか運ばないので、マーカーは必ず置き去りになる。ファズでは移動 401 件中 **70 件（17%）** で「hide が勝手に外れる」を観測。"
+  },
+  {
+   "id": "H-03",
+   "title": "hide 中のノードを moveNewGroup すると、死んだ `---` と空マーカーが二重に残る",
+   "input": "# root\n\n## A\n\n### A1\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "toggleHidden(B) → core.moveNewGroup([B], root)",
+   "expected": "B が新しい束としてルートの末尾に移り、空になった元の束の `---` は empty_bundle_sep_edits が消す。B は hide のまま。",
+   "actual": "`# root\\n\\n## A\\n\\n### A1\\n\\n---\\n\\n<!--\\n-->\\n---\\n\\n## C\\n\\n---\\n\\n## B\\n`。B の hide は外れる。元の束の `---` は**消えない**（H-01 で既に無効化され st.seps に居ないため empty_bundle_sep_edits の対象外）。テキストには `---` が 3 本残り、うち 1 本は束境界として死んでいるがレンダラでは水平線として出る。undo は 1 回で完全復元。",
+   "verdict": "バグ",
+   "note": "H-01 の連鎖被害。hide が区切りを殺した時点で、その束は「掃除できない束」になる。"
+  },
+  {
+   "id": "H-04",
+   "title": "hide 中のノードを moveNewGroupBefore すると同様に残骸が残る",
+   "input": "# root\n\n## A\n\n### A1\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "toggleHidden(B) → core.moveNewGroupBefore([B], C)",
+   "expected": "B が C の直前の新しい束になり、hide は維持、元の区切りは掃除される。",
+   "actual": "`# root\\n\\n## A\\n\\n### A1\\n\\n---\\n\\n<!--\\n-->\\n\\n---\\n\\n## B\\n\\n---\\n\\n## C\\n`。順序と束番号（A=g0 / B=g1 / C=g2）は正しいが、hide は外れ、死んだ `---` と空マーカーが残る。undo は 1 回で完全復元。",
+   "verdict": "バグ",
+   "note": "H-03 と同じ原因。順序・束番号だけを見ると正常に見えるので、テキストを見ないと気づけない。"
+  },
+  {
+   "id": "H-05",
+   "title": "hide 中のノードの「中へ」落とす（pos=0）— 折り畳みとして正しく振る舞う",
+   "input": "# root\n\n## A\n\n## B\n\n### B1\n\n## C\n",
+   "operation": "toggleHidden(B) → core.moveNodes([C], B, 0) → toggleHidden(B)（再表示）",
+   "expected": "C が hide 領域の中に入って hidden になり、B を再表示すると C が B の子として現れる（hide＝折り畳みなので、折り畳んだノードへの投げ込みは正当）。",
+   "actual": "`# root\\n\\n## A\\n\\n<!--\\n## B\\n\\n### B1\\n\\n### C\\n\\n-->\\n` → C は d3 / p=B / hidden。再表示で `# root\\n\\n## A\\n\\n## B\\n\\n### B1\\n\\n### C\\n\\n` となり B の子として正しく出る。",
+   "verdict": "正常",
+   "note": "唯一の懸念は UI 側。hidden ノードの子孫はマップから消える（mindmap.ts 808 付近）ので、ドラッグしたノードが着地と同時に画面から消える。挙動としては仕様どおりだが、`+n` のバッジが増える以外の手掛かりが無い。"
+  },
+  {
+   "id": "H-06",
+   "title": "hide 中のノードの「直前へ」落とす（pos=1）と、無関係なノードが hide 領域に飲み込まれる",
+   "input": "# root\n\n## A\n\n## B\n\n### B1\n\n## C\n",
+   "operation": "toggleHidden(B) → core.moveNodes([C], B, 1)（C を B の直前の兄弟に）",
+   "expected": "C は B の直前の**兄弟**として、hide 領域の外（`<!--` の手前）に置かれる。C は可視のまま。",
+   "actual": "`# root\\n\\n## A\\n\\n<!--\\n\\n## C\\n\\n## B\\n\\n### B1\\n\\n-->\\n`。挿入点が `B.hs`＝`<!--` の**直後**なので C が領域内に入り、C が hidden 化してマップから消える。md を GitHub 等で見ると C は丸ごとコメントアウトされている。",
+   "verdict": "バグ",
+   "note": "「hide の範囲が別のノードを巻き込む」の直撃例。move_steps の pos=1 は `tn.hs` を挿入点にするが、tn が hidden のときは領域の開始マーカーの手前を使うべき。"
+  },
+  {
+   "id": "H-07",
+   "title": "hide 中のノードの「直後へ」落とす（pos=2）でも飲み込まれる",
+   "input": "# root\n\n## A\n\n## B\n\n### B1\n\n## C\n",
+   "operation": "toggleHidden(B) → core.moveNodes([A], B, 2)（A を B の直後の兄弟に）",
+   "expected": "A は B の直後の兄弟として `-->` の**後ろ**に置かれ、可視のまま。",
+   "actual": "`# root\\n\\n<!--\\n## B\\n\\n### B1\\n\\n## A\\n\\n-->\\n## C\\n`。挿入点 `tn.sub_end` が `-->` の開始位置なので A が領域内に落ちて hidden 化。ツリー上は d2 / p=root のままなのに、マップからは消える。",
+   "verdict": "バグ",
+   "note": "H-06 と対。ファズでは移動 401 件中 **45 件（11%）** で「ユーザが hide していないノードが hidden 化」を観測。hidden ノードの sub_end は `-->` の直前で切られているので、pos=2/0 の挿入点はマーカーの後ろへ送る補正が要る。"
+  },
+  {
+   "id": "H-08",
+   "title": "束の最後の1つ（かつ hide 中）を move — 区切りとマーカーの両方が宙に浮く",
+   "input": "# root\n\n## A\n\n---\n\n## B\n",
+   "operation": "toggleHidden(B) → core.moveNodes([B], A, 1)（B を A の前へ）",
+   "expected": "束1が空になるので `---` は消え、マーカーも B と一緒に移動して何も残らない。",
+   "actual": "`# root\\n\\n## B\\n\\n## A\\n\\n---\\n\\n<!--\\n-->\\n`。**`---` と空マーカーの両方が末尾に浮いたまま**。さらに hide 直後の時点で、残った `---` + `<!--` が A の range に入るため **A に hasContent=true が立ち、マップの A に存在しない本文カードが表示される**。B の hide も外れる。undo は 1 回で完全復元。",
+   "verdict": "バグ",
+   "note": "担当項目4そのもの。plain move は empty_bundle_sep_edits を呼ばない（呼ぶのは moveNewGroup / moveNewGroupBefore だけ）ので、そもそも `---` の掃除機構が走らない。"
+  },
+  {
+   "id": "H-09",
+   "title": "hide 中のノードを親の子へ落としたら、死んだ `---` が復活して左右が入れ替わる",
+   "input": "# root\n\n## A\n\n---\n\n## B\n",
+   "operation": "toggleHidden(B) → core.moveNodes([B], A, 0)（B を A の子に）",
+   "expected": "B が A の子（d3）になる。束は 1 つだけになり B は右側の A の下にぶら下がる。",
+   "actual": "`# root\\n\\n## A\\n\\n---\\n\\n### B\\n\\n<!--\\n-->\\n`。テキストとしては `### B` だが、宙に浮いた `---` の直後に着地したため**区切りが再び有効化**し、束の読み替え規則で `### B` が**ルート直下（d2, g1）＝左側の新しい束**として読まれる。「A の子にする」というドロップが「左側の独立した束」になる。redo/undo は正しく往復する。",
+   "verdict": "バグ",
+   "note": "担当項目6「1 つの操作でテキストは正しいが束番号が変わって左右が入れ替わる」の完全な実例。挿入点は A.sub_end で、hide のせいで A.sub_end が `<!--` の手前＝`---` の後ろに来ていることが引き金。"
+  },
+  {
+   "id": "H-10",
+   "title": "moveAsParent の対象が hide 中のとき、割り込んだ側が飲み込まれる",
+   "input": "# root\n\n## A\n\n## B\n\n### B1\n\n## C\n",
+   "operation": "toggleHidden(B) → core.moveAsParent([C], B)（root→B の線に C を落とす）",
+   "expected": "C が B の新しい親になり、C は可視・B は hide のまま（root → C → B(hide)）。",
+   "actual": "`# root\\n\\n## A\\n\\n<!--\\n\\n## C\\n\\n### B\\n\\n#### B1\\n\\n-->\\n`。C は `move_steps(ids, target, 1)` 経由で `B.hs`（＝`<!--` の直後）に入るので hidden 化し、マップから消える。親子関係 root→C→B は正しいが、丸ごとコメントアウトされる。undo は 1 回で完全復元。",
+   "verdict": "バグ",
+   "note": "H-06（pos=1）と同一原因。hidden ノードは折り畳みノードとして描画され、その親からの辺も描かれるので、この線へのドロップは UI から到達可能。"
+  },
+  {
+   "id": "H-11",
+   "title": "moveAsParent のドラッグ元が hide 中のとき、hide が外れて空マーカーが残る",
+   "input": "# root\n\n## A\n\n## B\n\n### B1\n\n## C\n",
+   "operation": "toggleHidden(A) → core.moveAsParent([A], B)",
+   "expected": "A が B の親になり、A は hide のまま（＝B/B1 ごと折り畳まれる、もしくは少なくとも A の hide は維持）。",
+   "actual": "`# root\\n\\n<!--\\n-->\\n\\n## A\\n\\n### B\\n\\n#### B1\\n\\n## C\\n`。構造 root→A→B→B1 は正しいが A の hidden が外れ、先頭に空マーカーが残る。残骸により root が hasContent=true になる。undo は 1 回で完全復元。",
+   "verdict": "バグ",
+   "note": "H-02 と同一原因（マーカーが range 外なので運ばれない）。"
+  },
+  {
+   "id": "H-12",
+   "title": "moveNewGroupBefore が hide 領域の中に `---` を書き、後続の束が全部左右反転する",
+   "input": "# root\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "toggleHidden(A)（A は束0の先頭）→ core.moveNewGroupBefore([C], A)（A の束の手前に新しい束として C を置く）",
+   "expected": "C が A の束の手前に新しい束として入り、可視のまま。B の表示側（左）は変わらない。",
+   "actual": "`# root\\n\\n<!--\\n\\n## C\\n\\n---\\n\\n## A\\n\\n-->\\n---\\n\\n## B\\n`。sep2 の探索が失敗して `at = A.hs`（`<!--` の直後）になるため、(a) **C が領域内に落ちて hidden 化しマップから消える**、(b) 区切り行 `---` まで**コメントの中に書き込まれる**。scan_doc は `is_separator` を in_comment で守っていないので、この隠れた `---` が有効な束境界として数えられ、**B が g1(左)→g2(右)へ反転**。undo は 1 回で完全復元。",
+   "verdict": "バグ",
+   "note": "担当項目6の最悪ケース。「見えないところに書かれた区切り」が見えているノードの左右を決めてしまう。scan_doc の区切り収集を `!in_comment` で守るだけでも (b) は塞げるが、(a) は挿入点の補正が別途必要。"
+  },
+  {
+   "id": "H-13",
+   "title": "複数選択（hide 中と通常が混在）で move — 順序と構造は正しいが hide が全部外れる",
+   "input": "# root\n\n## A\n\n## B\n\n## C\n\n---\n\n## D\n",
+   "operation": "toggleHidden(B) → core.moveNodes([A, B], D, 0)（A(可視)+B(hide) を D の子へ）",
+   "expected": "A と B が文書順のまま D の子になり、B は hide のまま。",
+   "actual": "`# root\\n\\n<!--\\n-->\\n## C\\n\\n---\\n\\n## D\\n\\n### A\\n\\n### B\\n`。順序（A→B）・親子（D の子）・束（g1）はすべて正しいが、**B の hide が消失**し、空マーカーが元の位置に残る。moveNewGroup 版（core.moveNewGroup([A,B], root)）も同じ結果。undo はどちらも 1 回で完全復元。",
+   "verdict": "バグ",
+   "note": "混在選択に固有の破綻（順序の入れ替わり・部分適用など）は無い。壊れるのは hide 状態だけで、原因は H-02 と同じ。"
+  },
+  {
+   "id": "H-14",
+   "title": "hide 中の子を持つ部分木を hide 中のノードへ move — マーカーが入れ子になり、孫がルート直下へ脱出する",
+   "input": "# root\n\n## B\n\n### B1\n\n## X\n\n### X1\n\n### X2\n\n## Z\n",
+   "operation": "toggleHidden(X1) → toggleHidden(B) → core.moveNodes([X], B, 0)（hide 中の子を持つ X を hide 中の B の子へ）",
+   "expected": "README「入れ子の Hide は不可」に従い、入れ子が生じない形に正規化されるか、少なくとも X2 が X の子・hidden のまま保たれる。",
+   "actual": "`# root\\n\\n<!--\\n## B\\n\\n### B1\\n\\n### X\\n\\n<!--\\n#### X1\\n\\n-->\\n#### X2\\n\\n-->\\n## Z\\n` という**入れ子マーカー**が生成される。HTML コメントは入れ子にならないので最初の `-->` で閉じ、結果 **X2 は hidden=false・depth=4 なのに parent=root（p1）** になる。深さ 4 のノードがルート直下の別ツリーとしてマップに現れ、外側の `-->` は本文行として残る。undo は 1 回で完全復元。",
+   "verdict": "バグ",
+   "note": "ツリー不変条件（親の depth < 子の depth かつ子は親の range 内）が壊れる唯一のケース。cmd_toggle_hidden は入れ子を明示的に禁止しているのに、move が裏口からそれを作れてしまう。ファズでも newGroupBefore / move1 / move2 で同種の「hide が勝手に外れる（released）」を再現。"
+  },
+  {
+   "id": "H-15",
+   "title": "undo で 3 状態（テキスト・束・hide）が同時に戻るか",
+   "input": "# root\n\n## A\n\n### A1\n\n---\n\n## B\n\n---\n\n## C\n",
+   "operation": "toggleHidden(A) → moveNodes([C], B, 0) → moveNewGroup([B], root) の 3 手を進めたあと core.undo() ×3、続けて core.redo() ×3。各段でテキスト全文とノード表（id / depth / group / hidden / parent）を突き合わせ",
+   "expected": "undo 1 回につき 1 コマンド分だけ戻り、テキスト・束番号・hide 状態・ノード id がすべて実行直前と一致する。redo も同様。",
+   "actual": "undo→状態2 / 状態1 / 状態0、redo→状態1 / 状態2 / 状態3 のすべてで、テキストとノード表（id 含む）が完全一致。moveNewGroup のように内部で複数 apply_sets を行うコマンドも 1 トランザクション＝undo 1 回で戻る。個別ケース H-02〜H-14 の undo でも全件一致。",
+   "verdict": "正常",
+   "note": "undo/redo は begin_tx/commit_tx と Entry.before/after による id 復元が効いており、この三者の相互作用でも破綻しない。壊れているのは常に「前向きの 1 手」の側で、巻き戻しではない。"
+  },
+  {
+   "id": "H-16",
+   "title": "【対照】束の最後の1つ（通常ノード）を plain move しても `---` が宙に浮く",
+   "input": "# root\n\n## A\n\n---\n\n## B\n",
+   "operation": "core.moveNodes([B], A, 0)（hide を一切使わない）",
+   "expected": "束1が空になるので、moveNewGroup と同じく `---` が掃除される。",
+   "actual": "`# root\\n\\n## A\\n\\n### B\\n\\n---\\n`。`---` が末尾に残り、さらにそれが B の range に入るので **B に hasContent=true が立ち、マップの B に存在しない本文カードが出る**。",
+   "verdict": "バグ",
+   "note": "hide と無関係な素の D&D バグ。empty_bundle_sep_edits は cmd_move_new_group / cmd_move_new_group_before からしか呼ばれておらず、cmd_move / cmd_move_as_parent / cmd_outdent / cmd_reorder は掃除しない。担当項目4の前提部分なので併せて報告する。"
+  },
+  {
+   "id": "H-17",
+   "title": "ランダム文書での集計（hide 1 回 + D&D 1 回）",
+   "input": "audit/tests/_helpers.mjs の randomDoc(seed) を seed=1..600 で生成（`---` / `<!--` / フェンス / 深さ飛び / CRLF / 複数ルートを含む）",
+   "operation": "各 seed で initDoc → ランダムな 1 ノードに toggleHidden → {moveNodes(pos0/1/2), moveAsParent, moveNewGroup, moveNewGroupBefore} からランダムに 1 つ実行 → hidden 集合・束番号・undo 後テキストを検証",
+   "expected": "D&D は動かしたサブツリー以外の hidden 状態を変えない。undo でテキストが操作直前に戻る。",
+   "actual": "移動が実際に起きた 401 件のうち、**ユーザが hide していないノードが hidden 化＝45 件（11%）**、**hide が勝手に外れた＝70 件（17%）**。動かしたサブツリーの外のノードまで hide が外れた（＝マーカー分断）ケースも 3 件（newGroupBefore / move1 / move2）。undo 後のテキスト不一致は **0 件**。別途、hide 単独のファズ（seed=1..400）では hide 実行 21 件中 9 件で他ノードの束番号が動き、全件が左右反転だった。",
+   "verdict": "バグ",
+   "note": "個別ケース H-01〜H-14 の発生率確認。壊れ方は 2 系統（マーカーが移動に付いてこない／挿入点がマーカーの内側に落ちる）に集約でき、undo は全件健全。"
+  },
+  {
+   "id": "H-18",
+   "title": "既存テストスイートの現状（前提確認）",
+   "input": "（リポジトリ全体）",
+   "operation": "cd D:/1.atrium/mmm && node --test \"audit/tests/*.test.mjs\"",
+   "expected": "指示では C6（hide→show の往復）と C9b（outdent の id 保存）が既知の失敗。",
+   "actual": "**27 件すべて pass（fail 0）**。C6 も C9b も現在は通っている。したがって今回報告するケースはどれも既存テストが検出できていない未カバー領域。",
+   "verdict": "仕様が未定義",
+   "note": "指示にあった既知の失敗は現在の HEAD では解消済み。上記 H-01〜H-17 は既存の往復テストが hide と D&D を組み合わせていないために素通りしている。"
+  },
+  {
+   "id": "H-01",
+   "title": "仮説A本命: 途中に束を1つ挿すと、それ以降の束が全部左右反転する",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "node --input-type=module（audit/tests/_helpers.mjs 経由）で initDoc(上記) → core.addSibling(2, \"\", true)。id=2 は \"A\"。UI では Mod+o（新しい束として兄弟を作る）に相当",
+   "expected": "A の後ろに空の束が1つ増えるだけ。B / C / D は触っていないので、それぞれ左 / 右 / 左のまま動かない",
+   "actual": "新ノードが g1（左）に入り、B が g1→g2（左→右）、C が g2→g3（右→左）、D が g3→g4（左→右）。触っていない3つの束が全部反対側へ飛ぶ。テキストは `## A` と `## B` の間に `---` と `## ` が入っただけで正しい",
+   "verdict": "バグ",
+   "note": "困る度 最大。原因は core/doc.mbt:478-482 の compute_groups が group を「その位置より前にある有効な区切りの本数」＝通し番号にしていて、src/mindmap.ts:1071-1072 がそれを `group % 2 === 0` の偶奇で左右に振っていること。束の側は自分の属性ではなく「前に何本区切りがあるか」で決まるので、末尾以外のどこかに束を1つ足すと以降の束が全部ドミノで反転する。ユーザーがやったのは「1つ足す」だけなのに画面の左半分と右半分が丸ごと入れ替わり、目で追っていた場所を見失う。テキストは正しいので「どこが壊れたのか」が分からず、undo 以外に直す手がない（ダミーの束をもう1つ足して偶奇を戻す、という不本意な回避しかできない）。"
+  },
+  {
+   "id": "H-02",
+   "title": "仮説A: ドラッグで「束の手前に新しい束として置く」も同じく以降を全反転させる",
+   "input": "# R\n\n## A\n\n### X\n\n---\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "initDoc(上記) → core.moveNewGroupBefore([3], 4)。id=3 は \"X\"、id=4 は \"B\"。UI では X を B の束の手前へドラッグして新しい束にする操作",
+   "expected": "X が B の手前に新しい束として入る。B / C / D は順番も左右も変わらない（挿入位置より後ろは押し下がるだけ）",
+   "actual": "X が g1（左）に入り、B が g1→g2（左→右）、C が g2→g3（右→左）、D が g3→g4（左→右）。挿入位置より後ろの束が3つとも反対側へ移る",
+   "verdict": "バグ",
+   "note": "困る度 大。H-01 と同一の原因（group の通し番号＋偶奇で左右）。こちらはマウス操作なので「ここに置く」と狙いを定めた直後に画面全体が組み替わる。ドラッグ中の見た目と落とした後の結果が食い違うため、取り消して何度もやり直す羽目になる。束の数が多いほど反転する数が増え、束が5つ以上ある実文書では実質「毎回レイアウトが作り直される」体験になる。"
+  },
+  {
+   "id": "H-05",
+   "title": "仮説A: 束の先頭を折り畳む（Shift+H）だけで、その束の区切りが死んで以降が全反転する",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "initDoc(上記) → core.toggleHidden(3)。id=3 は束の先頭 \"B\"（Shift+H）",
+   "expected": "B の部分木が折り畳まれて hidden になるだけ。束の構成（A=右, B=左, C=右, D=左）は変わらない",
+   "actual": "テキストが \"---\\n\\n<!--\\n## B ... -->\\n---\" になり、1本目の `---` と次の見出しの間に `<!--` が挟まる。core/doc.mbt:316 の `!is_blank_range(s_next, heads[hp].hs)` に引っかかって1本目の区切りが無効化され、B が g1→g0（左→右、A と同じ束に吸収）、C が g2→g1（右→左）、D が g3→g2（左→右）。折り畳んだ本人だけでなく後続の束が全部動く",
+   "verdict": "バグ",
+   "note": "困る度 大。挿入ではなく「畳んだだけ」なのに構造が変わるのが特に痛い。hide は見た目を整理するための操作で、内容を動かす意図がまったくない。それなのに畳んだ瞬間に B が隣の束に合流し、C と D が反対側へ飛ぶ。しかも展開すれば元に戻るので「畳む→開く」を繰り返すたびに画面が跳ね、ユーザーは自分の操作と結果を結び付けられない。折り畳みを多用する長い文書ほど被害が大きい。"
+  },
+  {
+   "id": "H-03",
+   "title": "仮説B本命: 先頭が ### で書かれた束の中で兄弟を1つ足すと、以降の兄弟が新ノードの子に潜り込む",
+   "input": "# R\n\n## A\n\n---\n\n### B\n\n### C\n\n### D\n\n### E\n",
+   "operation": "initDoc(上記) → core.addSibling(3, \"\", false)。id=3 は \"B\"。split=false なので `---` は一切書かれない、純粋な挿入（UI の o キー）",
+   "expected": "B の直後に空の兄弟が1つ増えるだけ。C / D / E は B と同じくルート直下（depth 2）の兄弟のまま",
+   "actual": "テキストに `## ` が書き込まれ、C / D / E が depth 2→3・parent 1（ルート）→7（新しい空ノード）に変わる。3つの兄弟が、触ってもいないのに空ノードの子として1段潜る。md' = \"# R\\n\\n## A\\n\\n---\\n\\n### B\\n\\n## \\n\\n### C\\n\\n### D\\n\\n### E\\n\"",
+   "verdict": "バグ",
+   "note": "困る度 大。原因は「書かれた深さ」と「読み替え後の深さ」の取り違え。core/doc.mbt:343 で束の先頭（`### B`）を深さ2として読み、以降を相対で解釈しているのに、core/cmds.mbt:170 の cmd_add_sibling は読み替え後の nd.depth(=2) をそのまま hashes() に渡して `## ` を書く。書かれた `##` は基準(3)より浅いので core/doc.mbt:352-353 が基準を2に取り直し、残りの `###` が全部1段深く読み直される。`---` の直後を深さ2として読む仕様（手書きの md でごく自然に発生する）を使っているだけで、普通の「兄弟を足す」が後続ノードの親子関係を書き換える。マップ上は兄弟の列が突然インデントされた塊になり、レイアウトが大きく崩れる。テキスト側を見ても `## ` が1行増えただけなので原因が読み取れない。ランダム文書 250 本への総当たり（split=false の挿入のみ）で、触っていないノードの parent/depth/group が変わった事例は計 1458 件（addParent:depth 556, addSiblingBefore:parent+depth 233, addSiblingBefore:depth 106, addSibling:parent+depth 99, addParent:parent+depth 99, addSibling:depth 58, addSibling:group 53, addChild:group 52, addChild:parent+depth 51 ほか）。"
+  },
+  {
+   "id": "H-06",
+   "title": "仮説A+B 複合: 折り畳んだ束の隣で子を足すと、子ではなく新しい束になり、さらに以降が全反転する",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n### B1\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "initDoc(上記) → core.toggleHidden(3)（B を折り畳む） → core.addChild(2, \"\", false)。id=2 は \"A\"、UI の Tab キー相当",
+   "expected": "A の子（depth 3, parent=A）が1つ増えるだけ。折り畳み済みの B と、その後ろの C / D は動かない",
+   "actual": "新ノードが `---` の直後に置かれるため束の先頭として読まれ、depth 2 / parent=1（ルート）になる＝A の子ではなく独立した束。同時に眠っていた1本目の区切りが復活して B が g0→g1（右→左）、C が g1→g2（左→右）、D が g2→g3（右→左）と全部ずれる。md' = \"# R\\n\\n## A\\n\\n---\\n\\n### \\n\\n<!--\\n## B\\n\\n### B1\\n\\n-->\\n---\\n\\n## C\\n\\n---\\n\\n## D\\n\"",
+   "verdict": "バグ",
+   "note": "困る度 大。1回の Tab で3つの事故が同時に起きる: (1) 子を作ったのに兄弟（別の束）になる、(2) 触っていない束が3つとも左右反転する、(3) 書かれたのは `### ` なのに読まれるのは depth 2 でテキストと画面の深さが食い違う。H-05 で死んだ区切りが挿入で生き返るため、「折り畳む→何か足す」という日常的な2手で必ず踏む。ユーザーから見ると「Tab を押しただけでマップが作り直された」ようにしか見えない。"
+  },
+  {
+   "id": "H-09",
+   "title": "仮説B: 深い束で addParent すると、対象が2段深くなり、後ろの兄弟まで新しい親に取り込まれる",
+   "input": "# R\n\n## A\n\n---\n\n### B\n\n### C\n\n### D\n\n### E\n",
+   "operation": "initDoc(上記) → core.addParent(4, \"\", false)。id=4 は \"C\"（UI の Shift+Tab: 対象を新しい親で包む）",
+   "expected": "C だけが新しい空の親の子になる（新親 depth 2、C depth 3）。D / E は元のままルート直下の兄弟",
+   "actual": "新親は depth 2 だが C は depth 4（親との差が2段）になり、さらに D / E まで parent=7（新しい空ノード）に取り込まれる。md' = \"# R\\n\\n## A\\n\\n---\\n\\n### B\\n\\n## \\n\\n#### C\\n\\n### D\\n\\n### E\\n\"",
+   "verdict": "バグ",
+   "note": "困る度 中〜大。原因は H-03 と同じ（core/cmds.mbt:205 が実効深さで `##` を書く）に加え、addParent は対象の部分木にも `#` を足すので、基準の取り直しと二重にかかって C だけ2段沈む。「1つを包む」つもりの操作が、後ろの兄弟を全部巻き込んだうえに階層の飛びまで作る。depth の飛び（親 d2 → 子 d4）は木としても不正で、以降の indent / outdent / move の挙動も読めなくなる。"
+  },
+  {
+   "id": "H-04",
+   "title": "仮説B: 先頭が ### の束の中で子を足すと、子ではなく兄弟になる",
+   "input": "# R\n\n## A\n\n---\n\n### B\n\n### C\n",
+   "operation": "initDoc(上記) → core.addChild(3, \"\", false)。id=3 は \"B\"（UI の Tab キー）",
+   "expected": "B の子（depth 3, parent=B）が1つ増える",
+   "actual": "`### ` が書かれるが、束の基準が3なので読み替えで depth 2 になり、parent=1（ルート）＝B の兄弟として現れる。C は無事だが、要求した親子関係が成立しない。md' = \"# R\\n\\n## A\\n\\n---\\n\\n### B\\n\\n### \\n\\n### C\\n\"",
+   "verdict": "バグ",
+   "note": "困る度 中。core/cmds.mbt:153 が `nd.depth + 1`（実効深さ+1 = 3）を書くが、束の基準が3なので読み戻すと2になり、深さが1段吸収されて兄弟に落ちる。insert_heading_edit のコメント自身が「子を作ったのに兄弟になる」ことを警戒しているのに、`---` を自分で書くかどうかだけを見ていて、既にある束の基準ずれを見ていない。ユーザーは Tab を押すたびに「子ができない」ことに気付くが、なぜできないのかは画面からもテキストからも読み取れない。H-03 ほど派手に壊れない分、原因不明のまま繰り返し踏む。"
+  },
+  {
+   "id": "H-07",
+   "title": "仮説A: 眠っていた区切りが、無関係な場所への挿入で目を覚まし、以降が全反転する",
+   "input": "# R\n\n---\n\n<!--\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "initDoc(上記) → core.addChild(1, \"\", false)。id=1 はルート \"R\"（UI の Tab キー）。1本目の `---` は次の非空行が `<!--` なので無効（ただの水平線）",
+   "expected": "ルートの子が1つ増えるだけ。B / C / D の束番号と左右は変わらない",
+   "actual": "新ノードが `---` と `<!--` の間に入ることで1本目の区切りが有効になり、B が g0→g1（右→左）、C が g1→g2（左→右）、D が g2→g3（右→左）。3つとも反対側へ移る",
+   "verdict": "バグ",
+   "note": "困る度 中。区切りの有効/無効が「次の非空行が見出しか」（core/doc.mbt:316）という周辺依存の条件で決まるため、区切り自体を触らない挿入でも判定がひっくり返る。有効/無効が変わった瞬間に H-01 の通し番号ずれが発動して以降が全反転する。「見た目には何の変哲もない水平線」が地雷として文書に残り続け、いつ踏むか予測できないのが厄介。H-05 で hide が作る状態そのものなので、実文書でも自然に到達する。"
+  },
+  {
+   "id": "H-08",
+   "title": "仮説Bの火種: 束の先頭を indent するとマップは1ミリも変わらないのに、テキストだけ深くなる",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n### B1\n",
+   "operation": "initDoc(上記) → core.indentNodes([3])。id=3 は束の先頭 \"B\"（UI の indent）。同じ操作を3回繰り返す実験も実施",
+   "expected": "束の先頭はルート直下に固定なので indent はできない → 何も起きない（テキストも変わらない）",
+   "actual": "ツリーは前後で完全に同一（B は d2 p1 g1、B1 は d3 p3 g1 のまま）なのに、テキストだけ `## B`→`### B`、`### B1`→`#### B1` に変わる。3回繰り返すと `##### B` / `###### B1` まで深くなるが、マップは一度も変化しない",
+   "verdict": "バグ",
+   "note": "困る度 中（ただし波及が大きい）。prev_sibling が実効深さで前の束の A を「兄弟」と見なすので indent が成立してしまうが、束の読み替えが打ち消すのでマップには出ない。単体では「効かないキー」で済むが、この操作が H-03 / H-04 / H-09 の前提条件（先頭が `###` の束）を無音で作り出す点が本当の害。ユーザーは効かないと思って何度か押し、そのあと普通に o を押した瞬間に H-03 が発動する ―― まさに「単なる挿入なのに順番が入れ替わる」に見える経路。undo しても画面が変わらないので、undo が壊れているようにも見える。"
+  },
+  {
+   "id": "H-10",
+   "title": "仮説C: 差分レンダリングのキャッシュが順序変更に追従していない → 再現しなかった",
+   "input": "# R\n\n## A\n\n---\n\n## B\n\n---\n\n## C\n\n---\n\n## D\n",
+   "operation": "(1) randomDoc(seed=1..300) × 各20手のランダムコマンド列（addChild / addSibling / addSiblingBefore / addParent / indentNodes / outdentNodes / reorderNode / moveNodes / moveNewGroup / moveNewGroupBefore / toggleHidden / deleteNodes / undo / redo）を流し、snapshot.editSets を素の JS 文字列へ順に適用した結果と core.getText() を毎回比較（計 6000 回）。(2) src/mindmap.ts の描画差分の読解",
+   "expected": "順序が変わったときに古い位置や DOM の並びが残る",
+   "actual": "差分適用と本文の不一致は 6000 回中 0 件。描画側も src/mindmap.ts:851/985/1053 の通り boxes / subV / sideOf / frameOf はレンダーごとに作り直され、transform・class は値比較で毎回書き換え、中身は contentSig 比較、消えたノード/エッジ/区切り線は seen・want で毎回掃除、DOM の並びも order のシグネチャが変わったら append し直す（src/mindmap.ts:1539-1544）。キャッシュが順序変更を取りこぼす箇所は見つからなかった",
+   "verdict": "正常",
+   "note": "再現しなかった。ユーザーが見ている「順番が入れ替わる」は描画の遅れではなく、コアが返すツリーそのものが実際に組み替わっている（H-01〜H-09）。描画はそれを正直に描いているだけなので、ここを直しても症状は消えない。逆に言えば、コア側を直せば表示は自動的に追従するので、修正は core/doc.mbt と core/cmds.mbt に集中させてよい。"
+  },
+  {
+   "id": "H-11",
+   "title": "仮説D: move_block が複数ノード移動でオフセットを取りこぼす → 再現しなかった",
+   "input": "# R\n\n## A\n\n## B\n\n## C\n\n## D\n\n## E\n",
+   "operation": "(1) 上記に core.moveNodes([4,5,6], 2, 1) / core.moveNodes([6,5,4], 2, 1) / core.moveNodes([2,4], 6, 2)。(2) randomDoc(seed=1..600) から互いに部分木が重ならないノードを 2〜3 個選び、core.moveNodes(ids, target, pos) を pos=0/1/2 で計 426 回。ノードの消失・選択集合の相対順・移動対象の部分木に含まれない全ノードの相対順を検査",
+   "expected": "取りこぼしがあれば、2つ目以降の移動先がずれて順番が入れ替わるか、ノードが消える",
+   "actual": "3 つの手動ケースはすべて文書順どおり（[C,D,E] を A の前へ → R|C|D|E|A|B、選択順を逆に渡しても同じ結果、[A,C] を E の後ろへ → R|B|D|E|A|C）。426 回のランダム検査でも 消失=0 / 選択の相対順崩れ=0 / 無関係ノードの相対順変化=0",
+   "verdict": "正常",
+   "note": "再現しなかった。core/cmds.mbt:755 の move_steps は 1 件動かすたびに find_node(id) / find_node(anchor) でノードを引き直し、アンカーも直前に動かしたノード（anchor_pos=2 ＝ その後ろ）に更新するので、古いオフセットを持ち回る箇所がない。最初の粗い検査で「無関係ノードの順序変化 53 件」と出たが、これは移動対象の子孫（親と一緒に動くのが正しい）と normalize_selection が落とす包含関係の選択を数えていた検査側の誤りで、条件を正した再検査で全部消えた。"
+  }
+ ]
+}

@@ -1,0 +1,28 @@
+[package]
+name = "mmm"
+version = "0.1.0"
+description = "Markdown / mindmap / mirror"
+edition = "2021"
+
+[lib]
+# デスクトップとモバイルで共有する本体。main.rs は薄い入口に留める。
+name = "mmm_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+notify = "6"
+encoding_rs = "0.8"   # Shift-JIS 等の decode/encode（Firefox のエンコーディング実装）
+chardetng = "0.1"     # 非 UTF-8 の文字コード推定（Firefox の判定器）
+tauri-plugin-opener = "2.5.4"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

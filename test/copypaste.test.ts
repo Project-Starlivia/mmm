@@ -1,0 +1,202 @@
+// フェーズ3: コピー → 貼り付け の往復。
+// これは「ツリー → テキスト → ツリー」を通る唯一の実経路であり、
+// 往復で情報が落ちるならここに出る。
+//
+// 経路(src/main.ts の host.copySelection / host.paste に対応):
+//   copy  : core.selectionText(ids)
+//   paste : relevel(clip, 対象ノードの depth + 1) を対象の subEnd に挿入
+//
+// 実行: pnpm test
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { core, initDoc, getText, randomDoc, brief, fuzzCases, type NodeInfo } from "./_helpers.ts";
+
+import { relevel, hasHeadings } from "../src/relevel.ts";
+
+const CASES = fuzzCases(250);
+
+/**
+ * src/main.ts の paste() が行う挿入をそのまま再現する。
+ * (アプリ側のロジックを写経しているので、アプリが変わったらここも変わる)
+ */
+function pasteAsChildOf(anchorId: number, clip: string) {
+  const text = getText();
+  const s = (core.initDoc(text)); // 現在のノードを取り直す
+  const n = s.nodes.find((x) => x.id === anchorId);
+  if (!n) throw new Error("anchor が無い");
+  const normalized = clip.replace(/\r\n/g, "\n");
+  if (!hasHeadings(normalized)) return { skipped: "見出しなしとして無視された" };
+  const at = n.subEnd;
+  let body = relevel(normalized, n.depth + 1).trimEnd();
+  body += "\n";
+  let prefix = "";
+  if (at > 0 && text[at - 1] !== "\n") prefix = "\n\n";
+  else if (at >= 2 && text[at - 2] !== "\n") prefix = "\n";
+  const suffix = at !== text.length ? "\n" : "";
+  return { snap: (core.replaceText(at, at, prefix + body + suffix, "")) };
+}
+
+/** ノード部分木の「形」だけを取り出す(深さの相対値とラベル) */
+function subtreeShape(nodes: NodeInfo[], rootId: number) {
+  const root = nodes.find((n) => n.id === rootId);
+  if (!root) return null;
+  const out: { rel: number; label: string }[] = [];
+  for (const n of nodes) {
+    if (n.hs >= root.hs && n.subEnd <= root.subEnd) {
+      out.push({ rel: n.depth - root.depth, label: n.label });
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------
+// X1: コピーした部分木を別の場所に貼ると、同じ形になる
+// ---------------------------------------------------------------
+
+test("X1: コピー→貼り付けで部分木の形が保たれる", () => {
+  const docs = [
+    ["単純", "# r\n\n## src\n\n### s1\n\n### s2\n\n#### s21\n\n## dst\n"],
+    ["本文つき", "# r\n\n## src\n\n本文\n\n### s1\n\n本文2\n\n## dst\n"],
+    ["深さ飛び", "# r\n\n## src\n\n##### deep\n\n## dst\n"],
+    ["区切りを含む", "# r\n\n## src\n\n### s1\n\n---\n\n### s2\n\n## dst\n"],
+    ["フェンスを含む", "# r\n\n## src\n\n```\n## にせ見出し\n```\n\n### s1\n\n## dst\n"],
+  ];
+  const failures: string[] = [];
+  for (const [name, md] of docs) {
+    const s0 = initDoc(md);
+    const src = s0.nodes.find((n) => n.label === "src")!;
+    const dst = s0.nodes.find((n) => n.label === "dst")!;
+    const want = subtreeShape(s0.nodes, src.id);
+
+    const clip = core.selectionText([src.id]);
+    const res = pasteAsChildOf(dst.id, clip);
+    if (res.skipped) { failures.push(`${name}: ${res.skipped}`); continue; }
+
+    // 貼り付け後、dst の子として src と同じ形が現れているはず
+    const after = core.initDoc(getText());
+    const dst2 = after.nodes.find((n) => n.label === "dst")!;
+    const pasted = after.nodes.filter(
+      (n) => n.hs > dst2.hs && n.subEnd <= dst2.subEnd && n.label === "src",
+    )[0];
+    if (!pasted) {
+      failures.push(`${name}: 貼り付けた src が dst の下に見つからない。text=${brief(getText(), 200)}`);
+      continue;
+    }
+    const got = subtreeShape(after.nodes, pasted.id);
+    try {
+      assert.deepEqual(got, want);
+    } catch {
+      failures.push(`${name}: 形が違う\n    元  =${JSON.stringify(want)}\n    貼付=${JSON.stringify(got)}`);
+    }
+  }
+  assert.deepEqual(failures, [], `コピー→貼り付けで形が崩れる:\n  ${failures.join("\n  ")}`);
+});
+
+// ---------------------------------------------------------------
+// X2: relevel は深さの相対関係を保つ
+// ---------------------------------------------------------------
+
+test("X2: relevel は見出しの相対的な深さ関係を保つ", () => {
+  const failures: string[] = [];
+  const cases = [
+    ["連続", "## a\n### b\n#### c\n"],
+    ["飛び", "## a\n##### c\n"],
+    ["戻り", "## a\n### b\n## d\n"],
+    ["1始まり", "# a\n## b\n"],
+    ["深い開始", "##### a\n###### b\n"],
+  ];
+  for (const [name, md] of cases) {
+    for (const target of [1, 2, 3, 6]) {
+      const out = relevel(md, target);
+      const depthsIn = md.split("\n").filter((l) => /^#+\s/.test(l)).map((l) => l.match(/^#+/)![0].length);
+      const depthsOut = out.split("\n").filter((l) => /^#+\s/.test(l)).map((l) => l.match(/^#+/)![0].length);
+      if (depthsIn.length !== depthsOut.length) {
+        failures.push(`${name} -> ${target}: 見出しの数が ${depthsIn.length} -> ${depthsOut.length}`);
+        continue;
+      }
+      if (depthsOut[0] !== target) {
+        failures.push(`${name} -> ${target}: 先頭の深さが ${depthsOut[0]}(期待 ${target})`);
+      }
+      // 相対関係（増減の符号）が保たれているか
+      for (let i = 1; i < depthsIn.length; i++) {
+        const a = Math.sign(depthsIn[i] - depthsIn[i - 1]);
+        const b = Math.sign(depthsOut[i] - depthsOut[i - 1]);
+        if (a !== b) {
+          failures.push(`${name} -> ${target}: ${i}番目で相対関係が反転 (${depthsIn.join(",")}) -> (${depthsOut.join(",")})`);
+          break;
+        }
+      }
+    }
+  }
+  assert.deepEqual(failures, [], `relevel が深さ関係を壊す:\n  ${failures.join("\n  ")}`);
+});
+
+// ---------------------------------------------------------------
+// X3: relevel はフェンス内の # を見出しとして扱わない
+// ---------------------------------------------------------------
+
+test("X3: relevel と hasHeadings がフェンス内の # を無視する", () => {
+  const md = "## real\n\n```\n# fake\n## fake2\n```\n\n### real2\n";
+  const out = relevel(md, 4);
+  assert.ok(out.includes("# fake\n"), `フェンス内の # が書き換えられた:\n${out}`);
+  assert.ok(out.includes("## fake2\n"), `フェンス内の ## が書き換えられた:\n${out}`);
+  assert.ok(/^#### real\b/m.test(out), `本物の見出しが 4 に揃っていない:\n${out}`);
+
+  assert.equal(hasHeadings("```\n# fake\n```\n"), false, "フェンス内だけの # を見出しと誤判定");
+  assert.equal(hasHeadings("# real\n"), true);
+  assert.equal(hasHeadings("ただの本文\n"), false);
+});
+
+// ---------------------------------------------------------------
+// X4: コピーした内容に未選択の重複ルートが混ざらない（F-005 の回帰）
+// ---------------------------------------------------------------
+
+test("X4: コピーに未選択の # ブロックが混入しない（F-005 の回帰）", () => {
+  const md = "# root\n\n## a\n\n本文A\n\n# 二つ目のルート\n\n## b\n";
+  const s = initDoc(md);
+  const a = s.nodes.find((n) => n.label === "a")!;
+  const clip = core.selectionText([a.id]);
+  assert.ok(
+    !clip.includes("二つ目のルート"),
+    `ノード a のコピーに、選択していない見出しが混入している:\n  clip=${brief(clip)}`,
+  );
+});
+
+// ---------------------------------------------------------------
+// X5: ランダム文書でも コピー→貼り付け が例外を出さず木を壊さない
+// ---------------------------------------------------------------
+
+test("X5: ランダム文書のコピー→貼り付けで木が壊れない", () => {
+  const failures: string[] = [];
+  for (let seed = 1; seed <= CASES && failures.length < 6; seed++) {
+    const md = randomDoc(seed);
+    const s = initDoc(md);
+    if (s.nodes.length < 2) continue;
+    const src = s.nodes[1];
+    const dst = s.nodes[s.nodes.length - 1];
+    if (src.id === dst.id) continue;
+    let clip;
+    try { clip = core.selectionText([src.id]); }
+    catch (e) { failures.push(`seed=${seed}: copy で例外 ${String(e).slice(0, 80)}`); continue; }
+    let res;
+    try { res = pasteAsChildOf(dst.id, clip); }
+    catch (e) { failures.push(`seed=${seed}: paste で例外 ${String(e).slice(0, 80)}`); continue; }
+    if (res.skipped) continue;
+    const text = getText();
+    const after = core.initDoc(text);
+    // 内部整合性
+    for (const n of after.nodes) {
+      const line = text.slice(n.hs, n.he);
+      if (!/^#+(\s|$)/.test(line)) {
+        failures.push(`seed=${seed}: 貼り付け後に見出しでない行がノード化 ${JSON.stringify(line)}`);
+        break;
+      }
+    }
+    // ノードが減っていないこと（貼り付けは増えるだけのはず）
+    if (after.nodes.length < s.nodes.length) {
+      failures.push(`seed=${seed}: 貼り付けでノードが ${s.nodes.length} -> ${after.nodes.length} に減った`);
+    }
+  }
+  assert.deepEqual(failures, [], `コピー→貼り付けが木を壊す:\n  ${failures.join("\n  ")}`);
+});

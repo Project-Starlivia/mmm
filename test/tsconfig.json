@@ -1,0 +1,22 @@
+{
+  // テストは Node で動く（DOM は無い）。src の型だけ借りる。
+  // "dom" lib は型定義だけの話で実行時の DOM の有無とは関係ない —
+  // assets.ts 等 DOM 依存のファイルから純粋な関数(mdPath)だけを import
+  // するときに、そのファイルの他の部分の型チェックが通るように要る。
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    ".",
+    "../src/coreApi.ts",
+    "../src/relevel.ts",
+    "../src/app/assets.ts",
+    "../src/app/externalChange.ts"
+  ],
+  // 計測ハーネスは playwright を要求し、ブラウザ側で評価する式に DOM を含む。
+  // どちらもここには無いので型チェックの対象外（docs/audit/PERF.md 参照）。
+  "exclude": ["tools/perf.ts", "tools/perf-detail.ts", "tools/perf-heap.ts"]
+}

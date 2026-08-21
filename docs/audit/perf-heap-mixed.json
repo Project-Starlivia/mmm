@@ -1,0 +1,46 @@
+{
+  "fixture": "mixed",
+  "rounds": 400,
+  "editWallMs": 79808,
+  "msPerEdit": 199.5,
+  "samples": [
+    {
+      "label": "編集前",
+      "heapUsedMB": 13.2,
+      "heapTotalMB": 14.37,
+      "domCounters": {},
+      "dom": {
+        "all": 26265,
+        "svg": 26051,
+        "nodes": 5000
+      }
+    },
+    {
+      "label": "400回編集後",
+      "heapUsedMB": 14.99,
+      "heapTotalMB": 17.99,
+      "domCounters": {},
+      "dom": {
+        "all": 26316,
+        "svg": 26051,
+        "nodes": 5000
+      }
+    },
+    {
+      "label": "マップ操作も追加後",
+      "heapUsedMB": 15.01,
+      "heapTotalMB": 15.74,
+      "domCounters": {},
+      "dom": {
+        "all": 26316,
+        "svg": 26051,
+        "nodes": 5000
+      }
+    }
+  ],
+  "delta": {
+    "heapMB": 1.81,
+    "domNodes": null,
+    "listeners": null
+  }
+}

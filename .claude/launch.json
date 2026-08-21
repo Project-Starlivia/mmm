@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mmm",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "run",
+        "app"
+      ],
+      "port": 13131
+    },
+    {
+      "name": "mmm-dist",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "run",
+        "preview"
+      ],
+      "port": 4173
+    }
+  ]
+}
