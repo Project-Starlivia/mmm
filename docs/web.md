@@ -112,37 +112,54 @@ git は 2026-08-22 に入れた（それまでは未管理）。最初のコミ�
 終わったら main へ squash merge してブランチと worktree を捨てる。
 **main は merge の瞬間まで Tauri 版のまま動く。**
 
-### Phase 1 — `---` を消す
+### Phase 1 — `---` を消す（マップは片側だけになる）
 
-左右の振り分けを支えていた仕掛けを、テキスト側から全部落とす。
+左右の振り分けを、テキストからもマップからも落とす。**ルートは左端に立ち、
+すべて右へ伸びる。** マップは横に倒したアウトラインの形になる。
+
 **`core/` と `src/map/` の話で、Web 化とは独立。** Tauri 版のまま進めれば
 `pnpm run app` で目で確かめられるので、足回りを壊す前にここを済ませる。
 
-**core**
+**記法と区間**
 
-| 消すもの | |
-|---|---|
-| `seps.mbt` 全部（偶数本規則） | 138 行 |
-| `parser.mbt` の区切り検出（5 つの成立条件） | |
-| `doc.mbt` の `st.seps` / `nd.group` / `compute_groups` / 区切りでの `sub_end` 切り詰め | |
-| `add.mbt` の `cmd_add_side_end`、`move.mbt` の `cmd_move_side_end` | |
-| `cmds.mbt` の `dangling_sep_edits` 呼び出し | |
-| `api.mbt` / `js/exports.mbt` の `add_side_end` / `move_side_end`、snapshot の `group` | |
-| `core_test.mbt` の区切り関連テスト | 約 20 本 |
-
-**UI**
-
-| 消すもの | |
-|---|---|
-| `coreApi.ts` の `group` / `addSideEnd` / `moveSideEnd` | |
-| `mindmap.ts` のルートの左右 `+`、左右の脇へのドラッグ、左ツリーでの `←→` 反転 | |
-| `test/sides.test.ts` | 97 行 |
+- `seps.mbt` 全部（138 行、偶数本規則）
+- `parser.mbt` の `is_separator` / `is_setext_underline` / `is_text_line` /
+  `is_blank_or_marker_range` と、`scan_doc` が返す区切り
+- `doc.mbt` の `st.seps` / `nd.group` / `compute_groups`、区切りでの
+  `sub_end` 切り詰め、**区間ごとの深さの読み替え**（`eff`）
+- `add.mbt` の `cmd_add_side_end`、`move.mbt` の `cmd_move_side_end`、
+  `cmds.mbt` の `dangling_sep_edits` 呼び出し
+- `api.mbt` / `js/exports.mbt` の `add_side_end` / `move_side_end`、
+  snapshot の `group`
+- `coreApi.ts` の `group` / `addSideEnd` / `moveSideEnd`、`mindmap.ts` の
+  ルートの左右 `+`・左右の脇へのドラッグ・左ツリーでの `←→` 反転
+- `core_test.mbt` の区切り関連テスト（約 20 本）、`test/sides.test.ts`（97 行）
 
 **`---` はただの本文の行になる。** 「区切り行はどのノードの範囲にも属さない」
 という扱いも一緒に消えるので、既存の md にある `---` はその上のノードの本文に
 含まれる（カードにはならないので、マップには出ない）。コピーや削除には
 付いてくる。front matter は最初の見出しより前にあるので、いままで通り
 どのノードにも属さない。
+
+#### 連れて消えるもの
+
+**`depth` と `raw_depth` が 1 つになる。** 深さの読み替え（`eff`）は
+「区切りの直後の見出しをルート直下として読み、区間の中を相対的に読む」ための
+もので、基準の深さが 2 より深くなるのは区切りが基準を上書きしたときだけ。
+区切りが無くなれば基準は常に 2、ずらし量は常に 0 で、**構造上の深さは
+テキストに書かれた `#` の数と必ず一致する**。2 つ持つ理由が消えるので
+`depth` へ畳む（`coreApi.ts` の `rawDepth`、`name.ts` / `paste.ts` /
+`main.ts` の参照も一緒に）。
+
+**「フレーム」が消える。** `geometry.ts` の `Frame`（u = 成長軸 /
+v = 兄弟軸）は、右向きと左向きで式を分岐させないための道具だった。
+フレームが右 1 つになれば射影は恒等写像で、`Frame` / `F_RIGHT` / `F_LEFT` /
+`projU` / `projV` / `vOf` がまるごと要らなくなる。`edge.ts`・`layout.ts`・
+`mindmap.ts` が受け渡していたフレーム引数も、`layout.ts` の `sideOf` /
+`frameOf` / `placeSide` も消える。
+
+**フレーム 1 つのために抽象を残さない。** 2 つあるから意味のある道具で、
+1 つになった時点でただの遠回りになる。
 
 ### Phase 2 — Tauri を外す（Web で今の機能が動く）
 
@@ -189,41 +206,20 @@ git は 2026-08-22 に入れた（それまでは未管理）。最初のコミ�
 - ツールバーは **11 ボタン → 8 ボタン**（新規 / 開く / 保存 / ↩ ↪ /
   SVG / MD・マップ / ◑）
 
-## 消えないもの
+## Web 化で消えないもの
 
-`core/`（MoonBit）は**一行も変わらない**。テキストが唯一の真実で、構造操作が
-文字オフセットの編集セットに落ちるという設計は、ネイティブでもブラウザでも
-同じように正しい。`src/editor.ts`（CodeMirror 6）も `src/app/panes.ts` も
-`src/map/` の純粋層も、`name.ts` も `paste.ts` も `relevel.ts` も残る。
+Phase 2 は足回りだけの話で、**`core/`（MoonBit）は一行も変わらない**。
+テキストが唯一の真実で、構造操作が文字オフセットの編集セットに落ちるという
+設計は、ネイティブでもブラウザでも同じように正しい。`src/editor.ts`
+（CodeMirror 6）も `src/app/panes.ts` も `src/map/` も、`name.ts` も
+`paste.ts` も `relevel.ts` も残る。
 
-**消えるのは `src-tauri/` と `src/app/io.ts` の中身だけ。**
+**Phase 2 で消えるのは `src-tauri/` と `src/app/io.ts` の中身だけ。**
+core と map に手が入るのは Phase 1（`---`）のほうで、そちらは Web 化とは
+関係なく、Tauri 版のままでも成り立つ変更。
 
 ## いったん外すが、戻れる継ぎ目を残すもの
 
 **お絵描き**（canvas に描いて WebP で保存）。リンクやコードは md を打てば
 済むが、絵は打てない。`Blob` を渡せば置き場所を聞いて `![]()` を挿入する
 入り口（`assets.saveToDisk`）はそのまま残るので、戻すときはそこへ繋ぐだけ。
-
-## 未決
-
-### `---` を消したあと、マップはどんな形か
-
-左右の振り分けを**テキストから**消すのは決まった。残るのは、**マップの
-見た目まで片側にするか**どうか。core の削減は下の 2 つで同じで、
-違うのは `src/map/layout.ts` と `geometry.ts` だけ。
-
-**A. 片側だけ** — ルートは左端に立ち、すべて右へ伸びる。`F_LEFT` も
-`placeSide` も消え、`Frame` による射影そのものが要らなくなる（`geometry.ts`
-がさらに縮む）。いちばん単純。ただしマップは**横に倒したアウトライン**になる。
-
-**B. アプリが左右へ振り分ける** — テキストには何も書かず、ルート直下の
-子を子孫の数で均衡させて左右に置く。`layout.ts` に振り分けの規則が 1 つ
-増えるだけ（`F_LEFT` と `placeSide` は残る）。**テキストからは `---` が
-完全に消えたまま、根が中心にあって両側へ広がる形は残る。**
-代わりに、どちらの側に置くかをユーザーは選べない。
-
-**推し: B。** 「`---` を消す」の本体は、記法・偶数本規則・
-`add_side_end` / `move_side_end`・`group` という**テキスト側の仕掛け**で、
-それは A でも B でも全部消える。マップが両側へ広がるのは、この道具が
-アウトライナではなくマインドマップである理由そのもので、それを守る値段が
-純粋関数 1 つの中の 15 行なら安い。
