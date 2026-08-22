@@ -84,7 +84,7 @@ fn cmd_outdent(ids : Array[Int]) -> Unit {
       let mi = find_node(nd.id)
       let pi2 = find_node(nd.parent)
       if mi >= 0 && pi2 >= 0 {
-        move_block(mi, st.nodes[pi2].sub_end, nd.raw_depth - 1)
+        move_block(mi, st.nodes[pi2].sub_end, nd.depth - 1)
       }
       for rid in rehide {
         cmd_toggle_hidden(rid)
@@ -107,7 +107,7 @@ fn cmd_outdent(ids : Array[Int]) -> Unit {
 fn move_block(i : Int, at : Int, new_depth : Int) -> Unit {
   let nd = st.nodes[i]
   let old_id = nd.id
-  let delta = new_depth - nd.raw_depth
+  let delta = new_depth - nd.depth
   // shift every heading in the block by delta '#'; remember each heading's
   // id and its offset inside the rebuilt block so ids survive the move
   let heads = subtree_nodes(nd.hs, nd.sub_end)
@@ -185,9 +185,8 @@ fn move_block(i : Int, at : Int, new_depth : Int) -> Unit {
 }
 
 ///|
-/// 行き先が「動かす範囲の中」にある移動は成立しない。move_steps は 1 つずつ
-/// 静かにスキップするが、その前に区切りの掃除だけが走ると、移動していないのに
-/// テキストが変わってしまう。コマンドの入口で丸ごと弾くためのチェック。
+/// 行き先が「動かす範囲の中」にある移動は成立しない。
+/// コマンドの入口で丸ごと弾くためのチェック。
 fn move_lands_outside(order : Array[Int], target : Int) -> Bool {
   let t = find_node(target)
   if t < 0 {
@@ -216,10 +215,6 @@ fn cmd_move(ids : Array[Int], target : Int, pos : Int) -> Unit {
     return
   }
   let rehide = unhide_for_move(order)
-  let cleanup = dangling_sep_edits(order)
-  if cleanup.length() > 0 {
-    apply_sets([cleanup], "")
-  }
   let first_focus = move_steps(ids, target, pos)
   for id in rehide {
     cmd_toggle_hidden(id)
@@ -245,108 +240,11 @@ fn cmd_move_as_parent(ids : Array[Int], target : Int) -> Unit {
     return
   }
   let rehide = unhide_for_move(order)
-  let cleanup = dangling_sep_edits(order)
-  if cleanup.length() > 0 {
-    apply_sets([cleanup], "")
-  }
   let first_focus = move_steps(ids, target, 1)
   // 移動が一切起きなかったときに indent だけ走らせると、B が無関係な
   // 前の兄弟の下に潜ってしまう
   if first_focus != -1 {
     cmd_indent([target])
-  }
-  for id in rehide {
-    cmd_toggle_hidden(id)
-  }
-  commit_tx()
-  if first_focus != -1 {
-    st.focus = first_focus
-  }
-}
-
-///|
-/// 側の末尾に置く。マップの「ルート脇ゾーン」へのドロップの実体。
-///
-/// その側に既にノードがあれば、いちばん下のノードの後ろへ動かすだけ
-/// （＝ふつうの移動）。**左側が空のときだけ**、文書の末尾に `---` を
-/// 1 本書いてから置く — この道具が区切りを増やす経路はここしかない。
-/// 右側が空（タイトル直後に `---` がある文書）なら、その区切りの手前に置く。
-fn cmd_move_side_end(ids : Array[Int], left : Bool) -> Unit {
-  let ri = root_index()
-  if ri < 0 {
-    return
-  }
-  let rid = st.nodes[ri].id
-  // その側のいちばん下（テキスト順で最後）のルート直下ノード
-  let mut last = -1
-  for nd in st.nodes {
-    if nd.parent == rid && (nd.group % 2 == 1) == left {
-      last = nd.id
-    }
-  }
-  if last >= 0 {
-    // ふつうの「その後ろへ」で足りる（掃除も含めて cmd_move がやる）
-    cmd_move(ids, last, 2)
-    return
-  }
-  begin_tx("")
-  let order : Array[Int] = []
-  for k in normalize_selection(ids) {
-    order.push(st.nodes[k].id)
-  }
-  let rehide = unhide_for_move(order)
-  let cleanup = dangling_sep_edits(order)
-  if cleanup.length() > 0 {
-    apply_sets([cleanup], "")
-  }
-  let mut first_focus = -1
-  if left {
-    // 左が空 = 有効な区切りが無い。末尾へ動かし、先頭の前に `---` を書く
-    first_focus = move_steps(ids, rid, 0)
-    if first_focus != -1 {
-      let i = find_node(first_focus)
-      if i >= 0 {
-        let hs = st.nodes[i].hs
-        let br = nl()
-        let sb = StringBuilder::new()
-        // 直前が空行でないと setext 見出しの下線になってしまう
-        if !preceded_by_blank(hs) {
-          sb.write_string(br)
-        }
-        sb.write_string("---")
-        sb.write_string(br)
-        sb.write_string(br)
-        apply_sets(
-          [[Edit::{ from: hs, to: hs, insert: sb.to_string(), removed: "" }]],
-          "",
-        )
-      }
-    }
-  } else {
-    // 右が空 = 最初の有効な区切りの手前が右側の末尾
-    if st.seps.length() == 0 {
-      first_focus = move_steps(ids, rid, 0)
-    } else {
-      let mut cursor = st.seps[0]
-      for id in order {
-        let i = find_node(id)
-        if i < 0 {
-          continue
-        }
-        let nd = st.nodes[i]
-        if cursor >= nd.hs && cursor < nd.sub_end {
-          continue
-        }
-        move_block(i, cursor, 2)
-        if first_focus == -1 {
-          first_focus = st.focus
-        }
-        let j = find_node(st.focus)
-        if j >= 0 {
-          cursor = st.nodes[j].sub_end
-        }
-      }
-    }
   }
   for id in rehide {
     cmd_toggle_hidden(id)
@@ -427,17 +325,14 @@ fn move_steps(ids : Array[Int], target : Int, pos : Int) -> Int {
     if tn.hs >= nd.hs && tn.hs < nd.sub_end {
       continue
     }
-    // 行き先の `#` の数も、相手のテキスト上の深さから決める。
-    // 区間の中は同じだけ読み替えられるので、テキスト上で揃えれば
-    // 構造上の親子も揃う
     let (at, depth) = if anchor_pos == 0 {
-      (tn.sub_end, tn.raw_depth + 1)
+      (tn.sub_end, tn.depth + 1)
     } else if anchor_pos == 1 {
-      (tn.hs, tn.raw_depth)
+      (tn.hs, tn.depth)
     } else {
-      (tn.sub_end, tn.raw_depth)
+      (tn.sub_end, tn.depth)
     }
-    if (at == nd.hs || at == nd.sub_end) && depth == nd.raw_depth {
+    if (at == nd.hs || at == nd.sub_end) && depth == nd.depth {
       // dropping where it already is (also covers "as last child" of the
       // parent it is already the last child of)
       anchor = id
@@ -472,17 +367,15 @@ fn cmd_reorder(id : Int, dir : Int) -> Unit {
     commit_tx()
     return
   }
-  // 深さは変えない移動なので、書かれている `#` の数（raw_depth）を渡す。
-  // 構造上の深さを渡すと、読み替えの起きた区間の中で `#` が削られる
   if dir < 0 {
     let p = prev_sibling(i)
     if p >= 0 {
-      move_block(i, st.nodes[p].hs, st.nodes[i].raw_depth)
+      move_block(i, st.nodes[p].hs, st.nodes[i].depth)
     }
   } else {
     let nx = next_sibling(i)
     if nx >= 0 {
-      move_block(i, st.nodes[nx].sub_end, st.nodes[i].raw_depth)
+      move_block(i, st.nodes[nx].sub_end, st.nodes[i].depth)
     }
   }
   for rid in rehide {

@@ -1,20 +1,4 @@
 // マップの座標系。DOM を知らない数学だけの層。
-//
-// レイアウトは「フレーム」で考える: u = 成長軸（親から子へ伸びる向き）、
-// v = 兄弟軸（縦）。右向き・左向きの 2 つしか存在しないが、式をフレームで
-// 書いておくと左右で分岐せずに済む。
-
-/** Per-group layout frame: u = growth axis (outward), v = sibling axis. */
-export interface Frame {
-  ux: number;
-  uy: number;
-  vx: number;
-  vy: number;
-}
-
-/** 右へ伸びるフレーム / 左へ伸びるフレーム。既定は右 */
-export const F_RIGHT: Frame = { ux: 1, uy: 0, vx: 0, vy: 1 };
-export const F_LEFT: Frame = { ux: -1, uy: 0, vx: 0, vy: 1 };
 
 export interface Pt {
   x: number;
@@ -34,16 +18,6 @@ export const round2 = (v: number): number => Math.round(v * 100) / 100;
 
 /** 箱の中心 */
 export const centerOf = (b: Rect): Pt => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
-
-/** world の差分をフレームの成長軸 / 兄弟軸へ投影する */
-export const projU = (f: Frame, dx: number, dy: number): number => dx * f.ux + dy * f.uy;
-export const projV = (f: Frame, dx: number, dy: number): number => dx * f.vx + dy * f.vy;
-
-/** 箱の中心を、フレームの兄弟軸方向の座標として測る（並び順の比較に使う） */
-export const vOf = (b: Rect, f: Frame): number => {
-  const c = centerOf(b);
-  return projV(f, c.x, c.y);
-};
 
 /** 箱の縁の点（中心から (dx,dy) 方向へ出たところ） */
 export function exitPoint(b: Rect, dx: number, dy: number): Pt {

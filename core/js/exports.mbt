@@ -86,18 +86,6 @@ pub fn move_as_parent(ids : Array[Int], target : Int) -> String {
 }
 
 ///|
-#export_name("moveSideEnd")
-pub fn move_side_end(ids : Array[Int], left : Bool) -> String {
-  @core.move_side_end(ids, left)
-}
-
-///|
-#export_name("addSideEnd")
-pub fn add_side_end(left : Bool, tag : String) -> String {
-  @core.add_side_end(left, tag)
-}
-
-///|
 #export_name("reorderNode")
 pub fn reorder_node(id : Int, dir : Int) -> String {
   @core.reorder_node(id, dir)

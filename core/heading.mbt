@@ -131,9 +131,7 @@ fn focus_node_at(hs : Int) -> Unit {
 }
 
 ///|
-/// 同じ区間の中の前の兄弟。区間（`---` の区切り）をまたいだ相手は兄弟としない。
-/// またぐのを許すと、reorder（Mod+↑）で区間の壁を越えてノードが飛び、
-/// 区間の中身が入れ替わってしまう。indent も同じ理由で区間をまたがない。
+/// Previous sibling at the same depth.
 fn prev_sibling(i : Int) -> Int {
   let nd = st.nodes[i]
   for j = i - 1; j >= 0; j = j - 1 {
@@ -141,9 +139,6 @@ fn prev_sibling(i : Int) -> Int {
       return -1
     }
     if st.nodes[j].depth == nd.depth {
-      if st.nodes[j].group != nd.group {
-        return -1
-      }
       // same depth before any shallower heading == same parent
       return j
     }
@@ -152,7 +147,7 @@ fn prev_sibling(i : Int) -> Int {
 }
 
 ///|
-/// 同じ区間の中の次の兄弟。理由は prev_sibling と同じ。
+/// Next sibling at the same depth.
 fn next_sibling(i : Int) -> Int {
   let nd = st.nodes[i]
   for j = i + 1; j < st.nodes.length(); j = j + 1 {
@@ -160,9 +155,6 @@ fn next_sibling(i : Int) -> Int {
       return -1
     }
     if st.nodes[j].depth == nd.depth {
-      if st.nodes[j].group != nd.group {
-        return -1
-      }
       return j
     }
   }

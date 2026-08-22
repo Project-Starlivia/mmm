@@ -193,22 +193,6 @@ test("C6: hide→show がテキストを元に戻す", () => {
   assert.deepEqual(failures, [], `hide→show が非可逆:\n  ${failures.join("\n  ")}`);
 });
 
-test("C6b: 区切り直前のノードを hide しても、直後のノードの左右(group)は変わらない", () => {
-  // hide すると "---" の直前行がマーカー(-->)に変わる。マーカー行を
-  // 本文と誤判定すると区切りが無効になり、b の左右が反転してしまう
-  const before = initDoc("# r\n\n## a\n\n---\n\n## b\n");
-  const beforeText = getText();
-  const a = before.nodes.find((n) => n.label === "a")!;
-  const bBefore = before.nodes.find((n) => n.label === "b")!;
-  const hidden = (core.toggleHidden(a.id));
-  const bHidden = hidden.nodes.find((n) => n.label === "b")!;
-  assert.equal(bHidden.group, bBefore.group, "hide 中に b の group が変わった");
-  const shown = (core.toggleHidden(a.id));
-  assert.equal(getText(), beforeText, "show 後にテキストが元に戻らない");
-  const bShown = shown.nodes.find((n) => n.label === "b")!;
-  assert.equal(bShown.group, bBefore.group, "show 後に b の group が変わった");
-});
-
 test("C7: hide 状態のノードは構造に残り、hidden=true になる", () => {
   const s = initDoc("# r\n\n## a\n\n### a1\n\n## b\n");
   const a = s.nodes.find((n) => n.label === "a")!;

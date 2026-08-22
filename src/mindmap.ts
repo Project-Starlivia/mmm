@@ -2,23 +2,15 @@
 // drag re-parenting with a mandatory drop indicator (spec 3.3.2), and an
 // HTML overlay input for label editing (IME-safe).
 //
-// Layout: single root, horizontal growth only. The root's group 0
-// (everything before the first ---) grows right; every later group grows
-// left, stacked with wide gaps. Deeper sibling groups are separated by
-// extra spacing.
+// Layout: every tree grows from left to right.
 
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { NodeInfo } from "./coreApi";
 import {
-  type Frame,
-  F_RIGHT,
   centerOf,
   distToSeg,
   exitPoint,
   midOfPolyline,
-  projU,
-  projV,
-  round2,
 } from "./map/geometry";
 import { edgeDraw, edgeHintPath, edgeSegs, flattenSegs } from "./map/edge";
 import { CODE_LINE, CODE_PAD, IMG_H, IMG_ROW, LINK_ROW } from "./map/cards";
@@ -52,8 +44,6 @@ export interface MapHost {
   addSiblingBefore(id: number): void; // above current
   addParent(id: number): void; // wrap current
   addRoot(): void;
-  /** 側の末尾に新しい子を作る（ルートの左右 ＋ ボタン） */
-  addSideEnd(left: boolean): void;
   rename(id: number, label: string, tag: string): void;
   commitEdit(): void;
   deleteSelection(): void;
@@ -65,9 +55,8 @@ export interface MapHost {
    * pos 0 = target の子にする
    * pos 1 = target の直前へ挿入 / pos 2 = target の直後へ挿入
    * pos 3 = target の親として割り込む（A→B の線へのドロップ）
-   * pos 4 = 側の末尾へ（ルート脇ゾーン。side がどちらの側かを持つ）
    */
-  move(ids: number[], target: number, pos: 0 | 1 | 2 | 3 | 4, side?: 1 | -1): void;
+  move(ids: number[], target: number, pos: 0 | 1 | 2 | 3): void;
   copySelection(cut: boolean): void;
   paste(): void;
   addLink(id: number): void; // popup → [title](url) into the content
@@ -99,7 +88,6 @@ export class MindMap {
   private dropLine: SVGLineElement;
   private dropHint: SVGPathElement; // どの親につくかを示す予告の曲線
   private plusBtn: SVGGElement;
-  private plusBtnL: SVGGElement;
   private rubber: HTMLDivElement;
   private editor: HTMLInputElement;
   private hint: HTMLDivElement;
@@ -122,12 +110,8 @@ export class MindMap {
   private nodeCls = new Map<number, string>();
   private edgeD = new Map<number, string>();
   private domOrderSig = ""; // DOM の並び（= 重なり順）を直す判定用
-  private sideOf = new Map<number, -1 | 0 | 1>(); // -1 left, 0 root, 1 right
-  private frameOf = new Map<number, Frame>(); // layout frame (not on root)
   private parentOf = new Map<number, number>(); // 子 → 親（線の判定用）
   private fanOf = new Map<number, number>(); // 付け根のずらし量(px)
-  private rootId = -1; // 主ルート（最初の深さ1）。ドロップ判定で使う
-  private underRoot = new Set<number>(); // 主ルートの子孫（別ツリーを除く）
 
   // interaction state
   private spaceDown = false;
@@ -142,8 +126,7 @@ export class MindMap {
   // pos 3 = その相手の親として割り込む（A→B の線へのドロップ）
   private dropTarget: {
     id: number;
-    pos: 0 | 1 | 2 | 3 | 4;
-    side?: 1 | -1; // ルートのどちら側へ落とすか（pos 4 のとき）
+    pos: 0 | 1 | 2 | 3;
   } | null = null;
   // ドロップ中の一時的なノード印。render() のクラス計算にも合流させて
   // あるので、ドラッグ中に他の理由で render() が走っても消えない
@@ -185,14 +168,12 @@ export class MindMap {
       return btn;
     };
     this.plusBtn = makePlus();
-    this.plusBtnL = makePlus(); // root only: adds into the LEFT side
     this.viewport.append(
       this.edgeLayer,
       this.nodeLayer,
       this.dropHint,
       this.dropLine,
       this.plusBtn,
-      this.plusBtnL,
     );
     this.svg.append(this.viewport);
     pane.append(this.svg);
@@ -253,15 +234,11 @@ export class MindMap {
     this.hint.style.display = nodes.length === 0 ? "flex" : "none";
 
     const L = layoutMap(nodes, this.host.docText());
-    const { visible, boxes, hiddenKids, underRoot, fanOf } = L;
+    const { visible, boxes, hiddenKids, fanOf } = L;
     this.boxes = boxes;
     this.order = L.order;
-    this.sideOf = L.sideOf;
-    this.frameOf = L.frameOf;
     this.parentOf = L.parentOf;
     this.fanOf = fanOf;
-    this.rootId = L.rootId;
-    this.underRoot = underRoot;
     // ドラッグ中に別ペインの編集などで木が変わることがある。掴んでいた
     // ノードが消えていたらドラッグごと畳む（消えた id を指したまま
     // ドロップすると、無関係なノードが動く）
@@ -290,22 +267,17 @@ export class MindMap {
       // --- エッジ（親への曲線）---
       if (n.parent !== -1 && boxes.has(n.parent)) {
         const p = boxes.get(n.parent)!;
-        // the same open curve for every group, expressed in the group's
-        // frame: leaves the parent along the growth axis and arrives at
-        // the child already aligned with it (straight when in line)
-        const f = this.frameOf.get(n.id) ?? F_RIGHT;
         let path = this.edgeEls.get(n.id);
         if (!path) {
           path = svgEl("path", { class: "edge" });
           this.edgeLayer.append(path);
           this.edgeEls.set(n.id, path);
         }
-        const e = exitPoint(p, f.ux, f.uy);
+        const e = exitPoint(p, 1, 0);
         const fan = fanOf.get(n.id) ?? 0;
         const g = edgeDraw(
-          { x: e.x + f.vx * fan, y: e.y + f.vy * fan },
-          exitPoint(b, -f.ux, -f.uy),
-          f,
+          { x: e.x, y: e.y + fan },
+          exitPoint(b, -1, 0),
         );
         // 太さは EDGE.width で固定だが、d が変われば結局書き直すので、まとめて
         // 差分を見る
@@ -586,21 +558,19 @@ export class MindMap {
   /** 子 id から、その親へのエッジの幾何を出す（付け根のずらしも込み） */
   private edgeGeomOf(
     id: number,
-  ): { a: { x: number; y: number }; f: Frame; du: number; dv: number } | null {
+  ): { a: { x: number; y: number }; du: number; dv: number } | null {
     const b = this.boxes.get(id);
     const pid = this.parentOf.get(id);
     const p = pid !== undefined ? this.boxes.get(pid) : undefined;
     if (!b || !p) return null;
-    const f = this.frameOf.get(id) ?? F_RIGHT;
-    const e = exitPoint(p, f.ux, f.uy);
+    const e = exitPoint(p, 1, 0);
     const fan = this.fanOf.get(id) ?? 0;
-    const a = { x: e.x + f.vx * fan, y: e.y + f.vy * fan };
-    const z = exitPoint(b, -f.ux, -f.uy);
+    const a = { x: e.x, y: e.y + fan };
+    const z = exitPoint(b, -1, 0);
     return {
       a,
-      f,
-      du: projU(f, z.x - a.x, z.y - a.y),
-      dv: projV(f, z.x - a.x, z.y - a.y),
+      du: z.x - a.x,
+      dv: z.y - a.y,
     };
   }
 
@@ -609,8 +579,8 @@ export class MindMap {
     const g = this.edgeGeomOf(id);
     if (!g) return null;
     return flattenSegs(edgeSegs(g.du, g.dv), 8).map((q) => ({
-      x: g.a.x + g.f.ux * q[0] + g.f.vx * q[1],
-      y: g.a.y + g.f.uy * q[0] + g.f.vy * q[1],
+      x: g.a.x + q[0],
+      y: g.a.y + q[1],
     }));
   }
 
@@ -753,27 +723,14 @@ export class MindMap {
     const b = this.hoverId !== -1 ? this.boxes.get(this.hoverId) : undefined;
     if (!b || this.dragging || this.isEditing()) {
       this.plusBtn.setAttribute("visibility", "hidden");
-      this.plusBtnL.setAttribute("visibility", "hidden");
       return;
     }
     this.plusBtn.setAttribute("visibility", "visible");
-    // sit just past the node's outward edge along its growth axis
-    const f = this.frameOf.get(this.hoverId) ?? F_RIGHT;
-    const p = exitPoint(b, f.ux, f.uy);
+    const p = exitPoint(b, 1, 0);
     this.plusBtn.setAttribute(
       "transform",
-      `translate(${p.x + f.ux * 14} ${p.y + f.uy * 14})`,
+      `translate(${p.x + 14} ${p.y})`,
     );
-    // the root also gets a LEFT + that creates into the left side
-    if (b.n.depth === 1) {
-      this.plusBtnL.setAttribute("visibility", "visible");
-      this.plusBtnL.setAttribute(
-        "transform",
-        `translate(${b.x - 14} ${b.y + b.h / 2})`,
-      );
-    } else {
-      this.plusBtnL.setAttribute("visibility", "hidden");
-    }
   }
 
   // ---------- events ----------
@@ -959,7 +916,7 @@ export class MindMap {
         const drop = this.dropTarget;
         const ids = this.dragging.ids;
         this.stopDragVisuals();
-        if (drop) this.host.move(ids, drop.id, drop.pos, drop.side);
+        if (drop) this.host.move(ids, drop.id, drop.pos);
         this.dragCand = null;
         return;
       }
@@ -1038,17 +995,7 @@ export class MindMap {
     this.plusBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (this.hoverId === -1) return;
-      // ルートの右 ＋ は「右側の末尾」。ふつうのノードならただの子
-      if (this.hoverId === this.rootId) this.host.addSideEnd(false);
-      else this.host.addChild(this.hoverId);
-    });
-    this.plusBtnL.addEventListener("pointerdown", (e) => {
-      e.stopPropagation();
-    });
-    this.plusBtnL.addEventListener("click", (e) => {
-      e.stopPropagation();
-      // 左 ＋ はルートにしか出ない。左側の末尾（空なら `---` を書いて開く）
-      if (this.hoverId !== -1) this.host.addSideEnd(true);
+      this.host.addChild(this.hoverId);
     });
 
     // open link cards
@@ -1391,26 +1338,11 @@ export class MindMap {
         (i + (dirKey === "ArrowUp" ? -1 : 1) + sibs.length) % sibs.length;
       next = sibs[j].id;
     } else {
-      // side-aware: on the left half the tree grows leftwards
-      const side = this.sideOf.get(anchor) ?? 1;
-      if (side === 0) {
-        const want = dirKey === "ArrowLeft" ? -1 : 1;
+      if (dirKey === "ArrowLeft") next = cur.parent;
+      else
         next =
-          nodes.find(
-            (n) => n.parent === anchor && this.sideOf.get(n.id) === want,
-          )?.id ?? -1;
-      } else {
-        const toParent =
-          side === -1 ? dirKey === "ArrowRight" : dirKey === "ArrowLeft";
-        if (toParent) next = cur.parent;
-        else
-          // 折り畳んだノードの子は visible から除外され Box を持たないので、
-          // side===0 の枝と同様 boxes を持つものだけを対象にする（無いと
-          // 埋没した子孫が選択され、地図上は選択が消えたように見えていた）
-          next =
-            nodes.find((n) => n.parent === anchor && this.boxes.has(n.id))
-              ?.id ?? -1;
-      }
+          nodes.find((n) => n.parent === anchor && this.boxes.has(n.id))?.id ??
+          -1;
     }
     if (next !== -1 && next !== undefined) {
       this.host.setSelection([next], next);
@@ -1460,23 +1392,20 @@ export class MindMap {
     const w = this.toWorld(clientX, clientY);
     let target: {
       id: number;
-      pos: 0 | 1 | 2 | 3 | 4;
-      side?: 1 | -1;
+      pos: 0 | 1 | 2 | 3;
     } | null = null;
     const SLOP = 16;
     const BAND = 40; // wide before/after zones (mmm.md そのに: さらに拡大)
-    const frame = (id: number): Frame => this.frameOf.get(id) ?? F_RIGHT;
-    // pointer position in a box's frame, relative to its center, plus the
-    // box half-extents projected onto that frame
-    const local = (b: Box, f: Frame) => {
+    // pointer position relative to a box's center
+    const local = (b: Box) => {
       const c = centerOf(b);
       const dx = w.x - c.x;
       const dy = w.y - c.y;
       return {
-        du: projU(f, dx, dy),
-        dv: projV(f, dx, dy),
-        hu: (b.w * Math.abs(f.ux) + b.h * Math.abs(f.uy)) / 2,
-        hv: (b.w * Math.abs(f.vx) + b.h * Math.abs(f.vy)) / 2,
+        du: dx,
+        dv: dy,
+        hu: b.w / 2,
+        hv: b.h / 2,
       };
     };
     /**
@@ -1529,15 +1458,14 @@ export class MindMap {
     // どちらに倒れるかが実質その場の運になっていた。
     let best = Infinity;
     let rival = Infinity; // いちばん近い「別の親になる」候補までの距離
-    const parentFor = (id: number, pos: 0 | 1 | 2 | 3 | 4): number =>
+    const parentFor = (id: number, pos: 0 | 1 | 2 | 3): number =>
       pos === 0 ? id : (this.parentOf.get(id) ?? -1);
     const cands: { id: number; pos: 0 | 1 | 2; dist: number; parent: number }[] = [];
     for (const id of this.order) {
       if (dragging.subtree.has(id)) continue;
       const b = this.boxes.get(id);
       if (!b) continue;
-      const f = frame(id);
-      const { du, dv, hu, hv } = local(b, f);
+      const { du, dv, hu, hv } = local(b);
       if (Math.abs(du) > hu + SLOP || Math.abs(dv) > hv + BAND) continue;
       // 箱の中なら 0。外に出た分だけ距離が増える（兄弟軸のほうを重く見る）
       const dist =
@@ -1573,8 +1501,7 @@ export class MindMap {
       if (dragging.subtree.has(id)) continue;
       const b = this.boxes.get(id);
       if (!b) continue;
-      const f = frame(id);
-      const { du, dv, hu, hv } = local(b, f);
+      const { du, dv, hu, hv } = local(b);
       if (du <= hu || du > hu + REACH || Math.abs(dv) > hv + SLACK) continue;
       const d = du - hu + Math.max(0, Math.abs(dv) - hv) * 2;
       if (d < bestOut) {
@@ -1585,27 +1512,6 @@ export class MindMap {
     }
     if (outTarget && !edgeTarget && best > 0 && (outU <= NEAR || !target)) {
       target = outTarget;
-    }
-
-    // ルート脇ゾーンに落とす = その側の末尾へ（pos 4）。
-    // 左側が空のときだけ、コアが `---` を 1 本書いて左を開く
-    if (this.rootId !== -1 && !dragging.subtree.has(this.rootId)) {
-      const rb = this.boxes.get(this.rootId);
-      if (rb) {
-        const dx = w.x - (rb.x + rb.w / 2);
-        const dy = w.y - (rb.y + rb.h / 2);
-        const hu = rb.w / 2;
-        const hv = rb.h / 2;
-        const side: 1 | -1 = dx < 0 ? -1 : 1;
-        const outside = Math.abs(dx) - hu;
-        if (outside > 0 && outside <= REACH && Math.abs(dy) <= hv + SLACK) {
-          const near = outside <= NEAR;
-          // best === 0 はノードの箱の中 — 箱への「子にする」を横取りしない
-          if (!edgeTarget && best > 0 && (!target || near)) {
-            target = { id: this.rootId, pos: 4, side };
-          }
-        }
-      }
     }
 
     if (!target) target = findEdge();
@@ -1643,10 +1549,8 @@ export class MindMap {
         this.dropHint.setAttribute("visibility", "hidden");
         return;
       }
-      // 子は「その兄弟が置かれているフレーム」に並ぶので、親ではなく対象の側を見る
-      const pf = frame(target.id);
-      const from = exitPoint(p, pf.ux, pf.uy);
-      this.dropHint.setAttribute("d", edgeHintPath(from, to, pf));
+      const from = exitPoint(p, 1, 0);
+      this.dropHint.setAttribute("d", edgeHintPath(from, to));
       this.dropHint.setAttribute("visibility", "visible");
       this.markNode(parentId, "drop-parent");
     };
@@ -1670,73 +1574,35 @@ export class MindMap {
       this.dropLine.setAttribute("y2", String(m.y + (tx / tl) * half));
       this.dropLine.setAttribute("visibility", "visible");
       this.dropHint.setAttribute("visibility", "hidden");
-    } else if (target.pos === 4) {
-      // 側の末尾へ。入る場所が分かるよう、その側の幅で横線を引く
-      const side = target.side ?? 1;
-      const rb = this.boxes.get(this.rootId);
-      let x0 = Infinity;
-      let x1 = -Infinity;
-      let bottom = -Infinity;
-      for (const id of this.order) {
-        if (this.sideOf.get(id) !== side || !this.underRoot.has(id)) continue;
-        if (dragging.subtree.has(id)) continue; // 掴んでいる箱は含めない
-        const bb = this.boxes.get(id);
-        if (!bb) continue;
-        bottom = Math.max(bottom, bb.y + bb.h);
-        if (bb.n.parent !== this.rootId) continue;
-        x0 = Math.min(x0, bb.x);
-        x1 = Math.max(x1, bb.x + bb.w);
-      }
-      if (!Number.isFinite(x0) && rb) {
-        // その側にまだ何も無いとき（＝左を開く最初の 1 つ）
-        const e = side === 1 ? rb.x + rb.w : rb.x;
-        x0 = side === 1 ? e + GAP.x : e - GAP.x - 90;
-        x1 = side === 1 ? e + GAP.x + 90 : e - GAP.x;
-        bottom = rb.y + rb.h;
-      }
-      const y = bottom + GAP.y * 2;
-      this.dropLine.setAttribute("x1", String(round2(x0 - 8)));
-      this.dropLine.setAttribute("y1", String(round2(y)));
-      this.dropLine.setAttribute("x2", String(round2(x1 + 8)));
-      this.dropLine.setAttribute("y2", String(round2(y)));
-      this.dropLine.setAttribute("visibility", "visible");
-      this.dropHint.setAttribute("visibility", "hidden");
-      this.markNode(this.rootId, "drop-child");
     } else if (target.pos === 0) {
       // ring on the target PLUS an insertion line on its outward side,
       // where the new child will appear (mmm.md そのに)
       this.markNode(target.id, "drop-child");
-      // ルートの左右どちらに置くかが決まっているときは、その側に印を出す
-      const f: Frame =
-        target.side !== undefined
-          ? { ux: target.side, uy: 0, vx: 0, vy: 1 }
-          : frame(target.id);
-      const e = exitPoint(b, f.ux, f.uy);
-      const lx = e.x + f.ux * (GAP.x / 2);
-      const ly = e.y + f.uy * (GAP.x / 2);
+      const e = exitPoint(b, 1, 0);
+      const lx = e.x + GAP.x / 2;
+      const ly = e.y;
       const half = 16;
-      this.dropLine.setAttribute("x1", String(lx - f.vx * half));
-      this.dropLine.setAttribute("y1", String(ly - f.vy * half));
-      this.dropLine.setAttribute("x2", String(lx + f.vx * half));
-      this.dropLine.setAttribute("y2", String(ly + f.vy * half));
+      this.dropLine.setAttribute("x1", String(lx));
+      this.dropLine.setAttribute("y1", String(ly - half));
+      this.dropLine.setAttribute("x2", String(lx));
+      this.dropLine.setAttribute("y2", String(ly + half));
       this.dropLine.setAttribute("visibility", "visible");
       showHint({ x: lx, y: ly });
     } else {
       // an insertion line on the sibling axis, before or after the target
-      const f = frame(target.id);
-      const { hu, hv } = local(b, f);
+      const { hu, hv } = local(b);
       const cx = b.x + b.w / 2;
       const cy = b.y + b.h / 2;
       const off = (hv + GAP.y / 2) * (target.pos === 1 ? -1 : 1);
       const half = Math.max(hu, 40);
-      this.dropLine.setAttribute("x1", String(cx + f.vx * off - f.ux * half));
-      this.dropLine.setAttribute("y1", String(cy + f.vy * off - f.uy * half));
-      this.dropLine.setAttribute("x2", String(cx + f.vx * off + f.ux * half));
-      this.dropLine.setAttribute("y2", String(cy + f.vy * off + f.uy * half));
+      this.dropLine.setAttribute("x1", String(cx - half));
+      this.dropLine.setAttribute("y1", String(cy + off));
+      this.dropLine.setAttribute("x2", String(cx + half));
+      this.dropLine.setAttribute("y2", String(cy + off));
       this.dropLine.setAttribute("visibility", "visible");
       showHint({
-        x: cx + f.vx * off - f.ux * hu,
-        y: cy + f.vy * off - f.uy * hu,
+        x: cx - hu,
+        y: cy + off,
       });
     }
   }

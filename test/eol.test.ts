@@ -37,14 +37,14 @@ test("E2: どのコマンドを通しても LF が混ざらない", () => {
   noLone("子を追加");
   s = core.renameNode(s.focus, "新しい子", "");
   noLone("名前を変更");
-  s = core.moveSideEnd([idOf(s.nodes, "新しい子")], true);
-  noLone("左側の末尾へ移動");
+  s = core.moveNodes([idOf(s.nodes, "新しい子")], idOf(s.nodes, "b"), 2);
+  noLone("ノードを移動");
   s = core.toggleHidden(idOf(s.nodes, "a"));
   noLone("折り畳み");
   s = core.toggleHidden(idOf(s.nodes, "a"));
   noLone("展開");
   s = core.deleteNodes([idOf(s.nodes, "b")]);
-  noLone("削除（区切りの掃除つき）");
+  noLone("削除");
 
   // 全部 undo すれば原文へバイト単位で戻る
   // （initDoc を挟むと undo スタックが消えるので、途中で呼ばないこと）

@@ -49,20 +49,15 @@ fn is_space(c : Int) -> Bool {
 
 ///|
 /// Fence-aware scan (spec 4.3): a line starting with # inside a fenced
-/// code block is content, not structure. Also collects `---` separator
-/// lines as (line start, next line start) pairs, same fence rule.
+/// code block is content, not structure.
 ///
 /// Hide regions (mmm.md そのに: コメントアウトで無効化): a line that is
 /// exactly `<!--` opens one, a line that is exactly `-->` closes it.
 /// Headings inside stay part of the structure but are flagged hidden.
 /// Returns regions as (open start, open next, close start, close next);
 /// an unclosed region reports (-1, -1) for the close marker.
-fn scan_doc(
-  text : String,
-  lines : Array[Line],
-) -> (Array[Heading], Array[(Int, Int)], Array[HideRegion]) {
+fn scan_doc(text : String, lines : Array[Line]) -> (Array[Heading], Array[HideRegion]) {
   let out : Array[Heading] = []
-  let seps : Array[(Int, Int)] = []
   let regions : Array[HideRegion] = []
   let mut in_fence = false
   let mut fence_char = 0
@@ -115,17 +110,6 @@ fn scan_doc(
       in_comment = false
       continue
     }
-    if is_separator(text, l) {
-      // 直前が本文の行で、かつこの行が setext 見出しの下線になりうる
-      // （`-` だけの行。CommonMark で下線と衝突するのは `-` のみで、
-      // `***` `___` `- - -` は本文直後でも水平線）なら、区切りにしない
-      if idx == 0 ||
-        !is_text_line(text, lines[idx - 1]) ||
-        !is_setext_underline(text, l) {
-        seps.push((l.start, l.next))
-      }
-      continue
-    }
     // strict ^(#+)\s+(.*)$ with no leading spaces allowed
     let mut p = l.start
     while p < l.end && cc(text, p) == 35 {
@@ -160,7 +144,7 @@ fn scan_doc(
       close_next: -1,
     })
   }
-  (out, seps, regions)
+  (out, regions)
 }
 
 ///|
@@ -204,7 +188,6 @@ fn is_comment_open(text : String, l : Line) -> Bool {
 
 ///|
 /// Closer: 2+ dashes followed by `>`, nothing else on the line.
-/// (A run of dashes with no `>` is a thematic break, handled separately.)
 fn is_comment_close(text : String, l : Line) -> Bool {
   let (a, b) = trimmed_span(text, l)
   let mut p = a
@@ -214,86 +197,6 @@ fn is_comment_close(text : String, l : Line) -> Bool {
     dashes = dashes + 1
   }
   dashes >= 2 && p + 1 == b && cc(text, p) == 62
-}
-
-///|
-/// 区切り行（CommonMark の thematic break と同じ判定）。
-/// 先頭に空白 3 つまで、`-` `*` `_` のいずれかが 3 個以上、
-/// 間と後ろは空白のみ。`- - -` や `***` も同じ記号として扱う
-/// （CommonMark ではこの 3 つは区別されないため、`---` だけ特別扱い
-/// するのは筋が通らない）。
-fn is_separator(text : String, l : Line) -> Bool {
-  let mut p = l.start
-  let mut indent = 0
-  while p < l.end && cc(text, p) == 32 && indent < 3 {
-    p = p + 1
-    indent = indent + 1
-  }
-  if p >= l.end {
-    return false
-  }
-  let mark = cc(text, p)
-  if mark != 45 && mark != 42 && mark != 95 {
-    return false
-  }
-  let mut count = 0
-  let mut q = p
-  while q < l.end {
-    let c = cc(text, q)
-    if c == mark {
-      count = count + 1
-    } else if !is_space(c) {
-      return false
-    }
-    q = q + 1
-  }
-  count >= 3
-}
-
-///|
-/// setext 見出しの下線になりうる行か。下線は `-` の並びだけで、
-/// 内側に空白があってはならない（`- - -` は下線になれない）。
-fn is_setext_underline(text : String, l : Line) -> Bool {
-  let (a, b) = trimmed_span(text, l)
-  if a >= b {
-    return false
-  }
-  for q = a; q < b; q = q + 1 {
-    if cc(text, q) != 45 {
-      return false
-    }
-  }
-  true
-}
-
-///|
-/// 本文の行か。区切り行の直前がこれだと、CommonMark では setext 見出しの
-/// 下線（= `##` と等価）になるので、区切りとして扱ってはいけない。
-/// 空行・見出し・区切り・フェンス・コメントマーカーはどれも本文ではない。
-fn is_text_line(text : String, l : Line) -> Bool {
-  let mut p = l.start
-  while p < l.end && is_space(cc(text, p)) {
-    p = p + 1
-  }
-  if p >= l.end {
-    return false // 空行
-  }
-  if is_separator(text, l) || is_comment_open(text, l) || is_comment_close(text, l) {
-    return false
-  }
-  let (_, fl) = fence_open(text, l)
-  if fl >= 3 {
-    return false
-  }
-  // ATX 見出し
-  let mut h = l.start
-  while h < l.end && cc(text, h) == 35 {
-    h = h + 1
-  }
-  if h - l.start >= 1 && h < l.end && is_space(cc(text, h)) {
-    return false
-  }
-  true
 }
 
 ///|
@@ -358,41 +261,4 @@ fn fence_close_len(text : String, l : Line, fence_char : Int) -> Int {
     q = q + 1
   }
   len
-}
-
-///|
-/// [a, b) が、空行と hide のマーカー行だけでできているか。
-///
-/// 区切りの有効判定（次に来る非空白が見出しであること）に使う。素の
-/// 「空行だけか」で見ると、区間の先頭ノードを hide した瞬間に `---` と
-/// 見出しのあいだへ `<!--` が入り、その区切りが死ぬ。区間が 1 つ消えるので
-/// 以降の区間番号がずれ、無関係なノードの左右まで入れ替わっていた。
-/// hide は「見た目を畳む」操作であって、区間の構造を変えるものではない。
-fn is_blank_or_marker_range(text : String, a : Int, b : Int) -> Bool {
-  let mut p = a
-  while p < b {
-    let mut e = p
-    while e < b && cc(text, e) != 10 {
-      e = e + 1
-    }
-    let mut end = e
-    if end > p && cc(text, end - 1) == 13 {
-      end = end - 1
-    }
-    let line = Line::{ start: p, end: end, next: if e < b { e + 1 } else { b } }
-    let mut q = p
-    let mut blank = true
-    while q < end {
-      if !is_space(cc(text, q)) {
-        blank = false
-        break
-      }
-      q = q + 1
-    }
-    if !blank && !is_comment_open(text, line) && !is_comment_close(text, line) {
-      return false
-    }
-    p = if e < b { e + 1 } else { b }
-  }
-  true
 }

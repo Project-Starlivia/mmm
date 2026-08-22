@@ -233,10 +233,6 @@ const host: MapHost = {
     const tag = `s${++sessionN}`;
     runCmd(() => core.addRoot(tag), { edit: { tag } });
   },
-  addSideEnd(left) {
-    const tag = `s${++sessionN}`;
-    runCmd(() => core.addSideEnd(left, tag), { edit: { tag } });
-  },
   rename(id, label, tag) {
     applySnap(core.renameNode(id, label, tag), "map");
     // md ペイン側のハイライトは選択の範囲で描いている。ラベルの長さが
@@ -278,16 +274,12 @@ const host: MapHost = {
   toggleHidden(id) {
     runCmd(() => core.toggleHidden(id));
   },
-  move(ids, target, pos, side) {
+  move(ids, target, pos) {
     // pos 3 = A→B の線に落とした: ids が B の親になるよう割り込む
-    // pos 4 = ルート脇ゾーンに落とした: その側の末尾へ
-    //   （左が空のときだけコアが `---` を 1 本書く）
     runCmd(() =>
       pos === 3
         ? core.moveAsParent(ids, target)
-        : pos === 4
-          ? core.moveSideEnd(ids, side === -1)
-          : core.moveNodes(ids, target, pos),
+        : core.moveNodes(ids, target, pos),
     );
   },
   copySelection(cut) {
@@ -331,7 +323,7 @@ const host: MapHost = {
       // ここは clipboard の I/O と、結果を core へ適用する側だけを持つ
       const action = decidePaste(
         clip,
-        n0 ? { rawDepth: n0.rawDepth } : null,
+        n0 ? { depth: n0.depth } : null,
         nodes.length > 0,
       );
       switch (action.kind) {

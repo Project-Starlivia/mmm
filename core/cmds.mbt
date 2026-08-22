@@ -9,9 +9,7 @@ fn cmd_rename(id : Int, label : String, tag : String) -> Unit {
     return
   }
   let nd = st.nodes[i]
-  // rename も書かれている深さを保つ（読み替えで浅く見えているノードの
-  // `#` を勝手に減らさない）
-  let line = hashes(nd.raw_depth) + " " + sanitize_label(label)
+  let line = hashes(nd.depth) + " " + sanitize_label(label)
   let old = sub(st.text, nd.hs, nd.he)
   if line == old {
     return
@@ -25,29 +23,6 @@ fn cmd_rename(id : Int, label : String, tag : String) -> Unit {
 
 ///|
 fn cmd_delete(ids : Array[Int]) -> Unit {
-  let idxs = normalize_selection(ids)
-  if idxs.length() == 0 {
-    return
-  }
-  // 区間の中身を全部消すと区切りが宙に浮く。下の左右が変わらないよう、
-  // 偶数本ずつ消す（seps.mbt）。オフセットが動く前に編集を作っておく
-  let order0 : Array[Int] = []
-  for k in idxs {
-    order0.push(st.nodes[k].id)
-  }
-  let sep_cleanup = dangling_sep_edits(order0)
-  if sep_cleanup.length() > 0 {
-    begin_tx("")
-    apply_sets([sep_cleanup], "")
-    cmd_delete_body(order0)
-    commit_tx()
-    return
-  }
-  cmd_delete_body(order0)
-}
-
-///|
-fn cmd_delete_body(ids : Array[Int]) -> Unit {
   let idxs = normalize_selection(ids)
   if idxs.length() == 0 {
     return

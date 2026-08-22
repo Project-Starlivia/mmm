@@ -209,24 +209,10 @@ test "deleting adjacent blocks incl. the last one does not overlap edits" {
 }
 
 ///|
-test "separator splits groups and is fence-safe" {
-  let s = init_doc(
-    "# r\n\n## a\n\n---\n\n## b\n\n```\n---\n```\n\n## c\n",
-  )
-  // a は区間 0、b と c は区間 1（フェンス内の --- は数えない）。
-  // 区切り行はどのノードにも属さないので、a の添付コンテンツにもならない
-  assert_eq(
-    s.contains("\"group\":0,\"hasContent\":false,\"hidden\":false,\"label\":\"a\""),
-    true,
-  )
-  assert_eq(
-    s.contains("\"group\":1,\"hasContent\":true,\"hidden\":false,\"label\":\"b\""),
-    true,
-  )
-  assert_eq(
-    s.contains("\"group\":1,\"hasContent\":false,\"hidden\":false,\"label\":\"c\""),
-    true,
-  )
+test "thematic breaks are ordinary node content" {
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n"))
+  assert_eq(selection_text([2]).contains("---"), true)
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## b\n")
 }
 
 ///|
@@ -302,25 +288,6 @@ test "separate trees can be deleted together" {
 }
 
 ///|
-/// group 番号は文書全体の通し番号なので、ルート直下の区間と、無関係な
-/// 別ツリー（2 つ目の `#` 以降）が同じ番号を踏むことがある。区切りの
-/// 生死判定がそれに引きずられると、ルート側は空になったのに `---` が
-/// 消え残る（別ツリーがまだ同じ番号にいるように見えてしまうため）。
-test "dangling separator cleanup ignores unrelated trees sharing its group number" {
-  ignore(
-    init_doc(
-      "# Root\n\n## Child1\n\n---\n\n## Child2\n\n# SecondRoot\n\n---\n\n## Child3\n",
-    ),
-  )
-  // Root(1) Child1(2) Child2(3) SecondRoot(4) Child3(5)
-  ignore(delete_nodes([3]))
-  assert_eq(
-    get_text(),
-    "# Root\n\n## Child1\n\n# SecondRoot\n\n---\n\n## Child3\n",
-  )
-}
-
-///|
 test "indent keeps node ids (line-prefix inserts survive mapping)" {
   ignore(init_doc("# r\n\n## a\n\n## b\n\n### b1\n"))
   ignore(indent_nodes([3]))
@@ -355,20 +322,6 @@ test "undo and redo keep node ids" {
   ignore(redo()) // redo the rename — id still stable afterwards
   ignore(rename_node(3, "b3", ""))
   assert_eq(get_text(), "# r\n\n## a\n\n## b3\n")
-}
-
-///|
-test "a thematic break inside content does not split groups" {
-  let s = init_doc("# r\n\n## a\n\ntext\n\n---\n\nmore\n\n## b\n")
-  // the --- is followed by content, not a heading: a and b share group 0
-  assert_eq(
-    s.contains("\"group\":0,\"hasContent\":true,\"hidden\":false,\"label\":\"a\""),
-    true,
-  )
-  assert_eq(
-    s.contains("\"group\":0,\"hasContent\":false,\"hidden\":false,\"label\":\"b\""),
-    true,
-  )
 }
 
 ///|
@@ -550,13 +503,6 @@ test "comment opener tolerates extra dashes" {
 }
 
 ///|
-test "a run of dashes without > is still a separator, not a comment close" {
-  // `---` must keep splitting groups; only `-->`-shaped lines close comments
-  let s = init_doc("# r\n\n## a\n\n---\n\n## b\n")
-  assert_eq(s.contains("\"group\":1,\"hasContent\":false,\"hidden\":false,\"label\":\"b\""), true)
-}
-
-///|
 test "unclosed comment hides everything after it" {
   let s = init_doc("# r\n\n<!--\n## a\n\n## b\n")
   assert_eq(s.contains("\"hidden\":true,\"label\":\"a\""), true)
@@ -602,120 +548,6 @@ test "add root works even when a root already exists" {
 }
 
 ///|
-/// `---` の直後の見出しは、書かれた深さに関わらずルート直下として読む。
-/// id: r=1 a=2 a1=3 b=4 b1=5
-test "a separator lifts the next heading to a root child" {
-  ignore(init_doc("# r\n\n## a\n\n### a1\n\n---\n\n### b\n\n#### b1\n"))
-  // b は ### だが区間の先頭なので a の部分木には入らない
-  assert_eq(selection_text([2]).contains("### b"), false)
-  // ルートの部分木には入る（別ツリーになっていない）
-  assert_eq(selection_text([1]).contains("### b"), true)
-  // b1 は b の子のまま
-  assert_eq(selection_text([4]).contains("#### b1"), true)
-  // テキストは書き換えない
-  assert_eq(get_text(), "# r\n\n## a\n\n### a1\n\n---\n\n### b\n\n#### b1\n")
-}
-
-///|
-/// 区間の中で先頭より浅い見出しが出たら、そこで基準を取り直す。
-/// 取り直さないと、以降の深い見出しが元の基準でずれて親子関係が壊れる。
-/// id: r=1 a=2 b=3 c=4 c1=5
-test "a shallower heading re-anchors the run" {
-  ignore(init_doc("# r\n\n## a\n\n---\n\n### b\n\n## c\n\n### c1\n"))
-  // c は b の子ではなく、ルート直下の兄弟
-  assert_eq(selection_text([3]).contains("## c"), false)
-  // c1 は c の子のまま
-  assert_eq(selection_text([4]).contains("### c1"), true)
-  assert_eq(selection_text([1]).contains("### b"), true)
-}
-
-///|
-/// 直前が本文の行なら setext 見出しの下線なので、区切りにしない。
-test "a separator right after a paragraph is not a separator" {
-  let s = init_doc("# r\n\n## a\n\n本文\n---\n\n## b\n")
-  assert_eq(s.contains("\"group\":0,\"hasContent\":false,\"hidden\":false,\"label\":\"b\""), true)
-}
-
-///|
-/// `***` `___` `- - -` も CommonMark では同じ thematic break。
-test "other thematic break markers work the same" {
-  let s = init_doc("# r\n\n## a\n\n***\n\n## b\n\n- - -\n\n## c\n")
-  assert_eq(s.contains("\"group\":1,\"hasContent\":false,\"hidden\":false,\"label\":\"b\""), true)
-  assert_eq(s.contains("\"group\":2,\"hasContent\":false,\"hidden\":false,\"label\":\"c\""), true)
-}
-
-///|
-/// front matter の区切り線は、最初の `#` より前なので自動的に落ちる。
-test "front matter delimiters are not separators" {
-  let s = init_doc("---\ntitle: x\n---\n\n# r\n\n## a\n")
-  assert_eq(s.contains("\"group\":0,\"hasContent\":false,\"hidden\":false,\"label\":\"a\""), true)
-  assert_eq(get_text(), "---\ntitle: x\n---\n\n# r\n\n## a\n")
-}
-
-///|
-/// 先頭に置いた区切りは区間 0 を空にする（= 全部が反対側に出る）。
-test "a title separator sends everything left" {
-  let s = init_doc("# r\n\n---\n\n## a\n\n## b\n")
-  assert_eq(s.contains("\"group\":1,\"hasContent\":false,\"hidden\":false,\"label\":\"a\""), true)
-  assert_eq(s.contains("\"group\":1,\"hasContent\":false,\"hidden\":false,\"label\":\"b\""), true)
-}
-
-///|
-/// 区切り行はどのノードの範囲にも入らない（コピーや削除に付いてこない）。
-test "a separator line belongs to no node" {
-  ignore(init_doc("# r\n\n## a\n\n### a1\n\n---\n\n### b\n"))
-  assert_eq(selection_text([2]).contains("---"), false)
-  ignore(delete_nodes([2]))
-  assert_eq(get_text().contains("---"), true)
-}
-
-///|
-/// 2 連の区切りは、最後の 1 本だけが効く。
-test "consecutive separators collapse to one" {
-  let s = init_doc("# r\n\n## a\n\n---\n\n---\n\n## b\n")
-  assert_eq(s.contains("\"group\":1,\"hasContent\":false,\"hidden\":false,\"label\":\"b\""), true)
-}
-
-///|
-/// hide は見た目を畳む操作であって、区間の構造を変えるものではない。
-/// 区間の先頭を畳んだだけで区切りが死に、以降の左右が全部入れ替わっていた。
-test "hiding a run head keeps the separator alive" {
-  let s = init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n")
-  assert_eq(s.contains("\"group\":1,\"hasContent\":false,\"hidden\":false,\"label\":\"b\""), true)
-  ignore(toggle_hidden(3))
-  let after = init_doc(get_text())
-  // b は区間 1、c は区間 2 のまま（畳んでも区間番号が動かない）
-  assert_eq(after.contains("\"group\":1,\"hasContent\":false,\"hidden\":true,\"label\":\"b\""), true)
-  assert_eq(after.contains("\"group\":2,\"hasContent\":false,\"hidden\":false,\"label\":\"c\""), true)
-}
-
-///|
-/// 区間の中身を全部よそへ動かしたら、区切りは**両脇 2 本まとめて**消す。
-/// 1 本だけ消すと、そこから下の左右が全部反転してしまう。
-/// c は右（区切り 2 本）だった → 両脇が消えて 0 本 = 右のまま。
-test "moving a run's only node cleans up both separators" {
-  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n"))
-  ignore(move_nodes([3], 2, 0))
-  assert_eq(get_text(), "# r\n\n## a\n\n### b\n\n## c\n")
-}
-
-///|
-/// 削除でも同じ。
-test "deleting a run's only node cleans up both separators" {
-  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n"))
-  ignore(delete_nodes([3]))
-  assert_eq(get_text(), "# r\n\n## a\n\n## c\n")
-}
-
-///|
-/// 区間に他の中身が残るなら区切りは消さない。
-test "a separator survives when the run still has members" {
-  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n## b2\n\n---\n\n## c\n"))
-  ignore(delete_nodes([3]))
-  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## b2\n\n---\n\n## c\n")
-}
-
-///|
 /// 畳んだノードを動かすと、マーカーが元の場所に置き去りになっていた。
 test "a hidden node carries its markers when moved" {
   ignore(init_doc("# r\n\n## a\n\n## b\n"))
@@ -727,39 +559,19 @@ test "a hidden node carries its markers when moved" {
 }
 
 ///|
-/// 読み替えが起きた区間の中でも、子を作れば子になること（`#` の数）。
-test "add child inside a re-leveled run writes the right depth" {
+/// 子を作ると、見出しの `#` が 1 つ増える。
+test "add child writes the next heading depth" {
   ignore(init_doc("# r\n\n## a\n\n---\n\n### b\n"))
   ignore(add_child(3, ""))
   assert_eq(get_text(), "# r\n\n## a\n\n---\n\n### b\n\n#### \n")
 }
 
 ///|
-/// rename は書かれている深さを保つ（読み替えで浅く見えていても減らさない）。
-test "rename keeps the written heading depth" {
+/// rename は見出しの深さを保つ。
+test "rename keeps the heading depth" {
   ignore(init_doc("# r\n\n## a\n\n---\n\n### b\n"))
   ignore(rename_node(3, "B", ""))
   assert_eq(get_text(), "# r\n\n## a\n\n---\n\n### B\n")
-}
-
-///|
-/// reorder は区間の壁を越えない。越えると区間の中身が入れ替わる。
-test "reorder stays inside its bundle" {
-  let before = "# r\n\n## a\n\n---\n\n## b\n\n## c\n"
-  ignore(init_doc(before))
-  ignore(reorder_node(3, -1))
-  assert_eq(get_text(), before)
-  ignore(reorder_node(4, -1))
-  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## c\n\n## b\n")
-}
-
-///|
-/// indent も区間の壁を越えない。
-test "indent stays inside its bundle" {
-  let before = "# r\n\n## a\n\n---\n\n## b\n"
-  ignore(init_doc(before))
-  ignore(indent_nodes([3]))
-  assert_eq(get_text(), before)
 }
 
 ///|
@@ -784,25 +596,6 @@ test "unfold-then-add is one undo step" {
 }
 
 ///|
-/// reorder は深さを変えない移動。構造上の深さを渡していたせいで、
-/// 読み替えの起きた区間（先頭が ###）の中の #### が ### に化けていた。
-test "reorder keeps raw depth inside a re-leveled run" {
-  ignore(init_doc("# r\n\n## a\n\n---\n\n### h\n\n#### x\n\n#### y\n"))
-  ignore(reorder_node(5, -1))
-  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n### h\n\n#### y\n\n#### x\n")
-}
-
-///|
-/// setext の下線になりうるのは `-` だけの行のみ。`***` や `- - -` は
-/// 本文の直後でも水平線（CommonMark どおり）なので、区切りとして効く。
-test "only dash-only separators are suppressed after text" {
-  let s = init_doc("# r\n\n## a\n\nbody\n***\n\n## b\n")
-  assert_eq(s.contains("\"group\":1,\"hasContent\":false,\"hidden\":false,\"label\":\"b\""), true)
-  let s2 = init_doc("# r\n\n## a\n\nbody\n---\n\n## b\n")
-  assert_eq(s2.contains("\"group\":0,\"hasContent\":false,\"hidden\":false,\"label\":\"b\""), true)
-}
-
-///|
 /// HTML コメントは最初の `-->` で必ず終わる。hide 領域の中に孤立した
 /// フェンス行があっても、`-->` を食って以降を全部 hidden にしない。
 test "a stray fence inside a hide region does not eat the close marker" {
@@ -813,25 +606,11 @@ test "a stray fence inside a hide region does not eat the close marker" {
 
 ///|
 /// 行き先が動かす範囲の中にある移動は、丸ごと何もしない。
-/// 以前は移動せずに区切りの掃除だけが走り、テキストが変わっていた。
 test "a move into its own subtree changes nothing" {
   let before = "# r\n\n## a\n\n---\n\n## c\n\n### c1\n"
   ignore(init_doc(before))
   ignore(move_nodes([3], 4, 0))
   assert_eq(get_text(), before)
-}
-
-///|
-/// 左の区間を全部同時に消しても、残った右の区間の左右は変わらない。
-/// 対で消す規則の帰結: 生き残りが全部右なら、区切りは 1 本も残らない。
-test "deleting every left run keeps all survivors on the right" {
-  ignore(
-    init_doc(
-      "# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n\n---\n\n## d\n\n---\n\n## e\n\n---\n\n## f\n\n---\n\n## g\n\n---\n\n## h\n\n---\n\n## i\n\n---\n\n## j\n",
-    ),
-  )
-  ignore(delete_nodes([3, 5, 7, 9, 11]))
-  assert_eq(get_text(), "# r\n\n## a\n\n## c\n\n## e\n\n## g\n\n## i\n")
 }
 
 ///|
@@ -844,85 +623,4 @@ test "adding into a folded node stays one undo with the rename" {
   ignore(rename_node(4, "名前", "s9"))
   ignore(undo())
   assert_eq(get_text(), folded)
-}
-
-///|
-/// 掃除の偶数規則: 末尾の区間が空いたら、手前の区切りだけ消す（下が無いので
-/// 偶奇は関係ない）。
-test "emptying the last run removes its leading separator" {
-  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n"))
-  ignore(delete_nodes([3]))
-  assert_eq(get_text(), "# r\n\n## a\n")
-}
-
-///|
-/// 先頭の区間（右側の頭）が空いても、残った「タイトル直後の `---`」は
-/// 消さない — それは「全部左」の正しい表現。
-test "emptying the first run keeps the title separator" {
-  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n"))
-  ignore(delete_nodes([2]))
-  assert_eq(get_text(), "# r\n\n---\n\n## b\n")
-  let s = init_doc(get_text())
-  assert_eq(s.contains("\"group\":1,\"hasContent\":false,\"hidden\":false,\"label\":\"b\""), true)
-}
-
-///|
-/// 連続 2 区間が空いたら、3 本の候補から偶数の 2 本を消し、最後の 1 本を
-/// 境目として残す。下（e）の左右は変わらない。
-test "emptying two adjacent runs keeps one separator as the boundary" {
-  // a(右) b(左) c(右) d(左) e(右)
-  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n\n---\n\n## d\n\n---\n\n## e\n"))
-  // b と c を同時に消す → 区切り3本(手前・間・後ろ)のうち2本消して1本残す
-  ignore(delete_nodes([3, 4]))
-  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## d\n\n---\n\n## e\n")
-  // d は左のまま、e は右のまま
-  let s = init_doc(get_text())
-  assert_eq(s.contains("\"group\":1,\"hasContent\":false,\"hidden\":false,\"label\":\"d\""), true)
-  assert_eq(s.contains("\"group\":2,\"hasContent\":false,\"hidden\":false,\"label\":\"e\""), true)
-}
-
-///|
-/// 側の末尾へ移動: 左が空なら文書末尾に `---` を 1 本書いて置く。
-/// これがこの道具が区切りを増やす唯一の経路。
-test "move to empty left side writes the only separator" {
-  ignore(init_doc("# r\n\n## a\n\n### a1\n\n## b\n"))
-  ignore(move_side_end([4], true))
-  assert_eq(get_text(), "# r\n\n## a\n\n### a1\n\n---\n\n## b\n")
-}
-
-///|
-/// 左に既にノードがあれば、いちばん下の後ろへ動かすだけ（区切りは増えない）。
-test "move to occupied left side appends after its last node" {
-  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n"))
-  ignore(move_side_end([2], true))
-  assert_eq(get_text(), "# r\n\n---\n\n## b\n\n## a\n")
-}
-
-///|
-/// 右が空（タイトル直後 `---` = 全部左）なら、最初の区切りの手前へ。
-test "move to empty right side inserts before the first separator" {
-  ignore(init_doc("# r\n\n---\n\n## a\n\n## b\n"))
-  ignore(move_side_end([3], false))
-  assert_eq(get_text(), "# r\n\n## b\n\n---\n\n## a\n")
-}
-
-///|
-/// 側の末尾に子を作る（ルートの左右 ＋ ボタン）。左が空なら `---` ごと書く。
-test "add at empty left side writes separator and heading" {
-  ignore(init_doc("# r\n\n## a\n"))
-  ignore(add_side_end(true, ""))
-  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## \n")
-  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n"))
-  ignore(add_side_end(false, ""))
-  assert_eq(get_text(), "# r\n\n## a\n\n## \n\n---\n\n## b\n")
-}
-
-///|
-/// move_side_end は undo 1 回で戻る。
-test "move side end is one undo step" {
-  let before = "# r\n\n## a\n\n### a1\n\n## b\n"
-  ignore(init_doc(before))
-  ignore(move_side_end([4], true))
-  ignore(undo())
-  assert_eq(get_text(), before)
 }
