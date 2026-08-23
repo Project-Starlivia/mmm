@@ -1155,15 +1155,18 @@ export class MindMap {
       return;
     }
 
-    // movement: arrows, siblings loop vertically
+    // movement: arrows. 上下は同じ深さの列を縦に辿る
     if (!key.startsWith("Arrow")) return;
-    e.preventDefault();
-    if (mod && (key === "ArrowUp" || key === "ArrowDown")) {
+    // 並べ替えは Alt+↑↓（Alt+←→ はブラウザの戻る/進むなので取らない）
+    if (e.altKey && (key === "ArrowUp" || key === "ArrowDown")) {
+      e.preventDefault();
       if (anchor !== -1 && sel.size === 1) {
         this.host.reorder(anchor, key === "ArrowUp" ? -1 : 1);
       }
       return;
     }
+    if (mod) return; // Mod+矢印には何も割り当てない
+    e.preventDefault();
     if (this.order.length === 0) return;
     if (anchor === -1) {
       const first = this.order[0];
@@ -1187,12 +1190,16 @@ export class MindMap {
         this.host.setSelection([...set], nx);
         return;
       }
-      // loop among siblings (mmm.md 課題: 上下はループする)
-      const sibs = nodes.filter((n) => n.parent === cur.parent);
-      const i = sibs.findIndex((n) => n.id === anchor);
-      if (i === -1 || sibs.length === 0) return;
-      const j = (i + (key === "ArrowUp" ? -1 : 1) + sibs.length) % sibs.length;
-      next = sibs[j].id;
+      // 同じ深さの列を文書順（= 画面の上から下）に辿り、端でループする。
+      // 兄弟に限らずいとこも含む — 見えている限り、その階層は 1 本の列。
+      // 親が畳まれて埋もれたノードは列に入れない（選べないものへは飛べない）。
+      const level = this.order.filter(
+        (id) => byId.get(id)?.depth === cur.depth && this.boxes.has(id),
+      );
+      const i = level.indexOf(anchor);
+      if (i === -1) return;
+      const j = (i + (key === "ArrowUp" ? -1 : 1) + level.length) % level.length;
+      next = level[j];
     } else {
       if (key === "ArrowLeft") next = cur.parent;
       else
