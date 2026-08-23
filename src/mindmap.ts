@@ -5,7 +5,7 @@
 // Layout: every tree grows from left to right.
 
 import type { NodeInfo } from "./coreApi";
-import { tokenize } from "./map/highlight.ts";
+import { languageEpoch, tokenize } from "./map/highlight.ts";
 import {
   centerOf,
   distToSeg,
@@ -575,7 +575,8 @@ export class MindMap {
     // 値どうしは本文に出ない制御文字で区切る。連結だけだと
     // lang "ts"+行 "x" と lang "t"+行 "sx" のような別内容が同じ署名になる
     const SEP = "\u0000";
-    let s = `${b.w}|${b.h}|${n.hidden ? 1 : 0}|${buried}|${n.label}`;
+    // 言語の読み込みは後から効くので、世代も署名に混ぜる
+    let s = `${b.w}|${b.h}|${n.hidden ? 1 : 0}|${buried}|${languageEpoch()}|${n.label}`;
     for (const r of b.rows) {
       if (r.kind === "link") s += `|L${r.link.title}${SEP}${r.link.url}`;
       else if (r.kind === "svg") s += `|S${r.markup}`;

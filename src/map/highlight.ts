@@ -1,21 +1,15 @@
 // コードカードの色付け。
 //
-// 自前の字句解析は持たない。CodeMirror が MD ペインのフェンス用に既に
-// 積んでいるパーサ（js / ts / css / html）をそのまま借りる — 同じ文書の
-// 同じコードを 2 通りの規則で読むと、色が食い違ったときに理由が説明できない。
+// 自前の字句解析は持たない。CodeMirror の言語一覧（@codemirror/language-data、
+// 143 言語）をそのまま借りる。各言語は動的 import なので、**実際に文書に出て
+// きた言語だけ**が後から読み込まれる — 最初のバンドルには入らない。
 //
-// 知らない言語は色を付けない（推測で間違った色を出すより、付けないほうがよい）。
+// 読み込みは非同期なので、初回は色の付かない状態で出し、読み終わったら
+// 描き直す。画像の読み込み（app/assets.ts）と同じ手口。
 
 import { classHighlighter, highlightCode } from "@lezer/highlight";
-import {
-  javascriptLanguage,
-  jsxLanguage,
-  tsxLanguage,
-  typescriptLanguage,
-} from "@codemirror/lang-javascript";
-import { cssLanguage } from "@codemirror/lang-css";
-import { htmlLanguage } from "@codemirror/lang-html";
-import type { LRLanguage } from "@codemirror/language";
+import { LanguageDescription, type Language } from "@codemirror/language";
+import { languages } from "@codemirror/language-data";
 
 /** 1 つぶんの塊。`cls` が空なら色の付かない地の文。 */
 export interface Token {
@@ -23,30 +17,59 @@ export interface Token {
   cls: string;
 }
 
-const LANGUAGES: Record<string, LRLanguage> = {
-  js: javascriptLanguage,
-  javascript: javascriptLanguage,
-  mjs: javascriptLanguage,
-  cjs: javascriptLanguage,
-  json: javascriptLanguage,
-  jsx: jsxLanguage,
-  ts: typescriptLanguage,
-  typescript: typescriptLanguage,
-  tsx: tsxLanguage,
-  css: cssLanguage,
-  html: htmlLanguage,
-  htm: htmlLanguage,
-  svg: htmlLanguage,
-  xml: htmlLanguage,
-};
+/** 言語一覧。MD ペインのフェンスにも同じものを渡す（表を 2 つ持たない）。 */
+export { languages };
+
+/** 名前 → 読み込み済みの言語。null は「この名前に当たる言語は無い / 失敗」。 */
+const ready = new Map<string, Language | null>();
+let epoch = 0;
+let onReady: (() => void) | null = null;
 
 /**
- * フェンスの情報文字列から言語を取る。`js copy` のように後ろに語が続く
+ * 言語が読み終わったときに呼ばれる。描き直しを繋ぐために使う。
+ * 読み込みは非同期なので、これが無いと最初に出た色なしのままになる。
+ */
+export function onLanguageReady(fn: () => void): void {
+  onReady = fn;
+}
+
+/**
+ * 読み込みの世代。カードの署名に混ぜて、言語が増えたときに
+ * コードカードを作り直させる（署名が同じだと中身が据え置かれる）。
+ */
+export function languageEpoch(): number {
+  return epoch;
+}
+
+/**
+ * フェンスの情報文字列から言語名を取る。`js copy` のように後ろに語が続く
  * 書き方（GitHub などの行番号・コピー指定）があるので、最初の語だけ見る。
  */
-export function langOf(info: string): LRLanguage | null {
-  const first = info.trim().split(/[\s,]+/)[0]?.toLowerCase() ?? "";
-  return LANGUAGES[first] ?? null;
+function nameOf(info: string): string {
+  return info.trim().split(/[\s,]+/)[0]?.toLowerCase() ?? "";
+}
+
+/** 読み込み済みならその言語。まだなら null を返しつつ、裏で読み込む。 */
+function languageFor(info: string): Language | null {
+  const name = nameOf(info);
+  if (name === "") return null;
+  const hit = ready.get(name);
+  if (hit !== undefined) return hit;
+  // 読み込み中も「まだ無い」として扱う。二重に読みにいかせない印でもある
+  ready.set(name, null);
+  const desc = LanguageDescription.matchLanguageName(languages, name, true);
+  if (!desc) return null;
+  void desc
+    .load()
+    .then((support) => {
+      ready.set(name, support.language);
+      epoch++;
+      onReady?.();
+    })
+    .catch(() => {
+      /* 読めなければ色を付けないだけ */
+    });
+  return null;
 }
 
 /**
@@ -54,8 +77,8 @@ export function langOf(info: string): LRLanguage | null {
  * 行を繋いだ全体を一度に解析してから行へ割り直す。
  */
 export function tokenize(lines: string[], info: string): Token[][] {
-  const language = langOf(info);
   const plain = (): Token[][] => lines.map((text) => [{ text, cls: "" }]);
+  const language = languageFor(info);
   if (!language) return plain();
   try {
     const code = lines.join("\n");

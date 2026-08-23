@@ -16,6 +16,7 @@ import { deriveName } from "./app/name";
 import { initTheme } from "./app/theme";
 import { sweep } from "./app/persist";
 import { decidePaste } from "./app/paste";
+import { onLanguageReady } from "./map/highlight";
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -486,7 +487,10 @@ async function newFile(): Promise<void> {
     await io.close();
     savedText = "";
     loadText("", null);
-    mapPane.focus();
+    // フェンスの言語は後から読み込まれる。届いたら色を載せ直す
+onLanguageReady(() => map.render());
+
+mapPane.focus();
   } catch (err) {
     console.error("new file failed:", err);
     flashFilename("新規作成に失敗しました");
@@ -700,4 +704,7 @@ initTheme({
       flashFilename("前回のファイルを開けませんでした");
     });
 }
+// フェンスの言語は後から読み込まれる。届いたら色を載せ直す
+onLanguageReady(() => map.render());
+
 mapPane.focus();

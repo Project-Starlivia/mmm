@@ -19,7 +19,7 @@ import {
 } from "@codemirror/view";
 import { defaultKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { langOf } from "./map/highlight.ts";
+import { languages } from "./map/highlight.ts";
 import {
   defaultHighlightStyle,
   syntaxHighlighting,
@@ -99,10 +99,10 @@ export class MdEditor {
         extensions: [
           lineNumbers(),
           highlightField,
-          // フェンスの中も言語で色を付ける。言語表はマップのコードカードと
-          // 同じ langOf を使う — 同じフェンスが 2 つの窓で違う色になると、
-          // 食い違ったときに理由が説明できない
-          markdown({ codeLanguages: langOf }),
+          // フェンスの中も言語で色を付ける。言語一覧はマップのコードカードと
+          // 同じものを渡す — 同じフェンスが 2 つの窓で違う色になると、
+          // 食い違ったときに理由が説明できない。読み込みは CodeMirror が持つ
+          markdown({ codeLanguages: languages }),
           this.themeComp.of(DARK_EXT),
           EditorView.lineWrapping,
           keymap.of([indentWithTab, ...defaultKeymap]),
