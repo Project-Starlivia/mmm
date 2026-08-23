@@ -125,28 +125,35 @@ export function tokenizeBlock(text: string): Token[][] {
 }
 
 /**
- * 囲いそのもの（開き・閉じのバッククォート）が動く編集か。
- * **言語名は守らない** — そこはフェンスの一部だが、直せることが
- * その場で編集する理由の半分なので、意図して開けてある。
+ * 囲い（開き・閉じのバッククォート）が壊れる編集か。
+ * **言語名は守らない** — そこはフェンスの一部だが、直せることがその場で
+ * 編集する理由の半分なので、意図して開けてある。
+ *
+ * 挿入と削除で守る形が違う。削除は「閉じの手前の改行」まで含めないと
+ * 閉じが前の行にくっつくが、挿入で同じ範囲を塞ぐと、**本文の最終行の
+ * 末尾に打てなくなる**（その位置は改行の直前と同じ番号になる）。
  */
 export function touchesFence(text: string, from: number, to: number): boolean {
   const lines = text.split("\n");
   const open = /^(`{3,}|~{3,})/.exec(lines[0] ?? "");
   if (!open) return false;
+  const openEnd = open[1].length;
+
+  const tail = lines.length > 1 ? lines[lines.length - 1] : null;
   const marker = open[1][0];
-  const spans: [number, number][] = [[0, open[1].length]];
-  if (lines.length > 1) {
-    const tail = lines[lines.length - 1];
-    const trimmed = tail.trim();
-    if (
-      trimmed.length >= open[1].length &&
-      [...trimmed].every((c) => c === marker)
-    ) {
-      // 手前の改行ごと守る（消されると閉じが前の行にくっつく）
-      spans.push([text.length - tail.length - 1, text.length]);
-    }
+  const closed =
+    tail !== null &&
+    tail.trim().length >= openEnd &&
+    [...tail.trim()].every((c) => c === marker);
+  const closeStart = closed ? text.length - (tail as string).length : -1;
+
+  if (from === to) {
+    // 挿入。囲いの中へ割り込むか、開きより前へ押し出すものだけ止める
+    if (from < openEnd) return true;
+    return closed && from >= closeStart;
   }
-  return spans.some(([a, b]) =>
-    from === to ? a <= from && from < b : from < b && to > a,
-  );
+  // 削除・置換。閉じは手前の改行ごと守る
+  const spans: [number, number][] = [[0, openEnd]];
+  if (closed) spans.push([closeStart - 1, text.length]);
+  return spans.some(([a, b]) => from < b && to > a);
 }

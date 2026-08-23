@@ -29,10 +29,23 @@ test("touchesFence: 中身は自由に打てる", () => {
   assert.equal(touchesFence(BLOCK, bodyFrom, bodyFrom), false);
 });
 
+// 本文の最終行の末尾は、閉じの手前の改行と同じ番号になる。ここを塞ぐと
+// 「コードの末尾に書き足す」という一番よくある操作が通らなくなっていた。
+test("touchesFence: 本文の末尾に打てる（改行と番号が重なる位置）", () => {
+  const endOfBody = BLOCK.indexOf("const") + "const a = 1;".length;
+  assert.equal(touchesFence(BLOCK, endOfBody, endOfBody), false);
+});
+
+test("touchesFence: その改行を消すのは止める（閉じが前の行にくっつく）", () => {
+  const endOfBody = BLOCK.indexOf("const") + "const a = 1;".length;
+  assert.equal(touchesFence(BLOCK, endOfBody, endOfBody + 1), true);
+});
+
 test("touchesFence: 閉じは手前の改行ごと守る", () => {
   const closeAt = BLOCK.length - 3;
   assert.equal(touchesFence(BLOCK, closeAt, BLOCK.length), true);
   assert.equal(touchesFence(BLOCK, closeAt - 1, closeAt), true); // 改行だけ消す
+  assert.equal(touchesFence(BLOCK, closeAt, closeAt), true); // 閉じ行の頭に割り込む
   assert.equal(touchesFence(BLOCK, 0, BLOCK.length), true); // 全選択して消す
 });
 

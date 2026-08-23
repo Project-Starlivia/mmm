@@ -288,6 +288,7 @@ export class MindMap {
     // 言語は後から読み込まれる。開いている編集欄にも遅れて色を載せる
     if (this.codeEdit) this.paintCodeInk();
 
+
     // ---- DOM を差分更新する ----
     // 位置(transform)と class は毎回書き換えても安い。高いのは要素の生成と
     // 破棄なので、そこは「中身が変わったノードだけ」に絞る。
@@ -677,11 +678,13 @@ export class MindMap {
       Math.max(...lines.map((l) => measure(MONO_FONT, l))) + PAD * 2,
     );
     const hWorld = Math.max(rect.h, lines.length * CODE_LINE + PAD * 2);
+    const BORDER = 2; // 枠は拡大しない。box-sizing の分を足しておかないと
+    //                   最終行が 1〜2px 削れる
     const st = this.codeBox.style;
     st.left = `${rect.x * this.k + this.tx}px`;
     st.top = `${rect.y * this.k + this.ty}px`;
-    st.width = `${wWorld * this.k}px`;
-    st.height = `${hWorld * this.k}px`;
+    st.width = `${wWorld * this.k + BORDER}px`;
+    st.height = `${hWorld * this.k + BORDER}px`;
     // 字も枠と同じ倍率で拡縮する（ズームしても箱と字がずれない）
     st.fontSize = `${11 * this.k}px`;
     st.lineHeight = `${CODE_LINE * this.k}px`;
@@ -1314,10 +1317,6 @@ export class MindMap {
     this.codeEditor.addEventListener("input", () => {
       this.paintCodeInk();
       this.positionCodeEditor();
-    });
-    // 横に長い行を打つと textarea だけがスクロールするので、裏の層も揃える
-    this.codeEditor.addEventListener("scroll", () => {
-      this.codeInk.style.transform = `translate(${-this.codeEditor.scrollLeft}px, ${-this.codeEditor.scrollTop}px)`;
     });
 
     // keyboard, select mode

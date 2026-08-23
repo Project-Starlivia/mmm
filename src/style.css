@@ -343,7 +343,9 @@ html, body {
   caret-color: var(--accent);
   resize: none;
   outline: none;
-  overflow: auto;
+  /* 箱を中身に合わせて広げているので、はみ出しは起きない。
+     auto にすると使わないスクロールバーが場所を取って字がずれる */
+  overflow: hidden;
 }
 #code-editor textarea::selection { background: var(--accent-soft); }
 
