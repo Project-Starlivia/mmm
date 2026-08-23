@@ -304,6 +304,25 @@ html, body {
   display: none;
 }
 
+/* コードカードをその場で直す入力欄。カードの箱にぴったり重ねる
+   （枠は内側に描くので box-sizing で寸法を合わせる） */
+#code-editor {
+  position: absolute;
+  display: none;
+  box-sizing: border-box;
+  font-family: "Cascadia Code", Consolas, "JetBrains Mono", monospace;
+  padding: 4px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--ink);
+  outline: none;
+  resize: none;
+  white-space: pre;
+  overflow: auto;
+  z-index: 10;
+}
+
 #node-editor {
   position: absolute;
   display: none;

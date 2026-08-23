@@ -204,10 +204,8 @@ const host: MapHost = {
   nodes: () => nodes,
   docText: () => core.getText(),
   chooseImageFolder: () => void assets.chooseFolder(),
-  editText(from, to) {
-    // MD ペインが隠れていたら出してから渡す（飛び先が見えないと意味がない）
-    showPane("md");
-    editor.select(from, to);
+  replaceText(from, to, text) {
+    applySnap(core.replaceText(from, to, text, `c${++sessionN}`), "map");
   },
   deleteText(from, to) {
     // 行そのものを消す。残った改行が空行として居座らないよう、行末の
@@ -650,7 +648,7 @@ window.addEventListener(
 
 // ---------- pane / splitter / export / theme（実装は app/ 配下） ----------
 
-const { togglePane, togglePaneVis, showPane } = initPanes({
+const { togglePane, togglePaneVis } = initPanes({
   mdPane,
   mapPane,
   panesEl: $("panes"),

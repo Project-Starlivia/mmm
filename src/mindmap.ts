@@ -20,6 +20,7 @@ import {
   IMG_H,
   IMG_ROW,
   LINK_ROW,
+  rowH,
 } from "./map/cards";
 import {
   ROW_NORMAL,
@@ -40,8 +41,8 @@ export interface MapHost {
    * loading / until folder permission is granted */
   imageUrl(path: string): string | null;
   chooseImageFolder(): void;
-  /** マップから MD ペインへ飛んで、その範囲を選ぶ（コードカードの編集） */
-  editText(from: number, to: number): void;
+  /** その範囲を書き換える（コードカードをその場で直したとき） */
+  replaceText(from: number, to: number, text: string): void;
   /** その範囲を行ごと消す（画像カードの ×） */
   deleteText(from: number, to: number): void;
   selection(): Set<number>;
@@ -97,6 +98,7 @@ export class MindMap {
   private plusBtn: SVGGElement;
   private rubber: HTMLDivElement;
   private editor: HTMLInputElement;
+  private codeEditor: HTMLTextAreaElement;
   private hint: HTMLDivElement;
   private menu: HTMLDivElement;
 
@@ -144,6 +146,8 @@ export class MindMap {
   private hoverId = -1;
   /** 選んだ画像カード（文書上の位置で覚える。id は編集で変わらない） */
   private pickedImage: { from: number; to: number } | null = null;
+  /** その場で直しているコードブロック（文書上の位置） */
+  private codeEdit: { from: number; to: number } | null = null;
 
   // editing state
   editingId = -1;
@@ -190,6 +194,13 @@ export class MindMap {
     this.editor.id = "node-editor";
     this.editor.spellcheck = false;
     pane.append(this.editor);
+
+    // コードカードはその場で直す。ラベルと違って複数行なので textarea
+    this.codeEditor = document.createElement("textarea");
+    this.codeEditor.id = "code-editor";
+    this.codeEditor.spellcheck = false;
+    this.codeEditor.style.display = "none";
+    pane.append(this.codeEditor);
 
     this.hint = document.createElement("div");
     this.hint.id = "map-hint";
@@ -559,6 +570,83 @@ export class MindMap {
     if (mark === null) return null;
     const [from, to] = mark.split(",").map(Number);
     return Number.isFinite(from) && Number.isFinite(to) ? [from, to] : null;
+  }
+
+  /**
+   * コードカードの置かれている場所（world 座標）。描画の積み方をそのまま
+   * なぞって数える — 描画時に控えておく手もあるが、中身が変わっていない
+   * ノードは作り直しを飛ばすので、控えは歯抜けになる。
+   */
+  private codeRect(
+    from: number,
+    to: number,
+  ): { x: number; y: number; w: number; h: number } | null {
+    for (const b of this.boxes.values()) {
+      if (b.n.hidden) continue;
+      let rowY = ROW_NORMAL.rowH;
+      for (const r of b.rows) {
+        if (r.kind === "code" && r.from === from && r.to === to) {
+          return {
+            x: b.x + ROW_NORMAL.padX - 5,
+            y: b.y + rowY + 5,
+            w: b.w - (ROW_NORMAL.padX - 5) * 2,
+            h: r.lines.length * CODE_LINE + CODE_PAD * 2 - 10,
+          };
+        }
+        rowY += rowH(r);
+      }
+    }
+    return null;
+  }
+
+  /** コードカードをその場で開く。閉じるのは Esc / Mod+Enter / 他所クリック。 */
+  private beginCodeEdit(from: number, to: number): void {
+    const rect = this.codeRect(from, to);
+    if (!rect) return;
+    if (this.isEditing()) this.host.commitEdit();
+    this.codeEdit = { from, to };
+    this.codeEditor.value = this.host.docText().slice(from, to);
+    this.codeEditor.style.display = "block";
+    this.positionCodeEditor();
+    this.codeEditor.focus();
+    this.codeEditor.setSelectionRange(
+      this.codeEditor.value.length,
+      this.codeEditor.value.length,
+    );
+  }
+
+  private positionCodeEditor(): void {
+    if (!this.codeEdit) return;
+    const rect = this.codeRect(this.codeEdit.from, this.codeEdit.to);
+    if (!rect) {
+      this.endCodeEdit();
+      return;
+    }
+    const s = this.codeEditor.style;
+    s.left = `${rect.x * this.k + this.tx}px`;
+    s.top = `${rect.y * this.k + this.ty}px`;
+    s.width = `${rect.w * this.k}px`;
+    s.height = `${rect.h * this.k}px`;
+    s.fontSize = `${11 * this.k}px`;
+    s.lineHeight = `${CODE_LINE * this.k}px`;
+  }
+
+  /** 中身を文書へ返して閉じる。空にしたらブロックの中身が空になるだけ。 */
+  private commitCodeEdit(): void {
+    const at = this.codeEdit;
+    if (!at) return;
+    this.codeEdit = null;
+    this.codeEditor.style.display = "none";
+    const next = this.codeEditor.value;
+    if (next !== this.host.docText().slice(at.from, at.to)) {
+      this.host.replaceText(at.from, at.to, next);
+    }
+    this.pane.focus();
+  }
+
+  private endCodeEdit(): void {
+    this.codeEdit = null;
+    this.codeEditor.style.display = "none";
   }
 
   /** その画像カードが選ばれているか */
@@ -1031,7 +1119,7 @@ export class MindMap {
       const code = MindMap.span(this.markAt(e.clientX, e.clientY, "data-code"));
       if (code) {
         e.preventDefault();
-        this.host.editText(code[0], code[1]);
+        this.beginCodeEdit(code[0], code[1]);
         return;
       }
       // hit-test by position: pointer capture retargets the event to the
@@ -1069,7 +1157,9 @@ export class MindMap {
     });
 
     // open link cards
-    this.nodeLayer.addEventListener("click", (e) => {
+    // ペインに付ける。nodeLayer だと、ポインタキャプチャで
+    // イベントがペインへ付け替わったとき伝播経路から外れて届かない
+    pane.addEventListener("click", (e) => {
       const t = e.target as Element;
       // × は選択中の画像にだけ出ている。押されたらその行ごと消す
       const kill = MindMap.span(this.markAt(e.clientX, e.clientY, "data-kill"));
@@ -1141,6 +1231,19 @@ export class MindMap {
     this.editor.addEventListener("blur", () => {
       if (this.editingId !== -1) this.host.commitEdit();
     });
+
+    // コードの入力欄。Enter は改行なので、確定は Esc / Mod+Enter / 他所へ移る
+    this.codeEditor.addEventListener("keydown", (e) => {
+      e.stopPropagation(); // マップのショートカットへ流さない
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === "Escape" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) {
+        e.preventDefault();
+        this.commitCodeEdit();
+      }
+    });
+    this.codeEditor.addEventListener("blur", () => this.commitCodeEdit());
+    // 掴んで動かす・拡大する間も貼り付いて見えるように
+    this.codeEditor.addEventListener("input", () => this.positionCodeEditor());
 
     // keyboard, select mode
     pane.addEventListener("keydown", (e) => this.onKeydown(e));

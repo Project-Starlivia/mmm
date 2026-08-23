@@ -180,17 +180,6 @@ export class MdEditor {
     });
   }
 
-  /** その範囲を選んで画面に出し、打てる状態にする（マップからの飛び先）。 */
-  select(from: number, to: number): void {
-    const max = this.view.state.doc.length;
-    if (from < 0 || to > max || from > to) return;
-    this.view.dispatch({
-      selection: { anchor: from, head: to },
-      effects: EditorView.scrollIntoView(from, { y: "center" }),
-    });
-    this.view.focus();
-  }
-
   focus(): void {
     this.view.focus();
   }
