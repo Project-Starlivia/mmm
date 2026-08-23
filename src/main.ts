@@ -208,6 +208,16 @@ const host: MapHost = {
     showPane("md");
     editor.select(from, to);
   },
+  deleteText(from, to) {
+    // 行そのものを消す。残った改行が空行として居座らないよう、行末の
+    // 改行も一緒に持っていく（末尾の行なら手前の改行を巻き取る）
+    const text = core.getText();
+    let head = from;
+    let tail = to;
+    if (text[tail] === "\n") tail += 1;
+    else if (head > 0 && text[head - 1] === "\n") head -= 1;
+    applySnap(core.replaceText(head, tail, "", `x${++sessionN}`), "map");
+  },
   selection: () => selection,
   anchor: () => anchorId,
   setSelection: (ids, anchor, reveal) => setSelection(ids, anchor, reveal),

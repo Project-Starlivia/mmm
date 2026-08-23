@@ -15,7 +15,8 @@ export interface LinkInfo {
 /** One card row under the label, from the attached content. */
 export type CardRow =
   | { kind: "link"; link: LinkInfo }
-  | { kind: "img"; path: string; name: string }
+  // from/to はその行の文書上の位置（× で消すときに使う）
+  | { kind: "img"; path: string; name: string; from: number; to: number }
   | { kind: "svg"; markup: string }
   // from/to は本文（フェンスの内側）の文書上の位置。マップから MD ペインへ
   // 飛んで直せるように持つ
@@ -148,7 +149,13 @@ function rowsOfContent(text: string, base: number): CardRow[] {
     }
     const im = parseImage(lines[li]);
     if (im) {
-      list.push({ kind: "img", path: im.path, name: im.name });
+      list.push({
+        kind: "img",
+        path: im.path,
+        name: im.name,
+        from: lineAt[li],
+        to: lineAt[li] + lines[li].length,
+      });
     } else {
       const l = parseLink(lines[li]);
       if (l) list.push({ kind: "link", link: l });

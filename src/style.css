@@ -206,6 +206,22 @@ html, body {
   font-size: 11px;
   fill: var(--ink-dim);
 }
+/* 選んだ画像の枠と、その右上の × */
+.node rect.img-picked {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  pointer-events: none;
+}
+.node .img-kill { cursor: pointer; }
+.node .img-kill circle { fill: var(--accent); }
+.node .img-kill text {
+  fill: #fff;
+  font-size: 13px;
+  pointer-events: none;
+}
+.node .img-kill:hover circle { fill: #e5534b; }
+
 .node rect.code-bg { fill: var(--bg); stroke: var(--node-border); stroke-width: 1; }
 .node text.code-line {
   font-family: "Cascadia Code", Consolas, "JetBrains Mono", monospace;

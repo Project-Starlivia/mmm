@@ -13,7 +13,14 @@ import {
   midOfPolyline,
 } from "./map/geometry";
 import { edgeDraw, edgeHintPath, edgeSegs, flattenSegs } from "./map/edge";
-import { CODE_LINE, CODE_PAD, IMG_H, IMG_ROW, LINK_ROW } from "./map/cards";
+import {
+  type CardRow,
+  CODE_LINE,
+  CODE_PAD,
+  IMG_H,
+  IMG_ROW,
+  LINK_ROW,
+} from "./map/cards";
 import {
   ROW_NORMAL,
   displayLabel,
@@ -35,6 +42,8 @@ export interface MapHost {
   chooseImageFolder(): void;
   /** マップから MD ペインへ飛んで、その範囲を選ぶ（コードカードの編集） */
   editText(from: number, to: number): void;
+  /** その範囲を行ごと消す（画像カードの ×） */
+  deleteText(from: number, to: number): void;
   selection(): Set<number>;
   anchor(): number;
   setSelection(ids: number[], anchor: number, reveal?: boolean): void;
@@ -133,6 +142,8 @@ export class MindMap {
   private dropMarks = new Map<number, "drop-child" | "drop-parent">();
   private dropEdgeId: number | null = null;
   private hoverId = -1;
+  /** 選んだ画像カード（文書上の位置で覚える。id は編集で変わらない） */
+  private pickedImage: { from: number; to: number } | null = null;
 
   // editing state
   editingId = -1;
@@ -430,11 +441,14 @@ export class MindMap {
           rowY += h;
         } else {
           const url = this.host.imageUrl(r.path);
+          const spot = `${r.from},${r.to}`;
+          const imgW = b.w - ROW_NORMAL.padX * 2;
           if (url !== null) {
             const img = svgEl("image", {
+              "data-image": spot,
               x: String(ROW_NORMAL.padX),
               y: String(rowY + 6),
-              width: String(b.w - ROW_NORMAL.padX * 2),
+              width: String(imgW),
               height: String(IMG_H),
               preserveAspectRatio: "xMidYMid meet",
             });
@@ -446,7 +460,7 @@ export class MindMap {
             g.append(
               svgEl("rect", {
                 class: "img-ph",
-                "data-image": r.path,
+                "data-image": spot,
                 x: String(ROW_NORMAL.padX),
                 y: String(rowY + 6),
                 width: String(b.w - ROW_NORMAL.padX * 2),
@@ -456,13 +470,41 @@ export class MindMap {
             );
             const ph = svgEl("text", {
               class: "img-name",
-              "data-image": r.path,
+              "data-image": spot,
               x: String(b.w / 2),
               y: String(rowY + 6 + IMG_H / 2),
               "text-anchor": "middle",
             });
             ph.textContent = r.name;
             g.append(ph);
+          }
+          if (this.isPicked(r)) {
+            g.append(
+              svgEl("rect", {
+                class: "img-picked",
+                x: String(ROW_NORMAL.padX),
+                y: String(rowY + 6),
+                width: String(imgW),
+                height: String(IMG_H),
+                rx: "6",
+              }),
+            );
+            // × は画像の右上の角に重ねる
+            const cx = ROW_NORMAL.padX + imgW - 11;
+            const cy = rowY + 6 + 11;
+            const kill = svgEl("g", { class: "img-kill", "data-kill": spot });
+            kill.append(
+              svgEl("circle", { cx: String(cx), cy: String(cy), r: "9" }),
+            );
+            const mark = svgEl("text", {
+              x: String(cx),
+              y: String(cy),
+              "text-anchor": "middle",
+              "dominant-baseline": "central",
+            });
+            mark.textContent = "×";
+            kill.append(mark);
+            g.append(kill);
           }
           rowY += IMG_ROW;
         }
@@ -503,6 +545,16 @@ export class MindMap {
     this.positionEditor();
   }
 
+  /** その画像カードが選ばれているか */
+  private isPicked(r: CardRow): boolean {
+    return (
+      r.kind === "img" &&
+      this.pickedImage !== null &&
+      this.pickedImage.from === r.from &&
+      this.pickedImage.to === r.to
+    );
+  }
+
   private contentSig(n: NodeInfo, b: Box, buried: number): string {
     // 値どうしは本文に出ない制御文字で区切る。連結だけだと
     // lang "ts"+行 "x" と lang "t"+行 "sx" のような別内容が同じ署名になる
@@ -512,7 +564,10 @@ export class MindMap {
       if (r.kind === "link") s += `|L${r.link.title}${SEP}${r.link.url}`;
       else if (r.kind === "svg") s += `|S${r.markup}`;
       else if (r.kind === "code") s += `|C${r.lang}${SEP}${r.lines.join(SEP)}`;
-      else s += `|I${r.path}${SEP}${this.host.imageUrl(r.path) ?? ""}`;
+      else
+        s +=
+          `|I${r.path}${SEP}${this.host.imageUrl(r.path) ?? ""}` +
+          (this.isPicked(r) ? `${SEP}picked` : "");
     }
     return s;
   }
@@ -1004,8 +1059,28 @@ export class MindMap {
     // open link cards
     this.nodeLayer.addEventListener("click", (e) => {
       const t = e.target as Element;
-      if (t.closest?.("[data-image]")) {
-        this.host.chooseImageFolder();
+      // × は選択中の画像にだけ出ている。押されたらその行ごと消す
+      const kill = t.closest?.("[data-kill]");
+      if (kill) {
+        const [from, to] = (kill.getAttribute("data-kill") ?? "")
+          .split(",")
+          .map(Number);
+        this.pickedImage = null;
+        if (Number.isFinite(from) && Number.isFinite(to)) {
+          this.host.deleteText(from, to);
+        }
+        return;
+      }
+      const pick = t.closest?.("[data-image]");
+      if (pick) {
+        const [from, to] = (pick.getAttribute("data-image") ?? "")
+          .split(",")
+          .map(Number);
+        if (Number.isFinite(from) && Number.isFinite(to)) {
+          const same = this.pickedImage?.from === from;
+          this.pickedImage = same ? null : { from, to };
+          this.render();
+        }
         return;
       }
       if (!t.classList?.contains("link-open")) return;
@@ -1591,6 +1666,13 @@ export class MindMap {
         key: "Mod+V",
         run: () => this.host.paste(),
         disabled: multi,
+      },
+      "sep",
+      {
+        // 画像の入口はクリックから外れた（クリックは選択）。ここが唯一の
+        // 出入り口になるので、ノードに画像が無くても出す
+        label: "画像フォルダを選ぶ",
+        run: () => this.host.chooseImageFolder(),
       },
       "sep",
       { label: "削除", key: "Del", run: () => this.host.deleteSelection() },
