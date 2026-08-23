@@ -631,7 +631,7 @@ window.addEventListener(
 
 // ---------- pane / splitter / export / theme（実装は app/ 配下） ----------
 
-const { togglePane } = initPanes({
+const { togglePane, togglePaneVis } = initPanes({
   mdPane,
   mapPane,
   panesEl: $("panes"),
@@ -639,6 +639,19 @@ const { togglePane } = initPanes({
   mdButton: $<HTMLButtonElement>("btn-view-md"),
   mapButton: $<HTMLButtonElement>("btn-view-map"),
   focusEditor: () => editor.focus(),
+});
+
+// ペインの表示/非表示は Alt+数字（左から 1, 2）。
+// 矢印は使えない — Ctrl+←→ はテキスト欄の単語移動で、書いている最中に一番使う。
+// Ctrl+数字（タブ切替）・Ctrl+J（ダウンロード）・Ctrl+Shift+R（再読込）は
+// ブラウザの予約。Alt+数字はどちらにも触らず、JIS でも物理位置が動かない。
+window.addEventListener("keydown", (e) => {
+  if (e.isComposing || e.keyCode === 229) return;
+  if (!e.altKey || e.ctrlKey || e.metaKey) return;
+  const pane = { "1": "md", "2": "map" }[e.key] as "md" | "map" | undefined;
+  if (!pane) return;
+  e.preventDefault();
+  togglePaneVis(pane);
 });
 initExport({
   map,

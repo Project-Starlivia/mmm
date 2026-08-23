@@ -1176,20 +1176,10 @@ export class MindMap {
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const cur = byId.get(anchor);
     if (!cur) return;
+    // 行き先は Shift の有無で変わらない。Shift はそこを選択に足すだけで、
+    // 「移動の道筋」と「選択の広げ方」を別々に覚えなくてよくする。
     let next = -1;
     if (key === "ArrowUp" || key === "ArrowDown") {
-      if (e.shiftKey) {
-        // extend by display order; anchor edge stays (spec 3.4)
-        const idx = this.order.indexOf(anchor);
-        const j = idx + (key === "ArrowUp" ? -1 : 1);
-        if (j < 0 || j >= this.order.length) return;
-        const nx = this.order[j];
-        const set = new Set(sel);
-        if (set.has(nx) && sel.size > 1) set.delete(anchor);
-        else set.add(nx);
-        this.host.setSelection([...set], nx);
-        return;
-      }
       // 同じ深さの列を文書順（= 画面の上から下）に辿り、端でループする。
       // 兄弟に限らずいとこも含む — 見えている限り、その階層は 1 本の列。
       // 親が畳まれて埋もれたノードは列に入れない（選べないものへは飛べない）。
@@ -1207,10 +1197,18 @@ export class MindMap {
           nodes.find((n) => n.parent === anchor && this.boxes.has(n.id))?.id ??
           -1;
     }
-    if (next !== -1 && next !== undefined) {
+    if (next === -1 || next === undefined) return;
+    if (e.shiftKey) {
+      // 伸ばす。既に入っている先へ戻ったら、今いた側を外して縮める
+      // （行きすぎたぶんを引っ込められる）
+      const set = new Set(sel);
+      if (set.has(next) && sel.size > 1) set.delete(anchor);
+      else set.add(next);
+      this.host.setSelection([...set], next);
+    } else {
       this.host.setSelection([next], next);
-      this.ensureVisible(next);
     }
+    this.ensureVisible(next);
   }
 
   // ---------- drag re-parenting ----------

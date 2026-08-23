@@ -11,7 +11,7 @@ export function initPanes(args: {
   mapButton: HTMLButtonElement;
   /** md 側のフォーカスは CodeMirror が持つので注入 */
   focusEditor: () => void;
-}): { togglePane: () => void } {
+}): { togglePane: () => void; togglePaneVis: (which: "md" | "map") => void } {
   const { mdPane, mapPane, panesEl, splitter, mdButton, mapButton } = args;
   let paneVis = { md: true, map: true };
 
@@ -87,5 +87,5 @@ export function initPanes(args: {
   // ボタンのオン/オフ表示を初期化するため、既定でも必ず一度通す
   applyPaneVis({ md: true, map: true });
 
-  return { togglePane };
+  return { togglePane, togglePaneVis };
 }
