@@ -777,7 +777,10 @@ export class MindMap {
       this.hideMenu();
       pane.focus();
 
-      if (e.button === 0 && this.spaceDown) {
+      // パンは 2 つ入り口を持つ: 中クリックはマウスだけで完結し、
+      // Space+ドラッグはキーボードに手がある時に届く。担当する手が
+      // 違うので、片方だけでは塞がる場面がある
+      if (e.button === 1 || (e.button === 0 && this.spaceDown)) {
         this.panning = {
           px: e.clientX,
           py: e.clientY,
