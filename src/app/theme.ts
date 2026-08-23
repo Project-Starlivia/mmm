@@ -1,14 +1,42 @@
-// ライト/ダークの切り替え (mmm.md そのに: default = OS, fallback dark)。
-// 暗い部屋で目が痛いのは実用の問題なので残す。ブランドカラーは趣味の
-// 問題なので持たない — 色は style.css の --accent に固定。
+// 見た目の好み: ブランドカラー (mmm.md 課題: カラーピッカー) と
+// ライト/ダーク (mmm.md そのに: default = OS, fallback dark)。
+// どちらも保存して、次のセッションでもそのまま。
 
-import { LS_THEME, load, store } from "./persist.ts";
+import { LS_COLOR, LS_THEME, load, store } from "./persist.ts";
 import { logoInner, logoSvg } from "./logo.ts";
+
+/** 既定のブランドカラー。style.css の `--accent` の初期値と同じ。 */
+const DEFAULT_COLOR = "#5932ff";
+
+/** favicon は data URL なので、色を実値で埋める必要がある。 */
+function applyFavicon(color: string): void {
+  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "icon";
+    document.head.append(link);
+  }
+  link.href = `data:image/svg+xml,${encodeURIComponent(logoSvg(color))}`;
+}
+
+function applyColor(hex: string): void {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return;
+  const c = `#${m[1]}`;
+  const r = parseInt(m[1].slice(0, 2), 16);
+  const g = parseInt(m[1].slice(2, 4), 16);
+  const b = parseInt(m[1].slice(4, 6), 16);
+  const rootStyle = document.documentElement.style;
+  rootStyle.setProperty("--accent", c);
+  rootStyle.setProperty("--accent-soft", `rgba(${r}, ${g}, ${b}, 0.2)`);
+  applyFavicon(c);
+  store(LS_COLOR, c);
+}
 
 export type Theme = "light" | "dark";
 
 /**
- * テーマの配線と保存値の復元。
+ * カラーとテーマの配線と、保存値の復元。
  * `setEditorTheme` は CodeMirror 側のテーマ切り替え（DOM の外なので注入）。
  */
 export function initTheme(args: {
@@ -18,19 +46,34 @@ export function initTheme(args: {
 }): void {
   const { logo, themeButton } = args;
 
-  // 形の源は logo.ts ひとつ（静的ファイルに複製すると、以前のように片方だけ
-  // 左右が反転していても誰も気づけない）。色の源は style.css の --accent
-  // ひとつ。favicon は data URL なので色を実値で埋める必要があり、ここでだけ
-  // CSS から読み出す。
+  // ロゴの形の源は logo.ts ひとつ。topbar も favicon もここから作る
+  // （静的ファイルに複製すると、以前のように片方だけ左右が反転していても
+  // 誰も気づけない）。色は currentColor = --accent。
   logo.insertAdjacentHTML("beforeend", logoInner());
-  const accent = getComputedStyle(document.documentElement)
-    .getPropertyValue("--accent")
-    .trim();
-  const icon = document.createElement("link");
-  icon.rel = "icon";
-  icon.href = `data:image/svg+xml,${encodeURIComponent(logoSvg(accent))}`;
-  document.head.append(icon);
 
+  // ---- ブランドカラー ----
+  const colorInput = document.createElement("input");
+  colorInput.type = "color";
+  // ロゴの下に（見えない形で）置く。ネイティブのピッカーが画面外ではなく
+  // 左上に開くようにするため (mmm.md そのに)
+  colorInput.style.position = "fixed";
+  colorInput.style.left = "10px";
+  colorInput.style.top = "10px";
+  colorInput.style.width = "24px";
+  colorInput.style.height = "24px";
+  colorInput.style.opacity = "0";
+  colorInput.style.pointerEvents = "none";
+  document.body.append(colorInput);
+  colorInput.addEventListener("input", () => applyColor(colorInput.value));
+  logo.addEventListener("click", () => {
+    const cur = getComputedStyle(document.documentElement)
+      .getPropertyValue("--accent")
+      .trim();
+    colorInput.value = /^#[0-9a-f]{6}$/i.test(cur) ? cur : DEFAULT_COLOR;
+    colorInput.click();
+  });
+
+  // ---- ライト / ダーク ----
   const applyTheme = (t: Theme): void => {
     document.documentElement.classList.toggle("light", t === "light");
     args.setEditorTheme(t !== "light");
@@ -43,7 +86,9 @@ export function initTheme(args: {
     );
   });
 
+  // ---- 復元 ----
   const stored = load(LS_THEME) as Theme | null;
   const osLight = window.matchMedia?.("(prefers-color-scheme: light)").matches;
   applyTheme(stored ?? (osLight ? "light" : "dark"));
+  applyColor(load(LS_COLOR) ?? DEFAULT_COLOR);
 }

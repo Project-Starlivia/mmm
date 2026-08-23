@@ -72,7 +72,9 @@ html, body {
   height: 22px;
   display: block;
   color: var(--accent);
+  cursor: pointer;
 }
+#logo:hover { filter: brightness(1.25); }
 #filename { color: var(--ink-dim); font-size: 13px; }
 #filename.error { color: #e5534b; }
 #dirty { color: var(--accent); font-size: 10px; }
@@ -181,29 +183,6 @@ html, body {
   fill: var(--ink);
   white-space: pre;
 }
-/* 色は @lezer/highlight の classHighlighter が付ける tok-* に対応させる。
-   全部を塗り分けはしない — カードは 6 行のプレビューで、細かく分けるほど
-   小さい字が読みにくくなる。意味の大きい 6 系統だけ。 */
-.node text.code-line .tok-keyword,
-.node text.code-line .tok-modifier,
-.node text.code-line .tok-operatorKeyword { fill: var(--tok-keyword); }
-.node text.code-line .tok-string,
-.node text.code-line .tok-string2,
-.node text.code-line .tok-regexp { fill: var(--tok-string); }
-.node text.code-line .tok-number,
-.node text.code-line .tok-bool,
-.node text.code-line .tok-atom { fill: var(--tok-number); }
-.node text.code-line .tok-comment,
-.node text.code-line .tok-lineComment,
-.node text.code-line .tok-blockComment { fill: var(--tok-comment); font-style: italic; }
-.node text.code-line .tok-variableName,
-.node text.code-line .tok-propertyName,
-.node text.code-line .tok-function,
-.node text.code-line .tok-attributeName { fill: var(--tok-name); }
-.node text.code-line .tok-typeName,
-.node text.code-line .tok-className,
-.node text.code-line .tok-tagName,
-.node text.code-line .tok-namespace { fill: var(--tok-type); }
 .node text.label.empty { fill: var(--ink-dim); }
 .node line.card-sep { stroke: var(--node-border); stroke-width: 1; }
 .node text.link-row {
@@ -234,6 +213,29 @@ html, body {
   fill: var(--ink);
   white-space: pre;
 }
+/* 色は @lezer/highlight の classHighlighter が付ける tok-* に対応させる。
+   全部を塗り分けはしない — カードは 6 行のプレビューで、細かく分けるほど
+   小さい字が読みにくくなる。意味の大きい 6 系統だけ。 */
+.node text.code-line .tok-keyword,
+.node text.code-line .tok-modifier,
+.node text.code-line .tok-operatorKeyword { fill: var(--tok-keyword); }
+.node text.code-line .tok-string,
+.node text.code-line .tok-string2,
+.node text.code-line .tok-regexp { fill: var(--tok-string); }
+.node text.code-line .tok-number,
+.node text.code-line .tok-bool,
+.node text.code-line .tok-atom { fill: var(--tok-number); }
+.node text.code-line .tok-comment,
+.node text.code-line .tok-lineComment,
+.node text.code-line .tok-blockComment { fill: var(--tok-comment); font-style: italic; }
+.node text.code-line .tok-variableName,
+.node text.code-line .tok-propertyName,
+.node text.code-line .tok-function,
+.node text.code-line .tok-attributeName { fill: var(--tok-name); }
+.node text.code-line .tok-typeName,
+.node text.code-line .tok-className,
+.node text.code-line .tok-tagName,
+.node text.code-line .tok-namespace { fill: var(--tok-type); }
 .node.selected rect.box {
   stroke: var(--accent);
   stroke-width: 2;

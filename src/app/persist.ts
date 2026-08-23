@@ -1,12 +1,13 @@
 // 永続化の器。
 //
-// **持つのはテーマだけ**。文書の控えもファイルハンドルも持たない
-// （ハンドルは IndexedDB の app/handles.ts が扱う）。
+// **持つのは見た目の好みだけ**（テーマとブランドカラー）。文書の控えも
+// ファイルハンドルも持たない（ハンドルは IndexedDB の app/handles.ts が扱う）。
 
 export const LS_THEME = "mmm.theme";
+export const LS_COLOR = "mmm.color";
 
 /** いま意味のあるキー。ここに無い `mmm.*` は過去の遺物として捨てる。 */
-const OWNED: readonly string[] = [LS_THEME];
+const OWNED: readonly string[] = [LS_THEME, LS_COLOR];
 
 /**
  * localStorage への読み書き。容量オーバーや無効化で例外が飛ぶので、
@@ -35,8 +36,7 @@ export function load(key: string): string | null {
  * 役目を終えた `mmm.*` を捨てる。消えたキーの名前を並べる移行リストは
  * 増え続けて誰も消せなくなるので、持ち物のほうを宣言して残りを掃く。
  * これまでに捨てたもの: text / savedText（.md と二重の真実になる）、
- * fileName / eol（読めば分かる）、panes / folderQuiet / edgeTune / migrated、
- * color（ブランドカラーは持たないと決めた）。
+ * fileName / eol（読めば分かる）、panes / folderQuiet / edgeTune / migrated。
  */
 export function sweep(): void {
   try {
