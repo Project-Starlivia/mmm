@@ -1,8 +1,5 @@
 node_modules/
 dist/
 core/_build/
-src-tauri/target/
-src-tauri/gen/
-src-tauri/app-icon.svg
 .idea/
 .worktrees/
