@@ -545,6 +545,22 @@ export class MindMap {
     this.positionEditor();
   }
 
+  /**
+   * その座標にある要素から印を辿る。`e.target` は当てにしない —
+   * ドラッグのためにペインがポインタキャプチャを取ると、以降のイベントは
+   * ペインへ付け替えられ、target が実際に押した要素を指さなくなる。
+   */
+  private markAt(x: number, y: number, attr: string): string | null {
+    const el = document.elementFromPoint(x, y);
+    return el?.closest?.(`[${attr}]`)?.getAttribute(attr) ?? null;
+  }
+
+  private static span(mark: string | null): [number, number] | null {
+    if (mark === null) return null;
+    const [from, to] = mark.split(",").map(Number);
+    return Number.isFinite(from) && Number.isFinite(to) ? [from, to] : null;
+  }
+
   /** その画像カードが選ばれているか */
   private isPicked(r: CardRow): boolean {
     return (
@@ -1011,16 +1027,11 @@ export class MindMap {
       if ((e.target as Element).classList?.contains("link-open")) return;
       // コードカードはラベルではなく本文を直すので、MD ペインへ渡す。
       // 編集の場所を 2 つ持たない — 隣に本物のエディタが出ている
-      const code = (e.target as Element).closest?.("[data-code]");
+      const code = MindMap.span(this.markAt(e.clientX, e.clientY, "data-code"));
       if (code) {
-        const [from, to] = (code.getAttribute("data-code") ?? "")
-          .split(",")
-          .map(Number);
-        if (Number.isFinite(from) && Number.isFinite(to)) {
-          e.preventDefault();
-          this.host.editText(from, to);
-          return;
-        }
+        e.preventDefault();
+        this.host.editText(code[0], code[1]);
+        return;
       }
       // hit-test by position: pointer capture retargets the event to the
       // pane, so e.target never points at the node that was clicked
@@ -1060,27 +1071,17 @@ export class MindMap {
     this.nodeLayer.addEventListener("click", (e) => {
       const t = e.target as Element;
       // × は選択中の画像にだけ出ている。押されたらその行ごと消す
-      const kill = t.closest?.("[data-kill]");
+      const kill = MindMap.span(this.markAt(e.clientX, e.clientY, "data-kill"));
       if (kill) {
-        const [from, to] = (kill.getAttribute("data-kill") ?? "")
-          .split(",")
-          .map(Number);
         this.pickedImage = null;
-        if (Number.isFinite(from) && Number.isFinite(to)) {
-          this.host.deleteText(from, to);
-        }
+        this.host.deleteText(kill[0], kill[1]);
         return;
       }
-      const pick = t.closest?.("[data-image]");
+      const pick = MindMap.span(this.markAt(e.clientX, e.clientY, "data-image"));
       if (pick) {
-        const [from, to] = (pick.getAttribute("data-image") ?? "")
-          .split(",")
-          .map(Number);
-        if (Number.isFinite(from) && Number.isFinite(to)) {
-          const same = this.pickedImage?.from === from;
-          this.pickedImage = same ? null : { from, to };
-          this.render();
-        }
+        const same = this.pickedImage?.from === pick[0];
+        this.pickedImage = same ? null : { from: pick[0], to: pick[1] };
+        this.render();
         return;
       }
       if (!t.classList?.contains("link-open")) return;
