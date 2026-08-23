@@ -21,7 +21,8 @@ core/   MoonBit — ドキュメントモデル。テキストが唯一の真実
   api.mbt      スナップショット契約 / js/ エクスポート層(#export_name)
 src/    TypeScript — UI
   coreApi.ts   MoonBit core への型付きラッパー
-  editor.ts    Markdown ペイン(CodeMirror 6、履歴はコアに委譲)
+  editor.ts    Markdown ペイン(CodeMirror 6、履歴はコアに委譲。フェンスの
+               中は map/highlight.ts と同じ言語表で色を付ける)
   mindmap.ts   マインドマップペイン(DOM 差分更新と入力処理)
   relevel.ts   貼り付けた見出しの深さを読み替える
   style.css    全体のスタイル
