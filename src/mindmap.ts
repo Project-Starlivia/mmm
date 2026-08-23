@@ -154,6 +154,8 @@ export class MindMap {
   private hoverId = -1;
   /** 選んだ画像カード（文書上の位置で覚える。id は編集で変わらない） */
   private pickedImage: { from: number; to: number } | null = null;
+  /** 直前に描いたときの選択。変わったら画像の選択は落とす */
+  private lastSelSig = "";
   /** その場で直しているコードブロック（文書上の位置） */
   private codeEdit: { from: number; to: number } | null = null;
 
@@ -521,8 +523,8 @@ export class MindMap {
             // × は角そのものに載せる。枠線がボタンの中心を通る位置
             const cx = ROW_NORMAL.padX + imgW;
             const cy = rowY + 6;
-            const R = 9;
-            const arm = 3.2; // 中心からの腕の長さ
+            const R = 7;
+            const arm = 2.5; // 中心からの腕の長さ
             const kill = svgEl("g", { class: "img-kill", "data-kill": spot });
             kill.append(
               svgEl("circle", { cx: String(cx), cy: String(cy), r: String(R) }),
@@ -1892,6 +1894,17 @@ export class MindMap {
   /** Cheap selection repaint without a full re-layout (rubber band path). */
   refreshSelection(): void {
     const sel = this.host.selection();
+    // ノードの選択が動いたら、画像の選択は連れて行かない。選ばれている
+    // ものが 2 種類あると、× が何に効くのか分からなくなる。
+    // ここは選択が動く唯一の入口（render は通らない）
+    const selSig = [...sel].sort((a, b) => a - b).join(",");
+    if (selSig !== this.lastSelSig) {
+      this.lastSelSig = selSig;
+      if (this.pickedImage) {
+        this.pickedImage = null;
+        this.render(); // × を消すには中身を作り直す必要がある
+      }
+    }
     for (const [id, g] of this.nodeEls) {
       g.classList.toggle("selected", sel.has(id));
       // class を直接触ったらキャッシュも合わせる。放置すると次の render が
