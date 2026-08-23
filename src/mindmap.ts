@@ -5,7 +5,7 @@
 // Layout: every tree grows from left to right.
 
 import type { NodeInfo } from "./coreApi";
-import { clipTokens, tokenize } from "./map/highlight.ts";
+import { tokenize } from "./map/highlight.ts";
 import {
   centerOf,
   distToSeg,
@@ -15,9 +15,7 @@ import {
 import { edgeDraw, edgeHintPath, edgeSegs, flattenSegs } from "./map/edge";
 import { CODE_LINE, CODE_PAD, IMG_H, IMG_ROW, LINK_ROW } from "./map/cards";
 import {
-  MONO_FONT,
   ROW_NORMAL,
-  clipLabel,
   displayLabel,
   hiddenLabel,
   measure,
@@ -343,7 +341,7 @@ export class MindMap {
       });
       label.textContent = n.hidden
         ? hiddenLabel(n, buriedCount)
-        : clipLabel(displayLabel(n.label));
+        : displayLabel(n.label);
       const t = svgEl("title");
       t.textContent = n.hidden
         ? `${n.label}${buriedCount ? `\n（${buriedCount} 件を折り畳み中。Shift+H で戻す）` : "\n（非表示。Shift+H で戻す）"}`
@@ -368,7 +366,7 @@ export class MindMap {
             x: String(ROW_NORMAL.padX),
             y: String(rowY + LINK_ROW / 2),
           });
-          title.textContent = clipLabel(r.link.title);
+          title.textContent = r.link.title;
           const tt = svgEl("title");
           tt.textContent = r.link.url;
           const open = svgEl("text", {
@@ -422,7 +420,7 @@ export class MindMap {
               y: String(rowY + CODE_PAD + i * CODE_LINE + CODE_LINE / 2),
             });
             // 幅の判断は素の文字列で行い、色の付いた塊をそこへ合わせる
-            for (const t of clipTokens(tokens[i], clipLabel(r.lines[i], MONO_FONT))) {
+            for (const t of tokens[i]) {
               const span = svgEl("tspan", t.cls === "" ? {} : { class: t.cls });
               span.textContent = t.text;
               ln.append(span);

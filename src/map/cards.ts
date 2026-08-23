@@ -28,7 +28,6 @@ export const IMG_MIN_W = 200; // image/svg content is at least this wide (before
 export const CODE_LINE = 15; // height of one preview line in a code row
 export const CODE_PAD = 8; // vertical padding inside a code row
 export const CODE_MAX_LINES = 6; // longer blocks are cut with a trailing …
-export const CARD_MAX_ROWS = 4; // 1 ノードに出すカード行の上限
 
 /** カード行 1 つぶんの高さ */
 export const rowH = (r: CardRow): number =>
@@ -103,7 +102,7 @@ function rowsOfContent(text: string, base: number): CardRow[] {
     off += lines[i].length + 1;
   }
   const list: CardRow[] = [];
-  for (let li = 0; li < lines.length && list.length < CARD_MAX_ROWS; li++) {
+  for (let li = 0; li < lines.length; li++) {
     const t = lines[li].trim();
     // fenced code block
     const fence = /^(`{3,}|~{3,})\s*(\S*)\s*$/.exec(t);

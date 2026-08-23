@@ -13,7 +13,6 @@
 import type { NodeInfo } from "../coreApi.ts";
 import { type CardRow, rowH, IMG_MIN_W } from "./cards.ts";
 
-export const MAX_LABEL_W = 340;
 export const HIDDEN_MAX_W = 150; // hidden nodes never grow past this
 
 const UI_FAMILY = '"Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif';
@@ -66,9 +65,11 @@ export function measure(font: string, text: string): number {
 
 /**
  * 幅 maxW に収まるところで「…」を付けて詰める。
+ * **通常のノードは詰めない** — 使うのは折り畳み表示だけ（そこは「小さく畳む」
+ * ことが目的なので、長いラベルをそのまま出すと意味が無くなる）。
  * slice はサロゲートペアを割らないよう、切り口が上位サロゲートなら 1 つ戻す。
  */
-export function clipLabel(label: string, font = ROW_NORMAL.font, maxW = MAX_LABEL_W): string {
+export function clipLabel(label: string, font: string, maxW: number): string {
   if (measure(font, label) <= maxW) return label;
   let lo = 0;
   let hi = label.length;
@@ -112,7 +113,7 @@ export function nodeSize(n: NodeInfo, rows: CardRow[], buried: number): { w: num
     return { w, h: ROW_HIDDEN.rowH };
   }
   const label = displayLabel(n.label);
-  let w = Math.min(measure(ROW_NORMAL.font, label), MAX_LABEL_W);
+  let w = measure(ROW_NORMAL.font, label);
   let h = ROW_NORMAL.rowH;
   for (const r of rows) {
     h += rowH(r);
@@ -120,10 +121,10 @@ export function nodeSize(n: NodeInfo, rows: CardRow[], buried: number): { w: num
       w = Math.max(w, IMG_MIN_W);
     } else if (r.kind === "code") {
       for (const ln of r.lines) {
-        w = Math.max(w, Math.min(measure(MONO_FONT, ln), MAX_LABEL_W) + 12);
+        w = Math.max(w, measure(MONO_FONT, ln) + 12);
       }
     } else {
-      w = Math.max(w, Math.min(measure(CARD_FONT, r.link.title), MAX_LABEL_W) + 22);
+      w = Math.max(w, measure(CARD_FONT, r.link.title) + 22);
     }
   }
   // w はここまで content 幅（左右パディング抜き）。最終的な箱の幅は

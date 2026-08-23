@@ -73,22 +73,3 @@ export function tokenize(lines: string[], info: string): Token[][] {
     return plain();
   }
 }
-
-/**
- * 表示できる幅に合わせて塊を切り詰める。`clipped` は同じ行を素の文字列として
- * 切った結果で、末尾の `…` を含む。塊の側もそこに合わせて短くする。
- */
-export function clipTokens(tokens: Token[], clipped: string): Token[] {
-  const ellipsis = clipped.endsWith("…");
-  const budget = ellipsis ? clipped.length - 1 : clipped.length;
-  const out: Token[] = [];
-  let used = 0;
-  for (const token of tokens) {
-    if (used >= budget) break;
-    const text = token.text.slice(0, budget - used);
-    if (text !== "") out.push({ ...token, text });
-    used += text.length;
-  }
-  if (ellipsis) out.push({ text: "…", cls: "" });
-  return out;
-}
