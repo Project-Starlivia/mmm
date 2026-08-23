@@ -5,7 +5,12 @@
 // Layout: every tree grows from left to right.
 
 import type { NodeInfo } from "./coreApi";
-import { languageEpoch, tokenize, tokenizeBlock } from "./map/highlight.ts";
+import {
+  languageEpoch,
+  tokenize,
+  tokenizeBlock,
+  touchesFence,
+} from "./map/highlight.ts";
 import {
   centerOf,
   distToSeg,
@@ -990,9 +995,10 @@ export class MindMap {
     // the + button and link-open glyph stop pointerdown propagation, so
     // this handler only ever sees pane/node/editor presses
     pane.addEventListener("pointerdown", (e) => {
-      // clicks inside the label editor place the cursor; they must not
-      // commit the edit
+      // 入力欄の中のクリックはカーソルを置くためのもので、確定ではない。
+      // ここで pane.focus() まで進むと、押した瞬間に blur して閉じてしまう
       if (e.target === this.editor) return;
+      if (this.codeBox.contains(e.target as Node)) return;
       if (this.isEditing()) this.host.commitEdit();
       this.hideMenu();
       pane.focus();
@@ -1292,6 +1298,17 @@ export class MindMap {
       }
     });
     this.codeEditor.addEventListener("blur", () => this.commitCodeEdit());
+    this.codeEditor.addEventListener("beforeinput", (e) => {
+      const v = this.codeEditor.value;
+      let from = this.codeEditor.selectionStart;
+      let to = this.codeEditor.selectionEnd;
+      // 選択が無いときの削除は、隣の 1 文字へ伸びる
+      if (from === to) {
+        if (e.inputType.startsWith("deleteContentBackward")) from = Math.max(0, from - 1);
+        else if (e.inputType.startsWith("deleteContentForward")) to = Math.min(v.length, to + 1);
+      }
+      if (touchesFence(v, from, to)) e.preventDefault();
+    });
     this.codeEditor.addEventListener("input", () => {
       this.paintCodeInk();
       this.positionCodeEditor();

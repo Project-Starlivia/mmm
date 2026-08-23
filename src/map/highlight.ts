@@ -123,3 +123,30 @@ export function tokenizeBlock(text: string): Token[][] {
     ...(closed ? [plain(lines[last])] : []),
   ];
 }
+
+/**
+ * 囲いそのもの（開き・閉じのバッククォート）が動く編集か。
+ * **言語名は守らない** — そこはフェンスの一部だが、直せることが
+ * その場で編集する理由の半分なので、意図して開けてある。
+ */
+export function touchesFence(text: string, from: number, to: number): boolean {
+  const lines = text.split("\n");
+  const open = /^(`{3,}|~{3,})/.exec(lines[0] ?? "");
+  if (!open) return false;
+  const marker = open[1][0];
+  const spans: [number, number][] = [[0, open[1].length]];
+  if (lines.length > 1) {
+    const tail = lines[lines.length - 1];
+    const trimmed = tail.trim();
+    if (
+      trimmed.length >= open[1].length &&
+      [...trimmed].every((c) => c === marker)
+    ) {
+      // 手前の改行ごと守る（消されると閉じが前の行にくっつく）
+      spans.push([text.length - tail.length - 1, text.length]);
+    }
+  }
+  return spans.some(([a, b]) =>
+    from === to ? a <= from && from < b : from < b && to > a,
+  );
+}
