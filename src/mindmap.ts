@@ -59,9 +59,6 @@ export interface MapHost {
   move(ids: number[], target: number, pos: 0 | 1 | 2 | 3): void;
   copySelection(cut: boolean): void;
   paste(): void;
-  addLink(id: number): void; // popup → [title](url) into the content
-  addCode(id: number): void; // popup → fenced code block into the content
-  addDrawing(id: number): void; // popup → drawn image into the content
   editRequested(id: number): void;
   undo(): void;
   redo(): void;
@@ -139,13 +136,8 @@ export class MindMap {
   // editing state
   editingId = -1;
   editingTag = "";
-  private editCaret: "start" | "end" = "end";
-  private editClear = false;
   private composing = false; // IME 変換中は文書へ書き込まない
   private fitPending = false;
-  // two-stroke vim sequences (dd / yy / cc / gg / zz)
-  private pendingKey = "";
-  private pendingTimer = -1;
 
   constructor(pane: HTMLElement, host: MapHost) {
     this.pane = pane;
@@ -617,16 +609,6 @@ export class MindMap {
     }
   }
 
-  /** Pan so the given node sits at the pane center (vim zz). */
-  centerOn(id: number): void {
-    const b = this.boxes.get(id);
-    if (!b) return;
-    const r = this.pane.getBoundingClientRect();
-    this.tx = r.width / 2 - (b.x + b.w / 2) * this.k;
-    this.ty = r.height / 2 - (b.y + b.h / 2) * this.k;
-    this.applyTransform();
-  }
-
   /** Pan so the given node is visible (used after keyboard nav / creation). */
   ensureVisible(id: number): void {
     const b = this.boxes.get(id);
@@ -653,18 +635,11 @@ export class MindMap {
     this.editingTag = tag;
     this.editor.value = b.n.label;
     this.editor.style.display = "block";
-    if (this.editClear) {
-      // vim s / cc: substitute — start from an empty label
-      this.editClear = false;
-      this.editor.value = "";
-      this.host.rename(id, "", tag);
-    }
     this.positionEditor();
     this.editor.focus();
-    // never select-all; caret at the end (or start, for `I`)
-    const pos = this.editCaret === "start" ? 0 : this.editor.value.length;
+    // never select-all; caret at the end
+    const pos = this.editor.value.length;
     this.editor.setSelectionRange(pos, pos);
-    this.editCaret = "end";
   }
 
   /** 入力欄の現在値を文書へ反映する（変換確定後にだけ呼ぶ）。 */
@@ -802,7 +777,7 @@ export class MindMap {
       this.hideMenu();
       pane.focus();
 
-      if (e.button === 1 || (e.button === 0 && this.spaceDown)) {
+      if (e.button === 0 && this.spaceDown) {
         this.panning = {
           px: e.clientX,
           py: e.clientY,
@@ -1103,127 +1078,24 @@ export class MindMap {
     const anchor = this.host.anchor();
     const sel = this.host.selection();
     const nodes = this.host.nodes();
-    // CapsLock reports letters as capitals WITHOUT shiftKey. Uppercase keys
-    // here are commands (H = 折り畳み, C/D/L = ポップアップ, O = 上に追加…),
-    // so with CapsLock on, plain `h` would silently comment out the subtree.
+    // CapsLock reports letters as capitals WITHOUT shiftKey, so a plain `h`
+    // would arrive as `H` and silently comment out the subtree.
     // Treat a capital that arrived without Shift as the lowercase key.
     const key =
       !e.shiftKey && e.key.length === 1 && e.key >= "A" && e.key <= "Z"
         ? e.key.toLowerCase()
         : e.key;
 
-    // vim two-stroke sequences: the previous stroke, consumed on read
-    const prev = this.pendingKey;
-    this.pendingKey = "";
-    if (this.pendingTimer !== -1) {
-      window.clearTimeout(this.pendingTimer);
-      this.pendingTimer = -1;
+    // comment-out hide/show for the subtree (= collapse)
+    if (key === "H" && !mod && !e.altKey && anchor !== -1) {
+      this.host.toggleHidden(anchor);
+      e.preventDefault();
+      return;
     }
-    const pend = (k: string): void => {
-      this.pendingKey = k;
-      this.pendingTimer = window.setTimeout(() => {
-        this.pendingKey = "";
-        this.pendingTimer = -1;
-      }, 700);
-    };
-
-    if (!mod && !e.altKey) {
-      if (key === "d") {
-        if (prev === "d") this.host.deleteSelection();
-        else pend("d");
-        e.preventDefault();
-        return;
-      }
-      if (key === "y") {
-        if (prev === "y") this.host.copySelection(false);
-        else pend("y");
-        e.preventDefault();
-        return;
-      }
-      if (key === "c") {
-        if (prev === "c" && anchor !== -1 && sel.size <= 1) {
-          this.editClear = true;
-          this.host.editRequested(anchor);
-        } else if (prev !== "c") {
-          pend("c");
-        }
-        e.preventDefault();
-        return;
-      }
-      if (key === "s") {
-        if (anchor !== -1 && sel.size <= 1) {
-          this.editClear = true;
-          this.host.editRequested(anchor);
-        }
-        e.preventDefault();
-        return;
-      }
-      if (key === "g") {
-        if (prev === "g" && this.order.length > 0) {
-          const first = this.order[0];
-          this.host.setSelection([first], first);
-          this.ensureVisible(first);
-        } else if (prev !== "g") {
-          pend("g");
-        }
-        e.preventDefault();
-        return;
-      }
-      if (key === "G") {
-        if (this.order.length > 0) {
-          const last = this.order[this.order.length - 1];
-          this.host.setSelection([last], last);
-          this.ensureVisible(last);
-        }
-        e.preventDefault();
-        return;
-      }
-      if (key === "z") {
-        if (prev === "z" && anchor !== -1) this.centerOn(anchor);
-        else if (prev !== "z") pend("z");
-        e.preventDefault();
-        return;
-      }
-      if (key === "p" || key === "P") {
-        this.host.paste();
-        e.preventDefault();
-        return;
-      }
-      if (key === "u") {
-        this.host.undo();
-        e.preventDefault();
-        return;
-      }
-      // content popups: C = code block, D = drawing, L = link
-      if (
-        (key === "C" || key === "D" || key === "L") &&
-        anchor !== -1 &&
-        sel.size <= 1
-      ) {
-        if (key === "C") this.host.addCode(anchor);
-        else if (key === "D") this.host.addDrawing(anchor);
-        else this.host.addLink(anchor);
-        e.preventDefault();
-        return;
-      }
-      // comment-out hide/show for the subtree (= collapse)
-      if (key === "H" && anchor !== -1) {
-        this.host.toggleHidden(anchor);
-        e.preventDefault();
-        return;
-      }
-    }
-
-    // edit: Mod+Enter / i / a / A (cursor at end), I (cursor at start)
-    if (
-      (key === "Enter" && mod) ||
-      (["i", "a", "A", "I"].includes(key) && !mod && !e.altKey)
-    ) {
+    // edit the label
+    if (key === "Enter" && mod) {
       if (nodes.length === 0) this.host.addRoot();
-      else if (anchor !== -1 && sel.size <= 1) {
-        this.editCaret = key === "I" ? "start" : "end";
-        this.host.editRequested(anchor);
-      }
+      else if (anchor !== -1 && sel.size <= 1) this.host.editRequested(anchor);
       e.preventDefault();
       return;
     }
@@ -1231,16 +1103,6 @@ export class MindMap {
     if (key === "Enter") {
       if (nodes.length === 0) this.host.addRoot();
       else if (anchor !== -1) this.host.addSibling(anchor);
-      e.preventDefault();
-      return;
-    }
-    // create below / above: o / O（Mod 付きでも同じ。キーは食う —
-    // 素通しすると Mod+O がグローバルの「開く」に化けて事故る）
-    if ((key === "o" || key === "O") && !e.altKey) {
-      if (anchor !== -1) {
-        if (e.shiftKey) this.host.addSiblingBefore(anchor);
-        else this.host.addSibling(anchor);
-      }
       e.preventDefault();
       return;
     }
@@ -1290,23 +1152,12 @@ export class MindMap {
       return;
     }
 
-    // movement: arrows + hjkl (vim), siblings loop vertically
-    const dirKey = mod
-      ? key
-      : key === "h"
-        ? "ArrowLeft"
-        : key === "j"
-          ? "ArrowDown"
-          : key === "k"
-            ? "ArrowUp"
-            : key === "l"
-              ? "ArrowRight"
-              : key;
-    if (!dirKey.startsWith("Arrow")) return;
+    // movement: arrows, siblings loop vertically
+    if (!key.startsWith("Arrow")) return;
     e.preventDefault();
-    if (mod && (dirKey === "ArrowUp" || dirKey === "ArrowDown")) {
+    if (mod && (key === "ArrowUp" || key === "ArrowDown")) {
       if (anchor !== -1 && sel.size === 1) {
-        this.host.reorder(anchor, dirKey === "ArrowUp" ? -1 : 1);
+        this.host.reorder(anchor, key === "ArrowUp" ? -1 : 1);
       }
       return;
     }
@@ -1320,11 +1171,11 @@ export class MindMap {
     const cur = byId.get(anchor);
     if (!cur) return;
     let next = -1;
-    if (dirKey === "ArrowUp" || dirKey === "ArrowDown") {
+    if (key === "ArrowUp" || key === "ArrowDown") {
       if (e.shiftKey) {
         // extend by display order; anchor edge stays (spec 3.4)
         const idx = this.order.indexOf(anchor);
-        const j = idx + (dirKey === "ArrowUp" ? -1 : 1);
+        const j = idx + (key === "ArrowUp" ? -1 : 1);
         if (j < 0 || j >= this.order.length) return;
         const nx = this.order[j];
         const set = new Set(sel);
@@ -1337,11 +1188,10 @@ export class MindMap {
       const sibs = nodes.filter((n) => n.parent === cur.parent);
       const i = sibs.findIndex((n) => n.id === anchor);
       if (i === -1 || sibs.length === 0) return;
-      const j =
-        (i + (dirKey === "ArrowUp" ? -1 : 1) + sibs.length) % sibs.length;
+      const j = (i + (key === "ArrowUp" ? -1 : 1) + sibs.length) % sibs.length;
       next = sibs[j].id;
     } else {
-      if (dirKey === "ArrowLeft") next = cur.parent;
+      if (key === "ArrowLeft") next = cur.parent;
       else
         next =
           nodes.find((n) => n.parent === anchor && this.boxes.has(n.id))?.id ??
@@ -1638,13 +1488,13 @@ export class MindMap {
       },
       {
         label: "下に追加",
-        key: "o",
+        key: "Enter",
         run: () => this.host.addSibling(this.host.anchor()),
         disabled: multi,
       },
       {
+        // キーは持たない（上への追加は下への追加＋並べ替えで届く）
         label: "上に追加",
-        key: "O",
         run: () => this.host.addSiblingBefore(this.host.anchor()),
         disabled: multi,
       },
@@ -1656,7 +1506,7 @@ export class MindMap {
       },
       {
         label: "名前を変更",
-        key: "i",
+        key: "Mod+Enter",
         run: () => this.host.editRequested(this.host.anchor()),
         disabled: multi,
       },

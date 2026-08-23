@@ -14,8 +14,8 @@ import { initExport } from "./app/export";
 import { initPanes } from "./app/panes";
 import { deriveName } from "./app/name";
 import { initTheme } from "./app/theme";
+import { sweep } from "./app/persist";
 import { decidePaste } from "./app/paste";
-import { showCodePopup, showDrawPopup, showLinkPopup } from "./popup";
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -353,38 +353,6 @@ const host: MapHost = {
     })().catch(() => {});
   },
   imageUrl: (path) => assets.imageUrl(path),
-  addLink(id) {
-    if (!byId.has(id)) return;
-    void showLinkPopup().then((r) => {
-      if (r && byId.has(id)) {
-        insertContentLine(id, r.title === "" ? r.url : `[${r.title}](${r.url})`);
-      }
-      mapPane.focus();
-    });
-  },
-  addCode(id) {
-    if (!byId.has(id)) return;
-    void showCodePopup().then((r) => {
-      if (r && byId.has(id)) {
-        // a block that itself contains ``` gets a longer fence
-        const fence = r.code.includes("```") ? "````" : "```";
-        insertContentLine(id, `${fence}${r.lang}\n${r.code}\n${fence}`);
-      }
-      mapPane.focus();
-    });
-  },
-  addDrawing(id) {
-    if (!byId.has(id)) return;
-    void showDrawPopup().then(async (blob) => {
-      if (blob && byId.has(id)) {
-        const rel = await assets.saveToDisk(blob);
-        if (rel !== null && byId.has(id)) {
-          insertContentLine(id, `![](${rel})`);
-        }
-      }
-      mapPane.focus();
-    });
-  },
   editRequested(id) {
     if (!byId.has(id)) return;
     setSelection([id], id);
@@ -634,10 +602,6 @@ window.addEventListener(
   "keydown",
   (e) => {
     if (e.isComposing || e.keyCode === 229) return;
-    // モーダル（ポップアップ）が開いている間は引っ込む。この listener は
-    // capture なので、popup 側の stopPropagation では止められない —
-    // 裏の文書に Mod+Z が当たって、見えないところで undo されていた
-    if (document.querySelector(".popup-overlay")) return;
     const mod = e.ctrlKey || e.metaKey;
     if (!mod) return;
     const key = e.key.toLowerCase();
@@ -649,9 +613,6 @@ window.addEventListener(
       e.preventDefault();
       void newFile();
     } else if (key === "o") {
-      // in the map pane (incl. its label editor) Mod+O belongs to the map
-      // (the map consumes o/O regardless of Mod so this never fires there)
-      if (mapPane.contains(document.activeElement)) return;
       e.preventDefault();
       void openFile();
     } else if (key === "/") {
@@ -695,6 +656,7 @@ initTheme({
 // 本文の控えは持たない。IndexedDB に置くのはファイルハンドルだけで、
 // 起動時もディスク上の実体を読み直す。
 {
+  sweep(); // 役目を終えた localStorage のキーを捨てる
   loadText("", null); // 空 = まだ何も無い。dirty も立たない
   const bootGen = docGen;
   void io
