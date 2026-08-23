@@ -14,6 +14,13 @@
   --dot: #262b33;
   --font: "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
   --mono: Consolas, "SF Mono", "Cascadia Code", Menlo, monospace;
+  /* コードの色。既存の ink/accent とは別系統で、暗い地に載る想定 */
+  --tok-keyword: #c792ea;
+  --tok-string: #98c379;
+  --tok-number: #d19a66;
+  --tok-comment: #6b7280;
+  --tok-name: #61afef;
+  --tok-type: #e5c07b;
 }
 
 :root.light {
@@ -28,6 +35,12 @@
   --node-border: #cfd5dd;
   --node-border-strong: #9aa4b1;
   --edge: #b6bec9;
+  --tok-keyword: #a626a4;
+  --tok-string: #50a14f;
+  --tok-number: #b76b01;
+  --tok-comment: #9aa4b1;
+  --tok-name: #4078f2;
+  --tok-type: #986801;
   --dot: #dde1e7;
 }
 
@@ -168,6 +181,29 @@ html, body {
   fill: var(--ink);
   white-space: pre;
 }
+/* 色は @lezer/highlight の classHighlighter が付ける tok-* に対応させる。
+   全部を塗り分けはしない — カードは 6 行のプレビューで、細かく分けるほど
+   小さい字が読みにくくなる。意味の大きい 6 系統だけ。 */
+.node text.code-line .tok-keyword,
+.node text.code-line .tok-modifier,
+.node text.code-line .tok-operatorKeyword { fill: var(--tok-keyword); }
+.node text.code-line .tok-string,
+.node text.code-line .tok-string2,
+.node text.code-line .tok-regexp { fill: var(--tok-string); }
+.node text.code-line .tok-number,
+.node text.code-line .tok-bool,
+.node text.code-line .tok-atom { fill: var(--tok-number); }
+.node text.code-line .tok-comment,
+.node text.code-line .tok-lineComment,
+.node text.code-line .tok-blockComment { fill: var(--tok-comment); font-style: italic; }
+.node text.code-line .tok-variableName,
+.node text.code-line .tok-propertyName,
+.node text.code-line .tok-function,
+.node text.code-line .tok-attributeName { fill: var(--tok-name); }
+.node text.code-line .tok-typeName,
+.node text.code-line .tok-className,
+.node text.code-line .tok-tagName,
+.node text.code-line .tok-namespace { fill: var(--tok-type); }
 .node text.label.empty { fill: var(--ink-dim); }
 .node line.card-sep { stroke: var(--node-border); stroke-width: 1; }
 .node text.link-row {

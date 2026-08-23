@@ -26,7 +26,8 @@ src/    TypeScript — UI
   relevel.ts   貼り付けた見出しの深さを読み替える
   style.css    全体のスタイル
   map/         その純粋層 — geometry(座標系) / edge(線の形) / cards(添付→カード行)
-               / metrics(寸法) / layout(木→箱の配置) / export(SVG 書き出し)
+               / metrics(寸法) / layout(木→箱の配置) / highlight(コードの色分け)
+               / export(SVG 書き出し)
   main.ts      オーケストレータ(選択・同期・ファイル I/O・ショートカット)
   app/         その子系統 — name(文書の名前) / persist(テーマだけ) /
                theme(テーマとロゴ) / panes(ペイン) / assets(画像) /
@@ -157,7 +158,9 @@ pnpm run dev        # コアをビルドしてから vite（http://localhost:131
 - `[タイトル](URL)` または素の URL の行 → リンクカード。`↗` クリックで新しい
   タブで開く(外部通信はしない)。ラベル自体が URL のノードはただのテキスト
 - ` ``` ` フェンスのコードブロック → モノスペースのプレビュー(6 行まで、
-  以降は `…`。言語はツールチップ)
+  以降は `…`。言語はツールチップ)。**色付き** — js / ts / jsx / tsx /
+  css / html / json は CodeMirror が MD ペイン用に既に積んでいるパーサを
+  そのまま借りる。知らない言語は色を付けない(推測で間違った色を出さない)
 - `<svg>…</svg>` ブロック → そのまま描画(data URL 経由の静的表示)
 - `![](相対パス)` → 画像サムネイル(下記)
 

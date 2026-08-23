@@ -5,6 +5,7 @@
 // Layout: every tree grows from left to right.
 
 import type { NodeInfo } from "./coreApi";
+import { clipTokens, tokenize } from "./map/highlight.ts";
 import {
   centerOf,
   distToSeg,
@@ -408,13 +409,19 @@ export class MindMap {
             bg.append(tt);
           }
           g.append(bg);
+          const tokens = tokenize(r.lines, r.lang);
           for (let i = 0; i < r.lines.length; i++) {
             const ln = svgEl("text", {
               class: "code-line",
               x: String(ROW_NORMAL.padX + 1),
               y: String(rowY + CODE_PAD + i * CODE_LINE + CODE_LINE / 2),
             });
-            ln.textContent = clipLabel(r.lines[i], MONO_FONT);
+            // 幅の判断は素の文字列で行い、色の付いた塊をそこへ合わせる
+            for (const t of clipTokens(tokens[i], clipLabel(r.lines[i], MONO_FONT))) {
+              const span = svgEl("tspan", t.cls === "" ? {} : { class: t.cls });
+              span.textContent = t.text;
+              ln.append(span);
+            }
             g.append(ln);
           }
           rowY += h;
