@@ -4,7 +4,6 @@
 //
 // Layout: every tree grows from left to right.
 
-import { openUrl } from "@tauri-apps/plugin-opener";
 import type { NodeInfo } from "./coreApi";
 import {
   centerOf,
@@ -34,6 +33,7 @@ export interface MapHost {
   /** objectURL for a local image path (relative to the md); null while
    * loading / until folder permission is granted */
   imageUrl(path: string): string | null;
+  chooseImageFolder(): void;
   selection(): Set<number>;
   anchor(): number;
   setSelection(ids: number[], anchor: number, reveal?: boolean): void;
@@ -444,6 +444,7 @@ export class MindMap {
             g.append(
               svgEl("rect", {
                 class: "img-ph",
+                "data-image": r.path,
                 x: String(ROW_NORMAL.padX),
                 y: String(rowY + 6),
                 width: String(b.w - ROW_NORMAL.padX * 2),
@@ -453,6 +454,7 @@ export class MindMap {
             );
             const ph = svgEl("text", {
               class: "img-name",
+              "data-image": r.path,
               x: String(b.w / 2),
               y: String(rowY + 6 + IMG_H / 2),
               "text-anchor": "middle",
@@ -1001,12 +1003,13 @@ export class MindMap {
     // open link cards
     this.nodeLayer.addEventListener("click", (e) => {
       const t = e.target as Element;
+      if (t.closest?.("[data-image]")) {
+        this.host.chooseImageFolder();
+        return;
+      }
       if (!t.classList?.contains("link-open")) return;
       const url = t.getAttribute("data-url");
-      // Tauri の WebView は window.open を系のシステムブラウザへ委譲しない
-      // (素の管理外 webview ポップアップが直接そこへ遷移してしまう)ので、
-      // plugin-opener 経由で明示的に既定アプリへ渡す
-      if (url) void openUrl(url).catch(() => {});
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
     });
     this.nodeLayer.addEventListener("pointerdown", (e) => {
       if ((e.target as Element).classList?.contains("link-open")) {

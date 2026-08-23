@@ -1,83 +1,135 @@
-// ネイティブ本体（Rust）との窓口。パスは Rust が持ち、ここはテキストと
-// 表示名だけを受け取る。ブラウザの File System Access API は使わない。
+// ブラウザの File System Access API との窓口。
+// UTF-8 / LF の Markdown を 1 ファイルずつ読み書きする。
 
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ask } from "@tauri-apps/plugin-dialog";
+import { handles } from "./handles.ts";
 
-/** UI に渡る文書。text は常に LF。改行/文字コード/BOM は Rust 側だけが持つ。 */
+declare global {
+  interface FileSystemHandlePermissionDescriptor {
+    mode?: "read" | "readwrite";
+  }
+
+  interface FileSystemHandle {
+    queryPermission(
+      descriptor?: FileSystemHandlePermissionDescriptor,
+    ): Promise<PermissionState>;
+    requestPermission(
+      descriptor?: FileSystemHandlePermissionDescriptor,
+    ): Promise<PermissionState>;
+  }
+
+  interface Window {
+    showOpenFilePicker(options?: {
+      multiple?: boolean;
+      types?: { description?: string; accept: Record<string, string[]> }[];
+    }): Promise<FileSystemFileHandle[]>;
+    showSaveFilePicker(options?: {
+      suggestedName?: string;
+      types?: { description?: string; accept: Record<string, string[]> }[];
+    }): Promise<FileSystemFileHandle>;
+    showDirectoryPicker(options?: {
+      startIn?: FileSystemHandle;
+      mode?: "read" | "readwrite";
+    }): Promise<FileSystemDirectoryHandle>;
+  }
+
+  interface DataTransferItem {
+    getAsFileSystemHandle?: () => Promise<FileSystemHandle | null>;
+  }
+}
+
 export interface Doc {
   name: string;
   text: string;
 }
 
-export interface DocChange {
-  text: string;
+const MARKDOWN = [
+  {
+    description: "Markdown",
+    accept: { "text/markdown": [".md", ".markdown", ".txt"] },
+  },
+];
+
+let current: FileSystemFileHandle | null = null;
+
+const isCancel = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === "AbortError";
+
+async function readDoc(file: FileSystemFileHandle): Promise<Doc> {
+  const blob = await file.getFile();
+  return { name: file.name, text: (await blob.text()).replace(/\r\n?/g, "\n") };
 }
 
-/** ドロップ 1 件。ネイティブ D&D はファイルの実パスを渡す。 */
-export interface DropPayload {
-  paths: string[];
-  position: { x: number; y: number };
+async function use(file: FileSystemFileHandle): Promise<Doc> {
+  current = file;
+  await handles.saveFile(file);
+  return readDoc(file);
+}
+
+async function write(file: FileSystemFileHandle, text: string): Promise<void> {
+  const stream = await file.createWritable();
+  try {
+    await stream.write(text);
+  } finally {
+    await stream.close();
+  }
 }
 
 export const io = {
-  /** 起動時の 1 枚（引数の .md か、前回のファイル）。無ければ null。 */
-  startupDoc: () => invoke<Doc | null>("startup_doc"),
-  /** 新規作成。現在のパスと監視を手放す。 */
-  close: () => invoke<void>("close"),
-  /** ネイティブの「開く」。キャンセルは null。 */
-  openDialog: () => invoke<Doc | null>("open_dialog"),
-  /** パス指定で開く（ドロップ）。 */
-  openPath: (path: string) => invoke<Doc>("open_path", { path }),
-  /** 上書き保存。パスが無ければ reject（"no-path"）。 */
-  save: (text: string) => invoke<void>("save", { text }),
-  /** 別名で保存。キャンセルは null。 */
-  saveAs: (suggested: string, text: string) =>
-    invoke<Doc | null>("save_as", { suggested, text }),
-  /** 画像を解決してバイト列で返す。無ければ reject。 */
-  resolveImage: (rel: string) => invoke<ArrayBuffer>("resolve_image", { rel }),
-  /** フロントが作ったバイト列（WebP など）を rel へ書く。 */
-  saveImage: (rel: string, bytes: Uint8Array) =>
-    invoke<string>("save_image", { rel, bytes: Array.from(bytes) }),
-  /** ディスク上の画像を rel へ複製する（ドロップされた実ファイル）。 */
-  importImage: (src: string, rel: string) =>
-    invoke<string>("import_image", { src, rel }),
-  /** 絶対パスを現在のファイルからの相対へ。同ドライブでなければ null。 */
-  relativize: (abs: string) => invoke<string | null>("relativize", { abs }),
+  currentFile: (): FileSystemFileHandle | null => current,
 
-  onDocChanged: (cb: (d: DocChange) => void): Promise<UnlistenFn> =>
-    listen<DocChange>("doc:changed", (e) => cb(e.payload)),
-  onDocRemoved: (cb: () => void): Promise<UnlistenFn> =>
-    listen("doc:removed", () => cb()),
-  onDrop: (cb: (d: DropPayload) => void): Promise<UnlistenFn> =>
-    listen<DropPayload>("tauri://drag-drop", (e) => cb(e.payload)),
+  /** 許可が残っている前回のファイルを起動時に読み直す。 */
+  async startupDoc(): Promise<Doc | null> {
+    const file = await handles.file();
+    if (!file) return null;
+    current = file;
+    if ((await file.queryPermission({ mode: "readwrite" })) !== "granted") {
+      return null;
+    }
+    return readDoc(file);
+  },
 
-  /** ネイティブの確認ダイアログ（Yes/No）。true = Yes。
-   * WebView の `window.confirm()` は Tauri で当てにならないので必ずこちらを使う。 */
-  confirm: (message: string): Promise<boolean> =>
-    ask(message, { title: "mmm", kind: "warning" }),
+  /** ファイル名のクリックから、前回の許可を取り直す。 */
+  async restoreDoc(): Promise<Doc | null> {
+    const file = current ?? (await handles.file());
+    if (!file) return null;
+    if ((await file.requestPermission({ mode: "readwrite" })) !== "granted") {
+      return null;
+    }
+    return use(file);
+  },
 
-  /**
-   * ウィンドウを閉じる要求を受ける。`isDirty` が偽ならそのまま閉じ、真なら
-   * 一旦止めて破棄してよいか尋ね、Yes なら本当に閉じる。
-   * ブラウザの `beforeunload` はネイティブの閉じるを止められないので、これが要る。
-   */
-  onCloseRequest: (
-    isDirty: () => boolean,
-    message: string,
-  ): Promise<UnlistenFn> =>
-    // getCurrentWindow() は非 Tauri 文脈で同期例外を投げる。マイクロタスクに
-    // 逃がして「拒否」に変え、呼び出し側の .catch で拾えるようにする
-    // （閉じる確認の登録失敗で boot 全体を巻き添えにしない）。
-    Promise.resolve().then(() =>
-      getCurrentWindow().onCloseRequested(async (e) => {
-        if (!isDirty()) return;
-        e.preventDefault(); // 同期で止める（await より前）
-        if (await ask(message, { title: "mmm", kind: "warning" })) {
-          await getCurrentWindow().destroy();
-        }
-      }),
-    ),
+  async close(): Promise<void> {
+    current = null;
+    await handles.clearFile();
+  },
+
+  async openDialog(): Promise<Doc | null> {
+    try {
+      const [file] = await window.showOpenFilePicker({ multiple: false, types: MARKDOWN });
+      return file ? use(file) : null;
+    } catch (error) {
+      if (isCancel(error)) return null;
+      throw error;
+    }
+  },
+
+  openHandle: (file: FileSystemFileHandle): Promise<Doc> => use(file),
+
+  async save(text: string): Promise<void> {
+    if (!current) throw new Error("no-file");
+    await write(current, text);
+  },
+
+  async saveAs(suggested: string, text: string): Promise<Doc | null> {
+    try {
+      const file = await window.showSaveFilePicker({ suggestedName: suggested, types: MARKDOWN });
+      await write(file, text);
+      current = file;
+      await handles.saveFile(file);
+      return { name: file.name, text };
+    } catch (error) {
+      if (isCancel(error)) return null;
+      throw error;
+    }
+  },
 };

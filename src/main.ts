@@ -1,21 +1,19 @@
 // Orchestrator: single document model lives in the MoonBit core; both panes
 // mirror it (spec 4.2). Selection, focus, persistence and file I/O live
 // here, along with the glue that pure decision logic elsewhere (app/paste,
-// app/name, app/externalChange...) doesn't own: clipboard-paste dispatch,
-// drag & drop image path resolution, and the global keyboard shortcuts.
+// app/name...) doesn't own: clipboard-paste dispatch, drag & drop, and the
+// global keyboard shortcuts.
 
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import { core, type EditOp, type NodeInfo, type Snapshot } from "./coreApi";
 import { MdEditor } from "./editor";
 import { MindMap, type MapHost } from "./mindmap";
-import { io, type Doc, type DocChange } from "./app/io";
-import { initAssets, mdPath } from "./app/assets";
+import { io, type Doc } from "./app/io";
+import { initAssets } from "./app/assets";
 import { initExport } from "./app/export";
 import { initPanes } from "./app/panes";
 import { deriveName } from "./app/name";
 import { initTheme } from "./app/theme";
-import { load, store } from "./app/persist";
-import { decideExternalChange } from "./app/externalChange";
 import { decidePaste } from "./app/paste";
 import { showCodePopup, showDrawPopup, showLinkPopup } from "./popup";
 
@@ -51,7 +49,7 @@ let savedText = "";
 /**
  * 保存済みのファイル名。まだ保存していない文書では null で、名前は本文の
  * 見出しから導出する（app/name.ts）。「無題」という状態は持たない。
- * 実ファイルのパスは Rust 本体が持ち、ここは表示名だけを鏡写しにする。
+ * 実ファイルは File System Access API のハンドルが指す。
  */
 let savedName: string | null = null;
 
@@ -204,6 +202,7 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
 const host: MapHost = {
   nodes: () => nodes,
   docText: () => core.getText(),
+  chooseImageFolder: () => void assets.chooseFolder(),
   selection: () => selection,
   anchor: () => anchorId,
   setSelection: (ids, anchor, reveal) => setSelection(ids, anchor, reveal),
@@ -407,8 +406,7 @@ const map = new MindMap(mapPane, host);
 // 内部で LF に正規化し、コアは受け取ったバイト列をそのまま持つ。両者に
 // 別々の改行を渡すと、CodeMirror が出す LF 基準のオフセットがコア側でずれ、
 // **打鍵が見当違いの位置に書き込まれて表示と保存内容が乖離する**。
-// 元の改行（CRLF）はネイティブ本体が読み書きの端で吸収するので、UI は
-// LF だけを見ていればよい。
+// 読み込み時に LF へ揃え、保存も UTF-8 / LF で書く。
 
 function loadText(text: string, name: string | null): void {
   docGen++;
@@ -436,7 +434,7 @@ btnRedo.addEventListener("click", doRedo);
 
 // ---------- file I/O ----------
 
-/** 開いた文書を UI に載せる。パスは Rust が持つので、名前だけ受け取る。 */
+/** 開いた文書を UI に載せる。 */
 function applyDoc(doc: Doc): void {
   savedText = doc.text;
   loadText(doc.text, doc.name);
@@ -456,8 +454,7 @@ async function openFile(): Promise<void> {
 /**
  * 保存。`asNew`（別名で保存）と、まだ名前の無い文書はダイアログを出す。
  * ダイアログの初期値はいまの名前 — 保存済みならそのファイル名、まだなら
- * 本文から導いたもの（app/name.ts）。改行の復元と temp→rename の
- * アトミック書き込みはネイティブ本体（Rust）が担う。
+ * 本文から導いたもの（app/name.ts）。
  */
 async function saveFile(asNew = false): Promise<void> {
   const text = core.getText();
@@ -474,13 +471,11 @@ async function saveFile(asNew = false): Promise<void> {
     updateDirty();
   } catch (err) {
     // パスを見失っていたら別名保存へ（通常はここに来ない）
-    if (err === "no-path") {
+    if (err instanceof Error && err.message === "no-file") {
       void saveFile(true);
       return;
     }
-    // 自分でキャンセルしたときは null が返るのでここには来ない。本当の失敗
-    // （文字コードで表せない・ロック・権限・容量）は黙ってはいけない。
-    // Rust の Err 文字列はそのまま出す（「Shift_JIS で表せない文字が…」等）
+    // 自分でキャンセルしたときは null が返るのでここには来ない。
     console.error("save failed:", err);
     flashFilename(typeof err === "string" ? err : "保存失敗");
   }
@@ -499,7 +494,7 @@ function flashFilename(msg: string, isError = true): void {
 }
 
 /**
- * 新しい文書。いまの文書は捨て、ネイティブ本体のパスと監視も手放す
+ * 新しい文書。いまの文書は捨て、ファイルハンドルも手放す
  * （残すと、未保存の新規文書に貼った画像が前の文書の隣に置かれる）。
  */
 async function newFile(): Promise<void> {
@@ -515,23 +510,9 @@ async function newFile(): Promise<void> {
   }
 }
 
-/**
- * ディスク側が外部で変わったとき（別のエディタ・git など）。
- * 自分の保存はネイティブ本体がハッシュ照合で弾くので、ここに来るのは本物の
- * 外部変更だけ。未編集なら黙って追従し、編集中なら勝手に捨てず知らせるに留める。
- */
-function onExternalChange(d: DocChange): void {
-  if (decideExternalChange(core.getText(), savedText) === "reload") {
-    savedText = d.text;
-    loadText(d.text, savedName);
-  } else {
-    flashFilename("ファイルが外部で変更されました（保存で上書き）");
-  }
-}
-
 async function confirmDiscard(): Promise<boolean> {
   if (core.getText() === savedText) return true;
-  return io.confirm("未保存の変更があります。破棄して続行しますか？");
+  return window.confirm("未保存の変更があります。破棄して続行しますか？");
 }
 
 // ---------- images (mmm.md そのに: 画像配置 — local-first) ----------
@@ -582,72 +563,70 @@ async function pasteImage(blob: Blob): Promise<void> {
 btnNew.addEventListener("click", () => void newFile());
 btnOpen.addEventListener("click", () => void openFile());
 btnSave.addEventListener("click", () => void saveFile());
+elFilename.addEventListener("click", () => {
+  void (async () => {
+    if (!(await confirmDiscard())) return;
+    const doc = await io.restoreDoc();
+    if (doc) applyDoc(doc);
+  })().catch(() => flashFilename("ファイルの許可を取得できませんでした"));
+});
 
-// 閉じたら未保存ぶんは戻らない（控えを持たない）。ここが唯一の防波堤。
-io.onCloseRequest(
-  () => core.getText() !== savedText,
-  "未保存の変更があります。破棄して終了しますか？",
-).catch((e) => flashFilename(`閉じる確認を登録できません: ${e}`));
+window.addEventListener("beforeunload", (event) => {
+  if (core.getText() === savedText) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
 
 // ---------- drag & drop ----------
-//
-// ネイティブの D&D はファイルの**実パス**を渡す（ブラウザの File 中身ではなく）。
-// so md はパスで開き、画像は Rust に「複製せず指す / 複製する」を委ねられる。
 
 const IMG_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 const MD_RE = /\.(md|markdown|txt)$/i;
 
-/** 落とされた画像 1 枚をノードへ。既に近くにあれば複製せず指す。 */
-async function dropImage(abs: string, id: number, tag: string): Promise<void> {
-  if (!byId.has(id)) return;
-  let rel = await io.relativize(abs);
-  // md の木の外（../ で出る・別ドライブ）なら、木の中へ複製する
-  if (rel === null || rel.startsWith("..")) {
-    const name = abs.split(/[\\/]/).pop() ?? "image";
-    try {
-      rel = await io.importImage(abs, name);
-    } catch (err) {
-      console.error("import image failed:", err);
-      flashFilename("画像を貼れませんでした");
-      return;
-    }
+async function droppedHandles(data: DataTransfer): Promise<FileSystemFileHandle[]> {
+  const files: FileSystemFileHandle[] = [];
+  for (const item of data.items) {
+    if (item.kind !== "file" || !item.getAsFileSystemHandle) continue;
+    const handle = await item.getAsFileSystemHandle();
+    if (handle?.kind === "file") files.push(handle as FileSystemFileHandle);
   }
-  if (byId.has(id)) insertContentLine(id, `![](${mdPath(rel)})`, tag);
+  return files;
 }
 
-io.onDrop((p) => {
-  const md = p.paths.find((x) => MD_RE.test(x));
-  if (md) {
-    void (async () => {
-      if (!(await confirmDiscard())) return;
-      applyDoc(await io.openPath(md));
-    })().catch((err) => {
-      console.error("drop open failed:", err);
-      flashFilename("読み込み失敗");
-    });
-    return;
+window.addEventListener("dragover", (event) => {
+  if ([...event.dataTransfer?.items ?? []].some((item) => item.kind === "file")) {
+    event.preventDefault();
   }
-  const imgs = p.paths.filter((x) => IMG_RE.test(x));
-  if (imgs.length === 0) return;
-  if (savedName === null) {
-    flashFilename("画像を貼るには先にファイルを保存してください");
-    return;
-  }
-  // 宛先はカーソルの下のノード。物理座標を CSS 座標へ均してから当てる
-  const dpr = window.devicePixelRatio || 1;
-  const id = map.nodeAt(p.position.x / dpr, p.position.y / dpr);
-  if (!byId.has(id)) {
-    flashFilename("画像はノードの上に落としてください");
-    return;
-  }
-  const tag = `d${++sessionN}`; // 何枚落としても Undo は 1 回
+});
+
+window.addEventListener("drop", (event) => {
+  event.preventDefault();
+  const data = event.dataTransfer;
+  if (!data) return;
   void (async () => {
-    for (const abs of imgs) await dropImage(abs, id, tag);
-  })().catch((err) => {
-    console.error("drop image failed:", err);
-    flashFilename("画像を貼れませんでした");
+    const handles = await droppedHandles(data);
+    const md = handles.find((file) => MD_RE.test(file.name));
+    if (md) {
+      if (!(await confirmDiscard())) return;
+      applyDoc(await io.openHandle(md));
+      return;
+    }
+    const images = handles.filter((file) => IMG_RE.test(file.name));
+    if (images.length === 0) return;
+    const id = map.nodeAt(event.clientX, event.clientY);
+    if (!byId.has(id)) {
+      flashFilename("画像はノードの上に落としてください");
+      return;
+    }
+    const tag = `d${++sessionN}`;
+    for (const handle of images) {
+      const rel = await assets.saveToDisk(await handle.getFile());
+      if (rel !== null && byId.has(id)) insertContentLine(id, `![](${rel})`, tag);
+    }
+  })().catch((error) => {
+    console.error("drop failed:", error);
+    flashFilename("ドロップしたファイルを開けませんでした");
   });
-}).catch((e) => flashFilename(`ドロップの監視を登録できません: ${e}`));
+});
 
 // ---------- global shortcuts ----------
 
@@ -713,24 +692,9 @@ initTheme({
 
 // ---------- boot ----------
 
-// **本文の控えは持たない** — 持てば .md と二重の真実になる。覚えているのは
-// ファイルへの指し示しだけで、それはネイティブ本体（Rust）が app-config に
-// 持ち、起動時にディスクから読み直す。外部変更・削除もあちらが見張る。
+// 本文の控えは持たない。IndexedDB に置くのはファイルハンドルだけで、
+// 起動時もディスク上の実体を読み直す。
 {
-  // この仕組みより前のセッションが置いていった localStorage を片付ける。
-  // 一度片付ければ二度と残っていないので、移行後の全起動で走らせ続けない
-  // ように 1 回きりの印を立てる。
-  const MIGRATED = "mmm.migrated";
-  if (load(MIGRATED) === null) {
-    for (const k of ["mmm.text", "mmm.savedText", "mmm.fileName", "mmm.eol", "mmm.panes", "mmm.edgeTune", "mmm.folderQuiet"]) {
-      try {
-        localStorage.removeItem(k);
-      } catch {
-        /* ignore */
-      }
-    }
-    store(MIGRATED, "1");
-  }
   loadText("", null); // 空 = まだ何も無い。dirty も立たない
   const bootGen = docGen;
   void io
@@ -745,11 +709,5 @@ initTheme({
     .catch(() => {
       flashFilename("前回のファイルを開けませんでした");
     });
-  void io
-    .onDocChanged(onExternalChange)
-    .catch((e) => flashFilename(`外部変更の監視を登録できません: ${e}`));
-  void io
-    .onDocRemoved(() => flashFilename("ファイルが外部で削除されました"))
-    .catch((e) => flashFilename(`外部削除の監視を登録できません: ${e}`));
 }
 mapPane.focus();
