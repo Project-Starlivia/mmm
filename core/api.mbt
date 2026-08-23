@@ -71,11 +71,6 @@ fn snapshot() -> String {
     sb.write_string(nd.id.to_string())
     sb.write_string(",\"depth\":")
     sb.write_string(nd.depth.to_string())
-    // テキストに書かれている `#` の数。UI 側で見出しを組み立てるとき
-    // （貼り付けなど）は、構造上の深さではなくこちらを使わないと
-    // 読み替えの起きている区間の中で深さがずれる
-    sb.write_string(",\"rawDepth\":")
-    sb.write_string(nd.raw_depth.to_string())
     sb.write_string(",\"parent\":")
     sb.write_string(nd.parent.to_string())
     sb.write_string(",\"hs\":")
@@ -84,8 +79,6 @@ fn snapshot() -> String {
     sb.write_string(nd.he.to_string())
     sb.write_string(",\"subEnd\":")
     sb.write_string(nd.sub_end.to_string())
-    sb.write_string(",\"group\":")
-    sb.write_string(nd.group.to_string())
     sb.write_string(",\"hasContent\":")
     sb.write_string(if nd.has_content { "true" } else { "false" })
     sb.write_string(",\"hidden\":")
@@ -203,20 +196,6 @@ pub fn move_nodes(ids : Array[Int], target : Int, pos : Int) -> String {
 /// A -> B の線への割り込み。ids を B の直前へ動かしてから B を 1 段下げる。
 pub fn move_as_parent(ids : Array[Int], target : Int) -> String {
   cmd_move_as_parent(ids, target)
-  snapshot()
-}
-
-///|
-/// 側の末尾へ動かす。left=true で左（空なら `---` を 1 本書いて開く）。
-pub fn move_side_end(ids : Array[Int], left : Bool) -> String {
-  cmd_move_side_end(ids, left)
-  snapshot()
-}
-
-///|
-/// 側の末尾に新しい子を作る（ルートの左右 ＋ ボタン）。
-pub fn add_side_end(left : Bool, tag : String) -> String {
-  cmd_add_side_end(left, tag)
   snapshot()
 }
 

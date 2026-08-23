@@ -50,7 +50,6 @@ export function normTree(nodes: NodeInfo[], withIds = true) {
     hs: n.hs,
     he: n.he,
     subEnd: n.subEnd,
-    group: n.group,
     hasContent: n.hasContent,
     hidden: n.hidden,
     label: n.label,
@@ -63,7 +62,6 @@ export function shape(nodes: NodeInfo[]) {
   return nodes.map((n) => ({
     depth: n.depth,
     parentIdx: n.parent === -1 ? -1 : (idx.get(n.parent) ?? "??"),
-    group: n.group,
     hidden: n.hidden,
     hasContent: n.hasContent,
     label: n.label,

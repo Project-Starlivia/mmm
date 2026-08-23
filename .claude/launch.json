@@ -6,7 +6,7 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [
         "run",
-        "app"
+        "dev"
       ],
       "port": 13131
     },

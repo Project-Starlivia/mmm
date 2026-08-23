@@ -61,8 +61,7 @@ export function initPanes(args: {
   }
 
   // ---- スプリッタ ----
-  // double-click: collapse the md pane (restore via the MD button or Mod+/)
-  splitter.addEventListener("dblclick", () => togglePaneVis("md"));
+  // 幅を変えるだけ。開閉は MD / マップ ボタンと Mod+/ が持つ
   splitter.addEventListener("pointerdown", (e) => {
     splitter.classList.add("dragging");
     splitter.setPointerCapture(e.pointerId);

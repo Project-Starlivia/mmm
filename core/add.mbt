@@ -1,6 +1,4 @@
 // ノードを作るコマンド。子・兄弟・親・ルート。
-// `#` の数は必ずテキスト上の深さ（raw_depth）から決める。構造上の深さは
-// 区切りの後ろでは読み替えられていて、そのまま書くと「子を作ったのに兄弟」になる。
 
 ///|
 /// 畳んだノードに何かを足すときは、先に開く。
@@ -50,9 +48,7 @@ fn with_unfold(id : Int, tag : String, body : () -> Unit) -> Unit {
 fn cmd_add_child(id : Int, tag : String) -> Unit {
   with_unfold(id, tag, fn() {
     let nd = st.nodes[find_node(id)]
-    // `#` の数はテキスト上の深さから決める。構造上の深さ（区切りの後ろでは
-    // 読み替えられる）を使うと、子を作ったつもりが兄弟になる
-    let (e, prefix) = insert_heading_edit(nd.sub_end, nd.raw_depth + 1)
+    let (e, prefix) = insert_heading_edit(nd.sub_end, nd.depth + 1)
     apply_sets([[e]], tag)
     focus_node_at(nd.sub_end + prefix)
   })
@@ -71,7 +67,7 @@ fn cmd_add_sibling(id : Int, tag : String) -> Unit {
   }
   with_unfold(id, tag, fn() {
     let nd = st.nodes[find_node(id)]
-    let (e, prefix) = insert_heading_edit(nd.sub_end, nd.raw_depth)
+    let (e, prefix) = insert_heading_edit(nd.sub_end, nd.depth)
     apply_sets([[e]], tag)
     focus_node_at(nd.sub_end + prefix)
   })
@@ -90,7 +86,7 @@ fn cmd_add_sibling_before(id : Int, tag : String) -> Unit {
   }
   with_unfold(id, tag, fn() {
     let nd = st.nodes[find_node(id)]
-    let (e, prefix) = insert_heading_edit(nd.hs, nd.raw_depth)
+    let (e, prefix) = insert_heading_edit(nd.hs, nd.depth)
     apply_sets([[e]], tag)
     focus_node_at(nd.hs + prefix)
   })
@@ -111,7 +107,7 @@ fn cmd_add_parent(id : Int, tag : String) -> Unit {
   }
   with_unfold(id, tag, fn() {
     let nd = st.nodes[find_node(id)]
-    let (head, prefix) = insert_heading_edit(nd.hs, nd.raw_depth)
+    let (head, prefix) = insert_heading_edit(nd.hs, nd.depth)
     let set : Array[Edit] = [head]
     for m in subtree_nodes(nd.hs, nd.sub_end) {
       set.push(Edit::{
@@ -134,70 +130,4 @@ fn cmd_add_root(tag : String) -> Unit {
   let (e, prefix) = insert_heading_edit(at, 1)
   apply_sets([[e]], tag)
   focus_node_at(at + prefix)
-}
-
-///|
-/// 側の末尾に新しい子を作る。ルートの左右の ＋ ボタンの実体。
-///
-/// その側に既にノードがあれば、いちばん下のノードの後ろに挿すだけ。
-/// **左側が空のときだけ** `---` を 1 本書いてから見出しを置く
-/// （cmd_move_side_end と同じ、区切りを増やす唯一の経路）。
-/// 右側が空なら、最初の区切りの手前に置く。
-fn cmd_add_side_end(left : Bool, tag : String) -> Unit {
-  let ri = root_index()
-  if ri < 0 {
-    return
-  }
-  let rid = st.nodes[ri].id
-  let mut at = -1
-  for nd in st.nodes {
-    if nd.parent == rid && (nd.group % 2 == 1) == left {
-      at = nd.sub_end
-    }
-  }
-  if at >= 0 {
-    let (e, prefix) = insert_heading_edit(at, 2)
-    apply_sets([[e]], tag)
-    focus_node_at(at + prefix)
-    return
-  }
-  if left {
-    // 左が空 = 有効な区切りが無い。末尾に `---` + 見出しを 1 編集で書く
-    let p = st.nodes[ri].sub_end
-    let br = nl()
-    let sb = StringBuilder::new()
-    let mut prefix = 0
-    if p > 0 && cc(st.text, p - 1) != 10 {
-      sb.write_string(br)
-      sb.write_string(br)
-      prefix = br.length() * 2
-    } else if !preceded_by_blank(p) {
-      sb.write_string(br)
-      prefix = br.length()
-    }
-    sb.write_string("---")
-    sb.write_string(br)
-    sb.write_string(br)
-    prefix = prefix + 3 + br.length() * 2
-    sb.write_string("## ")
-    sb.write_string(br)
-    if p != st.text.length() {
-      sb.write_string(br)
-    }
-    apply_sets(
-      [[Edit::{ from: p, to: p, insert: sb.to_string(), removed: "" }]],
-      tag,
-    )
-    focus_node_at(p + prefix)
-  } else {
-    // 右が空 = 最初の有効な区切りの手前へ
-    let p = if st.seps.length() > 0 {
-      st.seps[0]
-    } else {
-      st.nodes[ri].sub_end
-    }
-    let (e, prefix) = insert_heading_edit(p, 2)
-    apply_sets([[e]], tag)
-    focus_node_at(p + prefix)
-  }
 }

@@ -69,7 +69,7 @@ export function deriveName(nodes: NodeInfo[]): string {
   if (nodes.length === 0) return EMPTY_NAME;
   let top = nodes[0];
   for (const n of nodes) {
-    if (n.rawDepth < top.rawDepth) top = n;
+    if (n.depth < top.depth) top = n;
   }
   return toFileName(top.label) || toFileName(nodes[0].label) || EMPTY_NAME;
 }

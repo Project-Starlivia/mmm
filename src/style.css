@@ -59,9 +59,7 @@ html, body {
   height: 22px;
   display: block;
   color: var(--accent);
-  cursor: pointer;
 }
-#logo:hover { filter: brightness(1.25); }
 #filename { color: var(--ink-dim); font-size: 13px; }
 #filename.error { color: #e5534b; }
 #dirty { color: var(--accent); font-size: 10px; }
@@ -82,15 +80,6 @@ html, body {
 
 #panes { display: flex; flex: 1; min-height: 0; }
 .pane-off { display: none !important; }
-/* エクスポートの隣に置くコピー用の小ボタン（mmm.md その３:
-   export だけじゃなくコピーもほしい。Shift+クリックの隠し操作をやめる） */
-#topbar button.mini {
-  padding: 3px 6px;
-  margin-left: -6px;
-  font-size: 12px;
-  color: var(--ink-dim);
-}
-#topbar button.mini:hover:not(:disabled) { color: var(--ink); }
 
 /* トグルボタンは押されているかが見た目で分かること（mmm.md その３）。
    ON = アクセント色で塗って枠を立てる / OFF = 沈んだ空枠 + 取り消し線 */
@@ -202,77 +191,6 @@ html, body {
   font-size: 11px;
   fill: var(--ink-dim);
 }
-/* ---------- popups (code / drawing / link) ---------- */
-
-.popup-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 40;
-}
-.popup {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px 16px;
-  min-width: 380px;
-  max-width: calc(100vw - 48px);
-  max-height: calc(100vh - 48px);
-  overflow: auto;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-}
-.popup-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
-.popup-body { display: flex; flex-direction: column; gap: 10px; }
-.popup-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-dim); }
-.popup-field input[type="text"],
-.popup-field textarea {
-  font: inherit;
-  font-size: 13px;
-  color: var(--ink);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 6px 8px;
-  outline: none;
-  min-width: 340px;
-}
-.popup-field textarea { font-family: var(--mono); resize: vertical; }
-.popup-field input:focus, .popup-field textarea:focus { border-color: var(--accent); }
-.popup-suffixed { display: flex; align-items: center; gap: 8px; }
-.popup-suffixed input[type="text"] { flex: 1; min-width: 300px; }
-.popup-suffix { font-size: 13px; color: var(--ink-dim); white-space: nowrap; }
-.popup-toolbar { display: flex; align-items: center; gap: 10px; }
-.popup-canvas {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  cursor: crosshair;
-  touch-action: none;
-  background: #fff;
-}
-.popup-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-.popup-hint { flex: 1; font-size: 11px; color: var(--ink-dim); }
-.popup button, .popup-toolbar button {
-  font: inherit;
-  font-size: 13px;
-  padding: 4px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--ink);
-  cursor: pointer;
-}
-.popup button:hover { background: var(--accent-soft); border-color: var(--accent); }
-.popup button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-
 .node rect.code-bg { fill: var(--bg); stroke: var(--node-border); stroke-width: 1; }
 .node text.code-line {
   font-family: "Cascadia Code", Consolas, "JetBrains Mono", monospace;

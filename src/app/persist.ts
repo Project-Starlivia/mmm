@@ -1,11 +1,12 @@
 // 永続化の器。
 //
-// **持つのは見た目の好みだけ**（ブランドカラーとテーマ）。文書の控えも、
-// ファイルの指し示しも持たない — それはネイティブ本体（Rust）の管轄で、
-// 前回のファイルはあちらが app-config に覚え、起動時に開き直す。
+// **持つのはテーマだけ**。文書の控えもファイルハンドルも持たない
+// （ハンドルは IndexedDB の app/handles.ts が扱う）。
 
-export const LS_COLOR = "mmm.color";
 export const LS_THEME = "mmm.theme";
+
+/** いま意味のあるキー。ここに無い `mmm.*` は過去の遺物として捨てる。 */
+const OWNED: readonly string[] = [LS_THEME];
 
 /**
  * localStorage への読み書き。容量オーバーや無効化で例外が飛ぶので、
@@ -27,5 +28,23 @@ export function load(key: string): string | null {
     return localStorage.getItem(key);
   } catch {
     return null;
+  }
+}
+
+/**
+ * 役目を終えた `mmm.*` を捨てる。消えたキーの名前を並べる移行リストは
+ * 増え続けて誰も消せなくなるので、持ち物のほうを宣言して残りを掃く。
+ * これまでに捨てたもの: text / savedText（.md と二重の真実になる）、
+ * fileName / eol（読めば分かる）、panes / folderQuiet / edgeTune / migrated、
+ * color（ブランドカラーは持たないと決めた）。
+ */
+export function sweep(): void {
+  try {
+    const dead = Object.keys(localStorage).filter(
+      (k) => k.startsWith("mmm.") && !OWNED.includes(k),
+    );
+    for (const k of dead) localStorage.removeItem(k);
+  } catch {
+    /* storage blocked — 捨てられなくても実害は無い */
   }
 }

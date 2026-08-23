@@ -16,7 +16,7 @@ export type PasteAction =
 
 export function decidePaste(
   clip: string,
-  anchor: { rawDepth: number } | null,
+  anchor: { depth: number } | null,
   hasNodes: boolean,
 ): PasteAction {
   const normalized = clip.replace(/\r\n/g, "\n");
@@ -40,7 +40,7 @@ export function decidePaste(
       ].join("\n\n");
       return { kind: "rootTree", body };
     }
-    const hashes = "#".repeat(Math.min(anchor.rawDepth + 1, 100));
+    const hashes = "#".repeat(Math.min(anchor.depth + 1, 100));
     const body = labels.map((l) => `${hashes} ${l}`).join("\n\n");
     return { kind: "children", body };
   }
@@ -51,6 +51,6 @@ export function decidePaste(
   }
   return {
     kind: "block",
-    body: relevel(normalized, anchor.rawDepth + 1).trimEnd(),
+    body: relevel(normalized, anchor.depth + 1).trimEnd(),
   };
 }

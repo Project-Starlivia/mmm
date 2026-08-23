@@ -12,15 +12,12 @@ export interface EditOp {
 
 export interface NodeInfo {
   id: number;
-  /** 構造上の深さ（`---` の後ろでは読み替えられる） */
+  /** テキストに書かれている `#` の数 */
   depth: number;
-  /** テキストに書かれている `#` の数。見出しを組み立てるときはこちら */
-  rawDepth: number;
   parent: number;
   hs: number;
   he: number;
   subEnd: number;
-  group: number;
   hasContent: boolean;
   hidden: boolean;
   label: string;
@@ -61,15 +58,6 @@ export const core = {
   /** A→B の線への割り込み: ids を B の直前へ動かしてから B を 1 段下げる */
   moveAsParent: (ids: number[], target: number): Snapshot =>
     snap(mbt.moveAsParent(ids, target)),
-  /**
-   * 側の末尾へ動かす（ルート脇ゾーンへのドロップ）。
-   * 左側が空のときだけ `---` を 1 本書く — 区切りが増える唯一の経路。
-   */
-  moveSideEnd: (ids: number[], left: boolean): Snapshot =>
-    snap(mbt.moveSideEnd(ids, left)),
-  /** 側の末尾に新しい子を作る（ルートの左右 ＋ ボタン） */
-  addSideEnd: (left: boolean, tag = ""): Snapshot =>
-    snap(mbt.addSideEnd(left, tag)),
   reorderNode: (id: number, dir: -1 | 1): Snapshot =>
     snap(mbt.reorderNode(id, dir)),
   toggleHidden: (id: number): Snapshot => snap(mbt.toggleHidden(id)),

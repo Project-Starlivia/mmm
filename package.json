@@ -5,21 +5,14 @@
   "type": "module",
   "scripts": {
     "core": "cd core && moon build --target js --release",
-    "dev": "vite",
-    "dev:full": "pnpm run core && vite",
-    "app": "pnpm run core && tauri dev",
-    "app:build": "pnpm run core && tauri build",
-    "app:release": "pnpm run core && tauri build --no-bundle && start \"\" src-tauri/target/release/mmm.exe",
-    "icon": "node scripts/icon.ts",
+    "dev": "pnpm run core && vite",
     "build": "pnpm run core && tsc --noEmit && vite build",
     "test": "node --test \"test/*.test.ts\"",
     "test:core": "cd core && moon test -p mmm-app/core",
-    "test:rust": "cd src-tauri && cargo test",
     "check": "tsc --noEmit && tsc -p test --noEmit",
     "preview": "vite preview"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^26.2.0",
     "typescript": "^5.6.0",
     "vite": "^6.0.0"
@@ -30,10 +23,7 @@
     "@codemirror/language": "^6.10.0",
     "@codemirror/state": "^6.5.0",
     "@codemirror/theme-one-dark": "^6.1.3",
-    "@codemirror/view": "^6.35.0",
-    "@tauri-apps/api": "^2.11.1",
-    "@tauri-apps/plugin-dialog": "^2.7.2",
-    "@tauri-apps/plugin-opener": "^2.5.4"
+    "@codemirror/view": "^6.35.0"
   },
   "devEngines": {
     "packageManager": {

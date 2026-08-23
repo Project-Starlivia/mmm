@@ -2,8 +2,7 @@
 //
 //   親の縁 --曲線--> 子の縁
 //
-// 座標はすべて成長軸 u ・兄弟軸 v のローカル座標（親の出口が原点）で組み、
-// 最後にフレームで world へ写す。こうすると右向き・左向きで式を分けずに済む。
+// 座標はすべて x・y のローカル座標（親の出口が原点）で組む。
 //
 // 経路は「制御点2つをそのまま持つ三次ベジェ」1 種類のみ。かつては経路の種類
 // (quad/cubic/sweep/arc/line/diagonal/elbow/spine) や見た目の修飾
@@ -14,7 +13,7 @@
 // として残すのは「今だけを見て組む」という方針に反するので、生きている
 // 式だけへ畳んだ。
 
-import { type Frame, type Pt, projU, projV, round2 } from "./geometry.ts";
+import { type Pt, round2 } from "./geometry.ts";
 
 /** 見た目の固定パラメータ。実文書の上で詰めた値（出発点は見本 Vector.svg）。 */
 export const EDGE = {
@@ -76,13 +75,12 @@ export function flattenSegs(segs: Seg[], per: number): number[][] {
 /** ローカル座標 (u, v) を world の "x y" 文字列にする写像 */
 type At = (u: number, v: number) => string;
 
-/** 始点 a とフレーム f から、写像 At を作る */
-const atOf = (a: Pt, f: Frame): At => (u, v) =>
-  `${round2(a.x + f.ux * u + f.vx * v)} ${round2(a.y + f.uy * u + f.vy * v)}`;
+/** 始点 a から、写像 At を作る */
+const atOf = (a: Pt): At => (u, v) => `${round2(a.x + u)} ${round2(a.y + v)}`;
 
 /** 経路を d 属性の文字列にする */
-export function segsToD(segs: Seg[], a: Pt, f: Frame): string {
-  const at = atOf(a, f);
+export function segsToD(segs: Seg[], a: Pt): string {
+  const at = atOf(a);
   let d = `M ${at(0, 0)}`;
   for (const s of segs) {
     const pairs: string[] = [];
@@ -102,18 +100,14 @@ export interface EdgeDraw {
  * 点 a から点 z へのライン。箱ではなく点を受けるのは、ドロップの予告のように
  * 「箱が無い場所」へも同じ形で引きたいため。
  */
-export function edgeDraw(a: Pt, z: Pt, f: Frame): EdgeDraw {
-  const du = projU(f, z.x - a.x, z.y - a.y);
-  const dv = projV(f, z.x - a.x, z.y - a.y);
-  return { d: segsToD(edgeSegs(du, dv), a, f), width: EDGE.width };
+export function edgeDraw(a: Pt, z: Pt): EdgeDraw {
+  return { d: segsToD(edgeSegs(z.x - a.x, z.y - a.y), a), width: EDGE.width };
 }
 
 /**
  * 2 点のあいだに、いまの形の曲線を引く。ドロップ予告のように
  * 「まだノードが無いところ」へ線を伸ばしたいときに使う。
  */
-export function edgeHintPath(a: Pt, z: Pt, f: Frame): string {
-  const du = projU(f, z.x - a.x, z.y - a.y);
-  const dv = projV(f, z.x - a.x, z.y - a.y);
-  return segsToD(edgeSegs(du, dv), a, f);
+export function edgeHintPath(a: Pt, z: Pt): string {
+  return segsToD(edgeSegs(z.x - a.x, z.y - a.y), a);
 }
