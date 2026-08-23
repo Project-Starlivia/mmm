@@ -5,7 +5,7 @@
 // Layout: every tree grows from left to right.
 
 import type { NodeInfo } from "./coreApi";
-import { languageEpoch, tokenize } from "./map/highlight.ts";
+import { languageEpoch, tokenize, tokenizeBlock } from "./map/highlight.ts";
 import {
   centerOf,
   distToSeg,
@@ -23,6 +23,7 @@ import {
   rowH,
 } from "./map/cards";
 import {
+  MONO_FONT,
   ROW_NORMAL,
   displayLabel,
   hiddenLabel,
@@ -98,6 +99,8 @@ export class MindMap {
   private plusBtn: SVGGElement;
   private rubber: HTMLDivElement;
   private editor: HTMLInputElement;
+  private codeBox: HTMLDivElement;
+  private codeInk: HTMLPreElement;
   private codeEditor: HTMLTextAreaElement;
   private hint: HTMLDivElement;
   private menu: HTMLDivElement;
@@ -195,12 +198,19 @@ export class MindMap {
     this.editor.spellcheck = false;
     pane.append(this.editor);
 
-    // コードカードはその場で直す。ラベルと違って複数行なので textarea
+    // コードカードはその場で直す。textarea 自体は色を持てないので、
+    // 同じ字形・同じ寸法の色付き層を裏に敷いて重ねる（打つのは透明な
+    // textarea、見えているのは裏の層）。字がずれないよう font と padding は
+    // CSS で 1 か所に揃えてある
+    this.codeBox = document.createElement("div");
+    this.codeBox.id = "code-editor";
+    this.codeBox.style.display = "none";
+    this.codeInk = document.createElement("pre");
+    this.codeInk.className = "code-ink";
     this.codeEditor = document.createElement("textarea");
-    this.codeEditor.id = "code-editor";
     this.codeEditor.spellcheck = false;
-    this.codeEditor.style.display = "none";
-    pane.append(this.codeEditor);
+    this.codeBox.append(this.codeInk, this.codeEditor);
+    pane.append(this.codeBox);
 
     this.hint = document.createElement("div");
     this.hint.id = "map-hint";
@@ -240,6 +250,7 @@ export class MindMap {
     const cell = 18 * this.k;
     this.pane.style.backgroundSize = `${cell}px ${cell}px`;
     this.positionEditor();
+    this.positionCodeEditor();
   }
 
   // ---------- layout & render ----------
@@ -267,6 +278,8 @@ export class MindMap {
     if (this.editingId !== -1 && !boxes.has(this.editingId)) {
       this.endEdit();
     }
+    // 言語は後から読み込まれる。開いている編集欄にも遅れて色を載せる
+    if (this.codeEdit) this.paintCodeInk();
 
     // ---- DOM を差分更新する ----
     // 位置(transform)と class は毎回書き換えても安い。高いのは要素の生成と
@@ -606,7 +619,8 @@ export class MindMap {
     if (this.isEditing()) this.host.commitEdit();
     this.codeEdit = { from, to };
     this.codeEditor.value = this.host.docText().slice(from, to);
-    this.codeEditor.style.display = "block";
+    this.codeBox.style.display = "block";
+    this.paintCodeInk();
     this.positionCodeEditor();
     this.codeEditor.focus();
     this.codeEditor.setSelectionRange(
@@ -615,6 +629,25 @@ export class MindMap {
     );
   }
 
+  /** 色付き層を今の中身で塗り直す（打つたびに呼ぶ） */
+  private paintCodeInk(): void {
+    this.codeInk.replaceChildren();
+    for (const line of tokenizeBlock(this.codeEditor.value)) {
+      for (const t of line) {
+        const span = document.createElement("span");
+        if (t.cls !== "") span.className = t.cls;
+        span.textContent = t.text;
+        this.codeInk.append(span);
+      }
+      // 空行でも高さを持たせる（改行だけの行がある文書で行がずれる）
+      this.codeInk.append(document.createTextNode("\n"));
+    }
+  }
+
+  /**
+   * カードの上にぴったり重ねる。中身が増えたら下と右へ伸ばす — 打っている
+   * 途中で文字が隠れると、何を書いているか分からなくなる。
+   */
   private positionCodeEditor(): void {
     if (!this.codeEdit) return;
     const rect = this.codeRect(this.codeEdit.from, this.codeEdit.to);
@@ -622,13 +655,22 @@ export class MindMap {
       this.endCodeEdit();
       return;
     }
-    const s = this.codeEditor.style;
-    s.left = `${rect.x * this.k + this.tx}px`;
-    s.top = `${rect.y * this.k + this.ty}px`;
-    s.width = `${rect.w * this.k}px`;
-    s.height = `${rect.h * this.k}px`;
-    s.fontSize = `${11 * this.k}px`;
-    s.lineHeight = `${CODE_LINE * this.k}px`;
+    const PAD = 5; // CSS の padding と揃える（world ではなく画面の px）
+    const lines = this.codeEditor.value.split("\n");
+    const wWorld = Math.max(
+      rect.w,
+      Math.max(...lines.map((l) => measure(MONO_FONT, l))) + PAD * 2,
+    );
+    const hWorld = Math.max(rect.h, lines.length * CODE_LINE + PAD * 2);
+    const st = this.codeBox.style;
+    st.left = `${rect.x * this.k + this.tx}px`;
+    st.top = `${rect.y * this.k + this.ty}px`;
+    st.width = `${wWorld * this.k}px`;
+    st.height = `${hWorld * this.k}px`;
+    // 字も枠と同じ倍率で拡縮する（ズームしても箱と字がずれない）
+    st.fontSize = `${11 * this.k}px`;
+    st.lineHeight = `${CODE_LINE * this.k}px`;
+    st.padding = `${PAD * this.k}px`;
   }
 
   /** 中身を文書へ返して閉じる。空にしたらブロックの中身が空になるだけ。 */
@@ -636,7 +678,7 @@ export class MindMap {
     const at = this.codeEdit;
     if (!at) return;
     this.codeEdit = null;
-    this.codeEditor.style.display = "none";
+    this.codeBox.style.display = "none";
     const next = this.codeEditor.value;
     if (next !== this.host.docText().slice(at.from, at.to)) {
       this.host.replaceText(at.from, at.to, next);
@@ -646,7 +688,7 @@ export class MindMap {
 
   private endCodeEdit(): void {
     this.codeEdit = null;
-    this.codeEditor.style.display = "none";
+    this.codeBox.style.display = "none";
   }
 
   /** その画像カードが選ばれているか */
@@ -1242,8 +1284,14 @@ export class MindMap {
       }
     });
     this.codeEditor.addEventListener("blur", () => this.commitCodeEdit());
-    // 掴んで動かす・拡大する間も貼り付いて見えるように
-    this.codeEditor.addEventListener("input", () => this.positionCodeEditor());
+    this.codeEditor.addEventListener("input", () => {
+      this.paintCodeInk();
+      this.positionCodeEditor();
+    });
+    // 横に長い行を打つと textarea だけがスクロールするので、裏の層も揃える
+    this.codeEditor.addEventListener("scroll", () => {
+      this.codeInk.style.transform = `translate(${-this.codeEditor.scrollLeft}px, ${-this.codeEditor.scrollTop}px)`;
+    });
 
     // keyboard, select mode
     pane.addEventListener("keydown", (e) => this.onKeydown(e));

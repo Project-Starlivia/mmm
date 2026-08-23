@@ -18,8 +18,7 @@ export type CardRow =
   // from/to はその行の文書上の位置（× で消すときに使う）
   | { kind: "img"; path: string; name: string; from: number; to: number }
   | { kind: "svg"; markup: string }
-  // from/to は本文（フェンスの内側）の文書上の位置。マップから MD ペインへ
-  // 飛んで直せるように持つ
+  // from/to はフェンスを含むブロック全体の文書上の位置（その場で直すため）
   | { kind: "code"; lang: string; lines: string[]; from: number; to: number };
 
 export const LINK_ROW = 26; // height of one link-card row under the label
@@ -120,9 +119,11 @@ function rowsOfContent(text: string, base: number): CardRow[] {
         }
         body.push(lines[j].replace(/\t/g, "  "));
       }
-      // 本文（フェンスの内側）の範囲。空なら開きフェンスの次の行頭を指す
-      const from = lineAt[li + 1] ?? lineAt[li] + lines[li].length;
-      const to = j > li + 1 ? lineAt[j - 1] + lines[j - 1].length : from;
+      // 開きフェンスから閉じフェンスまで丸ごと。言語の指定も閉じ方も
+      // 直せるようにする（結果フェンスでなくなれば、カードは消えるだけ）
+      const from = lineAt[li];
+      const last = Math.min(j, lines.length - 1);
+      const to = lineAt[last] + lines[last].length;
       li = j; // past the closing fence (or EOF)
       const preview =
         body.length > CODE_MAX_LINES

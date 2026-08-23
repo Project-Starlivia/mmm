@@ -96,3 +96,30 @@ export function tokenize(lines: string[], info: string): Token[][] {
     return plain();
   }
 }
+
+/**
+ * フェンスごと（```lang … ```）の色付け。編集欄は開き・閉じも含めて扱うので、
+ * 囲いの行はそのまま地の文にし、中身だけを言語で読む。
+ * フェンスの体を成していなければ、全部地の文にする。
+ */
+export function tokenizeBlock(text: string): Token[][] {
+  const lines = text.split("\n");
+  const open = /^\s*(`{3,}|~{3,})\s*(\S*)\s*$/.exec(lines[0] ?? "");
+  if (!open || lines.length < 2) return lines.map((t) => [{ text: t, cls: "" }]);
+  // 閉じは開きと同じ文字で同じ長さ以上（CommonMark）。正規表現を組み立てず
+  // 数えるだけにする — 記号を含む式は読みにくく、壊れても気づきにくい
+  const marker = open[1][0];
+  const last = lines.length - 1;
+  const tail = lines[last].trim();
+  const closed =
+    tail.length >= open[1].length &&
+    [...tail].every((c) => c === marker);
+  const body = lines.slice(1, closed ? last : lines.length);
+  const inner = body.length > 0 ? tokenize(body, open[2]) : [];
+  const plain = (t: string): Token[] => [{ text: t, cls: "" }];
+  return [
+    plain(lines[0]),
+    ...inner,
+    ...(closed ? [plain(lines[last])] : []),
+  ];
+}
