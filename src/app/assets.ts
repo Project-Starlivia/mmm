@@ -16,6 +16,28 @@ export function mdPath(rel: string): string {
   return rel.startsWith("../") ? rel : `./${rel.replace(/^\.\//, "")}`;
 }
 
+/** 先頭の `./` を落とした形。`./x` と `x` は同じ場所を指す。 */
+const bare = (path: string): string => path.replace(/^\.\//, "");
+
+/**
+ * md に書かれたパスが、宣言した保存パスの下に収まるか。
+ * 収まればフォルダからの相対を断片で返し、外れていれば null。
+ *
+ * 同じ場所を指す綴りが `./x` と `x` の 2 通りあるので、**必ず裸に寄せてから**
+ * 比べる。md に書くのは `./x`、カード側が持つのは `x` と非対称なため、
+ * どちらか片方だけを見ると既定の保存パス `./` で必ず外れる。
+ */
+export function assetTarget(declared: string, path: string): string[] | null {
+  const prefix = bare(declared);
+  const rest = bare(path);
+  if (!rest.startsWith(prefix)) return null;
+  const parts = rest.slice(prefix.length).split("/").filter(Boolean);
+  if (parts.length === 0) return null;
+  // フォルダの外へ出る綴りは受け取らない（宣言の外は見に行かない）
+  if (parts.some((part) => part === "." || part === "..")) return null;
+  return parts;
+}
+
 const normalizePath = (value: string): string | null => {
   let path = value.trim().replace(/\\/g, "/");
   if (path === "" || path === ".") path = "./";
@@ -114,11 +136,10 @@ export function initAssets(deps: {
   async function loadAsset(path: string): Promise<void> {
     try {
       const binding = await storedBinding();
-      if (!binding || !path.startsWith(binding.path)) return;
+      if (!binding) return;
+      const parts = assetTarget(binding.path, path);
+      if (!parts) return;
       if ((await binding.directory.queryPermission({ mode: "read" })) !== "granted") return;
-      const rel = path.slice(binding.path.length);
-      const parts = rel.split("/").filter(Boolean);
-      if (parts.length === 0 || parts.some((part) => part === "." || part === "..")) return;
       const file = await nestedFile(binding.directory, parts, false);
       const blob = await (await file.getFile()).arrayBuffer();
       const old = assetUrls.get(path);
@@ -194,8 +215,10 @@ export function initAssets(deps: {
           await stream.close();
         }
         const rel = `${binding.path}${parts.join("/")}`;
-        assetUrls.set(rel, URL.createObjectURL(out));
-        return rel;
+        // 鍵はカード側が問い合わせてくる形（裸）に合わせる。
+        // md へ書くのは mdPath の形（`./x`）。
+        assetUrls.set(bare(rel), URL.createObjectURL(out));
+        return mdPath(rel);
       } catch {
         deps.warn("画像の保存に失敗しました");
         return null;
