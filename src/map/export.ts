@@ -83,8 +83,15 @@ export async function exportMapSvg(args: {
       inline(orig.children[i], copy.children[i]);
     }
   };
+  // カードの選択枠と × は render() が**要素として**足したもので、上の
+  // クラス外しでは消えない。クローンから要素ごと落とす（生の DOM は触らない）。
+  // 拾うのは inline() の前 — inline() が class 属性を外すので、後からでは
+  // 選択子が効かない。落とすのは inline() の後 — inline() は orig と copy を
+  // 添字で対応づけて歩くので、途中で木の形を変えられない
+  const overlays = [...nodesG.querySelectorAll(".card-picked, .card-kill")];
   inline(args.edgeLayer, edges);
   inline(args.nodeLayer, nodesG);
+  for (const el of overlays) el.remove();
   for (const s of stripped) s.el.setAttribute("class", s.cls);
   // blob: thumbnails don't resolve outside this page — embed them.
   // 各画像の fetch→blob→dataURL は互いに独立なので並列に待つ

@@ -17,6 +17,12 @@ import { initTheme } from "./app/theme";
 import { sweep } from "./app/persist";
 import { decidePaste } from "./app/paste";
 import { onLanguageReady } from "./map/highlight";
+import {
+  type CardRef,
+  cardRows,
+  contentEnd as contentEndAt,
+} from "./map/cards";
+import { moveCard, removeCard } from "./map/cardEdit";
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -41,6 +47,12 @@ let nodes: NodeInfo[] = [];
 let byId = new Map<number, NodeInfo>();
 let selection = new Set<number>();
 let anchorId = -1;
+/**
+ * 選ばれているカード。ノードの選択とは**どちらか一方だけ**が空でない。
+ * 片方を選ぶともう片方は外れる — 選ばれているものが 2 種類あると、
+ * Delete や Alt+↑↓ が何に効くのか決まらない。
+ */
+let picked: CardRef | null = null;
 let sessionN = 0;
 /** loadText を呼ぶたびに進む世代番号。起動時の前回ファイル読み込みが、
  * その間に New/Open/Drop で別の(空の)文書を開いていた場合まで
@@ -75,6 +87,13 @@ function applySnap(snap: Snapshot, origin: Origin): void {
     anchorId = selection.size ? [...selection][selection.size - 1] : -1;
     selChanged = true;
   }
+  // カードも同じく刈る。指したままだと、キーはカードの枝に吸われ続けて
+  // 矢印も Delete も無反応になる（cardOf は範囲外を null で返すだけで、
+  // 選択そのものは落とさない）。cardRows は安くないので、選んでいるときだけ
+  if (picked !== null && !cardOf(picked)) {
+    picked = null;
+    selChanged = true;
+  }
   // structural edits from elsewhere invalidate the typing-merge chain
   if (origin !== "cm") editKind = "";
   map.render();
@@ -106,13 +125,37 @@ function showName(): void {
   if (flashTimer === -1) elFilename.textContent = docName();
 }
 
-function syncSelectionViews(reveal: boolean): void {
-  map.refreshSelection();
+/** CardRef からいまのカードを引く。範囲外なら null（選択は落とす）。 */
+function cardOf(ref: CardRef | null) {
+  if (!ref) return null;
+  const rows = cardRows(core.getText(), nodes, new Set<number>()).get(ref.node);
+  return rows?.[ref.index] ?? null;
+}
+
+/** そのノードの本文の終わり（末尾へ落としたときの挿入位置）。
+ * 式そのものは src/map/cards.ts の contentEnd が唯一の定義 — ここは
+ * id → index の変換だけを引き受ける。 */
+function contentEnd(id: number): number {
+  const n = byId.get(id);
+  return n ? contentEndAt(nodes, nodes.indexOf(n)) : core.getText().length;
+}
+
+/**
+ * 選択の見た目を貼り直す。`repaint` はカードの選択が出入りしたとき —
+ * カードの枠と × は render が**要素として**作るので、クラスを張り替えるだけの
+ * 軽い経路（refreshSelection）では出ても消えてもくれない。
+ */
+function syncSelectionViews(reveal: boolean, repaint = false): void {
+  if (repaint) map.render();
+  else map.refreshSelection();
+  const card = cardOf(picked);
   editor.highlight(
-    [...selection]
-      .map((id) => byId.get(id))
-      .filter((n): n is NodeInfo => !!n)
-      .map((n) => ({ from: n.hs, to: n.subEnd })),
+    card
+      ? [{ from: card.from, to: card.to }]
+      : [...selection]
+          .map((id) => byId.get(id))
+          .filter((n): n is NodeInfo => !!n)
+          .map((n) => ({ from: n.hs, to: n.subEnd })),
   );
   if (reveal && anchorId !== -1) {
     const n = byId.get(anchorId);
@@ -121,9 +164,13 @@ function syncSelectionViews(reveal: boolean): void {
 }
 
 function setSelection(ids: number[], anchor: number, reveal = true): void {
+  // 相互排他。ids が空でも落とす — clearSelection/Escape が空配列を渡すため、
+  // ids.length で分岐すると空クリックのときだけ picked が居座ってしまう
+  const hadCard = picked !== null;
+  picked = null;
   selection = new Set(ids);
   anchorId = anchor;
-  syncSelectionViews(reveal);
+  syncSelectionViews(reveal, hadCard);
 }
 
 /** Run a structural command; optionally focus / edit the resulting node. */
@@ -207,20 +254,63 @@ const host: MapHost = {
   replaceText(from, to, text) {
     applySnap(core.replaceText(from, to, text, `c${++sessionN}`), "map");
   },
-  deleteText(from, to) {
-    // 行そのものを消す。残った改行が空行として居座らないよう、行末の
-    // 改行も一緒に持っていく（末尾の行なら手前の改行を巻き取る）
-    const text = core.getText();
-    let head = from;
-    let tail = to;
-    if (text[tail] === "\n") tail += 1;
-    else if (head > 0 && text[head - 1] === "\n") head -= 1;
-    applySnap(core.replaceText(head, tail, "", `x${++sessionN}`), "map");
-  },
   selection: () => selection,
   anchor: () => anchorId,
   setSelection: (ids, anchor, reveal) => setSelection(ids, anchor, reveal),
   clearSelection: () => setSelection([], -1, false),
+  pickedCard: () => picked,
+  pickCard(ref) {
+    picked = ref;
+    if (ref) {
+      selection = new Set();
+      anchorId = -1;
+    }
+    syncSelectionViews(false, true);
+  },
+  deleteCard(ref) {
+    const row = cardOf(ref);
+    if (!row) return;
+    picked = null;
+    const e = removeCard(core.getText(), row.from, row.to);
+    applySnap(core.replaceText(e.from, e.to, e.insert, `x${++sessionN}`), "map");
+  },
+  reorderCard(ref, dir) {
+    const rows = cardRows(core.getText(), nodes, new Set<number>()).get(ref.node);
+    const row = rows?.[ref.index];
+    const next = rows?.[ref.index + dir];
+    if (!rows || !row || !next) return; // 端では何もしない
+    // 下へ動かすときは相手の後ろ、上へ動かすときは相手の頭へ入れる。
+    // next.to は次の行の直後（次の改行の手前、または改行の無い文書末）を
+    // 指す — next.to + 1 だと改行の無い文書末で文書長を超えてしまう。
+    // moveCard 側は between を書き戻すだけなので、+1 せずとも行は割れない
+    const at = dir === 1 ? next.to : next.from;
+    const e = moveCard(core.getText(), row.from, row.to, at);
+    if (!e) return;
+    picked = { node: ref.node, index: ref.index + dir };
+    applySnap(core.replaceText(e.from, e.to, e.insert, `m${++sessionN}`), "map");
+  },
+  moveCardTo(ref, node, index) {
+    const text = core.getText();
+    const all = cardRows(text, nodes, new Set<number>());
+    const row = all.get(ref.node)?.[ref.index];
+    if (!row) return false;
+    const target = all.get(node) ?? [];
+    // 落とし先の行頭。末尾なら、そのノードの本文の終わりへ
+    const dst = target[index];
+    const at = dst ? dst.from : contentEnd(node);
+    const e = moveCard(text, row.from, row.to, at);
+    if (!e) return false;
+    // 着地した後の実際の index。同じノードの中で下へ動かすときだけ、
+    // 自分を抜いた分 1 つ前へ詰まる（Alt+↓ の reorderCard と同じ考え方）。
+    // ここで動いた先を picked に付け直すので、ドラッグで動かしたカードも
+    // Alt+↓ と同じく選択が付いてくる — 続けて Alt+↓ を押しても同じ
+    // カードが動く
+    const landing =
+      node === ref.node && index > ref.index ? index - 1 : dst ? index : target.length;
+    picked = { node, index: landing };
+    applySnap(core.replaceText(e.from, e.to, e.insert, `d${++sessionN}`), "map");
+    return true;
+  },
 
   addChild(id) {
     if (!byId.has(id)) return;
@@ -394,6 +484,7 @@ function loadText(text: string, name: string | null): void {
   docGen++;
   savedName = name;
   assets.clear(); // image paths are relative to the (new) md
+  picked = null;
   setSelection([], -1, false);
   const snap = core.initDoc(text);
   editor.setText(text);
@@ -526,14 +617,8 @@ function insertBlock(at: number, body: string, tag = ""): void {
 /** Append a line at the END of a node's own attached content (before its
  * first child heading), as one undo entry. */
 function insertContentLine(id: number, line: string, tag = ""): void {
-  const n = byId.get(id);
-  if (!n) return;
-  const i = nodes.indexOf(n);
-  const at =
-    i + 1 < nodes.length && nodes[i + 1].hs < n.subEnd
-      ? nodes[i + 1].hs
-      : n.subEnd;
-  insertBlock(at, line, tag);
+  if (!byId.has(id)) return;
+  insertBlock(contentEnd(id), line, tag);
 }
 
 async function pasteImage(blob: Blob): Promise<void> {

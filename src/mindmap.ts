@@ -19,12 +19,11 @@ import {
 } from "./map/geometry";
 import { edgeDraw, edgeHintPath, edgeSegs, flattenSegs } from "./map/edge";
 import {
-  type CardRow,
+  type CardRef,
   CODE_LINE,
   CODE_PAD,
-  IMG_H,
-  IMG_ROW,
-  LINK_ROW,
+  cardBleed,
+  cardInset,
   rowH,
 } from "./map/cards";
 import {
@@ -34,6 +33,7 @@ import {
   hiddenLabel,
   measure,
   rowOf,
+  rowTop,
 } from "./map/metrics";
 import { type Box, GAP, layoutMap } from "./map/layout";
 import { exportMapSvg } from "./map/export";
@@ -47,14 +47,23 @@ export interface MapHost {
    * loading / until folder permission is granted */
   imageUrl(path: string): string | null;
   chooseImageFolder(): void;
-  /** その範囲を書き換える（コードカードをその場で直したとき） */
+  /** その範囲を書き換える（カードをその場で直したとき） */
   replaceText(from: number, to: number, text: string): void;
-  /** その範囲を行ごと消す（画像カードの ×） */
-  deleteText(from: number, to: number): void;
   selection(): Set<number>;
   anchor(): number;
   setSelection(ids: number[], anchor: number, reveal?: boolean): void;
   clearSelection(): void;
+  /** 選ばれているカード（無ければ null）。ノードの選択とは排他。 */
+  pickedCard(): CardRef | null;
+  /** カードを選ぶ / 外す（null で外す）。ノードの選択は落ちる。 */
+  pickCard(ref: CardRef | null): void;
+  /** そのカードを行ごと消す */
+  deleteCard(ref: CardRef): void;
+  /** 同じノードの中で 1 つ上/下へ。端では何もしない。 */
+  reorderCard(ref: CardRef, dir: -1 | 1): void;
+  /** そのカードを別のノードの index の位置へ動かす。実際に動かせたら
+   * true — 呼び出し側はこれで、後追いの click を握りつぶすか決める */
+  moveCardTo(ref: CardRef, node: number, index: number): boolean;
 
   addChild(id: number): void; // creates + enters edit mode
   addSibling(id: number): void; // below current
@@ -83,6 +92,10 @@ export interface MapHost {
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
+/** ドラッグと見なす最小の移動量（px の 2 乗）。ダブルクリックの 2 回目が
+ *  わずかに動いてもドラッグに化けないよう、ノードにもカードにも同じ値を使う */
+const DRAG_SLOP2 = 64;
+
 function svgEl<K extends keyof SVGElementTagNameMap>(
   tag: K,
   attrs: Record<string, string> = {},
@@ -104,9 +117,9 @@ export class MindMap {
   private plusBtn: SVGGElement;
   private rubber: HTMLDivElement;
   private editor: HTMLInputElement;
-  private codeBox: HTMLDivElement;
-  private codeInk: HTMLPreElement;
-  private codeEditor: HTMLTextAreaElement;
+  private editBox: HTMLDivElement;
+  private editInk: HTMLPreElement;
+  private cardEditor: HTMLTextAreaElement;
   private hint: HTMLDivElement;
   private menu: HTMLDivElement;
 
@@ -140,6 +153,17 @@ export class MindMap {
   private rubberStart: { x: number; y: number } | null = null;
   private dragCand: { id: number; px: number; py: number } | null = null;
   private dragging: { ids: number[]; subtree: Set<number> } | null = null;
+  /** カードのドラッグ。掴んだだけ（閾値を越えるまで）は drop を出さない */
+  private cardDrag: {
+    ref: CardRef;
+    px: number;
+    py: number;
+    moved: boolean;
+  } | null = null;
+  private cardDrop: { node: number; index: number } | null = null;
+  // ドラッグでカードを動かした直後、pointerup に続いて発火するネイティブの
+  // click が、落とし先の座標にあるカードをふらっと選び直すのを止める印
+  private suppressClick = false;
   // pos 3 = その相手の親として割り込む（A→B の線へのドロップ）
   private dropTarget: {
     id: number;
@@ -152,12 +176,8 @@ export class MindMap {
   private dropMarks = new Map<number, "drop-child" | "drop-parent">();
   private dropEdgeId: number | null = null;
   private hoverId = -1;
-  /** 選んだ画像カード（文書上の位置で覚える。id は編集で変わらない） */
-  private pickedImage: { from: number; to: number } | null = null;
-  /** 直前に描いたときの選択。変わったら画像の選択は落とす */
-  private lastSelSig = "";
-  /** その場で直しているコードブロック（文書上の位置） */
-  private codeEdit: { from: number; to: number } | null = null;
+  /** その場で直しているカード（位置は毎回引き直す） */
+  private editingCard: { ref: CardRef; from: number; to: number } | null = null;
 
   // editing state
   editingId = -1;
@@ -205,19 +225,19 @@ export class MindMap {
     this.editor.spellcheck = false;
     pane.append(this.editor);
 
-    // コードカードはその場で直す。textarea 自体は色を持てないので、
+    // カードはその場で直す。textarea 自体は色を持てないので、
     // 同じ字形・同じ寸法の色付き層を裏に敷いて重ねる（打つのは透明な
     // textarea、見えているのは裏の層）。字がずれないよう font と padding は
     // CSS で 1 か所に揃えてある
-    this.codeBox = document.createElement("div");
-    this.codeBox.id = "code-editor";
-    this.codeBox.style.display = "none";
-    this.codeInk = document.createElement("pre");
-    this.codeInk.className = "code-ink";
-    this.codeEditor = document.createElement("textarea");
-    this.codeEditor.spellcheck = false;
-    this.codeBox.append(this.codeInk, this.codeEditor);
-    pane.append(this.codeBox);
+    this.editBox = document.createElement("div");
+    this.editBox.id = "card-editor";
+    this.editBox.style.display = "none";
+    this.editInk = document.createElement("pre");
+    this.editInk.className = "card-ink";
+    this.cardEditor = document.createElement("textarea");
+    this.cardEditor.spellcheck = false;
+    this.editBox.append(this.editInk, this.cardEditor);
+    pane.append(this.editBox);
 
     this.hint = document.createElement("div");
     this.hint.id = "map-hint";
@@ -257,7 +277,7 @@ export class MindMap {
     const cell = 18 * this.k;
     this.pane.style.backgroundSize = `${cell}px ${cell}px`;
     this.positionEditor();
-    this.positionCodeEditor();
+    this.positionCardEditor();
   }
 
   // ---------- layout & render ----------
@@ -286,7 +306,7 @@ export class MindMap {
       this.endEdit();
     }
     // 言語は後から読み込まれる。開いている編集欄にも遅れて色を載せる
-    if (this.codeEdit) this.paintCodeInk();
+    if (this.editingCard) this.paintEditInk();
 
 
     // ---- DOM を差分更新する ----
@@ -392,8 +412,17 @@ export class MindMap {
       g.append(label, t);
       // card rows (links / images) from the attached content, stacked
       // under the label
-      let rowY = ROW_NORMAL.rowH;
-      for (const r of b.rows) {
+      for (let rowIndex = 0; rowIndex < b.rows.length; rowIndex++) {
+        const r = b.rows[rowIndex];
+        const spot = `${n.id},${rowIndex}`;
+        const rowY = rowTop(b.rows, rowIndex);
+        // 中身の置き場所。選択の枠も入力欄（cardRect）もここに合わせる
+        const inset = cardInset(r);
+        const bleed = cardBleed(r);
+        const y = rowY + inset;
+        const x = ROW_NORMAL.padX - bleed;
+        const w = b.w - ROW_NORMAL.padX * 2 + bleed * 2;
+        const h = rowH(r) - inset * 2;
         g.append(
           svgEl("line", {
             class: "card-sep",
@@ -404,30 +433,41 @@ export class MindMap {
           }),
         );
         if (r.kind === "link") {
+          // 当たり判定の面。他の 3 種は絵や背景がその役をするが、リンクは
+          // 文字しか描かないので、行いっぱいの透明な面を敷く
+          const hit = svgEl("rect", {
+            class: "link-hit",
+            "data-card": spot,
+            x: String(ROW_NORMAL.padX),
+            y: String(y),
+            width: String(w),
+            height: String(h),
+          });
           const title = svgEl("text", {
             class: "link-row",
             x: String(ROW_NORMAL.padX),
-            y: String(rowY + LINK_ROW / 2),
+            y: String(y + h / 2),
           });
           title.textContent = r.link.title;
           const tt = svgEl("title");
           tt.textContent = r.link.url;
           const open = svgEl("text", {
             class: "link-open",
-            x: String(b.w - ROW_NORMAL.padX + 6),
-            y: String(rowY + LINK_ROW / 2),
+            // 枠の内側に収める。外へ出すと、選択の枠が本体より小さく見える
+            x: String(x + w),
+            y: String(y + h / 2),
             "text-anchor": "end",
           });
           open.textContent = "↗";
           open.setAttribute("data-url", r.link.url);
-          g.append(title, tt, open);
-          rowY += LINK_ROW;
+          g.append(hit, title, tt, open);
         } else if (r.kind === "svg") {
           const img = svgEl("image", {
+            "data-card": spot,
             x: String(ROW_NORMAL.padX),
-            y: String(rowY + 6),
-            width: String(b.w - ROW_NORMAL.padX * 2),
-            height: String(IMG_H),
+            y: String(y),
+            width: String(w),
+            height: String(h),
             preserveAspectRatio: "xMidYMid meet",
           });
           img.setAttribute(
@@ -435,17 +475,16 @@ export class MindMap {
             `data:image/svg+xml;charset=utf-8,${encodeURIComponent(r.markup)}`,
           );
           g.append(img);
-          rowY += IMG_ROW;
         } else if (r.kind === "code") {
-          const h = r.lines.length * CODE_LINE + CODE_PAD * 2;
-          const where = `${r.from},${r.to}`;
+          // 背景は左右にも張り出す（コードは箱の縁まで塗る）。張り出しは
+          // 共有の x / w に織り込み済みなので、ここで足し直さない
           const bg = svgEl("rect", {
             class: "code-bg",
-            "data-code": where,
-            x: String(ROW_NORMAL.padX - 5),
-            y: String(rowY + 5),
-            width: String(b.w - (ROW_NORMAL.padX - 5) * 2),
-            height: String(h - 10),
+            "data-card": spot,
+            x: String(x),
+            y: String(y),
+            width: String(w),
+            height: String(h),
             rx: "5",
           });
           if (r.lang !== "") {
@@ -458,7 +497,7 @@ export class MindMap {
           for (let i = 0; i < r.lines.length; i++) {
             const ln = svgEl("text", {
               class: "code-line",
-              "data-code": where,
+              "data-card": spot,
               x: String(ROW_NORMAL.padX + 1),
               y: String(rowY + CODE_PAD + i * CODE_LINE + CODE_LINE / 2),
             });
@@ -470,18 +509,15 @@ export class MindMap {
             }
             g.append(ln);
           }
-          rowY += h;
         } else {
           const url = this.host.imageUrl(r.path);
-          const spot = `${r.from},${r.to}`;
-          const imgW = b.w - ROW_NORMAL.padX * 2;
           if (url !== null) {
             const img = svgEl("image", {
-              "data-image": spot,
+              "data-card": spot,
               x: String(ROW_NORMAL.padX),
-              y: String(rowY + 6),
-              width: String(imgW),
-              height: String(IMG_H),
+              y: String(y),
+              width: String(w),
+              height: String(h),
               preserveAspectRatio: "xMidYMid meet",
             });
             img.setAttribute("href", url);
@@ -492,61 +528,57 @@ export class MindMap {
             g.append(
               svgEl("rect", {
                 class: "img-ph",
-                "data-image": spot,
+                "data-card": spot,
                 x: String(ROW_NORMAL.padX),
-                y: String(rowY + 6),
-                width: String(b.w - ROW_NORMAL.padX * 2),
-                height: String(IMG_H),
+                y: String(y),
+                width: String(w),
+                height: String(h),
                 rx: "6",
               }),
             );
             const ph = svgEl("text", {
               class: "img-name",
-              "data-image": spot,
+              "data-card": spot,
               x: String(b.w / 2),
-              y: String(rowY + 6 + IMG_H / 2),
+              y: String(y + h / 2),
               "text-anchor": "middle",
             });
             ph.textContent = r.name;
             g.append(ph);
           }
-          if (this.isPicked(r)) {
-            g.append(
-              svgEl("rect", {
-                class: "img-picked",
-                x: String(ROW_NORMAL.padX),
-                y: String(rowY + 6),
-                width: String(imgW),
-                height: String(IMG_H),
-                rx: "6",
+        }
+        if (this.isPicked(n.id, rowIndex)) {
+          g.append(
+            svgEl("rect", {
+              class: "card-picked",
+              x: String(x),
+              y: String(y),
+              width: String(w),
+              height: String(h),
+              rx: "6",
+            }),
+          );
+          // × は角そのものに載せる。枠線がボタンの中心を通る位置
+          const cx = x + w;
+          const cy = y;
+          const arm = 2.5; // 中心からの腕の長さ
+          const kill = svgEl("g", { class: "card-kill", "data-kill": spot });
+          kill.append(svgEl("circle", { cx: String(cx), cy: String(cy), r: "7" }));
+          // × は文字ではなく線で引く。字だと書体で中心も太さも揺れる
+          for (const [dx, dy] of [
+            [1, 1],
+            [1, -1],
+          ]) {
+            kill.append(
+              svgEl("line", {
+                x1: String(cx - arm * dx),
+                y1: String(cy - arm * dy),
+                x2: String(cx + arm * dx),
+                y2: String(cy + arm * dy),
               }),
             );
-            // × は角そのものに載せる。枠線がボタンの中心を通る位置
-            const cx = ROW_NORMAL.padX + imgW;
-            const cy = rowY + 6;
-            const R = 7;
-            const arm = 2.5; // 中心からの腕の長さ
-            const kill = svgEl("g", { class: "img-kill", "data-kill": spot });
-            kill.append(
-              svgEl("circle", { cx: String(cx), cy: String(cy), r: String(R) }),
-            );
-            // × は文字ではなく線で引く。字だと書体で中心も太さも揺れる
-            for (const [dx, dy] of [
-              [1, 1],
-              [1, -1],
-            ]) {
-              kill.append(
-                svgEl("line", {
-                  x1: String(cx - arm * dx),
-                  y1: String(cy - arm * dy),
-                  x2: String(cx + arm * dx),
-                  y2: String(cy + arm * dy),
-                }),
-              );
-            }
-            g.append(kill);
           }
-          rowY += IMG_ROW;
+          g.append(kill);
         }
       }
     }
@@ -602,61 +634,93 @@ export class MindMap {
   }
 
   /**
-   * コードカードの置かれている場所（world 座標）。描画の積み方をそのまま
+   * カードの置かれている場所（world 座標）。描画の積み方をそのまま
    * なぞって数える — 描画時に控えておく手もあるが、中身が変わっていない
    * ノードは作り直しを飛ばすので、控えは歯抜けになる。
    */
-  private codeRect(
-    from: number,
-    to: number,
+  private cardRect(
+    ref: CardRef,
   ): { x: number; y: number; w: number; h: number } | null {
-    for (const b of this.boxes.values()) {
+    const b = this.boxes.get(ref.node);
+    const r = b?.rows[ref.index];
+    if (!b || !r || b.n.hidden) return null;
+    const inset = cardInset(r);
+    const bleed = cardBleed(r);
+    return {
+      x: b.x + ROW_NORMAL.padX - bleed,
+      y: b.y + rowTop(b.rows, ref.index) + inset,
+      w: b.w - ROW_NORMAL.padX * 2 + bleed * 2,
+      h: rowH(r) - inset * 2,
+    };
+  }
+
+  /** その座標が、どのノードの何枚目と何枚目の間か */
+  private cardSlotAt(
+    clientX: number,
+    clientY: number,
+  ): { node: number; index: number } | null {
+    const w = this.toWorld(clientX, clientY);
+    for (const [id, b] of this.boxes) {
       if (b.n.hidden) continue;
-      let rowY = ROW_NORMAL.rowH;
-      for (const r of b.rows) {
-        if (r.kind === "code" && r.from === from && r.to === to) {
-          return {
-            x: b.x + ROW_NORMAL.padX - 5,
-            y: b.y + rowY + 5,
-            w: b.w - (ROW_NORMAL.padX - 5) * 2,
-            h: r.lines.length * CODE_LINE + CODE_PAD * 2 - 10,
-          };
-        }
-        rowY += rowH(r);
+      if (w.x < b.x || w.x > b.x + b.w || w.y < b.y || w.y > b.y + b.h) continue;
+      for (let i = 0; i < b.rows.length; i++) {
+        // 行の上半分なら「その手前」、下半分なら「次の隙間」
+        const mid = b.y + rowTop(b.rows, i) + rowH(b.rows[i]) / 2;
+        if (w.y < mid) return { node: id, index: i };
       }
+      return { node: id, index: b.rows.length };
     }
     return null;
   }
 
-  /** コードカードをその場で開く。閉じるのは Esc / Mod+Enter / 他所クリック。 */
-  private beginCodeEdit(from: number, to: number): void {
-    const rect = this.codeRect(from, to);
-    if (!rect) return;
+  /** 落とし先を線で示す */
+  private showCardDrop(): void {
+    const d = this.cardDrop;
+    if (!d) {
+      this.dropLine.setAttribute("visibility", "hidden");
+      return;
+    }
+    const b = this.boxes.get(d.node);
+    if (!b) return;
+    const y = b.y + rowTop(b.rows, d.index);
+    this.dropLine.setAttribute("x1", String(b.x + ROW_NORMAL.padX));
+    this.dropLine.setAttribute("y1", String(y));
+    this.dropLine.setAttribute("x2", String(b.x + b.w - ROW_NORMAL.padX));
+    this.dropLine.setAttribute("y2", String(y));
+    this.dropLine.setAttribute("visibility", "visible");
+  }
+
+  /** カードをその場で開く。閉じるのは Esc / Mod+Enter / 他所クリック。 */
+  private beginCardEdit(ref: CardRef): void {
+    const b = this.boxes.get(ref.node);
+    const row = b?.rows[ref.index];
+    const rect = this.cardRect(ref);
+    if (!row || !rect) return;
     if (this.isEditing()) this.host.commitEdit();
-    this.codeEdit = { from, to };
-    this.codeEditor.value = this.host.docText().slice(from, to);
-    this.codeBox.style.display = "block";
-    this.paintCodeInk();
-    this.positionCodeEditor();
-    this.codeEditor.focus();
-    this.codeEditor.setSelectionRange(
-      this.codeEditor.value.length,
-      this.codeEditor.value.length,
+    this.editingCard = { ref, from: row.from, to: row.to };
+    this.cardEditor.value = this.host.docText().slice(row.from, row.to);
+    this.editBox.style.display = "block";
+    this.paintEditInk();
+    this.positionCardEditor();
+    this.cardEditor.focus();
+    this.cardEditor.setSelectionRange(
+      this.cardEditor.value.length,
+      this.cardEditor.value.length,
     );
   }
 
   /** 色付き層を今の中身で塗り直す（打つたびに呼ぶ） */
-  private paintCodeInk(): void {
-    this.codeInk.replaceChildren();
-    for (const line of tokenizeBlock(this.codeEditor.value)) {
+  private paintEditInk(): void {
+    this.editInk.replaceChildren();
+    for (const line of tokenizeBlock(this.cardEditor.value)) {
       for (const t of line) {
         const span = document.createElement("span");
         if (t.cls !== "") span.className = t.cls;
         span.textContent = t.text;
-        this.codeInk.append(span);
+        this.editInk.append(span);
       }
       // 空行でも高さを持たせる（改行だけの行がある文書で行がずれる）
-      this.codeInk.append(document.createTextNode("\n"));
+      this.editInk.append(document.createTextNode("\n"));
     }
   }
 
@@ -664,15 +728,17 @@ export class MindMap {
    * カードの上にぴったり重ねる。中身が増えたら下と右へ伸ばす — 打っている
    * 途中で文字が隠れると、何を書いているか分からなくなる。
    */
-  private positionCodeEditor(): void {
-    if (!this.codeEdit) return;
-    const rect = this.codeRect(this.codeEdit.from, this.codeEdit.to);
+  private positionCardEditor(): void {
+    if (!this.editingCard) return;
+    const rect = this.cardRect(this.editingCard.ref);
     if (!rect) {
-      this.endCodeEdit();
+      this.endCardEdit();
       return;
     }
-    const PAD = 5; // CSS の padding と揃える（world ではなく画面の px）
-    const lines = this.codeEditor.value.split("\n");
+    // 入力欄の内側の余白。CSS には宣言が無く、ここが唯一の源
+    // （world の単位。CSS へ書くときだけ倍率を掛ける）
+    const PAD = 5;
+    const lines = this.cardEditor.value.split("\n");
     const wWorld = Math.max(
       rect.w,
       Math.max(...lines.map((l) => measure(MONO_FONT, l))) + PAD * 2,
@@ -680,7 +746,7 @@ export class MindMap {
     const hWorld = Math.max(rect.h, lines.length * CODE_LINE + PAD * 2);
     const BORDER = 2; // 枠は拡大しない。box-sizing の分を足しておかないと
     //                   最終行が 1〜2px 削れる
-    const st = this.codeBox.style;
+    const st = this.editBox.style;
     st.left = `${rect.x * this.k + this.tx}px`;
     st.top = `${rect.y * this.k + this.ty}px`;
     st.width = `${wWorld * this.k + BORDER}px`;
@@ -692,31 +758,27 @@ export class MindMap {
   }
 
   /** 中身を文書へ返して閉じる。空にしたらブロックの中身が空になるだけ。 */
-  private commitCodeEdit(): void {
-    const at = this.codeEdit;
+  private commitCardEdit(): void {
+    const at = this.editingCard;
     if (!at) return;
-    this.codeEdit = null;
-    this.codeBox.style.display = "none";
-    const next = this.codeEditor.value;
+    this.editingCard = null;
+    this.editBox.style.display = "none";
+    const next = this.cardEditor.value;
     if (next !== this.host.docText().slice(at.from, at.to)) {
       this.host.replaceText(at.from, at.to, next);
     }
     this.pane.focus();
   }
 
-  private endCodeEdit(): void {
-    this.codeEdit = null;
-    this.codeBox.style.display = "none";
+  private endCardEdit(): void {
+    this.editingCard = null;
+    this.editBox.style.display = "none";
   }
 
-  /** その画像カードが選ばれているか */
-  private isPicked(r: CardRow): boolean {
-    return (
-      r.kind === "img" &&
-      this.pickedImage !== null &&
-      this.pickedImage.from === r.from &&
-      this.pickedImage.to === r.to
-    );
+  /** そのカードが選ばれているか（ノード id と何枚目かで見る） */
+  private isPicked(nodeId: number, index: number): boolean {
+    const p = this.host.pickedCard();
+    return p !== null && p.node === nodeId && p.index === index;
   }
 
   private contentSig(n: NodeInfo, b: Box, buried: number): string {
@@ -725,14 +787,13 @@ export class MindMap {
     const SEP = "\u0000";
     // 言語の読み込みは後から効くので、世代も署名に混ぜる
     let s = `${b.w}|${b.h}|${n.hidden ? 1 : 0}|${buried}|${languageEpoch()}|${n.label}`;
-    for (const r of b.rows) {
+    for (let i = 0; i < b.rows.length; i++) {
+      const r = b.rows[i];
       if (r.kind === "link") s += `|L${r.link.title}${SEP}${r.link.url}`;
       else if (r.kind === "svg") s += `|S${r.markup}`;
       else if (r.kind === "code") s += `|C${r.lang}${SEP}${r.lines.join(SEP)}`;
-      else
-        s +=
-          `|I${r.path}${SEP}${this.host.imageUrl(r.path) ?? ""}` +
-          (this.isPicked(r) ? `${SEP}picked` : "");
+      else s += `|I${r.path}${SEP}${this.host.imageUrl(r.path) ?? ""}`;
+      if (this.isPicked(n.id, i)) s += `${SEP}picked`;
     }
     return s;
   }
@@ -1000,10 +1061,14 @@ export class MindMap {
     // the + button and link-open glyph stop pointerdown propagation, so
     // this handler only ever sees pane/node/editor presses
     pane.addEventListener("pointerdown", (e) => {
+      // 新しい操作の始まり。前の操作が立てた「次の click は捨てる」印が
+      // 使われないまま残っていたら、ここで落とす（残すとユーザーの
+      // 次の 1 クリックを食う）
+      this.suppressClick = false;
       // 入力欄の中のクリックはカーソルを置くためのもので、確定ではない。
       // ここで pane.focus() まで進むと、押した瞬間に blur して閉じてしまう
       if (e.target === this.editor) return;
-      if (this.codeBox.contains(e.target as Node)) return;
+      if (this.editBox.contains(e.target as Node)) return;
       if (this.isEditing()) this.host.commitEdit();
       this.hideMenu();
       pane.focus();
@@ -1025,6 +1090,26 @@ export class MindMap {
       }
       if (e.button !== 0) return;
 
+      // 選んでいるカード（と その ×）の上での押下は、そのカードのもの。
+      // ここでノード選択を仕込むと、pointerup が選択を作り直して picked を
+      // 落とし、click が届く前に × が DOM から消える。選んでいるカードの
+      // 上からのドラッグはカードを動かす — 選んでいないカードの上からは、
+      // 従来どおりノードが動く（既存の D&D を奪わない）
+      const downKill = MindMap.span(this.markAt(e.clientX, e.clientY, "data-kill"));
+      const downCard = MindMap.span(this.markAt(e.clientX, e.clientY, "data-card"));
+      const held = this.host.pickedCard();
+      if (downKill !== null) return;
+      if (
+        downCard !== null &&
+        held !== null &&
+        held.node === downCard[0] &&
+        held.index === downCard[1]
+      ) {
+        this.cardDrag = { ref: held, px: e.clientX, py: e.clientY, moved: false };
+        pane.setPointerCapture(e.pointerId);
+        return;
+      }
+
       const id = this.nodeAt(e.clientX, e.clientY);
       if (id !== -1) {
         this.dragCand = { id, px: e.clientX, py: e.clientY };
@@ -1038,6 +1123,16 @@ export class MindMap {
     });
 
     pane.addEventListener("pointermove", (e) => {
+      if (this.cardDrag) {
+        const dx = e.clientX - this.cardDrag.px;
+        const dy = e.clientY - this.cardDrag.py;
+        // 一度でも越えたらドラッグ。戻ってきても掴んだままにする
+        if (!this.cardDrag.moved && dx * dx + dy * dy <= DRAG_SLOP2) return;
+        this.cardDrag.moved = true;
+        this.cardDrop = this.cardSlotAt(e.clientX, e.clientY);
+        this.showCardDrop();
+        return;
+      }
       if (this.panning) {
         this.tx = this.panning.ox + e.clientX - this.panning.px;
         this.ty = this.panning.oy + e.clientY - this.panning.py;
@@ -1091,9 +1186,7 @@ export class MindMap {
       if (this.dragCand && !this.dragging) {
         const dx = e.clientX - this.dragCand.px;
         const dy = e.clientY - this.dragCand.py;
-        // generous threshold so the second press of a double-click never
-        // turns into a drag
-        if (dx * dx + dy * dy > 64) this.startDrag();
+        if (dx * dx + dy * dy > DRAG_SLOP2) this.startDrag();
       }
       if (this.dragging) {
         this.lastPointer = { x: e.clientX, y: e.clientY };
@@ -1102,6 +1195,17 @@ export class MindMap {
     });
 
     pane.addEventListener("pointerup", (e) => {
+      if (this.cardDrag) {
+        const from = this.cardDrag.ref;
+        const to = this.cardDrop;
+        this.cardDrag = null;
+        this.cardDrop = null;
+        this.dropLine.setAttribute("visibility", "hidden");
+        if (to && this.host.moveCardTo(from, to.node, to.index)) {
+          this.suppressClick = true;
+        }
+        return;
+      }
       if (this.panning) {
         this.panning = null;
         pane.style.cursor = this.spaceDown ? "grab" : "";
@@ -1169,18 +1273,21 @@ export class MindMap {
       this.rubber.style.display = "none";
       this.dragCand = null;
       if (this.dragging) this.stopDragVisuals();
+      this.cardDrag = null;
+      this.cardDrop = null;
+      this.dropLine.setAttribute("visibility", "hidden");
       pane.style.cursor = "";
     });
 
     pane.addEventListener("dblclick", (e) => {
       // double-clicking the ↗ glyph opens the link; don't also start editing
       if ((e.target as Element).classList?.contains("link-open")) return;
-      // コードカードはラベルではなく本文を直すので、MD ペインへ渡す。
+      // カードはラベルではなく元テキストを直すので、専用の入力欄を開く。
       // 編集の場所を 2 つ持たない — 隣に本物のエディタが出ている
-      const code = MindMap.span(this.markAt(e.clientX, e.clientY, "data-code"));
-      if (code) {
+      const card = MindMap.span(this.markAt(e.clientX, e.clientY, "data-card"));
+      if (card) {
         e.preventDefault();
-        this.beginCodeEdit(code[0], code[1]);
+        this.beginCardEdit({ node: card[0], index: card[1] });
         return;
       }
       // hit-test by position: pointer capture retargets the event to the
@@ -1221,19 +1328,26 @@ export class MindMap {
     // ペインに付ける。nodeLayer だと、ポインタキャプチャで
     // イベントがペインへ付け替わったとき伝播経路から外れて届かない
     pane.addEventListener("click", (e) => {
-      const t = e.target as Element;
-      // × は選択中の画像にだけ出ている。押されたらその行ごと消す
-      const kill = MindMap.span(this.markAt(e.clientX, e.clientY, "data-kill"));
-      if (kill) {
-        this.pickedImage = null;
-        this.host.deleteText(kill[0], kill[1]);
+      if (this.suppressClick) {
+        this.suppressClick = false;
         return;
       }
-      const pick = MindMap.span(this.markAt(e.clientX, e.clientY, "data-image"));
+      const t = e.target as Element;
+      // × は選ばれているカードにだけ出ている。押されたらその行ごと消す
+      const kill = MindMap.span(this.markAt(e.clientX, e.clientY, "data-kill"));
+      if (kill) {
+        this.host.deleteCard({ node: kill[0], index: kill[1] });
+        return;
+      }
+      const pick = MindMap.span(this.markAt(e.clientX, e.clientY, "data-card"));
       if (pick) {
-        const same = this.pickedImage?.from === pick[0];
-        this.pickedImage = same ? null : { from: pick[0], to: pick[1] };
-        this.render();
+        const ref = { node: pick[0], index: pick[1] };
+        // pointerdown が「いま掴んでいるカードの上」を dragCand の対象から
+        // 外している（下記 pointerdown 参照）ので、素のノード選択は起きず
+        // picked はここに来るまで書き換わっていない
+        const now = this.host.pickedCard();
+        const same = now !== null && now.node === ref.node && now.index === ref.index;
+        this.host.pickCard(same ? null : ref);
         return;
       }
       if (!t.classList?.contains("link-open")) return;
@@ -1293,20 +1407,20 @@ export class MindMap {
       if (this.editingId !== -1) this.host.commitEdit();
     });
 
-    // コードの入力欄。Enter は改行なので、確定は Esc / Mod+Enter / 他所へ移る
-    this.codeEditor.addEventListener("keydown", (e) => {
+    // カードの入力欄。Enter は改行なので、確定は Esc / Mod+Enter / 他所へ移る
+    this.cardEditor.addEventListener("keydown", (e) => {
       e.stopPropagation(); // マップのショートカットへ流さない
       if (e.isComposing || e.keyCode === 229) return;
       if (e.key === "Escape" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) {
         e.preventDefault();
-        this.commitCodeEdit();
+        this.commitCardEdit();
       }
     });
-    this.codeEditor.addEventListener("blur", () => this.commitCodeEdit());
-    this.codeEditor.addEventListener("beforeinput", (e) => {
-      const v = this.codeEditor.value;
-      let from = this.codeEditor.selectionStart;
-      let to = this.codeEditor.selectionEnd;
+    this.cardEditor.addEventListener("blur", () => this.commitCardEdit());
+    this.cardEditor.addEventListener("beforeinput", (e) => {
+      const v = this.cardEditor.value;
+      let from = this.cardEditor.selectionStart;
+      let to = this.cardEditor.selectionEnd;
       // 選択が無いときの削除は、隣の 1 文字へ伸びる
       if (from === to) {
         if (e.inputType.startsWith("deleteContentBackward")) from = Math.max(0, from - 1);
@@ -1314,9 +1428,9 @@ export class MindMap {
       }
       if (touchesFence(v, from, to)) e.preventDefault();
     });
-    this.codeEditor.addEventListener("input", () => {
-      this.paintCodeInk();
-      this.positionCodeEditor();
+    this.cardEditor.addEventListener("input", () => {
+      this.paintEditInk();
+      this.positionCardEditor();
     });
 
     // keyboard, select mode
@@ -1366,6 +1480,49 @@ export class MindMap {
         ? e.key.toLowerCase()
         : e.key;
 
+    // カードを選んでいる間は、キーはカードに効く。ノードの選択とは排他なので
+    // 「どちらに効くのか」で迷わない
+    const card = this.host.pickedCard();
+    if (card && !e.altKey) {
+      if (key === "Delete" || key === "Backspace") {
+        this.host.deleteCard(card);
+        e.preventDefault();
+        return;
+      }
+      if (key.startsWith("Arrow")) {
+        // 矢印はここで丸ごと引き取る。Mod+矢印はノード側の
+        // `if (mod) return;` と同じく何も割り当てないが、素通りはさせない
+        // — card 選択中は anchor が -1 なので、下のノード用ハンドラへ渡すと
+        // 無関係な先頭ノードへ飛んだりしてしまう（ArrowRight も同じ理由で
+        // ここで止め、下へは渡さない）
+        e.preventDefault();
+        if (mod) return;
+        if (key === "ArrowUp" || key === "ArrowDown") {
+          const rows = this.boxes.get(card.node)?.rows ?? [];
+          const next = card.index + (key === "ArrowUp" ? -1 : 1);
+          if (next >= 0 && next < rows.length) {
+            this.host.pickCard({ node: card.node, index: next });
+          }
+        } else if (key === "ArrowLeft") {
+          this.host.setSelection([card.node], card.node);
+        }
+        return;
+      }
+    }
+    if (card && e.altKey && !mod && (key === "ArrowUp" || key === "ArrowDown")) {
+      this.host.reorderCard(card, key === "ArrowUp" ? -1 : 1);
+      e.preventDefault();
+      return;
+    }
+    // ここまでで拾わなかった矢印（Alt+←→ など）も、card 選択中はここで
+    // 止める。ブラウザの戻る/進むには渡らないが、ノード用ハンドラに
+    // 抜けさせない方を優先する — 抜けると anchor=-1 の副作用で
+    // 無関係な先頭ノードへ飛んでしまう
+    if (card && key.startsWith("Arrow")) {
+      e.preventDefault();
+      return;
+    }
+
     // comment-out hide/show for the subtree (= collapse)
     if (key === "H" && !mod && !e.altKey && anchor !== -1) {
       this.host.toggleHidden(anchor);
@@ -1396,6 +1553,12 @@ export class MindMap {
 
     // edit the label
     if (key === "Enter" && mod) {
+      const p = this.host.pickedCard();
+      if (p) {
+        this.beginCardEdit(p);
+        e.preventDefault();
+        return;
+      }
       if (nodes.length === 0) this.host.addRoot();
       else if (anchor !== -1 && sel.size <= 1) this.host.editRequested(anchor);
       e.preventDefault();
@@ -1466,7 +1629,7 @@ export class MindMap {
     // movement: arrows. 上下は同じ深さの列を縦に辿る
     if (!key.startsWith("Arrow")) return;
     // 並べ替えは Alt+↑↓（Alt+←→ はブラウザの戻る/進むなので取らない）
-    if (e.altKey && (key === "ArrowUp" || key === "ArrowDown")) {
+    if (e.altKey && !mod && (key === "ArrowUp" || key === "ArrowDown")) {
       e.preventDefault();
       if (anchor !== -1 && sel.size === 1) {
         this.host.reorder(anchor, key === "ArrowUp" ? -1 : 1);
@@ -1501,8 +1664,11 @@ export class MindMap {
     } else {
       if (key === "ArrowLeft") next = cur.parent;
       else
+        // 子が無ければ先頭へ回る。上下が兄弟の中で回るのと同じで、
+        // 行き止まりで無反応になるより一周できるほうが迷わない
         next =
           nodes.find((n) => n.parent === anchor && this.boxes.has(n.id))?.id ??
+          this.order[0] ??
           -1;
     }
     if (next === -1 || next === undefined) return;
@@ -1890,20 +2056,10 @@ export class MindMap {
     this.menu.style.display = "none";
   }
 
-  /** Cheap selection repaint without a full re-layout (rubber band path). */
+  /** Cheap selection repaint without a full re-layout (rubber band path).
+   *  選択そのものは持たない — 何が選ばれているかは main.ts が決める。 */
   refreshSelection(): void {
     const sel = this.host.selection();
-    // ノードの選択が動いたら、画像の選択は連れて行かない。選ばれている
-    // ものが 2 種類あると、× が何に効くのか分からなくなる。
-    // ここは選択が動く唯一の入口（render は通らない）
-    const selSig = [...sel].sort((a, b) => a - b).join(",");
-    if (selSig !== this.lastSelSig) {
-      this.lastSelSig = selSig;
-      if (this.pickedImage) {
-        this.pickedImage = null;
-        this.render(); // × を消すには中身を作り直す必要がある
-      }
-    }
     for (const [id, g] of this.nodeEls) {
       g.classList.toggle("selected", sel.has(id));
       // class を直接触ったらキャッシュも合わせる。放置すると次の render が

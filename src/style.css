@@ -185,9 +185,14 @@ html, body {
 }
 .node text.label.empty { fill: var(--ink-dim); }
 .node line.card-sep { stroke: var(--node-border); stroke-width: 1; }
+/* リンク行の当たり判定。見えないが押せる（他の 3 種は絵や背景がこの役をする） */
+.node rect.link-hit { fill: transparent; cursor: pointer; }
+/* 当たり判定は下に敷いた rect が持つ。文字が上から拾ってしまうと、
+   タイトルの上だけクリックが死ぬ（SVG の text はインクに当たる） */
 .node text.link-row {
   font-size: 12px;
-  fill: var(--accent);
+  fill: var(--ink);
+  pointer-events: none;
 }
 .node text.link-open {
   font-size: 13px;
@@ -208,24 +213,24 @@ html, body {
   font-size: 11px;
   fill: var(--ink-dim);
 }
-/* 選んだ画像の枠と、その右上の × */
-.node rect.img-picked {
+/* 選んだカードの枠と、その右上の × */
+.node rect.card-picked {
   fill: none;
   stroke: var(--accent);
   stroke-width: 2;
   pointer-events: none;
 }
-.node .img-kill { cursor: pointer; }
-.node .img-kill circle { fill: var(--accent); stroke: var(--node-bg); stroke-width: 1.5; }
-.node .img-kill line {
+.node .card-kill { cursor: pointer; }
+.node .card-kill circle { fill: var(--accent); stroke: var(--node-bg); stroke-width: 1.5; }
+.node .card-kill line {
   stroke: #fff;
   stroke-width: 1.6;
   stroke-linecap: round;
   pointer-events: none;
 }
-.node .img-kill:hover circle { fill: #e5534b; }
+.node .card-kill:hover circle { fill: #e5534b; }
 
-.node rect.code-bg { fill: var(--bg); stroke: var(--node-border); stroke-width: 1; }
+.node rect.code-bg { fill: var(--bg); stroke: var(--node-border); stroke-width: 1; cursor: pointer; }
 .node text.code-line {
   font-family: "Cascadia Code", Consolas, "JetBrains Mono", monospace;
   font-size: 11px;
@@ -306,10 +311,10 @@ html, body {
   display: none;
 }
 
-/* コードカードをその場で直す編集欄。裏に色付きの層（.code-ink）、
+/* カードをその場で直す編集欄。裏に色付きの層（.card-ink）、
    表に透明な textarea を重ねる。字がずれないよう、font と padding と
    line-height は入れ物側で 1 回だけ決めて両方に継がせる */
-#code-editor {
+#card-editor {
   position: absolute;
   display: none;
   box-sizing: border-box;
@@ -320,8 +325,8 @@ html, body {
   overflow: hidden;
   z-index: 10;
 }
-#code-editor .code-ink,
-#code-editor textarea {
+#card-editor .card-ink,
+#card-editor textarea {
   position: absolute;
   inset: 0;
   margin: 0;
@@ -334,11 +339,11 @@ html, body {
   border: none;
   background: none;
 }
-#code-editor .code-ink {
+#card-editor .card-ink {
   color: var(--ink);
   pointer-events: none;
 }
-#code-editor textarea {
+#card-editor textarea {
   color: transparent;
   caret-color: var(--accent);
   resize: none;
@@ -347,7 +352,7 @@ html, body {
      auto にすると使わないスクロールバーが場所を取って字がずれる */
   overflow: hidden;
 }
-#code-editor textarea::selection { background: var(--accent-soft); }
+#card-editor textarea::selection { background: var(--accent-soft); }
 
 #node-editor {
   position: absolute;

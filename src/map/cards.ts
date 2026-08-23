@@ -12,22 +12,32 @@ export interface LinkInfo {
   host: string;
 }
 
-/** One card row under the label, from the attached content. */
+/** One card row under the label, from the attached content.
+ *  from/to はそのカードの元テキストの範囲。`text.slice(from, to)` が
+ *  そのカードそのものになる（選択・編集・移動はすべてこれに乗る）。 */
 export type CardRow =
-  | { kind: "link"; link: LinkInfo }
-  // from/to はその行の文書上の位置（× で消すときに使う）
+  | { kind: "link"; link: LinkInfo; from: number; to: number }
   | { kind: "img"; path: string; name: string; from: number; to: number }
-  | { kind: "svg"; markup: string }
-  // from/to はフェンスを含むブロック全体の文書上の位置（その場で直すため）
+  | { kind: "svg"; markup: string; from: number; to: number }
   | { kind: "code"; lang: string; lines: string[]; from: number; to: number };
 
-export const LINK_ROW = 26; // height of one link-card row under the label
-export const IMG_H = 64; // thumbnail height inside an image row
-export const IMG_ROW = IMG_H + 12; // height of one image row under the label
+/**
+ * カードの指し方。文書上の位置ではなく「ノード id + そのノードの中で
+ * 何枚目か」で指す — 位置だと別のノードを 1 行編集しただけでずれるが、
+ * ノード id はコアが編集をまたいで維持するので外れない。
+ */
+export interface CardRef {
+  node: number;
+  index: number;
+}
+
+const LINK_ROW = 26; // height of one link-card row under the label
+const IMG_H = 64; // thumbnail height inside an image row
+const IMG_ROW = IMG_H + 12; // height of one image row under the label
 export const IMG_MIN_W = 200; // image/svg content is at least this wide (before node padding)
 export const CODE_LINE = 15; // height of one preview line in a code row
 export const CODE_PAD = 8; // vertical padding inside a code row
-export const CODE_MAX_LINES = 6; // longer blocks are cut with a trailing …
+const CODE_MAX_LINES = 6; // longer blocks are cut with a trailing …
 
 /** カード行 1 つぶんの高さ */
 export const rowH = (r: CardRow): number =>
@@ -36,6 +46,21 @@ export const rowH = (r: CardRow): number =>
     : r.kind === "code"
       ? r.lines.length * CODE_LINE + CODE_PAD * 2
       : LINK_ROW;
+
+/**
+ * カード 1 行の、行の枠から中身までの上下の余白。選択の枠も、その場で
+ * 直す入力欄も、同じ場所を指さないと 2px ずれる — 実際にずれた。
+ * 数字を 2 か所に置かないための唯一の定義。
+ */
+export const cardInset = (r: CardRow): number =>
+  r.kind === "code" ? 5 : r.kind === "link" ? 4 : 6;
+
+/**
+ * カード 1 行が、中身の箱から左右へはみ出す量。コードだけは背景をノードの
+ * 縁近くまで塗るので、その分だけ広い。上下の `cardInset` と同じ理由で
+ * ここが唯一の定義 — 選択の枠が本体より内側に出て、小さく見えていた。
+ */
+export const cardBleed = (r: CardRow): number => (r.kind === "code" ? 5 : 0);
 
 /** Label of the form `[text](https://...)` or a bare URL. */
 export function parseLink(label: string): LinkInfo | null {
@@ -101,6 +126,8 @@ function rowsOfContent(text: string, base: number): CardRow[] {
     lineAt.push(off);
     off += lines[i].length + 1;
   }
+  /** 行 k の終わり（改行の手前）= どのカードの to もこれ */
+  const endOf = (k: number): number => lineAt[k] + lines[k].length;
   const list: CardRow[] = [];
   for (let li = 0; li < lines.length; li++) {
     const t = lines[li].trim();
@@ -122,8 +149,7 @@ function rowsOfContent(text: string, base: number): CardRow[] {
       // 開きフェンスから閉じフェンスまで丸ごと。言語の指定も閉じ方も
       // 直せるようにする（結果フェンスでなくなれば、カードは消えるだけ）
       const from = lineAt[li];
-      const last = Math.min(j, lines.length - 1);
-      const to = lineAt[last] + lines[last].length;
+      const to = endOf(Math.min(j, lines.length - 1));
       li = j; // past the closing fence (or EOF)
       const preview =
         body.length > CODE_MAX_LINES
@@ -143,7 +169,12 @@ function rowsOfContent(text: string, base: number): CardRow[] {
         buf.push(lines[j]);
       }
       if (buf[buf.length - 1].includes("</svg>")) {
-        list.push({ kind: "svg", markup: buf.join("\n") });
+        list.push({
+          kind: "svg",
+          markup: buf.join("\n"),
+          from: lineAt[li],
+          to: endOf(j),
+        });
         li = j;
         continue;
       }
@@ -155,14 +186,29 @@ function rowsOfContent(text: string, base: number): CardRow[] {
         path: im.path,
         name: im.name,
         from: lineAt[li],
-        to: lineAt[li] + lines[li].length,
+        to: endOf(li),
       });
     } else {
       const l = parseLink(lines[li]);
-      if (l) list.push({ kind: "link", link: l });
+      if (l)
+        list.push({ kind: "link", link: l, from: lineAt[li], to: endOf(li) });
     }
   }
   return list;
+}
+
+/**
+ * そのノード（nodes[i]）の本文の終わり: 次ノードの見出し行頭、無ければ
+ * そのノードの部分木の終わり。カード行を切り出す境界（cardRows）と、
+ * カードの移動先を「そのノードの末尾」に決める境界（main.ts の
+ * moveCardTo/insertContentLine）は同じ場所を指す — この式をここ以外に
+ * 書かない。
+ */
+export function contentEnd(nodes: NodeInfo[], i: number): number {
+  const n = nodes[i];
+  return i + 1 < nodes.length && nodes[i + 1].hs < n.subEnd
+    ? nodes[i + 1].hs
+    : n.subEnd;
 }
 
 /**
@@ -184,10 +230,7 @@ export function cardRows(
     }
     const nlPos = doc.indexOf("\n", n.he);
     const cStart = nlPos === -1 ? -1 : nlPos + 1;
-    const cEnd =
-      i + 1 < nodes.length && nodes[i + 1].hs < n.subEnd
-        ? nodes[i + 1].hs
-        : n.subEnd;
+    const cEnd = contentEnd(nodes, i);
     if (cStart > 0 && cStart < cEnd) {
       out.set(n.id, rowsOfContent(doc.slice(cStart, cEnd), cStart));
     } else {

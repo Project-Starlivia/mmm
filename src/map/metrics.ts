@@ -101,6 +101,18 @@ export function hiddenLabel(n: NodeInfo, buried: number): string {
   return clipLabel(raw, ROW_HIDDEN.font, budget) + badge;
 }
 
+/**
+ * 箱の上から数えて、i 枚目のカード行の上端はどこか。カードはラベル行の下に
+ * 積むので、i = rows.length なら積み終わり = 箱の高さそのものになる。
+ * 「行 i は縦のどこか」を数えるのはここだけ — 描画も当たり判定も落とし先も
+ * 同じ積み方を見る（散らばっていた頃、余白が 2px ずれた）。
+ */
+export function rowTop(rows: CardRow[], i: number): number {
+  let y = ROW_NORMAL.rowH;
+  for (let k = 0; k < i; k++) y += rowH(rows[k]);
+  return y;
+}
+
 /** ノードの箱の大きさ。ラベルとカード行から決まる */
 export function nodeSize(n: NodeInfo, rows: CardRow[], buried: number): { w: number; h: number } {
   if (n.hidden) {
@@ -114,9 +126,7 @@ export function nodeSize(n: NodeInfo, rows: CardRow[], buried: number): { w: num
   }
   const label = displayLabel(n.label);
   let w = measure(ROW_NORMAL.font, label);
-  let h = ROW_NORMAL.rowH;
   for (const r of rows) {
-    h += rowH(r);
     if (r.kind === "img" || r.kind === "svg") {
       w = Math.max(w, IMG_MIN_W);
     } else if (r.kind === "code") {
@@ -130,5 +140,5 @@ export function nodeSize(n: NodeInfo, rows: CardRow[], buried: number): { w: num
   // w はここまで content 幅（左右パディング抜き）。最終的な箱の幅は
   // これに ROW_NORMAL.padX*2 を足したもの — IMG_MIN_W 等の「最低幅」も
   // content 側の基準であって、箱の実測幅そのものではない。
-  return { w: Math.ceil(w) + ROW_NORMAL.padX * 2, h };
+  return { w: Math.ceil(w) + ROW_NORMAL.padX * 2, h: rowTop(rows, rows.length) };
 }
