@@ -195,7 +195,9 @@ html, body {
   cursor: pointer;
 }
 .node text.link-open:hover { fill: var(--accent); }
-.node image { pointer-events: none; }
+/* 画像も当たり判定に入れる（クリックで選ぶため）。ドラッグやノードの
+   当たり判定は座標で見ているので、これを外しても掴めなくならない */
+.node image { cursor: pointer; }
 .node rect.img-ph {
   fill: transparent;
   stroke: var(--node-border);
