@@ -1102,6 +1102,28 @@ export class MindMap {
       e.preventDefault();
       return;
     }
+    // 名前がまだ無いノード。ここでは「足す」より「埋める」ほうが要る
+    const blank =
+      anchor !== -1 &&
+      sel.size <= 1 &&
+      (nodes.find((n) => n.id === anchor)?.label ?? "").trim() === "";
+
+    // 名前が無いなら、打ち始めればそのまま書ける（Enter を挟ませない）。
+    // 入れる文字は e.key のまま — CapsLock 正規化した key を使うと、
+    // CapsLock で打った大文字が小文字になって入る。
+    // Space はパンに使うので除く。
+    if (blank && !mod && !e.altKey && e.key.length === 1 && e.key !== " ") {
+      this.host.editRequested(anchor);
+      if (this.isEditing()) {
+        this.editor.value = e.key;
+        this.editor.setSelectionRange(1, 1);
+        // 既存の input 経路に乗せる（ラベルと箱の幅がそのまま追従する）
+        this.editor.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      e.preventDefault();
+      return;
+    }
+
     // edit the label
     if (key === "Enter" && mod) {
       if (nodes.length === 0) this.host.addRoot();
@@ -1109,9 +1131,18 @@ export class MindMap {
       e.preventDefault();
       return;
     }
-    // Enter: add a sibling below (mmm.md そのに: enterで兄弟追加、復活)
+    // Shift+Enter: 上に兄弟を足す
+    if (key === "Enter" && e.shiftKey) {
+      if (anchor !== -1) this.host.addSiblingBefore(anchor);
+      e.preventDefault();
+      return;
+    }
+    // Enter: add a sibling below (mmm.md そのに: enterで兄弟追加、復活)。
+    // 名前が無いノードでは、まずそこを埋める — 空のまま足しても名無しが
+    // 2 つ並ぶだけで、次に打つ場所が決まらない
     if (key === "Enter") {
       if (nodes.length === 0) this.host.addRoot();
+      else if (blank) this.host.editRequested(anchor);
       else if (anchor !== -1) this.host.addSibling(anchor);
       e.preventDefault();
       return;
@@ -1508,8 +1539,8 @@ export class MindMap {
         disabled: multi,
       },
       {
-        // キーは持たない（上への追加は下への追加＋並べ替えで届く）
         label: "上に追加",
+        key: "Shift+Enter",
         run: () => this.host.addSiblingBefore(this.host.anchor()),
         disabled: multi,
       },
