@@ -216,10 +216,11 @@ html, body {
   pointer-events: none;
 }
 .node .img-kill { cursor: pointer; }
-.node .img-kill circle { fill: var(--accent); }
-.node .img-kill text {
-  fill: #fff;
-  font-size: 13px;
+.node .img-kill circle { fill: var(--accent); stroke: var(--node-bg); stroke-width: 1.5; }
+.node .img-kill line {
+  stroke: #fff;
+  stroke-width: 1.6;
+  stroke-linecap: round;
   pointer-events: none;
 }
 .node .img-kill:hover circle { fill: #e5534b; }

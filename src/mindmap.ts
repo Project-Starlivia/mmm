@@ -513,21 +513,29 @@ export class MindMap {
                 rx: "6",
               }),
             );
-            // × は画像の右上の角に重ねる
-            const cx = ROW_NORMAL.padX + imgW - 11;
-            const cy = rowY + 6 + 11;
+            // × は角そのものに載せる。枠線がボタンの中心を通る位置
+            const cx = ROW_NORMAL.padX + imgW;
+            const cy = rowY + 6;
+            const R = 9;
+            const arm = 3.2; // 中心からの腕の長さ
             const kill = svgEl("g", { class: "img-kill", "data-kill": spot });
             kill.append(
-              svgEl("circle", { cx: String(cx), cy: String(cy), r: "9" }),
+              svgEl("circle", { cx: String(cx), cy: String(cy), r: String(R) }),
             );
-            const mark = svgEl("text", {
-              x: String(cx),
-              y: String(cy),
-              "text-anchor": "middle",
-              "dominant-baseline": "central",
-            });
-            mark.textContent = "×";
-            kill.append(mark);
+            // × は文字ではなく線で引く。字だと書体で中心も太さも揺れる
+            for (const [dx, dy] of [
+              [1, 1],
+              [1, -1],
+            ]) {
+              kill.append(
+                svgEl("line", {
+                  x1: String(cx - arm * dx),
+                  y1: String(cy - arm * dy),
+                  x2: String(cx + arm * dx),
+                  y2: String(cy + arm * dy),
+                }),
+              );
+            }
             g.append(kill);
           }
           rowY += IMG_ROW;
