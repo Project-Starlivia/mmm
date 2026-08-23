@@ -35,6 +35,8 @@ export interface MapHost {
    * loading / until folder permission is granted */
   imageUrl(path: string): string | null;
   chooseImageFolder(): void;
+  /** マップから MD ペインへ飛んで、その範囲を選ぶ（コードカードの編集） */
+  editText(from: number, to: number): void;
   selection(): Set<number>;
   anchor(): number;
   setSelection(ids: number[], anchor: number, reveal?: boolean): void;
@@ -395,8 +397,10 @@ export class MindMap {
           rowY += IMG_ROW;
         } else if (r.kind === "code") {
           const h = r.lines.length * CODE_LINE + CODE_PAD * 2;
+          const where = `${r.from},${r.to}`;
           const bg = svgEl("rect", {
             class: "code-bg",
+            "data-code": where,
             x: String(ROW_NORMAL.padX - 5),
             y: String(rowY + 5),
             width: String(b.w - (ROW_NORMAL.padX - 5) * 2),
@@ -413,6 +417,7 @@ export class MindMap {
           for (let i = 0; i < r.lines.length; i++) {
             const ln = svgEl("text", {
               class: "code-line",
+              "data-code": where,
               x: String(ROW_NORMAL.padX + 1),
               y: String(rowY + CODE_PAD + i * CODE_LINE + CODE_LINE / 2),
             });
@@ -951,6 +956,19 @@ export class MindMap {
     pane.addEventListener("dblclick", (e) => {
       // double-clicking the ↗ glyph opens the link; don't also start editing
       if ((e.target as Element).classList?.contains("link-open")) return;
+      // コードカードはラベルではなく本文を直すので、MD ペインへ渡す。
+      // 編集の場所を 2 つ持たない — 隣に本物のエディタが出ている
+      const code = (e.target as Element).closest?.("[data-code]");
+      if (code) {
+        const [from, to] = (code.getAttribute("data-code") ?? "")
+          .split(",")
+          .map(Number);
+        if (Number.isFinite(from) && Number.isFinite(to)) {
+          e.preventDefault();
+          this.host.editText(from, to);
+          return;
+        }
+      }
       // hit-test by position: pointer capture retargets the event to the
       // pane, so e.target never points at the node that was clicked
       const id = this.nodeAt(e.clientX, e.clientY);

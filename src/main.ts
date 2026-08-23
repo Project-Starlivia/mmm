@@ -203,6 +203,11 @@ const host: MapHost = {
   nodes: () => nodes,
   docText: () => core.getText(),
   chooseImageFolder: () => void assets.chooseFolder(),
+  editText(from, to) {
+    // MD ペインが隠れていたら出してから渡す（飛び先が見えないと意味がない）
+    showPane("md");
+    editor.select(from, to);
+  },
   selection: () => selection,
   anchor: () => anchorId,
   setSelection: (ids, anchor, reveal) => setSelection(ids, anchor, reveal),
@@ -631,7 +636,7 @@ window.addEventListener(
 
 // ---------- pane / splitter / export / theme（実装は app/ 配下） ----------
 
-const { togglePane, togglePaneVis } = initPanes({
+const { togglePane, togglePaneVis, showPane } = initPanes({
   mdPane,
   mapPane,
   panesEl: $("panes"),

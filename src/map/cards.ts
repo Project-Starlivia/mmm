@@ -17,7 +17,9 @@ export type CardRow =
   | { kind: "link"; link: LinkInfo }
   | { kind: "img"; path: string; name: string }
   | { kind: "svg"; markup: string }
-  | { kind: "code"; lang: string; lines: string[] };
+  // from/to は本文（フェンスの内側）の文書上の位置。マップから MD ペインへ
+  // 飛んで直せるように持つ
+  | { kind: "code"; lang: string; lines: string[]; from: number; to: number };
 
 export const LINK_ROW = 26; // height of one link-card row under the label
 export const IMG_H = 64; // thumbnail height inside an image row
@@ -85,8 +87,21 @@ export function hasLocalImage(text: string): boolean {
   return text.split("\n").some((l) => parseImage(l) !== null);
 }
 
-/** 本文からカード行を抜き出す（1 ノードぶん） */
-function rowsOfContent(lines: string[]): CardRow[] {
+/**
+ * 本文からカード行を抜き出す（1 ノードぶん）。`base` はこの本文が文書の
+ * どこから始まるかで、コードブロックの位置を文書の座標へ戻すのに使う。
+ *
+ * 行分割は LF だけで行う。アプリの中の改行は常に LF なので結果は同じで、
+ * かつ 1 行の長さ +1 がそのまま次の行頭になる（CR を挟む切り方だと、
+ * その 1 文字ぶん位置がずれる）。
+ */
+function rowsOfContent(text: string, base: number): CardRow[] {
+  const lines = text.split("\n");
+  const lineAt: number[] = [];
+  for (let i = 0, off = base; i < lines.length; i++) {
+    lineAt.push(off);
+    off += lines[i].length + 1;
+  }
   const list: CardRow[] = [];
   for (let li = 0; li < lines.length && list.length < CARD_MAX_ROWS; li++) {
     const t = lines[li].trim();
@@ -105,6 +120,9 @@ function rowsOfContent(lines: string[]): CardRow[] {
         }
         body.push(lines[j].replace(/\t/g, "  "));
       }
+      // 本文（フェンスの内側）の範囲。空なら開きフェンスの次の行頭を指す
+      const from = lineAt[li + 1] ?? lineAt[li] + lines[li].length;
+      const to = j > li + 1 ? lineAt[j - 1] + lines[j - 1].length : from;
       li = j; // past the closing fence (or EOF)
       const preview =
         body.length > CODE_MAX_LINES
@@ -112,7 +130,7 @@ function rowsOfContent(lines: string[]): CardRow[] {
           : body.length > 0
             ? body
             : [""];
-      list.push({ kind: "code", lang: fence[2], lines: preview });
+      list.push({ kind: "code", lang: fence[2], lines: preview, from, to });
       continue;
     }
     // inline <svg>…</svg> block (rendered via data URL — static, safe)
@@ -164,7 +182,7 @@ export function cardRows(
         ? nodes[i + 1].hs
         : n.subEnd;
     if (cStart > 0 && cStart < cEnd) {
-      out.set(n.id, rowsOfContent(doc.slice(cStart, cEnd).split(/\r?\n/)));
+      out.set(n.id, rowsOfContent(doc.slice(cStart, cEnd), cStart));
     } else {
       out.set(n.id, []);
     }

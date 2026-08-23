@@ -11,7 +11,11 @@ export function initPanes(args: {
   mapButton: HTMLButtonElement;
   /** md 側のフォーカスは CodeMirror が持つので注入 */
   focusEditor: () => void;
-}): { togglePane: () => void; togglePaneVis: (which: "md" | "map") => void } {
+}): {
+  togglePane: () => void;
+  togglePaneVis: (which: "md" | "map") => void;
+  showPane: (which: "md" | "map") => void;
+} {
   const { mdPane, mapPane, panesEl, splitter, mdButton, mapButton } = args;
   let paneVis = { md: true, map: true };
 
@@ -39,6 +43,11 @@ export function initPanes(args: {
     // never end up with zero panes: hiding the last one shows the other
     if (!next.md && !next.map) next[which === "md" ? "map" : "md"] = true;
     applyPaneVis(next);
+  };
+
+  /** 隠れていたら出す。出ているときは何もしない（切り替えではない）。 */
+  const showPane = (which: "md" | "map"): void => {
+    if (!paneVis[which]) applyPaneVis({ ...paneVis, [which]: true });
   };
 
   mdButton.addEventListener("click", () => togglePaneVis("md"));
@@ -87,5 +96,5 @@ export function initPanes(args: {
   // ボタンのオン/オフ表示を初期化するため、既定でも必ず一度通す
   applyPaneVis({ md: true, map: true });
 
-  return { togglePane, togglePaneVis };
+  return { togglePane, togglePaneVis, showPane };
 }
