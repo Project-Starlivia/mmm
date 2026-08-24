@@ -2,9 +2,9 @@
 // すべての木は左から右へ伸びる。
 
 import type { DocView, NodeInfo } from "../coreApi.ts";
-import { type CardRow, cardRows } from "./cards.ts";
-import { type Pt, leftOf, rightOf } from "./geometry.ts";
-import { nodeSize } from "./metrics.ts";
+import { type CardRow, cardBleed, cardInset, cardRows, rowH } from "./cards.ts";
+import { type Pt, type Rect, leftOf, rightOf } from "./geometry.ts";
+import { ROW_NORMAL, nodeSize, rowTop } from "./metrics.ts";
 
 export const GAP = {
   x: 45,
@@ -25,6 +25,25 @@ export interface Box {
   w: number;
   h: number;
   rows: CardRow[];
+}
+
+/**
+ * カード 1 行の中身を置く矩形（**箱の左上から見た座標**）。
+ *
+ * 描くのも、選んだ枠を出すのも、その場で直す入力欄を置くのも、必ずここを
+ * 通る。以前は描画とマップが同じ積み方を別々に数えていて、実際に 2px ずれた。
+ */
+export function cardRect(b: Box, index: number): Rect | null {
+  const r = b.rows[index];
+  if (r === undefined) return null;
+  const inset = cardInset(r);
+  const bleed = cardBleed(r);
+  return {
+    x: ROW_NORMAL.padX - bleed,
+    y: rowTop(b.rows, index) + inset,
+    w: b.w - ROW_NORMAL.padX * 2 + bleed * 2,
+    h: rowH(r) - inset * 2,
+  };
 }
 
 export interface Layout {

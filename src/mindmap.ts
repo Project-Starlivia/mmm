@@ -6,18 +6,18 @@
 
 import type { DocView } from "./coreApi.ts";
 import { tokenizeBlock, touchesFence } from "./map/highlight.ts";
-import { type Pt, midOfPolyline, rightOf } from "./map/geometry.ts";
+import { type Pt, type Rect, midOfPolyline, rightOf } from "./map/geometry.ts";
 import { edgePath, edgeSegs, flattenSegs } from "./map/edge.ts";
-import {
-  type CardRef,
-  type CardRow,
-  CODE_LINE,
-  cardBleed,
-  cardInset,
-  rowH,
-} from "./map/cards.ts";
+import { type CardRef, type CardRow, CODE_LINE, rowH } from "./map/cards.ts";
 import { MONO_FONT, ROW_NORMAL, measure, rowOf, rowTop } from "./map/metrics.ts";
-import { type Box, type Layout, GAP, edgeEnds, layoutMap } from "./map/layout.ts";
+import {
+  type Box,
+  type Layout,
+  GAP,
+  cardRect,
+  edgeEnds,
+  layoutMap,
+} from "./map/layout.ts";
 import { type DropTarget, resolveDrop } from "./map/drop.ts";
 import { arrowTarget, extendSelection, isArrowKey } from "./map/navigate.ts";
 import { cardPlacement, labelPlacement } from "./map/overlay.ts";
@@ -357,24 +357,14 @@ export class MindMap {
   }
 
   /**
-   * カードの置かれている場所（world 座標）。描画の積み方をそのまま
-   * なぞって数える — 描画時に控えておく手もあるが、中身が変わっていない
-   * ノードは作り直しを飛ばすので、控えは歯抜けになる。
+   * カードの置かれている場所（world 座標）。積み方は数えない —
+   * `cardRect` が描画と共通の唯一の出所で、ここは箱の位置ぶん動かすだけ。
    */
-  private cardRect(
-    ref: CardRef,
-  ): { x: number; y: number; w: number; h: number } | null {
+  private cardWorld(ref: CardRef): Rect | null {
     const b = this.boxes.get(ref.node);
-    const r = b?.rows[ref.index];
-    if (!b || !r || b.n.hidden) return null;
-    const inset = cardInset(r);
-    const bleed = cardBleed(r);
-    return {
-      x: b.x + ROW_NORMAL.padX - bleed,
-      y: b.y + rowTop(b.rows, ref.index) + inset,
-      w: b.w - ROW_NORMAL.padX * 2 + bleed * 2,
-      h: rowH(r) - inset * 2,
-    };
+    if (!b || b.n.hidden) return null;
+    const r = cardRect(b, ref.index);
+    return r === null ? null : { ...r, x: b.x + r.x, y: b.y + r.y };
   }
 
   /**
@@ -398,7 +388,7 @@ export class MindMap {
   /** 選んでいるカードの上に印を置き直す（レイアウトか選択が動いたら呼ぶ） */
   private showPick(): void {
     const ref = this.host.pickedCard();
-    if (ref) this.pick.show(ref, this.cardRect(ref));
+    if (ref) this.pick.show(ref, this.cardWorld(ref));
     else this.pick.hide();
   }
 
@@ -449,7 +439,7 @@ export class MindMap {
   private beginCardEdit(ref: CardRef): void {
     const b = this.boxes.get(ref.node);
     const row = b?.rows[ref.index];
-    const rect = this.cardRect(ref);
+    const rect = this.cardWorld(ref);
     if (!row || !rect) return;
     if (this.isEditingLabel()) this.host.commitEdit();
     this.editingCard = ref;
@@ -485,7 +475,7 @@ export class MindMap {
    */
   private positionCardEditor(): void {
     if (!this.editingCard) return;
-    const rect = this.cardRect(this.editingCard);
+    const rect = this.cardWorld(this.editingCard);
     if (!rect) {
       this.endCardEdit();
       return;
