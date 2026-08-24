@@ -66,10 +66,6 @@ export function layoutMap(doc: DocView): Layout {
   const nodes = doc.nodes;
   const { visible, buried, buriedCount } = collapseHidden(nodes);
   const rowsOf = cardRows(doc, buried);
-  const sizes = new Map<number, { w: number; h: number }>();
-  for (const n of visible) {
-    sizes.set(n.id, nodeSize(n, rowsOf.get(n.id)!, buriedCount.get(n.id) ?? 0));
-  }
 
   const children = new Map<number, NodeInfo[]>();
   const tops: NodeInfo[] = [];
@@ -81,27 +77,46 @@ export function layoutMap(doc: DocView): Layout {
       else children.set(n.parent, [n]);
     }
   }
+  const kidsOf = (n: NodeInfo): NodeInfo[] => children.get(n.id) ?? [];
   const root = tops.find((n) => n.depth === 1) ?? null;
   const boxes = new Map<number, Box>();
-  const subH = new Map<number, number>();
 
-  const stackH = (kids: NodeInfo[]): number => {
-    let sum = 0;
-    for (let i = 0; i < kids.length; i++) sum += (subH.get(kids[i].id) ?? 0) + gapBefore(i);
-    return sum;
+  // 寸法と部分木の高さは**要るときに測って覚える**。先に表を埋めてから
+  // 引き直す形だと「必ず入っているはず」を `!` で言い張ることになり、
+  // 順番を間違えたときに遠くで落ちる
+  const sizes = new Map<number, { w: number; h: number }>();
+  const sizeOf = (n: NodeInfo): { w: number; h: number } => {
+    const hit = sizes.get(n.id);
+    if (hit) return hit;
+    const size = nodeSize(n, rowsOf.get(n.id) ?? [], buriedCount.get(n.id) ?? 0);
+    sizes.set(n.id, size);
+    return size;
   };
 
-  const measureTree = (n: NodeInfo): number => {
-    const kids = children.get(n.id) ?? [];
-    for (const child of kids) measureTree(child);
-    const height = Math.max(sizes.get(n.id)!.h, kids.length === 0 ? 0 : stackH(kids));
-    subH.set(n.id, height);
+  const heights = new Map<number, number>();
+  /** その部分木が縦にどれだけ要るか（自分の高さと、子を積んだ高さの大きい方） */
+  const heightOf = (n: NodeInfo): number => {
+    const hit = heights.get(n.id);
+    if (hit !== undefined) return hit;
+    const kids = kidsOf(n);
+    const height = Math.max(
+      sizeOf(n).h,
+      kids.length === 0 ? 0 : stackH(kids),
+    );
+    heights.set(n.id, height);
     return height;
   };
 
+  /** 子を縦に積んだときの高さ（あいだの隙間込み） */
+  function stackH(kids: NodeInfo[]): number {
+    let sum = 0;
+    for (let i = 0; i < kids.length; i++) sum += heightOf(kids[i]) + gapBefore(i);
+    return sum;
+  }
+
   const place = (n: NodeInfo, left: number, top: number): number => {
-    const size = sizes.get(n.id)!;
-    const kids = children.get(n.id) ?? [];
+    const size = sizeOf(n);
+    const kids = kidsOf(n);
     let centerY: number;
     if (kids.length === 0) {
       centerY = top + size.h / 2;
@@ -111,7 +126,7 @@ export function layoutMap(doc: DocView): Layout {
       for (let i = 0; i < kids.length; i++) {
         y += gapBefore(i);
         centers.push(place(kids[i], left + size.w + GAP.x, y));
-        y += subH.get(kids[i].id)!;
+        y += heightOf(kids[i]);
       }
       centerY = (centers[0] + centers[centers.length - 1]) / 2;
     }
@@ -121,48 +136,43 @@ export function layoutMap(doc: DocView): Layout {
       y: centerY - size.h / 2,
       w: size.w,
       h: size.h,
-      rows: rowsOf.get(n.id)!,
+      rows: rowsOf.get(n.id) ?? [],
     });
     return centerY;
   };
 
-  if (root) {
-    measureTree(root);
-    place(root, 0, -subH.get(root.id)! / 2);
-  }
+  if (root) place(root, 0, -heightOf(root) / 2);
 
   let bottom = 0;
   for (const box of boxes.values()) bottom = Math.max(bottom, box.y + box.h);
   let top = boxes.size > 0 ? bottom + GAP.root * 2 : 0;
   for (const tree of tops) {
     if (tree === root) continue;
-    measureTree(tree);
     place(tree, 0, top);
-    top += subH.get(tree.id)! + GAP.root;
+    top += heightOf(tree) + GAP.root;
   }
 
   const parentOf = new Map<number, number>();
   const fanOf = new Map<number, number>();
-  for (const n of visible) {
-    if (n.parent !== -1 && boxes.has(n.parent) && boxes.has(n.id)) parentOf.set(n.id, n.parent);
+  // 付け根をずらすのは「同じ親から出る線が 2 本以上」あるときだけ。
+  // 箱そのものを持ち回るので、id で引き直して「必ず在るはず」を言わなくてよい
+  const fans = new Map<number, { parent: Box; kids: Box[] }>();
+  for (const [id, b] of boxes) {
+    const pid = b.n.parent;
+    const parent = pid === -1 ? undefined : boxes.get(pid);
+    if (!parent) continue;
+    parentOf.set(id, pid);
+    const fan = fans.get(pid);
+    if (fan) fan.kids.push(b);
+    else fans.set(pid, { parent, kids: [b] });
   }
-  const fans = new Map<number, NodeInfo[]>();
-  for (const n of visible) {
-    if (!parentOf.has(n.id)) continue;
-    const list = fans.get(n.parent);
-    if (list) list.push(n);
-    else fans.set(n.parent, [n]);
-  }
-  const centerY = (id: number): number => {
-    const b = boxes.get(id)!;
-    return b.y + b.h / 2;
-  };
-  for (const list of fans.values()) {
-    if (list.length < 2) continue;
-    const band = boxes.get(list[0].parent)!.h * FAN_BAND;
-    const sorted = [...list].sort((a, b) => centerY(a.id) - centerY(b.id));
+  const centerY = (b: Box): number => b.y + b.h / 2;
+  for (const { parent, kids } of fans.values()) {
+    if (kids.length < 2) continue;
+    const band = parent.h * FAN_BAND;
+    const sorted = [...kids].sort((a, b) => centerY(a) - centerY(b));
     for (let i = 0; i < sorted.length; i++) {
-      fanOf.set(sorted[i].id, ((i + 0.5) / sorted.length - 0.5) * band);
+      fanOf.set(sorted[i].n.id, ((i + 0.5) / sorted.length - 0.5) * band);
     }
   }
 

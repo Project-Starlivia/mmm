@@ -6,7 +6,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { core, initDoc, getText, shape, randomDoc, brief, fuzzCases, type NodeInfo, type Snapshot } from "./_helpers.ts";
+import { core, initDoc, getText, shape, randomDoc, brief, fuzzCases, nodeOf, reason, type NodeInfo, type Snapshot } from "./_helpers.ts";
 
 const CASES = fuzzCases(250);
 
@@ -110,7 +110,7 @@ test("C3: コマンド実行後のツリーが常に内部整合を保つ", () =
     initDoc(SEED_DOC);
     let s;
     try { s = fn(); } catch (e) { failures.push(`${name}: 例外 ${String(e).slice(0, 120)}`); continue; }
-    try { assertTreeSane(s.nodes, getText(), name); } catch (e) { failures.push(`${name}: ${(e as Error).message}`); }
+    try { assertTreeSane(s.nodes, getText(), name); } catch (e) { failures.push(`${name}: ${reason(e)}`); }
   }
   assert.deepEqual(failures, [], `整合性が壊れるコマンド:\n  ${failures.join("\n  ")}`);
 });
@@ -195,7 +195,7 @@ test("C6: hide→show がテキストを元に戻す", () => {
 
 test("C7: hide 状態のノードは構造に残り、hidden=true になる", () => {
   const s = initDoc("# r\n\n## a\n\n### a1\n\n## b\n");
-  const a = s.nodes.find((n) => n.label === "a")!;
+  const a = nodeOf(s.nodes, "a");
   const idsBefore = s.nodes.map((n) => n.id);
   const h = (core.toggleHidden(a.id));
   assert.deepEqual(h.nodes.map((n) => n.id), idsBefore, "hide でノード id が変わった");
@@ -296,8 +296,8 @@ test("C10b: ルートの兄弟位置への移動でノードが消えない（F-
   const failures: string[] = [];
   for (const pos of [1, 2] as const) {
     const s0 = initDoc(md);
-    const root = s0.nodes.find((n) => n.depth === 1)!;
-    const b = s0.nodes.find((n) => n.label === "b")!;
+    const root = nodeOf(s0.nodes, "root");
+    const b = nodeOf(s0.nodes, "b");
     const s1 = (core.moveNodes([b.id], root.id, pos));
     const lostIds = s0.nodes.map((n) => n.id).filter((id) => !s1.nodes.some((n) => n.id === id));
     if (lostIds.length) {
@@ -336,15 +336,15 @@ test("C12: 自分の子孫への移動が木を壊さない", () => {
   const failures: string[] = [];
   const md = "# r\n\n## a\n\n### a1\n\n#### a11\n\n## b\n";
   const s0 = initDoc(md);
-  const a = s0.nodes.find((n) => n.label === "a")!;
-  const a1 = s0.nodes.find((n) => n.label === "a1")!;
-  const a11 = s0.nodes.find((n) => n.label === "a11")!;
+  const a = nodeOf(s0.nodes, "a");
+  const a1 = nodeOf(s0.nodes, "a1");
+  const a11 = nodeOf(s0.nodes, "a11");
   for (const [name, src, dst] of ([
     ["a を自分自身へ", a.id, a.id],
     ["a を子 a1 へ", a.id, a1.id],
     ["a を孫 a11 へ", a.id, a11.id],
     ["a1 を子 a11 へ", a1.id, a11.id],
-  ] as [string, number, number][])) {
+  ] satisfies [string, number, number][])) {
     for (const pos of ([0, 1, 2] as const)) {
       initDoc(md);
       let s;
@@ -352,7 +352,7 @@ test("C12: 自分の子孫への移動が木を壊さない", () => {
       catch (e) { failures.push(`${name} pos=${pos}: 例外 ${String(e).slice(0, 100)}`); continue; }
       const text = getText();
       try { assertTreeSane(s.nodes, text, `${name} pos=${pos}`); }
-      catch (e) { failures.push((e as Error).message); continue; }
+      catch (e) { failures.push(reason(e)); continue; }
       // ノードが消えたり増殖したりしていないこと
       if (s.nodes.length !== s0.nodes.length) {
         failures.push(`${name} pos=${pos}: ノード数が ${s0.nodes.length} -> ${s.nodes.length} に変化。text=${brief(text, 150)}`);

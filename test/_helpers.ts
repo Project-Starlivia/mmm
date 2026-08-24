@@ -32,12 +32,18 @@ export function loadDoc(md: string): DocView {
   return { text: core.getText(), nodes: snap.nodes, fences: snap.fences };
 }
 
-/** ラベルから id を引く。無ければ分かりやすく失敗させる（テストの初期化直後に使う）。 */
-export function idOf(nodes: NodeInfo[], label: string): number {
+/** ラベルからノードを引く。無ければ分かりやすく失敗させる。
+ *  `find(...)!` で押し切ると、無かったときに関係ない場所で
+ *  「undefined の何かを読めない」と落ちて原因が見えない。 */
+export function nodeOf(nodes: NodeInfo[], label: string): NodeInfo {
   const n = nodes.find((x) => x.label === label);
   assert.ok(n, `ノード ${label} が無い`);
-  return n.id;
+  return n;
 }
+
+/** ラベルから id を引く（テストの初期化直後に使う）。 */
+export const idOf = (nodes: NodeInfo[], label: string): number =>
+  nodeOf(nodes, label).id;
 
 /** ランダム系テストのケース数。環境変数 MMM_FUZZ で上書き可能（デフォルトは各所で指定）。 */
 export function fuzzCases(defaultCases: number): number {
@@ -172,6 +178,10 @@ export function corpus(): { path: string; md: string }[] {
     md: readFileSync(p, "utf8"),
   }));
 }
+
+/** catch した何かを、読める理由にする（`catch (e)` は unknown）。 */
+export const reason = (e: unknown): string =>
+  e instanceof Error ? e.message : String(e);
 
 /** 入力の要点を短く出す（失敗時に何が原因か分かるように） */
 export function brief(md: string, max = 220): string {

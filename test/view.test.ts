@@ -85,7 +85,8 @@ test("全部を収める見え方は、中身の中心をペインの中心に�
     { x: 0, y: 0, w: 100, h: 40 },
     { x: 300, y: 200, w: 100, h: 40 },
   ];
-  const v = fitToPane(boxes, PANE, 60)!;
+  const v = fitToPane(boxes, PANE, 60);
+  assert.ok(v);
   const cx = (0 + 400) / 2;
   const cy = (0 + 240) / 2;
   assert.ok(Math.abs(cx * v.k + v.tx - PANE.width / 2) < 1e-9);
@@ -93,14 +94,17 @@ test("全部を収める見え方は、中身の中心をペインの中心に�
 });
 
 test("小さい文書でも 1 倍を超えて寄らない", () => {
-  const v = fitToPane([{ x: 0, y: 0, w: 10, h: 10 }], PANE, 60)!;
+  const v = fitToPane([{ x: 0, y: 0, w: 10, h: 10 }], PANE, 60);
+  assert.ok(v);
   assert.equal(v.k, 1);
 });
 
 test("大きい文書は収まるまで引くが、下限では止まる", () => {
-  const wide = fitToPane([{ x: 0, y: 0, w: 4000, h: 100 }], PANE, 60)!;
+  const wide = fitToPane([{ x: 0, y: 0, w: 4000, h: 100 }], PANE, 60);
+  assert.ok(wide);
   assert.ok(wide.k < 1 && wide.k > MIN_ZOOM);
-  const huge = fitToPane([{ x: 0, y: 0, w: 400000, h: 100 }], PANE, 60)!;
+  const huge = fitToPane([{ x: 0, y: 0, w: 400000, h: 100 }], PANE, 60);
+  assert.ok(huge);
   assert.equal(huge.k, MIN_ZOOM);
 });
 

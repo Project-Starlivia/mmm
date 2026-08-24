@@ -105,7 +105,8 @@ export function parseImage(line: string): { path: string; name: string } | null 
   if (path.startsWith("./")) path = path.slice(2);
   if (path === "") return null;
   // Windows のパスは `\` 区切りでも来る（ドライブレターや `..\..\x.png`）
-  const name = path.split(/[\\/]/).pop()!;
+  // split は必ず 1 つ以上返すが、型は言い切らないので素直に受ける
+  const name = path.split(/[\\/]/).pop() ?? path;
   return { path, name };
 }
 

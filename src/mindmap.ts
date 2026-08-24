@@ -19,7 +19,7 @@ import {
 import { MONO_FONT, ROW_NORMAL, measure, rowOf, rowTop } from "./map/metrics.ts";
 import { type Box, type Layout, GAP, edgeEnds, layoutMap } from "./map/layout.ts";
 import { type DropTarget, resolveDrop } from "./map/drop.ts";
-import { type ArrowKey, arrowTarget, extendSelection } from "./map/navigate.ts";
+import { arrowTarget, extendSelection, isArrowKey } from "./map/navigate.ts";
 import { cardPlacement, labelPlacement } from "./map/overlay.ts";
 import {
   type View,
@@ -97,6 +97,17 @@ const emptyLayout = (): Layout => ({
 /** 全体を収めるときの余白と、1 つを見せるときの余白（画面 px） */
 const FIT_MARGIN = 60;
 const SHOW_MARGIN = 40;
+
+/**
+ * その出来事の的が `selector` に当てはまる要素（かその中）なら、それを返す。
+ *
+ * `e.target` は `EventTarget` で、要素とは限らない（document / window も来る）。
+ * `as Element` と名乗ってから `?.` で保険をかけるのは、名乗りを自分で
+ * 信じていないということ。**確かめれば保険が要らない。**
+ */
+function targetIn(e: Event, selector: string): Element | null {
+  return e.target instanceof Element ? e.target.closest(selector) : null;
+}
 
 /** 空集合の使い回し（毎レンダで new しない） */
 const NO_IDS: ReadonlySet<number> = new Set<number>();
@@ -769,7 +780,7 @@ export class MindMap {
       // 入力欄の中のクリックはカーソルを置くためのもので、確定ではない。
       // ここで pane.focus() まで進むと、押した瞬間に blur して閉じてしまう
       if (e.target === this.editor) return;
-      if (this.editBox.contains(e.target as Node)) return;
+      if (e.target instanceof Node && this.editBox.contains(e.target)) return;
       // カードの入力欄は blur が自分で確定する。ここはラベルの担当
       if (this.isEditingLabel()) this.host.commitEdit();
       this.hideMenu();
@@ -990,8 +1001,8 @@ export class MindMap {
   private bindClick(): void {
     const pane = this.pane;
     pane.addEventListener("dblclick", (e) => {
-      // double-clicking the ↗ glyph opens the link; don't also start editing
-      if ((e.target as Element).classList?.contains("link-open")) return;
+      // ↗ のダブルクリックはリンクを開く。編集にまで入らない
+      if (targetIn(e, ".link-open")) return;
       // カードはラベルではなく元テキストを直すので、専用の入力欄を開く。
       // 編集の場所を 2 つ持たない — 隣に本物のエディタが出ている
       const card = this.cardAt(e.clientX, e.clientY, "data-card");
@@ -1011,14 +1022,13 @@ export class MindMap {
     });
 
     pane.addEventListener("pointerover", (e) => {
-      const nodeG = (e.target as Element).closest?.(
-        "g.node",
-      ) as SVGGElement | null;
-      const next = nodeG
-        ? Number(nodeG.dataset.id)
-        : this.overPlus(e)
-          ? this.hoverId
-          : -1;
+      const hit = targetIn(e, "g.node");
+      const next =
+        hit instanceof SVGGElement
+          ? Number(hit.dataset.id)
+          : this.overPlus(e)
+            ? this.hoverId
+            : -1;
       if (next !== this.hoverId) {
         this.hoverId = next;
         this.updatePlus();
@@ -1042,7 +1052,6 @@ export class MindMap {
         this.suppressClick = false;
         return;
       }
-      const t = e.target as Element;
       // × は選ばれているカードにだけ出ている。押されたらその行ごと消す
       const kill = this.cardAt(e.clientX, e.clientY, "data-kill");
       if (kill) {
@@ -1060,14 +1069,11 @@ export class MindMap {
         this.host.pickCard(same ? null : pick);
         return;
       }
-      if (!t.classList?.contains("link-open")) return;
-      const url = t.getAttribute("data-url");
+      const url = targetIn(e, ".link-open")?.getAttribute("data-url");
       if (url) window.open(url, "_blank", "noopener,noreferrer");
     });
     this.renderer.nodeLayer.addEventListener("pointerdown", (e) => {
-      if ((e.target as Element).classList?.contains("link-open")) {
-        e.stopPropagation();
-      }
+      if (targetIn(e, ".link-open")) e.stopPropagation();
     });
   }
 
@@ -1110,7 +1116,7 @@ export class MindMap {
       this.commitEditorValue();
     });
     this.editor.addEventListener("input", (e) => {
-      if (this.composing || (e as InputEvent).isComposing) {
+      if (this.composing || (e instanceof InputEvent && e.isComposing)) {
         this.positionEditor();
         return;
       }
@@ -1169,13 +1175,13 @@ export class MindMap {
     // the context menu must close on any interaction elsewhere, not just
     // inside the map pane
     document.addEventListener("pointerdown", (e) => {
-      if (!this.menu.contains(e.target as Node)) this.hideMenu();
+      if (!this.menu.contains(e.target)) this.hideMenu();
     });
     window.addEventListener("blur", () => this.hideMenu());
   }
 
   private overPlus(e: Event): boolean {
-    return !!(e.target as Element).closest?.(".plus-btn");
+    return targetIn(e, ".plus-btn") !== null;
   }
 
   /** Node whose box contains the given client position, or -1. Iterates in
@@ -1236,7 +1242,7 @@ export class MindMap {
       e.preventDefault();
       return true;
     }
-    if (!key.startsWith("Arrow")) return false;
+    if (!isArrowKey(key)) return false;
     e.preventDefault();
     if (mod) return true; // Mod+矢印には何も割り当てない
     if (e.altKey) {
@@ -1362,7 +1368,7 @@ export class MindMap {
     }
 
     // movement: arrows. 上下は同じ深さの列を縦に辿る
-    if (!key.startsWith("Arrow")) return;
+    if (!isArrowKey(key)) return;
     // 並べ替えは Alt+↑↓（Alt+←→ はブラウザの戻る/進むなので取らない）
     if (e.altKey && !mod && (key === "ArrowUp" || key === "ArrowDown")) {
       e.preventDefault();
@@ -1374,7 +1380,7 @@ export class MindMap {
     if (mod) return; // Mod+矢印には何も割り当てない
     e.preventDefault();
     // 行き先の決め方は map/navigate.ts。ここは選択に反映するだけ
-    const next = arrowTarget(nodes, this.layout, anchor, key as ArrowKey);
+    const next = arrowTarget(nodes, this.layout, anchor, key);
     if (next === -1) return;
     this.host.setSelection(
       e.shiftKey ? extendSelection(sel, anchor, next) : [next],
@@ -1440,7 +1446,10 @@ export class MindMap {
       this.dropHint.setAttribute("visibility", "hidden");
       return;
     }
-    const b = this.boxes.get(target.id)!;
+    // 行き先は箱から選んでいるので必ず在るが、描き直しと競っていれば
+    // 消えていることもある。そのときは印を出さない
+    const b = this.boxes.get(target.id);
+    if (!b) return;
 
     // 挿入線だけだと「上の親の末尾」と「下の親の先頭」が同じ場所に出て
     // 区別できない。どの親につくのかを、その親からの予告線と枠で示す。
@@ -1462,7 +1471,8 @@ export class MindMap {
       // 「この線の途中に入る」以外の読み方がないので、親の枠までは出さない。
       this.dropEdgeId = target.id;
       this.renderer.edgeEl(target.id)?.classList.add("drop-edge");
-      const pts = this.edgePolyline(target.id)!;
+      const pts = this.edgePolyline(target.id);
+      if (!pts) return;
       const m = midOfPolyline(pts);
       // 印は線に直交させる（線の向きは中央付近の傾きから取る）
       const i = Math.max(1, Math.floor(pts.length / 2));

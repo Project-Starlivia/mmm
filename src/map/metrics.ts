@@ -59,7 +59,8 @@ export function measure(font: string, text: string): number {
   const key = font + "\u0000" + text;
   const hit = widthCache.get(key);
   if (hit !== undefined) return hit;
-  measureCtx ??= document.createElement("canvas").getContext("2d")!;
+  measureCtx ??= document.createElement("canvas").getContext("2d");
+  if (!measureCtx) throw new Error("文字を測る 2d コンテキストを作れない");
   measureCtx.font = font;
   const w = measureCtx.measureText(text).width;
   if (widthCache.size >= WIDTH_CACHE_MAX) widthCache.clear();

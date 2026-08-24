@@ -45,8 +45,12 @@ export async function mapToSvg(args: {
       "dragging",
     );
   }
-  const edges = args.edgeLayer.cloneNode(true) as SVGGElement;
-  const nodesG = args.nodeLayer.cloneNode(true) as SVGGElement;
+  // cloneNode は Node しか名乗らないので、複製が同じものであることを確かめる
+  const edges = args.edgeLayer.cloneNode(true);
+  const nodesG = args.nodeLayer.cloneNode(true);
+  if (!(edges instanceof SVGGElement) || !(nodesG instanceof SVGGElement)) {
+    return null;
+  }
   const PROPS = [
     "fill",
     "stroke",
@@ -89,7 +93,11 @@ export async function mapToSvg(args: {
         const b = await (await fetch(href)).blob();
         const dataUrl = await new Promise<string>((resolve, reject) => {
           const fr = new FileReader();
-          fr.onload = () => resolve(fr.result as string);
+          // readAsDataURL の結果は文字列だが、型は union のまま。確かめる
+          fr.onload = () =>
+            typeof fr.result === "string"
+              ? resolve(fr.result)
+              : reject(new Error("data URL にならなかった"));
           fr.onerror = () => reject(fr.error);
           fr.readAsDataURL(b);
         });

@@ -50,7 +50,8 @@ function scene(
     preferEdge: false,
     polyline: (id) => {
       const b = boxMap.get(id);
-      const p = parentOf.has(id) ? boxMap.get(parentOf.get(id)!) : undefined;
+      const pid = parentOf.get(id);
+      const p = pid === undefined ? undefined : boxMap.get(pid);
       if (!b || !p) return null;
       const a = rightOf(p);
       const z = leftOf(b);

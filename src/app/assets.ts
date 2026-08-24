@@ -62,7 +62,9 @@ async function webp(blob: Blob): Promise<Blob> {
   const bitmap = await createImageBitmap(blob);
   try {
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-    canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("2d コンテキストを作れない");
+    ctx.drawImage(bitmap, 0, 0);
     const out = await canvas.convertToBlob({ type: "image/webp", quality: 0.92 });
     if (out.type !== "image/webp") throw new Error("webp conversion failed");
     return out;
