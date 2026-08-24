@@ -107,7 +107,7 @@ function applySnap(snap: Snapshot, origin: Origin): void {
   if (origin !== "cm") editKind = "";
   map.render();
   // render がクラスまで塗り終えているので、ここで塗り直さない
-  if (selChanged) syncSelectionViews(false, "done");
+  if (selChanged) syncSelectionViews(false, true);
   btnUndo.disabled = !snap.canUndo;
   btnRedo.disabled = !snap.canRedo;
   updateDirty();
@@ -151,17 +151,11 @@ function contentEnd(id: number): number {
 }
 
 /**
- * 選択の見た目を貼り直す。`paint` は地図側の塗り直し方:
- * - `classes` … クラスの張り替えだけ（軽い）
- * - `render`  … カードの枠と × は render が**要素として**作るので、
- *                選択が出入りするときは作り直しが要る
- * - `done`    … 直前に render を済ませてある（applySnap の中）
+ * 選択の見た目を貼り直す。`painted` は「地図側は直前に描き終えている」印
+ * （applySnap の中だけ）。それ以外は地図にも塗り直しを頼む。
  */
-type Paint = "classes" | "render" | "done";
-
-function syncSelectionViews(reveal: boolean, paint: Paint = "classes"): void {
-  if (paint === "render") map.render();
-  else if (paint === "classes") map.refreshSelection();
+function syncSelectionViews(reveal: boolean, painted = false): void {
+  if (!painted) map.refreshSelection();
   const card = cardOf(picked);
   editor.highlight(
     card
@@ -180,11 +174,10 @@ function syncSelectionViews(reveal: boolean, paint: Paint = "classes"): void {
 function setSelection(ids: number[], anchor: number, reveal = true): void {
   // 相互排他。ids が空でも落とす — clearSelection/Escape が空配列を渡すため、
   // ids.length で分岐すると空クリックのときだけ picked が居座ってしまう
-  const hadCard = picked !== null;
   picked = null;
   selection = new Set(ids);
   anchorId = anchor;
-  syncSelectionViews(reveal, hadCard ? "render" : "classes");
+  syncSelectionViews(reveal);
 }
 
 /**
@@ -293,7 +286,7 @@ const host: MapHost = {
       selection = new Set();
       anchorId = -1;
     }
-    syncSelectionViews(false, "render");
+    syncSelectionViews(false);
   },
   deleteCard(ref) {
     const row = cardOf(ref);

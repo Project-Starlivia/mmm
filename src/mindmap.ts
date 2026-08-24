@@ -31,6 +31,7 @@ import {
 } from "./map/view.ts";
 import { ContextMenu, type MenuEntry } from "./map/menu.ts";
 import { MapRenderer } from "./map/render.ts";
+import { CardPick } from "./map/pick.ts";
 import { mapToSvg } from "./map/toSvg.ts";
 import { svgEl } from "./map/svg.ts";
 
@@ -113,6 +114,8 @@ export class MindMap {
   private dropLine: SVGLineElement;
   private dropHint: SVGPathElement; // どの親につくかを示す予告の曲線
   private plusBtn: SVGGElement;
+  /** 選んでいるカードに被せる枠と ×（常に高々 1 枚なので 1 個だけ持つ） */
+  private pick = new CardPick();
   private rubber: HTMLDivElement;
   private editor: HTMLInputElement;
   private editBox: HTMLDivElement;
@@ -155,10 +158,9 @@ export class MindMap {
   // click が、落とし先の座標にあるカードをふらっと選び直すのを止める印
   private suppressClick = false;
   private dropTarget: DropTarget | null = null;
-  // ドロップ中の一時的なノード印。render() のクラス計算にも合流させて
-  // あるので、ドラッグ中に他の理由で render() が走っても消えない
-  // （直接 classList を触るだけだと、render() が自分の知らないクラスごと
-  // class 属性を上書きして印を消してしまう）。
+  // ドロップ中の一時的なノード印。**どれに付けたかを覚えておくのは、
+  // 外すときに全ノードを舐めないため**（マウス移動のたびに外して付け直す）。
+  // 描き直しで要素が作り直されても paintState が同じ印を戻す
   private dropMarks = new Map<number, "drop-child" | "drop-parent">();
   private dropEdgeId: number | null = null;
   private hoverId = -1;
@@ -193,6 +195,7 @@ export class MindMap {
     this.viewport.append(
       this.renderer.edgeLayer,
       this.renderer.nodeLayer,
+      this.pick.el,
       this.dropHint,
       this.dropLine,
       this.plusBtn,
@@ -304,14 +307,14 @@ export class MindMap {
     if (this.editingCard) this.paintEditInk();
 
 
+    // 文書とレイアウトから決まるものだけを描き、そのあとで
+    // 「いまの操作の状態」（選択・ドラッグ・ドロップ先・選んだカード）を被せる。
+    // 作り直された要素にも付け直す必要があるので、順番はこの通り
     this.renderer.draw({
       layout: L,
-      selection: this.host.selection(),
-      dragging: this.dragging?.subtree ?? NO_IDS,
-      dropMarks: this.dropMarks,
-      picked: this.host.pickedCard(),
       imageUrl: (path) => this.host.imageUrl(path),
     });
+    this.paintState();
 
     this.updatePlus();
     this.positionEditor();
@@ -359,6 +362,31 @@ export class MindMap {
       w: b.w - ROW_NORMAL.padX * 2 + bleed * 2,
       h: rowH(r) - inset * 2,
     };
+  }
+
+  /**
+   * いまの操作の状態を、描き終えた要素に被せる。**描画はこれを知らない** —
+   * 選択もドラッグもドロップ先も文書からは導けず、変えた本人だけが知っている。
+   */
+  private paintState(): void {
+    this.renderer.refreshSelection(this.host.selection());
+    for (const id of this.dragging?.subtree ?? NO_IDS) {
+      this.renderer.nodeEl(id)?.classList.add("dragging");
+    }
+    for (const [id, cls] of this.dropMarks) {
+      this.renderer.nodeEl(id)?.classList.add(cls);
+    }
+    if (this.dropEdgeId !== null) {
+      this.renderer.edgeEl(this.dropEdgeId)?.classList.add("drop-edge");
+    }
+    this.showPick();
+  }
+
+  /** 選んでいるカードの上に印を置き直す（レイアウトか選択が動いたら呼ぶ） */
+  private showPick(): void {
+    const ref = this.host.pickedCard();
+    if (ref) this.pick.show(ref, this.cardRect(ref));
+    else this.pick.hide();
   }
 
   /** その座標が、どのノードの何枚目と何枚目の間か */
@@ -1535,5 +1563,6 @@ export class MindMap {
    *  選択そのものは持たない — 何が選ばれているかは main.ts が決める。 */
   refreshSelection(): void {
     this.renderer.refreshSelection(this.host.selection());
+    this.showPick();
   }
 }

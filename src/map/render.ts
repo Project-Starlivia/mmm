@@ -6,7 +6,7 @@
 // 毎回書き換えても安いが、**要素の生成と破棄は高い**ので、そこだけを
 // 「中身が変わったノード」に絞る。
 
-import type { CardRef, CardRow } from "./cards.ts";
+import type { CardRow } from "./cards.ts";
 import type { NodeInfo } from "../coreApi.ts";
 import {
   CODE_LINE,
@@ -27,23 +27,16 @@ import {
 } from "./metrics.ts";
 import { svgEl } from "./svg.ts";
 
-/** 1 回の描き直しに要るもの */
+/**
+ * 1 回の描き直しに要るもの。**選択やドラッグは入っていない** — それらは
+ * 文書から導けない「いまの操作の状態」で、変えた本人がクラスで塗る。
+ * ここが受け取るのは、文書とレイアウトから決まるものだけ。
+ */
 export interface Scene {
   layout: Layout;
-  selection: Set<number>;
-  /** 掴んでいる部分木（薄く描く） */
-  dragging: ReadonlySet<number>;
-  /** ドロップ中の一時的な印 */
-  dropMarks: Map<number, "drop-child" | "drop-parent">;
-  /** 選ばれているカード */
-  picked: CardRef | null;
   /** ローカル画像の objectURL（まだ読めていなければ null） */
   imageUrl: (path: string) => string | null;
 }
-
-/** そのカードが選ばれているか */
-const isPicked = (picked: CardRef | null, node: number, index: number): boolean =>
-  picked !== null && picked.node === node && picked.index === index;
 
 /**
  * ノードの中身を作り直すかどうかの判定材料。値をそのまま持って、そのまま
@@ -59,8 +52,6 @@ interface NodeShape {
   rows: CardRow[];
   /** rows と同じ並びで、画像だけ解決済みの URL（他は null） */
   urls: (string | null)[];
-  /** 選ばれているカードの枚数目。無ければ -1 */
-  picked: number;
 }
 
 /** カード 1 枚が、描き直しを要するほど変わったか */
@@ -90,7 +81,6 @@ function sameShape(a: NodeShape | undefined, b: NodeShape): boolean {
     a.buried !== b.buried ||
     a.epoch !== b.epoch ||
     a.label !== b.label ||
-    a.picked !== b.picked ||
     a.rows.length !== b.rows.length
   ) {
     return false;
@@ -109,10 +99,9 @@ export class MapRenderer {
   private nodeEls = new Map<number, SVGGElement>();
   private edgeEls = new Map<number, SVGPathElement>();
   private nodeShape = new Map<number, NodeShape>(); // 内側を作り直す判定用
-  // 直前に書いた transform / class。同じ値の setAttribute はスタイル無効化を
+  // 直前に書いた transform。同じ値の setAttribute はスタイル無効化を
   // 起こすだけ無駄なので書かない（プロファイル上いちばん重い JS 呼び出しだった）
   private nodeTf = new Map<number, string>();
-  private nodeCls = new Map<number, string>();
   private edgeD = new Map<number, string>();
   private domOrderSig = ""; // DOM の並び（= 重なり順）を直す判定用
 
@@ -129,12 +118,11 @@ export class MapRenderer {
    * レイアウトを丸ごと見直さない軽い塗り替え（矩形選択の途中で使う）。
    * 選択そのものは持たない — 何が選ばれているかは呼び出し側が決める。
    */
+  /** 選択の印を塗り直す。draw() は選択を知らないので、**作り直された要素にも
+   *  付け直す**必要がある（畳んで開いたノードなど）。 */
   refreshSelection(sel: Set<number>): void {
     for (const [id, g] of this.nodeEls) {
       g.classList.toggle("selected", sel.has(id));
-      // class を直接触ったらキャッシュも合わせる。放置すると次の draw が
-      // 「同じだから書かない」と判断して、DOM とズレたままになる
-      this.nodeCls.set(id, g.getAttribute("class") ?? "");
     }
   }
 
@@ -150,7 +138,6 @@ export class MapRenderer {
       rows: b.rows,
       // 画像は「まだ読めていない」から「読めた」へ後から変わる
       urls: b.rows.map((r) => (r.kind === "img" ? p.imageUrl(r.path) : null)),
-      picked: b.rows.findIndex((_, i) => isPicked(p.picked, n.id, i)),
     };
   }
 
@@ -161,7 +148,6 @@ export class MapRenderer {
     // ---- DOM を差分更新する ----
     // 位置(transform)と class は毎回書き換えても安い。高いのは要素の生成と
     // 破棄なので、そこは「中身が変わったノードだけ」に絞る。
-    const sel = p.selection;
     const seen = new Set<number>();
 
     for (const n of L.visible) {
@@ -195,25 +181,17 @@ export class MapRenderer {
       // --- ノード本体 ---
       let g = this.nodeEls.get(n.id);
       if (!g) {
-        g = svgEl("g");
+        g = svgEl("g", { class: "node" });
         g.dataset.id = String(n.id);
         this.nodeLayer.append(g);
         this.nodeEls.set(n.id, g);
         this.nodeShape.delete(n.id); // 新規なので必ず中身を作る
       }
-      const dropMark = p.dropMarks.get(n.id);
-      const cls =
-        "node" +
-        (n.depth === 1 ? " root" : "") +
-        (b.rows.length > 0 ? " link-card" : "") +
-        (n.hidden ? " hidden-node" : "") +
-        (sel.has(n.id) ? " selected" : "") +
-        (p.dragging.has(n.id) ? " dragging" : "") +
-        (dropMark ? ` ${dropMark}` : "");
-      if (this.nodeCls.get(n.id) !== cls) {
-        g.setAttribute("class", cls);
-        this.nodeCls.set(n.id, cls);
-      }
+      // **文書から決まるクラスだけ**を、1 つずつ付け外しする。class 属性を
+      // まるごと書くと、選択やドラッグの印（付けた本人しか知らない）を
+      // 巻き添えで消してしまう
+      g.classList.toggle("root", n.depth === 1);
+      g.classList.toggle("hidden-node", n.hidden);
       const tf = `translate(${b.x} ${b.y})`;
       if (this.nodeTf.get(n.id) !== tf) {
         g.setAttribute("transform", tf);
@@ -226,11 +204,12 @@ export class MapRenderer {
       this.nodeShape.set(n.id, shape);
       g.replaceChildren();
       g.append(
+        // 角丸は状態（畳んでいるか）で変わるだけの定数なので CSS が持つ。
+        // ここが出すのはレイアウトが計算した数だけ
         svgEl("rect", {
           class: "box",
           width: String(b.w),
           height: String(b.h),
-          rx: n.hidden ? "4" : "8",
         }),
       );
       const label = svgEl("text", {
@@ -323,7 +302,6 @@ export class MapRenderer {
             y: String(y),
             width: String(w),
             height: String(h),
-            rx: "5",
           });
           if (r.lang !== "") {
             const tt = svgEl("title");
@@ -371,7 +349,6 @@ export class MapRenderer {
                 y: String(y),
                 width: String(w),
                 height: String(h),
-                rx: "6",
               }),
             );
             const ph = svgEl("text", {
@@ -385,39 +362,6 @@ export class MapRenderer {
             g.append(ph);
           }
         }
-        if (isPicked(p.picked, n.id, rowIndex)) {
-          g.append(
-            svgEl("rect", {
-              class: "card-picked",
-              x: String(x),
-              y: String(y),
-              width: String(w),
-              height: String(h),
-              rx: "6",
-            }),
-          );
-          // × は角そのものに載せる。枠線がボタンの中心を通る位置
-          const cx = x + w;
-          const cy = y;
-          const arm = 2.5; // 中心からの腕の長さ
-          const kill = svgEl("g", { class: "card-kill", "data-kill": spot });
-          kill.append(svgEl("circle", { cx: String(cx), cy: String(cy), r: "7" }));
-          // × は文字ではなく線で引く。字だと書体で中心も太さも揺れる
-          for (const [dx, dy] of [
-            [1, 1],
-            [1, -1],
-          ]) {
-            kill.append(
-              svgEl("line", {
-                x1: String(cx - arm * dx),
-                y1: String(cy - arm * dy),
-                x2: String(cx + arm * dx),
-                y2: String(cy + arm * dy),
-              }),
-            );
-          }
-          g.append(kill);
-        }
       }
     }
 
@@ -428,7 +372,6 @@ export class MapRenderer {
       this.nodeEls.delete(id);
       this.nodeShape.delete(id);
       this.nodeTf.delete(id);
-      this.nodeCls.delete(id);
     }
     for (const [id, el] of this.edgeEls) {
       if (seen.has(id)) continue;

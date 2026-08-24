@@ -168,12 +168,13 @@ html, body {
   stroke-linecap: round;
 }
 
-/* 角丸は mindmap.ts が属性で入れる（通常 8 / 折り畳み 4）。同じ数字を
-   ここに置くと、片方だけ直したときに気づけない */
+/* 角丸は「状態で変わるだけの定数」なので CSS が持つ（SVG2 の geometry
+   property。属性より CSS が勝つ）。TS が出すのは、レイアウトが計算した数だけ */
 .node rect.box {
   fill: var(--node-bg);
   stroke: var(--node-border);
   stroke-width: 1.2;
+  rx: 8px;
 }
 .node.root rect.box { stroke-width: 2; stroke: var(--node-border-strong); }
 .node text {
@@ -211,29 +212,39 @@ html, body {
   stroke: var(--node-border);
   stroke-width: 1;
   stroke-dasharray: 4 3;
+  rx: 6px;
 }
 .node text.img-name {
   font-size: 11px;
   fill: var(--ink-dim);
 }
-/* 選んだカードの枠と、その右上の × */
-.node rect.card-picked {
+/* 選んだカードの枠と、その右上の ×。ノードの中ではなく、world に浮かぶ
+   1 個の印（選ばれているカードは常に高々 1 枚なので） */
+#card-pick rect.card-picked {
   fill: none;
   stroke: var(--accent);
   stroke-width: 2;
+  rx: 6px;
+  /* 枠は素通りさせる。もう一度押して外せなくなるため */
   pointer-events: none;
 }
-.node .card-kill { cursor: pointer; }
-.node .card-kill circle { fill: var(--accent); stroke: var(--node-bg); stroke-width: 1.5; }
-.node .card-kill line {
+#card-pick .card-kill { cursor: pointer; }
+#card-pick .card-kill circle { fill: var(--accent); stroke: var(--node-bg); stroke-width: 1.5; }
+#card-pick .card-kill line {
   stroke: #fff;
   stroke-width: 1.6;
   stroke-linecap: round;
   pointer-events: none;
 }
-.node .card-kill:hover circle { fill: #e5534b; }
+#card-pick .card-kill:hover circle { fill: #e5534b; }
 
-.node rect.code-bg { fill: var(--bg); stroke: var(--node-border); stroke-width: 1; cursor: pointer; }
+.node rect.code-bg {
+  fill: var(--bg);
+  stroke: var(--node-border);
+  stroke-width: 1;
+  rx: 5px;
+  cursor: pointer;
+}
 .node text.code-line {
   font-family: "Cascadia Code", Consolas, "JetBrains Mono", monospace;
   font-size: 11px;
@@ -268,7 +279,8 @@ html, body {
   fill: color-mix(in srgb, var(--accent) 16%, var(--node-bg));
 }
 .node.hidden-node { opacity: 0.45; }
-.node.hidden-node rect.box { stroke-dasharray: 4 3; }
+/* 畳んだノードは小さく丸めて、別のものだと分かるようにする */
+.node.hidden-node rect.box { rx: 4px; stroke-dasharray: 4 3; }
 .node.hidden-node text.label { fill: var(--ink-dim); }
 .node.drop-child rect.box { stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 5 3; }
 .node.dragging { opacity: 0.35; }
