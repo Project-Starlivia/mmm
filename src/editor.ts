@@ -72,10 +72,14 @@ const highlightField = StateField.define<DecorationSet>({
     deco = deco.map(tr.changes);
     for (const e of tr.effects) {
       if (e.is(setHighlights)) {
+        // 第 2 引数は「並べ替えてから受け取れ」。選択は Set なので**入れた順**
+        // で、Mod+クリックで文書順と逆に選ぶと from が降順で届く。
+        // CodeMirror は昇順を要求して例外を投げ、ハイライトが丸ごと死ぬ
         deco = Decoration.set(
           e.value
             .filter((r) => r.from < r.to)
             .map((r) => highlightMark.range(r.from, r.to)),
+          true,
         );
       }
     }
