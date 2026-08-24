@@ -110,16 +110,16 @@ export async function mapToSvg(args: {
   const out = svgEl("svg", {
     xmlns: SVG_NS,
     viewBox: `${x0 - M} ${y0 - M} ${w} ${h}`,
-    width: String(w),
-    height: String(h),
+    width: w,
+    height: h,
   });
   const bgColor = getComputedStyle(args.pane).backgroundColor;
   out.append(
     svgEl("rect", {
-      x: String(x0 - M),
-      y: String(y0 - M),
-      width: String(w),
-      height: String(h),
+      x: x0 - M,
+      y: y0 - M,
+      width: w,
+      height: h,
       fill: bgColor,
     }),
     edges,

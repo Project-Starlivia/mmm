@@ -208,16 +208,16 @@ export class MapRenderer {
         // ここが出すのはレイアウトが計算した数だけ
         svgEl("rect", {
           class: "box",
-          width: String(b.w),
-          height: String(b.h),
+          width: b.w,
+          height: b.h,
         }),
       );
       const label = svgEl("text", {
         class: "label" + (n.label === "" ? " empty" : ""),
-        x: String(rowOf(n).padX),
-        y: String(rowOf(n).rowH / 2),
+        x: rowOf(n).padX,
+        y: rowOf(n).rowH / 2,
         // font-size は CSS ではなく属性で入れる（同じ数字を 2 箇所に置かない）
-        "font-size": String(rowOf(n).fontPx),
+        "font-size": rowOf(n).fontPx,
       });
       label.textContent = n.hidden
         ? hiddenLabel(n, buried)
@@ -243,10 +243,10 @@ export class MapRenderer {
         g.append(
           svgEl("line", {
             class: "card-sep",
-            x1: String(ROW_NORMAL.padX - 4),
-            y1: String(rowY),
-            x2: String(b.w - ROW_NORMAL.padX + 4),
-            y2: String(rowY),
+            x1: ROW_NORMAL.padX - 4,
+            y1: rowY,
+            x2: b.w - ROW_NORMAL.padX + 4,
+            y2: rowY,
           }),
         );
         if (r.kind === "link") {
@@ -255,15 +255,15 @@ export class MapRenderer {
           const hit = svgEl("rect", {
             class: "link-hit",
             "data-card": spot,
-            x: String(ROW_NORMAL.padX),
-            y: String(y),
-            width: String(w),
-            height: String(h),
+            x: ROW_NORMAL.padX,
+            y,
+            width: w,
+            height: h,
           });
           const title = svgEl("text", {
             class: "link-row",
-            x: String(ROW_NORMAL.padX),
-            y: String(y + h / 2),
+            x: ROW_NORMAL.padX,
+            y: y + h / 2,
           });
           title.textContent = r.link.title;
           const tt = svgEl("title");
@@ -271,8 +271,8 @@ export class MapRenderer {
           const open = svgEl("text", {
             class: "link-open",
             // 枠の内側に収める。外へ出すと、選択の枠が本体より小さく見える
-            x: String(x + w),
-            y: String(y + h / 2),
+            x: x + w,
+            y: y + h / 2,
             "text-anchor": "end",
           });
           open.textContent = "↗";
@@ -281,10 +281,10 @@ export class MapRenderer {
         } else if (r.kind === "svg") {
           const img = svgEl("image", {
             "data-card": spot,
-            x: String(ROW_NORMAL.padX),
-            y: String(y),
-            width: String(w),
-            height: String(h),
+            x: ROW_NORMAL.padX,
+            y,
+            width: w,
+            height: h,
             preserveAspectRatio: "xMidYMid meet",
           });
           img.setAttribute(
@@ -298,10 +298,10 @@ export class MapRenderer {
           const bg = svgEl("rect", {
             class: "code-bg",
             "data-card": spot,
-            x: String(x),
-            y: String(y),
-            width: String(w),
-            height: String(h),
+            x,
+            y,
+            width: w,
+            height: h,
           });
           if (r.lang !== "") {
             const tt = svgEl("title");
@@ -314,8 +314,8 @@ export class MapRenderer {
             const ln = svgEl("text", {
               class: "code-line",
               "data-card": spot,
-              x: String(ROW_NORMAL.padX + 1),
-              y: String(rowY + CODE_PAD + i * CODE_LINE + CODE_LINE / 2),
+              x: ROW_NORMAL.padX + 1,
+              y: rowY + CODE_PAD + i * CODE_LINE + CODE_LINE / 2,
             });
             // 幅の判断は素の文字列で行い、色の付いた塊をそこへ合わせる
             for (const t of tokens[i]) {
@@ -330,10 +330,10 @@ export class MapRenderer {
           if (url !== null) {
             const img = svgEl("image", {
               "data-card": spot,
-              x: String(ROW_NORMAL.padX),
-              y: String(y),
-              width: String(w),
-              height: String(h),
+              x: ROW_NORMAL.padX,
+              y,
+              width: w,
+              height: h,
               preserveAspectRatio: "xMidYMid meet",
             });
             img.setAttribute("href", url);
@@ -345,17 +345,17 @@ export class MapRenderer {
               svgEl("rect", {
                 class: "img-ph",
                 "data-card": spot,
-                x: String(ROW_NORMAL.padX),
-                y: String(y),
-                width: String(w),
-                height: String(h),
+                x: ROW_NORMAL.padX,
+                y,
+                width: w,
+                height: h,
               }),
             );
             const ph = svgEl("text", {
               class: "img-name",
               "data-card": spot,
-              x: String(b.w / 2),
-              y: String(y + h / 2),
+              x: b.w / 2,
+              y: y + h / 2,
               "text-anchor": "middle",
             });
             ph.textContent = r.name;
