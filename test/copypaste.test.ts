@@ -10,7 +10,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { core, initDoc, getText, randomDoc, brief, fuzzCases, type NodeInfo } from "./_helpers.ts";
+import { core, initDoc, getText, randomDoc, brief, fuzzCases, nodeOf, type NodeInfo } from "./_helpers.ts";
 import { decidePaste } from "../src/app/paste.ts";
 import { insertBlock } from "../src/edits.ts";
 
@@ -60,8 +60,8 @@ test("X1: コピー→貼り付けで部分木の形が保たれる", () => {
   const failures: string[] = [];
   for (const [name, md] of docs) {
     const s0 = initDoc(md);
-    const src = s0.nodes.find((n) => n.label === "src")!;
-    const dst = s0.nodes.find((n) => n.label === "dst")!;
+    const src = nodeOf(s0.nodes, "src");
+    const dst = nodeOf(s0.nodes, "dst");
     const want = subtreeShape(s0.nodes, src.id);
 
     const clip = core.selectionText([src.id]);
@@ -70,7 +70,7 @@ test("X1: コピー→貼り付けで部分木の形が保たれる", () => {
 
     // 貼り付け後、dst の子として src と同じ形が現れているはず
     const after = core.initDoc(getText());
-    const dst2 = after.nodes.find((n) => n.label === "dst")!;
+    const dst2 = nodeOf(after.nodes, "dst");
     const pasted = after.nodes.filter(
       (n) => n.from > dst2.from && n.to <= dst2.to && n.label === "src",
     )[0];
@@ -162,7 +162,7 @@ test("X3b: 情報文字列が 2 語のフェンスでも中は見出しになら
 test("X4: コピーに未選択の # ブロックが混入しない（F-005 の回帰）", () => {
   const md = "# root\n\n## a\n\n本文A\n\n# 二つ目のルート\n\n## b\n";
   const s = initDoc(md);
-  const a = s.nodes.find((n) => n.label === "a")!;
+  const a = nodeOf(s.nodes, "a");
   const clip = core.selectionText([a.id]);
   assert.ok(
     !clip.includes("二つ目のルート"),

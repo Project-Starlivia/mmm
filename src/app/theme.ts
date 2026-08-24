@@ -9,8 +9,12 @@ const DEFAULT_COLOR = "#5932ff";
 
 /** favicon は data URL なので、色を実値で埋める必要がある。 */
 function applyFavicon(color: string): void {
-  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-  if (!link) {
+  const found = document.querySelector('link[rel="icon"]');
+  // 型は名乗らせず確かめる。`<link rel=icon>` でないものが居たら作り直す
+  let link: HTMLLinkElement;
+  if (found instanceof HTMLLinkElement) {
+    link = found;
+  } else {
     link = document.createElement("link");
     link.rel = "icon";
     document.head.append(link);
@@ -39,7 +43,8 @@ export type Theme = "light" | "dark";
  * `setEditorTheme` は CodeMirror 側のテーマ切り替え（DOM の外なので注入）。
  */
 export function initTheme(args: {
-  logo: HTMLElement;
+  /** topbar の `<svg id="logo">`。中身は logo.ts が入れる */
+  logo: SVGSVGElement;
   themeButton: HTMLButtonElement;
   setEditorTheme: (dark: boolean) => void;
 }): void {
@@ -94,8 +99,12 @@ export function initTheme(args: {
   });
 
   // ---- 復元 ----
-  const stored = load(LS_THEME) as Theme | null;
+  // localStorage の中身は何でもありうる（人が書き替えられるし、昔の版が
+  // 別の値を入れているかもしれない）。名乗らせずに確かめる
+  const stored = load(LS_THEME);
+  const saved: Theme | null =
+    stored === "light" || stored === "dark" ? stored : null;
   const osLight = window.matchMedia?.("(prefers-color-scheme: light)").matches;
-  applyTheme(stored ?? (osLight ? "light" : "dark"));
+  applyTheme(saved ?? (osLight ? "light" : "dark"));
   applyColor(load(LS_COLOR) ?? DEFAULT_COLOR);
 }

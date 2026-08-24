@@ -27,22 +27,30 @@ import { onLanguageReady } from "./map/highlight.ts";
 import { type CardRef, cardRowsOf, contentEndOf } from "./map/cards.ts";
 import { insertBlock, moveLine, removeLine } from "./edits.ts";
 
-const $ = <T extends HTMLElement>(id: string): T => {
-  const el = document.getElementById(id);
-  if (!el) throw new Error(`missing element #${id}`);
-  return el as T;
-};
+/**
+ * index.html の要素を、**その型であることを実際に確かめて**引く。
+ * `as` で名乗るだけだと、タグを替えたときに誰も気づけない — `<button>` を
+ * `<span>` にしたら `disabled` が黙って効かなくなるし、`<svg id="logo">` を
+ * `HTMLElement` と名乗るのは**そもそも嘘**だった（SVG は HTML ではない）。
+ *
+ * DOM を id で引くのはこのファイルだけ。他のモジュールは受け取る。
+ */
+function el<T extends Element>(id: string, kind: abstract new () => T): T {
+  const found = document.getElementById(id);
+  if (found instanceof kind) return found;
+  throw new Error(`#${id} が ${kind.name} ではない`);
+}
 
-const mdPane = $("md-pane");
-const mapPane = $("map-pane");
-const btnNew = $<HTMLButtonElement>("btn-new");
-const btnOpen = $<HTMLButtonElement>("btn-open");
-const btnSave = $<HTMLButtonElement>("btn-save");
-const btnUndo = $<HTMLButtonElement>("btn-undo");
-const btnRedo = $<HTMLButtonElement>("btn-redo");
-const elFilename = $("filename");
-const elDirty = $("dirty");
-const elLogo = $("logo");
+const mdPane = el("md-pane", HTMLElement);
+const mapPane = el("map-pane", HTMLElement);
+const btnNew = el("btn-new", HTMLButtonElement);
+const btnOpen = el("btn-open", HTMLButtonElement);
+const btnSave = el("btn-save", HTMLButtonElement);
+const btnUndo = el("btn-undo", HTMLButtonElement);
+const btnRedo = el("btn-redo", HTMLButtonElement);
+const elFilename = el("filename", HTMLElement);
+const elDirty = el("dirty", HTMLElement);
+const elLogo = el("logo", SVGSVGElement);
 
 // ---------- app state ----------
 
@@ -429,13 +437,15 @@ const host: MapHost = {
         return;
       }
       const clip = await navigator.clipboard.readText();
-      const n0 = anchorId !== -1 ? (byId.get(anchorId) ?? null) : null;
-      if (anchorId !== -1 && !n0) return;
+      // 選んでいるノード。選んでいるのに引けなかったら（消えた直後など）
+      // 何もしない — 宛先が決まらない貼り方はしない
+      const anchorNode = anchorId === -1 ? null : (byId.get(anchorId) ?? null);
+      if (anchorId !== -1 && !anchorNode) return;
       // 何を貼るか(URL/子ノード/子ツリー)の判定は app/paste.ts の純粋関数。
       // ここは clipboard の I/O と、結果を core へ適用する側だけを持つ
       const action = decidePaste(
         clip,
-        n0 ? { depth: n0.depth } : null,
+        anchorNode ? { depth: anchorNode.depth } : null,
         doc.nodes.length > 0,
       );
       switch (action.kind) {
@@ -455,13 +465,15 @@ const host: MapHost = {
           return;
         }
         case "children":
-          insertParagraph(n0!.to, action.body);
+          // decidePaste が children を返すのは anchor があるときだけ
+          if (anchorNode) insertParagraph(anchorNode.to, action.body);
           return;
-        case "block": {
-          const at = anchorId === -1 ? core.getText().length : n0!.to;
-          insertParagraph(at, action.body);
+        case "block":
+          insertParagraph(
+            anchorNode ? anchorNode.to : doc.text.length,
+            action.body,
+          );
           return;
-        }
       }
     })().catch(() => {});
   },
@@ -669,21 +681,22 @@ initDrop({
 const { togglePane, togglePaneVis } = initPanes({
   mdPane,
   mapPane,
-  panesEl: $("panes"),
-  splitter: $("splitter"),
-  mdButton: $<HTMLButtonElement>("btn-view-md"),
-  mapButton: $<HTMLButtonElement>("btn-view-map"),
+  panesEl: el("panes", HTMLElement),
+  splitter: el("splitter", HTMLElement),
+  mdButton: el("btn-view-md", HTMLButtonElement),
+  mapButton: el("btn-view-map", HTMLButtonElement),
   focusEditor: () => editor.focus(),
 });
 
 initDownload({
   map,
+  button: el("btn-export-svg", HTMLButtonElement),
   name: () => docName(),
   notify: (msg, isError = true) => flashFilename(msg, isError),
 });
 initTheme({
   logo: elLogo,
-  themeButton: $<HTMLButtonElement>("btn-theme"),
+  themeButton: el("btn-theme", HTMLButtonElement),
   setEditorTheme: (dark) => editor.setTheme(dark),
 });
 initShortcuts({

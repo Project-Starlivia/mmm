@@ -148,9 +148,14 @@ export function touchesFence(text: string, from: number, to: number): boolean {
   const open = fenceOpen(lines[0] ?? "");
   if (!open) return false;
   const openEnd = lines[0].indexOf(open.marker) + open.marker.length;
+  // 閉じの開始位置。閉じていなければ -1（`tail` を後から取り直すと
+  // `null` でないことを言い直すはめになるので、ここで畳む）
   const tail = lines.length > 1 ? lines[lines.length - 1] : null;
-  const closed = tail !== null && closesFence(tail, open.marker);
-  const closeStart = closed ? text.length - (tail as string).length : -1;
+  const closeStart =
+    tail !== null && closesFence(tail, open.marker)
+      ? text.length - tail.length
+      : -1;
+  const closed = closeStart !== -1;
   if (from === to) {
     // 挿入。囲いの中へ割り込むか、開きより前へ押し出すものだけ止める
     if (from < openEnd) return true;

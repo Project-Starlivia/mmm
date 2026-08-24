@@ -60,7 +60,9 @@ export function initShortcuts(deps: {
   window.addEventListener("keydown", (e) => {
     if (e.isComposing || e.keyCode === 229) return;
     if (!e.altKey || e.ctrlKey || e.metaKey) return;
-    const pane = { "1": "md", "2": "map" }[e.key] as "md" | "map" | undefined;
+    // 表から引くと値が `string` になり、`as` で締め直すことになる。
+    // 2 つしか無いのだから、そのまま書けば型が分かる
+    const pane = e.key === "1" ? "md" : e.key === "2" ? "map" : null;
     if (!pane) return;
     e.preventDefault();
     deps.togglePaneVis(pane);

@@ -14,7 +14,9 @@ async function droppedFiles(
   for (const item of data.items) {
     if (item.kind !== "file" || !item.getAsFileSystemHandle) continue;
     const handle = await item.getAsFileSystemHandle();
-    if (handle?.kind === "file") files.push(handle as FileSystemFileHandle);
+    // `kind === "file"` では TS は絞り込めない（union ではなく上位型なので）。
+    // 実物を確かめる
+    if (handle instanceof FileSystemFileHandle) files.push(handle);
   }
   return files;
 }

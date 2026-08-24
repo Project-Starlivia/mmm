@@ -16,6 +16,8 @@ export function downloadBlob(blob: Blob, name: string): void {
 
 export function initDownload(deps: {
   map: MindMap;
+  /** SVG ボタン。DOM を id で引くのは main.ts だけ */
+  button: HTMLButtonElement;
   /** ダウンロード名の元になる、いまのファイル名 */
   name: () => string;
   notify: (msg: string, isError?: boolean) => void;
@@ -36,7 +38,5 @@ export function initDownload(deps: {
     }
   };
 
-  const btn = document.getElementById("btn-export-svg");
-  if (!btn) throw new Error("#btn-export-svg が無い");
-  btn.addEventListener("click", () => void exportMap());
+  deps.button.addEventListener("click", () => void exportMap());
 }

@@ -54,8 +54,10 @@ export class ContextMenu {
     this.el.style.display = "none";
   }
 
-  /** メニューの中で起きた出来事か（外を押したときだけ閉じるため） */
-  contains(node: Node | null): boolean {
-    return node !== null && this.el.contains(node);
+  /** メニューの中で起きた出来事か（外を押したときだけ閉じるため）。
+   *  `EventTarget` をそのまま受けて、ここで確かめる — 呼び出し側に
+   *  `as Node` と名乗らせない */
+  contains(target: EventTarget | null): boolean {
+    return target instanceof Node && this.el.contains(target);
   }
 }

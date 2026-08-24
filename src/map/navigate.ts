@@ -6,7 +6,14 @@
 import type { NodeInfo } from "../coreApi.ts";
 import type { Layout } from "./layout.ts";
 
-export type ArrowKey = "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight";
+const ARROWS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"] as const;
+
+export type ArrowKey = (typeof ARROWS)[number];
+
+/** 矢印キーか。`key.startsWith("Arrow")` を `as ArrowKey` で締めていたのを、
+ *  型が実際に分かる形にしたもの。 */
+export const isArrowKey = (key: string): key is ArrowKey =>
+  ARROWS.some((a) => a === key);
 
 /**
  * `anchor` から矢印 1 回ぶんの行き先。行けなければ -1。
