@@ -1,14 +1,22 @@
 // マップを 1 枚の <svg> にする。画面の DOM から、一時的な UI 状態
 // （選択・ドロップ印）を取り除き、計算済みスタイルを属性に焼き込むので、
 // この結果だけで単体表示できる。
+//
+// **写すものは呼ぶ側が選ぶ。** 層をまるごと写していた頃は「全体」しか
+// 出せなかったが、枝だけを書き出したいときにここが決められることは無い
+// （どれが選ばれているかを知っているのはマップ側）。
 
 import type { Rect } from "./geometry.ts";
 import { SVG_NS, svgEl } from "./svg.ts";
 
 export async function mapToSvg(args: {
+  /** 収める範囲。写すノードの箱をそのまま渡す */
   boxes: Iterable<Rect>;
-  edgeLayer: SVGGElement;
-  nodeLayer: SVGGElement;
+  /** 写す親子の線。枝の外へ出ていくものは呼ぶ側が外しておく */
+  edges: Iterable<SVGPathElement>;
+  /** 写すノード */
+  nodes: Iterable<SVGGElement>;
+  /** 地の色をここから読む */
   pane: HTMLElement;
 }): Promise<SVGSVGElement | null> {
   const boxes = [...args.boxes];
@@ -27,30 +35,28 @@ export async function mapToSvg(args: {
   const M = 24;
   const w = Math.ceil(x1 - x0 + M * 2);
   const h = Math.ceil(y1 - y0 + M * 2);
-  // export without transient UI state (selection, drop highlights)
+  // Iterable は 1 度しか回せないことがあるので、先に確定させる
+  const edgeEls = [...args.edges];
+  const nodeEls = [...args.nodes];
+  // いまの操作の状態（選択・ドロップの印）は書き出さない。
+  // **計算済みスタイルは元の要素から読む**ので、写す前に画面側から外す
   const stripped: Array<{ el: Element; cls: string }> = [];
-  // `.drop-edge` はエッジ側に付くので、ノード層だけ見ても外れない
-  for (const el of [
-    ...args.nodeLayer.querySelectorAll(
-      ".selected, .drop-child, .drop-parent, .dragging",
-    ),
-    ...args.edgeLayer.querySelectorAll(".drop-edge"),
-  ]) {
-    stripped.push({ el, cls: el.getAttribute("class") ?? "" });
-    el.classList.remove(
-      "selected",
-      "drop-child",
-      "drop-parent",
-      "drop-edge",
-      "dragging",
-    );
+  const TRANSIENT = [
+    "selected",
+    "drop-child",
+    "drop-parent",
+    "drop-edge",
+    "dragging",
+  ];
+  for (const root of [...edgeEls, ...nodeEls]) {
+    for (const el of [root, ...root.querySelectorAll(`.${TRANSIENT.join(",.")}`)]) {
+      if (!TRANSIENT.some((c) => el.classList.contains(c))) continue;
+      stripped.push({ el, cls: el.getAttribute("class") ?? "" });
+      el.classList.remove(...TRANSIENT);
+    }
   }
-  // cloneNode は Node しか名乗らないので、複製が同じものであることを確かめる
-  const edges = args.edgeLayer.cloneNode(true);
-  const nodesG = args.nodeLayer.cloneNode(true);
-  if (!(edges instanceof SVGGElement) || !(nodesG instanceof SVGGElement)) {
-    return null;
-  }
+  const edges = svgEl("g");
+  const nodesG = svgEl("g");
   const PROPS = [
     "fill",
     "stroke",
@@ -78,9 +84,19 @@ export async function mapToSvg(args: {
     }
   };
   // カードの選択枠と × は、ノードの中ではなく world に浮かぶ別の印なので、
-  // ここで写す 2 層（エッジ / ノード）には最初から入っていない
-  inline(args.edgeLayer, edges);
-  inline(args.nodeLayer, nodesG);
+  // 呼ぶ側が渡してくるエッジ / ノードには最初から入っていない
+  for (const orig of edgeEls) {
+    const copy = orig.cloneNode(true);
+    if (!(copy instanceof SVGElement)) return null;
+    inline(orig, copy);
+    edges.append(copy);
+  }
+  for (const orig of nodeEls) {
+    const copy = orig.cloneNode(true);
+    if (!(copy instanceof SVGElement)) return null;
+    inline(orig, copy);
+    nodesG.append(copy);
+  }
   for (const s of stripped) s.el.setAttribute("class", s.cls);
   // blob: thumbnails don't resolve outside this page — embed them.
   // 各画像の fetch→blob→dataURL は互いに独立なので並列に待つ

@@ -482,9 +482,9 @@ html, body {
   z-index: 10;
 }
 
-/* ========== 右クリックメニュー ========== */
+/* ========== メニュー（右クリック / 書き出しの形式） ========== */
 
-#ctx-menu {
+.ctx-menu {
   position: fixed;
   z-index: 100;
   min-width: 180px;

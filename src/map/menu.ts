@@ -1,5 +1,10 @@
-// 右クリックメニューの器。**何を並べるかは持たない** — 並びはマップ側が
-// 決めて渡す。ここが引き受けるのは、作る・置く・画面からはみ出させない、だけ。
+// メニューの器。**何を並べるかは持たない** — 並びは呼ぶ側が決めて渡す。
+// ここが引き受けるのは、作る・置く・画面からはみ出させない・**外を押されたら
+// 閉じる**、だけ。閉じる条件はメニューであることの一部であって、
+// マップであることの一部ではない。
+//
+// **1 個しか作れない器にはしない**（id ではなく class）。マップの右クリックと、
+// 書き出しの形式選びが、同じ器を別々に持つ。
 
 /** 1 行。`sep` は区切り線 */
 export type MenuEntry =
@@ -12,9 +17,18 @@ export class ContextMenu {
   private el = document.createElement("div");
 
   constructor() {
-    this.el.id = "ctx-menu";
+    this.el.className = "ctx-menu";
     this.el.style.display = "none";
     document.body.append(this.el);
+    // 開いているあいだだけ付け外しする手もあるが、`hide()` は何度呼んでも
+    // 同じなので、付けっぱなしのほうが短い
+    document.addEventListener("pointerdown", (e) => {
+      if (!this.contains(e.target)) this.hide();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.hide();
+    });
+    window.addEventListener("blur", () => this.hide());
   }
 
   /** その座標に開く。画面外へはみ出すときは内側へ寄せる */

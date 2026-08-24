@@ -1,13 +1,15 @@
 // 永続化の器。
 //
-// **持つのは見た目の好みだけ**（テーマとブランドカラー）。文書の控えも
+// **持つのは見た目の好みだけ**（テーマ・ブランドカラー・書き出しの形式）。文書の控えも
 // ファイルハンドルも持たない（ハンドルは IndexedDB の app/handles.ts が扱う）。
 
 export const LS_THEME = "mmm.theme";
 export const LS_COLOR = "mmm.color";
+/** 最後に選んだ書き出しの形式（app/export.ts が持ち主） */
+export const LS_FORMAT = "mmm.exportFormat";
 
 /** いま意味のあるキー。ここに無い `mmm.*` は過去の遺物として捨てる。 */
-const OWNED: readonly string[] = [LS_THEME, LS_COLOR];
+const OWNED: readonly string[] = [LS_THEME, LS_COLOR, LS_FORMAT];
 
 /**
  * localStorage への読み書き。容量オーバーや無効化で例外が飛ぶので、

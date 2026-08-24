@@ -14,6 +14,7 @@ import {
   type Box,
   type Layout,
   GAP,
+  branchIds,
   cardRect,
   edgeEnds,
   layoutMap,
@@ -81,6 +82,8 @@ export interface MapHost {
    */
   move(ids: number[], target: number, pos: 0 | 1 | 2 | 3): void;
   copySelection(cut: boolean): void;
+  /** いま書き出す範囲（選んでいる枝、無ければ全体）を絵にしてクリップボードへ */
+  copyMap(as: "png" | "svg"): void;
   paste(): void;
   editRequested(id: number): void;
   undo(): void;
@@ -527,17 +530,31 @@ export class MindMap {
     if (v) this.setView(v);
   }
 
-  /** 一時的な UI 状態（選択・ドロップ印）を除いた、書き出し用の SVG。
-   * computed style を属性にインライン化し、画像サムネイルは data URL で
-   * 埋め込むので、この結果だけで単体表示できる（ダウンロード/ラスタライズ用）。
-   * 地図が空なら null。 */
+  /**
+   * 書き出し用の SVG。**選んでいる枝**、何も選んでいなければ全体。
+   *
+   * 一時的な UI 状態（選択・ドロップ印）は入らない。computed style を属性へ
+   * 焼き込み、画像サムネイルは data URL で埋めるので、この結果だけで単体
+   * 表示できる（ダウンロードにもラスタ化にも同じものを使う）。空なら null。
+   */
   exportSvg(): Promise<SVGSVGElement | null> {
-    return mapToSvg({
-      boxes: this.boxes.values(),
-      edgeLayer: this.renderer.edgeLayer,
-      nodeLayer: this.renderer.nodeLayer,
-      pane: this.pane,
-    });
+    const ids = branchIds(this.layout, this.host.selection());
+    const boxes: Box[] = [];
+    const nodes: SVGGElement[] = [];
+    const edges: SVGPathElement[] = [];
+    for (const id of ids) {
+      const b = this.boxes.get(id);
+      const el = this.renderer.nodeEl(id);
+      if (!b || !el) continue;
+      boxes.push(b);
+      nodes.push(el);
+      // 親への線は、その親も写るときだけ引く。枝の外へ出ていく線を残すと、
+      // 何にもつながらない曲線が書き出しの端から生えてしまう
+      const up = this.layout.parentOf.get(id);
+      const edge = up !== undefined && ids.has(up) ? this.renderer.edgeEl(id) : undefined;
+      if (edge) edges.push(edge);
+    }
+    return mapToSvg({ boxes, edges, nodes, pane: this.pane });
   }
 
   /**
@@ -775,7 +792,6 @@ export class MindMap {
       if (e.target instanceof Node && this.editBox.contains(e.target)) return;
       // カードの入力欄は blur が自分で確定する。ここはラベルの担当
       if (this.isEditingLabel()) this.host.commitEdit();
-      this.hideMenu();
       pane.focus();
 
       // パンは 2 つ入り口を持つ: 中クリックはマウスだけで完結し、
@@ -1164,12 +1180,6 @@ export class MindMap {
     const pane = this.pane;
     pane.addEventListener("keydown", (e) => this.onKeydown(e));
 
-    // the context menu must close on any interaction elsewhere, not just
-    // inside the map pane
-    document.addEventListener("pointerdown", (e) => {
-      if (!this.menu.contains(e.target)) this.hideMenu();
-    });
-    window.addEventListener("blur", () => this.hideMenu());
   }
 
   private overPlus(e: Event): boolean {
@@ -1551,6 +1561,8 @@ export class MindMap {
       "sep",
       { label: "コピー", key: "Mod+C", run: () => this.host.copySelection(false) },
       { label: "カット", key: "Mod+X", run: () => this.host.copySelection(true) },
+      { label: "画像としてコピー", run: () => this.host.copyMap("png") },
+      { label: "SVG としてコピー", run: () => this.host.copyMap("svg") },
       { label: "子として貼り付け", key: "Mod+V", run: () => this.host.paste(), disabled: multi },
       "sep",
       {

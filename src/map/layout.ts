@@ -57,6 +57,35 @@ export interface Layout {
   fanOf: Map<number, number>;
 }
 
+/**
+ * `roots` とその子孫のうち、見えているものすべて。**`roots` が空なら全体**。
+ *
+ * 書き出しの範囲がこれ。mmm では「選ぶ」がどこでも枝ごとを意味する
+ * （コピーもカットも削除も移動も）ので、書き出しだけ別の意味にはしない。
+ * 畳んで埋もれているノードは `visible` に入らないため、畳んだまま書き出せば
+ * 畳んだ姿がそのまま出る。
+ */
+export function branchIds(layout: Layout, roots: Set<number>): Set<number> {
+  const out = new Set<number>();
+  for (const n of layout.visible) {
+    if (roots.size === 0) {
+      out.add(n.id);
+      continue;
+    }
+    // 自分から親をたどって、途中に選ばれたものがあれば入る
+    for (let id = n.id; ; ) {
+      if (roots.has(id)) {
+        out.add(n.id);
+        break;
+      }
+      const up = layout.parentOf.get(id);
+      if (up === undefined) break;
+      id = up;
+    }
+  }
+  return out;
+}
+
 const gapBefore = (i: number): number => (i === 0 ? 0 : GAP.y);
 
 function collapseHidden(nodes: NodeInfo[]): {

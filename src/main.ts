@@ -15,7 +15,7 @@ import { MdEditor } from "./editor.ts";
 import { MindMap, type MapHost } from "./mindmap.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
-import { initDownload } from "./app/download.ts";
+import { copyMapImage, initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
 import { deriveName } from "./app/name.ts";
 import { initTheme } from "./app/theme.ts";
@@ -430,6 +430,20 @@ const host: MapHost = {
     void navigator.clipboard.writeText(text).catch(() => {});
     if (cut) host.deleteSelection();
   },
+  copyMap(as) {
+    void (async () => {
+      const svg = await map.exportSvg();
+      if (!svg) {
+        flashFilename("マップが空です");
+        return;
+      }
+      await copyMapImage(svg, as);
+      flashFilename(as === "svg" ? "SVG をコピーしました" : "画像をコピーしました", false);
+    })().catch((error: unknown) => {
+      console.error("copy failed:", error);
+      flashFilename("コピーに失敗しました");
+    });
+  },
   paste() {
     // 貼り付け先は選んでいるノードの**子**。空の文書へはそのまま入れる
     if (anchorId === -1 && doc.nodes.length > 0) return;
@@ -708,9 +722,10 @@ const { togglePane, togglePaneVis } = initPanes({
   focusEditor: () => editor.focus(),
 });
 
-initDownload({
+initExport({
   map,
-  button: el("btn-export-svg", HTMLButtonElement),
+  button: el("btn-export", HTMLButtonElement),
+  formatButton: el("btn-export-format", HTMLButtonElement),
   name: () => docName(),
   notify: (msg, isError = true) => flashFilename(msg, isError),
 });
