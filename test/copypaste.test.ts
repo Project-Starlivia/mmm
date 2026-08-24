@@ -4,35 +4,32 @@
 //
 // 経路(src/main.ts の host.copySelection / host.paste に対応):
 //   copy  : core.selectionText(ids)
-//   paste : core.relevelText(clip, 対象ノードの depth + 1) を対象の to に挿入
+//   paste : decidePaste で何を貼るか決め、insertBlock で対象の to に挿す
 //
 // 実行: pnpm test
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { core, initDoc, getText, randomDoc, brief, fuzzCases, type NodeInfo } from "./_helpers.ts";
+import { decidePaste } from "../src/app/paste.ts";
+import { insertBlock } from "../src/edits.ts";
 
 const CASES = fuzzCases(250);
 
 /**
- * src/main.ts の paste() が行う挿入をそのまま再現する。
- * (アプリ側のロジックを写経しているので、アプリが変わったらここも変わる)
+ * src/main.ts の paste() が通る道を、**アプリと同じ部品で**再現する。
+ * 何を貼るかは app/paste.ts、どう挿すかは src/edits.ts が決める —
+ * ここに写経を置くと、アプリだけ直したときに誰も気づけない。
  */
 function pasteAsChildOf(anchorId: number, clip: string) {
   const text = getText();
-  const s = (core.initDoc(text)); // 現在のノードを取り直す
+  const s = core.initDoc(text); // 現在のノードを取り直す
   const n = s.nodes.find((x) => x.id === anchorId);
   if (!n) throw new Error("anchor が無い");
-  const normalized = clip.replace(/\r\n/g, "\n");
-  if (!core.hasHeadings(normalized)) return { skipped: "見出しなしとして無視された" };
-  const at = n.to;
-  let body = core.relevelText(normalized, n.depth + 1).trimEnd();
-  body += "\n";
-  let prefix = "";
-  if (at > 0 && text[at - 1] !== "\n") prefix = "\n\n";
-  else if (at >= 2 && text[at - 2] !== "\n") prefix = "\n";
-  const suffix = at !== text.length ? "\n" : "";
-  return { snap: (core.replaceText(at, at, prefix + body + suffix, "")) };
+  const action = decidePaste(clip, { depth: n.depth }, s.nodes.length > 0);
+  if (action.kind !== "block") return { skipped: `${action.kind} として扱われた` };
+  const e = insertBlock(text, n.to, action.body);
+  return { snap: core.replaceText(e.from, e.to, e.insert, "") };
 }
 
 /** ノード部分木の「形」だけを取り出す(深さの相対値とラベル) */

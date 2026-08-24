@@ -1,4 +1,4 @@
-// カードの削除・移動を「1 回の置き換え」に落とす計算。DOM も文書の意味も
+// 行やブロックの出し入れを「1 回の置き換え」に落とす計算。DOM も文書の意味も
 // 知らない、ただのオフセット算術。
 //
 // 1 回に落とすのは Undo を 1 回にするため。2 回に分けると、戻すのに
@@ -15,7 +15,7 @@ export interface TextEdit {
  * その範囲を行ごと消す。行末の改行も持っていく — 残すと空行が居座る。
  * 末尾の行なら、代わりに手前の改行を巻き取る。
  */
-export function removeCard(text: string, from: number, to: number): TextEdit {
+export function removeLine(text: string, from: number, to: number): TextEdit {
   let head = from;
   let tail = to;
   if (text[tail] === "\n") tail += 1;
@@ -28,7 +28,7 @@ export function removeCard(text: string, from: number, to: number): TextEdit {
  * 元と先を含む一続きの範囲を組み直して返すので、置き換えは 1 回で済む。
  * 動かす意味が無い（結果が元と 1 文字も変わらない）ときは null。
  */
-export function moveCard(
+export function moveLine(
   text: string,
   from: number,
   to: number,
@@ -36,7 +36,7 @@ export function moveCard(
 ): TextEdit | null {
   if (at >= from && at <= to) return null;
   const body = text.slice(from, to);
-  const cut = removeCard(text, from, to);
+  const cut = removeLine(text, from, to);
   let edit: TextEdit;
   if (at < from) {
     // 上へ。[at, cut.to) を「本文 + 改行 + 元々そこにあったもの」に組み直す
@@ -50,9 +50,29 @@ export function moveCard(
     // 改行があるかどうかは、こちらから変えない
     const nlBefore = between === "" || between.endsWith("\n") ? "" : "\n";
     const nlAfter = nlBefore === "" ? "\n" : "";
-    edit = { from: cut.from, to: at, insert: `${between}${nlBefore}${body}${nlAfter}` };
+    edit = {
+      from: cut.from,
+      to: at,
+      insert: `${between}${nlBefore}${body}${nlAfter}`,
+    };
   }
   // 置き換えても 1 文字も変わらないなら、動いていない。自分のすぐ下へ
   // 落とした場合がこれで、返すと呼び出し側が「動かせた」と信じてしまう
   return text.slice(edit.from, edit.to) === edit.insert ? null : edit;
+}
+
+/**
+ * `body` を独立した段落として `at` へ挿し込む。直前の改行が 0 / 1 / 2 個の
+ * どれかで前の空行を出し分け、文書の途中なら後ろにも 1 個足す。
+ *
+ * 「ブロックとブロックのあいだは空行 1 つ」という見た目を、貼り付けでも
+ * 画像の挿入でも同じ式で保つ。**この式をここ以外に書かない** — テストが
+ * 写経していたころ、アプリだけ直しても誰も気づけなかった。
+ */
+export function insertBlock(text: string, at: number, body: string): TextEdit {
+  let prefix = "";
+  if (at > 0 && text[at - 1] !== "\n") prefix = "\n\n";
+  else if (at >= 2 && text[at - 2] !== "\n") prefix = "\n";
+  const suffix = at !== text.length ? "\n" : "";
+  return { from: at, to: at, insert: `${prefix}${body}\n${suffix}` };
 }

@@ -10,20 +10,22 @@ import {
   type EditOp,
   type NodeInfo,
   type Snapshot,
-} from "./coreApi";
-import { MdEditor } from "./editor";
-import { MindMap, type MapHost } from "./mindmap";
-import { io, type Doc } from "./app/io";
-import { initAssets } from "./app/assets";
-import { initDownload } from "./app/download";
-import { initPanes } from "./app/panes";
-import { deriveName } from "./app/name";
-import { initTheme } from "./app/theme";
-import { sweep } from "./app/persist";
-import { decidePaste } from "./app/paste";
-import { onLanguageReady } from "./map/highlight";
-import { type CardRef, cardRowsOf, contentEndOf } from "./map/cards";
-import { moveCard, removeCard } from "./map/cardEdit";
+} from "./coreApi.ts";
+import { MdEditor } from "./editor.ts";
+import { MindMap, type MapHost } from "./mindmap.ts";
+import { io, type Doc } from "./app/io.ts";
+import { initAssets } from "./app/assets.ts";
+import { initDownload } from "./app/download.ts";
+import { initPanes } from "./app/panes.ts";
+import { deriveName } from "./app/name.ts";
+import { initTheme } from "./app/theme.ts";
+import { sweep } from "./app/persist.ts";
+import { decidePaste } from "./app/paste.ts";
+import { initDrop } from "./app/dnd.ts";
+import { initShortcuts } from "./app/shortcuts.ts";
+import { onLanguageReady } from "./map/highlight.ts";
+import { type CardRef, cardRowsOf, contentEndOf } from "./map/cards.ts";
+import { insertBlock, moveLine, removeLine } from "./edits.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -297,7 +299,7 @@ const host: MapHost = {
     const row = cardOf(ref);
     if (!row) return;
     picked = null;
-    const e = removeCard(core.getText(), row.from, row.to);
+    const e = removeLine(doc.text, row.from, row.to);
     applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
   },
   reorderCard(ref, dir) {
@@ -310,7 +312,7 @@ const host: MapHost = {
     // 指す — next.to + 1 だと改行の無い文書末で文書長を超えてしまう。
     // moveCard 側は between を書き戻すだけなので、+1 せずとも行は割れない
     const at = dir === 1 ? next.to : next.from;
-    const e = moveCard(core.getText(), row.from, row.to, at);
+    const e = moveLine(doc.text, row.from, row.to, at);
     if (!e) return;
     picked = { node: ref.node, index: ref.index + dir };
     applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
@@ -322,7 +324,7 @@ const host: MapHost = {
     // 落とし先の行頭。末尾なら、そのノードの本文の終わりへ
     const dst = target[index];
     const at = dst ? dst.from : contentEnd(node);
-    const e = moveCard(doc.text, row.from, row.to, at);
+    const e = moveLine(doc.text, row.from, row.to, at);
     if (!e) return false;
     // 着地した後の実際の index。同じノードの中で下へ動かすときだけ、
     // 自分を抜いた分 1 つ前へ詰まる（Alt+↓ の reorderCard と同じ考え方）。
@@ -460,11 +462,11 @@ const host: MapHost = {
           return;
         }
         case "children":
-          insertBlock(n0!.to, action.body);
+          insertParagraph(n0!.to, action.body);
           return;
         case "block": {
           const at = anchorId === -1 ? core.getText().length : n0!.to;
-          insertBlock(at, action.body);
+          insertParagraph(at, action.body);
           return;
         }
       }
@@ -610,25 +612,17 @@ const assets = initAssets({
   refresh: () => map.render(),
 });
 
-/**
- * `body` を独立した段落として `at` へ挿し込む。前後に必要なだけ空行を足し
- * (直前が改行 0/1/2 個かで prefix を出し分け、直後が文書末でなければ改行
- * 1 個を足す)、1 つの Snapshot として適用する。
- */
-function insertBlock(at: number, body: string, tag = ""): void {
-  const text = core.getText();
-  let prefix = "";
-  if (at > 0 && text[at - 1] !== "\n") prefix = "\n\n";
-  else if (at >= 2 && text[at - 2] !== "\n") prefix = "\n";
-  const suffix = at !== text.length ? "\n" : "";
-  applySnap(core.replaceText(at, at, prefix + body + "\n" + suffix, tag), "core");
+/** `body` を独立した段落として `at` へ挿し込む（式は src/edits.ts）。 */
+function insertParagraph(at: number, body: string, tag = ""): void {
+  const e = insertBlock(doc.text, at, body);
+  applySnap(core.replaceText(e.from, e.to, e.insert, tag), "core");
 }
 
 /** Append a line at the END of a node's own attached content (before its
  * first child heading), as one undo entry. */
 function insertContentLine(id: number, line: string, tag = ""): void {
   if (!byId.has(id)) return;
-  insertBlock(contentEnd(id), line, tag);
+  insertParagraph(contentEnd(id), line, tag);
 }
 
 async function pasteImage(blob: Blob): Promise<void> {
@@ -657,94 +651,27 @@ window.addEventListener("beforeunload", (event) => {
   event.returnValue = "";
 });
 
-// ---------- drag & drop ----------
+// ---------- ドラッグ & ドロップ（振り分けは app/dnd.ts） ----------
 
-const IMG_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
-const MD_RE = /\.(md|markdown|txt)$/i;
-
-async function droppedHandles(data: DataTransfer): Promise<FileSystemFileHandle[]> {
-  const files: FileSystemFileHandle[] = [];
-  for (const item of data.items) {
-    if (item.kind !== "file" || !item.getAsFileSystemHandle) continue;
-    const handle = await item.getAsFileSystemHandle();
-    if (handle?.kind === "file") files.push(handle as FileSystemFileHandle);
-  }
-  return files;
-}
-
-window.addEventListener("dragover", (event) => {
-  if ([...event.dataTransfer?.items ?? []].some((item) => item.kind === "file")) {
-    event.preventDefault();
-  }
-});
-
-window.addEventListener("drop", (event) => {
-  event.preventDefault();
-  const data = event.dataTransfer;
-  if (!data) return;
-  void (async () => {
-    const handles = await droppedHandles(data);
-    const md = handles.find((file) => MD_RE.test(file.name));
-    if (md) {
-      if (!(await confirmDiscard())) return;
-      applyDoc(await io.openHandle(md));
-      return;
-    }
-    const images = handles.filter((file) => IMG_RE.test(file.name));
-    if (images.length === 0) return;
-    const id = map.nodeAt(event.clientX, event.clientY);
-    if (!byId.has(id)) {
-      flashFilename("画像はノードの上に落としてください");
-      return;
-    }
+initDrop({
+  nodeAt: (x, y) => map.nodeAt(x, y),
+  warn: (msg) => flashFilename(msg),
+  async openMarkdown(file) {
+    if (!(await confirmDiscard())) return;
+    applyDoc(await io.openHandle(file));
+  },
+  async addImages(files, node) {
     const tag = nextTag();
-    for (const handle of images) {
-      const rel = await assets.saveToDisk(await handle.getFile());
-      if (rel !== null && byId.has(id)) insertContentLine(id, `![](${rel})`, tag);
-    }
-  })().catch((error) => {
-    console.error("drop failed:", error);
-    flashFilename("ドロップしたファイルを開けませんでした");
-  });
-});
-
-// ---------- global shortcuts ----------
-
-window.addEventListener(
-  "keydown",
-  (e) => {
-    if (e.isComposing || e.keyCode === 229) return;
-    const mod = e.ctrlKey || e.metaKey;
-    if (!mod) return;
-    const key = e.key.toLowerCase();
-    if (key === "s") {
-      e.preventDefault();
-      void saveFile(e.shiftKey); // Shift = 別名で保存
-    } else if (key === "n" && e.altKey) {
-      // `Mod+N` はブラウザの「新規ウィンドウ」に吸われてページまで来ない
-      e.preventDefault();
-      void newFile();
-    } else if (key === "o") {
-      e.preventDefault();
-      void openFile();
-    } else if (key === "/") {
-      e.preventDefault();
-      togglePane();
-    } else if (key === "z" || key === "y") {
-      // 入力欄（ラベル / カード）が開いている間は、その欄のネイティブな
-      // undo に任せる。文書の undo を割り込ませると、開いたままの入力欄が
-      // 指す範囲だけが古くなり、確定で別の場所を上書きしてしまう
-      if (map.isEditing()) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (key === "y" || e.shiftKey) doRedo();
-      else doUndo();
+    for (const file of files) {
+      const rel = await assets.saveToDisk(await file.getFile());
+      if (rel !== null && byId.has(node)) {
+        insertContentLine(node, `![](${rel})`, tag);
+      }
     }
   },
-  { capture: true },
-);
+});
 
-// ---------- pane / splitter / export / theme（実装は app/ 配下） ----------
+// ---------- ペイン / スプリッタ / 書き出し / テーマ / キー（実装は app/ 配下） ----------
 
 const { togglePane, togglePaneVis } = initPanes({
   mdPane,
@@ -756,18 +683,6 @@ const { togglePane, togglePaneVis } = initPanes({
   focusEditor: () => editor.focus(),
 });
 
-// ペインの表示/非表示は Alt+数字（左から 1, 2）。
-// 矢印は使えない — Ctrl+←→ はテキスト欄の単語移動で、書いている最中に一番使う。
-// Ctrl+数字（タブ切替）・Ctrl+J（ダウンロード）・Ctrl+Shift+R（再読込）は
-// ブラウザの予約。Alt+数字はどちらにも触らず、JIS でも物理位置が動かない。
-window.addEventListener("keydown", (e) => {
-  if (e.isComposing || e.keyCode === 229) return;
-  if (!e.altKey || e.ctrlKey || e.metaKey) return;
-  const pane = { "1": "md", "2": "map" }[e.key] as "md" | "map" | undefined;
-  if (!pane) return;
-  e.preventDefault();
-  togglePaneVis(pane);
-});
 initDownload({
   map,
   name: () => docName(),
@@ -777,6 +692,16 @@ initTheme({
   logo: elLogo,
   themeButton: $<HTMLButtonElement>("btn-theme"),
   setEditorTheme: (dark) => editor.setTheme(dark),
+});
+initShortcuts({
+  save: (asNew) => void saveFile(asNew),
+  open: () => void openFile(),
+  create: () => void newFile(),
+  togglePane,
+  togglePaneVis,
+  undo: doUndo,
+  redo: doRedo,
+  isEditing: () => map.isEditing(),
 });
 
 // ---------- boot ----------

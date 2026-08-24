@@ -3,6 +3,7 @@
 
 import type { DocView, NodeInfo } from "../coreApi.ts";
 import { type CardRow, cardRows } from "./cards.ts";
+import { type Pt, leftOf, rightOf } from "./geometry.ts";
 import { nodeSize } from "./metrics.ts";
 
 export const GAP = {
@@ -166,4 +167,18 @@ export function layoutMap(doc: DocView): Layout {
   }
 
   return { visible, boxes, parentOf, buriedCount, fanOf };
+}
+
+/**
+ * 子 id から、その親へ引く線の両端（付け根のずらしも込み）。
+ * **描画も当たり判定もここだけを見る** — 同じ式を 2 箇所に書いていた頃、
+ * 片方だけ直すと線と当たり判定が静かにずれた。
+ */
+export function edgeEnds(L: Layout, id: number): { from: Pt; to: Pt } | null {
+  const b = L.boxes.get(id);
+  const pid = L.parentOf.get(id);
+  const p = pid === undefined ? undefined : L.boxes.get(pid);
+  if (!b || !p) return null;
+  const e = rightOf(p);
+  return { from: { x: e.x, y: e.y + (L.fanOf.get(id) ?? 0) }, to: leftOf(b) };
 }

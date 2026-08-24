@@ -25,7 +25,7 @@ import {
   syntaxHighlighting,
 } from "@codemirror/language";
 import { oneDarkHighlightStyle, oneDarkTheme } from "@codemirror/theme-one-dark";
-import type { EditOp } from "./coreApi";
+import type { EditOp } from "./coreApi.ts";
 
 const darkTweaks = EditorView.theme(
   {

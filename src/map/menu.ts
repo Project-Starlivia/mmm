@@ -1,0 +1,61 @@
+// 右クリックメニューの器。**何を並べるかは持たない** — 並びはマップ側が
+// 決めて渡す。ここが引き受けるのは、作る・置く・画面からはみ出させない、だけ。
+
+/** 1 行。`sep` は区切り線 */
+export type MenuEntry =
+  | { label: string; key?: string; run: () => void; disabled?: boolean }
+  | "sep";
+
+const MARGIN = 8; // 画面の縁からこれだけは離す
+
+export class ContextMenu {
+  private el = document.createElement("div");
+
+  constructor() {
+    this.el.id = "ctx-menu";
+    this.el.style.display = "none";
+    document.body.append(this.el);
+  }
+
+  /** その座標に開く。画面外へはみ出すときは内側へ寄せる */
+  show(x: number, y: number, items: MenuEntry[]): void {
+    this.el.replaceChildren();
+    for (const it of items) {
+      if (it === "sep") {
+        this.el.append(document.createElement("hr"));
+        continue;
+      }
+      const row = document.createElement("div");
+      row.className = "item" + (it.disabled ? " disabled" : "");
+      const label = document.createElement("span");
+      label.textContent = it.label;
+      row.append(label);
+      if (it.key) {
+        const key = document.createElement("span");
+        key.className = "key";
+        key.textContent = it.key;
+        row.append(key);
+      }
+      row.addEventListener("click", () => {
+        this.hide();
+        it.run();
+      });
+      this.el.append(row);
+    }
+    // 大きさは出してからでないと測れない
+    this.el.style.display = "block";
+    const w = this.el.offsetWidth;
+    const h = this.el.offsetHeight;
+    this.el.style.left = `${Math.min(x, window.innerWidth - w - MARGIN)}px`;
+    this.el.style.top = `${Math.min(y, window.innerHeight - h - MARGIN)}px`;
+  }
+
+  hide(): void {
+    this.el.style.display = "none";
+  }
+
+  /** メニューの中で起きた出来事か（外を押したときだけ閉じるため） */
+  contains(node: Node | null): boolean {
+    return node !== null && this.el.contains(node);
+  }
+}

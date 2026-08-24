@@ -7,7 +7,7 @@
 // ここが問い合わせるのは「その断片に見出しがあるか」「深さをずらすと
 // どうなるか」だけで、その答えはコアが持つ（同じ規則を 2 つ書かない）。
 
-import { core } from "../coreApi";
+import { core } from "../coreApi.ts";
 
 export type PasteAction =
   | { kind: "noop" }
@@ -21,7 +21,9 @@ export function decidePaste(
   anchor: { depth: number } | null,
   hasNodes: boolean,
 ): PasteAction {
-  const normalized = clip.replace(/\r\n/g, "\n");
+  // アプリの中の改行は常に LF。外から来る文字列はここで揃える
+  // （読み込み側 app/io.ts と同じ規則。単独の CR も落とす）
+  const normalized = clip.replace(/\r\n?/g, "\n");
   if (!normalized.trim()) return { kind: "noop" };
 
   const asLink = normalized.trim();
