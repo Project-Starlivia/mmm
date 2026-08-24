@@ -1167,63 +1167,75 @@ export class MindMap {
 
   // ---------- keyboard (select mode) ----------
 
+  /**
+   * 選択モードのキー。**ノードとカードは同時に選ばれない**ので、
+   * どちらが選ばれているかで担当を分ける（どちらに効くのかで迷わない）。
+   */
   private onKeydown(e: KeyboardEvent): void {
     if (e.isComposing || e.keyCode === 229) return;
     if (this.isEditing()) return;
-    const mod = e.ctrlKey || e.metaKey;
-    const anchor = this.host.anchor();
-    const sel = this.host.selection();
-    const nodes = this.host.doc().nodes;
-    // CapsLock reports letters as capitals WITHOUT shiftKey, so a plain `h`
-    // would arrive as `H` and silently comment out the subtree.
-    // Treat a capital that arrived without Shift as the lowercase key.
+    // CapsLock は Shift 無しで大文字を送ってくる。素の `h` が `H` として届き、
+    // 黙ってサブツリーを畳んでしまうので、Shift 無しの大文字は小文字に戻す
     const key =
       !e.shiftKey && e.key.length === 1 && e.key >= "A" && e.key <= "Z"
         ? e.key.toLowerCase()
         : e.key;
-
-    // カードを選んでいる間は、キーはカードに効く。ノードの選択とは排他なので
-    // 「どちらに効くのか」で迷わない
     const card = this.host.pickedCard();
-    if (card && !e.altKey) {
-      if (key === "Delete" || key === "Backspace") {
-        this.host.deleteCard(card);
-        e.preventDefault();
-        return;
-      }
-      if (key.startsWith("Arrow")) {
-        // 矢印はここで丸ごと引き取る。Mod+矢印はノード側の
-        // `if (mod) return;` と同じく何も割り当てないが、素通りはさせない
-        // — card 選択中は anchor が -1 なので、下のノード用ハンドラへ渡すと
-        // 無関係な先頭ノードへ飛んだりしてしまう（ArrowRight も同じ理由で
-        // ここで止め、下へは渡さない）
-        e.preventDefault();
-        if (mod) return;
-        if (key === "ArrowUp" || key === "ArrowDown") {
-          const rows = this.boxes.get(card.node)?.rows ?? [];
-          const next = card.index + (key === "ArrowUp" ? -1 : 1);
-          if (next >= 0 && next < rows.length) {
-            this.host.pickCard({ node: card.node, index: next });
-          }
-        } else if (key === "ArrowLeft") {
-          this.host.setSelection([card.node], card.node);
-        }
-        return;
-      }
-    }
-    if (card && e.altKey && !mod && (key === "ArrowUp" || key === "ArrowDown")) {
-      this.host.reorderCard(card, key === "ArrowUp" ? -1 : 1);
+    // カード側で拾わなかったキーは、そのままノード側へ流す。Escape のように
+    // どちらでも同じ意味を持つものがあるため
+    if (card && this.cardKeys(e, key, card)) return;
+    this.nodeKeys(e, key);
+  }
+
+  /**
+   * カードを選んでいるときのキー。
+   *
+   * **矢印は行き先が無くても必ず飲む。** ノード側へ抜けさせると、カード選択中は
+   * anchor が -1 なので無関係な先頭ノードへ飛んでしまう（ブラウザの戻る/進むへ
+   * 渡らないことより、そちらを避けるほうを優先する）。
+   *
+   * 拾ったら true。false なら呼び出し側がノード側へ流す。
+   */
+  private cardKeys(e: KeyboardEvent, key: string, card: CardRef): boolean {
+    const mod = e.ctrlKey || e.metaKey;
+    if (!e.altKey && (key === "Delete" || key === "Backspace")) {
+      this.host.deleteCard(card);
       e.preventDefault();
-      return;
+      return true;
     }
-    // ここまでで拾わなかった矢印（Alt+←→ など）も、card 選択中はここで
-    // 止める。ブラウザの戻る/進むには渡らないが、ノード用ハンドラに
-    // 抜けさせない方を優先する — 抜けると anchor=-1 の副作用で
-    // 無関係な先頭ノードへ飛んでしまう
-    if (card && key.startsWith("Arrow")) {
+    if (key === "Enter" && mod) {
+      this.beginCardEdit(card);
       e.preventDefault();
-      return;
+      return true;
     }
+    if (!key.startsWith("Arrow")) return false;
+    e.preventDefault();
+    if (mod) return true; // Mod+矢印には何も割り当てない
+    if (e.altKey) {
+      // 並べ替えは Alt+↑↓ だけ（Alt+←→ はブラウザの戻る/進む）
+      if (key === "ArrowUp" || key === "ArrowDown") {
+        this.host.reorderCard(card, key === "ArrowUp" ? -1 : 1);
+      }
+      return true;
+    }
+    if (key === "ArrowUp" || key === "ArrowDown") {
+      const rows = this.boxes.get(card.node)?.rows ?? [];
+      const next = card.index + (key === "ArrowUp" ? -1 : 1);
+      if (next >= 0 && next < rows.length) {
+        this.host.pickCard({ node: card.node, index: next });
+      }
+    } else if (key === "ArrowLeft") {
+      this.host.setSelection([card.node], card.node);
+    }
+    return true;
+  }
+
+  /** ノードを選んでいるときのキー。 */
+  private nodeKeys(e: KeyboardEvent, key: string): void {
+    const mod = e.ctrlKey || e.metaKey;
+    const anchor = this.host.anchor();
+    const sel = this.host.selection();
+    const nodes = this.host.doc().nodes;
 
     // comment-out hide/show for the subtree (= collapse)
     if (key === "H" && !mod && !e.altKey && anchor !== -1) {
@@ -1255,12 +1267,6 @@ export class MindMap {
 
     // edit the label
     if (key === "Enter" && mod) {
-      const p = this.host.pickedCard();
-      if (p) {
-        this.beginCardEdit(p);
-        e.preventDefault();
-        return;
-      }
       if (nodes.length === 0) this.host.addRoot();
       else if (anchor !== -1 && sel.size <= 1) this.host.editRequested(anchor);
       e.preventDefault();
