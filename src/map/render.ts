@@ -8,23 +8,11 @@
 
 import type { CardRow } from "./cards.ts";
 import type { NodeInfo } from "../coreApi.ts";
-import {
-  CODE_LINE,
-  CODE_PAD,
-  cardBleed,
-  cardInset,
-  rowH,
-} from "./cards.ts";
-import { type Box, type Layout, edgeEnds } from "./layout.ts";
+import { type Box, type Layout, cardRect, edgeEnds } from "./layout.ts";
+import { drawCard } from "./drawCard.ts";
 import { edgePath } from "./edge.ts";
-import { languageEpoch, tokenize } from "./highlight.ts";
-import {
-  ROW_NORMAL,
-  displayLabel,
-  hiddenLabel,
-  rowOf,
-  rowTop,
-} from "./metrics.ts";
+import { languageEpoch } from "./highlight.ts";
+import { displayLabel, hiddenLabel, rowOf, rowTop } from "./metrics.ts";
 import { svgEl } from "./svg.ts";
 
 /**
@@ -208,16 +196,16 @@ export class MapRenderer {
         // ここが出すのはレイアウトが計算した数だけ
         svgEl("rect", {
           class: "box",
-          width: String(b.w),
-          height: String(b.h),
+          width: b.w,
+          height: b.h,
         }),
       );
       const label = svgEl("text", {
         class: "label" + (n.label === "" ? " empty" : ""),
-        x: String(rowOf(n).padX),
-        y: String(rowOf(n).rowH / 2),
+        x: rowOf(n).padX,
+        y: rowOf(n).rowH / 2,
         // font-size は CSS ではなく属性で入れる（同じ数字を 2 箇所に置かない）
-        "font-size": String(rowOf(n).fontPx),
+        "font-size": rowOf(n).fontPx,
       });
       label.textContent = n.hidden
         ? hiddenLabel(n, buried)
@@ -227,141 +215,19 @@ export class MapRenderer {
         ? `${n.label}${buried ? `\n（${buried} 件を折り畳み中。Shift+H で戻す）` : "\n（非表示。Shift+H で戻す）"}`
         : n.label;
       g.append(label, t);
-      // card rows (links / images) from the attached content, stacked
-      // under the label
-      for (let rowIndex = 0; rowIndex < b.rows.length; rowIndex++) {
-        const r = b.rows[rowIndex];
-        const spot = `${n.id},${rowIndex}`;
-        const rowY = rowTop(b.rows, rowIndex);
-        // 中身の置き場所。選択の枠も入力欄（cardRect）もここに合わせる
-        const inset = cardInset(r);
-        const bleed = cardBleed(r);
-        const y = rowY + inset;
-        const x = ROW_NORMAL.padX - bleed;
-        const w = b.w - ROW_NORMAL.padX * 2 + bleed * 2;
-        const h = rowH(r) - inset * 2;
+      // ラベルの下に、本文から起こしたカードを積む。**形は drawCard が持つ**
+      // — ここが決めるのは「どこに置くか」だけ
+      for (let i = 0; i < b.rows.length; i++) {
+        const rect = cardRect(b, i);
+        if (rect === null) continue;
         g.append(
-          svgEl("line", {
-            class: "card-sep",
-            x1: String(ROW_NORMAL.padX - 4),
-            y1: String(rowY),
-            x2: String(b.w - ROW_NORMAL.padX + 4),
-            y2: String(rowY),
-          }),
+          ...drawCard(b.rows[i], {
+            rect,
+            rowY: rowTop(b.rows, i),
+            boxW: b.w,
+            spot: `${n.id},${i}`,
+          }, p.imageUrl),
         );
-        if (r.kind === "link") {
-          // 当たり判定の面。他の 3 種は絵や背景がその役をするが、リンクは
-          // 文字しか描かないので、行いっぱいの透明な面を敷く
-          const hit = svgEl("rect", {
-            class: "link-hit",
-            "data-card": spot,
-            x: String(ROW_NORMAL.padX),
-            y: String(y),
-            width: String(w),
-            height: String(h),
-          });
-          const title = svgEl("text", {
-            class: "link-row",
-            x: String(ROW_NORMAL.padX),
-            y: String(y + h / 2),
-          });
-          title.textContent = r.link.title;
-          const tt = svgEl("title");
-          tt.textContent = r.link.url;
-          const open = svgEl("text", {
-            class: "link-open",
-            // 枠の内側に収める。外へ出すと、選択の枠が本体より小さく見える
-            x: String(x + w),
-            y: String(y + h / 2),
-            "text-anchor": "end",
-          });
-          open.textContent = "↗";
-          open.setAttribute("data-url", r.link.url);
-          g.append(hit, title, tt, open);
-        } else if (r.kind === "svg") {
-          const img = svgEl("image", {
-            "data-card": spot,
-            x: String(ROW_NORMAL.padX),
-            y: String(y),
-            width: String(w),
-            height: String(h),
-            preserveAspectRatio: "xMidYMid meet",
-          });
-          img.setAttribute(
-            "href",
-            `data:image/svg+xml;charset=utf-8,${encodeURIComponent(r.markup)}`,
-          );
-          g.append(img);
-        } else if (r.kind === "code") {
-          // 背景は左右にも張り出す（コードは箱の縁まで塗る）。張り出しは
-          // 共有の x / w に織り込み済みなので、ここで足し直さない
-          const bg = svgEl("rect", {
-            class: "code-bg",
-            "data-card": spot,
-            x: String(x),
-            y: String(y),
-            width: String(w),
-            height: String(h),
-          });
-          if (r.lang !== "") {
-            const tt = svgEl("title");
-            tt.textContent = r.lang;
-            bg.append(tt);
-          }
-          g.append(bg);
-          const tokens = tokenize(r.lines, r.lang);
-          for (let i = 0; i < r.lines.length; i++) {
-            const ln = svgEl("text", {
-              class: "code-line",
-              "data-card": spot,
-              x: String(ROW_NORMAL.padX + 1),
-              y: String(rowY + CODE_PAD + i * CODE_LINE + CODE_LINE / 2),
-            });
-            // 幅の判断は素の文字列で行い、色の付いた塊をそこへ合わせる
-            for (const t of tokens[i]) {
-              const span = svgEl("tspan", t.cls === "" ? {} : { class: t.cls });
-              span.textContent = t.text;
-              ln.append(span);
-            }
-            g.append(ln);
-          }
-        } else {
-          const url = p.imageUrl(r.path);
-          if (url !== null) {
-            const img = svgEl("image", {
-              "data-card": spot,
-              x: String(ROW_NORMAL.padX),
-              y: String(y),
-              width: String(w),
-              height: String(h),
-              preserveAspectRatio: "xMidYMid meet",
-            });
-            img.setAttribute("href", url);
-            g.append(img);
-          } else {
-            // not loadable yet (permission pending / file missing):
-            // stable-size placeholder so the layout doesn't jump on load
-            g.append(
-              svgEl("rect", {
-                class: "img-ph",
-                "data-card": spot,
-                x: String(ROW_NORMAL.padX),
-                y: String(y),
-                width: String(w),
-                height: String(h),
-              }),
-            );
-            const ph = svgEl("text", {
-              class: "img-name",
-              "data-card": spot,
-              x: String(b.w / 2),
-              y: String(y + h / 2),
-              "text-anchor": "middle",
-            });
-            ph.textContent = r.name;
-            g.append(ph);
-          }
-        }
       }
     }
 

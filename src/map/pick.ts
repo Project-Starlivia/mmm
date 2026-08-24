@@ -19,7 +19,7 @@ export class CardPick {
   readonly el = svgEl("g", { id: "card-pick", visibility: "hidden" });
   private frame = svgEl("rect", { class: "card-picked" });
   private kill = svgEl("g", { class: "card-kill" });
-  private circle = svgEl("circle", { r: String(HIT_R) });
+  private circle = svgEl("circle", { r: HIT_R });
   private strokes = [svgEl("line"), svgEl("line")];
 
   constructor() {

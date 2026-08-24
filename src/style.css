@@ -1,3 +1,11 @@
+/* mmm の見た目。**部品ごとに 1 つの塊**にしてある — その部品がどう見えるかは
+   その名前の下だけを読めば分かる。入れ子は CSS 自身の機能で、道具は要らない。
+
+   ここに書かないもの: レイアウトが計算した数（TS が属性で入れる）。
+   ここに書くもの: 状態で変わるだけの定数（角丸・色・破線など）。 */
+
+/* ========== 色の源 ========== */
+
 :root {
   color-scheme: dark;
   --bg: #15171c;
@@ -44,6 +52,8 @@
   --dot: #dde1e7;
 }
 
+/* ========== 土台 ========== */
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -57,6 +67,8 @@ html, body {
 
 #app { display: flex; flex-direction: column; height: 100vh; }
 
+/* ========== 上の帯 ========== */
+
 #topbar {
   display: flex;
   align-items: center;
@@ -66,76 +78,77 @@ html, body {
   border-bottom: 1px solid var(--line);
   user-select: none;
   flex: none;
+
+  & button {
+    font: inherit;
+    font-size: 13px;
+    padding: 3px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--ink);
+    cursor: pointer;
+
+    &:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); }
+    &:disabled { opacity: 0.4; cursor: default; }
+  }
+
+  /* トグルボタンは押されているかが見た目で分かること。
+     ON = アクセント色で塗って枠を立てる / OFF = 沈んだ空枠 + 取り消し線 */
+  & button.toggle {
+    position: relative;
+    padding-left: 22px;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      width: 8px;
+      height: 8px;
+      margin-top: -4px;
+      border-radius: 2px;
+      border: 1px solid var(--node-border-strong);
+      background: transparent;
+    }
+    &.on {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--ink);
+
+      &::before { background: var(--accent); border-color: var(--accent); }
+    }
+    &.off {
+      opacity: 0.6;
+      color: var(--ink-dim);
+      text-decoration: line-through;
+    }
+  }
 }
+
 #logo {
   width: 22px;
   height: 22px;
   display: block;
   color: var(--accent);
   cursor: pointer;
+
+  &:hover { filter: brightness(1.25); }
 }
-#logo:hover { filter: brightness(1.25); }
-#filename { color: var(--ink-dim); font-size: 13px; }
-#filename.error { color: #e5534b; }
+#filename {
+  color: var(--ink-dim);
+  font-size: 13px;
+
+  &.error { color: #e5534b; }
+}
 #dirty { color: var(--accent); font-size: 10px; }
 .spacer { flex: 1; }
 .sep { width: 1px; height: 18px; background: var(--line); }
-#topbar button {
-  font: inherit;
-  font-size: 13px;
-  padding: 3px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--ink);
-  cursor: pointer;
-}
-#topbar button:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); }
-#topbar button:disabled { opacity: 0.4; cursor: default; }
+
+/* ========== ペインの割り付け ========== */
 
 #panes { display: flex; flex: 1; min-height: 0; }
 .pane-off { display: none !important; }
-
-/* トグルボタンは押されているかが見た目で分かること。
-   ON = アクセント色で塗って枠を立てる / OFF = 沈んだ空枠 + 取り消し線 */
-#topbar button.toggle {
-  position: relative;
-  padding-left: 22px;
-}
-#topbar button.toggle::before {
-  content: "";
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  margin-top: -4px;
-  border-radius: 2px;
-  border: 1px solid var(--node-border-strong);
-  background: transparent;
-}
-#topbar button.toggle.on {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--ink);
-}
-#topbar button.toggle.on::before {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-#topbar button.toggle.off {
-  opacity: 0.6;
-  color: var(--ink-dim);
-  text-decoration: line-through;
-}
-
-#md-pane { flex: 0 0 var(--md-width, 42%); min-width: 200px; background: var(--panel); }
-#panes.no-map #md-pane { flex: 1; }
-#md-pane .cm-editor { height: 100%; font-size: 13.5px; }
-#md-pane .cm-editor.cm-focused { outline: none; }
-#md-pane .cm-scroller { font-family: var(--mono); line-height: 1.55; }
-#md-pane .cm-gutters { background: var(--panel); border-right: 1px solid var(--line); color: var(--ink-dim); }
-.cm-mmm-selected { background: var(--accent-soft); }
 
 #splitter {
   flex: none;
@@ -143,8 +156,35 @@ html, body {
   cursor: col-resize;
   background: var(--line);
   transition: background 0.15s;
+
+  &:hover, &.dragging { background: var(--accent); }
 }
-#splitter:hover, #splitter.dragging { background: var(--accent); }
+
+/* ========== md のペイン ========== */
+
+#md-pane {
+  flex: 0 0 var(--md-width, 42%);
+  min-width: 200px;
+  background: var(--panel);
+
+  & .cm-editor {
+    height: 100%;
+    font-size: 13.5px;
+
+    &.cm-focused { outline: none; }
+  }
+  & .cm-scroller { font-family: var(--mono); line-height: 1.55; }
+  & .cm-gutters {
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    color: var(--ink-dim);
+  }
+}
+#panes.no-map #md-pane { flex: 1; }
+/* マップで選んでいるノードの、md 側での対応範囲 */
+.cm-mmm-selected { background: var(--accent-soft); }
+
+/* ========== マップのペイン ========== */
 
 #map-pane {
   flex: 1;
@@ -154,10 +194,35 @@ html, body {
   outline: none;
   background-color: var(--bg);
   background-image: radial-gradient(circle, var(--dot) 1px, transparent 1px);
+
+  &.pane-focused { box-shadow: inset 0 0 0 2px var(--accent-soft); }
 }
-#map-pane.pane-focused { box-shadow: inset 0 0 0 2px var(--accent-soft); }
 
 #map-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+#map-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-dim);
+  font-size: 13px;
+  pointer-events: none;
+  text-align: center;
+  line-height: 2;
+}
+
+/* 矩形選択の帯 */
+#rubber {
+  position: absolute;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  pointer-events: none;
+  display: none;
+}
+
+/* ========== 親子をつなぐ線 ========== */
 
 /* 線の太さはここが唯一の宣言。以前は同じ 1.7 が map/edge.ts にもあり、
    render() が毎レンダで style へ書き戻していた */
@@ -168,90 +233,112 @@ html, body {
   stroke-linecap: round;
 }
 
-/* 角丸は「状態で変わるだけの定数」なので CSS が持つ（SVG2 の geometry
-   property。属性より CSS が勝つ）。TS が出すのは、レイアウトが計算した数だけ */
-.node rect.box {
-  fill: var(--node-bg);
-  stroke: var(--node-border);
-  stroke-width: 1.2;
-  rx: 8px;
-}
-.node.root rect.box { stroke-width: 2; stroke: var(--node-border-strong); }
-.node text {
-  font-family: var(--font);
-  dominant-baseline: central;
-  user-select: none;
-}
-.node text.label {
-  /* font-size は mindmap.ts の rowOf() が属性で入れる（数字を2箇所に置かない） */
-  fill: var(--ink);
-  white-space: pre;
-}
-.node text.label.empty { fill: var(--ink-dim); }
-.node line.card-sep { stroke: var(--node-border); stroke-width: 1; }
-/* リンク行の当たり判定。見えないが押せる（他の 3 種は絵や背景がこの役をする） */
-.node rect.link-hit { fill: transparent; cursor: pointer; }
-/* 当たり判定は下に敷いた rect が持つ。文字が上から拾ってしまうと、
-   タイトルの上だけクリックが死ぬ（SVG の text はインクに当たる） */
-.node text.link-row {
-  font-size: 12px;
-  fill: var(--ink);
-  pointer-events: none;
-}
-.node text.link-open {
-  font-size: 13px;
-  fill: var(--ink-dim);
-  cursor: pointer;
-}
-.node text.link-open:hover { fill: var(--accent); }
-/* 画像も当たり判定に入れる（クリックで選ぶため）。ドラッグやノードの
-   当たり判定は座標で見ているので、これを外しても掴めなくならない */
-.node image { cursor: pointer; }
-.node rect.img-ph {
-  fill: transparent;
-  stroke: var(--node-border);
-  stroke-width: 1;
-  stroke-dasharray: 4 3;
-  rx: 6px;
-}
-.node text.img-name {
-  font-size: 11px;
-  fill: var(--ink-dim);
-}
-/* 選んだカードの枠と、その右上の ×。ノードの中ではなく、world に浮かぶ
-   1 個の印（選ばれているカードは常に高々 1 枚なので） */
-#card-pick rect.card-picked {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2;
-  rx: 6px;
-  /* 枠は素通りさせる。もう一度押して外せなくなるため */
-  pointer-events: none;
-}
-#card-pick .card-kill { cursor: pointer; }
-#card-pick .card-kill circle { fill: var(--accent); stroke: var(--node-bg); stroke-width: 1.5; }
-#card-pick .card-kill line {
-  stroke: #fff;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  pointer-events: none;
-}
-#card-pick .card-kill:hover circle { fill: #e5534b; }
+/* ========== ノードとカード ==========
+   形は map/render.ts と map/drawCard.ts が作る。ここが持つのは、
+   状態で変わるだけの定数（角丸・色・破線）。 */
 
-.node rect.code-bg {
-  fill: var(--bg);
-  stroke: var(--node-border);
-  stroke-width: 1;
-  rx: 5px;
-  cursor: pointer;
+.node {
+  cursor: default;
+
+  /* ---- 本体 ---- */
+  /* 角丸は「状態で変わるだけの定数」なので CSS が持つ（SVG2 の geometry
+     property。属性より CSS が勝つ）。TS が出すのは、レイアウトが計算した数だけ */
+  & rect.box {
+    fill: var(--node-bg);
+    stroke: var(--node-border);
+    stroke-width: 1.2;
+    rx: 8px;
+  }
+  &.root rect.box { stroke-width: 2; stroke: var(--node-border-strong); }
+  & text {
+    font-family: var(--font);
+    dominant-baseline: central;
+    user-select: none;
+  }
+  & text.label {
+    /* font-size は map/metrics.ts の rowOf() が属性で入れる（数字を2箇所に置かない） */
+    fill: var(--ink);
+    white-space: pre;
+
+    &.empty { fill: var(--ink-dim); }
+  }
+
+  /* ---- カード共通 ---- */
+  & line.card-sep { stroke: var(--node-border); stroke-width: 1; }
+  /* 画像も当たり判定に入れる（クリックで選ぶため）。ドラッグやノードの
+     当たり判定は座標で見ているので、これを外しても掴めなくならない */
+  & image { cursor: pointer; }
+
+  /* ---- リンクのカード ---- */
+  /* 当たり判定は下に敷いた rect が持つ。文字が上から拾ってしまうと、
+     タイトルの上だけクリックが死ぬ（SVG の text はインクに当たる） */
+  & rect.link-hit { fill: transparent; cursor: pointer; }
+  & text.link-row {
+    font-size: 12px;
+    fill: var(--ink);
+    pointer-events: none;
+  }
+  & text.link-open {
+    font-size: 13px;
+    fill: var(--ink-dim);
+    cursor: pointer;
+
+    &:hover { fill: var(--accent); }
+  }
+
+  /* ---- 画像のカード ---- */
+  /* 読めていないときの場所取り */
+  & rect.img-ph {
+    fill: transparent;
+    stroke: var(--node-border);
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+    rx: 6px;
+  }
+  & text.img-name {
+    font-size: 11px;
+    fill: var(--ink-dim);
+  }
+
+  /* ---- コードのカード ---- */
+  & rect.code-bg {
+    fill: var(--bg);
+    stroke: var(--node-border);
+    stroke-width: 1;
+    rx: 5px;
+    cursor: pointer;
+  }
+  & text.code-line {
+    font-family: "Cascadia Code", Consolas, "JetBrains Mono", monospace;
+    font-size: 11px;
+    fill: var(--ink);
+    white-space: pre;
+  }
+
+  /* ---- いまの操作の状態（付けるのは mindmap.ts の paintState）----
+     ここは順番が意味を持つ。同じ強さなので、後ろに書いたものが勝つ */
+  &.selected rect.box {
+    stroke: var(--accent);
+    stroke-width: 2;
+    fill: color-mix(in srgb, var(--accent) 16%, var(--node-bg));
+  }
+  &.hidden-node {
+    opacity: 0.45;
+
+    /* 畳んだノードは小さく丸めて、別のものだと分かるようにする */
+    & rect.box { rx: 4px; stroke-dasharray: 4 3; }
+    & text.label { fill: var(--ink-dim); }
+  }
+  &.drop-child rect.box { stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 5 3; }
+  &.dragging { opacity: 0.35; }
+  &.drop-parent rect.box {
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-dasharray: 5 4;
+  }
 }
-.node text.code-line {
-  font-family: "Cascadia Code", Consolas, "JetBrains Mono", monospace;
-  font-size: 11px;
-  fill: var(--ink);
-  white-space: pre;
-}
-/* 色は @lezer/highlight の classHighlighter が付ける tok-* に対応させる。
+
+/* コードの色は @lezer/highlight の classHighlighter が付ける tok-* に対応させる。
    SVG は fill、HTML は color で塗るので両方書く — マップのカードと
    その場の編集欄で、同じコードが同じ色になる。
    全部を塗り分けはしない — 6 行のプレビューで細かく分けるほど読みにくい */
@@ -273,22 +360,42 @@ html, body {
 .tok-typeName, .tok-className, .tok-tagName, .tok-namespace {
   fill: var(--tok-type); color: var(--tok-type);
 }
-.node.selected rect.box {
-  stroke: var(--accent);
-  stroke-width: 2;
-  fill: color-mix(in srgb, var(--accent) 16%, var(--node-bg));
-}
-.node.hidden-node { opacity: 0.45; }
-/* 畳んだノードは小さく丸めて、別のものだと分かるようにする */
-.node.hidden-node rect.box { rx: 4px; stroke-dasharray: 4 3; }
-.node.hidden-node text.label { fill: var(--ink-dim); }
-.node.drop-child rect.box { stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 5 3; }
-.node.dragging { opacity: 0.35; }
-.node { cursor: default; }
 
-.plus-btn circle { fill: var(--accent); }
-.plus-btn line { stroke: #fff; stroke-width: 2; stroke-linecap: round; }
-.plus-btn { cursor: pointer; }
+/* ========== 選んだカードの印 ========== */
+
+/* 枠と、その右上の ×。ノードの中ではなく world に浮かぶ 1 個の印
+   （選ばれているカードは常に高々 1 枚なので） */
+#card-pick {
+  & rect.card-picked {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    rx: 6px;
+    /* 枠は素通りさせる。もう一度押して外せなくなるため */
+    pointer-events: none;
+  }
+  & .card-kill {
+    cursor: pointer;
+
+    & circle { fill: var(--accent); stroke: var(--node-bg); stroke-width: 1.5; }
+    & line {
+      stroke: #fff;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      pointer-events: none;
+    }
+    &:hover circle { fill: #e5534b; }
+  }
+}
+
+/* ========== 落とし先の示し ========== */
+
+.plus-btn {
+  cursor: pointer;
+
+  & circle { fill: var(--accent); }
+  & line { stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+}
 
 #drop-line {
   stroke: var(--accent);
@@ -307,28 +414,18 @@ html, body {
   opacity: 0.85;
   pointer-events: none;
 }
+
 /* 線への割り込み（A→C→B）: その線だけを光らせる */
 .edge.drop-edge {
   stroke: var(--accent);
   stroke-width: 3;
 }
-.node.drop-parent rect.box {
-  stroke: var(--accent);
-  stroke-width: 2;
-  stroke-dasharray: 5 4;
-}
 
-#rubber {
-  position: absolute;
-  border: 1px solid var(--accent);
-  background: var(--accent-soft);
-  pointer-events: none;
-  display: none;
-}
+/* ========== その場で直す入力欄 ========== */
 
-/* カードをその場で直す編集欄。裏に色付きの層（.card-ink）、
-   表に透明な textarea を重ねる。字がずれないよう、font と padding と
-   line-height は入れ物側で 1 回だけ決めて両方に継がせる */
+/* カードの編集欄。裏に色付きの層（.card-ink）、表に透明な textarea を
+   重ねる。字がずれないよう、font と padding と line-height は入れ物側で
+   1 回だけ決めて両方に継がせる */
 #card-editor {
   position: absolute;
   display: none;
@@ -339,39 +436,40 @@ html, body {
   background: var(--bg);
   overflow: hidden;
   z-index: 10;
-}
-#card-editor .card-ink,
-#card-editor textarea {
-  position: absolute;
-  inset: 0;
-  margin: 0;
-  box-sizing: border-box;
-  padding: inherit;
-  font: inherit;
-  line-height: inherit;
-  white-space: pre;
-  overflow: hidden;
-  border: none;
-  background: none;
-}
-#card-editor .card-ink {
-  color: var(--ink);
-  pointer-events: none;
-}
-#card-editor textarea {
-  color: transparent;
-  caret-color: var(--accent);
-  resize: none;
-  outline: none;
-  /* 箱を中身に合わせて広げているので、はみ出しは起きない。
-     auto にすると使わないスクロールバーが場所を取って字がずれる */
-  overflow: hidden;
-}
-#card-editor textarea::selection { background: var(--accent-soft); }
 
-/* 寸法（font-size / padding / 幅・高さ）は map/metrics.ts の ROW_* が
-   唯一の定義で、positionEditor() がズーム込みで書き込む。ここに書くと
-   ラベルと入力欄で文字位置がずれる */
+  & .card-ink, & textarea {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    box-sizing: border-box;
+    padding: inherit;
+    font: inherit;
+    line-height: inherit;
+    white-space: pre;
+    overflow: hidden;
+    border: none;
+    background: none;
+  }
+  & .card-ink {
+    color: var(--ink);
+    pointer-events: none;
+  }
+  & textarea {
+    color: transparent;
+    caret-color: var(--accent);
+    resize: none;
+    outline: none;
+    /* 箱を中身に合わせて広げているので、はみ出しは起きない。
+       auto にすると使わないスクロールバーが場所を取って字がずれる */
+    overflow: hidden;
+
+    &::selection { background: var(--accent-soft); }
+  }
+}
+
+/* ラベルの編集欄。寸法（font-size / padding / 幅・高さ）は map/metrics.ts の
+   ROW_* が唯一の定義で、positionEditor() がズーム込みで書き込む。
+   ここに書くとラベルと入力欄で文字位置がずれる */
 #node-editor {
   position: absolute;
   display: none;
@@ -384,6 +482,8 @@ html, body {
   z-index: 10;
 }
 
+/* ========== 右クリックメニュー ========== */
+
 #ctx-menu {
   position: fixed;
   z-index: 100;
@@ -395,22 +495,25 @@ html, body {
   padding: 4px;
   display: none;
   user-select: none;
-}
-#ctx-menu .item {
-  padding: 6px 12px;
-  border-radius: 5px;
-  font-size: 13px;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-#ctx-menu .item .key { color: var(--ink-dim); font-size: 11px; }
-#ctx-menu .item:hover { background: var(--accent-soft); }
-#ctx-menu .item.disabled { opacity: 0.4; pointer-events: none; }
-#ctx-menu hr { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
 
-/* ---------- お絵描き（app/draw.ts） ---------- */
+  & .item {
+    padding: 6px 12px;
+    border-radius: 5px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+
+    & .key { color: var(--ink-dim); font-size: 11px; }
+    &:hover { background: var(--accent-soft); }
+    &.disabled { opacity: 0.4; pointer-events: none; }
+  }
+  & hr { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
+}
+
+/* ========== お絵描き（app/draw.ts） ========== */
+
 /* 紙の色はキャンバス自身が最初に塗る。CSS にも置くと、出来上がる画像の色と
    同じ数字を 2 か所に持つことになる */
 .popup-overlay {
@@ -423,6 +526,7 @@ html, body {
   outline: none;
   z-index: 40;
 }
+
 .popup {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -432,7 +536,22 @@ html, body {
   max-height: calc(100vh - 48px);
   overflow: auto;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+
+  & button {
+    font: inherit;
+    font-size: 13px;
+    padding: 4px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--ink);
+    cursor: pointer;
+
+    &:hover { background: var(--accent-soft); border-color: var(--accent); }
+    &.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  }
 }
+
 .popup-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
 .popup-toolbar {
   display: flex;
@@ -459,29 +578,3 @@ html, body {
   margin-top: 12px;
 }
 .popup-hint { flex: 1; font-size: 11px; color: var(--ink-dim); }
-.popup button {
-  font: inherit;
-  font-size: 13px;
-  padding: 4px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--ink);
-  cursor: pointer;
-}
-.popup button:hover { background: var(--accent-soft); border-color: var(--accent); }
-.popup button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-
-#map-hint {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-dim);
-  font-size: 13px;
-  pointer-events: none;
-  text-align: center;
-  line-height: 2;
-}
-
