@@ -12,12 +12,14 @@ import {
   touchesFence,
 } from "./map/highlight.ts";
 import {
+  type Pt,
   centerOf,
   distToSeg,
-  exitPoint,
+  leftOf,
   midOfPolyline,
+  rightOf,
 } from "./map/geometry";
-import { edgeDraw, edgeHintPath, edgeSegs, flattenSegs } from "./map/edge";
+import { edgePath, edgeSegs, flattenSegs } from "./map/edge";
 import {
   type CardRef,
   type CardRow,
@@ -37,7 +39,8 @@ import {
   rowTop,
 } from "./map/metrics";
 import { type Box, GAP, layoutMap } from "./map/layout";
-import { exportMapSvg } from "./map/export";
+import { mapToSvg } from "./map/toSvg";
+import { svgEl } from "./map/svg";
 
 export interface MapHost {
   /** いまの文書（テキスト・ノード・フェンスの組）。必ず同じ rev のもの */
@@ -89,20 +92,9 @@ export interface MapHost {
   redo(): void;
 }
 
-const SVG_NS = "http://www.w3.org/2000/svg";
-
 /** ドラッグと見なす最小の移動量（px の 2 乗）。ダブルクリックの 2 回目が
  *  わずかに動いてもドラッグに化けないよう、ノードにもカードにも同じ値を使う */
 const DRAG_SLOP2 = 64;
-
-function svgEl<K extends keyof SVGElementTagNameMap>(
-  tag: K,
-  attrs: Record<string, string> = {},
-): SVGElementTagNameMap[K] {
-  const el = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-  return el;
-}
 
 export class MindMap {
   private pane: HTMLElement;
@@ -320,27 +312,18 @@ export class MindMap {
       seen.add(n.id);
 
       // --- エッジ（親への曲線）---
-      if (n.parent !== -1 && boxes.has(n.parent)) {
-        const p = boxes.get(n.parent)!;
+      const ends = this.edgeEnds(n.id);
+      if (ends) {
         let path = this.edgeEls.get(n.id);
         if (!path) {
           path = svgEl("path", { class: "edge" });
           this.edgeLayer.append(path);
           this.edgeEls.set(n.id, path);
         }
-        const e = exitPoint(p, 1, 0);
-        const fan = fanOf.get(n.id) ?? 0;
-        const g = edgeDraw(
-          { x: e.x, y: e.y + fan },
-          exitPoint(b, -1, 0),
-        );
-        // 太さは EDGE.width で固定だが、d が変われば結局書き直すので、まとめて
-        // 差分を見る
-        const sig = `${g.width}|${g.d}`;
-        if (this.edgeD.get(n.id) !== sig) {
-          path.setAttribute("d", g.d);
-          path.style.strokeWidth = String(g.width);
-          this.edgeD.set(n.id, sig);
+        const d = edgePath(ends.from, ends.to);
+        if (this.edgeD.get(n.id) !== d) {
+          path.setAttribute("d", d);
+          this.edgeD.set(n.id, d);
         }
       } else {
         const stale = this.edgeEls.get(n.id);
@@ -837,7 +820,7 @@ export class MindMap {
    * 埋め込むので、この結果だけで単体表示できる（ダウンロード/ラスタライズ用）。
    * 地図が空なら null。 */
   exportSvg(): Promise<SVGSVGElement | null> {
-    return exportMapSvg({
+    return mapToSvg({
       boxes: this.boxes.values(),
       edgeLayer: this.edgeLayer,
       nodeLayer: this.nodeLayer,
@@ -845,33 +828,30 @@ export class MindMap {
     });
   }
 
-  /** 子 id から、その親へのエッジの幾何を出す（付け根のずらしも込み） */
-  private edgeGeomOf(
-    id: number,
-  ): { a: { x: number; y: number }; du: number; dv: number } | null {
+  /**
+   * 子 id から、その親へ引く線の両端（付け根のずらしも込み）。
+   * **描画も当たり判定もここだけを見る** — 同じ式を 2 箇所に書いていた頃、
+   * 片方だけ直すと線と当たり判定が静かにずれた。
+   */
+  private edgeEnds(id: number): { from: Pt; to: Pt } | null {
     const b = this.boxes.get(id);
     const pid = this.parentOf.get(id);
-    const p = pid !== undefined ? this.boxes.get(pid) : undefined;
+    const p = pid === undefined ? undefined : this.boxes.get(pid);
     if (!b || !p) return null;
-    const e = exitPoint(p, 1, 0);
-    const fan = this.fanOf.get(id) ?? 0;
-    const a = { x: e.x, y: e.y + fan };
-    const z = exitPoint(b, -1, 0);
+    const e = rightOf(p);
     return {
-      a,
-      du: z.x - a.x,
-      dv: z.y - a.y,
+      from: { x: e.x, y: e.y + (this.fanOf.get(id) ?? 0) },
+      to: leftOf(b),
     };
   }
 
   /** エッジを world 座標の折れ線にする（線への当たり判定と印の位置に使う） */
-  private edgePolyline(id: number): { x: number; y: number }[] | null {
-    const g = this.edgeGeomOf(id);
-    if (!g) return null;
-    return flattenSegs(edgeSegs(g.du, g.dv), 8).map((q) => ({
-      x: g.a.x + q[0],
-      y: g.a.y + q[1],
-    }));
+  private edgePolyline(id: number): Pt[] | null {
+    const e = this.edgeEnds(id);
+    if (!e) return null;
+    return flattenSegs(edgeSegs(e.to.x - e.from.x, e.to.y - e.from.y), 8).map(
+      (q) => ({ x: e.from.x + q[0], y: e.from.y + q[1] }),
+    );
   }
 
   /** id を指定して一時的な class を付ける（DOM を舐めずに済む） */
@@ -1010,7 +990,7 @@ export class MindMap {
       return;
     }
     this.plusBtn.setAttribute("visibility", "visible");
-    const p = exitPoint(b, 1, 0);
+    const p = rightOf(b);
     this.plusBtn.setAttribute(
       "transform",
       `translate(${p.x + 14} ${p.y})`,
@@ -1901,8 +1881,7 @@ export class MindMap {
         this.dropHint.setAttribute("visibility", "hidden");
         return;
       }
-      const from = exitPoint(p, 1, 0);
-      this.dropHint.setAttribute("d", edgeHintPath(from, to));
+      this.dropHint.setAttribute("d", edgePath(rightOf(p), to));
       this.dropHint.setAttribute("visibility", "visible");
       this.markNode(parentId, "drop-parent");
     };
@@ -1930,7 +1909,7 @@ export class MindMap {
       // ring on the target PLUS an insertion line on its outward side,
       // where the new child will appear (mmm.md そのに)
       this.markNode(target.id, "drop-child");
-      const e = exitPoint(b, 1, 0);
+      const e = rightOf(b);
       const lx = e.x + GAP.x / 2;
       const ly = e.y;
       const half = 16;

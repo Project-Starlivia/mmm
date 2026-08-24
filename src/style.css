@@ -159,18 +159,21 @@ html, body {
 
 #map-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
+/* 線の太さはここが唯一の宣言。以前は同じ 1.7 が map/edge.ts にもあり、
+   render() が毎レンダで style へ書き戻していた */
 .edge {
   fill: none;
   stroke: var(--edge);
-  stroke-width: 1.7; /* mindmap.ts の render() が EDGE.width で毎回上書きする */
+  stroke-width: 1.7;
   stroke-linecap: round;
 }
 
+/* 角丸は mindmap.ts が属性で入れる（通常 8 / 折り畳み 4）。同じ数字を
+   ここに置くと、片方だけ直したときに気づけない */
 .node rect.box {
   fill: var(--node-bg);
   stroke: var(--node-border);
   stroke-width: 1.2;
-  rx: 8;
 }
 .node.root rect.box { stroke-width: 2; stroke: var(--node-border-strong); }
 .node text {
@@ -354,12 +357,13 @@ html, body {
 }
 #card-editor textarea::selection { background: var(--accent-soft); }
 
+/* 寸法（font-size / padding / 幅・高さ）は map/metrics.ts の ROW_* が
+   唯一の定義で、positionEditor() がズーム込みで書き込む。ここに書くと
+   ラベルと入力欄で文字位置がずれる */
 #node-editor {
   position: absolute;
   display: none;
   font-family: var(--font);
-  font-size: 13px;
-  padding: 0 10px;
   border: 2px solid var(--accent);
   border-radius: 8px;
   background: var(--node-bg);

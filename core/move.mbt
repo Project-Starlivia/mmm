@@ -130,7 +130,7 @@ fn move_block(i : Int, at : Int, new_depth : Int) -> Unit {
   sb.write_string(sub(st.text, pos, nd.sub_end))
   let mut moved = sb.to_string()
   // keep block boundaries tidy: blank-line separated, single newline at EOF
-  let br = nl()
+  let br = eol
   while moved.length() > 0 &&
         (
           cc(moved, moved.length() - 1) == 10 ||

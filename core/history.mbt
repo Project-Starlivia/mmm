@@ -172,17 +172,3 @@ fn do_redo() -> Unit {
   replay_entry(entry.steps, false, entry.after)
   st.undo.push(entry)
 }
-
-///|
-/// Abort an in-flight editing session: if the top undo entry carries `tag`,
-/// revert it and drop it (no redo entry).
-fn do_abort(tag : String) -> Unit {
-  if st.undo.length() == 0 {
-    return
-  }
-  if st.undo[st.undo.length() - 1].tag != tag {
-    return
-  }
-  let entry = st.undo.unsafe_pop()
-  replay_entry(entry.inv, true, entry.before)
-}

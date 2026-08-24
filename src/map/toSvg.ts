@@ -1,21 +1,11 @@
-// マップの SVG 書き出し。画面の DOM から、一時的な UI 状態
-// （選択・ドロップ印）を取り除き、計算済みスタイルを属性に焼き込んだ
-// 自己完結の <svg> を作る（mmm.md そのに: コピー、ダウンロード svg/webp）。
+// マップを 1 枚の <svg> にする。画面の DOM から、一時的な UI 状態
+// （選択・ドロップ印）を取り除き、計算済みスタイルを属性に焼き込むので、
+// この結果だけで単体表示できる。
 
 import type { Rect } from "./geometry.ts";
+import { SVG_NS, svgEl } from "./svg.ts";
 
-const SVG_NS = "http://www.w3.org/2000/svg";
-
-function svgEl<K extends keyof SVGElementTagNameMap>(
-  tag: K,
-  attrs: Record<string, string> = {},
-): SVGElementTagNameMap[K] {
-  const el = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-  return el;
-}
-
-export async function exportMapSvg(args: {
+export async function mapToSvg(args: {
   boxes: Iterable<Rect>;
   edgeLayer: SVGGElement;
   nodeLayer: SVGGElement;

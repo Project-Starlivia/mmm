@@ -33,15 +33,12 @@ fn sanitize_label(label : String) -> String {
 }
 
 ///|
-/// Dominant newline of the current document ("\r\n" or "\n").
-fn nl() -> String {
-  for i = 0; i < st.text.length(); i = i + 1 {
-    if cc(st.text, i) == 10 {
-      return if i > 0 && cc(st.text, i - 1) == 13 { "\r\n" } else { "\n" }
-    }
-  }
-  "\n"
-}
+/// 書き足す改行。**常に LF**。
+///
+/// 読み込みで CRLF を LF へ正規化し、保存も LF で書く（src/app/io.ts）ので、
+/// 文書の中に CR が残ることは無い。以前はここで「その文書の流儀」を毎回
+/// 探していたが、アプリからは到達できない一般性だった。
+let eol : String = "\n"
 
 ///|
 /// True if block-boundary offset `at` is already preceded by a blank line
@@ -69,7 +66,7 @@ fn preceded_by_blank(at : Int) -> Bool {
 /// Returns the edit plus the prefix length (the new heading line starts at
 /// `at + prefix` once applied).
 fn insert_heading_edit(at : Int, depth : Int) -> (Edit, Int) {
-  let br = nl()
+  let br = eol
   let sb = StringBuilder::new()
   let mut prefix_len = 0
   if at > 0 && cc(st.text, at - 1) != 10 {

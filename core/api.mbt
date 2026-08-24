@@ -269,16 +269,6 @@ pub fn redo() -> String {
 }
 
 ///|
-/// 入力中のセッションを丸ごと取り消す。
-/// **UI からは呼んでいない**（マップの編集は「確定のみ、キャンセル無し」と
-/// 決めたため、js/exports.mbt にも出していない）。コアの機能としては
-/// 生きていてテストもあるので、キャンセルを入れるならここから繋ぐ。
-pub fn abort_session(tag : String) -> String {
-  do_abort(tag)
-  take_snapshot()
-}
-
-///|
 pub fn selection_text(ids : Array[Int]) -> String {
   subtree_text(ids)
 }

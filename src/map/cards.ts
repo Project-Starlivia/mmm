@@ -12,7 +12,6 @@ import type { DocView, FenceSpan, NodeInfo } from "../coreApi.ts";
 export interface LinkInfo {
   title: string;
   url: string;
-  host: string;
 }
 
 /** One card row under the label, from the attached content.
@@ -79,14 +78,15 @@ export function parseLink(label: string): LinkInfo | null {
   } else {
     return null;
   }
+  // URL として読めないものはリンクにしない。読めたホスト名は、題が
+  // 無いときの題になる
   let host = "";
   try {
     host = new URL(url).hostname;
   } catch {
     return null;
   }
-  if (title === "") title = host;
-  return { title, url, host };
+  return { title: title === "" ? host : title, url };
 }
 
 /** Content line of the form `![alt](path)` with a LOCAL (relative) path.
@@ -107,11 +107,6 @@ export function parseImage(line: string): { path: string; name: string } | null 
   // Windows のパスは `\` 区切りでも来る（ドライブレターや `..\..\x.png`）
   const name = path.split(/[\\/]/).pop()!;
   return { path, name };
-}
-
-/** 文書のどこかにローカル画像があるか（画像フォルダの要否はここから導く） */
-export function hasLocalImage(text: string): boolean {
-  return text.split("\n").some((l) => parseImage(l) !== null);
 }
 
 /**

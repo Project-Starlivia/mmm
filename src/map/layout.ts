@@ -2,7 +2,6 @@
 // すべての木は左から右へ伸びる。
 
 import type { DocView, NodeInfo } from "../coreApi.ts";
-import { EDGE } from "./edge.ts";
 import { type CardRow, cardRows } from "./cards.ts";
 import { nodeSize } from "./metrics.ts";
 
@@ -11,6 +10,12 @@ export const GAP = {
   y: 10,
   root: 34,
 };
+
+/**
+ * 親の辺のうち、何割を「付け根の帯」に使うか。子が複数あるとき、線の出口を
+ * この帯の中に配って重なりを解く。
+ */
+const FAN_BAND = 0.6;
 
 export interface Box {
   n: NodeInfo;
@@ -138,24 +143,23 @@ export function layoutMap(doc: DocView): Layout {
   for (const n of visible) {
     if (n.parent !== -1 && boxes.has(n.parent) && boxes.has(n.id)) parentOf.set(n.id, n.parent);
   }
-  if (EDGE.spread > 0) {
-    const fans = new Map<number, NodeInfo[]>();
-    for (const n of visible) {
-      if (!parentOf.has(n.id)) continue;
-      const list = fans.get(n.parent);
-      if (list) list.push(n);
-      else fans.set(n.parent, [n]);
-    }
-    for (const list of fans.values()) {
-      if (list.length < 2) continue;
-      const parent = boxes.get(list[0].parent)!;
-      const sorted = [...list].sort(
-        (a, b) => boxes.get(a.id)!.y + boxes.get(a.id)!.h / 2 - boxes.get(b.id)!.y - boxes.get(b.id)!.h / 2,
-      );
-      const band = parent.h * Math.min(1, EDGE.spread);
-      for (let i = 0; i < sorted.length; i++) {
-        fanOf.set(sorted[i].id, ((i + 0.5) / sorted.length - 0.5) * band);
-      }
+  const fans = new Map<number, NodeInfo[]>();
+  for (const n of visible) {
+    if (!parentOf.has(n.id)) continue;
+    const list = fans.get(n.parent);
+    if (list) list.push(n);
+    else fans.set(n.parent, [n]);
+  }
+  const centerY = (id: number): number => {
+    const b = boxes.get(id)!;
+    return b.y + b.h / 2;
+  };
+  for (const list of fans.values()) {
+    if (list.length < 2) continue;
+    const band = boxes.get(list[0].parent)!.h * FAN_BAND;
+    const sorted = [...list].sort((a, b) => centerY(a.id) - centerY(b.id));
+    for (let i = 0; i < sorted.length; i++) {
+      fanOf.set(sorted[i].id, ((i + 0.5) / sorted.length - 0.5) * band);
     }
   }
 

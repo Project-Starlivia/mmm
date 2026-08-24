@@ -42,7 +42,7 @@ export function decidePaste(
       ].join("\n\n");
       return { kind: "rootTree", body };
     }
-    const hashes = "#".repeat(Math.min(anchor.depth + 1, 100));
+    const hashes = "#".repeat(anchor.depth + 1);
     const body = labels.map((l) => `${hashes} ${l}`).join("\n\n");
     return { kind: "children", body };
   }

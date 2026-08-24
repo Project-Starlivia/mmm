@@ -19,16 +19,14 @@ export const round2 = (v: number): number => Math.round(v * 100) / 100;
 /** 箱の中心 */
 export const centerOf = (b: Rect): Pt => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
 
-/** 箱の縁の点（中心から (dx,dy) 方向へ出たところ） */
-export function exitPoint(b: Rect, dx: number, dy: number): Pt {
-  const cx = b.x + b.w / 2;
-  const cy = b.y + b.h / 2;
-  if (dx === 0 && dy === 0) return { x: cx, y: cy };
-  const sx = dx !== 0 ? b.w / 2 / Math.abs(dx) : Infinity;
-  const sy = dy !== 0 ? b.h / 2 / Math.abs(dy) : Infinity;
-  const s = Math.min(sx, sy);
-  return { x: cx + dx * s, y: cy + dy * s };
-}
+// 木は左から右へ伸びる。線が箱に触れるのは左右の辺の中点だけで、
+// 任意方向へ出る一般形は左右振り分けを持っていた頃の名残だった。
+
+/** 右辺の中点。子への線・`+` ボタンはここから出る */
+export const rightOf = (b: Rect): Pt => ({ x: b.x + b.w, y: b.y + b.h / 2 });
+
+/** 左辺の中点。親からの線はここへ入る */
+export const leftOf = (b: Rect): Pt => ({ x: b.x, y: b.y + b.h / 2 });
 
 /** 点 p から線分 ab までの距離 */
 export function distToSeg(p: Pt, a: Pt, b: Pt): number {

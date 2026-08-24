@@ -108,7 +108,7 @@ fn cmd_delete(ids : Array[Int]) -> Unit {
 /// Separators follow the document's own newline flavor.
 fn subtree_text(ids : Array[Int]) -> String {
   let idxs = normalize_selection(ids)
-  let br = nl()
+  let br = eol
   let sb = StringBuilder::new()
   for n = 0; n < idxs.length(); n = n + 1 {
     let nd = st.nodes[idxs[n]]
@@ -160,7 +160,6 @@ fn cmd_toggle_hidden(id : Int) -> Unit {
           // その改行も一緒に消さないと、往復するたびに末尾が伸びる
           let mut from = r.close_start
           if r.close_next == n && (n == 0 || cc(st.text, n - 1) != 10) {
-            let eol = nl()
             let len = eol.length()
             if from >= len && sub(st.text, from - len, from) == eol {
               from = from - len
@@ -186,7 +185,6 @@ fn cmd_toggle_hidden(id : Int) -> Unit {
       return
     }
   }
-  let eol = nl()
   // 閉じマーカーは必ず行頭に置く。本文が改行で終わっていないときは前に改行を
   // 足すが、そのぶん後ろには足さない。こうすると「マーカーが改行で終わって
   // いるか」で、足した改行の有無が show 側から判別できる（往復が可逆になる）

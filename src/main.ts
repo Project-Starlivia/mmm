@@ -16,7 +16,7 @@ import { MdEditor } from "./editor";
 import { MindMap, type MapHost } from "./mindmap";
 import { io, type Doc } from "./app/io";
 import { initAssets } from "./app/assets";
-import { initExport } from "./app/export";
+import { initDownload } from "./app/download";
 import { initPanes } from "./app/panes";
 import { deriveName } from "./app/name";
 import { initTheme } from "./app/theme";
@@ -56,7 +56,6 @@ let anchorId = -1;
  * Delete や Alt+↑↓ が何に効くのか決まらない。
  */
 let picked: CardRef | null = null;
-let sessionN = 0;
 /** loadText を呼ぶたびに進む世代番号。起動時の前回ファイル読み込みが、
  * その間に New/Open/Drop で別の(空の)文書を開いていた場合まで
  * 上書きしてしまわないためのガード。 */
@@ -72,7 +71,13 @@ let savedName: string | null = null;
 
 // ---------- sync ----------
 
-type Origin = "cm" | "map" | "core" | "load";
+/**
+ * そのスナップショットを誰が起こしたか。振る舞いが変わるのは 3 通りだけ。
+ * - `cm`   … MD ペインの打鍵。CodeMirror には既に入っているので送り返さない
+ * - `load` … 文書まるごとの入れ替え。setText が済んでいる
+ * - `core` … それ以外（マップの操作・undo/redo）。MD ペインへ差分を送る
+ */
+type Origin = "cm" | "load" | "core";
 
 function applySnap(snap: Snapshot, origin: Origin): void {
   doc = { text: core.getText(), nodes: snap.nodes, fences: snap.fences };
@@ -174,13 +179,28 @@ function setSelection(ids: number[], anchor: number, reveal = true): void {
   syncSelectionViews(reveal, hadCard);
 }
 
-/** Run a structural command; optionally focus / edit the resulting node. */
+/**
+ * undo の粒度を分ける印。**tag が違えば必ず別の undo になる**ので、
+ * 番号が違うだけで足りる（用途ごとに接頭辞を変えていた頃、番号が既に
+ * 一意なので接頭辞は何も区別していなかった）。
+ * 同じ tag を続けて渡すと 1 つの undo にまとまる（打鍵の連結）。
+ */
+let tagN = 0;
+const nextTag = (): string => `t${++tagN}`;
+
+/** ノードを作るコマンドは、どれも「作って、そのまま編集に入る」。 */
+function addNode(fn: (tag: string) => Snapshot): void {
+  const tag = nextTag();
+  runCmd(() => fn(tag), { edit: { tag } });
+}
+
+/** 構造を変えるコマンドを走らせ、結果のノードへ選択を移す（必要なら編集へ）。 */
 function runCmd(
   fn: () => Snapshot,
   opts: { edit?: { tag: string } } = {},
 ): void {
   const snap = fn();
-  applySnap(snap, "map");
+  applySnap(snap, "core");
   if (snap.focus !== -1 && byId.has(snap.focus)) {
     setSelection([snap.focus], snap.focus);
     map.ensureVisible(snap.focus);
@@ -204,7 +224,7 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
     // IME: every composition update replaces the previous candidate text;
     // keep ONE tag for the whole composition so undo treats it as one edit
     if (editKind !== "compose") {
-      editTag = `t${++sessionN}`;
+      editTag = nextTag();
       editKind = "compose";
     }
     tag = editTag;
@@ -216,7 +236,7 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
       if (editKind === "type" && e.from === editPos) {
         tag = editTag;
       } else {
-        tag = `t${++sessionN}`;
+        tag = nextTag();
       }
       editKind = "type";
       editTag = tag;
@@ -225,7 +245,7 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
       if (editKind === "del" && e.to === editPos) {
         tag = editTag;
       } else {
-        tag = `t${++sessionN}`;
+        tag = nextTag();
       }
       editKind = "del";
       editTag = tag;
@@ -235,7 +255,7 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
     }
   } else {
     editKind = "";
-    tag = `t${++sessionN}`; // multi-cursor transaction: one undo entry
+    tag = nextTag(); // multi-cursor transaction: one undo entry
   }
   let delta = 0;
   let snap: Snapshot | null = null;
@@ -252,7 +272,7 @@ const host: MapHost = {
   doc: () => doc,
   chooseImageFolder: () => void assets.chooseFolder(),
   replaceText(from, to, text) {
-    applySnap(core.replaceText(from, to, text, `c${++sessionN}`), "map");
+    applySnap(core.replaceText(from, to, text, nextTag()), "core");
   },
   selection: () => selection,
   anchor: () => anchorId,
@@ -272,7 +292,7 @@ const host: MapHost = {
     if (!row) return;
     picked = null;
     const e = removeCard(core.getText(), row.from, row.to);
-    applySnap(core.replaceText(e.from, e.to, e.insert, `x${++sessionN}`), "map");
+    applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
   },
   reorderCard(ref, dir) {
     const rows = cardRows(doc, new Set<number>()).get(ref.node);
@@ -287,7 +307,7 @@ const host: MapHost = {
     const e = moveCard(core.getText(), row.from, row.to, at);
     if (!e) return;
     picked = { node: ref.node, index: ref.index + dir };
-    applySnap(core.replaceText(e.from, e.to, e.insert, `m${++sessionN}`), "map");
+    applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
   },
   moveCardTo(ref, node, index) {
     const text = core.getText();
@@ -308,36 +328,27 @@ const host: MapHost = {
     const landing =
       node === ref.node && index > ref.index ? index - 1 : dst ? index : target.length;
     picked = { node, index: landing };
-    applySnap(core.replaceText(e.from, e.to, e.insert, `d${++sessionN}`), "map");
+    applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
     return true;
   },
 
   addChild(id) {
-    if (!byId.has(id)) return;
-    const tag = `s${++sessionN}`;
-    runCmd(() => core.addChild(id, tag), { edit: { tag } });
+    if (byId.has(id)) addNode((tag) => core.addChild(id, tag));
   },
   addSibling(id) {
-    if (!byId.has(id)) return;
-    const tag = `s${++sessionN}`;
-    runCmd(() => core.addSibling(id, tag), { edit: { tag } });
+    if (byId.has(id)) addNode((tag) => core.addSibling(id, tag));
   },
   addSiblingBefore(id) {
-    if (!byId.has(id)) return;
-    const tag = `s${++sessionN}`;
-    runCmd(() => core.addSiblingBefore(id, tag), { edit: { tag } });
+    if (byId.has(id)) addNode((tag) => core.addSiblingBefore(id, tag));
   },
   addParent(id) {
-    if (!byId.has(id)) return;
-    const tag = `s${++sessionN}`;
-    runCmd(() => core.addParent(id, tag), { edit: { tag } });
+    if (byId.has(id)) addNode((tag) => core.addParent(id, tag));
   },
   addRoot() {
-    const tag = `s${++sessionN}`;
-    runCmd(() => core.addRoot(tag), { edit: { tag } });
+    addNode((tag) => core.addRoot(tag));
   },
   rename(id, label, tag) {
-    applySnap(core.renameNode(id, label, tag), "map");
+    applySnap(core.renameNode(id, label, tag), "core");
     // md ペイン側のハイライトは選択の範囲で描いている。ラベルの長さが
     // 変わると範囲がずれるので、貼り直す
     syncSelectionViews(false);
@@ -351,7 +362,7 @@ const host: MapHost = {
   deleteSelection() {
     if (selection.size === 0) return;
     const snap = core.deleteNodes([...selection]);
-    applySnap(snap, "map");
+    applySnap(snap, "core");
     if (snap.focus !== -1 && byId.has(snap.focus)) {
       setSelection([snap.focus], snap.focus);
       // 他のコマンドは runCmd 経由でここまでやる。削除だけ落ちていたので、
@@ -363,12 +374,12 @@ const host: MapHost = {
   },
   indentSelection() {
     if (selection.size === 0) return;
-    applySnap(core.indentNodes([...selection]), "map");
+    applySnap(core.indentNodes([...selection]), "core");
     syncSelectionViews(false);
   },
   outdentSelection() {
     if (selection.size === 0) return;
-    applySnap(core.outdentNodes([...selection]), "map");
+    applySnap(core.outdentNodes([...selection]), "core");
     syncSelectionViews(false);
   },
   reorder(id, dir) {
@@ -441,7 +452,7 @@ const host: MapHost = {
           const pre = t0 === "" ? "" : t0.endsWith("\n") ? "\n" : "\n\n";
           applySnap(
             core.replaceText(t0.length, t0.length, pre + action.body + "\n", ""),
-            "map",
+            "core",
           );
           return;
         }
@@ -460,8 +471,7 @@ const host: MapHost = {
   editRequested(id) {
     if (!byId.has(id)) return;
     setSelection([id], id);
-    const tag = `s${++sessionN}`;
-    map.beginEdit(id, tag);
+    map.beginEdit(id, nextTag());
   },
   undo: () => doUndo(),
   redo: () => doRedo(),
@@ -608,7 +618,7 @@ function insertBlock(at: number, body: string, tag = ""): void {
   if (at > 0 && text[at - 1] !== "\n") prefix = "\n\n";
   else if (at >= 2 && text[at - 2] !== "\n") prefix = "\n";
   const suffix = at !== text.length ? "\n" : "";
-  applySnap(core.replaceText(at, at, prefix + body + "\n" + suffix, tag), "map");
+  applySnap(core.replaceText(at, at, prefix + body + "\n" + suffix, tag), "core");
 }
 
 /** Append a line at the END of a node's own attached content (before its
@@ -684,7 +694,7 @@ window.addEventListener("drop", (event) => {
       flashFilename("画像はノードの上に落としてください");
       return;
     }
-    const tag = `d${++sessionN}`;
+    const tag = nextTag();
     for (const handle of images) {
       const rel = await assets.saveToDisk(await handle.getFile());
       if (rel !== null && byId.has(id)) insertContentLine(id, `![](${rel})`, tag);
@@ -755,7 +765,7 @@ window.addEventListener("keydown", (e) => {
   e.preventDefault();
   togglePaneVis(pane);
 });
-initExport({
+initDownload({
   map,
   name: () => docName(),
   notify: (msg, isError = true) => flashFilename(msg, isError),

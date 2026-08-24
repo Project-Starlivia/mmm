@@ -142,7 +142,7 @@ test "multi-node command is one undo step" {
 }
 
 ///|
-test "typing coalesces by tag and abort reverts the session" {
+test "typing coalesces into one undo entry by tag" {
   ignore(init_doc("# r\n"))
   ignore(replace_text(3, 3, "x", "s1"))
   ignore(replace_text(4, 4, "y", "s1"))
@@ -151,8 +151,6 @@ test "typing coalesces by tag and abort reverts the session" {
   assert_eq(get_text(), "# r\n")
   ignore(redo())
   assert_eq(get_text(), "# rxy\n")
-  ignore(abort_session("s1"))
-  assert_eq(get_text(), "# r\n")
 }
 
 ///|
@@ -336,10 +334,13 @@ test "move to the same spot is a no-op" {
 }
 
 ///|
-test "crlf newlines are preserved and matched on insert" {
+/// 既にある行のバイト列には触らないが、**書き足す改行は常に LF**。
+/// 読み込みが CRLF を LF へ正規化する（src/app/io.ts）ので、アプリから
+/// この状態にはならない — その前提をここで固定しておく。
+test "existing bytes are kept, but inserted newlines are always LF" {
   ignore(init_doc("# r\r\n\r\n## a\r\n"))
   ignore(add_sibling(2, ""))
-  assert_eq(get_text(), "# r\r\n\r\n## a\r\n\r\n## \r\n")
+  assert_eq(get_text(), "# r\r\n\r\n## a\r\n\n## \n")
 }
 
 ///|
