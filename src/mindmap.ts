@@ -19,6 +19,16 @@ import {
 import { MONO_FONT, ROW_NORMAL, measure, rowOf, rowTop } from "./map/metrics.ts";
 import { type Box, type Layout, GAP, edgeEnds, layoutMap } from "./map/layout.ts";
 import { type DropTarget, resolveDrop } from "./map/drop.ts";
+import { type ArrowKey, arrowTarget, extendSelection } from "./map/navigate.ts";
+import { cardPlacement, labelPlacement } from "./map/overlay.ts";
+import {
+  type View,
+  fitToPane,
+  panBy,
+  panToShow,
+  toWorld,
+  zoomAt,
+} from "./map/view.ts";
 import { ContextMenu, type MenuEntry } from "./map/menu.ts";
 import { MapRenderer } from "./map/render.ts";
 import { mapToSvg } from "./map/toSvg.ts";
@@ -82,6 +92,10 @@ const emptyLayout = (): Layout => ({
   buriedCount: new Map(),
   fanOf: new Map(),
 });
+
+/** 全体を収めるときの余白と、1 つを見せるときの余白（画面 px） */
+const FIT_MARGIN = 60;
+const SHOW_MARGIN = 40;
 
 /** 空集合の使い回し（毎レンダで new しない） */
 const NO_IDS: ReadonlySet<number> = new Set<number>();
@@ -228,10 +242,26 @@ export class MindMap {
 
   private toWorld(clientX: number, clientY: number): { x: number; y: number } {
     const r = this.pane.getBoundingClientRect();
-    return {
-      x: (clientX - r.left - this.tx) / this.k,
-      y: (clientY - r.top - this.ty) / this.k,
-    };
+    return toWorld(this.view(), clientX - r.left, clientY - r.top);
+  }
+
+  /** 新しい見え方を受け取って画面へ反映する */
+  private setView(v: View): void {
+    this.k = v.k;
+    this.tx = v.tx;
+    this.ty = v.ty;
+    this.applyTransform();
+  }
+
+  /** ペインの大きさ（画面 px） */
+  private paneSize(): { width: number; height: number } {
+    const r = this.pane.getBoundingClientRect();
+    return { width: r.width, height: r.height };
+  }
+
+  /** いまの見え方（world → 画面）。入力欄の置き場所を計算する側へ渡す */
+  private view(): View {
+    return { k: this.k, tx: this.tx, ty: this.ty };
   }
 
   private applyTransform(): void {
@@ -419,26 +449,20 @@ export class MindMap {
       this.endCardEdit();
       return;
     }
-    // 入力欄の内側の余白。CSS には宣言が無く、ここが唯一の源
-    // （world の単位。CSS へ書くときだけ倍率を掛ける）
-    const PAD = 5;
+    // 文字を測るのはこちら、置き場所を決めるのは map/overlay.ts
     const lines = this.cardEditor.value.split("\n");
-    const wWorld = Math.max(
-      rect.w,
-      Math.max(...lines.map((l) => measure(MONO_FONT, l))) + PAD * 2,
-    );
-    const hWorld = Math.max(rect.h, lines.length * CODE_LINE + PAD * 2);
-    const BORDER = 2; // 枠は拡大しない。box-sizing の分を足しておかないと
-    //                   最終行が 1〜2px 削れる
+    const p = cardPlacement(rect, this.view(), {
+      lines: lines.length,
+      widest: Math.max(...lines.map((l) => measure(MONO_FONT, l))),
+    });
     const st = this.editBox.style;
-    st.left = `${rect.x * this.k + this.tx}px`;
-    st.top = `${rect.y * this.k + this.ty}px`;
-    st.width = `${wWorld * this.k + BORDER}px`;
-    st.height = `${hWorld * this.k + BORDER}px`;
-    // 字も枠と同じ倍率で拡縮する（ズームしても箱と字がずれない）
-    st.fontSize = `${11 * this.k}px`;
+    st.left = `${p.left}px`;
+    st.top = `${p.top}px`;
+    st.width = `${p.width}px`;
+    st.height = `${p.height}px`;
+    st.fontSize = `${p.fontSize}px`;
     st.lineHeight = `${CODE_LINE * this.k}px`;
-    st.padding = `${PAD * this.k}px`;
+    st.padding = `${p.padding}px`;
   }
 
   /** 中身を文書へ返して閉じる。空にしたらブロックの中身が空になるだけ。 */
@@ -461,30 +485,15 @@ export class MindMap {
   /** Center the whole tree in the pane (file open / initial view). If the
    * pane has no size yet (hidden / pre-layout boot), defer until it does. */
   fitView(): void {
-    if (this.boxes.size === 0) return;
-    const r = this.pane.getBoundingClientRect();
-    if (r.width < 80 || r.height < 80) {
+    const pane = this.paneSize();
+    // まだ大きさが無い（隠れている / 起動直後）なら、付いてから改めて
+    if (pane.width < 80 || pane.height < 80) {
       this.fitPending = true;
       return;
     }
     this.fitPending = false;
-    let x0 = Infinity;
-    let y0 = Infinity;
-    let x1 = -Infinity;
-    let y1 = -Infinity;
-    for (const b of this.boxes.values()) {
-      x0 = Math.min(x0, b.x);
-      y0 = Math.min(y0, b.y);
-      x1 = Math.max(x1, b.x + b.w);
-      y1 = Math.max(y1, b.y + b.h);
-    }
-    const m = 60;
-    const kx = (r.width - m * 2) / Math.max(1, x1 - x0);
-    const ky = (r.height - m * 2) / Math.max(1, y1 - y0);
-    this.k = Math.max(0.15, Math.min(1, kx, ky));
-    this.tx = r.width / 2 - ((x0 + x1) / 2) * this.k;
-    this.ty = r.height / 2 - ((y0 + y1) / 2) * this.k;
-    this.applyTransform();
+    const v = fitToPane(this.boxes.values(), pane, FIT_MARGIN);
+    if (v) this.setView(v);
   }
 
   /** 一時的な UI 状態（選択・ドロップ印）を除いた、書き出し用の SVG。
@@ -552,18 +561,7 @@ export class MindMap {
   /** Pan so the given node is visible (used after keyboard nav / creation). */
   ensureVisible(id: number): void {
     const b = this.boxes.get(id);
-    if (!b) return;
-    const r = this.pane.getBoundingClientRect();
-    const sx = b.x * this.k + this.tx;
-    const sy = b.y * this.k + this.ty;
-    const sw = b.w * this.k;
-    const sh = b.h * this.k;
-    const m = 40;
-    if (sx < m) this.tx += m - sx;
-    else if (sx + sw > r.width - m) this.tx -= sx + sw - (r.width - m);
-    if (sy < m) this.ty += m - sy;
-    else if (sy + sh > r.height - m) this.ty -= sy + sh - (r.height - m);
-    this.applyTransform();
+    if (b) this.setView(panToShow(this.view(), b, this.paneSize(), SHOW_MARGIN));
   }
 
   // ---------- label editing ----------
@@ -620,28 +618,19 @@ export class MindMap {
     if (this.editingId === -1) return;
     const b = this.boxes.get(this.editingId);
     if (!b) return;
-    // 入力欄はラベル行に**ぴったり**重ならなければならない。以下はすべて
-    // world 単位で組んでから 1 度だけ倍率を掛ける — 入力欄の padding と
-    // border は CSS ピクセルでズームに追従しないので、そのままにすると
-    // 倍率 1 以外で箱と入力欄がずれる（実際にずれていた）。
-    const BORDER = 2; // #node-editor の枠（拡大しない）
-    // ラベル行の寸法は rowOf() が唯一の定義。SVG 側と同じものを使うので
-    // 通常ノードでも折り畳んだノードでも文字位置がずれない
-    const row = rowOf(b.n);
-    // box-sizing: border-box なので文字は left+border+padding から始まる。
-    // left を border ぶん外へずらしてあるぶんが打ち消すので、padding は
-    // SVG ラベルの x（= row.padX）をそのままスケールした値でよい
-    const padW = Math.max(row.padX * this.k, 2);
-    // 文字が箱より長くなったら伸びる。短いときは箱にぴったり重なる
-    const textWorld = measure(row.font, this.editor.value) + row.padX * 2;
-    const wWorld = Math.max(b.w, textWorld);
-    this.editor.style.left = `${b.x * this.k + this.tx - BORDER}px`;
-    this.editor.style.top = `${b.y * this.k + this.ty - BORDER}px`;
-    this.editor.style.width = `${wWorld * this.k + BORDER * 2}px`;
-    this.editor.style.height = `${row.rowH * this.k + BORDER * 2}px`;
-    this.editor.style.paddingLeft = `${padW}px`;
-    this.editor.style.paddingRight = `${padW}px`;
-    this.editor.style.fontSize = `${row.fontPx * this.k}px`;
+    const p = labelPlacement(
+      b,
+      this.view(),
+      measure(rowOf(b.n).font, this.editor.value),
+    );
+    const st = this.editor.style;
+    st.left = `${p.left}px`;
+    st.top = `${p.top}px`;
+    st.width = `${p.width}px`;
+    st.height = `${p.height}px`;
+    st.fontSize = `${p.fontSize}px`;
+    st.paddingLeft = `${p.padding}px`;
+    st.paddingRight = `${p.padding}px`;
   }
 
   // ---------- hover plus button ----------
@@ -662,9 +651,24 @@ export class MindMap {
 
   // ---------- events ----------
 
+  /** 出来事の配線。ひとかたまりに見えるが、**本当に 1 つの状態機械なのは
+   *  bindPointer だけ**で、残りは互いに独立した紐づけ。 */
   private bindEvents(): void {
-    const pane = this.pane;
+    this.bindDragKeys();
+    this.bindWheel();
+    this.bindPointer();
+    this.bindClick();
+    this.bindMenu();
+    this.bindOverlays();
+    this.bindKeys();
+  }
 
+  /**
+   * ドラッグ中の Shift の押し外しと、Space パン。指を動かさずに
+   * 判定を出し直したいので、キーの上げ下げも見る。
+   */
+  private bindDragKeys(): void {
+    const pane = this.pane;
     // Shift を押す/離すだけで、指を動かさずに判定を切り替えたい
     const onDragMod = (e: KeyboardEvent): void => {
       if (!this.dragging || !this.lastPointer) return;
@@ -691,34 +695,44 @@ export class MindMap {
       }
     });
 
+  }
+
+  /**
+   * 見え方を変える入力（ホイールのズームとスクロール）。
+   * 動かし方そのものは map/view.ts。
+   */
+  private bindWheel(): void {
+    const pane = this.pane;
     pane.addEventListener(
       "wheel",
       (e) => {
         e.preventDefault();
+        // 動かし方は map/view.ts。ここは入力の振り分けだけ
         if (e.ctrlKey || e.metaKey) {
-          // ズームはカーソルを基点にする
           const r = pane.getBoundingClientRect();
-          const cx = e.clientX - r.left;
-          const cy = e.clientY - r.top;
-          const factor = Math.exp(-e.deltaY * 0.0022);
-          const nk = Math.min(3, Math.max(0.15, this.k * factor));
-          const real = nk / this.k;
-          this.tx = cx - (cx - this.tx) * real;
-          this.ty = cy - (cy - this.ty) * real;
-          this.k = nk;
+          this.setView(
+            zoomAt(this.view(), e.clientX - r.left, e.clientY - r.top, e.deltaY),
+          );
         } else if (e.shiftKey) {
-          this.tx -= e.deltaY !== 0 ? e.deltaY : e.deltaX;
+          // Shift+ホイールは横スクロール（縦の目盛りしか出さないマウス用）
+          this.setView(panBy(this.view(), -(e.deltaY || e.deltaX), 0));
         } else {
-          this.tx -= e.deltaX;
-          this.ty -= e.deltaY;
+          this.setView(panBy(this.view(), -e.deltaX, -e.deltaY));
         }
-        this.applyTransform();
       },
       { passive: false },
     );
+  }
 
-    // the + button and link-open glyph stop pointerdown propagation, so
-    // this handler only ever sees pane/node/editor presses
+  /**
+   * **ポインタの状態機械。** パン / 矩形選択 / ノードのドラッグ /
+   * カードのドラッグは、どれも同じ down → move → up の流れを共有し、
+   * 「いまどの最中か」で枝分かれする。分けて書くと状態の持ち主が散る。
+   */
+  private bindPointer(): void {
+    const pane = this.pane;
+    // `+` ボタンとリンクの ↗ は pointerdown を止めるので、ここへ来るのは
+    // ペイン / ノード / 入力欄の上での押下だけ
     pane.addEventListener("pointerdown", (e) => {
       // 新しい操作の始まり。前の操作が立てた「次の click は捨てる」印が
       // 使われないまま残っていたら、ここで落とす（残すとユーザーの
@@ -793,9 +807,11 @@ export class MindMap {
         return;
       }
       if (this.panning) {
-        this.tx = this.panning.ox + e.clientX - this.panning.px;
-        this.ty = this.panning.oy + e.clientY - this.panning.py;
-        this.applyTransform();
+        this.setView({
+          k: this.k,
+          tx: this.panning.ox + e.clientX - this.panning.px,
+          ty: this.panning.oy + e.clientY - this.panning.py,
+        });
         return;
       }
       if (this.rubberStart) {
@@ -937,7 +953,14 @@ export class MindMap {
       this.dropLine.setAttribute("visibility", "hidden");
       pane.style.cursor = "";
     });
+  }
 
+  /**
+   * 押して離す以外のマウス操作 — ダブルクリック、ホバーと `+` ボタン、
+   * リンクとカードのクリック。
+   */
+  private bindClick(): void {
+    const pane = this.pane;
     pane.addEventListener("dblclick", (e) => {
       // double-clicking the ↗ glyph opens the link; don't also start editing
       if ((e.target as Element).classList?.contains("link-open")) return;
@@ -1018,7 +1041,13 @@ export class MindMap {
         e.stopPropagation();
       }
     });
+  }
 
+  /**
+   * 右クリックメニュー。外を押したときと、窓から離れたときに閉じる。
+   */
+  private bindMenu(): void {
+    const pane = this.pane;
     pane.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       const id = this.nodeAt(e.clientX, e.clientY);
@@ -1038,6 +1067,13 @@ export class MindMap {
     // 変換中に外から value を書き換えるのは日本語入力を壊す代表的なパターン
     // なので、確定するまで待って compositionend で 1 回だけ反映する。
     // 入力欄の見た目（幅）だけは変換中も追従させる。
+  }
+
+  /**
+   * その場で直す 2 つの入力欄（ラベルとカード）。IME を壊さないよう、
+   * 変換中は文書へ書き込まない。
+   */
+  private bindOverlays(): void {
     this.editor.addEventListener("compositionstart", () => {
       this.composing = true;
     });
@@ -1093,6 +1129,13 @@ export class MindMap {
     });
 
     // keyboard, select mode
+  }
+
+  /**
+   * 選択モードのキー。中身は onKeydown。
+   */
+  private bindKeys(): void {
+    const pane = this.pane;
     pane.addEventListener("keydown", (e) => this.onKeydown(e));
 
     // the context menu must close on any interaction elsewhere, not just
@@ -1296,50 +1339,13 @@ export class MindMap {
     }
     if (mod) return; // Mod+矢印には何も割り当てない
     e.preventDefault();
-    if (this.order.length === 0) return;
-    if (anchor === -1) {
-      const first = this.order[0];
-      this.host.setSelection([first], first);
-      return;
-    }
-    const byId = new Map(nodes.map((n) => [n.id, n]));
-    const cur = byId.get(anchor);
-    if (!cur) return;
-    // 行き先は Shift の有無で変わらない。Shift はそこを選択に足すだけで、
-    // 「移動の道筋」と「選択の広げ方」を別々に覚えなくてよくする。
-    let next = -1;
-    if (key === "ArrowUp" || key === "ArrowDown") {
-      // 同じ深さの列を文書順（= 画面の上から下）に辿り、端でループする。
-      // 兄弟に限らずいとこも含む — 見えている限り、その階層は 1 本の列。
-      // 親が畳まれて埋もれたノードは列に入れない（選べないものへは飛べない）。
-      const level = this.order.filter(
-        (id) => byId.get(id)?.depth === cur.depth && this.boxes.has(id),
-      );
-      const i = level.indexOf(anchor);
-      if (i === -1) return;
-      const j = (i + (key === "ArrowUp" ? -1 : 1) + level.length) % level.length;
-      next = level[j];
-    } else {
-      if (key === "ArrowLeft") next = cur.parent;
-      else
-        // 子が無ければ先頭へ回る。上下が兄弟の中で回るのと同じで、
-        // 行き止まりで無反応になるより一周できるほうが迷わない
-        next =
-          nodes.find((n) => n.parent === anchor && this.boxes.has(n.id))?.id ??
-          this.order[0] ??
-          -1;
-    }
-    if (next === -1 || next === undefined) return;
-    if (e.shiftKey) {
-      // 伸ばす。既に入っている先へ戻ったら、今いた側を外して縮める
-      // （行きすぎたぶんを引っ込められる）
-      const set = new Set(sel);
-      if (set.has(next) && sel.size > 1) set.delete(anchor);
-      else set.add(next);
-      this.host.setSelection([...set], next);
-    } else {
-      this.host.setSelection([next], next);
-    }
+    // 行き先の決め方は map/navigate.ts。ここは選択に反映するだけ
+    const next = arrowTarget(nodes, this.layout, anchor, key as ArrowKey);
+    if (next === -1) return;
+    this.host.setSelection(
+      e.shiftKey ? extendSelection(sel, anchor, next) : [next],
+      next,
+    );
     this.ensureVisible(next);
   }
 
