@@ -6,44 +6,54 @@
 
 ## 構成
 
+**コアが「その .md が何を意味するか」の唯一の判定者で、TS は「それをどう
+見せるか」だけを持つ。** 見出し・フェンス・hide 領域の判定は core に 1 つしか
+無い（同じ規則を UI 側で書き直すと、静かに食い違う）。
+
 ```
 core/   MoonBit — ドキュメントモデル。テキストが唯一の真実。構造操作はすべて
         文字オフセットの編集セットに変換されるため、未編集行のバイト列は
         決して再整形されない。
   core.mbt      パッケージ先頭の一言(このコメントだけ。実体は無い)
-  parser.mbt    行スキャン(見出し / フェンス / hide 領域)
-  doc.mbt       状態と木の再構築
-  edit.mbt      Edit 型と純関数(適用 / 逆転 / オフセット追跡)
+  parser.mbt    行スキャン(見出し / フェンス区間 / hide 領域を 1 パスで)
+  doc.mbt       状態と木の再構築。ノードは [from, to) の区間に付けた名前
+  edit.mbt      Edit 型と純関数(適用 / 逆転 / オフセットのまとめ写し)
   history.mbt   単一 Undo スタックとトランザクション
   heading.mbt   見出し行を書く・整える・探す道具
   add.mbt       作るコマンド(子 / 兄弟 / 親 / ルート)
   move.mbt      動かすコマンド(D&D / 並べ替え / インデント)
   cmds.mbt      その場のコマンド(rename / delete / hide / コピー用テキスト)
+  relevel.mbt   貼り付けた断片の見出しの深さを読み替える(st に触らない純関数)
   api.mbt       スナップショット契約(文字列 in・JSON 文字列 out)
   js/           api.mbt を browser 向けに #export_name で包むだけの薄い層
                 (exports.mbt)。分けるのは、core 本体を moon test だけで
                 試験できる状態に保つため
-  core_test.mbt 上記すべての単体テスト(構造コマンド・Undo・hide/show・id 保持)
+  core_test.mbt 上記すべての単体テスト(構造コマンド・Undo・hide/show・
+                フェンス区間・id 保持)
 src/    TypeScript — UI
-  coreApi.ts   MoonBit core への型付きラッパー
+  coreApi.ts   MoonBit core への型付きラッパー。DocView(テキスト+ノード+
+               フェンス)は必ず同じ rev の組で持ち回る
   editor.ts    Markdown ペイン(CodeMirror 6、履歴はコアに委譲。フェンスの
                中は map/highlight.ts と同じ言語表で色を付ける)
-  mindmap.ts   マインドマップペイン(DOM 差分更新と入力処理)
-  relevel.ts   貼り付けた見出しの深さを読み替える
+  mindmap.ts   マインドマップペイン(見た目の状態と入力処理)
+  edits.ts     行・ブロックの出し入れを 1 回の置き換えに落とす計算
   style.css    全体のスタイル
-  map/         その純粋層 — geometry(座標系) / edge(線の形) / cards(添付→カード行)
-               / cardEdit(カードの削除・移動の計算) / metrics(寸法)
-               / layout(木→箱の配置) / highlight(コードの色分け) / export(SVG 書き出し)
-  main.ts      オーケストレータ(選択・同期・ファイル I/O・ショートカット)
+  map/         その純粋層 — geometry(座標系) / edge(線の形) / cards(添付→
+               カード行) / metrics(寸法) / layout(木→箱の配置) /
+               drop(落とし先の決定) / render(SVG の差分更新) / menu(右クリック) /
+               highlight(コードの色分け) / toSvg(1 枚の svg にする) / svg(要素を作る)
+  main.ts      束ねる場所(選択・同期・ファイル I/O)
   app/         その子系統 — name(文書の名前) / persist(テーマと色) /
                theme(テーマ・ブランドカラー・ロゴ) / panes(ペイン) / assets(画像) /
-               export(書き出し) / io(File System Access API の窓口) /
-               handles(ハンドルを IndexedDB に置く層) / logo(ロゴの唯一の源) /
-               paste(貼り付けの振り分け)
-test/   検証 — *.test.ts(往復 / コマンド / コピペ / 名前 / 画像パス / カード行 /
-        カード編集 / フェンス編集)、tools/(負荷サンプル生成・性能計測)、
-        fixtures/(計測入力)
-docs/   記録 — web.md は Web へ戻した理由と段取り、
+               io(File System Access API の窓口) / handles(ハンドルを IndexedDB に
+               置く層) / logo(ロゴの唯一の源) / paste(貼り付けの振り分け) /
+               dnd(落とされたファイルの振り分け) / shortcuts(全体のキー) /
+               download(ディスクへ落とす)
+test/   検証 — *.test.ts(往復 / コマンド / コピペ / 貼り付けの判断 / 名前 /
+        画像パス / カード行 / 行とブロックの編集 / 落とし先 / 座標 /
+        フェンス編集)、tools/(負荷サンプル生成・性能の物差し)、
+        fixtures/(負荷サンプル。往復テストの入力も兼ねる)
+docs/   記録 — web.md は Web へ戻した理由と段取り、origin.md は最初の企画メモ、
         audit/ は過去の監査とリファクタの記録（当時のまま）、
         superpowers/ は個々の変更の設計(specs/)と実装計画(plans/) — コードに
         残らない「なぜ」はここに置く
@@ -68,6 +78,9 @@ pnpm run dev        # コアをビルドしてから vite（http://localhost:131
 - コア(`core/*.mbt`)を変更したら `pnpm run core` で JS を再生成
 - コアのテスト: `pnpm run test:core` / UI 側のテスト: `pnpm test`
 - 型チェックだけ: `pnpm run check`（src と test の両方）
+- 性能の物差し: `pnpm run perf`（追加の依存なし。規模ごとに init / 1 打鍵 /
+  カード抽出 / 全コピー / 全段下げを測る。`pnpm run perf -- fixtures` で
+  `test/fixtures/*.md` も）。負荷サンプルの作り直しは `pnpm run fixtures`
 
 ## 使い方
 
@@ -206,6 +219,9 @@ pnpm run dev        # コアをビルドしてから vite（http://localhost:131
 `Delete` と同じくその行を消す。`Mod+Z` で戻る)。その場編集は、カードに
 ぴったり重なる入力欄にそのカードの元テキストをそのまま載せる。`Enter` は
 改行で、確定は `Esc` / `Mod+Enter` / 他所をクリック(キャンセルは持たない)。
+入力欄を開いている間の `Mod+Z` は**その欄の中の取り消し**で、文書の undo は
+動かない(開いたままの入力欄が指す範囲だけ古くなり、確定で別の場所を
+上書きしてしまうため)。
 コードカードだけは中身に ` ``` ` の**開きと閉じも含む**ので言語の指定も
 その場で直せるが、**囲いそのもの（バッククォート）は打ち消せない** — 言語名
 だけが開けてある(直せることがその場で編集する理由の半分で、囲いを壊す
@@ -296,18 +312,24 @@ md と同じフォルダを選んで `./` のままなら、何も考えなく�
 
 ### 文字コードと改行
 
-**UTF-8 / LF だけ**。読み込み時に CRLF は LF へ正規化し、**保存も LF で書く**
-(元の改行へ戻さない)。Shift-JIS の往復も CRLF の往復も、ネイティブだから
+**UTF-8 / LF だけ**。読み込み時に CRLF も単独の CR も LF へ正規化し、
+**保存も LF で書く**(元の改行へ戻さない)。クリップボードから来る文字列も
+同じ規則で揃える。Shift-JIS の往復も CRLF の往復も、ネイティブだから
 背負えた要求だった。
 
 CodeMirror は読み込んだ文書の改行を内部で LF に正規化するのに対し、コアは
 渡されたバイト列をそのまま保持する。両者に別々の改行を渡すと文字位置が
 ずれて、打鍵が見当違いの場所に書き込まれる。これを避けるための統一。
 
+コアが**書き足す**改行も常に LF。以前は「その文書の流儀」を毎回探していたが、
+入口で LF に揃えている以上そこには辿り着けなかった(既にある行のバイト列は
+従来どおり触らない)。
+
 ### その他
 
 - ヘッダーの ◑ でライト/ダークテーマ切り替え(初期値は OS 設定、不明ならダーク)
-- ヘッダーのロゴをクリックするとブランドカラーを変更できる(favicon にも反映、保存される)
+- ヘッダーのロゴを押すとブランドカラーを変更できる(クリックでも、フォーカス
+  して `Enter` / `Space` でも。favicon にも反映され、保存される)
 - localStorage に残すのは**テーマとブランドカラーだけ**。本文の控えは持たない
   — 持てばディスクの .md と二重の真実になる
 - IndexedDB に置くのは**ファイルとフォルダのハンドル**(ディスクへの指し示し)
@@ -317,4 +339,6 @@ CodeMirror は読み込んだ文書の改行を内部で LF に正規化する�
 
 ### 全体
 
-`Mod+Z` / `Mod+Shift+Z` … Undo / Redo(両ペイン共通の単一スタック)、`Mod+/` … ペイン切り替え
+`Mod+Z` / `Mod+Shift+Z` … Undo / Redo(両ペイン共通の単一スタック。ただし
+その場の入力欄を開いている間は、その欄の中の取り消しになる)、
+`Mod+/` … ペイン切り替え
