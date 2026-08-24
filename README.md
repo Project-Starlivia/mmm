@@ -38,9 +38,12 @@ src/    TypeScript — UI
   mindmap.ts   マインドマップペイン(見た目の状態と入力処理)
   edits.ts     行・ブロックの出し入れを 1 回の置き換えに落とす計算
   style.css    全体のスタイル
-  map/         その純粋層 — geometry(座標系) / edge(線の形) / cards(添付→
-               カード行) / metrics(寸法) / layout(木→箱の配置) /
-               drop(落とし先の決定) / render(SVG の差分更新) / menu(右クリック) /
+  map/         その純粋層 — geometry(座標系) / view(パン・ズーム・寄せ) /
+               edge(線の形) / cards(添付→カード行) / metrics(寸法) /
+               layout(木→箱の配置) / drop(落とし先の決定) / navigate(矢印の行き先) /
+               overlay(入力欄の置き場所) / render(SVG の差分更新。**文書から
+               決まるものだけ**を描き、選択やドラッグの印は付けた本人が被せる) /
+               pick(選んだカードの枠と ×。1 個だけの印) / menu(右クリック) /
                highlight(コードの色分け) / toSvg(1 枚の svg にする) / svg(要素を作る)
   main.ts      束ねる場所(選択・同期・ファイル I/O)
   app/         その子系統 — name(文書の名前) / persist(テーマと色) /
