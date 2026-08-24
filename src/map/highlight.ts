@@ -98,30 +98,40 @@ export function tokenize(lines: string[], info: string): Token[][] {
 }
 
 /**
+ * 開きフェンスの行を読む。**対象は文書ではなく入力欄の中身**（コードカードを
+ * その場で直しているときのバッファ）なので、コアには聞けない — 打っている
+ * 途中の断片であって、まだ文書ではないため。規則だけはコア
+ * （core/parser.mbt の fence_open）と同じにしてある: 行頭の空白は 3 つまで、
+ * フェンスは 3 本以上、バッククォートなら情報文字列にバッククォートを含めない。
+ */
+function fenceOpen(line: string): { marker: string; info: string } | null {
+  const m = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+  if (!m) return null;
+  if (m[1][0] === "`" && m[2].includes("`")) return null;
+  return { marker: m[1], info: m[2].trim() };
+}
+
+/** その行が `marker` を閉じるか（同じ文字で同じ長さ以上、後ろは空白だけ）。 */
+function closesFence(line: string, marker: string): boolean {
+  const tail = line.trim();
+  return tail.length >= marker.length && [...tail].every((c) => c === marker[0]);
+}
+
+/**
  * フェンスごと（```lang … ```）の色付け。編集欄は開き・閉じも含めて扱うので、
  * 囲いの行はそのまま地の文にし、中身だけを言語で読む。
  * フェンスの体を成していなければ、全部地の文にする。
  */
 export function tokenizeBlock(text: string): Token[][] {
   const lines = text.split("\n");
-  const open = /^\s*(`{3,}|~{3,})\s*(\S*)\s*$/.exec(lines[0] ?? "");
-  if (!open || lines.length < 2) return lines.map((t) => [{ text: t, cls: "" }]);
-  // 閉じは開きと同じ文字で同じ長さ以上（CommonMark）。正規表現を組み立てず
-  // 数えるだけにする — 記号を含む式は読みにくく、壊れても気づきにくい
-  const marker = open[1][0];
-  const last = lines.length - 1;
-  const tail = lines[last].trim();
-  const closed =
-    tail.length >= open[1].length &&
-    [...tail].every((c) => c === marker);
-  const body = lines.slice(1, closed ? last : lines.length);
-  const inner = body.length > 0 ? tokenize(body, open[2]) : [];
   const plain = (t: string): Token[] => [{ text: t, cls: "" }];
-  return [
-    plain(lines[0]),
-    ...inner,
-    ...(closed ? [plain(lines[last])] : []),
-  ];
+  const open = fenceOpen(lines[0] ?? "");
+  if (!open || lines.length < 2) return lines.map(plain);
+  const last = lines.length - 1;
+  const closed = closesFence(lines[last], open.marker);
+  const body = lines.slice(1, closed ? last : lines.length);
+  const inner = body.length > 0 ? tokenize(body, open.info) : [];
+  return [plain(lines[0]), ...inner, ...(closed ? [plain(lines[last])] : [])];
 }
 
 /**
@@ -135,18 +145,12 @@ export function tokenizeBlock(text: string): Token[][] {
  */
 export function touchesFence(text: string, from: number, to: number): boolean {
   const lines = text.split("\n");
-  const open = /^(`{3,}|~{3,})/.exec(lines[0] ?? "");
+  const open = fenceOpen(lines[0] ?? "");
   if (!open) return false;
-  const openEnd = open[1].length;
-
+  const openEnd = lines[0].indexOf(open.marker) + open.marker.length;
   const tail = lines.length > 1 ? lines[lines.length - 1] : null;
-  const marker = open[1][0];
-  const closed =
-    tail !== null &&
-    tail.trim().length >= openEnd &&
-    [...tail.trim()].every((c) => c === marker);
+  const closed = tail !== null && closesFence(tail, open.marker);
   const closeStart = closed ? text.length - (tail as string).length : -1;
-
   if (from === to) {
     // 挿入。囲いの中へ割り込むか、開きより前へ押し出すものだけ止める
     if (from < openEnd) return true;

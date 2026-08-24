@@ -21,10 +21,16 @@ if (!existsSync(CORE_JS)) {
 }
 
 export { core, type Snapshot, type NodeInfo } from "../src/coreApi.ts";
-import { core, type NodeInfo } from "../src/coreApi.ts";
+import { core, type DocView, type NodeInfo } from "../src/coreApi.ts";
 
 export const initDoc = (md: string) => core.initDoc(md);
 export const getText = () => core.getText();
+
+/** initDoc して、いまの文書をテキスト・ノード・フェンスの組で返す。 */
+export function loadDoc(md: string): DocView {
+  const snap = core.initDoc(md);
+  return { text: core.getText(), nodes: snap.nodes, fences: snap.fences };
+}
 
 /** ラベルから id を引く。無ければ分かりやすく失敗させる（テストの初期化直後に使う）。 */
 export function idOf(nodes: NodeInfo[], label: string): number {

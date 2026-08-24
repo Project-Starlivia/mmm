@@ -624,3 +624,67 @@ test "adding into a folded node stays one undo with the rename" {
   ignore(undo())
   assert_eq(get_text(), folded)
 }
+
+///|
+/// フェンス区間はコアが唯一の答えを持つ。UI はここから受け取るだけなので、
+/// 「どこからどこまでか」と「情報文字列」を固定する。情報文字列に語が
+/// 2 つ並んでも開く（GitHub のコピー指定など）。
+test "fence spans cover the whole block and carry the info string" {
+  let s = init_doc("# r\n\n```js copy\nlet a = 1\n```\n")
+  assert_eq(
+    s.contains(
+      "\"fences\":[{\"from\":5,\"to\":29,\"bodyFrom\":16,\"bodyTo\":25,\"info\":\"js copy\"}]",
+    ),
+    true,
+  )
+}
+
+///|
+/// 中身が空でも区間は成立する（body は body_start より手前で終わる）。
+test "an empty fence has no body" {
+  let s = init_doc("# r\n\n```\n```\n")
+  assert_eq(
+    s.contains("\"from\":5,\"to\":12,\"bodyFrom\":9,\"bodyTo\":8,\"info\":\"\""),
+    true,
+  )
+}
+
+///|
+/// 閉じないフェンスは文書末まで。以降の `#` はどのみち見出しにならない。
+test "an unclosed fence runs to the end of the document" {
+  let s = init_doc("# r\n\n~~~\n# not a heading\n")
+  assert_eq(
+    s.contains("\"from\":5,\"to\":24,\"bodyFrom\":9,\"bodyTo\":24"),
+    true,
+  )
+  // 見出しはルートだけ（フェンスの中の # は数えない）
+  assert_eq(s.contains("\"label\":\"not a heading\""), false)
+}
+
+///|
+/// hide 領域の中で開いたフェンスは、領域と一緒に `-->` で終わる。
+test "a fence opened inside a hide region ends with the region" {
+  let s = init_doc("# r\n\n<!--\n## a\n\n```\ncode\n-->\n\n## b\n")
+  assert_eq(s.contains("\"from\":16,\"to\":24,\"bodyFrom\":20,\"bodyTo\":24"), true)
+  // 領域が閉じているので b は隠れない
+  assert_eq(s.contains("\"hidden\":false,\"label\":\"b\""), true)
+}
+
+///|
+/// 断片の読み替え。フェンスの中の `#` は動かさない。
+test "relevel shifts real headings only" {
+  assert_eq(
+    relevel_text("## a\n\n```\n# fake\n```\n\n### b\n", 4),
+    "#### a\n\n```\n# fake\n```\n\n##### b\n",
+  )
+  assert_eq(relevel_text("本文だけ\n", 3), "本文だけ\n")
+  assert_eq(has_headings("```js copy\n# fake\n```\n"), false)
+  assert_eq(has_headings("### real\n"), true)
+}
+
+///|
+/// 深さは 1 を下回らない（浅くしすぎても壊れない）。
+test "relevel never goes above depth one" {
+  assert_eq(relevel_text("### a\n\n#### b\n", 1), "# a\n\n## b\n")
+  assert_eq(relevel_text("# a\n\n## b\n", 1), "# a\n\n## b\n")
+}

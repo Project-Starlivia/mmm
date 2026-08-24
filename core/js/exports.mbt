@@ -114,3 +114,15 @@ pub fn redo() -> String {
 pub fn selection_text(ids : Array[Int]) -> String {
   @core.selection_text(ids)
 }
+
+///|
+#export_name("hasHeadings")
+pub fn has_headings(text : String) -> Bool {
+  @core.has_headings(text)
+}
+
+///|
+#export_name("relevelText")
+pub fn relevel_text(text : String, target_depth : Int) -> String {
+  @core.relevel_text(text, target_depth)
+}

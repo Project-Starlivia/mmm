@@ -4,7 +4,7 @@
 //
 // Layout: every tree grows from left to right.
 
-import type { NodeInfo } from "./coreApi";
+import type { DocView, NodeInfo } from "./coreApi";
 import {
   languageEpoch,
   tokenize,
@@ -40,10 +40,8 @@ import { type Box, GAP, layoutMap } from "./map/layout";
 import { exportMapSvg } from "./map/export";
 
 export interface MapHost {
-  /** current document nodes, document order */
-  nodes(): NodeInfo[];
-  /** full markdown text (for reading attached content) */
-  docText(): string;
+  /** いまの文書（テキスト・ノード・フェンスの組）。必ず同じ rev のもの */
+  doc(): DocView;
   /** objectURL for a local image path (relative to the md); null while
    * loading / until folder permission is granted */
   imageUrl(path: string): string | null;
@@ -284,10 +282,10 @@ export class MindMap {
   // ---------- layout & render ----------
 
   render(): void {
-    const nodes = this.host.nodes();
-    this.hint.style.display = nodes.length === 0 ? "flex" : "none";
+    const doc = this.host.doc();
+    this.hint.style.display = doc.nodes.length === 0 ? "flex" : "none";
 
-    const L = layoutMap(nodes, this.host.docText());
+    const L = layoutMap(doc);
     const { visible, boxes, hiddenKids, fanOf } = L;
     this.boxes = boxes;
     this.order = L.order;
@@ -706,7 +704,7 @@ export class MindMap {
     if (!row || !rect) return;
     if (this.isEditingLabel()) this.host.commitEdit();
     this.editingCard = ref;
-    this.cardEditor.value = this.host.docText().slice(row.from, row.to);
+    this.cardEditor.value = this.host.doc().text.slice(row.from, row.to);
     this.editBox.style.display = "block";
     this.paintEditInk();
     this.positionCardEditor();
@@ -771,7 +769,7 @@ export class MindMap {
     this.endCardEdit();
     if (!row) return;
     const next = this.cardEditor.value;
-    if (next !== this.host.docText().slice(row.from, row.to)) {
+    if (next !== this.host.doc().text.slice(row.from, row.to)) {
       this.host.replaceText(row.from, row.to, next);
     }
     this.pane.focus();
@@ -1490,7 +1488,7 @@ export class MindMap {
     const mod = e.ctrlKey || e.metaKey;
     const anchor = this.host.anchor();
     const sel = this.host.selection();
-    const nodes = this.host.nodes();
+    const nodes = this.host.doc().nodes;
     // CapsLock reports letters as capitals WITHOUT shiftKey, so a plain `h`
     // would arrive as `H` and silently comment out the subtree.
     // Treat a capital that arrived without Shift as the lowercase key.
@@ -1718,7 +1716,7 @@ export class MindMap {
       this.host.setSelection([id], id);
     }
     // subtree ids for visuals + drop-target exclusion
-    const nodes = this.host.nodes();
+    const nodes = this.host.doc().nodes;
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const subtree = new Set<number>();
     for (const nid of ids) {
@@ -1976,7 +1974,8 @@ export class MindMap {
     const sel = this.host.selection();
     const multi = sel.size > 1;
     const anchorHidden =
-      this.host.nodes().find((n) => n.id === this.host.anchor())?.hidden ?? false;
+      this.host.doc().nodes.find((n) => n.id === this.host.anchor())?.hidden ??
+      false;
     const items: (
       | { label: string; key?: string; run: () => void; disabled?: boolean }
       | "sep"

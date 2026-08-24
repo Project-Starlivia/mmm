@@ -1,7 +1,7 @@
 // ノード木 → 箱の配置。DOM を知らない純粋なレイアウト層。
 // すべての木は左から右へ伸びる。
 
-import type { NodeInfo } from "../coreApi.ts";
+import type { DocView, NodeInfo } from "../coreApi.ts";
 import { EDGE } from "./edge.ts";
 import { type CardRow, cardRows } from "./cards.ts";
 import { nodeSize } from "./metrics.ts";
@@ -54,9 +54,10 @@ function collapseHidden(nodes: NodeInfo[]): {
   return { visible: nodes.filter((n) => !buried.has(n.id)), buried, hiddenKids };
 }
 
-export function layoutMap(nodes: NodeInfo[], doc: string): Layout {
+export function layoutMap(doc: DocView): Layout {
+  const nodes = doc.nodes;
   const { visible, buried, hiddenKids } = collapseHidden(nodes);
-  const rowsOf = cardRows(doc, nodes, buried);
+  const rowsOf = cardRows(doc, buried);
   const sizes = new Map<number, { w: number; h: number }>();
   for (const n of visible) {
     sizes.set(n.id, nodeSize(n, rowsOf.get(n.id)!, hiddenKids.get(n.id) ?? 0));

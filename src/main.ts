@@ -5,7 +5,13 @@
 // global keyboard shortcuts.
 
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
-import { core, type EditOp, type NodeInfo, type Snapshot } from "./coreApi";
+import {
+  core,
+  type DocView,
+  type EditOp,
+  type NodeInfo,
+  type Snapshot,
+} from "./coreApi";
 import { MdEditor } from "./editor";
 import { MindMap, type MapHost } from "./mindmap";
 import { io, type Doc } from "./app/io";
@@ -17,11 +23,7 @@ import { initTheme } from "./app/theme";
 import { sweep } from "./app/persist";
 import { decidePaste } from "./app/paste";
 import { onLanguageReady } from "./map/highlight";
-import {
-  type CardRef,
-  cardRows,
-  contentEnd as contentEndAt,
-} from "./map/cards";
+import { type CardRef, cardRows, contentEndOf } from "./map/cards";
 import { moveCard, removeCard } from "./map/cardEdit";
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -43,7 +45,8 @@ const elLogo = $("logo");
 
 // ---------- app state ----------
 
-let nodes: NodeInfo[] = [];
+/** いまの文書（テキスト・ノード・フェンスの組）。スナップショットごと差し替える */
+let doc: DocView = { text: "", nodes: [], fences: [] };
 let byId = new Map<number, NodeInfo>();
 let selection = new Set<number>();
 let anchorId = -1;
@@ -72,8 +75,8 @@ let savedName: string | null = null;
 type Origin = "cm" | "map" | "core" | "load";
 
 function applySnap(snap: Snapshot, origin: Origin): void {
-  nodes = snap.nodes;
-  byId = new Map(nodes.map((n) => [n.id, n]));
+  doc = { text: core.getText(), nodes: snap.nodes, fences: snap.fences };
+  byId = new Map(doc.nodes.map((n) => [n.id, n]));
   if (origin !== "cm" && origin !== "load") editor.applySets(snap.editSets);
   // prune selection to surviving nodes
   let selChanged = false;
@@ -110,7 +113,7 @@ function updateDirty(): void {
 
 /** いまの文書の名前。保存済みならそのファイル名、まだなら本文から導く */
 function docName(): string {
-  return savedName ?? `${deriveName(nodes)}.md`;
+  return savedName ?? `${deriveName(doc.nodes)}.md`;
 }
 
 /**
@@ -119,7 +122,7 @@ function docName(): string {
  * まっさらな文書に `empty.md` と名乗らせても何も伝わらない。
  */
 function showName(): void {
-  const name = savedName ?? (nodes.length ? docName() : null);
+  const name = savedName ?? (doc.nodes.length ? docName() : null);
   document.title = name === null ? "mmm" : `${name} - mmm`;
   // ファイル名欄は flash 中だけ別のことを言っている。終わったら戻る
   if (flashTimer === -1) elFilename.textContent = docName();
@@ -128,16 +131,14 @@ function showName(): void {
 /** CardRef からいまのカードを引く。範囲外なら null（選択は落とす）。 */
 function cardOf(ref: CardRef | null) {
   if (!ref) return null;
-  const rows = cardRows(core.getText(), nodes, new Set<number>()).get(ref.node);
+  const rows = cardRows(doc, new Set<number>()).get(ref.node);
   return rows?.[ref.index] ?? null;
 }
 
 /** そのノードの本文の終わり（末尾へ落としたときの挿入位置）。
- * 式そのものは src/map/cards.ts の contentEnd が唯一の定義 — ここは
- * id → index の変換だけを引き受ける。 */
+ * 式そのものは src/map/cards.ts が唯一の定義。 */
 function contentEnd(id: number): number {
-  const n = byId.get(id);
-  return n ? contentEndAt(nodes, nodes.indexOf(n)) : core.getText().length;
+  return contentEndOf(doc.nodes, id) ?? doc.text.length;
 }
 
 /**
@@ -248,8 +249,7 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
 // ---------- mindmap host ----------
 
 const host: MapHost = {
-  nodes: () => nodes,
-  docText: () => core.getText(),
+  doc: () => doc,
   chooseImageFolder: () => void assets.chooseFolder(),
   replaceText(from, to, text) {
     applySnap(core.replaceText(from, to, text, `c${++sessionN}`), "map");
@@ -275,7 +275,7 @@ const host: MapHost = {
     applySnap(core.replaceText(e.from, e.to, e.insert, `x${++sessionN}`), "map");
   },
   reorderCard(ref, dir) {
-    const rows = cardRows(core.getText(), nodes, new Set<number>()).get(ref.node);
+    const rows = cardRows(doc, new Set<number>()).get(ref.node);
     const row = rows?.[ref.index];
     const next = rows?.[ref.index + dir];
     if (!rows || !row || !next) return; // 端では何もしない
@@ -291,7 +291,7 @@ const host: MapHost = {
   },
   moveCardTo(ref, node, index) {
     const text = core.getText();
-    const all = cardRows(text, nodes, new Set<number>());
+    const all = cardRows(doc, new Set<number>());
     const row = all.get(ref.node)?.[ref.index];
     if (!row) return false;
     const target = all.get(node) ?? [];
@@ -394,7 +394,7 @@ const host: MapHost = {
   paste() {
     // paste as CHILD of the focused node (mmm.md 課題); into an empty
     // document the clip is inserted verbatim
-    if (anchorId === -1 && nodes.length > 0) return;
+    if (anchorId === -1 && doc.nodes.length > 0) return;
     void (async () => {
       // an image on the clipboard wins over text (mmm.md そのに: 画像配置)
       //
@@ -427,7 +427,7 @@ const host: MapHost = {
       const action = decidePaste(
         clip,
         n0 ? { depth: n0.depth } : null,
-        nodes.length > 0,
+        doc.nodes.length > 0,
       );
       switch (action.kind) {
         case "noop":

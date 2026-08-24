@@ -23,6 +23,25 @@ export interface NodeInfo {
   label: string;
 }
 
+/**
+ * フェンスで囲まれたコードブロックの一区間。
+ * **どこからどこまでがフェンスかを決めるのはコアだけ**（core/parser.mbt）。
+ * 同じ規則を UI 側で書き直すと、`” ```js copy ”` のような情報文字列で
+ * 静かに食い違う。
+ */
+export interface FenceSpan {
+  /** 開きフェンス行の行頭 */
+  from: number;
+  /** 閉じフェンス行の行末（閉じていなければ文書末） */
+  to: number;
+  /** 中身の最初の行頭 */
+  bodyFrom: number;
+  /** 中身の最後の行末。中身が無ければ bodyFrom より手前 */
+  bodyTo: number;
+  /** 開きフェンスの後ろ（言語名など） */
+  info: string;
+}
+
 export interface Snapshot {
   rev: number;
   focus: number;
@@ -30,6 +49,17 @@ export interface Snapshot {
   canRedo: boolean;
   editSets: EditOp[][];
   nodes: NodeInfo[];
+  fences: FenceSpan[];
+}
+
+/**
+ * いまの文書。テキスト・ノード・フェンスは**必ず同じ rev のものを組で**
+ * 持ち回る — 片方だけ新しいオフセットで読むと、位置が黙ってずれる。
+ */
+export interface DocView {
+  text: string;
+  nodes: NodeInfo[];
+  fences: FenceSpan[];
 }
 
 // The JSON contract (field names/shapes) is defined by core/api.mbt's
@@ -64,4 +94,9 @@ export const core = {
   undo: (): Snapshot => snap(mbt.undo()),
   redo: (): Snapshot => snap(mbt.redo()),
   selectionText: (ids: number[]): string => mbt.selectionText(ids),
+  /** 断片に（フェンスの外の）見出しがあるか。いまの文書には触らない */
+  hasHeadings: (text: string): boolean => mbt.hasHeadings(text),
+  /** 断片のいちばん浅い見出しが targetDepth になるようずらす */
+  relevelText: (text: string, targetDepth: number): string =>
+    mbt.relevelText(text, targetDepth),
 };

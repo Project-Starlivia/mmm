@@ -1,11 +1,13 @@
-// クリップボードから何を貼るかの純粋な判定(mmm.md その３)。
+// クリップボードから何を貼るかの判定。
 // URL 単体 → そのノードの内容(リンクカード) / 見出し無しテキスト →
 // 行ごとに子ノード(アンカー無しなら先頭行をルート) / 見出しあり →
 // 従来どおり子ツリー。
-// クリップボード I/O・core への実際の適用は呼び出し側(main.ts)が担う —
-// ここは navigator.clipboard も core も知らない純粋関数のみ。
+//
+// クリップボード I/O と、結果を文書へ適用するのは呼び出し側(main.ts)。
+// ここが問い合わせるのは「その断片に見出しがあるか」「深さをずらすと
+// どうなるか」だけで、その答えはコアが持つ（同じ規則を 2 つ書かない）。
 
-import { hasHeadings, relevel } from "../relevel";
+import { core } from "../coreApi";
 
 export type PasteAction =
   | { kind: "noop" }
@@ -27,7 +29,7 @@ export function decidePaste(
     return { kind: "link", url: asLink };
   }
 
-  if (!hasHeadings(normalized)) {
+  if (!core.hasHeadings(normalized)) {
     const labels = normalized
       .split("\n")
       .map((l) => l.trim())
@@ -51,6 +53,6 @@ export function decidePaste(
   }
   return {
     kind: "block",
-    body: relevel(normalized, anchor.depth + 1).trimEnd(),
+    body: core.relevelText(normalized, anchor.depth + 1).trimEnd(),
   };
 }

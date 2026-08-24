@@ -33,17 +33,6 @@ priv struct Node {
 }
 
 ///|
-/// `<!-- … -->` の一区間。閉じていない（文書末まで開いたまま）ときは
-/// close_start/close_next が -1。4 つ組の位置指定タプルだと、取り違えても
-/// 型では検知できず、呼び出し側ごとに順序を覚える必要があったための struct 化。
-priv struct HideRegion {
-  open_start : Int
-  open_next : Int
-  close_start : Int
-  close_next : Int
-}
-
-///|
 priv struct St {
   mut text : String
   mut nodes : Array[Node]
@@ -55,6 +44,7 @@ priv struct St {
   mut last_sets : Array[Array[Edit]] // sets applied by the current API call
   mut tx : Entry? // open transaction accumulating steps
   mut hide_regions : Array[HideRegion] // <!-- … --> marker spans
+  mut fences : Array[Fence] // ``` … ``` spans
 }
 
 ///|
@@ -69,6 +59,7 @@ let st : St = {
   last_sets: [],
   tx: None,
   hide_regions: [],
+  fences: [],
 }
 
 ///|
@@ -78,8 +69,11 @@ let st : St = {
 /// 見出しは、それぞれ独立したツリーになる。
 fn rebuild_nodes(id_at : Map[Int, Int]) -> Unit {
   let lines = scan_lines(st.text)
-  let (heads, regions) = scan_doc(st.text, lines)
+  let scan = scan_doc(st.text, lines)
+  let heads = scan.heads
+  let regions = scan.hides
   st.hide_regions = regions
+  st.fences = scan.fences
   // Offsets that are NOT nodes but must still stop a subtree.
   //
   // A node's range [hs, sub_end) is what delete / copy / move / hide all
