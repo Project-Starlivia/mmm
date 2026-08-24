@@ -15,16 +15,19 @@
 
 import { type Pt, round2 } from "./geometry.ts";
 
-/** 見た目の固定パラメータ。実文書の上で詰めた値（出発点は見本 Vector.svg）。 */
-export const EDGE = {
-  // ハンドル2つをそのまま持つ三次ベジェ。子を (1,1) とする正規化座標で、
-  // h1 は親から、h2 は子から測る（親側は縦に立ち上がり、子側は横から入る）
+/**
+ * 曲線の形。実文書の上で詰めた値（出発点は見本 Vector.svg）。
+ * ハンドル 2 つをそのまま持つ三次ベジェで、子を (1,1) とする正規化座標。
+ * h1 は親から、h2 は子から測る（親側は縦に立ち上がり、子側は横から入る）。
+ *
+ * 太さはここに持たない。CSS の `.edge` が唯一の宣言 — 同じ 1.7 を
+ * 2 箇所に置いて、片方が毎レンダで上書きしていた。
+ */
+const EDGE = {
   h1u: 0.08,
   h1v: 0.27,
   h2u: 0.58,
   h2v: 0.05,
-  spread: 0.6, // 親の辺のうち何割を「付け根の帯」に使うか。0 で 1 点から出る
-  width: 1.7,
 };
 
 /** 経路の一区間。座標は u, v の並び（L は 1 点、C は 3 点）。 */
@@ -90,24 +93,10 @@ export function segsToD(segs: Seg[], a: Pt): string {
   return d;
 }
 
-/** 1 本のエッジをどう描くか */
-export interface EdgeDraw {
-  d: string;
-  width: number;
-}
-
 /**
- * 点 a から点 z へのライン。箱ではなく点を受けるのは、ドロップの予告のように
- * 「箱が無い場所」へも同じ形で引きたいため。
+ * 点 a から点 z へのラインの d 属性。箱ではなく点を受けるのは、ドロップの
+ * 予告のように「まだノードが無いところ」へも同じ形で引きたいため。
  */
-export function edgeDraw(a: Pt, z: Pt): EdgeDraw {
-  return { d: segsToD(edgeSegs(z.x - a.x, z.y - a.y), a), width: EDGE.width };
-}
-
-/**
- * 2 点のあいだに、いまの形の曲線を引く。ドロップ予告のように
- * 「まだノードが無いところ」へ線を伸ばしたいときに使う。
- */
-export function edgeHintPath(a: Pt, z: Pt): string {
+export function edgePath(a: Pt, z: Pt): string {
   return segsToD(edgeSegs(z.x - a.x, z.y - a.y), a);
 }

@@ -5,16 +5,15 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { core, idOf, initDoc } from "./_helpers.ts";
+import { core, idOf, initDoc, loadDoc } from "./_helpers.ts";
 import { cardRows, contentEnd } from "../src/map/cards.ts";
 
 /** 1 ノードぶんのカードを取り出す小道具 */
 function rowsOf(md: string) {
-  const snap = initDoc(md);
-  const text = core.getText();
-  const map = cardRows(text, snap.nodes, new Set<number>());
-  const node = snap.nodes[snap.nodes.length - 1];
-  return { rows: map.get(node.id) ?? [], text };
+  const doc = loadDoc(md);
+  const map = cardRows(doc, new Set<number>());
+  const node = doc.nodes[doc.nodes.length - 1];
+  return { rows: map.get(node.id) ?? [], text: doc.text };
 }
 
 test("cardRows: 4 種すべてが from/to を持ち、slice が元テキストに一致する", () => {
@@ -33,6 +32,33 @@ test("cardRows: 4 種すべてが from/to を持ち、slice が元テキスト�
   assert.equal(text.slice(rows[1].from, rows[1].to), "![](./a.webp)");
   assert.equal(text.slice(rows[2].from, rows[2].to), "<svg><rect/></svg>");
   assert.equal(text.slice(rows[3].from, rows[3].to), "```ts\nconst a = 1;\n```");
+});
+
+test("cardRows: 情報文字列が 2 語でも 1 枚のコードカードになる", () => {
+  // 以前はカード側だけがこれをフェンスと認めず、中の URL がリンクカードに
+  // 化けていた。区間はコアが渡すので、MD ペインと読み方がずれようがない
+  const md = "# r\n\n## n\n\n```js copy\nhttps://example.com/in-fence\n```\n";
+  const { rows, text } = rowsOf(md);
+  assert.deepEqual(
+    rows.map((r) => r.kind),
+    ["code"],
+  );
+  assert.equal(rows[0].kind === "code" ? rows[0].lang : "", "js copy");
+  assert.equal(
+    text.slice(rows[0].from, rows[0].to),
+    "```js copy\nhttps://example.com/in-fence\n```",
+  );
+});
+
+test("cardRows: 閉じないフェンスは文書の終わりまでを 1 枚にする", () => {
+  const md = "# r\n\n## n\n\n```\nhttps://example.com/in-fence\n";
+  const { rows, text } = rowsOf(md);
+  assert.deepEqual(
+    rows.map((r) => r.kind),
+    ["code"],
+  );
+  assert.equal(text.slice(rows[0].from, rows[0].to).startsWith("```\n"), true);
+  assert.equal(rows[0].to, text.length - 1); // 末尾の改行の手前
 });
 
 test("cardRows: 複数行の svg も丸ごと指す", () => {
@@ -70,13 +96,13 @@ test("contentEnd: 部分木の外の見出しは境界にしない（折り畳�
   // 向こう側 = 折り畳みの中へ入ってしまう
   const md = "# r\n\n## n\n\n[a](https://a.example)\n\n<!--\n\n## h\n\n-->\n\n## m\n";
   const { end, node, next, text } = endOfNode(md, "n");
-  assert.ok(next.hs > node.subEnd, "この文書は分岐を踏み分けていない");
-  assert.equal(end, node.subEnd);
+  assert.ok(next.from > node.to, "この文書は分岐を踏み分けていない");
+  assert.equal(end, node.to);
   assert.equal(end, text.indexOf("<!--"));
 });
 
 test("contentEnd: 最後のノードなら、部分木の終わり（＝文書の終わり）", () => {
   const md = "# r\n\n## n\n\n[a](https://a.example)\n";
   const { end, node } = endOfNode(md, "n");
-  assert.equal(end, node.subEnd);
+  assert.equal(end, node.to);
 });

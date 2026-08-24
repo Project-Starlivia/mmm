@@ -13,10 +13,10 @@ fn cmd_indent(ids : Array[Int]) -> Unit {
   for k in idxs {
     if prev_sibling(k) >= 0 {
       keep.push(st.nodes[k].id)
-      for m in subtree_nodes(st.nodes[k].hs, st.nodes[k].sub_end) {
+      for m in subtree_of(k) {
         set.push(Edit::{
-          from: st.nodes[m].hs,
-          to: st.nodes[m].hs,
+          from: st.nodes[m].from,
+          to: st.nodes[m].from,
           insert: "#",
           removed: "",
         })
@@ -62,29 +62,29 @@ fn cmd_outdent(ids : Array[Int]) -> Unit {
     if pi < 0 {
       continue
     }
-    let pe = st.nodes[pi].sub_end
-    if pe == nd.sub_end {
+    let pe = st.nodes[pi].to
+    if pe == nd.to {
       // already the last block in the parent: pure depth change
       let set : Array[Edit] = []
-      for m in subtree_nodes(nd.hs, nd.sub_end) {
+      for m in subtree_of(i) {
         set.push(Edit::{
-          from: st.nodes[m].hs,
-          to: st.nodes[m].hs + 1,
+          from: st.nodes[m].from,
+          to: st.nodes[m].from + 1,
           insert: "",
           removed: "#",
         })
       }
       apply_sets([set], "")
-      focus_node_at(nd.hs)
+      focus_node_at(nd.from)
     } else {
-      // unhide は nd.hs より前のマーカー行を消しうるので、pe（親の
-      // sub_end）はunhide後に取り直さないと古いオフセットのまま挿入
+      // unhide は nd.from より前のマーカー行を消しうるので、pe（親の
+      // to）はunhide後に取り直さないと古いオフセットのまま挿入
       // 先を指してしまう
       let rehide = unhide_for_move([nd.id])
       let mi = find_node(nd.id)
       let pi2 = find_node(nd.parent)
       if mi >= 0 && pi2 >= 0 {
-        move_block(mi, st.nodes[pi2].sub_end, nd.depth - 1)
+        move_block(mi, st.nodes[pi2].to, nd.depth - 1)
       }
       for rid in rehide {
         cmd_toggle_hidden(rid)
@@ -110,43 +110,43 @@ fn move_block(i : Int, at : Int, new_depth : Int) -> Unit {
   let delta = new_depth - nd.depth
   // shift every heading in the block by delta '#'; remember each heading's
   // id and its offset inside the rebuilt block so ids survive the move
-  let heads = subtree_nodes(nd.hs, nd.sub_end)
+  let heads = subtree_of(i)
   let rels : Array[(Int, Int)] = []
   let sb = StringBuilder::new()
-  let mut pos = nd.hs
+  let mut pos = nd.from
   let mut acc = 0
   for m in heads {
     let h = st.nodes[m]
-    rels.push((h.id, h.hs - nd.hs + acc))
+    rels.push((h.id, h.from - nd.from + acc))
     acc = acc + delta
-    sb.write_string(sub(st.text, pos, h.hs))
+    sb.write_string(slice(st.text, pos, h.from))
     if delta > 0 {
       sb.write_string(hashes(delta))
-      pos = h.hs
+      pos = h.from
     } else {
-      pos = h.hs - delta // skip -delta '#' chars
+      pos = h.from - delta // skip -delta '#' chars
     }
   }
-  sb.write_string(sub(st.text, pos, nd.sub_end))
+  sb.write_string(slice(st.text, pos, nd.to))
   let mut moved = sb.to_string()
   // keep block boundaries tidy: blank-line separated, single newline at EOF
-  let br = nl()
+  let br = eol
   while moved.length() > 0 &&
         (
-          cc(moved, moved.length() - 1) == 10 ||
-          cc(moved, moved.length() - 1) == 13
+          code_at(moved, moved.length() - 1) == 10 ||
+          code_at(moved, moved.length() - 1) == 13
         ) {
-    moved = sub(moved, 0, moved.length() - 1)
+    moved = slice(moved, 0, moved.length() - 1)
   }
   let len = st.text.length()
-  let del_from = if nd.sub_end == len { tidy_del_start(nd.hs) } else { nd.hs }
+  let del_from = if nd.to == len { tidy_del_start(nd.from) } else { nd.from }
   // an insertion point inside the widened deletion collapses onto its start
-  let at2 = if at > del_from && at <= nd.hs { del_from } else { at }
+  let at2 = if at > del_from && at <= nd.from { del_from } else { at }
   // does the insertion point land at EOF once the old block is gone?
-  let eof_effective = at2 == len || (nd.sub_end == len && at2 == del_from)
+  let eof_effective = at2 == len || (nd.to == len && at2 == del_from)
   moved = if eof_effective { moved + br } else { moved + br + br }
   // context immediately before the insertion point in the post-delete text
-  let ctx = if at2 == nd.sub_end { del_from } else { at2 }
+  let ctx = if at2 == nd.to { del_from } else { at2 }
   let mut prefix_len = 0
   if !preceded_by_blank(ctx) {
     moved = br + moved
@@ -154,31 +154,32 @@ fn move_block(i : Int, at : Int, new_depth : Int) -> Unit {
   }
   let del = Edit::{
     from: del_from,
-    to: nd.sub_end,
+    to: nd.to,
     insert: "",
-    removed: sub(st.text, del_from, nd.sub_end),
+    removed: slice(st.text, del_from, nd.to),
   }
   let ins = Edit::{ from: at2, to: at2, insert: moved, removed: "" }
   let set : Array[Edit] = if at2 <= del_from { [ins, del] } else { [del, ins] }
   apply_sets([set], "")
-  let new_hs = if at2 >= nd.sub_end {
-    at2 - (nd.sub_end - del_from)
+  let new_from = if at2 >= nd.to {
+    at2 - (nd.to - del_from)
   } else {
     at2
   }
   // restore the block's original ids at their new positions
-  let base = new_hs + prefix_len
-  let at_hs : Map[Int, Int] = Map([]) // hs -> node index
+  let base = new_from + prefix_len
+  let at_from : Map[Int, Int] = Map([]) // from -> node index
   for idx = 0; idx < st.nodes.length(); idx = idx + 1 {
-    at_hs[st.nodes[idx].hs] = idx
+    at_from[st.nodes[idx].from] = idx
   }
   for r in rels {
     let (rid, rel) = r
-    match at_hs.get(base + rel) {
+    match at_from.get(base + rel) {
       Some(idx) => st.nodes[idx].id = rid
       None => ()
     }
   }
+  reindex() // id を貼り直したので表も作り直す
   recompute_parents()
   refresh_entry_after()
   st.focus = old_id
@@ -192,10 +193,10 @@ fn move_lands_outside(order : Array[Int], target : Int) -> Bool {
   if t < 0 {
     return false
   }
-  let t_hs = st.nodes[t].hs
+  let t_hs = st.nodes[t].from
   for id in order {
     let i = find_node(id)
-    if i >= 0 && t_hs >= st.nodes[i].hs && t_hs < st.nodes[i].sub_end {
+    if i >= 0 && t_hs >= st.nodes[i].from && t_hs < st.nodes[i].to {
       return false
     }
   }
@@ -264,7 +265,7 @@ fn sole_hide_region(nd : Node) -> Int {
   let mut idx = -1
   for i = 0; i < st.hide_regions.length(); i = i + 1 {
     let r = st.hide_regions[i]
-    if r.open_next == nd.hs && r.close_start == nd.sub_end {
+    if r.open_next == nd.from && r.close_start == nd.to {
       idx = i
       break
     }
@@ -322,17 +323,17 @@ fn move_steps(ids : Array[Int], target : Int, pos : Int) -> Int {
     let nd = st.nodes[i]
     let tn = st.nodes[t]
     // reject drops inside the moving subtree
-    if tn.hs >= nd.hs && tn.hs < nd.sub_end {
+    if tn.from >= nd.from && tn.from < nd.to {
       continue
     }
     let (at, depth) = if anchor_pos == 0 {
-      (tn.sub_end, tn.depth + 1)
+      (tn.to, tn.depth + 1)
     } else if anchor_pos == 1 {
-      (tn.hs, tn.depth)
+      (tn.from, tn.depth)
     } else {
-      (tn.sub_end, tn.depth)
+      (tn.to, tn.depth)
     }
-    if (at == nd.hs || at == nd.sub_end) && depth == nd.depth {
+    if (at == nd.from || at == nd.to) && depth == nd.depth {
       // dropping where it already is (also covers "as last child" of the
       // parent it is already the last child of)
       anchor = id
@@ -370,12 +371,12 @@ fn cmd_reorder(id : Int, dir : Int) -> Unit {
   if dir < 0 {
     let p = prev_sibling(i)
     if p >= 0 {
-      move_block(i, st.nodes[p].hs, st.nodes[i].depth)
+      move_block(i, st.nodes[p].from, st.nodes[i].depth)
     }
   } else {
     let nx = next_sibling(i)
     if nx >= 0 {
-      move_block(i, st.nodes[nx].sub_end, st.nodes[i].depth)
+      move_block(i, st.nodes[nx].to, st.nodes[i].depth)
     }
   }
   for rid in rehide {

@@ -1,28 +1,31 @@
-// Orchestrator: single document model lives in the MoonBit core; both panes
-// mirror it (spec 4.2). Selection, focus, persistence and file I/O live
-// here, along with the glue that pure decision logic elsewhere (app/paste,
-// app/name...) doesn't own: clipboard-paste dispatch, drag & drop, and the
-// global keyboard shortcuts.
+// 束ねる場所。文書そのものは MoonBit コアが 1 つだけ持ち、2 枚のペインは
+// どちらもその写し。ここに居るのは、選択・フォーカス・保存とファイル I/O、
+// そして純粋な判断（app/paste, app/name…）が引き受けない繋ぎ —
+// クリップボードの振り分け、ドラッグ&ドロップ、全体のショートカット。
 
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
-import { core, type EditOp, type NodeInfo, type Snapshot } from "./coreApi";
-import { MdEditor } from "./editor";
-import { MindMap, type MapHost } from "./mindmap";
-import { io, type Doc } from "./app/io";
-import { initAssets } from "./app/assets";
-import { initExport } from "./app/export";
-import { initPanes } from "./app/panes";
-import { deriveName } from "./app/name";
-import { initTheme } from "./app/theme";
-import { sweep } from "./app/persist";
-import { decidePaste } from "./app/paste";
-import { onLanguageReady } from "./map/highlight";
 import {
-  type CardRef,
-  cardRows,
-  contentEnd as contentEndAt,
-} from "./map/cards";
-import { moveCard, removeCard } from "./map/cardEdit";
+  core,
+  type DocView,
+  type EditOp,
+  type NodeInfo,
+  type Snapshot,
+} from "./coreApi.ts";
+import { MdEditor } from "./editor.ts";
+import { MindMap, type MapHost } from "./mindmap.ts";
+import { io, type Doc } from "./app/io.ts";
+import { initAssets } from "./app/assets.ts";
+import { initDownload } from "./app/download.ts";
+import { initPanes } from "./app/panes.ts";
+import { deriveName } from "./app/name.ts";
+import { initTheme } from "./app/theme.ts";
+import { sweep } from "./app/persist.ts";
+import { decidePaste } from "./app/paste.ts";
+import { initDrop } from "./app/dnd.ts";
+import { initShortcuts } from "./app/shortcuts.ts";
+import { onLanguageReady } from "./map/highlight.ts";
+import { type CardRef, cardRowsOf, contentEndOf } from "./map/cards.ts";
+import { insertBlock, moveLine, removeLine } from "./edits.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -43,7 +46,8 @@ const elLogo = $("logo");
 
 // ---------- app state ----------
 
-let nodes: NodeInfo[] = [];
+/** いまの文書（テキスト・ノード・フェンスの組）。スナップショットごと差し替える */
+let doc: DocView = { text: "", nodes: [], fences: [] };
 let byId = new Map<number, NodeInfo>();
 let selection = new Set<number>();
 let anchorId = -1;
@@ -53,7 +57,6 @@ let anchorId = -1;
  * Delete や Alt+↑↓ が何に効くのか決まらない。
  */
 let picked: CardRef | null = null;
-let sessionN = 0;
 /** loadText を呼ぶたびに進む世代番号。起動時の前回ファイル読み込みが、
  * その間に New/Open/Drop で別の(空の)文書を開いていた場合まで
  * 上書きしてしまわないためのガード。 */
@@ -69,11 +72,17 @@ let savedName: string | null = null;
 
 // ---------- sync ----------
 
-type Origin = "cm" | "map" | "core" | "load";
+/**
+ * そのスナップショットを誰が起こしたか。振る舞いが変わるのは 3 通りだけ。
+ * - `cm`   … MD ペインの打鍵。CodeMirror には既に入っているので送り返さない
+ * - `load` … 文書まるごとの入れ替え。setText が済んでいる
+ * - `core` … それ以外（マップの操作・undo/redo）。MD ペインへ差分を送る
+ */
+type Origin = "cm" | "load" | "core";
 
 function applySnap(snap: Snapshot, origin: Origin): void {
-  nodes = snap.nodes;
-  byId = new Map(nodes.map((n) => [n.id, n]));
+  doc = { text: core.getText(), nodes: snap.nodes, fences: snap.fences };
+  byId = new Map(doc.nodes.map((n) => [n.id, n]));
   if (origin !== "cm" && origin !== "load") editor.applySets(snap.editSets);
   // prune selection to surviving nodes
   let selChanged = false;
@@ -97,7 +106,8 @@ function applySnap(snap: Snapshot, origin: Origin): void {
   // structural edits from elsewhere invalidate the typing-merge chain
   if (origin !== "cm") editKind = "";
   map.render();
-  if (selChanged) syncSelectionViews(false);
+  // render がクラスまで塗り終えているので、ここで塗り直さない
+  if (selChanged) syncSelectionViews(false, "done");
   btnUndo.disabled = !snap.canUndo;
   btnRedo.disabled = !snap.canRedo;
   updateDirty();
@@ -105,12 +115,12 @@ function applySnap(snap: Snapshot, origin: Origin): void {
 }
 
 function updateDirty(): void {
-  elDirty.hidden = core.getText() === savedText;
+  elDirty.hidden = doc.text === savedText;
 }
 
 /** いまの文書の名前。保存済みならそのファイル名、まだなら本文から導く */
 function docName(): string {
-  return savedName ?? `${deriveName(nodes)}.md`;
+  return savedName ?? `${deriveName(doc.nodes)}.md`;
 }
 
 /**
@@ -119,35 +129,39 @@ function docName(): string {
  * まっさらな文書に `empty.md` と名乗らせても何も伝わらない。
  */
 function showName(): void {
-  const name = savedName ?? (nodes.length ? docName() : null);
-  document.title = name === null ? "mmm" : `${name} - mmm`;
+  const name = savedName ?? (doc.nodes.length ? docName() : null);
+  const title = name === null ? "mmm" : `${name} - mmm`;
+  // 打鍵のたびに呼ばれるので、変わっていないなら DOM に触らない
+  if (document.title !== title) document.title = title;
   // ファイル名欄は flash 中だけ別のことを言っている。終わったら戻る
-  if (flashTimer === -1) elFilename.textContent = docName();
+  if (flashTimer !== -1) return;
+  const shown = docName();
+  if (elFilename.textContent !== shown) elFilename.textContent = shown;
 }
 
 /** CardRef からいまのカードを引く。範囲外なら null（選択は落とす）。 */
 function cardOf(ref: CardRef | null) {
-  if (!ref) return null;
-  const rows = cardRows(core.getText(), nodes, new Set<number>()).get(ref.node);
-  return rows?.[ref.index] ?? null;
+  return ref ? (cardRowsOf(doc, ref.node)[ref.index] ?? null) : null;
 }
 
 /** そのノードの本文の終わり（末尾へ落としたときの挿入位置）。
- * 式そのものは src/map/cards.ts の contentEnd が唯一の定義 — ここは
- * id → index の変換だけを引き受ける。 */
+ * 式そのものは src/map/cards.ts が唯一の定義。 */
 function contentEnd(id: number): number {
-  const n = byId.get(id);
-  return n ? contentEndAt(nodes, nodes.indexOf(n)) : core.getText().length;
+  return contentEndOf(doc.nodes, id) ?? doc.text.length;
 }
 
 /**
- * 選択の見た目を貼り直す。`repaint` はカードの選択が出入りしたとき —
- * カードの枠と × は render が**要素として**作るので、クラスを張り替えるだけの
- * 軽い経路（refreshSelection）では出ても消えてもくれない。
+ * 選択の見た目を貼り直す。`paint` は地図側の塗り直し方:
+ * - `classes` … クラスの張り替えだけ（軽い）
+ * - `render`  … カードの枠と × は render が**要素として**作るので、
+ *                選択が出入りするときは作り直しが要る
+ * - `done`    … 直前に render を済ませてある（applySnap の中）
  */
-function syncSelectionViews(reveal: boolean, repaint = false): void {
-  if (repaint) map.render();
-  else map.refreshSelection();
+type Paint = "classes" | "render" | "done";
+
+function syncSelectionViews(reveal: boolean, paint: Paint = "classes"): void {
+  if (paint === "render") map.render();
+  else if (paint === "classes") map.refreshSelection();
   const card = cardOf(picked);
   editor.highlight(
     card
@@ -155,11 +169,11 @@ function syncSelectionViews(reveal: boolean, repaint = false): void {
       : [...selection]
           .map((id) => byId.get(id))
           .filter((n): n is NodeInfo => !!n)
-          .map((n) => ({ from: n.hs, to: n.subEnd })),
+          .map((n) => ({ from: n.from, to: n.to })),
   );
   if (reveal && anchorId !== -1) {
     const n = byId.get(anchorId);
-    if (n) editor.reveal(n.hs);
+    if (n) editor.reveal(n.from);
   }
 }
 
@@ -170,16 +184,31 @@ function setSelection(ids: number[], anchor: number, reveal = true): void {
   picked = null;
   selection = new Set(ids);
   anchorId = anchor;
-  syncSelectionViews(reveal, hadCard);
+  syncSelectionViews(reveal, hadCard ? "render" : "classes");
 }
 
-/** Run a structural command; optionally focus / edit the resulting node. */
+/**
+ * undo の粒度を分ける印。**tag が違えば必ず別の undo になる**ので、
+ * 番号が違うだけで足りる（用途ごとに接頭辞を変えていた頃、番号が既に
+ * 一意なので接頭辞は何も区別していなかった）。
+ * 同じ tag を続けて渡すと 1 つの undo にまとまる（打鍵の連結）。
+ */
+let tagN = 0;
+const nextTag = (): string => `t${++tagN}`;
+
+/** ノードを作るコマンドは、どれも「作って、そのまま編集に入る」。 */
+function addNode(fn: (tag: string) => Snapshot): void {
+  const tag = nextTag();
+  runCmd(() => fn(tag), { edit: { tag } });
+}
+
+/** 構造を変えるコマンドを走らせ、結果のノードへ選択を移す（必要なら編集へ）。 */
 function runCmd(
   fn: () => Snapshot,
   opts: { edit?: { tag: string } } = {},
 ): void {
   const snap = fn();
-  applySnap(snap, "map");
+  applySnap(snap, "core");
   if (snap.focus !== -1 && byId.has(snap.focus)) {
     setSelection([snap.focus], snap.focus);
     map.ensureVisible(snap.focus);
@@ -203,7 +232,7 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
     // IME: every composition update replaces the previous candidate text;
     // keep ONE tag for the whole composition so undo treats it as one edit
     if (editKind !== "compose") {
-      editTag = `t${++sessionN}`;
+      editTag = nextTag();
       editKind = "compose";
     }
     tag = editTag;
@@ -215,7 +244,7 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
       if (editKind === "type" && e.from === editPos) {
         tag = editTag;
       } else {
-        tag = `t${++sessionN}`;
+        tag = nextTag();
       }
       editKind = "type";
       editTag = tag;
@@ -224,7 +253,7 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
       if (editKind === "del" && e.to === editPos) {
         tag = editTag;
       } else {
-        tag = `t${++sessionN}`;
+        tag = nextTag();
       }
       editKind = "del";
       editTag = tag;
@@ -234,7 +263,7 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
     }
   } else {
     editKind = "";
-    tag = `t${++sessionN}`; // multi-cursor transaction: one undo entry
+    tag = nextTag(); // multi-cursor transaction: one undo entry
   }
   let delta = 0;
   let snap: Snapshot | null = null;
@@ -248,11 +277,10 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
 // ---------- mindmap host ----------
 
 const host: MapHost = {
-  nodes: () => nodes,
-  docText: () => core.getText(),
+  doc: () => doc,
   chooseImageFolder: () => void assets.chooseFolder(),
   replaceText(from, to, text) {
-    applySnap(core.replaceText(from, to, text, `c${++sessionN}`), "map");
+    applySnap(core.replaceText(from, to, text, nextTag()), "core");
   },
   selection: () => selection,
   anchor: () => anchorId,
@@ -265,40 +293,38 @@ const host: MapHost = {
       selection = new Set();
       anchorId = -1;
     }
-    syncSelectionViews(false, true);
+    syncSelectionViews(false, "render");
   },
   deleteCard(ref) {
     const row = cardOf(ref);
     if (!row) return;
     picked = null;
-    const e = removeCard(core.getText(), row.from, row.to);
-    applySnap(core.replaceText(e.from, e.to, e.insert, `x${++sessionN}`), "map");
+    const e = removeLine(doc.text, row.from, row.to);
+    applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
   },
   reorderCard(ref, dir) {
-    const rows = cardRows(core.getText(), nodes, new Set<number>()).get(ref.node);
-    const row = rows?.[ref.index];
-    const next = rows?.[ref.index + dir];
-    if (!rows || !row || !next) return; // 端では何もしない
+    const rows = cardRowsOf(doc, ref.node);
+    const row = rows[ref.index];
+    const next = rows[ref.index + dir];
+    if (!row || !next) return; // 端では何もしない
     // 下へ動かすときは相手の後ろ、上へ動かすときは相手の頭へ入れる。
     // next.to は次の行の直後（次の改行の手前、または改行の無い文書末）を
     // 指す — next.to + 1 だと改行の無い文書末で文書長を超えてしまう。
     // moveCard 側は between を書き戻すだけなので、+1 せずとも行は割れない
     const at = dir === 1 ? next.to : next.from;
-    const e = moveCard(core.getText(), row.from, row.to, at);
+    const e = moveLine(doc.text, row.from, row.to, at);
     if (!e) return;
     picked = { node: ref.node, index: ref.index + dir };
-    applySnap(core.replaceText(e.from, e.to, e.insert, `m${++sessionN}`), "map");
+    applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
   },
   moveCardTo(ref, node, index) {
-    const text = core.getText();
-    const all = cardRows(text, nodes, new Set<number>());
-    const row = all.get(ref.node)?.[ref.index];
+    const row = cardRowsOf(doc, ref.node)[ref.index];
     if (!row) return false;
-    const target = all.get(node) ?? [];
+    const target = node === ref.node ? cardRowsOf(doc, ref.node) : cardRowsOf(doc, node);
     // 落とし先の行頭。末尾なら、そのノードの本文の終わりへ
     const dst = target[index];
     const at = dst ? dst.from : contentEnd(node);
-    const e = moveCard(text, row.from, row.to, at);
+    const e = moveLine(doc.text, row.from, row.to, at);
     if (!e) return false;
     // 着地した後の実際の index。同じノードの中で下へ動かすときだけ、
     // 自分を抜いた分 1 つ前へ詰まる（Alt+↓ の reorderCard と同じ考え方）。
@@ -308,42 +334,33 @@ const host: MapHost = {
     const landing =
       node === ref.node && index > ref.index ? index - 1 : dst ? index : target.length;
     picked = { node, index: landing };
-    applySnap(core.replaceText(e.from, e.to, e.insert, `d${++sessionN}`), "map");
+    applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
     return true;
   },
 
   addChild(id) {
-    if (!byId.has(id)) return;
-    const tag = `s${++sessionN}`;
-    runCmd(() => core.addChild(id, tag), { edit: { tag } });
+    if (byId.has(id)) addNode((tag) => core.addChild(id, tag));
   },
   addSibling(id) {
-    if (!byId.has(id)) return;
-    const tag = `s${++sessionN}`;
-    runCmd(() => core.addSibling(id, tag), { edit: { tag } });
+    if (byId.has(id)) addNode((tag) => core.addSibling(id, tag));
   },
   addSiblingBefore(id) {
-    if (!byId.has(id)) return;
-    const tag = `s${++sessionN}`;
-    runCmd(() => core.addSiblingBefore(id, tag), { edit: { tag } });
+    if (byId.has(id)) addNode((tag) => core.addSiblingBefore(id, tag));
   },
   addParent(id) {
-    if (!byId.has(id)) return;
-    const tag = `s${++sessionN}`;
-    runCmd(() => core.addParent(id, tag), { edit: { tag } });
+    if (byId.has(id)) addNode((tag) => core.addParent(id, tag));
   },
   addRoot() {
-    const tag = `s${++sessionN}`;
-    runCmd(() => core.addRoot(tag), { edit: { tag } });
+    addNode((tag) => core.addRoot(tag));
   },
   rename(id, label, tag) {
-    applySnap(core.renameNode(id, label, tag), "map");
+    applySnap(core.renameNode(id, label, tag), "core");
     // md ペイン側のハイライトは選択の範囲で描いている。ラベルの長さが
     // 変わると範囲がずれるので、貼り直す
     syncSelectionViews(false);
   },
   commitEdit() {
-    if (!map.isEditing()) return;
+    if (!map.isEditingLabel()) return;
     const id = map.editingId;
     map.endEdit();
     if (byId.has(id)) setSelection([id], id);
@@ -351,7 +368,7 @@ const host: MapHost = {
   deleteSelection() {
     if (selection.size === 0) return;
     const snap = core.deleteNodes([...selection]);
-    applySnap(snap, "map");
+    applySnap(snap, "core");
     if (snap.focus !== -1 && byId.has(snap.focus)) {
       setSelection([snap.focus], snap.focus);
       // 他のコマンドは runCmd 経由でここまでやる。削除だけ落ちていたので、
@@ -363,12 +380,12 @@ const host: MapHost = {
   },
   indentSelection() {
     if (selection.size === 0) return;
-    applySnap(core.indentNodes([...selection]), "map");
+    applySnap(core.indentNodes([...selection]), "core");
     syncSelectionViews(false);
   },
   outdentSelection() {
     if (selection.size === 0) return;
-    applySnap(core.outdentNodes([...selection]), "map");
+    applySnap(core.outdentNodes([...selection]), "core");
     syncSelectionViews(false);
   },
   reorder(id, dir) {
@@ -392,11 +409,10 @@ const host: MapHost = {
     if (cut) host.deleteSelection();
   },
   paste() {
-    // paste as CHILD of the focused node (mmm.md 課題); into an empty
-    // document the clip is inserted verbatim
-    if (anchorId === -1 && nodes.length > 0) return;
+    // 貼り付け先は選んでいるノードの**子**。空の文書へはそのまま入れる
+    if (anchorId === -1 && doc.nodes.length > 0) return;
     void (async () => {
-      // an image on the clipboard wins over text (mmm.md そのに: 画像配置)
+      // クリップボードに画像があれば、テキストより優先する
       //
       // try で囲うのは**クリップボードを読むところだけ**。画像を置く処理まで
       // 囲うと、フォルダ選択の失敗が「クリップボードが読めなかった」と
@@ -427,7 +443,7 @@ const host: MapHost = {
       const action = decidePaste(
         clip,
         n0 ? { depth: n0.depth } : null,
-        nodes.length > 0,
+        doc.nodes.length > 0,
       );
       switch (action.kind) {
         case "noop":
@@ -441,16 +457,16 @@ const host: MapHost = {
           const pre = t0 === "" ? "" : t0.endsWith("\n") ? "\n" : "\n\n";
           applySnap(
             core.replaceText(t0.length, t0.length, pre + action.body + "\n", ""),
-            "map",
+            "core",
           );
           return;
         }
         case "children":
-          insertBlock(n0!.subEnd, action.body);
+          insertParagraph(n0!.to, action.body);
           return;
         case "block": {
-          const at = anchorId === -1 ? core.getText().length : n0!.subEnd;
-          insertBlock(at, action.body);
+          const at = anchorId === -1 ? core.getText().length : n0!.to;
+          insertParagraph(at, action.body);
           return;
         }
       }
@@ -460,8 +476,7 @@ const host: MapHost = {
   editRequested(id) {
     if (!byId.has(id)) return;
     setSelection([id], id);
-    const tag = `s${++sessionN}`;
-    map.beginEdit(id, tag);
+    map.beginEdit(id, nextTag());
   },
   undo: () => doUndo(),
   redo: () => doRedo(),
@@ -576,10 +591,7 @@ async function newFile(): Promise<void> {
     await io.close();
     savedText = "";
     loadText("", null);
-    // フェンスの言語は後から読み込まれる。届いたら色を載せ直す
-onLanguageReady(() => map.render());
-
-mapPane.focus();
+    mapPane.focus();
   } catch (err) {
     console.error("new file failed:", err);
     flashFilename("新規作成に失敗しました");
@@ -591,7 +603,7 @@ async function confirmDiscard(): Promise<boolean> {
   return window.confirm("未保存の変更があります。破棄して続行しますか？");
 }
 
-// ---------- images (mmm.md そのに: 画像配置 — local-first) ----------
+// ---------- 画像（ローカルファースト） ----------
 // 実装は app/assets.ts。ここは「いまのファイル」と描き直しを繋ぐだけ
 
 const assets = initAssets({
@@ -600,25 +612,17 @@ const assets = initAssets({
   refresh: () => map.render(),
 });
 
-/**
- * `body` を独立した段落として `at` へ挿し込む。前後に必要なだけ空行を足し
- * (直前が改行 0/1/2 個かで prefix を出し分け、直後が文書末でなければ改行
- * 1 個を足す)、1 つの Snapshot として適用する。
- */
-function insertBlock(at: number, body: string, tag = ""): void {
-  const text = core.getText();
-  let prefix = "";
-  if (at > 0 && text[at - 1] !== "\n") prefix = "\n\n";
-  else if (at >= 2 && text[at - 2] !== "\n") prefix = "\n";
-  const suffix = at !== text.length ? "\n" : "";
-  applySnap(core.replaceText(at, at, prefix + body + "\n" + suffix, tag), "map");
+/** `body` を独立した段落として `at` へ挿し込む（式は src/edits.ts）。 */
+function insertParagraph(at: number, body: string, tag = ""): void {
+  const e = insertBlock(doc.text, at, body);
+  applySnap(core.replaceText(e.from, e.to, e.insert, tag), "core");
 }
 
 /** Append a line at the END of a node's own attached content (before its
  * first child heading), as one undo entry. */
 function insertContentLine(id: number, line: string, tag = ""): void {
   if (!byId.has(id)) return;
-  insertBlock(contentEnd(id), line, tag);
+  insertParagraph(contentEnd(id), line, tag);
 }
 
 async function pasteImage(blob: Blob): Promise<void> {
@@ -647,91 +651,27 @@ window.addEventListener("beforeunload", (event) => {
   event.returnValue = "";
 });
 
-// ---------- drag & drop ----------
+// ---------- ドラッグ & ドロップ（振り分けは app/dnd.ts） ----------
 
-const IMG_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
-const MD_RE = /\.(md|markdown|txt)$/i;
-
-async function droppedHandles(data: DataTransfer): Promise<FileSystemFileHandle[]> {
-  const files: FileSystemFileHandle[] = [];
-  for (const item of data.items) {
-    if (item.kind !== "file" || !item.getAsFileSystemHandle) continue;
-    const handle = await item.getAsFileSystemHandle();
-    if (handle?.kind === "file") files.push(handle as FileSystemFileHandle);
-  }
-  return files;
-}
-
-window.addEventListener("dragover", (event) => {
-  if ([...event.dataTransfer?.items ?? []].some((item) => item.kind === "file")) {
-    event.preventDefault();
-  }
-});
-
-window.addEventListener("drop", (event) => {
-  event.preventDefault();
-  const data = event.dataTransfer;
-  if (!data) return;
-  void (async () => {
-    const handles = await droppedHandles(data);
-    const md = handles.find((file) => MD_RE.test(file.name));
-    if (md) {
-      if (!(await confirmDiscard())) return;
-      applyDoc(await io.openHandle(md));
-      return;
-    }
-    const images = handles.filter((file) => IMG_RE.test(file.name));
-    if (images.length === 0) return;
-    const id = map.nodeAt(event.clientX, event.clientY);
-    if (!byId.has(id)) {
-      flashFilename("画像はノードの上に落としてください");
-      return;
-    }
-    const tag = `d${++sessionN}`;
-    for (const handle of images) {
-      const rel = await assets.saveToDisk(await handle.getFile());
-      if (rel !== null && byId.has(id)) insertContentLine(id, `![](${rel})`, tag);
-    }
-  })().catch((error) => {
-    console.error("drop failed:", error);
-    flashFilename("ドロップしたファイルを開けませんでした");
-  });
-});
-
-// ---------- global shortcuts ----------
-
-window.addEventListener(
-  "keydown",
-  (e) => {
-    if (e.isComposing || e.keyCode === 229) return;
-    const mod = e.ctrlKey || e.metaKey;
-    if (!mod) return;
-    const key = e.key.toLowerCase();
-    if (key === "s") {
-      e.preventDefault();
-      void saveFile(e.shiftKey); // Shift = 別名で保存
-    } else if (key === "n" && e.altKey) {
-      // `Mod+N` はブラウザの「新規ウィンドウ」に吸われてページまで来ない
-      e.preventDefault();
-      void newFile();
-    } else if (key === "o") {
-      e.preventDefault();
-      void openFile();
-    } else if (key === "/") {
-      e.preventDefault();
-      togglePane();
-    } else if (key === "z" || key === "y") {
-      if (map.isEditing()) return; // native input undo while label editing
-      e.preventDefault();
-      e.stopPropagation();
-      if (key === "y" || e.shiftKey) doRedo();
-      else doUndo();
+initDrop({
+  nodeAt: (x, y) => map.nodeAt(x, y),
+  warn: (msg) => flashFilename(msg),
+  async openMarkdown(file) {
+    if (!(await confirmDiscard())) return;
+    applyDoc(await io.openHandle(file));
+  },
+  async addImages(files, node) {
+    const tag = nextTag();
+    for (const file of files) {
+      const rel = await assets.saveToDisk(await file.getFile());
+      if (rel !== null && byId.has(node)) {
+        insertContentLine(node, `![](${rel})`, tag);
+      }
     }
   },
-  { capture: true },
-);
+});
 
-// ---------- pane / splitter / export / theme（実装は app/ 配下） ----------
+// ---------- ペイン / スプリッタ / 書き出し / テーマ / キー（実装は app/ 配下） ----------
 
 const { togglePane, togglePaneVis } = initPanes({
   mdPane,
@@ -743,19 +683,7 @@ const { togglePane, togglePaneVis } = initPanes({
   focusEditor: () => editor.focus(),
 });
 
-// ペインの表示/非表示は Alt+数字（左から 1, 2）。
-// 矢印は使えない — Ctrl+←→ はテキスト欄の単語移動で、書いている最中に一番使う。
-// Ctrl+数字（タブ切替）・Ctrl+J（ダウンロード）・Ctrl+Shift+R（再読込）は
-// ブラウザの予約。Alt+数字はどちらにも触らず、JIS でも物理位置が動かない。
-window.addEventListener("keydown", (e) => {
-  if (e.isComposing || e.keyCode === 229) return;
-  if (!e.altKey || e.ctrlKey || e.metaKey) return;
-  const pane = { "1": "md", "2": "map" }[e.key] as "md" | "map" | undefined;
-  if (!pane) return;
-  e.preventDefault();
-  togglePaneVis(pane);
-});
-initExport({
+initDownload({
   map,
   name: () => docName(),
   notify: (msg, isError = true) => flashFilename(msg, isError),
@@ -764,6 +692,16 @@ initTheme({
   logo: elLogo,
   themeButton: $<HTMLButtonElement>("btn-theme"),
   setEditorTheme: (dark) => editor.setTheme(dark),
+});
+initShortcuts({
+  save: (asNew) => void saveFile(asNew),
+  open: () => void openFile(),
+  create: () => void newFile(),
+  togglePane,
+  togglePaneVis,
+  undo: doUndo,
+  redo: doRedo,
+  isEditing: () => map.isEditing(),
 });
 
 // ---------- boot ----------

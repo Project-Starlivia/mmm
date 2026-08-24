@@ -1,48 +1,32 @@
-// Mindmap pane: SVG rendering + Figma-style pan/zoom/selection (spec 3.3),
-// drag re-parenting with a mandatory drop indicator (spec 3.3.2), and an
-// HTML overlay input for label editing (IME-safe).
+// マップのペイン。SVG の描画と、Figma 風のパン / ズーム / 選択、
+// ドラッグでの付け替え（落とし先は必ず線で示す）、そしてラベルとカードを
+// その場で直す HTML の入力欄（IME を壊さないため SVG の外に重ねる）。
 //
-// Layout: every tree grows from left to right.
+// レイアウトはすべて左から右へ伸びる。
 
-import type { NodeInfo } from "./coreApi";
-import {
-  languageEpoch,
-  tokenize,
-  tokenizeBlock,
-  touchesFence,
-} from "./map/highlight.ts";
-import {
-  centerOf,
-  distToSeg,
-  exitPoint,
-  midOfPolyline,
-} from "./map/geometry";
-import { edgeDraw, edgeHintPath, edgeSegs, flattenSegs } from "./map/edge";
+import type { DocView } from "./coreApi.ts";
+import { tokenizeBlock, touchesFence } from "./map/highlight.ts";
+import { type Pt, midOfPolyline, rightOf } from "./map/geometry.ts";
+import { edgePath, edgeSegs, flattenSegs } from "./map/edge.ts";
 import {
   type CardRef,
+  type CardRow,
   CODE_LINE,
-  CODE_PAD,
   cardBleed,
   cardInset,
   rowH,
-} from "./map/cards";
-import {
-  MONO_FONT,
-  ROW_NORMAL,
-  displayLabel,
-  hiddenLabel,
-  measure,
-  rowOf,
-  rowTop,
-} from "./map/metrics";
-import { type Box, GAP, layoutMap } from "./map/layout";
-import { exportMapSvg } from "./map/export";
+} from "./map/cards.ts";
+import { MONO_FONT, ROW_NORMAL, measure, rowOf, rowTop } from "./map/metrics.ts";
+import { type Box, type Layout, GAP, edgeEnds, layoutMap } from "./map/layout.ts";
+import { type DropTarget, resolveDrop } from "./map/drop.ts";
+import { ContextMenu, type MenuEntry } from "./map/menu.ts";
+import { MapRenderer } from "./map/render.ts";
+import { mapToSvg } from "./map/toSvg.ts";
+import { svgEl } from "./map/svg.ts";
 
 export interface MapHost {
-  /** current document nodes, document order */
-  nodes(): NodeInfo[];
-  /** full markdown text (for reading attached content) */
-  docText(): string;
+  /** いまの文書（テキスト・ノード・フェンスの組）。必ず同じ rev のもの */
+  doc(): DocView;
   /** objectURL for a local image path (relative to the md); null while
    * loading / until folder permission is granted */
   imageUrl(path: string): string | null;
@@ -90,28 +74,28 @@ export interface MapHost {
   redo(): void;
 }
 
-const SVG_NS = "http://www.w3.org/2000/svg";
+/** 描く前の空のレイアウト */
+const emptyLayout = (): Layout => ({
+  visible: [],
+  boxes: new Map(),
+  parentOf: new Map(),
+  buriedCount: new Map(),
+  fanOf: new Map(),
+});
+
+/** 空集合の使い回し（毎レンダで new しない） */
+const NO_IDS: ReadonlySet<number> = new Set<number>();
 
 /** ドラッグと見なす最小の移動量（px の 2 乗）。ダブルクリックの 2 回目が
  *  わずかに動いてもドラッグに化けないよう、ノードにもカードにも同じ値を使う */
 const DRAG_SLOP2 = 64;
-
-function svgEl<K extends keyof SVGElementTagNameMap>(
-  tag: K,
-  attrs: Record<string, string> = {},
-): SVGElementTagNameMap[K] {
-  const el = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-  return el;
-}
 
 export class MindMap {
   private pane: HTMLElement;
   private host: MapHost;
   private svg: SVGSVGElement;
   private viewport: SVGGElement;
-  private edgeLayer: SVGGElement;
-  private nodeLayer: SVGGElement;
+  private renderer = new MapRenderer();
   private dropLine: SVGLineElement;
   private dropHint: SVGPathElement; // どの親につくかを示す予告の曲線
   private plusBtn: SVGGElement;
@@ -121,27 +105,19 @@ export class MindMap {
   private editInk: HTMLPreElement;
   private cardEditor: HTMLTextAreaElement;
   private hint: HTMLDivElement;
-  private menu: HTMLDivElement;
+  private menu = new ContextMenu();
 
   private tx = 60;
   private ty = 60;
   private k = 1;
 
-  private boxes = new Map<number, Box>();
+  /** 直近のレイアウト。箱の位置も親子も付け根のずらしも、すべてここから引く */
+  private layout: Layout = emptyLayout();
   private order: number[] = []; // ids in document order
-  // 差分更新用: id → DOM。以前は毎レンダで全消ししていたので、1 打鍵ごとに
-  // 数万個の SVG 要素を作り直していた（それが入力遅延の実体だった）
-  private nodeEls = new Map<number, SVGGElement>();
-  private edgeEls = new Map<number, SVGPathElement>();
-  private nodeSig = new Map<number, string>(); // 内側を作り直す判定用
-  // 直前に書いた transform / class。同じ値の setAttribute はスタイル無効化を
-  // 起こすだけ無駄なので書かない（プロファイル上いちばん重い JS 呼び出しだった）
-  private nodeTf = new Map<number, string>();
-  private nodeCls = new Map<number, string>();
-  private edgeD = new Map<number, string>();
-  private domOrderSig = ""; // DOM の並び（= 重なり順）を直す判定用
-  private parentOf = new Map<number, number>(); // 子 → 親（線の判定用）
-  private fanOf = new Map<number, number>(); // 付け根のずらし量(px)
+  private get boxes(): Map<number, Box> {
+    return this.layout.boxes;
+  }
+  private polyOf = new Map<number, Pt[]>(); // 子 → エッジの折れ線（render で捨てる）
 
   // interaction state
   private spaceDown = false;
@@ -164,11 +140,7 @@ export class MindMap {
   // ドラッグでカードを動かした直後、pointerup に続いて発火するネイティブの
   // click が、落とし先の座標にあるカードをふらっと選び直すのを止める印
   private suppressClick = false;
-  // pos 3 = その相手の親として割り込む（A→B の線へのドロップ）
-  private dropTarget: {
-    id: number;
-    pos: 0 | 1 | 2 | 3;
-  } | null = null;
+  private dropTarget: DropTarget | null = null;
   // ドロップ中の一時的なノード印。render() のクラス計算にも合流させて
   // あるので、ドラッグ中に他の理由で render() が走っても消えない
   // （直接 classList を触るだけだと、render() が自分の知らないクラスごと
@@ -177,7 +149,7 @@ export class MindMap {
   private dropEdgeId: number | null = null;
   private hoverId = -1;
   /** その場で直しているカード（位置は毎回引き直す） */
-  private editingCard: { ref: CardRef; from: number; to: number } | null = null;
+  private editingCard: CardRef | null = null;
 
   // editing state
   editingId = -1;
@@ -191,8 +163,6 @@ export class MindMap {
 
     this.svg = svgEl("svg", { id: "map-svg" });
     this.viewport = svgEl("g");
-    this.edgeLayer = svgEl("g");
-    this.nodeLayer = svgEl("g");
     this.dropLine = svgEl("line", { id: "drop-line", visibility: "hidden" });
     this.dropHint = svgEl("path", { id: "drop-hint", visibility: "hidden" });
     // crosshair drawn with lines so the glyph is perfectly centered
@@ -207,8 +177,8 @@ export class MindMap {
     };
     this.plusBtn = makePlus();
     this.viewport.append(
-      this.edgeLayer,
-      this.nodeLayer,
+      this.renderer.edgeLayer,
+      this.renderer.nodeLayer,
       this.dropHint,
       this.dropLine,
       this.plusBtn,
@@ -246,10 +216,6 @@ export class MindMap {
     this.hint.style.display = "none";
     pane.append(this.hint);
 
-    this.menu = document.createElement("div");
-    this.menu.id = "ctx-menu";
-    document.body.append(this.menu);
-
     this.bindEvents();
     this.applyTransform();
     // a fitView requested while the pane had no size runs once it gets one
@@ -283,15 +249,14 @@ export class MindMap {
   // ---------- layout & render ----------
 
   render(): void {
-    const nodes = this.host.nodes();
-    this.hint.style.display = nodes.length === 0 ? "flex" : "none";
+    const doc = this.host.doc();
+    this.hint.style.display = doc.nodes.length === 0 ? "flex" : "none";
 
-    const L = layoutMap(nodes, this.host.docText());
-    const { visible, boxes, hiddenKids, fanOf } = L;
-    this.boxes = boxes;
-    this.order = L.order;
-    this.parentOf = L.parentOf;
-    this.fanOf = fanOf;
+    const L = layoutMap(doc);
+    const boxes = L.boxes;
+    this.layout = L;
+    this.polyOf.clear(); // 箱が動いたら線も動く
+    this.order = L.visible.map((n) => n.id);
     // ドラッグ中に別ペインの編集などで木が変わることがある。掴んでいた
     // ノードが消えていたらドラッグごと畳む（消えた id を指したまま
     // ドロップすると、無関係なノードが動く）
@@ -309,328 +274,40 @@ export class MindMap {
     if (this.editingCard) this.paintEditInk();
 
 
-    // ---- DOM を差分更新する ----
-    // 位置(transform)と class は毎回書き換えても安い。高いのは要素の生成と
-    // 破棄なので、そこは「中身が変わったノードだけ」に絞る。
-    const sel = this.host.selection();
-    const seen = new Set<number>();
-
-    for (const n of visible) {
-      const b = boxes.get(n.id);
-      if (!b) continue;
-      seen.add(n.id);
-
-      // --- エッジ（親への曲線）---
-      if (n.parent !== -1 && boxes.has(n.parent)) {
-        const p = boxes.get(n.parent)!;
-        let path = this.edgeEls.get(n.id);
-        if (!path) {
-          path = svgEl("path", { class: "edge" });
-          this.edgeLayer.append(path);
-          this.edgeEls.set(n.id, path);
-        }
-        const e = exitPoint(p, 1, 0);
-        const fan = fanOf.get(n.id) ?? 0;
-        const g = edgeDraw(
-          { x: e.x, y: e.y + fan },
-          exitPoint(b, -1, 0),
-        );
-        // 太さは EDGE.width で固定だが、d が変われば結局書き直すので、まとめて
-        // 差分を見る
-        const sig = `${g.width}|${g.d}`;
-        if (this.edgeD.get(n.id) !== sig) {
-          path.setAttribute("d", g.d);
-          path.style.strokeWidth = String(g.width);
-          this.edgeD.set(n.id, sig);
-        }
-      } else {
-        const stale = this.edgeEls.get(n.id);
-        if (stale) {
-          stale.remove();
-          this.edgeEls.delete(n.id);
-          this.edgeD.delete(n.id);
-        }
-      }
-
-      // --- ノード本体 ---
-      let g = this.nodeEls.get(n.id);
-      if (!g) {
-        g = svgEl("g");
-        g.dataset.id = String(n.id);
-        this.nodeLayer.append(g);
-        this.nodeEls.set(n.id, g);
-        this.nodeSig.delete(n.id); // 新規なので必ず中身を作る
-      }
-      const dropMark = this.dropMarks.get(n.id);
-      const cls =
-        "node" +
-        (n.depth === 1 ? " root" : "") +
-        (b.rows.length > 0 ? " link-card" : "") +
-        (n.hidden ? " hidden-node" : "") +
-        (sel.has(n.id) ? " selected" : "") +
-        (this.dragging?.subtree.has(n.id) ? " dragging" : "") +
-        (dropMark ? ` ${dropMark}` : "");
-      if (this.nodeCls.get(n.id) !== cls) {
-        g.setAttribute("class", cls);
-        this.nodeCls.set(n.id, cls);
-      }
-      const tf = `translate(${b.x} ${b.y})`;
-      if (this.nodeTf.get(n.id) !== tf) {
-        g.setAttribute("transform", tf);
-        this.nodeTf.set(n.id, tf);
-      }
-
-      // 同じ render の中に「折り畳まれた id の集合」の buried もあるので、
-      // こちらは件数と分かる名前にする
-      const buriedCount = hiddenKids.get(n.id) ?? 0;
-      const sig = this.contentSig(n, b, buriedCount);
-      if (this.nodeSig.get(n.id) === sig) continue; // 中身は据え置き
-      this.nodeSig.set(n.id, sig);
-      g.replaceChildren();
-      g.append(
-        svgEl("rect", {
-          class: "box",
-          width: String(b.w),
-          height: String(b.h),
-          rx: n.hidden ? "4" : "8",
-        }),
-      );
-      const label = svgEl("text", {
-        class: "label" + (n.label === "" ? " empty" : ""),
-        x: String(rowOf(n).padX),
-        y: String(rowOf(n).rowH / 2),
-        // font-size は CSS ではなく属性で入れる（同じ数字を 2 箇所に置かない）
-        "font-size": String(rowOf(n).fontPx),
-      });
-      label.textContent = n.hidden
-        ? hiddenLabel(n, buriedCount)
-        : displayLabel(n.label);
-      const t = svgEl("title");
-      t.textContent = n.hidden
-        ? `${n.label}${buriedCount ? `\n（${buriedCount} 件を折り畳み中。Shift+H で戻す）` : "\n（非表示。Shift+H で戻す）"}`
-        : n.label;
-      g.append(label, t);
-      // card rows (links / images) from the attached content, stacked
-      // under the label
-      for (let rowIndex = 0; rowIndex < b.rows.length; rowIndex++) {
-        const r = b.rows[rowIndex];
-        const spot = `${n.id},${rowIndex}`;
-        const rowY = rowTop(b.rows, rowIndex);
-        // 中身の置き場所。選択の枠も入力欄（cardRect）もここに合わせる
-        const inset = cardInset(r);
-        const bleed = cardBleed(r);
-        const y = rowY + inset;
-        const x = ROW_NORMAL.padX - bleed;
-        const w = b.w - ROW_NORMAL.padX * 2 + bleed * 2;
-        const h = rowH(r) - inset * 2;
-        g.append(
-          svgEl("line", {
-            class: "card-sep",
-            x1: String(ROW_NORMAL.padX - 4),
-            y1: String(rowY),
-            x2: String(b.w - ROW_NORMAL.padX + 4),
-            y2: String(rowY),
-          }),
-        );
-        if (r.kind === "link") {
-          // 当たり判定の面。他の 3 種は絵や背景がその役をするが、リンクは
-          // 文字しか描かないので、行いっぱいの透明な面を敷く
-          const hit = svgEl("rect", {
-            class: "link-hit",
-            "data-card": spot,
-            x: String(ROW_NORMAL.padX),
-            y: String(y),
-            width: String(w),
-            height: String(h),
-          });
-          const title = svgEl("text", {
-            class: "link-row",
-            x: String(ROW_NORMAL.padX),
-            y: String(y + h / 2),
-          });
-          title.textContent = r.link.title;
-          const tt = svgEl("title");
-          tt.textContent = r.link.url;
-          const open = svgEl("text", {
-            class: "link-open",
-            // 枠の内側に収める。外へ出すと、選択の枠が本体より小さく見える
-            x: String(x + w),
-            y: String(y + h / 2),
-            "text-anchor": "end",
-          });
-          open.textContent = "↗";
-          open.setAttribute("data-url", r.link.url);
-          g.append(hit, title, tt, open);
-        } else if (r.kind === "svg") {
-          const img = svgEl("image", {
-            "data-card": spot,
-            x: String(ROW_NORMAL.padX),
-            y: String(y),
-            width: String(w),
-            height: String(h),
-            preserveAspectRatio: "xMidYMid meet",
-          });
-          img.setAttribute(
-            "href",
-            `data:image/svg+xml;charset=utf-8,${encodeURIComponent(r.markup)}`,
-          );
-          g.append(img);
-        } else if (r.kind === "code") {
-          // 背景は左右にも張り出す（コードは箱の縁まで塗る）。張り出しは
-          // 共有の x / w に織り込み済みなので、ここで足し直さない
-          const bg = svgEl("rect", {
-            class: "code-bg",
-            "data-card": spot,
-            x: String(x),
-            y: String(y),
-            width: String(w),
-            height: String(h),
-            rx: "5",
-          });
-          if (r.lang !== "") {
-            const tt = svgEl("title");
-            tt.textContent = r.lang;
-            bg.append(tt);
-          }
-          g.append(bg);
-          const tokens = tokenize(r.lines, r.lang);
-          for (let i = 0; i < r.lines.length; i++) {
-            const ln = svgEl("text", {
-              class: "code-line",
-              "data-card": spot,
-              x: String(ROW_NORMAL.padX + 1),
-              y: String(rowY + CODE_PAD + i * CODE_LINE + CODE_LINE / 2),
-            });
-            // 幅の判断は素の文字列で行い、色の付いた塊をそこへ合わせる
-            for (const t of tokens[i]) {
-              const span = svgEl("tspan", t.cls === "" ? {} : { class: t.cls });
-              span.textContent = t.text;
-              ln.append(span);
-            }
-            g.append(ln);
-          }
-        } else {
-          const url = this.host.imageUrl(r.path);
-          if (url !== null) {
-            const img = svgEl("image", {
-              "data-card": spot,
-              x: String(ROW_NORMAL.padX),
-              y: String(y),
-              width: String(w),
-              height: String(h),
-              preserveAspectRatio: "xMidYMid meet",
-            });
-            img.setAttribute("href", url);
-            g.append(img);
-          } else {
-            // not loadable yet (permission pending / file missing):
-            // stable-size placeholder so the layout doesn't jump on load
-            g.append(
-              svgEl("rect", {
-                class: "img-ph",
-                "data-card": spot,
-                x: String(ROW_NORMAL.padX),
-                y: String(y),
-                width: String(w),
-                height: String(h),
-                rx: "6",
-              }),
-            );
-            const ph = svgEl("text", {
-              class: "img-name",
-              "data-card": spot,
-              x: String(b.w / 2),
-              y: String(y + h / 2),
-              "text-anchor": "middle",
-            });
-            ph.textContent = r.name;
-            g.append(ph);
-          }
-        }
-        if (this.isPicked(n.id, rowIndex)) {
-          g.append(
-            svgEl("rect", {
-              class: "card-picked",
-              x: String(x),
-              y: String(y),
-              width: String(w),
-              height: String(h),
-              rx: "6",
-            }),
-          );
-          // × は角そのものに載せる。枠線がボタンの中心を通る位置
-          const cx = x + w;
-          const cy = y;
-          const arm = 2.5; // 中心からの腕の長さ
-          const kill = svgEl("g", { class: "card-kill", "data-kill": spot });
-          kill.append(svgEl("circle", { cx: String(cx), cy: String(cy), r: "7" }));
-          // × は文字ではなく線で引く。字だと書体で中心も太さも揺れる
-          for (const [dx, dy] of [
-            [1, 1],
-            [1, -1],
-          ]) {
-            kill.append(
-              svgEl("line", {
-                x1: String(cx - arm * dx),
-                y1: String(cy - arm * dy),
-                x2: String(cx + arm * dx),
-                y2: String(cy + arm * dy),
-              }),
-            );
-          }
-          g.append(kill);
-        }
-      }
-    }
-
-    // 見えなくなったノード / エッジを片付ける
-    for (const [id, el] of this.nodeEls) {
-      if (seen.has(id)) continue;
-      el.remove();
-      this.nodeEls.delete(id);
-      this.nodeSig.delete(id);
-      this.nodeTf.delete(id);
-      this.nodeCls.delete(id);
-    }
-    for (const [id, el] of this.edgeEls) {
-      if (seen.has(id)) continue;
-      el.remove();
-      this.edgeEls.delete(id);
-      // 値キャッシュも一緒に捨てる。残すと、折り畳んで戻したときに
-      // 「テキストが元通り = 署名も元通り」で書き換えがスキップされ、
-      // 作り直した空の <path> に d が入らないままエッジが消える
-      this.edgeD.delete(id);
-    }
-
-    // DOM の並び = 重なり順。文書順が変わったときだけ並べ直す
-    // （既存要素の append は「移動」であって作り直しではない）
-    const orderSig = this.order.join(",");
-    if (orderSig !== this.domOrderSig) {
-      for (const id of this.order) {
-        const el = this.nodeEls.get(id);
-        if (el) this.nodeLayer.append(el);
-      }
-      this.domOrderSig = orderSig;
-    }
+    this.renderer.draw({
+      layout: L,
+      selection: this.host.selection(),
+      dragging: this.dragging?.subtree ?? NO_IDS,
+      dropMarks: this.dropMarks,
+      picked: this.host.pickedCard(),
+      imageUrl: (path) => this.host.imageUrl(path),
+    });
 
     this.updatePlus();
     this.positionEditor();
   }
 
   /**
-   * その座標にある要素から印を辿る。`e.target` は当てにしない —
-   * ドラッグのためにペインがポインタキャプチャを取ると、以降のイベントは
-   * ペインへ付け替えられ、target が実際に押した要素を指さなくなる。
+   * その座標にあるカード。`e.target` は当てにしない — ドラッグのために
+   * ペインがポインタキャプチャを取ると、以降のイベントはペインへ
+   * 付け替えられ、target が実際に押した要素を指さなくなる。
+   *
+   * `data-card` はカードそのもの、`data-kill` は選択中に出る × ボタン。
    */
-  private markAt(x: number, y: number, attr: string): string | null {
-    const el = document.elementFromPoint(x, y);
-    return el?.closest?.(`[${attr}]`)?.getAttribute(attr) ?? null;
-  }
-
-  private static span(mark: string | null): [number, number] | null {
-    if (mark === null) return null;
-    const [from, to] = mark.split(",").map(Number);
-    return Number.isFinite(from) && Number.isFinite(to) ? [from, to] : null;
+  private cardAt(
+    x: number,
+    y: number,
+    attr: "data-card" | "data-kill",
+  ): CardRef | null {
+    const mark = document
+      .elementFromPoint(x, y)
+      ?.closest?.(`[${attr}]`)
+      ?.getAttribute(attr);
+    if (!mark) return null;
+    const [node, index] = mark.split(",").map(Number);
+    return Number.isFinite(node) && Number.isFinite(index)
+      ? { node, index }
+      : null;
   }
 
   /**
@@ -690,15 +367,22 @@ export class MindMap {
     this.dropLine.setAttribute("visibility", "visible");
   }
 
+  /** 開いているカードのいまの範囲。boxes は毎レンダで作り直されるので、
+   *  外から文書が動いても（undo など）ここは常に現在の位置を返す。 */
+  private editingRow(): CardRow | null {
+    const ref = this.editingCard;
+    return ref ? (this.boxes.get(ref.node)?.rows[ref.index] ?? null) : null;
+  }
+
   /** カードをその場で開く。閉じるのは Esc / Mod+Enter / 他所クリック。 */
   private beginCardEdit(ref: CardRef): void {
     const b = this.boxes.get(ref.node);
     const row = b?.rows[ref.index];
     const rect = this.cardRect(ref);
     if (!row || !rect) return;
-    if (this.isEditing()) this.host.commitEdit();
-    this.editingCard = { ref, from: row.from, to: row.to };
-    this.cardEditor.value = this.host.docText().slice(row.from, row.to);
+    if (this.isEditingLabel()) this.host.commitEdit();
+    this.editingCard = ref;
+    this.cardEditor.value = this.host.doc().text.slice(row.from, row.to);
     this.editBox.style.display = "block";
     this.paintEditInk();
     this.positionCardEditor();
@@ -730,7 +414,7 @@ export class MindMap {
    */
   private positionCardEditor(): void {
     if (!this.editingCard) return;
-    const rect = this.cardRect(this.editingCard.ref);
+    const rect = this.cardRect(this.editingCard);
     if (!rect) {
       this.endCardEdit();
       return;
@@ -759,13 +443,12 @@ export class MindMap {
 
   /** 中身を文書へ返して閉じる。空にしたらブロックの中身が空になるだけ。 */
   private commitCardEdit(): void {
-    const at = this.editingCard;
-    if (!at) return;
-    this.editingCard = null;
-    this.editBox.style.display = "none";
+    const row = this.editingRow();
+    this.endCardEdit();
+    if (!row) return;
     const next = this.cardEditor.value;
-    if (next !== this.host.docText().slice(at.from, at.to)) {
-      this.host.replaceText(at.from, at.to, next);
+    if (next !== this.host.doc().text.slice(row.from, row.to)) {
+      this.host.replaceText(row.from, row.to, next);
     }
     this.pane.focus();
   }
@@ -773,29 +456,6 @@ export class MindMap {
   private endCardEdit(): void {
     this.editingCard = null;
     this.editBox.style.display = "none";
-  }
-
-  /** そのカードが選ばれているか（ノード id と何枚目かで見る） */
-  private isPicked(nodeId: number, index: number): boolean {
-    const p = this.host.pickedCard();
-    return p !== null && p.node === nodeId && p.index === index;
-  }
-
-  private contentSig(n: NodeInfo, b: Box, buried: number): string {
-    // 値どうしは本文に出ない制御文字で区切る。連結だけだと
-    // lang "ts"+行 "x" と lang "t"+行 "sx" のような別内容が同じ署名になる
-    const SEP = "\u0000";
-    // 言語の読み込みは後から効くので、世代も署名に混ぜる
-    let s = `${b.w}|${b.h}|${n.hidden ? 1 : 0}|${buried}|${languageEpoch()}|${n.label}`;
-    for (let i = 0; i < b.rows.length; i++) {
-      const r = b.rows[i];
-      if (r.kind === "link") s += `|L${r.link.title}${SEP}${r.link.url}`;
-      else if (r.kind === "svg") s += `|S${r.markup}`;
-      else if (r.kind === "code") s += `|C${r.lang}${SEP}${r.lines.join(SEP)}`;
-      else s += `|I${r.path}${SEP}${this.host.imageUrl(r.path) ?? ""}`;
-      if (this.isPicked(n.id, i)) s += `${SEP}picked`;
-    }
-    return s;
   }
 
   /** Center the whole tree in the pane (file open / initial view). If the
@@ -832,46 +492,35 @@ export class MindMap {
    * 埋め込むので、この結果だけで単体表示できる（ダウンロード/ラスタライズ用）。
    * 地図が空なら null。 */
   exportSvg(): Promise<SVGSVGElement | null> {
-    return exportMapSvg({
+    return mapToSvg({
       boxes: this.boxes.values(),
-      edgeLayer: this.edgeLayer,
-      nodeLayer: this.nodeLayer,
+      edgeLayer: this.renderer.edgeLayer,
+      nodeLayer: this.renderer.nodeLayer,
       pane: this.pane,
     });
   }
 
-  /** 子 id から、その親へのエッジの幾何を出す（付け根のずらしも込み） */
-  private edgeGeomOf(
-    id: number,
-  ): { a: { x: number; y: number }; du: number; dv: number } | null {
-    const b = this.boxes.get(id);
-    const pid = this.parentOf.get(id);
-    const p = pid !== undefined ? this.boxes.get(pid) : undefined;
-    if (!b || !p) return null;
-    const e = exitPoint(p, 1, 0);
-    const fan = this.fanOf.get(id) ?? 0;
-    const a = { x: e.x, y: e.y + fan };
-    const z = exitPoint(b, -1, 0);
-    return {
-      a,
-      du: z.x - a.x,
-      dv: z.y - a.y,
-    };
-  }
-
-  /** エッジを world 座標の折れ線にする（線への当たり判定と印の位置に使う） */
-  private edgePolyline(id: number): { x: number; y: number }[] | null {
-    const g = this.edgeGeomOf(id);
-    if (!g) return null;
-    return flattenSegs(edgeSegs(g.du, g.dv), 8).map((q) => ({
-      x: g.a.x + q[0],
-      y: g.a.y + q[1],
-    }));
+  /**
+   * エッジを world 座標の折れ線にする（線への当たり判定と印の位置に使う）。
+   * ドラッグ中は指を動かすたびに**すべての**エッジを調べるので、レイアウトが
+   * 変わるまで使い回す（1 本あたり 9 点を毎フレーム作り直していた）。
+   */
+  private edgePolyline(id: number): Pt[] | null {
+    const hit = this.polyOf.get(id);
+    if (hit) return hit;
+    const e = edgeEnds(this.layout, id);
+    if (!e) return null;
+    const pts = flattenSegs(
+      edgeSegs(e.to.x - e.from.x, e.to.y - e.from.y),
+      8,
+    ).map((q) => ({ x: e.from.x + q[0], y: e.from.y + q[1] }));
+    this.polyOf.set(id, pts);
+    return pts;
   }
 
   /** id を指定して一時的な class を付ける（DOM を舐めずに済む） */
   private markNode(id: number, cls: "dragging" | "drop-child" | "drop-parent"): void {
-    this.nodeEls.get(id)?.classList.add(cls);
+    this.renderer.nodeEl(id)?.classList.add(cls);
     if (cls === "drop-child" || cls === "drop-parent") {
       this.dropMarks.set(id, cls);
     }
@@ -886,16 +535,16 @@ export class MindMap {
    */
   private clearDropMarks(alsoDragging: boolean): void {
     for (const [id, cls] of this.dropMarks) {
-      this.nodeEls.get(id)?.classList.remove(cls);
+      this.renderer.nodeEl(id)?.classList.remove(cls);
     }
     this.dropMarks.clear();
     if (this.dropEdgeId !== null) {
-      this.edgeEls.get(this.dropEdgeId)?.classList.remove("drop-edge");
+      this.renderer.edgeEl(this.dropEdgeId)?.classList.remove("drop-edge");
       this.dropEdgeId = null;
     }
     if (alsoDragging && this.dragging) {
       for (const id of this.dragging.subtree) {
-        this.nodeEls.get(id)?.classList.remove("dragging");
+        this.renderer.nodeEl(id)?.classList.remove("dragging");
       }
     }
   }
@@ -952,19 +601,29 @@ export class MindMap {
     this.pane.focus();
   }
 
-  isEditing(): boolean {
+  /** ラベルの入力欄が開いているか（確定は host.commitEdit が持つ）。 */
+  isEditingLabel(): boolean {
     return this.editingId !== -1;
+  }
+
+  /**
+   * ラベルとカード、**どちらかの入力欄が開いている**か。
+   * 「いまキーはネイティブの入力欄のものか」を聞きたい側はこちらを見る —
+   * ラベルだけを見ていたころ、カードを直している最中の `Mod+Z` が
+   * textarea ではなく文書へ効いて、確定時に別の範囲を上書きしていた。
+   */
+  isEditing(): boolean {
+    return this.editingId !== -1 || this.editingCard !== null;
   }
 
   private positionEditor(): void {
     if (this.editingId === -1) return;
     const b = this.boxes.get(this.editingId);
     if (!b) return;
-    // The input has to sit EXACTLY on the node's label row (mmm.md その３:
-    // 編集時入力欄右に空白がある). Everything below is computed in world
-    // units first and scaled once, because the input's padding and border
-    // are CSS pixels that do NOT scale with the zoom — leaving them fixed is
-    // what made the input and the box disagree at any zoom other than 1.
+    // 入力欄はラベル行に**ぴったり**重ならなければならない。以下はすべて
+    // world 単位で組んでから 1 度だけ倍率を掛ける — 入力欄の padding と
+    // border は CSS ピクセルでズームに追従しないので、そのままにすると
+    // 倍率 1 以外で箱と入力欄がずれる（実際にずれていた）。
     const BORDER = 2; // #node-editor の枠（拡大しない）
     // ラベル行の寸法は rowOf() が唯一の定義。SVG 側と同じものを使うので
     // 通常ノードでも折り畳んだノードでも文字位置がずれない
@@ -994,7 +653,7 @@ export class MindMap {
       return;
     }
     this.plusBtn.setAttribute("visibility", "visible");
-    const p = exitPoint(b, 1, 0);
+    const p = rightOf(b);
     this.plusBtn.setAttribute(
       "transform",
       `translate(${p.x + 14} ${p.y})`,
@@ -1037,7 +696,7 @@ export class MindMap {
       (e) => {
         e.preventDefault();
         if (e.ctrlKey || e.metaKey) {
-          // zoom anchored at the cursor (spec 3.3)
+          // ズームはカーソルを基点にする
           const r = pane.getBoundingClientRect();
           const cx = e.clientX - r.left;
           const cy = e.clientY - r.top;
@@ -1069,7 +728,8 @@ export class MindMap {
       // ここで pane.focus() まで進むと、押した瞬間に blur して閉じてしまう
       if (e.target === this.editor) return;
       if (this.editBox.contains(e.target as Node)) return;
-      if (this.isEditing()) this.host.commitEdit();
+      // カードの入力欄は blur が自分で確定する。ここはラベルの担当
+      if (this.isEditingLabel()) this.host.commitEdit();
       this.hideMenu();
       pane.focus();
 
@@ -1095,15 +755,14 @@ export class MindMap {
       // 落とし、click が届く前に × が DOM から消える。選んでいるカードの
       // 上からのドラッグはカードを動かす — 選んでいないカードの上からは、
       // 従来どおりノードが動く（既存の D&D を奪わない）
-      const downKill = MindMap.span(this.markAt(e.clientX, e.clientY, "data-kill"));
-      const downCard = MindMap.span(this.markAt(e.clientX, e.clientY, "data-card"));
+      const downCard = this.cardAt(e.clientX, e.clientY, "data-card");
       const held = this.host.pickedCard();
-      if (downKill !== null) return;
+      if (this.cardAt(e.clientX, e.clientY, "data-kill")) return;
       if (
         downCard !== null &&
         held !== null &&
-        held.node === downCard[0] &&
-        held.index === downCard[1]
+        held.node === downCard.node &&
+        held.index === downCard.index
       ) {
         this.cardDrag = { ref: held, px: e.clientX, py: e.clientY, moved: false };
         pane.setPointerCapture(e.pointerId);
@@ -1115,7 +774,7 @@ export class MindMap {
         this.dragCand = { id, px: e.clientX, py: e.clientY };
         pane.setPointerCapture(e.pointerId);
       } else {
-        // empty space: rubber band (spec 3.3)
+        // 何も無いところ: 矩形選択
         const r = pane.getBoundingClientRect();
         this.rubberStart = { x: e.clientX - r.left, y: e.clientY - r.top };
         pane.setPointerCapture(e.pointerId);
@@ -1236,7 +895,7 @@ export class MindMap {
         return;
       }
       if (this.dragCand) {
-        // plain click on a node: selection (spec 3.3 / 3.3.1)
+        // ノードの素のクリック: 選択
         const id = this.dragCand.id;
         this.dragCand = null;
         const sel = this.host.selection();
@@ -1246,7 +905,7 @@ export class MindMap {
           const b = this.order.indexOf(id);
           if (a !== -1 && b !== -1) {
             const [lo, hi] = a < b ? [a, b] : [b, a];
-            // display order = document order = md line order (spec 3.3.1)
+            // 画面の並び = 文書順 = md の行順
             this.host.setSelection(
               this.order.slice(lo, hi + 1),
               this.host.anchor(),
@@ -1284,10 +943,10 @@ export class MindMap {
       if ((e.target as Element).classList?.contains("link-open")) return;
       // カードはラベルではなく元テキストを直すので、専用の入力欄を開く。
       // 編集の場所を 2 つ持たない — 隣に本物のエディタが出ている
-      const card = MindMap.span(this.markAt(e.clientX, e.clientY, "data-card"));
+      const card = this.cardAt(e.clientX, e.clientY, "data-card");
       if (card) {
         e.preventDefault();
-        this.beginCardEdit({ node: card[0], index: card[1] });
+        this.beginCardEdit(card);
         return;
       }
       // hit-test by position: pointer capture retargets the event to the
@@ -1325,7 +984,7 @@ export class MindMap {
     });
 
     // open link cards
-    // ペインに付ける。nodeLayer だと、ポインタキャプチャで
+    // ペインに付ける。ノード層だと、ポインタキャプチャで
     // イベントがペインへ付け替わったとき伝播経路から外れて届かない
     pane.addEventListener("click", (e) => {
       if (this.suppressClick) {
@@ -1334,27 +993,27 @@ export class MindMap {
       }
       const t = e.target as Element;
       // × は選ばれているカードにだけ出ている。押されたらその行ごと消す
-      const kill = MindMap.span(this.markAt(e.clientX, e.clientY, "data-kill"));
+      const kill = this.cardAt(e.clientX, e.clientY, "data-kill");
       if (kill) {
-        this.host.deleteCard({ node: kill[0], index: kill[1] });
+        this.host.deleteCard(kill);
         return;
       }
-      const pick = MindMap.span(this.markAt(e.clientX, e.clientY, "data-card"));
+      const pick = this.cardAt(e.clientX, e.clientY, "data-card");
       if (pick) {
-        const ref = { node: pick[0], index: pick[1] };
         // pointerdown が「いま掴んでいるカードの上」を dragCand の対象から
         // 外している（下記 pointerdown 参照）ので、素のノード選択は起きず
         // picked はここに来るまで書き換わっていない
         const now = this.host.pickedCard();
-        const same = now !== null && now.node === ref.node && now.index === ref.index;
-        this.host.pickCard(same ? null : ref);
+        const same =
+          now !== null && now.node === pick.node && now.index === pick.index;
+        this.host.pickCard(same ? null : pick);
         return;
       }
       if (!t.classList?.contains("link-open")) return;
       const url = t.getAttribute("data-url");
       if (url) window.open(url, "_blank", "noopener,noreferrer");
     });
-    this.nodeLayer.addEventListener("pointerdown", (e) => {
+    this.renderer.nodeLayer.addEventListener("pointerdown", (e) => {
       if ((e.target as Element).classList?.contains("link-open")) {
         e.stopPropagation();
       }
@@ -1368,11 +1027,11 @@ export class MindMap {
         return;
       }
       if (!this.host.selection().has(id)) this.host.setSelection([id], id);
-      this.showMenu(e.clientX, e.clientY);
+      this.menu.show(e.clientX, e.clientY, this.menuItems());
     });
 
-    // node label editor: Enter / Esc / Mod+Enter all COMMIT (mmm.md そのに:
-    // enter決定。キャンセルは存在しない); Tab does nothing
+    // ラベルの入力欄。Enter / Esc / Mod+Enter はどれも**確定**で、
+    // キャンセルは存在しない。Tab は何もしない
     // IME の変換中は文書へ書き込まない。
     // 変換中の中間候補まで rename すると、(a) 未確定の文字列が「唯一の真実」
     // であるはずの markdown に流れ込み、(b) 候補が変わるたびに全再描画が走る。
@@ -1471,7 +1130,7 @@ export class MindMap {
     const mod = e.ctrlKey || e.metaKey;
     const anchor = this.host.anchor();
     const sel = this.host.selection();
-    const nodes = this.host.nodes();
+    const nodes = this.host.doc().nodes;
     // CapsLock reports letters as capitals WITHOUT shiftKey, so a plain `h`
     // would arrive as `H` and silently comment out the subtree.
     // Treat a capital that arrived without Shift as the lowercase key.
@@ -1541,7 +1200,7 @@ export class MindMap {
     // Space はパンに使うので除く。
     if (blank && !mod && !e.altKey && e.key.length === 1 && e.key !== " ") {
       this.host.editRequested(anchor);
-      if (this.isEditing()) {
+      if (this.isEditingLabel()) {
         this.editor.value = e.key;
         this.editor.setSelectionRange(1, 1);
         // 既存の input 経路に乗せる（ラベルと箱の幅がそのまま追従する）
@@ -1570,9 +1229,8 @@ export class MindMap {
       e.preventDefault();
       return;
     }
-    // Enter: add a sibling below (mmm.md そのに: enterで兄弟追加、復活)。
-    // 名前が無いノードでは、まずそこを埋める — 空のまま足しても名無しが
-    // 2 つ並ぶだけで、次に打つ場所が決まらない
+    // Enter: 下に兄弟を足す。ただし名前が無いノードでは、まずそこを埋める
+    // — 空のまま足しても名無しが 2 つ並ぶだけで、次に打つ場所が決まらない
     if (key === "Enter") {
       if (nodes.length === 0) this.host.addRoot();
       else if (blank) this.host.editRequested(anchor);
@@ -1699,14 +1357,14 @@ export class MindMap {
       this.host.setSelection([id], id);
     }
     // subtree ids for visuals + drop-target exclusion
-    const nodes = this.host.nodes();
+    const nodes = this.host.doc().nodes;
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const subtree = new Set<number>();
     for (const nid of ids) {
       const nd = byId.get(nid);
       if (!nd) continue;
       for (const m of nodes) {
-        if (m.hs >= nd.hs && m.hs < nd.subEnd) subtree.add(m.id);
+        if (m.from >= nd.from && m.from < nd.to) subtree.add(m.id);
       }
     }
     this.dragging = { ids, subtree };
@@ -1715,158 +1373,27 @@ export class MindMap {
   }
 
   /**
-   * preferEdge = Shift を押しながら。線への割り込み（A→C→B）を先に判定し、
-   * 狙える範囲も広げる。押していないときは「子にする」「前後に挿入」を
-   * 優先して、線の判定はどこにも属さない空間だけに絞る。
+   * ドラッグ中の落とし先を決めて、その見た目を出す。
+   * **どこへ落とすかの判断は map/drop.ts の純関数**が持つ。ここは世界座標へ
+   * 直して渡し、返ってきた行き先を線と枠で示すところだけ。
    */
   private updateDrop(clientX: number, clientY: number, preferEdge = false): void {
-    // 呼び出し側は全員 `if (this.dragging)` の中からしか呼ばない。ここで
-    // 1 回だけ絞り込めば、以降 `this.dragging!` を都度書かずに済む
+    // 呼び出し側は全員 `if (this.dragging)` の中からしか呼ばない
     const dragging = this.dragging;
     if (!dragging) return;
-    const w = this.toWorld(clientX, clientY);
-    let target: {
-      id: number;
-      pos: 0 | 1 | 2 | 3;
-    } | null = null;
-    const SLOP = 16;
-    const BAND = 40; // wide before/after zones (mmm.md そのに: さらに拡大)
-    // pointer position relative to a box's center
-    const local = (b: Box) => {
-      const c = centerOf(b);
-      const dx = w.x - c.x;
-      const dy = w.y - c.y;
-      return {
-        du: dx,
-        dv: dy,
-        hu: b.w / 2,
-        hv: b.h / 2,
-      };
-    };
-    /**
-     * A→B の線のまんなかに落とす = B の親として割り込む（A→C→B）。
-     * 押していないときはいちばん最後に判定する。ノードの上でも、その外側の
-     * 「子にする」帯でもない、どこにも属さない空間だけを拾う。頻度の高い
-     * 「子にする」から場所を取ると使いにくい、という実際の使用感を優先。
-     * Shift を押していれば先に判定し、狙える範囲も広げる。
-     * 複数まとめて持っているときは「誰が親になるのか」が決まらないので出さない。
-     */
-    const findEdge = (): { id: number; pos: 3 } | null => {
-      if (dragging.ids.length !== 1) return null;
-      let bestEdge = preferEdge ? 30 : 16; // 線からこの距離まで拾う
-      const band = preferEdge ? 0.1 : 0.3; // 端から何割を狙い所から外すか
-      let onEdge: number | null = null;
-      for (const id of this.parentOf.keys()) {
-        if (dragging.subtree.has(id)) continue;
-        const pts = this.edgePolyline(id);
-        if (!pts) continue;
-        // 端のほうは「前後に挿入」や「子にする」と紛らわしいので、
-        // 長さで測って真ん中あたりだけを狙い所にする
-        let total = 0;
-        const segLen: number[] = [];
-        for (let i = 1; i < pts.length; i++) {
-          const l = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-          segLen.push(l);
-          total += l;
-        }
-        let acc = 0;
-        for (let i = 1; i < pts.length; i++) {
-          const mid = acc + segLen[i - 1] / 2;
-          acc += segLen[i - 1];
-          if (mid < total * band || mid > total * (1 - band)) continue;
-          const d = distToSeg(w, pts[i - 1], pts[i]);
-          if (d < bestEdge) {
-            bestEdge = d;
-            onEdge = id;
-          }
-        }
-      }
-      return onEdge === null ? null : { id: onEdge, pos: 3 };
-    };
-    // Shift = 線への割り込みを最優先。見つかったかどうかは後の段でも使う
-    // （見つかった線を、外側ゾーンや帯が黙って横取りしない）
-    const edgeTarget = preferEdge ? findEdge() : null;
-    if (edgeTarget) target = edgeTarget;
-
-    // 帯は隣の兄弟と重なるので、最初に見つかった相手ではなく「いちばん近い」
-    // 相手を選ぶ。文書順で決めていたころは、親が違う子スタックの境目で
-    // どちらに倒れるかが実質その場の運になっていた。
-    let best = Infinity;
-    let rival = Infinity; // いちばん近い「別の親になる」候補までの距離
-    const parentFor = (id: number, pos: 0 | 1 | 2 | 3): number =>
-      pos === 0 ? id : (this.parentOf.get(id) ?? -1);
-    const cands: { id: number; pos: 0 | 1 | 2; dist: number; parent: number }[] = [];
-    for (const id of this.order) {
-      if (dragging.subtree.has(id)) continue;
-      const b = this.boxes.get(id);
-      if (!b) continue;
-      const { du, dv, hu, hv } = local(b);
-      if (Math.abs(du) > hu + SLOP || Math.abs(dv) > hv + BAND) continue;
-      // 箱の中なら 0。外に出た分だけ距離が増える（兄弟軸のほうを重く見る）
-      const dist =
-        Math.max(0, Math.abs(du) - hu) + Math.max(0, Math.abs(dv) - hv) * 2;
-      // the root has no siblings: any drop on it means "child"
-      const pos: 0 | 1 | 2 =
-        b.n.depth === 1 ? 0 : dv < -hv * 0.4 ? 1 : dv > hv * 0.4 ? 2 : 0;
-      cands.push({ id, pos, dist, parent: parentFor(id, pos) });
-      if (dist < best) {
-        best = dist;
-        if (!edgeTarget) target = { id, pos };
-      }
-    }
-    // outward zone: hovering just beyond a node's outer edge (along its
-    // growth axis) also means "as child" (mmm.md 課題)
-    //
-    // よく使う操作なので広めに取る。重なったときは文書順ではなく近い方を選ぶ。
-    // 判定の優先順は 4 段:
-    //   1. 箱の中
-    //   2. 外側ゾーンの近い側（NEAR まで）… 前後への挿入より強い
-    //   3. 前後への挿入（箱の上下の帯）
-    //   4. 外側ゾーンの遠い側（REACH まで）… 誰も取らない空間の受け皿
-    // 近くを子に振らないと、次の列の子の帯に吸われて「右に置いたのに
-    // 兄弟になる」が起きる。逆に遠くまで子を優先させると、今度は前後への
-    // 挿入がほぼ出せなくなるので、そこは前後に譲る
-    const REACH = GAP.x * 4 + 16; // 成長軸方向にどこまで伸ばすか
-    const NEAR = REACH * 0.4; // ここまでは前後への挿入より子を優先する
-    const SLACK = 18; // 兄弟軸方向に箱からどれだけはみ出してよいか
-    let outTarget: { id: number; pos: 0 } | null = null;
-    let bestOut = Infinity;
-    let outU = Infinity; // 選んだ相手の、箱の外縁からの距離
-    for (const id of this.order) {
-      if (dragging.subtree.has(id)) continue;
-      const b = this.boxes.get(id);
-      if (!b) continue;
-      const { du, dv, hu, hv } = local(b);
-      if (du <= hu || du > hu + REACH || Math.abs(dv) > hv + SLACK) continue;
-      const d = du - hu + Math.max(0, Math.abs(dv) - hv) * 2;
-      if (d < bestOut) {
-        bestOut = d;
-        outU = du - hu;
-        outTarget = { id, pos: 0 };
-      }
-    }
-    if (outTarget && !edgeTarget && best > 0 && (outU <= NEAR || !target)) {
-      target = outTarget;
-    }
-
-    if (!target) target = findEdge();
-
-    // 親が変わりうる相手がすぐ隣にいるときだけ「どの親につくか」を出す。
-    // 迷いようがない場面（同じ親の兄弟どうし、ノードのど真ん中）では
-    // 挿入線だけにして、目線を余計なところへ引っ張らない。
-    // 最終的な行き先が決まってから測る — 外側ゾーンなどで差し替えたあとに
-    // 帯の時点の判定を使うと、予告線の出る/出ないが行き先とずれる
-    if (target) {
-      const chosen = parentFor(target.id, target.pos);
-      for (const c of cands) {
-        if (c.parent !== chosen && c.dist < rival) rival = c.dist;
-      }
-    }
-    const AMBIGUOUS = 26; // これより競っていれば迷う場面とみなす
-    const ambiguous = rival - best <= AMBIGUOUS;
+    const { target, ambiguous } = resolveDrop({
+      at: this.toWorld(clientX, clientY),
+      order: this.order,
+      boxes: this.boxes,
+      parentOf: this.layout.parentOf,
+      dragging: dragging.subtree,
+      single: dragging.ids.length === 1,
+      preferEdge,
+      polyline: (id) => this.edgePolyline(id),
+    });
 
     this.dropTarget = target;
-    // indicator is mandatory (spec 3.3.2)
+    // 落とし先は必ず示す。示せないなら受け付けない
     this.clearDropMarks(false);
     if (!target) {
       this.dropLine.setAttribute("visibility", "hidden");
@@ -1877,15 +1404,15 @@ export class MindMap {
 
     // 挿入線だけだと「上の親の末尾」と「下の親の先頭」が同じ場所に出て
     // 区別できない。どの親につくのかを、その親からの予告線と枠で示す。
-    const parentId = target.pos === 0 ? target.id : (this.parentOf.get(target.id) ?? -1);
+    const parentId =
+      target.pos === 0 ? target.id : (this.layout.parentOf.get(target.id) ?? -1);
     const showHint = (to: { x: number; y: number }): void => {
       const p = ambiguous ? this.boxes.get(parentId) : undefined;
       if (!p) {
         this.dropHint.setAttribute("visibility", "hidden");
         return;
       }
-      const from = exitPoint(p, 1, 0);
-      this.dropHint.setAttribute("d", edgeHintPath(from, to));
+      this.dropHint.setAttribute("d", edgePath(rightOf(p), to));
       this.dropHint.setAttribute("visibility", "visible");
       this.markNode(parentId, "drop-parent");
     };
@@ -1894,7 +1421,7 @@ export class MindMap {
       // 線への割り込み。線そのものを光らせて、その真ん中に印を出す。
       // 「この線の途中に入る」以外の読み方がないので、親の枠までは出さない。
       this.dropEdgeId = target.id;
-      this.edgeEls.get(target.id)?.classList.add("drop-edge");
+      this.renderer.edgeEl(target.id)?.classList.add("drop-edge");
       const pts = this.edgePolyline(target.id)!;
       const m = midOfPolyline(pts);
       // 印は線に直交させる（線の向きは中央付近の傾きから取る）
@@ -1911,9 +1438,9 @@ export class MindMap {
       this.dropHint.setAttribute("visibility", "hidden");
     } else if (target.pos === 0) {
       // ring on the target PLUS an insertion line on its outward side,
-      // where the new child will appear (mmm.md そのに)
+      // where the new child will appear
       this.markNode(target.id, "drop-child");
-      const e = exitPoint(b, 1, 0);
+      const e = rightOf(b);
       const lx = e.x + GAP.x / 2;
       const ly = e.y;
       const half = 16;
@@ -1924,21 +1451,17 @@ export class MindMap {
       this.dropLine.setAttribute("visibility", "visible");
       showHint({ x: lx, y: ly });
     } else {
-      // an insertion line on the sibling axis, before or after the target
-      const { hu, hv } = local(b);
+      // 兄弟軸の上に挿入線を引く（相手の手前 / 後ろ）
       const cx = b.x + b.w / 2;
       const cy = b.y + b.h / 2;
-      const off = (hv + GAP.y / 2) * (target.pos === 1 ? -1 : 1);
-      const half = Math.max(hu, 40);
+      const off = (b.h / 2 + GAP.y / 2) * (target.pos === 1 ? -1 : 1);
+      const half = Math.max(b.w / 2, 40);
       this.dropLine.setAttribute("x1", String(cx - half));
       this.dropLine.setAttribute("y1", String(cy + off));
       this.dropLine.setAttribute("x2", String(cx + half));
       this.dropLine.setAttribute("y2", String(cy + off));
       this.dropLine.setAttribute("visibility", "visible");
-      showHint({
-        x: cx - hu,
-        y: cy + off,
-      });
+      showHint({ x: cx - b.w / 2, y: cy + off });
     }
   }
 
@@ -1953,65 +1476,33 @@ export class MindMap {
 
   // ---------- context menu ----------
 
-  private showMenu(x: number, y: number): void {
-    const sel = this.host.selection();
-    const multi = sel.size > 1;
-    const anchorHidden =
-      this.host.nodes().find((n) => n.id === this.host.anchor())?.hidden ?? false;
-    const items: (
-      | { label: string; key?: string; run: () => void; disabled?: boolean }
-      | "sep"
-    )[] = [
-      {
-        label: "子を追加",
-        key: "Tab",
-        run: () => this.host.addChild(this.host.anchor()),
-        disabled: multi,
-      },
-      {
-        label: "下に追加",
-        key: "Enter",
-        run: () => this.host.addSibling(this.host.anchor()),
-        disabled: multi,
-      },
-      {
-        label: "上に追加",
-        key: "Shift+Enter",
-        run: () => this.host.addSiblingBefore(this.host.anchor()),
-        disabled: multi,
-      },
-      {
-        label: "親を作成",
-        key: "Shift+Tab",
-        run: () => this.host.addParent(this.host.anchor()),
-        disabled: multi,
-      },
-      {
-        label: "名前を変更",
-        key: "Mod+Enter",
-        run: () => this.host.editRequested(this.host.anchor()),
-        disabled: multi,
-      },
+  /** そのノードに対して、いま何ができるか。並べ方はメニュー側が持つ */
+  private menuItems(): MenuEntry[] {
+    const anchor = this.host.anchor();
+    const multi = this.host.selection().size > 1;
+    const folded =
+      this.host.doc().nodes.find((n) => n.id === anchor)?.hidden ?? false;
+    return [
+      { label: "子を追加", key: "Tab", run: () => this.host.addChild(anchor), disabled: multi },
+      { label: "下に追加", key: "Enter", run: () => this.host.addSibling(anchor), disabled: multi },
+      { label: "上に追加", key: "Shift+Enter", run: () => this.host.addSiblingBefore(anchor), disabled: multi },
+      { label: "親を作成", key: "Shift+Tab", run: () => this.host.addParent(anchor), disabled: multi },
+      { label: "名前を変更", key: "Mod+Enter", run: () => this.host.editRequested(anchor), disabled: multi },
       "sep",
       { label: "1 段下げ", run: () => this.host.indentSelection() },
       { label: "1 段上げ", run: () => this.host.outdentSelection() },
       "sep",
       {
-        // mmm.md その３: キーだけでなく UI からも指定・解除できるように
-        label: anchorHidden ? "再表示（折り畳みを開く）" : "非表示（折り畳む）",
+        // キーだけでなく、ここからも指定・解除できるように
+        label: folded ? "再表示（折り畳みを開く）" : "非表示（折り畳む）",
         key: "H",
-        run: () => this.host.toggleHidden(this.host.anchor()),
-        disabled: this.host.anchor() === -1,
+        run: () => this.host.toggleHidden(anchor),
+        disabled: anchor === -1,
       },
       "sep",
       { label: "コピー", key: "Mod+C", run: () => this.host.copySelection(false) },
       { label: "カット", key: "Mod+X", run: () => this.host.copySelection(true) },
-      {
-        label: "子として貼り付け",
-        key: "Mod+V",
-        run: () => this.host.paste(),
-        disabled: multi,
-      },
+      { label: "子として貼り付け", key: "Mod+V", run: () => this.host.paste(), disabled: multi },
       "sep",
       {
         // 画像の入口はクリックから外れた（クリックは選択）。ここが唯一の
@@ -2022,49 +1513,15 @@ export class MindMap {
       "sep",
       { label: "削除", key: "Del", run: () => this.host.deleteSelection() },
     ];
-    this.menu.replaceChildren();
-    for (const it of items) {
-      if (it === "sep") {
-        this.menu.append(document.createElement("hr"));
-        continue;
-      }
-      const div = document.createElement("div");
-      div.className = "item" + (it.disabled ? " disabled" : "");
-      const l = document.createElement("span");
-      l.textContent = it.label;
-      div.append(l);
-      if (it.key) {
-        const k = document.createElement("span");
-        k.className = "key";
-        k.textContent = it.key;
-        div.append(k);
-      }
-      div.addEventListener("click", () => {
-        this.hideMenu();
-        it.run();
-      });
-      this.menu.append(div);
-    }
-    this.menu.style.display = "block";
-    const mw = this.menu.offsetWidth;
-    const mh = this.menu.offsetHeight;
-    this.menu.style.left = `${Math.min(x, window.innerWidth - mw - 8)}px`;
-    this.menu.style.top = `${Math.min(y, window.innerHeight - mh - 8)}px`;
   }
 
   hideMenu(): void {
-    this.menu.style.display = "none";
+    this.menu.hide();
   }
 
-  /** Cheap selection repaint without a full re-layout (rubber band path).
+  /** レイアウトを見直さない軽い塗り替え（矩形選択の途中で使う）。
    *  選択そのものは持たない — 何が選ばれているかは main.ts が決める。 */
   refreshSelection(): void {
-    const sel = this.host.selection();
-    for (const [id, g] of this.nodeEls) {
-      g.classList.toggle("selected", sel.has(id));
-      // class を直接触ったらキャッシュも合わせる。放置すると次の render が
-      // 「同じだから書かない」と判断して、DOM とズレたままになる
-      this.nodeCls.set(id, g.getAttribute("class") ?? "");
-    }
+    this.renderer.refreshSelection(this.host.selection());
   }
 }

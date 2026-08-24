@@ -23,25 +23,22 @@ fn sanitize_label(label : String) -> String {
   let s = sb.to_string()
   let mut a = 0
   let mut b = s.length()
-  while a < b && is_space(cc(s, a)) {
+  while a < b && is_space(code_at(s, a)) {
     a = a + 1
   }
-  while b > a && is_space(cc(s, b - 1)) {
+  while b > a && is_space(code_at(s, b - 1)) {
     b = b - 1
   }
-  sub(s, a, b)
+  slice(s, a, b)
 }
 
 ///|
-/// Dominant newline of the current document ("\r\n" or "\n").
-fn nl() -> String {
-  for i = 0; i < st.text.length(); i = i + 1 {
-    if cc(st.text, i) == 10 {
-      return if i > 0 && cc(st.text, i - 1) == 13 { "\r\n" } else { "\n" }
-    }
-  }
-  "\n"
-}
+/// 書き足す改行。**常に LF**。
+///
+/// 読み込みで CRLF を LF へ正規化し、保存も LF で書く（src/app/io.ts）ので、
+/// 文書の中に CR が残ることは無い。以前はここで「その文書の流儀」を毎回
+/// 探していたが、アプリからは到達できない一般性だった。
+let eol : String = "\n"
 
 ///|
 /// True if block-boundary offset `at` is already preceded by a blank line
@@ -51,17 +48,17 @@ fn preceded_by_blank(at : Int) -> Bool {
   if p == 0 {
     return true
   }
-  if cc(st.text, p - 1) != 10 {
+  if code_at(st.text, p - 1) != 10 {
     return false
   }
   p = p - 1
-  if p > 0 && cc(st.text, p - 1) == 13 {
+  if p > 0 && code_at(st.text, p - 1) == 13 {
     p = p - 1
   }
-  while p > 0 && is_space(cc(st.text, p - 1)) {
+  while p > 0 && is_space(code_at(st.text, p - 1)) {
     p = p - 1
   }
-  p == 0 || cc(st.text, p - 1) == 10
+  p == 0 || code_at(st.text, p - 1) == 10
 }
 
 ///|
@@ -69,10 +66,10 @@ fn preceded_by_blank(at : Int) -> Bool {
 /// Returns the edit plus the prefix length (the new heading line starts at
 /// `at + prefix` once applied).
 fn insert_heading_edit(at : Int, depth : Int) -> (Edit, Int) {
-  let br = nl()
+  let br = eol
   let sb = StringBuilder::new()
   let mut prefix_len = 0
-  if at > 0 && cc(st.text, at - 1) != 10 {
+  if at > 0 && code_at(st.text, at - 1) != 10 {
     sb.write_string(br)
     sb.write_string(br)
     prefix_len = br.length() * 2
@@ -96,7 +93,7 @@ fn insert_heading_edit(at : Int, depth : Int) -> (Edit, Int) {
 fn tidy_del_start(ss : Int) -> Int {
   let mut q = ss
   while q > 0 {
-    let c = cc(st.text, q - 1)
+    let c = code_at(st.text, q - 1)
     if c == 10 || c == 13 || is_space(c) {
       q = q - 1
     } else {
@@ -107,23 +104,23 @@ fn tidy_del_start(ss : Int) -> Int {
     return 0
   }
   let mut r = q
-  while r < ss && is_space(cc(st.text, r)) {
+  while r < ss && is_space(code_at(st.text, r)) {
     r = r + 1
   }
-  if r < ss && cc(st.text, r) == 13 {
+  if r < ss && code_at(st.text, r) == 13 {
     r = r + 1
   }
-  if r < ss && cc(st.text, r) == 10 {
+  if r < ss && code_at(st.text, r) == 10 {
     r = r + 1
   }
   r // always <= ss: every advance above is guarded by `< ss`
 }
 
 ///|
-fn focus_node_at(hs : Int) -> Unit {
+fn focus_node_at(from : Int) -> Unit {
   st.focus = -1
   for nd in st.nodes {
-    if nd.hs == hs {
+    if nd.from == from {
       st.focus = nd.id
       break
     }
@@ -162,13 +159,17 @@ fn next_sibling(i : Int) -> Int {
 }
 
 ///|
-/// Headings inside [ss, se) in document order (indexes into st.nodes).
-fn subtree_nodes(ss : Int, se : Int) -> Array[Int] {
+/// ノード i の部分木に含まれる見出しの添字（自分を含む、文書順）。
+///
+/// 文書順なので部分木は必ず**連続した添字の並び**になる。毎回すべての
+/// ノードを舐めていたころ、まとめて段下げすると「選んだ数 × ノード数」に
+/// なっていた。
+fn subtree_of(i : Int) -> Array[Int] {
   let out : Array[Int] = []
-  for i = 0; i < st.nodes.length(); i = i + 1 {
-    if st.nodes[i].hs >= ss && st.nodes[i].hs < se {
-      out.push(i)
-    }
+  let se = st.nodes[i].to
+  let n = st.nodes.length()
+  for j = i; j < n && st.nodes[j].from < se; j = j + 1 {
+    out.push(j)
   }
   out
 }

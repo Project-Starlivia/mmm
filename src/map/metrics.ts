@@ -45,10 +45,13 @@ export const rowOf = (n: NodeInfo): LabelRow => (n.hidden ? ROW_HIDDEN : ROW_NOR
 export const EMPTY_LABEL = "（空）";
 export const displayLabel = (label: string): string => (label === "" ? EMPTY_LABEL : label);
 
-const measureCtx = document.createElement("canvas").getContext("2d")!;
+// 実測用のキャンバスは**最初に測るときに**作る。読み込んだだけで DOM に
+// 触ると、このファイルを辿るだけのモジュール（レイアウトやドロップ判定）が
+// ブラウザの外で読めなくなる
+let measureCtx: CanvasRenderingContext2D | null = null;
 
-// measureText is the hottest call in render(); labels repeat across
-// renders, so cache widths per font+string
+// measureText は render() でいちばん回る呼び出し。ラベルはレンダをまたいで
+// 繰り返し出てくるので、font + 文字列で幅を覚える
 const widthCache = new Map<string, number>();
 const WIDTH_CACHE_MAX = 4000; // rename 中の途中文字列などで無限に伸びるので上限
 
@@ -56,6 +59,7 @@ export function measure(font: string, text: string): number {
   const key = font + "\u0000" + text;
   const hit = widthCache.get(key);
   if (hit !== undefined) return hit;
+  measureCtx ??= document.createElement("canvas").getContext("2d")!;
   measureCtx.font = font;
   const w = measureCtx.measureText(text).width;
   if (widthCache.size >= WIDTH_CACHE_MAX) widthCache.clear();

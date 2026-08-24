@@ -10,6 +10,8 @@
     "test": "node --test \"test/*.test.ts\"",
     "test:core": "cd core && moon test -p mmm-app/core",
     "check": "tsc --noEmit && tsc -p test --noEmit",
+    "perf": "pnpm run core && node test/tools/perf.ts",
+    "fixtures": "node test/tools/gen-load.ts",
     "preview": "vite preview"
   },
   "devDependencies": {

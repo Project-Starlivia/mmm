@@ -20,8 +20,8 @@ fn json_escape(s : String, sb : StringBuilder) -> Unit {
     } else if c < 32 {
       let hex = "0123456789abcdef"
       sb.write_string("\\u00")
-      sb.write_string(sub(hex, c / 16, c / 16 + 1))
-      sb.write_string(sub(hex, c % 16, c % 16 + 1))
+      sb.write_string(slice(hex, c / 16, c / 16 + 1))
+      sb.write_string(slice(hex, c % 16, c % 16 + 1))
     } else {
       sb.write_char(ch)
     }
@@ -29,63 +29,108 @@ fn json_escape(s : String, sb : StringBuilder) -> Unit {
 }
 
 ///|
-fn snapshot() -> String {
+/// `"key":value` を 1 つ書く。前の要素との区切りは `sep` が持つ —
+/// 「先頭かどうか」を知っているのは呼び出し側だけなので。
+fn put_int(sb : StringBuilder, key : String, v : Int) -> Unit {
+  sb.write_string("\"")
+  sb.write_string(key)
+  sb.write_string("\":")
+  sb.write_string(v.to_string())
+}
+
+///|
+fn put_bool(sb : StringBuilder, key : String, v : Bool) -> Unit {
+  sb.write_string("\"")
+  sb.write_string(key)
+  sb.write_string("\":")
+  sb.write_string(if v { "true" } else { "false" })
+}
+
+///|
+fn put_str(sb : StringBuilder, key : String, v : String) -> Unit {
+  sb.write_string("\"")
+  sb.write_string(key)
+  sb.write_string("\":\"")
+  json_escape(v, sb)
+  sb.write_string("\"")
+}
+
+///|
+/// 配列の 2 つ目以降にカンマを打つ。
+fn sep(sb : StringBuilder, i : Int) -> Unit {
+  if i > 0 {
+    sb.write_string(",")
+  }
+}
+
+///|
+fn take_snapshot() -> String {
   let sb = StringBuilder::new()
-  sb.write_string("{\"rev\":")
-  sb.write_string(st.rev.to_string())
-  sb.write_string(",\"focus\":")
-  sb.write_string(st.focus.to_string())
-  sb.write_string(",\"canUndo\":")
-  sb.write_string(if st.undo.length() > 0 { "true" } else { "false" })
-  sb.write_string(",\"canRedo\":")
-  sb.write_string(if st.redo.length() > 0 { "true" } else { "false" })
+  sb.write_string("{")
+  put_int(sb, "rev", st.rev)
+  sb.write_string(",")
+  put_int(sb, "focus", st.focus)
+  sb.write_string(",")
+  put_bool(sb, "canUndo", st.undo.length() > 0)
+  sb.write_string(",")
+  put_bool(sb, "canRedo", st.redo.length() > 0)
   sb.write_string(",\"editSets\":[")
   for i = 0; i < st.last_sets.length(); i = i + 1 {
-    if i > 0 {
-      sb.write_string(",")
-    }
+    sep(sb, i)
     sb.write_string("[")
     let set = st.last_sets[i]
     for j = 0; j < set.length(); j = j + 1 {
-      if j > 0 {
-        sb.write_string(",")
-      }
+      sep(sb, j)
       let e = set[j]
-      sb.write_string("{\"from\":")
-      sb.write_string(e.from.to_string())
-      sb.write_string(",\"to\":")
-      sb.write_string(e.to.to_string())
-      sb.write_string(",\"insert\":\"")
-      json_escape(e.insert, sb)
-      sb.write_string("\"}")
+      sb.write_string("{")
+      put_int(sb, "from", e.from)
+      sb.write_string(",")
+      put_int(sb, "to", e.to)
+      sb.write_string(",")
+      put_str(sb, "insert", e.insert)
+      sb.write_string("}")
     }
     sb.write_string("]")
   }
   sb.write_string("],\"nodes\":[")
   for i = 0; i < st.nodes.length(); i = i + 1 {
-    if i > 0 {
-      sb.write_string(",")
-    }
+    sep(sb, i)
     let nd = st.nodes[i]
-    sb.write_string("{\"id\":")
-    sb.write_string(nd.id.to_string())
-    sb.write_string(",\"depth\":")
-    sb.write_string(nd.depth.to_string())
-    sb.write_string(",\"parent\":")
-    sb.write_string(nd.parent.to_string())
-    sb.write_string(",\"hs\":")
-    sb.write_string(nd.hs.to_string())
-    sb.write_string(",\"he\":")
-    sb.write_string(nd.he.to_string())
-    sb.write_string(",\"subEnd\":")
-    sb.write_string(nd.sub_end.to_string())
-    sb.write_string(",\"hasContent\":")
-    sb.write_string(if nd.has_content { "true" } else { "false" })
-    sb.write_string(",\"hidden\":")
-    sb.write_string(if nd.hidden { "true" } else { "false" })
-    sb.write_string(",\"label\":\"")
-    json_escape(nd.label, sb)
-    sb.write_string("\"}")
+    sb.write_string("{")
+    put_int(sb, "id", nd.id)
+    sb.write_string(",")
+    put_int(sb, "depth", nd.depth)
+    sb.write_string(",")
+    put_int(sb, "parent", nd.parent)
+    sb.write_string(",")
+    put_int(sb, "from", nd.from)
+    sb.write_string(",")
+    put_int(sb, "headEnd", nd.head_end)
+    sb.write_string(",")
+    put_int(sb, "to", nd.to)
+    sb.write_string(",")
+    put_bool(sb, "hasContent", nd.has_content)
+    sb.write_string(",")
+    put_bool(sb, "hidden", nd.hidden)
+    sb.write_string(",")
+    put_str(sb, "label", nd.label)
+    sb.write_string("}")
+  }
+  sb.write_string("],\"fences\":[")
+  for i = 0; i < st.fences.length(); i = i + 1 {
+    sep(sb, i)
+    let f = st.fences[i]
+    sb.write_string("{")
+    put_int(sb, "from", f.start)
+    sb.write_string(",")
+    put_int(sb, "to", f.end)
+    sb.write_string(",")
+    put_int(sb, "bodyFrom", f.body_start)
+    sb.write_string(",")
+    put_int(sb, "bodyTo", f.body_end)
+    sb.write_string(",")
+    put_str(sb, "info", f.info)
+    sb.write_string("}")
   }
   sb.write_string("]}")
   st.last_sets = []
@@ -105,7 +150,7 @@ pub fn init_doc(text : String) -> String {
   rebuild_nodes(Map([]))
   st.rev = st.rev + 1
   st.focus = -1
-  snapshot()
+  take_snapshot()
 }
 
 ///|
@@ -122,118 +167,122 @@ pub fn replace_text(
 ) -> String {
   let n = st.text.length()
   if from < 0 || to > n || from > to {
-    return snapshot()
+    return take_snapshot()
   }
-  let removed = sub(st.text, from, to)
+  let removed = slice(st.text, from, to)
   if removed == insert {
-    return snapshot()
+    return take_snapshot()
   }
   apply_sets([[Edit::{ from, to, insert, removed }]], tag)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn add_child(id : Int, tag : String) -> String {
   cmd_add_child(id, tag)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn add_sibling(id : Int, tag : String) -> String {
   cmd_add_sibling(id, tag)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn add_sibling_before(id : Int, tag : String) -> String {
   cmd_add_sibling_before(id, tag)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn add_parent(id : Int, tag : String) -> String {
   cmd_add_parent(id, tag)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn add_root(tag : String) -> String {
   cmd_add_root(tag)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn rename_node(id : Int, label : String, tag : String) -> String {
   cmd_rename(id, label, tag)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn delete_nodes(ids : Array[Int]) -> String {
   cmd_delete(ids)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn indent_nodes(ids : Array[Int]) -> String {
   cmd_indent(ids)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn outdent_nodes(ids : Array[Int]) -> String {
   cmd_outdent(ids)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn move_nodes(ids : Array[Int], target : Int, pos : Int) -> String {
   cmd_move(ids, target, pos)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 /// A -> B の線への割り込み。ids を B の直前へ動かしてから B を 1 段下げる。
 pub fn move_as_parent(ids : Array[Int], target : Int) -> String {
   cmd_move_as_parent(ids, target)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn reorder_node(id : Int, dir : Int) -> String {
   cmd_reorder(id, dir)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn toggle_hidden(id : Int) -> String {
   cmd_toggle_hidden(id)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn undo() -> String {
   do_undo()
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn redo() -> String {
   do_redo()
-  snapshot()
-}
-
-///|
-/// 入力中のセッションを丸ごと取り消す。
-/// **UI からは呼んでいない**（マップの編集は「確定のみ、キャンセル無し」と
-/// 決めたため、js/exports.mbt にも出していない）。コアの機能としては
-/// 生きていてテストもあるので、キャンセルを入れるならここから繋ぐ。
-pub fn abort_session(tag : String) -> String {
-  do_abort(tag)
-  snapshot()
+  take_snapshot()
 }
 
 ///|
 pub fn selection_text(ids : Array[Int]) -> String {
   subtree_text(ids)
+}
+
+///|
+/// 貼り付けようとしている断片に見出しがあるか（フェンスの中は数えない）。
+/// いまの文書には触らない。
+pub fn has_headings(text : String) -> Bool {
+  has_any_heading(text)
+}
+
+///|
+/// 断片のいちばん浅い見出しが `target_depth` になるようずらす。
+/// いまの文書には触らない。
+pub fn relevel_text(text : String, target_depth : Int) -> String {
+  relevel(text, target_depth)
 }

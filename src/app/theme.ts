@@ -1,6 +1,5 @@
-// 見た目の好み: ブランドカラー (mmm.md 課題: カラーピッカー) と
-// ライト/ダーク (mmm.md そのに: default = OS, fallback dark)。
-// どちらも保存して、次のセッションでもそのまま。
+// 見た目の好み: ブランドカラーと、ライト/ダーク（既定は OS 設定、
+// 分からなければダーク）。どちらも保存して、次のセッションでもそのまま。
 
 import { LS_COLOR, LS_THEME, load, store } from "./persist.ts";
 import { logoInner, logoSvg } from "./logo.ts";
@@ -55,7 +54,7 @@ export function initTheme(args: {
   const colorInput = document.createElement("input");
   colorInput.type = "color";
   // ロゴの下に（見えない形で）置く。ネイティブのピッカーが画面外ではなく
-  // 左上に開くようにするため (mmm.md そのに)
+  // 左上に開くようにするため
   colorInput.style.position = "fixed";
   colorInput.style.left = "10px";
   colorInput.style.top = "10px";
@@ -65,12 +64,20 @@ export function initTheme(args: {
   colorInput.style.pointerEvents = "none";
   document.body.append(colorInput);
   colorInput.addEventListener("input", () => applyColor(colorInput.value));
-  logo.addEventListener("click", () => {
+  const pickColor = (): void => {
     const cur = getComputedStyle(document.documentElement)
       .getPropertyValue("--accent")
       .trim();
     colorInput.value = /^#[0-9a-f]{6}$/i.test(cur) ? cur : DEFAULT_COLOR;
     colorInput.click();
+  };
+  logo.addEventListener("click", pickColor);
+  // ロゴは <svg role="button">。SVG はフォーカスされても Enter / Space で
+  // click を出さないので、ボタンだと名乗る以上ここで自分で出す
+  logo.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    pickColor();
   });
 
   // ---- ライト / ダーク ----

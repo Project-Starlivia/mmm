@@ -1,5 +1,5 @@
-// マップの書き出し。MindMap 側が自己完結の <svg> を作るので、
-// ここでは直列化とダウンロードへの受け渡しだけ。
+// ディスクへ落とす。マップを 1 枚の <svg> にするのは map/toSvg.ts の
+// 仕事なので、ここは直列化とダウンロードへの受け渡しだけ。
 
 import type { MindMap } from "../mindmap.ts";
 
@@ -14,7 +14,7 @@ export function downloadBlob(blob: Blob, name: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-export function initExport(deps: {
+export function initDownload(deps: {
   map: MindMap;
   /** ダウンロード名の元になる、いまのファイル名 */
   name: () => string;

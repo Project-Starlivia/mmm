@@ -1,5 +1,5 @@
 // Markdown pane: CodeMirror 6 without its own history. Every user edit is
-// forwarded to the core (single undo stack, spec 4.1); edits coming from
+// forwarded to the core (both panes share one undo stack); edits coming from
 // the core are dispatched with the `fromCore` annotation so they are not
 // forwarded back (no echo loop).
 
@@ -25,7 +25,7 @@ import {
   syntaxHighlighting,
 } from "@codemirror/language";
 import { oneDarkHighlightStyle, oneDarkTheme } from "@codemirror/theme-one-dark";
-import type { EditOp } from "./coreApi";
+import type { EditOp } from "./coreApi.ts";
 
 const darkTweaks = EditorView.theme(
   {
@@ -168,7 +168,7 @@ export class MdEditor {
     }
   }
 
-  /** Highlight the given ranges (mindmap selection mirror, spec 4.4). */
+  /** マップで選ばれている範囲を、こちらの行にも映す。 */
   highlight(ranges: { from: number; to: number }[]): void {
     this.view.dispatch({ effects: setHighlights.of(ranges) });
   }

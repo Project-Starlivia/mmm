@@ -1,4 +1,4 @@
-// 1 本の undo スタック (spec 4.1)。エントリは Edit 集合の列と、その逆。
+// 1 本の undo スタック。エントリは Edit 集合の列と、その逆。
 // id は「エントリ適用の前後で、どの見出しがどの id だったか」の対応表で
 // undo / redo をまたいで生き残る。
 // begin_tx / commit_tx は複数コマンドを 1 つの undo にまとめるための括弧。
@@ -8,7 +8,7 @@ priv struct Entry {
   steps : Array[Array[Edit]] // applied in order for redo
   inv : Array[Array[Edit]] // inv[i] undoes steps[i]; undo applies in reverse
   tag : String
-  before : Array[(Int, Int)] // (hs, id) per node before the entry applied
+  before : Array[(Int, Int)] // (from, id) per node before the entry applied
   mut after : Array[(Int, Int)] // same, after — ids survive undo/redo
 }
 
@@ -18,7 +18,7 @@ priv struct Entry {
 fn id_pairs() -> Array[(Int, Int)] {
   let out : Array[(Int, Int)] = []
   for nd in st.nodes {
-    out.push((nd.hs, nd.id))
+    out.push((nd.from, nd.id))
   }
   out
 }
@@ -27,8 +27,8 @@ fn id_pairs() -> Array[(Int, Int)] {
 fn pairs_map(pairs : Array[(Int, Int)]) -> Map[Int, Int] {
   let m : Map[Int, Int] = Map([])
   for p in pairs {
-    let (hs, id) = p
-    m[hs] = id
+    let (from, id) = p
+    m[from] = id
   }
   m
 }
@@ -53,17 +53,13 @@ fn refresh_entry_after() -> Unit {
 fn apply_sets(sets : Array[Array[Edit]], tag : String) -> Unit {
   let before = id_pairs()
   // carry old ids through the edits by position
-  let mapped : Array[Int] = [] // mapped hs per old node, -1 if destroyed
+  let mapped : Array[Int] = [] // mapped from per old node, -1 if destroyed
   for nd in st.nodes {
-    mapped.push(nd.hs)
+    mapped.push(nd.from)
   }
   let inv_sets : Array[Array[Edit]] = []
   for s in sets {
-    for k = 0; k < mapped.length(); k = k + 1 {
-      if mapped[k] >= 0 {
-        mapped[k] = map_offset(mapped[k], s)
-      }
-    }
+    map_offsets(mapped, s)
     inv_sets.push(invert_edit_set(s))
     st.text = apply_edit_set(st.text, s)
   }
@@ -171,18 +167,4 @@ fn do_redo() -> Unit {
   let entry = st.redo.unsafe_pop()
   replay_entry(entry.steps, false, entry.after)
   st.undo.push(entry)
-}
-
-///|
-/// Abort an in-flight editing session: if the top undo entry carries `tag`,
-/// revert it and drop it (no redo entry).
-fn do_abort(tag : String) -> Unit {
-  if st.undo.length() == 0 {
-    return
-  }
-  if st.undo[st.undo.length() - 1].tag != tag {
-    return
-  }
-  let entry = st.undo.unsafe_pop()
-  replay_entry(entry.inv, true, entry.before)
 }

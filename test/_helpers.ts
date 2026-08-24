@@ -21,10 +21,16 @@ if (!existsSync(CORE_JS)) {
 }
 
 export { core, type Snapshot, type NodeInfo } from "../src/coreApi.ts";
-import { core, type NodeInfo } from "../src/coreApi.ts";
+import { core, type DocView, type NodeInfo } from "../src/coreApi.ts";
 
 export const initDoc = (md: string) => core.initDoc(md);
 export const getText = () => core.getText();
+
+/** initDoc して、いまの文書をテキスト・ノード・フェンスの組で返す。 */
+export function loadDoc(md: string): DocView {
+  const snap = core.initDoc(md);
+  return { text: core.getText(), nodes: snap.nodes, fences: snap.fences };
+}
 
 /** ラベルから id を引く。無ければ分かりやすく失敗させる（テストの初期化直後に使う）。 */
 export function idOf(nodes: NodeInfo[], label: string): number {
@@ -47,9 +53,9 @@ export function normTree(nodes: NodeInfo[], withIds = true) {
     ...(withIds ? { id: n.id } : {}),
     depth: n.depth,
     parent: n.parent,
-    hs: n.hs,
-    he: n.he,
-    subEnd: n.subEnd,
+    from: n.from,
+    headEnd: n.headEnd,
+    to: n.to,
     hasContent: n.hasContent,
     hidden: n.hidden,
     label: n.label,

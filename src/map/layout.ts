@@ -1,9 +1,9 @@
 // ノード木 → 箱の配置。DOM を知らない純粋なレイアウト層。
 // すべての木は左から右へ伸びる。
 
-import type { NodeInfo } from "../coreApi.ts";
-import { EDGE } from "./edge.ts";
+import type { DocView, NodeInfo } from "../coreApi.ts";
 import { type CardRow, cardRows } from "./cards.ts";
+import { type Pt, leftOf, rightOf } from "./geometry.ts";
 import { nodeSize } from "./metrics.ts";
 
 export const GAP = {
@@ -11,6 +11,12 @@ export const GAP = {
   y: 10,
   root: 34,
 };
+
+/**
+ * 親の辺のうち、何割を「付け根の帯」に使うか。子が複数あるとき、線の出口を
+ * この帯の中に配って重なりを解く。
+ */
+const FAN_BAND = 0.6;
 
 export interface Box {
   n: NodeInfo;
@@ -22,11 +28,13 @@ export interface Box {
 }
 
 export interface Layout {
+  /** 描くノード、文書順（畳まれて埋もれたものは入らない） */
   visible: NodeInfo[];
-  order: number[];
   boxes: Map<number, Box>;
   parentOf: Map<number, number>;
-  hiddenKids: Map<number, number>;
+  /** 畳んだノード → その下に埋もれている**子孫**の数（子だけではない） */
+  buriedCount: Map<number, number>;
+  /** 子 → 親の辺の上での、付け根のずらし量(px) */
   fanOf: Map<number, number>;
 }
 
@@ -35,12 +43,12 @@ const gapBefore = (i: number): number => (i === 0 ? 0 : GAP.y);
 function collapseHidden(nodes: NodeInfo[]): {
   visible: NodeInfo[];
   buried: Set<number>;
-  hiddenKids: Map<number, number>;
+  buriedCount: Map<number, number>;
 } {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const topOf = new Map<number, number>();
   const buried = new Set<number>();
-  const hiddenKids = new Map<number, number>();
+  const buriedCount = new Map<number, number>();
   for (const n of nodes) {
     const parent = n.parent === -1 ? undefined : byId.get(n.parent);
     if (!parent) continue;
@@ -48,18 +56,19 @@ function collapseHidden(nodes: NodeInfo[]): {
     if (top !== undefined) {
       topOf.set(n.id, top);
       buried.add(n.id);
-      hiddenKids.set(top, (hiddenKids.get(top) ?? 0) + 1);
+      buriedCount.set(top, (buriedCount.get(top) ?? 0) + 1);
     }
   }
-  return { visible: nodes.filter((n) => !buried.has(n.id)), buried, hiddenKids };
+  return { visible: nodes.filter((n) => !buried.has(n.id)), buried, buriedCount };
 }
 
-export function layoutMap(nodes: NodeInfo[], doc: string): Layout {
-  const { visible, buried, hiddenKids } = collapseHidden(nodes);
-  const rowsOf = cardRows(doc, nodes, buried);
+export function layoutMap(doc: DocView): Layout {
+  const nodes = doc.nodes;
+  const { visible, buried, buriedCount } = collapseHidden(nodes);
+  const rowsOf = cardRows(doc, buried);
   const sizes = new Map<number, { w: number; h: number }>();
   for (const n of visible) {
-    sizes.set(n.id, nodeSize(n, rowsOf.get(n.id)!, hiddenKids.get(n.id) ?? 0));
+    sizes.set(n.id, nodeSize(n, rowsOf.get(n.id)!, buriedCount.get(n.id) ?? 0));
   }
 
   const children = new Map<number, NodeInfo[]>();
@@ -137,33 +146,39 @@ export function layoutMap(nodes: NodeInfo[], doc: string): Layout {
   for (const n of visible) {
     if (n.parent !== -1 && boxes.has(n.parent) && boxes.has(n.id)) parentOf.set(n.id, n.parent);
   }
-  if (EDGE.spread > 0) {
-    const fans = new Map<number, NodeInfo[]>();
-    for (const n of visible) {
-      if (!parentOf.has(n.id)) continue;
-      const list = fans.get(n.parent);
-      if (list) list.push(n);
-      else fans.set(n.parent, [n]);
-    }
-    for (const list of fans.values()) {
-      if (list.length < 2) continue;
-      const parent = boxes.get(list[0].parent)!;
-      const sorted = [...list].sort(
-        (a, b) => boxes.get(a.id)!.y + boxes.get(a.id)!.h / 2 - boxes.get(b.id)!.y - boxes.get(b.id)!.h / 2,
-      );
-      const band = parent.h * Math.min(1, EDGE.spread);
-      for (let i = 0; i < sorted.length; i++) {
-        fanOf.set(sorted[i].id, ((i + 0.5) / sorted.length - 0.5) * band);
-      }
+  const fans = new Map<number, NodeInfo[]>();
+  for (const n of visible) {
+    if (!parentOf.has(n.id)) continue;
+    const list = fans.get(n.parent);
+    if (list) list.push(n);
+    else fans.set(n.parent, [n]);
+  }
+  const centerY = (id: number): number => {
+    const b = boxes.get(id)!;
+    return b.y + b.h / 2;
+  };
+  for (const list of fans.values()) {
+    if (list.length < 2) continue;
+    const band = boxes.get(list[0].parent)!.h * FAN_BAND;
+    const sorted = [...list].sort((a, b) => centerY(a.id) - centerY(b.id));
+    for (let i = 0; i < sorted.length; i++) {
+      fanOf.set(sorted[i].id, ((i + 0.5) / sorted.length - 0.5) * band);
     }
   }
 
-  return {
-    visible,
-    order: visible.map((n) => n.id),
-    boxes,
-    parentOf,
-    hiddenKids,
-    fanOf,
-  };
+  return { visible, boxes, parentOf, buriedCount, fanOf };
+}
+
+/**
+ * 子 id から、その親へ引く線の両端（付け根のずらしも込み）。
+ * **描画も当たり判定もここだけを見る** — 同じ式を 2 箇所に書いていた頃、
+ * 片方だけ直すと線と当たり判定が静かにずれた。
+ */
+export function edgeEnds(L: Layout, id: number): { from: Pt; to: Pt } | null {
+  const b = L.boxes.get(id);
+  const pid = L.parentOf.get(id);
+  const p = pid === undefined ? undefined : L.boxes.get(pid);
+  if (!b || !p) return null;
+  const e = rightOf(p);
+  return { from: { x: e.x, y: e.y + (L.fanOf.get(id) ?? 0) }, to: leftOf(b) };
 }

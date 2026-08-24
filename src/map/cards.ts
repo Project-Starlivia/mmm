@@ -1,15 +1,17 @@
 // 添付コンテンツ → カード行。テキスト処理だけの層（DOM を知らない）。
 //
 // ノードの見出し行の下に続く本文のうち、URL / [text](url) / ローカル画像 /
-// コードフェンス / インライン SVG をカード行としてラベルの下に出す
-// (mmm.md そのに)。ラベル自身が URL のノードはただのノードのまま。
+// コードフェンス / インライン SVG をカード行としてラベルの下に出す。
+// ラベル自身が URL のノードはただのノードのまま。
+//
+// **フェンスの区間はコアが渡してくる**（DocView.fences）。「どこからどこまでが
+// フェンスか」は文書の意味であって見せ方ではないので、ここでは判定しない。
 
-import type { NodeInfo } from "../coreApi.ts";
+import type { DocView, FenceSpan, NodeInfo } from "../coreApi.ts";
 
 export interface LinkInfo {
   title: string;
   url: string;
-  host: string;
 }
 
 /** One card row under the label, from the attached content.
@@ -76,14 +78,15 @@ export function parseLink(label: string): LinkInfo | null {
   } else {
     return null;
   }
+  // URL として読めないものはリンクにしない。読めたホスト名は、題が
+  // 無いときの題になる
   let host = "";
   try {
     host = new URL(url).hostname;
   } catch {
     return null;
   }
-  if (title === "") title = host;
-  return { title, url, host };
+  return { title: title === "" ? host : title, url };
 }
 
 /** Content line of the form `![alt](path)` with a LOCAL (relative) path.
@@ -106,93 +109,77 @@ export function parseImage(line: string): { path: string; name: string } | null 
   return { path, name };
 }
 
-/** 文書のどこかにローカル画像があるか（画像フォルダの要否はここから導く） */
-export function hasLocalImage(text: string): boolean {
-  return text.split("\n").some((l) => parseImage(l) !== null);
+/**
+ * コードカード 1 枚。範囲は開きフェンスから閉じフェンスまで丸ごと —
+ * 言語の指定も閉じ方もその場で直せるようにするため（結果フェンスで
+ * なくなれば、カードが消えるだけ）。
+ */
+function codeCard(text: string, f: FenceSpan): CardRow {
+  const body =
+    f.bodyTo > f.bodyFrom
+      ? text
+          .slice(f.bodyFrom, f.bodyTo)
+          .split("\n")
+          .map((l) => l.replace(/\t/g, "  "))
+      : [];
+  const lines =
+    body.length > CODE_MAX_LINES
+      ? [...body.slice(0, CODE_MAX_LINES - 1), "…"]
+      : body.length > 0
+        ? body
+        : [""];
+  return { kind: "code", lang: f.info, lines, from: f.from, to: f.to };
 }
 
 /**
- * 本文からカード行を抜き出す（1 ノードぶん）。`base` はこの本文が文書の
- * どこから始まるかで、コードブロックの位置を文書の座標へ戻すのに使う。
+ * 本文 [from, to) からカード行を抜き出す（1 ノードぶん）。オフセットは
+ * ずっと文書全体のもので、行を切り出して数え直さない。
  *
- * 行分割は LF だけで行う。アプリの中の改行は常に LF なので結果は同じで、
- * かつ 1 行の長さ +1 がそのまま次の行頭になる（CR を挟む切り方だと、
- * その 1 文字ぶん位置がずれる）。
+ * フェンスの区間は**コアが渡してくる**ので、ここで「これはフェンスか」を
+ * 判定しない。行分割は LF だけ — アプリの中の改行は常に LF。
  */
-function rowsOfContent(text: string, base: number): CardRow[] {
-  const lines = text.split("\n");
-  const lineAt: number[] = [];
-  for (let i = 0, off = base; i < lines.length; i++) {
-    lineAt.push(off);
-    off += lines[i].length + 1;
-  }
-  /** 行 k の終わり（改行の手前）= どのカードの to もこれ */
-  const endOf = (k: number): number => lineAt[k] + lines[k].length;
+function rowsOfContent(
+  text: string,
+  from: number,
+  to: number,
+  fenceAt: Map<number, FenceSpan>,
+): CardRow[] {
   const list: CardRow[] = [];
-  for (let li = 0; li < lines.length; li++) {
-    const t = lines[li].trim();
-    // fenced code block
-    const fence = /^(`{3,}|~{3,})\s*(\S*)\s*$/.exec(t);
+  /** その行の終わり（改行の手前）。範囲の終わりで打ち切る */
+  const endOf = (p: number): number => {
+    const brk = text.indexOf("\n", p);
+    return brk === -1 || brk > to ? to : brk;
+  };
+  let p = from;
+  while (p < to) {
+    const fence = fenceAt.get(p);
     if (fence) {
-      const body: string[] = [];
-      // 閉じフェンスは開きと同じ文字で、同じ長さ以上（CommonMark）。
-      // フェンス 1 本につき不変なので、本体を走査するループの外で 1 回だけ作る。
-      const closeRe = new RegExp(`^\\${fence[1][0]}{${fence[1].length},}$`);
-      let j = li + 1;
-      for (; j < lines.length; j++) {
-        const c = lines[j].trim();
-        if (c[0] === fence[1][0] && closeRe.test(c)) {
-          break;
-        }
-        body.push(lines[j].replace(/\t/g, "  "));
-      }
-      // 開きフェンスから閉じフェンスまで丸ごと。言語の指定も閉じ方も
-      // 直せるようにする（結果フェンスでなくなれば、カードは消えるだけ）
-      const from = lineAt[li];
-      const to = endOf(Math.min(j, lines.length - 1));
-      li = j; // past the closing fence (or EOF)
-      const preview =
-        body.length > CODE_MAX_LINES
-          ? [...body.slice(0, CODE_MAX_LINES - 1), "…"]
-          : body.length > 0
-            ? body
-            : [""];
-      list.push({ kind: "code", lang: fence[2], lines: preview, from, to });
+      list.push(codeCard(text, fence));
+      p = fence.to + 1; // 閉じフェンス行の次の行頭（文書末なら to を越える）
       continue;
     }
+    const end = endOf(p);
+    const line = text.slice(p, end);
     // inline <svg>…</svg> block (rendered via data URL — static, safe)
-    if (t.startsWith("<svg")) {
-      const buf: string[] = [lines[li]];
-      let j = li;
-      while (!buf[buf.length - 1].includes("</svg>") && j + 1 < lines.length) {
-        j++;
-        buf.push(lines[j]);
+    if (line.trim().startsWith("<svg")) {
+      let last = end;
+      while (!text.slice(p, last).includes("</svg>") && last < to) {
+        last = endOf(last + 1);
       }
-      if (buf[buf.length - 1].includes("</svg>")) {
-        list.push({
-          kind: "svg",
-          markup: buf.join("\n"),
-          from: lineAt[li],
-          to: endOf(j),
-        });
-        li = j;
+      if (text.slice(p, last).includes("</svg>")) {
+        list.push({ kind: "svg", markup: text.slice(p, last), from: p, to: last });
+        p = last + 1;
         continue;
       }
     }
-    const im = parseImage(lines[li]);
-    if (im) {
-      list.push({
-        kind: "img",
-        path: im.path,
-        name: im.name,
-        from: lineAt[li],
-        to: endOf(li),
-      });
+    const image = parseImage(line);
+    if (image) {
+      list.push({ kind: "img", path: image.path, name: image.name, from: p, to: end });
     } else {
-      const l = parseLink(lines[li]);
-      if (l)
-        list.push({ kind: "link", link: l, from: lineAt[li], to: endOf(li) });
+      const link = parseLink(line);
+      if (link) list.push({ kind: "link", link, from: p, to: end });
     }
+    p = end + 1;
   }
   return list;
 }
@@ -206,9 +193,32 @@ function rowsOfContent(text: string, base: number): CardRow[] {
  */
 export function contentEnd(nodes: NodeInfo[], i: number): number {
   const n = nodes[i];
-  return i + 1 < nodes.length && nodes[i + 1].hs < n.subEnd
-    ? nodes[i + 1].hs
-    : n.subEnd;
+  return i + 1 < nodes.length && nodes[i + 1].from < n.to
+    ? nodes[i + 1].from
+    : n.to;
+}
+
+/** フェンスを「開きフェンス行の行頭」で引けるようにする */
+const fenceIndex = (doc: DocView): Map<number, FenceSpan> => {
+  const m = new Map<number, FenceSpan>();
+  for (const f of doc.fences) m.set(f.from, f);
+  return m;
+};
+
+/** ノード 1 つぶんのカード行。折り畳んだノードはラベルだけで中身を出さない。 */
+function rowsOfNode(
+  doc: DocView,
+  i: number,
+  fenceAt: Map<number, FenceSpan>,
+): CardRow[] {
+  const n = doc.nodes[i];
+  if (!n.hasContent || n.hidden) return [];
+  const brk = doc.text.indexOf("\n", n.headEnd);
+  const start = brk === -1 ? -1 : brk + 1;
+  const end = contentEnd(doc.nodes, i);
+  return start > 0 && start < end
+    ? rowsOfContent(doc.text, start, end, fenceAt)
+    : [];
 }
 
 /**
@@ -216,26 +226,29 @@ export function contentEnd(nodes: NodeInfo[], i: number): number {
  * パースしない — 箱を作らないノードの分は捨て仕事になるだけ。
  */
 export function cardRows(
-  doc: string,
-  nodes: NodeInfo[],
+  doc: DocView,
   skip: Set<number>,
 ): Map<number, CardRow[]> {
+  const fenceAt = fenceIndex(doc);
   const out = new Map<number, CardRow[]>();
-  for (let i = 0; i < nodes.length; i++) {
-    const n = nodes[i];
-    // hidden nodes stay compact: label only, no content cards
-    if (!n.hasContent || n.hidden || skip.has(n.id)) {
-      out.set(n.id, []);
-      continue;
-    }
-    const nlPos = doc.indexOf("\n", n.he);
-    const cStart = nlPos === -1 ? -1 : nlPos + 1;
-    const cEnd = contentEnd(nodes, i);
-    if (cStart > 0 && cStart < cEnd) {
-      out.set(n.id, rowsOfContent(doc.slice(cStart, cEnd), cStart));
-    } else {
-      out.set(n.id, []);
-    }
+  for (const [i, n] of doc.nodes.entries()) {
+    out.set(n.id, skip.has(n.id) ? [] : rowsOfNode(doc, i, fenceAt));
   }
   return out;
+}
+
+/**
+ * そのノード 1 つぶんのカード行。**1 枚引くために全文を舐めない** —
+ * 選んでいるカードを引き直すたびに文書全体をパースしていて、1 打鍵あたり
+ * 同じ仕事を 3 回していた。
+ */
+export function cardRowsOf(doc: DocView, id: number): CardRow[] {
+  const i = doc.nodes.findIndex((n) => n.id === id);
+  return i === -1 ? [] : rowsOfNode(doc, i, fenceIndex(doc));
+}
+
+/** そのノードの本文の終わり。id から引くときはこちら。 */
+export function contentEndOf(nodes: NodeInfo[], id: number): number | null {
+  const i = nodes.findIndex((n) => n.id === id);
+  return i === -1 ? null : contentEnd(nodes, i);
 }
