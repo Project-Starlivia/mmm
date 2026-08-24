@@ -108,19 +108,60 @@ SVG2 で `x` / `y` / `width` / `height` / `rx` / `ry` は CSS プロパティ
 
 ## 見送ったこと
 
-### `<template>` でカードの形を宣言する（D）
+### `<template>` でカードの形を宣言する（D） → **不採用**（2026-08-25 に決着）
 
 `draw()` の半分を占めるカード 4 種の形を `index.html` の `<template>` に置き、
-`cloneNode(true)` して変わる値だけ埋める案。
+`cloneNode(true)` して変わる値だけ埋める案。当初「保留」としていたが、
+手段を一通り調べ直して**採らないと決めた**。
 
-- 得: **形が宣言として見える**（CSS の隣に形がある = Locality of Behaviour）。
-  生成も clone のほうが速い
-- 損: 埋める側が `querySelector` で clone に入るので、**形と埋め方の対応を
-  型が守らない**
+**当初の売り文句のうち、速度は嘘だった。** Chrome 148 で 2000 ノード
+（= 24000 要素）を組む時間を測った:
 
-**保留。** 上の 1〜3 で `draw()` から状態の分岐が抜けたので、残る形の記述が
-どう見えるかを見てから判断するほうが安い。テンプレートエンジンの導入とは
-別物（ブラウザの素の機能）だが、手段は慎重に選ぶ。
+| 組み方 | 中央値 |
+|---|---|
+| `createElementNS` + `setAttribute`（現状） | 95.3ms |
+| `<template>` clone + `querySelector` で埋める | 83.2ms |
+| `<template>` clone + 子の位置で辿って埋める | 72.2ms |
+
+13〜24% 速いが、**実負荷は 1 打鍵で作り直すノードが 1 個**なので、
+0.048ms が 0.036ms になるだけ。差し引きゼロ。
+
+残る理由は損のほうだけになる:
+
+- 埋める側が `querySelector` で clone に入るので、**形と埋め方の対応を型が
+  守らない**
+- **`<svg>` で包まないと中身が XHTML 名前空間になり**、エラーも出さずに
+  何も描かれない（実測。`<svg>` で包めば正しく SVG 名前空間になる）
+- 形が `index.html` へ出ていくと **CSS の隣には来るが、数を出している TS から
+  離れる**。Locality of Behaviour として差し引きで負ける
+
+### 同時に調べて落とした手段
+
+| 手段 | 落とした理由 |
+|---|---|
+| `<symbol>` + `<use>` | use の中は shadow tree でスタイルが届かない。**値を持たない固定の絵**にしか効かず、mmm の ↗ × ＋ は文字なので困っていない |
+| `<foreignObject>` + HTML/CSS | flexbox にレイアウトを任せられる唯一の案だが、**`toSvg.ts` の書き出しが壊れる**（ブラウザ以外で開けない SVG になる）。描画コストの報告も多い |
+| Web Components | **SVG では定義できない**。custom element は HTML 名前空間のみ（W3C で議論中の未実装） |
+| タグ付きテンプレート（自作 / uhtml / lit-html） | いちばん宣言的だが、依存か 100 行超の機構を足すことになる。**膨大を減らすために膨大を足す**形 |
+| CSS `attr()` 型付き | Chromium 133+ で前提には合うが、**数を出すのは結局 TS**。経由地が増えるだけ |
+| DOM Parts / Template Instantiation | TAG レビュー保留、Gecko/WebKit のシグナル無し。待つ対象ですらない |
+
+### 代わりに採ったこと（2026-08-25）
+
+機構を足さずに同じ観点を満たす 3 つ。
+
+1. **`svgEl` が数を受け取る** — `String(...)` が 44 か所消えた。SVG の属性は
+   ほとんどが数で、文字にするのは `setAttribute` に渡す 1 行だけの仕事
+2. **`map/drawCard.ts`** — カード 1 行を SVG にする層。種類ごとに形・クラス・
+   埋め方が縦に並ぶ。`render.ts` は「どこに置くか」だけを決める（399 → 265 行）。
+   同時に、置き場所を描画とマップが別々に数えていた重複を `layout.cardRect`
+   1 本に畳んだ
+3. **CSS のネスト** — ブラウザ自身の機能で、部品ごとの塊にした。487 行が
+   フラットで区切りも無く、`.node` の規則が `#card-pick` を挟んで散っていた
+
+いずれも**出力が変わっていないことを実測で確かめている**。2 は構造・幾何・
+計算済みスタイルが baseline と完全一致。3 は旧 CSS と新 CSS を同じページに
+順に当てて、ダーク / ライト × 3 状態 × 全要素 × 63 プロパティが完全一致。
 
 ### Signals / 細粒度リアクティビティ
 
@@ -148,6 +189,15 @@ TC39 Signals は **Stage 1**（API 未確定）。それ以前に、mmm は
   セレクタが `.node.selected` で読めているので**クラスのまま**にした。
   得られるもの（独立して付け外しできる）は同じ
 - [tc39/proposal-signals](https://github.com/tc39/proposal-signals)
+- [Template in a SVG context does not have any content — WICG/webcomponents #744](https://github.com/WICG/webcomponents/issues/744)
+  … `<svg>` の中に `<template>` は置けない（SVGTemplateElement が無い）。
+  HTML の `<template>` の中に `<svg>` ごと書くのが唯一の道
+- [Styling SVG `<use>` Content with CSS — Codrops](https://tympanus.net/codrops/2015/07/16/styling-svg-use-content-css/)
+  / [w3c/svgwg #504](https://github.com/w3c/svgwg/issues/504) … use の shadow tree
+- [Don't use foreignObject HTML for text in SVG output — drawio #3350](https://github.com/jgraph/drawio/issues/3350)
+- [Proposal: Allow custom elements to be in any namespace — WICG/webcomponents #634](https://github.com/WICG/webcomponents/issues/634)
+- [CSS attr() gets an upgrade — Chrome for Developers](https://developer.chrome.com/blog/advanced-attr)
+- [Template-Instantiation.md — WICG/webcomponents](https://github.com/WICG/webcomponents/blob/gh-pages/proposals/Template-Instantiation.md)
 
 ## この作業で見つけた別の不具合
 
