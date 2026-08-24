@@ -20,6 +20,7 @@ import {
 import { edgeDraw, edgeHintPath, edgeSegs, flattenSegs } from "./map/edge";
 import {
   type CardRef,
+  type CardRow,
   CODE_LINE,
   CODE_PAD,
   cardBleed,
@@ -177,7 +178,7 @@ export class MindMap {
   private dropEdgeId: number | null = null;
   private hoverId = -1;
   /** その場で直しているカード（位置は毎回引き直す） */
-  private editingCard: { ref: CardRef; from: number; to: number } | null = null;
+  private editingCard: CardRef | null = null;
 
   // editing state
   editingId = -1;
@@ -690,14 +691,21 @@ export class MindMap {
     this.dropLine.setAttribute("visibility", "visible");
   }
 
+  /** 開いているカードのいまの範囲。boxes は毎レンダで作り直されるので、
+   *  外から文書が動いても（undo など）ここは常に現在の位置を返す。 */
+  private editingRow(): CardRow | null {
+    const ref = this.editingCard;
+    return ref ? (this.boxes.get(ref.node)?.rows[ref.index] ?? null) : null;
+  }
+
   /** カードをその場で開く。閉じるのは Esc / Mod+Enter / 他所クリック。 */
   private beginCardEdit(ref: CardRef): void {
     const b = this.boxes.get(ref.node);
     const row = b?.rows[ref.index];
     const rect = this.cardRect(ref);
     if (!row || !rect) return;
-    if (this.isEditing()) this.host.commitEdit();
-    this.editingCard = { ref, from: row.from, to: row.to };
+    if (this.isEditingLabel()) this.host.commitEdit();
+    this.editingCard = ref;
     this.cardEditor.value = this.host.docText().slice(row.from, row.to);
     this.editBox.style.display = "block";
     this.paintEditInk();
@@ -730,7 +738,7 @@ export class MindMap {
    */
   private positionCardEditor(): void {
     if (!this.editingCard) return;
-    const rect = this.cardRect(this.editingCard.ref);
+    const rect = this.cardRect(this.editingCard);
     if (!rect) {
       this.endCardEdit();
       return;
@@ -759,13 +767,12 @@ export class MindMap {
 
   /** 中身を文書へ返して閉じる。空にしたらブロックの中身が空になるだけ。 */
   private commitCardEdit(): void {
-    const at = this.editingCard;
-    if (!at) return;
-    this.editingCard = null;
-    this.editBox.style.display = "none";
+    const row = this.editingRow();
+    this.endCardEdit();
+    if (!row) return;
     const next = this.cardEditor.value;
-    if (next !== this.host.docText().slice(at.from, at.to)) {
-      this.host.replaceText(at.from, at.to, next);
+    if (next !== this.host.docText().slice(row.from, row.to)) {
+      this.host.replaceText(row.from, row.to, next);
     }
     this.pane.focus();
   }
@@ -952,8 +959,19 @@ export class MindMap {
     this.pane.focus();
   }
 
-  isEditing(): boolean {
+  /** ラベルの入力欄が開いているか（確定は host.commitEdit が持つ）。 */
+  isEditingLabel(): boolean {
     return this.editingId !== -1;
+  }
+
+  /**
+   * ラベルとカード、**どちらかの入力欄が開いている**か。
+   * 「いまキーはネイティブの入力欄のものか」を聞きたい側はこちらを見る —
+   * ラベルだけを見ていたころ、カードを直している最中の `Mod+Z` が
+   * textarea ではなく文書へ効いて、確定時に別の範囲を上書きしていた。
+   */
+  isEditing(): boolean {
+    return this.editingId !== -1 || this.editingCard !== null;
   }
 
   private positionEditor(): void {
@@ -1069,7 +1087,8 @@ export class MindMap {
       // ここで pane.focus() まで進むと、押した瞬間に blur して閉じてしまう
       if (e.target === this.editor) return;
       if (this.editBox.contains(e.target as Node)) return;
-      if (this.isEditing()) this.host.commitEdit();
+      // カードの入力欄は blur が自分で確定する。ここはラベルの担当
+      if (this.isEditingLabel()) this.host.commitEdit();
       this.hideMenu();
       pane.focus();
 
@@ -1541,7 +1560,7 @@ export class MindMap {
     // Space はパンに使うので除く。
     if (blank && !mod && !e.altKey && e.key.length === 1 && e.key !== " ") {
       this.host.editRequested(anchor);
-      if (this.isEditing()) {
+      if (this.isEditingLabel()) {
         this.editor.value = e.key;
         this.editor.setSelectionRange(1, 1);
         // 既存の input 経路に乗せる（ラベルと箱の幅がそのまま追従する）

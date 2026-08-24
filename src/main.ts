@@ -343,7 +343,7 @@ const host: MapHost = {
     syncSelectionViews(false);
   },
   commitEdit() {
-    if (!map.isEditing()) return;
+    if (!map.isEditingLabel()) return;
     const id = map.editingId;
     map.endEdit();
     if (byId.has(id)) setSelection([id], id);
@@ -576,10 +576,7 @@ async function newFile(): Promise<void> {
     await io.close();
     savedText = "";
     loadText("", null);
-    // フェンスの言語は後から読み込まれる。届いたら色を載せ直す
-onLanguageReady(() => map.render());
-
-mapPane.focus();
+    mapPane.focus();
   } catch (err) {
     console.error("new file failed:", err);
     flashFilename("新規作成に失敗しました");
@@ -721,7 +718,10 @@ window.addEventListener(
       e.preventDefault();
       togglePane();
     } else if (key === "z" || key === "y") {
-      if (map.isEditing()) return; // native input undo while label editing
+      // 入力欄（ラベル / カード）が開いている間は、その欄のネイティブな
+      // undo に任せる。文書の undo を割り込ませると、開いたままの入力欄が
+      // 指す範囲だけが古くなり、確定で別の場所を上書きしてしまう
+      if (map.isEditing()) return;
       e.preventDefault();
       e.stopPropagation();
       if (key === "y" || e.shiftKey) doRedo();

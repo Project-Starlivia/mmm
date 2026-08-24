@@ -65,12 +65,20 @@ export function initTheme(args: {
   colorInput.style.pointerEvents = "none";
   document.body.append(colorInput);
   colorInput.addEventListener("input", () => applyColor(colorInput.value));
-  logo.addEventListener("click", () => {
+  const pickColor = (): void => {
     const cur = getComputedStyle(document.documentElement)
       .getPropertyValue("--accent")
       .trim();
     colorInput.value = /^#[0-9a-f]{6}$/i.test(cur) ? cur : DEFAULT_COLOR;
     colorInput.click();
+  };
+  logo.addEventListener("click", pickColor);
+  // ロゴは <svg role="button">。SVG はフォーカスされても Enter / Space で
+  // click を出さないので、ボタンだと名乗る以上ここで自分で出す
+  logo.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    pickColor();
   });
 
   // ---- ライト / ダーク ----
