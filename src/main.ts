@@ -22,6 +22,7 @@ import { initTheme } from "./app/theme.ts";
 import { sweep } from "./app/persist.ts";
 import { decidePaste } from "./app/paste.ts";
 import { initDrop } from "./app/dnd.ts";
+import { showDrawing } from "./app/draw.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 import { type CardRef, cardRowsOf, contentEndOf } from "./map/cards.ts";
@@ -76,6 +77,12 @@ let savedText = "";
  * 実ファイルは File System Access API のハンドルが指す。
  */
 let savedName: string | null = null;
+/**
+ * お絵描きが開いているか。開いている間は全体の `Mod+Z` を止める
+ * （その中の取り消しに譲る）。門を 2 つ作らないよう、入力欄と同じ
+ * `isEditing` の判定に合流させる。
+ */
+let drawingOpen = false;
 
 
 // ---------- sync ----------
@@ -280,6 +287,20 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
 const host: MapHost = {
   doc: () => doc,
   chooseImageFolder: () => void assets.chooseFolder(),
+  addDrawing(id) {
+    if (!byId.has(id) || drawingOpen) return;
+    drawingOpen = true;
+    void showDrawing()
+      .then((blob) => (blob === null ? undefined : attachImage(id, blob)))
+      .catch((error: unknown) => {
+        console.error("drawing failed:", error);
+        flashFilename("お絵描きを貼れませんでした");
+      })
+      .finally(() => {
+        drawingOpen = false;
+        mapPane.focus();
+      });
+  },
   replaceText(from, to, text) {
     applySnap(core.replaceText(from, to, text, nextTag()), "core");
   },
@@ -433,7 +454,7 @@ const host: MapHost = {
         /* clipboard.read unavailable/denied → try the text path */
       }
       if (img) {
-        await pasteImage(img);
+        await attachImage(anchorId, img);
         return;
       }
       const clip = await navigator.clipboard.readText();
@@ -630,13 +651,16 @@ function insertContentLine(id: number, line: string, tag = ""): void {
   insertParagraph(contentEnd(id), line, tag);
 }
 
-async function pasteImage(blob: Blob): Promise<void> {
-  const targetId = anchorId;
-  if (!byId.has(targetId)) return;
+/**
+ * 画像をディスクへ置いて、そのノードの本文の末尾に `![]()` を足す。
+ * **貼り付け・ドロップ・お絵描きが通る唯一の道** — WebP への変換も名前の
+ * 確認も画像フォルダの結び付けも、`assets.saveToDisk` が 1 か所で持つ。
+ */
+async function attachImage(id: number, blob: Blob, tag = ""): Promise<void> {
+  if (!byId.has(id)) return;
   const rel = await assets.saveToDisk(blob);
-  if (rel !== null && byId.has(targetId)) {
-    insertContentLine(targetId, `![](${rel})`);
-  }
+  // 置いているあいだに消えていることがある
+  if (rel !== null && byId.has(id)) insertContentLine(id, `![](${rel})`, tag);
 }
 
 btnNew.addEventListener("click", () => void newFile());
@@ -666,13 +690,9 @@ initDrop({
     applyDoc(await io.openHandle(file));
   },
   async addImages(files, node) {
+    // 複数落としても 1 回の undo で戻せるよう、同じ tag に揃える
     const tag = nextTag();
-    for (const file of files) {
-      const rel = await assets.saveToDisk(await file.getFile());
-      if (rel !== null && byId.has(node)) {
-        insertContentLine(node, `![](${rel})`, tag);
-      }
-    }
+    for (const file of files) await attachImage(node, await file.getFile(), tag);
   },
 });
 
@@ -707,7 +727,7 @@ initShortcuts({
   togglePaneVis,
   undo: doUndo,
   redo: doRedo,
-  isEditing: () => map.isEditing(),
+  isEditing: () => map.isEditing() || drawingOpen,
 });
 
 // ---------- boot ----------

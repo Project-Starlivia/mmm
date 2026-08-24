@@ -410,6 +410,68 @@ html, body {
 #ctx-menu .item.disabled { opacity: 0.4; pointer-events: none; }
 #ctx-menu hr { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
 
+/* ---------- お絵描き（app/draw.ts） ---------- */
+/* 紙の色はキャンバス自身が最初に塗る。CSS にも置くと、出来上がる画像の色と
+   同じ数字を 2 か所に持つことになる */
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  z-index: 40;
+}
+.popup {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.popup-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.popup-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.popup-canvas {
+  display: block;
+  /* 窓が狭ければ縮む。出来上がる絵の大きさは変わらない（draw.ts が持つ） */
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: crosshair;
+  /* 指やペンでも描けるように、ブラウザのスクロール/ズームへ渡さない */
+  touch-action: none;
+}
+.popup-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.popup-hint { flex: 1; font-size: 11px; color: var(--ink-dim); }
+.popup button {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+}
+.popup button:hover { background: var(--accent-soft); border-color: var(--accent); }
+.popup button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
 #map-hint {
   position: absolute;
   inset: 0;

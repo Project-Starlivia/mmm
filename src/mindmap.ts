@@ -42,6 +42,8 @@ export interface MapHost {
    * loading / until folder permission is granted */
   imageUrl(path: string): string | null;
   chooseImageFolder(): void;
+  /** その場で描いて、画像としてこのノードに貼る */
+  addDrawing(id: number): void;
   /** その範囲を書き換える（カードをその場で直したとき） */
   replaceText(from: number, to: number, text: string): void;
   selection(): Set<number>;
@@ -1277,6 +1279,13 @@ export class MindMap {
       e.preventDefault();
       return;
     }
+    // その場で描いて貼る。**空ノードの打ち始めより前**に置く — 後ろだと
+    // 名前の無いノードで `D` が文字入力に化ける
+    if (key === "D" && !mod && !e.altKey && anchor !== -1 && sel.size <= 1) {
+      this.host.addDrawing(anchor);
+      e.preventDefault();
+      return;
+    }
     // 名前がまだ無いノード。ここでは「足す」より「埋める」ほうが要る
     const blank =
       anchor !== -1 &&
@@ -1554,6 +1563,12 @@ export class MindMap {
       { label: "カット", key: "Mod+X", run: () => this.host.copySelection(true) },
       { label: "子として貼り付け", key: "Mod+V", run: () => this.host.paste(), disabled: multi },
       "sep",
+      {
+        label: "お絵描き",
+        key: "Shift+D",
+        run: () => this.host.addDrawing(anchor),
+        disabled: anchor === -1 || multi,
+      },
       {
         // 画像の入口はクリックから外れた（クリックは選択）。ここが唯一の
         // 出入り口になるので、ノードに画像が無くても出す
