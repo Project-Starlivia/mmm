@@ -159,13 +159,17 @@ fn next_sibling(i : Int) -> Int {
 }
 
 ///|
-/// Headings inside [ss, se) in document order (indexes into st.nodes).
-fn subtree_nodes(ss : Int, se : Int) -> Array[Int] {
+/// ノード i の部分木に含まれる見出しの添字（自分を含む、文書順）。
+///
+/// 文書順なので部分木は必ず**連続した添字の並び**になる。毎回すべての
+/// ノードを舐めていたころ、まとめて段下げすると「選んだ数 × ノード数」に
+/// なっていた。
+fn subtree_of(i : Int) -> Array[Int] {
   let out : Array[Int] = []
-  for i = 0; i < st.nodes.length(); i = i + 1 {
-    if st.nodes[i].from >= ss && st.nodes[i].from < se {
-      out.push(i)
-    }
+  let se = st.nodes[i].to
+  let n = st.nodes.length()
+  for j = i; j < n && st.nodes[j].from < se; j = j + 1 {
+    out.push(j)
   }
   out
 }

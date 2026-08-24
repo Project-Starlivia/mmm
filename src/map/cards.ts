@@ -198,6 +198,29 @@ export function contentEnd(nodes: NodeInfo[], i: number): number {
     : n.to;
 }
 
+/** フェンスを「開きフェンス行の行頭」で引けるようにする */
+const fenceIndex = (doc: DocView): Map<number, FenceSpan> => {
+  const m = new Map<number, FenceSpan>();
+  for (const f of doc.fences) m.set(f.from, f);
+  return m;
+};
+
+/** ノード 1 つぶんのカード行。折り畳んだノードはラベルだけで中身を出さない。 */
+function rowsOfNode(
+  doc: DocView,
+  i: number,
+  fenceAt: Map<number, FenceSpan>,
+): CardRow[] {
+  const n = doc.nodes[i];
+  if (!n.hasContent || n.hidden) return [];
+  const brk = doc.text.indexOf("\n", n.headEnd);
+  const start = brk === -1 ? -1 : brk + 1;
+  const end = contentEnd(doc.nodes, i);
+  return start > 0 && start < end
+    ? rowsOfContent(doc.text, start, end, fenceAt)
+    : [];
+}
+
 /**
  * 全ノードのカード行。skip に入っている id（折り畳みで描かれないノード）は
  * パースしない — 箱を作らないノードの分は捨て仕事になるだけ。
@@ -206,27 +229,22 @@ export function cardRows(
   doc: DocView,
   skip: Set<number>,
 ): Map<number, CardRow[]> {
-  const fenceAt = new Map<number, FenceSpan>();
-  for (const f of doc.fences) fenceAt.set(f.from, f);
+  const fenceAt = fenceIndex(doc);
   const out = new Map<number, CardRow[]>();
-  for (let i = 0; i < doc.nodes.length; i++) {
-    const n = doc.nodes[i];
-    // hidden nodes stay compact: label only, no content cards
-    if (!n.hasContent || n.hidden || skip.has(n.id)) {
-      out.set(n.id, []);
-      continue;
-    }
-    const brk = doc.text.indexOf("\n", n.headEnd);
-    const start = brk === -1 ? -1 : brk + 1;
-    const end = contentEnd(doc.nodes, i);
-    out.set(
-      n.id,
-      start > 0 && start < end
-        ? rowsOfContent(doc.text, start, end, fenceAt)
-        : [],
-    );
+  for (const [i, n] of doc.nodes.entries()) {
+    out.set(n.id, skip.has(n.id) ? [] : rowsOfNode(doc, i, fenceAt));
   }
   return out;
+}
+
+/**
+ * そのノード 1 つぶんのカード行。**1 枚引くために全文を舐めない** —
+ * 選んでいるカードを引き直すたびに文書全体をパースしていて、1 打鍵あたり
+ * 同じ仕事を 3 回していた。
+ */
+export function cardRowsOf(doc: DocView, id: number): CardRow[] {
+  const i = doc.nodes.findIndex((n) => n.id === id);
+  return i === -1 ? [] : rowsOfNode(doc, i, fenceIndex(doc));
 }
 
 /** そのノードの本文の終わり。id から引くときはこちら。 */

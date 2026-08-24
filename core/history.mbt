@@ -59,11 +59,7 @@ fn apply_sets(sets : Array[Array[Edit]], tag : String) -> Unit {
   }
   let inv_sets : Array[Array[Edit]] = []
   for s in sets {
-    for k = 0; k < mapped.length(); k = k + 1 {
-      if mapped[k] >= 0 {
-        mapped[k] = map_offset(mapped[k], s)
-      }
-    }
+    map_offsets(mapped, s)
     inv_sets.push(invert_edit_set(s))
     st.text = apply_edit_set(st.text, s)
   }

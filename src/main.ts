@@ -22,7 +22,7 @@ import { initTheme } from "./app/theme";
 import { sweep } from "./app/persist";
 import { decidePaste } from "./app/paste";
 import { onLanguageReady } from "./map/highlight";
-import { type CardRef, cardRows, contentEndOf } from "./map/cards";
+import { type CardRef, cardRowsOf, contentEndOf } from "./map/cards";
 import { moveCard, removeCard } from "./map/cardEdit";
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -104,7 +104,8 @@ function applySnap(snap: Snapshot, origin: Origin): void {
   // structural edits from elsewhere invalidate the typing-merge chain
   if (origin !== "cm") editKind = "";
   map.render();
-  if (selChanged) syncSelectionViews(false);
+  // render がクラスまで塗り終えているので、ここで塗り直さない
+  if (selChanged) syncSelectionViews(false, "done");
   btnUndo.disabled = !snap.canUndo;
   btnRedo.disabled = !snap.canRedo;
   updateDirty();
@@ -112,7 +113,7 @@ function applySnap(snap: Snapshot, origin: Origin): void {
 }
 
 function updateDirty(): void {
-  elDirty.hidden = core.getText() === savedText;
+  elDirty.hidden = doc.text === savedText;
 }
 
 /** いまの文書の名前。保存済みならそのファイル名、まだなら本文から導く */
@@ -127,16 +128,18 @@ function docName(): string {
  */
 function showName(): void {
   const name = savedName ?? (doc.nodes.length ? docName() : null);
-  document.title = name === null ? "mmm" : `${name} - mmm`;
+  const title = name === null ? "mmm" : `${name} - mmm`;
+  // 打鍵のたびに呼ばれるので、変わっていないなら DOM に触らない
+  if (document.title !== title) document.title = title;
   // ファイル名欄は flash 中だけ別のことを言っている。終わったら戻る
-  if (flashTimer === -1) elFilename.textContent = docName();
+  if (flashTimer !== -1) return;
+  const shown = docName();
+  if (elFilename.textContent !== shown) elFilename.textContent = shown;
 }
 
 /** CardRef からいまのカードを引く。範囲外なら null（選択は落とす）。 */
 function cardOf(ref: CardRef | null) {
-  if (!ref) return null;
-  const rows = cardRows(doc, new Set<number>()).get(ref.node);
-  return rows?.[ref.index] ?? null;
+  return ref ? (cardRowsOf(doc, ref.node)[ref.index] ?? null) : null;
 }
 
 /** そのノードの本文の終わり（末尾へ落としたときの挿入位置）。
@@ -146,13 +149,17 @@ function contentEnd(id: number): number {
 }
 
 /**
- * 選択の見た目を貼り直す。`repaint` はカードの選択が出入りしたとき —
- * カードの枠と × は render が**要素として**作るので、クラスを張り替えるだけの
- * 軽い経路（refreshSelection）では出ても消えてもくれない。
+ * 選択の見た目を貼り直す。`paint` は地図側の塗り直し方:
+ * - `classes` … クラスの張り替えだけ（軽い）
+ * - `render`  … カードの枠と × は render が**要素として**作るので、
+ *                選択が出入りするときは作り直しが要る
+ * - `done`    … 直前に render を済ませてある（applySnap の中）
  */
-function syncSelectionViews(reveal: boolean, repaint = false): void {
-  if (repaint) map.render();
-  else map.refreshSelection();
+type Paint = "classes" | "render" | "done";
+
+function syncSelectionViews(reveal: boolean, paint: Paint = "classes"): void {
+  if (paint === "render") map.render();
+  else if (paint === "classes") map.refreshSelection();
   const card = cardOf(picked);
   editor.highlight(
     card
@@ -175,7 +182,7 @@ function setSelection(ids: number[], anchor: number, reveal = true): void {
   picked = null;
   selection = new Set(ids);
   anchorId = anchor;
-  syncSelectionViews(reveal, hadCard);
+  syncSelectionViews(reveal, hadCard ? "render" : "classes");
 }
 
 /**
@@ -284,7 +291,7 @@ const host: MapHost = {
       selection = new Set();
       anchorId = -1;
     }
-    syncSelectionViews(false, true);
+    syncSelectionViews(false, "render");
   },
   deleteCard(ref) {
     const row = cardOf(ref);
@@ -294,10 +301,10 @@ const host: MapHost = {
     applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
   },
   reorderCard(ref, dir) {
-    const rows = cardRows(doc, new Set<number>()).get(ref.node);
-    const row = rows?.[ref.index];
-    const next = rows?.[ref.index + dir];
-    if (!rows || !row || !next) return; // 端では何もしない
+    const rows = cardRowsOf(doc, ref.node);
+    const row = rows[ref.index];
+    const next = rows[ref.index + dir];
+    if (!row || !next) return; // 端では何もしない
     // 下へ動かすときは相手の後ろ、上へ動かすときは相手の頭へ入れる。
     // next.to は次の行の直後（次の改行の手前、または改行の無い文書末）を
     // 指す — next.to + 1 だと改行の無い文書末で文書長を超えてしまう。
@@ -309,15 +316,13 @@ const host: MapHost = {
     applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
   },
   moveCardTo(ref, node, index) {
-    const text = core.getText();
-    const all = cardRows(doc, new Set<number>());
-    const row = all.get(ref.node)?.[ref.index];
+    const row = cardRowsOf(doc, ref.node)[ref.index];
     if (!row) return false;
-    const target = all.get(node) ?? [];
+    const target = node === ref.node ? cardRowsOf(doc, ref.node) : cardRowsOf(doc, node);
     // 落とし先の行頭。末尾なら、そのノードの本文の終わりへ
     const dst = target[index];
     const at = dst ? dst.from : contentEnd(node);
-    const e = moveCard(text, row.from, row.to, at);
+    const e = moveCard(doc.text, row.from, row.to, at);
     if (!e) return false;
     // 着地した後の実際の index。同じノードの中で下へ動かすときだけ、
     // 自分を抜いた分 1 つ前へ詰まる（Alt+↓ の reorderCard と同じ考え方）。

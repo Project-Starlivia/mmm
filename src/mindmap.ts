@@ -96,6 +96,62 @@ export interface MapHost {
  *  わずかに動いてもドラッグに化けないよう、ノードにもカードにも同じ値を使う */
 const DRAG_SLOP2 = 64;
 
+/**
+ * ノードの中身を作り直すかどうかの判定材料。値をそのまま持って、そのまま
+ * 比べる（畳んだ文字列にしない — 下記 sameShape）。
+ */
+interface NodeShape {
+  w: number;
+  h: number;
+  hidden: boolean;
+  buried: number;
+  epoch: number;
+  label: string;
+  rows: CardRow[];
+  /** rows と同じ並びで、画像だけ解決済みの URL（他は null） */
+  urls: (string | null)[];
+  /** 選ばれているカードの枚数目。無ければ -1 */
+  picked: number;
+}
+
+/** カード 1 枚が、描き直しを要するほど変わったか */
+function sameRow(a: CardRow, b: CardRow): boolean {
+  if (a.kind === "link" && b.kind === "link") {
+    return a.link.title === b.link.title && a.link.url === b.link.url;
+  }
+  if (a.kind === "svg" && b.kind === "svg") return a.markup === b.markup;
+  if (a.kind === "img" && b.kind === "img") return a.path === b.path;
+  if (a.kind === "code" && b.kind === "code") {
+    return (
+      a.lang === b.lang &&
+      a.lines.length === b.lines.length &&
+      a.lines.every((l, i) => l === b.lines[i])
+    );
+  }
+  return false;
+}
+
+/** 前回と同じなら、その要素はそのまま置いておける */
+function sameShape(a: NodeShape | undefined, b: NodeShape): boolean {
+  if (
+    a === undefined ||
+    a.w !== b.w ||
+    a.h !== b.h ||
+    a.hidden !== b.hidden ||
+    a.buried !== b.buried ||
+    a.epoch !== b.epoch ||
+    a.label !== b.label ||
+    a.picked !== b.picked ||
+    a.rows.length !== b.rows.length
+  ) {
+    return false;
+  }
+  for (let i = 0; i < a.rows.length; i++) {
+    if (a.urls[i] !== b.urls[i] || !sameRow(a.rows[i], b.rows[i])) return false;
+  }
+  return true;
+}
+
 export class MindMap {
   private pane: HTMLElement;
   private host: MapHost;
@@ -124,7 +180,7 @@ export class MindMap {
   // 数万個の SVG 要素を作り直していた（それが入力遅延の実体だった）
   private nodeEls = new Map<number, SVGGElement>();
   private edgeEls = new Map<number, SVGPathElement>();
-  private nodeSig = new Map<number, string>(); // 内側を作り直す判定用
+  private nodeShape = new Map<number, NodeShape>(); // 内側を作り直す判定用
   // 直前に書いた transform / class。同じ値の setAttribute はスタイル無効化を
   // 起こすだけ無駄なので書かない（プロファイル上いちばん重い JS 呼び出しだった）
   private nodeTf = new Map<number, string>();
@@ -133,6 +189,7 @@ export class MindMap {
   private domOrderSig = ""; // DOM の並び（= 重なり順）を直す判定用
   private parentOf = new Map<number, number>(); // 子 → 親（線の判定用）
   private fanOf = new Map<number, number>(); // 付け根のずらし量(px)
+  private polyOf = new Map<number, Pt[]>(); // 子 → エッジの折れ線（render で捨てる）
 
   // interaction state
   private spaceDown = false;
@@ -280,6 +337,7 @@ export class MindMap {
     const L = layoutMap(doc);
     const { visible, boxes, buriedCount, fanOf } = L;
     this.boxes = boxes;
+    this.polyOf.clear(); // 箱が動いたら線も動く
     this.order = visible.map((n) => n.id);
     this.parentOf = L.parentOf;
     this.fanOf = fanOf;
@@ -341,7 +399,7 @@ export class MindMap {
         g.dataset.id = String(n.id);
         this.nodeLayer.append(g);
         this.nodeEls.set(n.id, g);
-        this.nodeSig.delete(n.id); // 新規なので必ず中身を作る
+        this.nodeShape.delete(n.id); // 新規なので必ず中身を作る
       }
       const dropMark = this.dropMarks.get(n.id);
       const cls =
@@ -363,9 +421,9 @@ export class MindMap {
       }
 
       const buried = buriedCount.get(n.id) ?? 0;
-      const sig = this.contentSig(n, b, buried);
-      if (this.nodeSig.get(n.id) === sig) continue; // 中身は据え置き
-      this.nodeSig.set(n.id, sig);
+      const shape = this.shapeOf(n, b, buried);
+      if (sameShape(this.nodeShape.get(n.id), shape)) continue; // 中身は据え置き
+      this.nodeShape.set(n.id, shape);
       g.replaceChildren();
       g.append(
         svgEl("rect", {
@@ -568,7 +626,7 @@ export class MindMap {
       if (seen.has(id)) continue;
       el.remove();
       this.nodeEls.delete(id);
-      this.nodeSig.delete(id);
+      this.nodeShape.delete(id);
       this.nodeTf.delete(id);
       this.nodeCls.delete(id);
     }
@@ -774,21 +832,27 @@ export class MindMap {
     return p !== null && p.node === nodeId && p.index === index;
   }
 
-  private contentSig(n: NodeInfo, b: Box, buried: number): string {
-    // 値どうしは本文に出ない制御文字で区切る。連結だけだと
-    // lang "ts"+行 "x" と lang "t"+行 "sx" のような別内容が同じ署名になる
-    const SEP = "\u0000";
-    // 言語の読み込みは後から効くので、世代も署名に混ぜる
-    let s = `${b.w}|${b.h}|${n.hidden ? 1 : 0}|${buried}|${languageEpoch()}|${n.label}`;
-    for (let i = 0; i < b.rows.length; i++) {
-      const r = b.rows[i];
-      if (r.kind === "link") s += `|L${r.link.title}${SEP}${r.link.url}`;
-      else if (r.kind === "svg") s += `|S${r.markup}`;
-      else if (r.kind === "code") s += `|C${r.lang}${SEP}${r.lines.join(SEP)}`;
-      else s += `|I${r.path}${SEP}${this.host.imageUrl(r.path) ?? ""}`;
-      if (this.isPicked(n.id, i)) s += `${SEP}picked`;
-    }
-    return s;
+  /**
+   * 中身を作り直すかどうかの判定材料。**1 本の文字列に畳まない** —
+   * 畳むと、大きな SVG や長いラベルを毎レンダで丸ごとコピーすることになる
+   * うえ、区切り文字の選び方しだいで別の中身が同じ署名になりうる。
+   */
+  private shapeOf(n: NodeInfo, b: Box, buried: number): NodeShape {
+    return {
+      w: b.w,
+      h: b.h,
+      hidden: n.hidden,
+      buried,
+      // 言語の読み込みは後から効くので、世代も見る
+      epoch: languageEpoch(),
+      label: n.label,
+      rows: b.rows,
+      // 画像は「まだ読めていない」から「読めた」へ後から変わる
+      urls: b.rows.map((r) =>
+        r.kind === "img" ? this.host.imageUrl(r.path) : null,
+      ),
+      picked: b.rows.findIndex((_, i) => this.isPicked(n.id, i)),
+    };
   }
 
   /** Center the whole tree in the pane (file open / initial view). If the
@@ -850,13 +914,22 @@ export class MindMap {
     };
   }
 
-  /** エッジを world 座標の折れ線にする（線への当たり判定と印の位置に使う） */
+  /**
+   * エッジを world 座標の折れ線にする（線への当たり判定と印の位置に使う）。
+   * ドラッグ中は指を動かすたびに**すべての**エッジを調べるので、レイアウトが
+   * 変わるまで使い回す（1 本あたり 9 点を毎フレーム作り直していた）。
+   */
   private edgePolyline(id: number): Pt[] | null {
+    const hit = this.polyOf.get(id);
+    if (hit) return hit;
     const e = this.edgeEnds(id);
     if (!e) return null;
-    return flattenSegs(edgeSegs(e.to.x - e.from.x, e.to.y - e.from.y), 8).map(
-      (q) => ({ x: e.from.x + q[0], y: e.from.y + q[1] }),
-    );
+    const pts = flattenSegs(
+      edgeSegs(e.to.x - e.from.x, e.to.y - e.from.y),
+      8,
+    ).map((q) => ({ x: e.from.x + q[0], y: e.from.y + q[1] }));
+    this.polyOf.set(id, pts);
+    return pts;
   }
 
   /** id を指定して一時的な class を付ける（DOM を舐めずに済む） */

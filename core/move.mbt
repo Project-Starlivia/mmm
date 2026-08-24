@@ -13,7 +13,7 @@ fn cmd_indent(ids : Array[Int]) -> Unit {
   for k in idxs {
     if prev_sibling(k) >= 0 {
       keep.push(st.nodes[k].id)
-      for m in subtree_nodes(st.nodes[k].from, st.nodes[k].to) {
+      for m in subtree_of(k) {
         set.push(Edit::{
           from: st.nodes[m].from,
           to: st.nodes[m].from,
@@ -66,7 +66,7 @@ fn cmd_outdent(ids : Array[Int]) -> Unit {
     if pe == nd.to {
       // already the last block in the parent: pure depth change
       let set : Array[Edit] = []
-      for m in subtree_nodes(nd.from, nd.to) {
+      for m in subtree_of(i) {
         set.push(Edit::{
           from: st.nodes[m].from,
           to: st.nodes[m].from + 1,
@@ -110,7 +110,7 @@ fn move_block(i : Int, at : Int, new_depth : Int) -> Unit {
   let delta = new_depth - nd.depth
   // shift every heading in the block by delta '#'; remember each heading's
   // id and its offset inside the rebuilt block so ids survive the move
-  let heads = subtree_nodes(nd.from, nd.to)
+  let heads = subtree_of(i)
   let rels : Array[(Int, Int)] = []
   let sb = StringBuilder::new()
   let mut pos = nd.from
@@ -161,24 +161,25 @@ fn move_block(i : Int, at : Int, new_depth : Int) -> Unit {
   let ins = Edit::{ from: at2, to: at2, insert: moved, removed: "" }
   let set : Array[Edit] = if at2 <= del_from { [ins, del] } else { [del, ins] }
   apply_sets([set], "")
-  let new_hs = if at2 >= nd.to {
+  let new_from = if at2 >= nd.to {
     at2 - (nd.to - del_from)
   } else {
     at2
   }
   // restore the block's original ids at their new positions
-  let base = new_hs + prefix_len
-  let at_hs : Map[Int, Int] = Map([]) // from -> node index
+  let base = new_from + prefix_len
+  let at_from : Map[Int, Int] = Map([]) // from -> node index
   for idx = 0; idx < st.nodes.length(); idx = idx + 1 {
-    at_hs[st.nodes[idx].from] = idx
+    at_from[st.nodes[idx].from] = idx
   }
   for r in rels {
     let (rid, rel) = r
-    match at_hs.get(base + rel) {
+    match at_from.get(base + rel) {
       Some(idx) => st.nodes[idx].id = rid
       None => ()
     }
   }
+  reindex() // id を貼り直したので表も作り直す
   recompute_parents()
   refresh_entry_after()
   st.focus = old_id

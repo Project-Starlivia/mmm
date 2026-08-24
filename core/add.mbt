@@ -109,7 +109,7 @@ fn cmd_add_parent(id : Int, tag : String) -> Unit {
     let nd = st.nodes[find_node(id)]
     let (head, prefix) = insert_heading_edit(nd.from, nd.depth)
     let set : Array[Edit] = [head]
-    for m in subtree_nodes(nd.from, nd.to) {
+    for m in subtree_of(find_node(id)) {
       set.push(Edit::{
         from: st.nodes[m].from,
         to: st.nodes[m].from,

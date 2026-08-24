@@ -44,6 +44,7 @@ priv struct St {
   mut tx : Entry? // open transaction accumulating steps
   mut hide_regions : Array[HideRegion] // <!-- … --> marker spans
   mut fences : Array[Fence] // ``` … ``` spans
+  mut index_of : Map[Int, Int] // node id -> 添字
 }
 
 ///|
@@ -59,6 +60,7 @@ let st : St = {
   tx: None,
   hide_regions: [],
   fences: [],
+  index_of: Map([]),
 }
 
 ///|
@@ -92,11 +94,8 @@ fn rebuild_nodes(id_at : Map[Int, Int]) -> Unit {
   let hn = heads.length()
   let n = st.text.length()
 
-  // ---- subtree end ----
-  // (1) next kept heading with depth <= ours (stack, O(n))
-  // `to` という名前は Node.to へそのまま流れ込む値だから
-  // （以前は `sub` という名で、同じファイル中の substring ヘルパー
-  // `slice(s, a, b)` と紛らわしく衝突していた）。
+  // ---- 区間の終わり ----
+  // (1) 深さが自分以下の次の見出しの手前まで（スタックで O(n)）
   let range_end : Array[Int] = Array::make(hn, n)
   let open : Array[Int] = []
   for i = 0; i < hn; i = i + 1 {
@@ -167,6 +166,7 @@ fn rebuild_nodes(id_at : Map[Int, Int]) -> Unit {
     })
   }
   st.nodes = nodes
+  reindex()
   recompute_parents()
 }
 
@@ -209,40 +209,50 @@ fn recompute_parents() -> Unit {
 }
 
 ///|
-fn find_node(id : Int) -> Int {
+/// id → 添字の表を作り直す。ノードを並べ替えたあと（move_block が id を
+/// 貼り直したあとも含む）必ず呼ぶ。
+fn reindex() -> Unit {
+  let m : Map[Int, Int] = Map([])
   for i = 0; i < st.nodes.length(); i = i + 1 {
-    if st.nodes[i].id == id {
-      return i
-    }
+    m[st.nodes[i].id] = i
   }
-  -1
+  st.index_of = m
+}
+
+///|
+/// 無ければ -1。線形に探していたころ、まとめて動かすと
+/// 「選んだ数 × ノード数」になっていた。
+fn find_node(id : Int) -> Int {
+  match st.index_of.get(id) {
+    Some(i) => i
+    None => -1
+  }
 }
 
 ///|
 /// 他の選択に含まれている id を落とし、文書順のまま返す。親子関係ではなく
 /// **範囲の包含**で見るのは、テキストのコマンドが実際に相手にするのが
 /// 範囲だから。
+///
+/// 文書順では「先に来るノードの from のほうが必ず小さい」ので、i が落ちる
+/// 条件は「i より前の選択ノードの to の最大値 > i.from」と同じ。総当たりで
+/// 見ていたころ、覆うノードが無い並び（兄弟だけを全選択）で二乗になり、
+/// 4000 個の Mod+A → Tab が 240ms 固まっていた。
 fn normalize_selection(ids : Array[Int]) -> Array[Int] {
   let want : Map[Int, Bool] = Map([])
   for id in ids {
     want[id] = true
   }
   let out : Array[Int] = []
+  let mut cover_end = -1
   for i = 0; i < st.nodes.length(); i = i + 1 {
     let nd = st.nodes[i]
     if want.get(nd.id) is Some(_) {
-      let mut covered = false
-      for j = 0; j < st.nodes.length(); j = j + 1 {
-        if j != i && want.get(st.nodes[j].id) is Some(_) {
-          let o = st.nodes[j]
-          if nd.from > o.from && nd.from < o.to {
-            covered = true
-            break
-          }
-        }
-      }
-      if !covered {
+      if nd.from >= cover_end {
         out.push(i)
+      }
+      if nd.to > cover_end {
+        cover_end = nd.to
       }
     }
   }
