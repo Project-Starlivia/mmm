@@ -27,11 +27,13 @@ export interface Box {
 }
 
 export interface Layout {
+  /** 描くノード、文書順（畳まれて埋もれたものは入らない） */
   visible: NodeInfo[];
-  order: number[];
   boxes: Map<number, Box>;
   parentOf: Map<number, number>;
-  hiddenKids: Map<number, number>;
+  /** 畳んだノード → その下に埋もれている**子孫**の数（子だけではない） */
+  buriedCount: Map<number, number>;
+  /** 子 → 親の辺の上での、付け根のずらし量(px) */
   fanOf: Map<number, number>;
 }
 
@@ -40,12 +42,12 @@ const gapBefore = (i: number): number => (i === 0 ? 0 : GAP.y);
 function collapseHidden(nodes: NodeInfo[]): {
   visible: NodeInfo[];
   buried: Set<number>;
-  hiddenKids: Map<number, number>;
+  buriedCount: Map<number, number>;
 } {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const topOf = new Map<number, number>();
   const buried = new Set<number>();
-  const hiddenKids = new Map<number, number>();
+  const buriedCount = new Map<number, number>();
   for (const n of nodes) {
     const parent = n.parent === -1 ? undefined : byId.get(n.parent);
     if (!parent) continue;
@@ -53,19 +55,19 @@ function collapseHidden(nodes: NodeInfo[]): {
     if (top !== undefined) {
       topOf.set(n.id, top);
       buried.add(n.id);
-      hiddenKids.set(top, (hiddenKids.get(top) ?? 0) + 1);
+      buriedCount.set(top, (buriedCount.get(top) ?? 0) + 1);
     }
   }
-  return { visible: nodes.filter((n) => !buried.has(n.id)), buried, hiddenKids };
+  return { visible: nodes.filter((n) => !buried.has(n.id)), buried, buriedCount };
 }
 
 export function layoutMap(doc: DocView): Layout {
   const nodes = doc.nodes;
-  const { visible, buried, hiddenKids } = collapseHidden(nodes);
+  const { visible, buried, buriedCount } = collapseHidden(nodes);
   const rowsOf = cardRows(doc, buried);
   const sizes = new Map<number, { w: number; h: number }>();
   for (const n of visible) {
-    sizes.set(n.id, nodeSize(n, rowsOf.get(n.id)!, hiddenKids.get(n.id) ?? 0));
+    sizes.set(n.id, nodeSize(n, rowsOf.get(n.id)!, buriedCount.get(n.id) ?? 0));
   }
 
   const children = new Map<number, NodeInfo[]>();
@@ -163,12 +165,5 @@ export function layoutMap(doc: DocView): Layout {
     }
   }
 
-  return {
-    visible,
-    order: visible.map((n) => n.id),
-    boxes,
-    parentOf,
-    hiddenKids,
-    fanOf,
-  };
+  return { visible, boxes, parentOf, buriedCount, fanOf };
 }

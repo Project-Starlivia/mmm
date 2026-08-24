@@ -19,11 +19,11 @@ fn apply_edit_set(text : String, edits : Array[Edit]) -> String {
   let sb = StringBuilder::new()
   let mut pos = 0
   for e in edits {
-    sb.write_string(sub(text, pos, e.from))
+    sb.write_string(slice(text, pos, e.from))
     sb.write_string(e.insert)
     pos = e.to
   }
-  sb.write_string(sub(text, pos, text.length()))
+  sb.write_string(slice(text, pos, text.length()))
   sb.to_string()
 }
 
@@ -71,7 +71,7 @@ fn map_offset(p : Int, edits : Array[Edit]) -> Int {
         // 付くことはない
         let mut has_nl = false
         for k = 0; k < e.removed.length(); k = k + 1 {
-          if cc(e.removed, k) == 10 {
+          if code_at(e.removed, k) == 10 {
             has_nl = true
             break
           }
@@ -85,7 +85,7 @@ fn map_offset(p : Int, edits : Array[Edit]) -> Int {
       // newline creates new line(s) ABOVE and pushes the heading right;
       // anything else (e.g. an indent's "#") rewrites this line in place
       let n = e.insert.length()
-      if n > 0 && cc(e.insert, n - 1) == 10 {
+      if n > 0 && code_at(e.insert, n - 1) == 10 {
         delta = delta + n
       }
       break

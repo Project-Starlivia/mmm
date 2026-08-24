@@ -1,4 +1,6 @@
 // mmm core — markdown / mindmap / mirror.
-// The Markdown text is the single source of truth; the tree is a derived
-// view, and every mutation from either pane is a text-edit command on one
-// shared undo stack. See parser.mbt / doc.mbt / cmds.mbt / api.mbt.
+//
+// Markdown のテキストが唯一の真実で、木はそこから導いた見え方にすぎない。
+// どちらのペインからの変更も、1 本の undo スタックに載るテキストの編集に
+// なる。入口は api.mbt、読み取りは parser.mbt / doc.mbt、
+// コマンドは add / move / cmds。

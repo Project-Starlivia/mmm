@@ -96,7 +96,7 @@ html, body {
 #panes { display: flex; flex: 1; min-height: 0; }
 .pane-off { display: none !important; }
 
-/* トグルボタンは押されているかが見た目で分かること（mmm.md その３）。
+/* トグルボタンは押されているかが見た目で分かること。
    ON = アクセント色で塗って枠を立てる / OFF = 沈んだ空枠 + 取り消し線 */
 #topbar button.toggle {
   position: relative;

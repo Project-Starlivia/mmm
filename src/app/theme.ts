@@ -1,6 +1,5 @@
-// 見た目の好み: ブランドカラー (mmm.md 課題: カラーピッカー) と
-// ライト/ダーク (mmm.md そのに: default = OS, fallback dark)。
-// どちらも保存して、次のセッションでもそのまま。
+// 見た目の好み: ブランドカラーと、ライト/ダーク（既定は OS 設定、
+// 分からなければダーク）。どちらも保存して、次のセッションでもそのまま。
 
 import { LS_COLOR, LS_THEME, load, store } from "./persist.ts";
 import { logoInner, logoSvg } from "./logo.ts";
@@ -55,7 +54,7 @@ export function initTheme(args: {
   const colorInput = document.createElement("input");
   colorInput.type = "color";
   // ロゴの下に（見えない形で）置く。ネイティブのピッカーが画面外ではなく
-  // 左上に開くようにするため (mmm.md そのに)
+  // 左上に開くようにするため
   colorInput.style.position = "fixed";
   colorInput.style.left = "10px";
   colorInput.style.top = "10px";

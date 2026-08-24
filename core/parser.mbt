@@ -1,6 +1,6 @@
-// Line-level scanner. Structure detection is a single rule: ^(#+)\s+(.*)$
-// (spec 2.1). Depth is unbounded (spec 2.2), so the standard Markdown parser
-// cannot be used for headings; we only need line offsets and fence tracking.
+// 行の走査。構造の判定は `^(#+)\s+(.*)$` の 1 本だけ。深さに上限を置かない
+// ので既成の Markdown パーサは使えないが、必要なのは行のオフセットと
+// フェンス / hide 領域の追跡だけなので、これで足りる。
 
 ///|
 priv struct Line {
@@ -16,9 +16,9 @@ fn scan_lines(text : String) -> Array[Line] {
   let mut start = 0
   let mut i = 0
   while i < n {
-    if cc(text, i) == 10 {
+    if code_at(text, i) == 10 {
       let mut e = i
-      if e > start && cc(text, e - 1) == 13 {
+      if e > start && code_at(text, e - 1) == 13 {
         e = e - 1
       }
       lines.push(Line::{ start, end: e, next: i + 1 })
@@ -35,8 +35,8 @@ fn scan_lines(text : String) -> Array[Line] {
 ///|
 priv struct Heading {
   depth : Int
-  hs : Int // heading line start offset
-  he : Int // heading line end offset (excl newline)
+  from : Int // heading line start offset
+  head_end : Int // heading line end offset (excl newline)
   content_start : Int // offset just after the heading line's newline
   label : String
   hidden : Bool // inside a <!-- … --> hide region
@@ -183,26 +183,26 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
     }
     // strict ^(#+)\s+(.*)$ with no leading spaces allowed
     let mut p = l.start
-    while p < l.end && cc(text, p) == 35 {
+    while p < l.end && code_at(text, p) == 35 {
       p = p + 1
     }
     let depth = p - l.start
-    if depth >= 1 && p < l.end && is_space(cc(text, p)) {
-      while p < l.end && is_space(cc(text, p)) {
+    if depth >= 1 && p < l.end && is_space(code_at(text, p)) {
+      while p < l.end && is_space(code_at(text, p)) {
         p = p + 1
       }
       let mut label_end = l.end
       // also trim a trailing \r (a file ending in "\r" with no final \n)
       while label_end > p &&
-            (is_space(cc(text, label_end - 1)) || cc(text, label_end - 1) == 13) {
+            (is_space(code_at(text, label_end - 1)) || code_at(text, label_end - 1) == 13) {
         label_end = label_end - 1
       }
       out.push(Heading::{
         depth,
-        hs: l.start,
-        he: l.end,
+        from: l.start,
+        head_end: l.end,
         content_start: l.next,
-        label: sub(text, p, label_end),
+        label: slice(text, p, label_end),
         hidden: in_comment,
       })
     }
@@ -239,10 +239,10 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
 fn trim_range(text : String, a : Int, b : Int) -> (Int, Int) {
   let mut s = a
   let mut e = b
-  while s < e && is_space(cc(text, s)) {
+  while s < e && is_space(code_at(text, s)) {
     s = s + 1
   }
-  while e > s && (is_space(cc(text, e - 1)) || cc(text, e - 1) == 13) {
+  while e > s && (is_space(code_at(text, e - 1)) || code_at(text, e - 1) == 13) {
     e = e - 1
   }
   (s, e)
@@ -260,17 +260,17 @@ fn trimmed_span(text : String, l : Line) -> (Int, Int) {
 /// extra dash is content) and `--->` still closes one (it is `-` followed
 /// by `-->`). Being stricter than the renderer means a one-character typo
 /// silently hides the rest of the document while every other tool shows it
-/// closed — which is exactly what happened in mmm.md.
+/// closed — which is exactly what happened on a real document.
 ///
 /// Opener: `<!` followed by 2+ dashes, nothing else on the line.
 fn is_comment_open(text : String, l : Line) -> Bool {
   let (a, b) = trimmed_span(text, l)
-  if b - a < 4 || cc(text, a) != 60 || cc(text, a + 1) != 33 {
+  if b - a < 4 || code_at(text, a) != 60 || code_at(text, a + 1) != 33 {
     return false
   }
   let mut p = a + 2
   let mut dashes = 0
-  while p < b && cc(text, p) == 45 {
+  while p < b && code_at(text, p) == 45 {
     p = p + 1
     dashes = dashes + 1
   }
@@ -283,11 +283,11 @@ fn is_comment_close(text : String, l : Line) -> Bool {
   let (a, b) = trimmed_span(text, l)
   let mut p = a
   let mut dashes = 0
-  while p < b && cc(text, p) == 45 {
+  while p < b && code_at(text, p) == 45 {
     p = p + 1
     dashes = dashes + 1
   }
-  dashes >= 2 && p + 1 == b && cc(text, p) == 62
+  dashes >= 2 && p + 1 == b && code_at(text, p) == 62
 }
 
 ///|
@@ -296,19 +296,19 @@ fn is_comment_close(text : String, l : Line) -> Bool {
 fn fence_open(text : String, l : Line) -> FenceOpen? {
   let mut p = l.start
   let mut indent = 0
-  while p < l.end && cc(text, p) == 32 && indent < 3 {
+  while p < l.end && code_at(text, p) == 32 && indent < 3 {
     p = p + 1
     indent = indent + 1
   }
   if p >= l.end {
     return None
   }
-  let c = cc(text, p)
+  let c = code_at(text, p)
   if c != 96 && c != 126 {
     return None
   }
   let mut q = p
-  while q < l.end && cc(text, q) == c {
+  while q < l.end && code_at(text, q) == c {
     q = q + 1
   }
   let len = q - p
@@ -318,14 +318,14 @@ fn fence_open(text : String, l : Line) -> FenceOpen? {
   if c == 96 {
     let mut r = q
     while r < l.end {
-      if cc(text, r) == 96 {
+      if code_at(text, r) == 96 {
         return None
       }
       r = r + 1
     }
   }
   let (a, b) = trim_range(text, q, l.end)
-  Some(FenceOpen::{ ch: c, len, info: sub(text, a, b) })
+  Some(FenceOpen::{ ch: c, len, info: slice(text, a, b) })
 }
 
 ///|
@@ -333,12 +333,12 @@ fn fence_open(text : String, l : Line) -> FenceOpen? {
 fn fence_close_len(text : String, l : Line, fence_char : Int) -> Int {
   let mut p = l.start
   let mut indent = 0
-  while p < l.end && cc(text, p) == 32 && indent < 3 {
+  while p < l.end && code_at(text, p) == 32 && indent < 3 {
     p = p + 1
     indent = indent + 1
   }
   let mut q = p
-  while q < l.end && cc(text, q) == fence_char {
+  while q < l.end && code_at(text, q) == fence_char {
     q = q + 1
   }
   let len = q - p
@@ -346,7 +346,7 @@ fn fence_close_len(text : String, l : Line, fence_char : Int) -> Int {
     return 0
   }
   while q < l.end {
-    if !is_space(cc(text, q)) {
+    if !is_space(code_at(text, q)) {
       return 0
     }
     q = q + 1

@@ -124,16 +124,16 @@ test("P2c: ノードのオフセットと親子関係が常に整合する", () 
     const s = initDoc(md);
     const text = getText();
     const byId = new Map(s.nodes.map((n) => [n.id, n]));
-    let prevHs = -1;
+    let prevFrom = -1;
     for (const n of s.nodes) {
-      assert.ok(n.hs > prevHs, `${tag}: hs が文書順に単調増加でない (id=${n.id})`);
-      prevHs = n.hs;
-      assert.ok(n.he >= n.hs, `${tag}: he < hs (id=${n.id})`);
-      assert.ok(n.subEnd >= n.he, `${tag}: subEnd < he (id=${n.id})`);
-      assert.ok(n.subEnd <= text.length, `${tag}: subEnd が本文長を超える (id=${n.id})`);
+      assert.ok(n.from > prevFrom, `${tag}: from が文書順に単調増加でない (id=${n.id})`);
+      prevFrom = n.from;
+      assert.ok(n.headEnd >= n.from, `${tag}: headEnd < from (id=${n.id})`);
+      assert.ok(n.to >= n.headEnd, `${tag}: to < headEnd (id=${n.id})`);
+      assert.ok(n.to <= text.length, `${tag}: to が本文長を超える (id=${n.id})`);
       // 見出し行が本当に見出しであること
-      const line = text.slice(n.hs, n.he);
-      assert.match(line, /^#+(\s|$)/, `${tag}: hs..he が見出し行でない (id=${n.id}, ${JSON.stringify(line)})`);
+      const line = text.slice(n.from, n.headEnd);
+      assert.match(line, /^#+(\s|$)/, `${tag}: hs..headEnd が見出し行でない (id=${n.id}, ${JSON.stringify(line)})`);
       // depth は「# の数」そのものではない。`---` で始まる束の中では、
       // 束の先頭を深さ 2 として相対的に読み替える（2026-08-12 の記法変更）。
       // 読み替えは持ち上げる方向にしか働かないので、depth が # の数を
@@ -152,7 +152,7 @@ test("P2c: ノードのオフセットと親子関係が常に整合する", () 
         assert.ok(p, `${tag}: parent id ${n.parent} が存在しない (id=${n.id})`);
         assert.ok(p.depth < n.depth, `${tag}: 親の depth が子以上 (id=${n.id})`);
         assert.ok(
-          p.hs < n.hs && n.subEnd <= p.subEnd,
+          p.from < n.from && n.to <= p.to,
           `${tag}: 子の範囲が親の範囲に含まれていない (id=${n.id})`,
         );
       }
@@ -186,7 +186,7 @@ test("P2d: depth1 のノードはどれも親を持たず、範囲が重なら�
     // 隣り合うルートの範囲が食い合わない（食うと片方を消したとき巻き添えになる）
     for (let i = 1; i < roots.length; i++) {
       assert.ok(
-        roots[i - 1].subEnd <= roots[i].hs,
+        roots[i - 1].to <= roots[i].from,
         `seed=${seed}: ルート id=${roots[i - 1].id} の範囲が次のルートに食い込んでいる。入力=${brief(md)}`,
       );
     }

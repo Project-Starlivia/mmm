@@ -16,7 +16,7 @@ fn unfold_before_add(i : Int, tag : String) -> Bool {
     return false
   }
   for r in st.hide_regions {
-    if r.open_next == nd.hs && r.close_start == nd.sub_end {
+    if r.open_next == nd.from && r.close_start == nd.to {
       begin_tx(tag)
       cmd_toggle_hidden(nd.id)
       return true
@@ -48,9 +48,9 @@ fn with_unfold(id : Int, tag : String, body : () -> Unit) -> Unit {
 fn cmd_add_child(id : Int, tag : String) -> Unit {
   with_unfold(id, tag, fn() {
     let nd = st.nodes[find_node(id)]
-    let (e, prefix) = insert_heading_edit(nd.sub_end, nd.depth + 1)
+    let (e, prefix) = insert_heading_edit(nd.to, nd.depth + 1)
     apply_sets([[e]], tag)
-    focus_node_at(nd.sub_end + prefix)
+    focus_node_at(nd.to + prefix)
   })
 }
 
@@ -67,9 +67,9 @@ fn cmd_add_sibling(id : Int, tag : String) -> Unit {
   }
   with_unfold(id, tag, fn() {
     let nd = st.nodes[find_node(id)]
-    let (e, prefix) = insert_heading_edit(nd.sub_end, nd.depth)
+    let (e, prefix) = insert_heading_edit(nd.to, nd.depth)
     apply_sets([[e]], tag)
-    focus_node_at(nd.sub_end + prefix)
+    focus_node_at(nd.to + prefix)
   })
 }
 
@@ -86,9 +86,9 @@ fn cmd_add_sibling_before(id : Int, tag : String) -> Unit {
   }
   with_unfold(id, tag, fn() {
     let nd = st.nodes[find_node(id)]
-    let (e, prefix) = insert_heading_edit(nd.hs, nd.depth)
+    let (e, prefix) = insert_heading_edit(nd.from, nd.depth)
     apply_sets([[e]], tag)
-    focus_node_at(nd.hs + prefix)
+    focus_node_at(nd.from + prefix)
   })
 }
 
@@ -107,18 +107,18 @@ fn cmd_add_parent(id : Int, tag : String) -> Unit {
   }
   with_unfold(id, tag, fn() {
     let nd = st.nodes[find_node(id)]
-    let (head, prefix) = insert_heading_edit(nd.hs, nd.depth)
+    let (head, prefix) = insert_heading_edit(nd.from, nd.depth)
     let set : Array[Edit] = [head]
-    for m in subtree_nodes(nd.hs, nd.sub_end) {
+    for m in subtree_nodes(nd.from, nd.to) {
       set.push(Edit::{
-        from: st.nodes[m].hs,
-        to: st.nodes[m].hs,
+        from: st.nodes[m].from,
+        to: st.nodes[m].from,
         insert: "#",
         removed: "",
       })
     }
     apply_sets([set], tag)
-    focus_node_at(nd.hs + prefix)
+    focus_node_at(nd.from + prefix)
   })
 }
 

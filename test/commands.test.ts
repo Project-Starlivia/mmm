@@ -13,17 +13,17 @@ const CASES = fuzzCases(250);
 /** ノードのオフセット整合性（roundtrip.test.mjs の P2c と同じ検査） */
 function assertTreeSane(nodes: NodeInfo[], text: string, tag: string): void {
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  let prevHs = -1;
+  let prevFrom = -1;
   for (const n of nodes) {
-    assert.ok(n.hs > prevHs, `${tag}: hs が単調増加でない (id=${n.id})`);
-    prevHs = n.hs;
-    assert.ok(n.subEnd <= text.length, `${tag}: subEnd が本文長超過 (id=${n.id})`);
-    const line = text.slice(n.hs, n.he);
+    assert.ok(n.from > prevFrom, `${tag}: from が単調増加でない (id=${n.id})`);
+    prevFrom = n.from;
+    assert.ok(n.to <= text.length, `${tag}: to が本文長超過 (id=${n.id})`);
+    const line = text.slice(n.from, n.headEnd);
     assert.match(line, /^#+(\s|$)/, `${tag}: 見出し行でない (id=${n.id}, ${JSON.stringify(line)})`);
     if (n.parent !== -1) {
       const p = byId.get(n.parent);
       assert.ok(p, `${tag}: 親 ${n.parent} が存在しない (id=${n.id})`);
-      assert.ok(p.hs < n.hs && n.subEnd <= p.subEnd, `${tag}: 親の範囲外 (id=${n.id})`);
+      assert.ok(p.from < n.from && n.to <= p.to, `${tag}: 親の範囲外 (id=${n.id})`);
     }
   }
 }

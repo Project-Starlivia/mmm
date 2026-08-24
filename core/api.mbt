@@ -20,8 +20,8 @@ fn json_escape(s : String, sb : StringBuilder) -> Unit {
     } else if c < 32 {
       let hex = "0123456789abcdef"
       sb.write_string("\\u00")
-      sb.write_string(sub(hex, c / 16, c / 16 + 1))
-      sb.write_string(sub(hex, c % 16, c % 16 + 1))
+      sb.write_string(slice(hex, c / 16, c / 16 + 1))
+      sb.write_string(slice(hex, c % 16, c % 16 + 1))
     } else {
       sb.write_char(ch)
     }
@@ -103,11 +103,11 @@ fn take_snapshot() -> String {
     sb.write_string(",")
     put_int(sb, "parent", nd.parent)
     sb.write_string(",")
-    put_int(sb, "hs", nd.hs)
+    put_int(sb, "from", nd.from)
     sb.write_string(",")
-    put_int(sb, "he", nd.he)
+    put_int(sb, "headEnd", nd.head_end)
     sb.write_string(",")
-    put_int(sb, "subEnd", nd.sub_end)
+    put_int(sb, "to", nd.to)
     sb.write_string(",")
     put_bool(sb, "hasContent", nd.has_content)
     sb.write_string(",")
@@ -169,7 +169,7 @@ pub fn replace_text(
   if from < 0 || to > n || from > to {
     return take_snapshot()
   }
-  let removed = sub(st.text, from, to)
+  let removed = slice(st.text, from, to)
   if removed == insert {
     return take_snapshot()
   }

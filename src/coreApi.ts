@@ -10,14 +10,21 @@ export interface EditOp {
   insert: string;
 }
 
+/**
+ * ノードは、テキストの一区間 `[from, to)` に付けた名前でしかない。
+ * 削除・コピー・移動・折り畳みはすべてこの区間に対する編集になる。
+ */
 export interface NodeInfo {
   id: number;
   /** テキストに書かれている `#` の数 */
   depth: number;
   parent: number;
-  hs: number;
-  he: number;
-  subEnd: number;
+  /** 区間の始まり = 見出し行の行頭 */
+  from: number;
+  /** 見出し行の行末（改行の手前）。ラベルを書き換える範囲 */
+  headEnd: number;
+  /** 区間の終わり = 部分木の終わり */
+  to: number;
   hasContent: boolean;
   hidden: boolean;
   label: string;

@@ -33,10 +33,10 @@ fn relevel(text : String, target_depth : Int) -> String {
   for h in heads {
     let depth = if h.depth + delta < 1 { 1 } else { h.depth + delta }
     edits.push(Edit::{
-      from: h.hs,
-      to: h.hs + h.depth,
+      from: h.from,
+      to: h.from + h.depth,
       insert: hashes(depth),
-      removed: sub(text, h.hs, h.hs + h.depth),
+      removed: slice(text, h.from, h.from + h.depth),
     })
   }
   apply_edit_set(text, edits)

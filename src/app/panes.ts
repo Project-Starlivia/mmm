@@ -25,7 +25,7 @@ export function initPanes(args: {
     mapPane.classList.toggle("pane-off", !v.map);
     splitter.classList.toggle("pane-off", !v.md || !v.map);
     panesEl.classList.toggle("no-map", !v.map);
-    // オン/オフがボタンの見た目で分かること(mmm.md その３)
+    // 押されているかどうかが、見た目で分かること
     mdButton.classList.toggle("on", v.md);
     mdButton.classList.toggle("off", !v.md);
     mdButton.setAttribute("aria-pressed", String(v.md));

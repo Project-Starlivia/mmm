@@ -4,7 +4,7 @@
 //
 // 経路(src/main.ts の host.copySelection / host.paste に対応):
 //   copy  : core.selectionText(ids)
-//   paste : core.relevelText(clip, 対象ノードの depth + 1) を対象の subEnd に挿入
+//   paste : core.relevelText(clip, 対象ノードの depth + 1) を対象の to に挿入
 //
 // 実行: pnpm test
 
@@ -25,7 +25,7 @@ function pasteAsChildOf(anchorId: number, clip: string) {
   if (!n) throw new Error("anchor が無い");
   const normalized = clip.replace(/\r\n/g, "\n");
   if (!core.hasHeadings(normalized)) return { skipped: "見出しなしとして無視された" };
-  const at = n.subEnd;
+  const at = n.to;
   let body = core.relevelText(normalized, n.depth + 1).trimEnd();
   body += "\n";
   let prefix = "";
@@ -41,7 +41,7 @@ function subtreeShape(nodes: NodeInfo[], rootId: number) {
   if (!root) return null;
   const out: { rel: number; label: string }[] = [];
   for (const n of nodes) {
-    if (n.hs >= root.hs && n.subEnd <= root.subEnd) {
+    if (n.from >= root.from && n.to <= root.to) {
       out.push({ rel: n.depth - root.depth, label: n.label });
     }
   }
@@ -75,7 +75,7 @@ test("X1: コピー→貼り付けで部分木の形が保たれる", () => {
     const after = core.initDoc(getText());
     const dst2 = after.nodes.find((n) => n.label === "dst")!;
     const pasted = after.nodes.filter(
-      (n) => n.hs > dst2.hs && n.subEnd <= dst2.subEnd && n.label === "src",
+      (n) => n.from > dst2.from && n.to <= dst2.to && n.label === "src",
     )[0];
     if (!pasted) {
       failures.push(`${name}: 貼り付けた src が dst の下に見つからない。text=${brief(getText(), 200)}`);
@@ -197,7 +197,7 @@ test("X5: ランダム文書のコピー→貼り付けで木が壊れない", (
     const after = core.initDoc(text);
     // 内部整合性
     for (const n of after.nodes) {
-      const line = text.slice(n.hs, n.he);
+      const line = text.slice(n.from, n.headEnd);
       if (!/^#+(\s|$)/.test(line)) {
         failures.push(`seed=${seed}: 貼り付け後に見出しでない行がノード化 ${JSON.stringify(line)}`);
         break;

@@ -267,7 +267,7 @@ test "pre-root nodes form their own separate tree" {
   ignore(init_doc("## L\n\n### L1\n\n# r\n\n## R\n"))
   // kept order: L(1), L1(2), r(3), R(4); L is an independent top-level
   // tree (not a child of the root)
-  // sibling of L inserts at L's sub_end — still before the root
+  // sibling of L inserts at L's to — still before the root
   ignore(add_sibling(1, ""))
   assert_eq(get_text(), "## L\n\n### L1\n\n## \n\n# r\n\n## R\n")
   ignore(undo())
@@ -346,7 +346,7 @@ test "existing bytes are kept, but inserted newlines are always LF" {
 ///|
 test "hide wraps the subtree in comment markers" {
   ignore(init_doc("# r\n\n## a\n\nbody\n\n### a1\n\n## b\n"))
-  // a = id 2; hiding wraps [hs, sub_end)
+  // a = id 2; hiding wraps [from, to)
   ignore(toggle_hidden(2))
   assert_eq(
     get_text(),
@@ -489,7 +489,7 @@ test "hide at EOF with trailing newline round-trips" {
 ///|
 test "comment markers follow renderer behaviour, not exact strings" {
   // `--->` closes a comment in HTML (it is `-` then `-->`), so it must
-  // close one here too. Being stricter hid the rest of mmm.md.
+  // close one here too. Being stricter hid the rest of a real document.
   ignore(init_doc("# r\n\n<!--\n## a\n--->\n\n## b\n"))
   let s = init_doc("# r\n\n<!--\n## a\n--->\n\n## b\n")
   assert_eq(s.contains("\"hidden\":true,\"label\":\"a\""), true)

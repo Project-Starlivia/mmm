@@ -96,13 +96,13 @@ test("contentEnd: 部分木の外の見出しは境界にしない（折り畳�
   // 向こう側 = 折り畳みの中へ入ってしまう
   const md = "# r\n\n## n\n\n[a](https://a.example)\n\n<!--\n\n## h\n\n-->\n\n## m\n";
   const { end, node, next, text } = endOfNode(md, "n");
-  assert.ok(next.hs > node.subEnd, "この文書は分岐を踏み分けていない");
-  assert.equal(end, node.subEnd);
+  assert.ok(next.from > node.to, "この文書は分岐を踏み分けていない");
+  assert.equal(end, node.to);
   assert.equal(end, text.indexOf("<!--"));
 });
 
 test("contentEnd: 最後のノードなら、部分木の終わり（＝文書の終わり）", () => {
   const md = "# r\n\n## n\n\n[a](https://a.example)\n";
   const { end, node } = endOfNode(md, "n");
-  assert.equal(end, node.subEnd);
+  assert.equal(end, node.to);
 });

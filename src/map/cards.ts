@@ -193,9 +193,9 @@ function rowsOfContent(
  */
 export function contentEnd(nodes: NodeInfo[], i: number): number {
   const n = nodes[i];
-  return i + 1 < nodes.length && nodes[i + 1].hs < n.subEnd
-    ? nodes[i + 1].hs
-    : n.subEnd;
+  return i + 1 < nodes.length && nodes[i + 1].from < n.to
+    ? nodes[i + 1].from
+    : n.to;
 }
 
 /**
@@ -216,7 +216,7 @@ export function cardRows(
       out.set(n.id, []);
       continue;
     }
-    const brk = doc.text.indexOf("\n", n.he);
+    const brk = doc.text.indexOf("\n", n.headEnd);
     const start = brk === -1 ? -1 : brk + 1;
     const end = contentEnd(doc.nodes, i);
     out.set(

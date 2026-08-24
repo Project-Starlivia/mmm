@@ -1,8 +1,7 @@
-// Orchestrator: single document model lives in the MoonBit core; both panes
-// mirror it (spec 4.2). Selection, focus, persistence and file I/O live
-// here, along with the glue that pure decision logic elsewhere (app/paste,
-// app/name...) doesn't own: clipboard-paste dispatch, drag & drop, and the
-// global keyboard shortcuts.
+// 束ねる場所。文書そのものは MoonBit コアが 1 つだけ持ち、2 枚のペインは
+// どちらもその写し。ここに居るのは、選択・フォーカス・保存とファイル I/O、
+// そして純粋な判断（app/paste, app/name…）が引き受けない繋ぎ —
+// クリップボードの振り分け、ドラッグ&ドロップ、全体のショートカット。
 
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import {
@@ -161,11 +160,11 @@ function syncSelectionViews(reveal: boolean, repaint = false): void {
       : [...selection]
           .map((id) => byId.get(id))
           .filter((n): n is NodeInfo => !!n)
-          .map((n) => ({ from: n.hs, to: n.subEnd })),
+          .map((n) => ({ from: n.from, to: n.to })),
   );
   if (reveal && anchorId !== -1) {
     const n = byId.get(anchorId);
-    if (n) editor.reveal(n.hs);
+    if (n) editor.reveal(n.from);
   }
 }
 
@@ -403,11 +402,10 @@ const host: MapHost = {
     if (cut) host.deleteSelection();
   },
   paste() {
-    // paste as CHILD of the focused node (mmm.md 課題); into an empty
-    // document the clip is inserted verbatim
+    // 貼り付け先は選んでいるノードの**子**。空の文書へはそのまま入れる
     if (anchorId === -1 && doc.nodes.length > 0) return;
     void (async () => {
-      // an image on the clipboard wins over text (mmm.md そのに: 画像配置)
+      // クリップボードに画像があれば、テキストより優先する
       //
       // try で囲うのは**クリップボードを読むところだけ**。画像を置く処理まで
       // 囲うと、フォルダ選択の失敗が「クリップボードが読めなかった」と
@@ -457,10 +455,10 @@ const host: MapHost = {
           return;
         }
         case "children":
-          insertBlock(n0!.subEnd, action.body);
+          insertBlock(n0!.to, action.body);
           return;
         case "block": {
-          const at = anchorId === -1 ? core.getText().length : n0!.subEnd;
+          const at = anchorId === -1 ? core.getText().length : n0!.to;
           insertBlock(at, action.body);
           return;
         }
@@ -598,7 +596,7 @@ async function confirmDiscard(): Promise<boolean> {
   return window.confirm("未保存の変更があります。破棄して続行しますか？");
 }
 
-// ---------- images (mmm.md そのに: 画像配置 — local-first) ----------
+// ---------- 画像（ローカルファースト） ----------
 // 実装は app/assets.ts。ここは「いまのファイル」と描き直しを繋ぐだけ
 
 const assets = initAssets({

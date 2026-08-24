@@ -1,8 +1,8 @@
-// Mindmap pane: SVG rendering + Figma-style pan/zoom/selection (spec 3.3),
-// drag re-parenting with a mandatory drop indicator (spec 3.3.2), and an
-// HTML overlay input for label editing (IME-safe).
+// マップのペイン。SVG の描画と、Figma 風のパン / ズーム / 選択、
+// ドラッグでの付け替え（落とし先は必ず線で示す）、そしてラベルとカードを
+// その場で直す HTML の入力欄（IME を壊さないため SVG の外に重ねる）。
 //
-// Layout: every tree grows from left to right.
+// レイアウトはすべて左から右へ伸びる。
 
 import type { DocView, NodeInfo } from "./coreApi";
 import {
@@ -278,9 +278,9 @@ export class MindMap {
     this.hint.style.display = doc.nodes.length === 0 ? "flex" : "none";
 
     const L = layoutMap(doc);
-    const { visible, boxes, hiddenKids, fanOf } = L;
+    const { visible, boxes, buriedCount, fanOf } = L;
     this.boxes = boxes;
-    this.order = L.order;
+    this.order = visible.map((n) => n.id);
     this.parentOf = L.parentOf;
     this.fanOf = fanOf;
     // ドラッグ中に別ペインの編集などで木が変わることがある。掴んでいた
@@ -362,10 +362,8 @@ export class MindMap {
         this.nodeTf.set(n.id, tf);
       }
 
-      // 同じ render の中に「折り畳まれた id の集合」の buried もあるので、
-      // こちらは件数と分かる名前にする
-      const buriedCount = hiddenKids.get(n.id) ?? 0;
-      const sig = this.contentSig(n, b, buriedCount);
+      const buried = buriedCount.get(n.id) ?? 0;
+      const sig = this.contentSig(n, b, buried);
       if (this.nodeSig.get(n.id) === sig) continue; // 中身は据え置き
       this.nodeSig.set(n.id, sig);
       g.replaceChildren();
@@ -385,11 +383,11 @@ export class MindMap {
         "font-size": String(rowOf(n).fontPx),
       });
       label.textContent = n.hidden
-        ? hiddenLabel(n, buriedCount)
+        ? hiddenLabel(n, buried)
         : displayLabel(n.label);
       const t = svgEl("title");
       t.textContent = n.hidden
-        ? `${n.label}${buriedCount ? `\n（${buriedCount} 件を折り畳み中。Shift+H で戻す）` : "\n（非表示。Shift+H で戻す）"}`
+        ? `${n.label}${buried ? `\n（${buried} 件を折り畳み中。Shift+H で戻す）` : "\n（非表示。Shift+H で戻す）"}`
         : n.label;
       g.append(label, t);
       // card rows (links / images) from the attached content, stacked
@@ -600,19 +598,26 @@ export class MindMap {
   }
 
   /**
-   * その座標にある要素から印を辿る。`e.target` は当てにしない —
-   * ドラッグのためにペインがポインタキャプチャを取ると、以降のイベントは
-   * ペインへ付け替えられ、target が実際に押した要素を指さなくなる。
+   * その座標にあるカード。`e.target` は当てにしない — ドラッグのために
+   * ペインがポインタキャプチャを取ると、以降のイベントはペインへ
+   * 付け替えられ、target が実際に押した要素を指さなくなる。
+   *
+   * `data-card` はカードそのもの、`data-kill` は選択中に出る × ボタン。
    */
-  private markAt(x: number, y: number, attr: string): string | null {
-    const el = document.elementFromPoint(x, y);
-    return el?.closest?.(`[${attr}]`)?.getAttribute(attr) ?? null;
-  }
-
-  private static span(mark: string | null): [number, number] | null {
-    if (mark === null) return null;
-    const [from, to] = mark.split(",").map(Number);
-    return Number.isFinite(from) && Number.isFinite(to) ? [from, to] : null;
+  private cardAt(
+    x: number,
+    y: number,
+    attr: "data-card" | "data-kill",
+  ): CardRef | null {
+    const mark = document
+      .elementFromPoint(x, y)
+      ?.closest?.(`[${attr}]`)
+      ?.getAttribute(attr);
+    if (!mark) return null;
+    const [node, index] = mark.split(",").map(Number);
+    return Number.isFinite(node) && Number.isFinite(index)
+      ? { node, index }
+      : null;
   }
 
   /**
@@ -956,11 +961,10 @@ export class MindMap {
     if (this.editingId === -1) return;
     const b = this.boxes.get(this.editingId);
     if (!b) return;
-    // The input has to sit EXACTLY on the node's label row (mmm.md その３:
-    // 編集時入力欄右に空白がある). Everything below is computed in world
-    // units first and scaled once, because the input's padding and border
-    // are CSS pixels that do NOT scale with the zoom — leaving them fixed is
-    // what made the input and the box disagree at any zoom other than 1.
+    // 入力欄はラベル行に**ぴったり**重ならなければならない。以下はすべて
+    // world 単位で組んでから 1 度だけ倍率を掛ける — 入力欄の padding と
+    // border は CSS ピクセルでズームに追従しないので、そのままにすると
+    // 倍率 1 以外で箱と入力欄がずれる（実際にずれていた）。
     const BORDER = 2; // #node-editor の枠（拡大しない）
     // ラベル行の寸法は rowOf() が唯一の定義。SVG 側と同じものを使うので
     // 通常ノードでも折り畳んだノードでも文字位置がずれない
@@ -1033,7 +1037,7 @@ export class MindMap {
       (e) => {
         e.preventDefault();
         if (e.ctrlKey || e.metaKey) {
-          // zoom anchored at the cursor (spec 3.3)
+          // ズームはカーソルを基点にする
           const r = pane.getBoundingClientRect();
           const cx = e.clientX - r.left;
           const cy = e.clientY - r.top;
@@ -1092,15 +1096,14 @@ export class MindMap {
       // 落とし、click が届く前に × が DOM から消える。選んでいるカードの
       // 上からのドラッグはカードを動かす — 選んでいないカードの上からは、
       // 従来どおりノードが動く（既存の D&D を奪わない）
-      const downKill = MindMap.span(this.markAt(e.clientX, e.clientY, "data-kill"));
-      const downCard = MindMap.span(this.markAt(e.clientX, e.clientY, "data-card"));
+      const downCard = this.cardAt(e.clientX, e.clientY, "data-card");
       const held = this.host.pickedCard();
-      if (downKill !== null) return;
+      if (this.cardAt(e.clientX, e.clientY, "data-kill")) return;
       if (
         downCard !== null &&
         held !== null &&
-        held.node === downCard[0] &&
-        held.index === downCard[1]
+        held.node === downCard.node &&
+        held.index === downCard.index
       ) {
         this.cardDrag = { ref: held, px: e.clientX, py: e.clientY, moved: false };
         pane.setPointerCapture(e.pointerId);
@@ -1112,7 +1115,7 @@ export class MindMap {
         this.dragCand = { id, px: e.clientX, py: e.clientY };
         pane.setPointerCapture(e.pointerId);
       } else {
-        // empty space: rubber band (spec 3.3)
+        // 何も無いところ: 矩形選択
         const r = pane.getBoundingClientRect();
         this.rubberStart = { x: e.clientX - r.left, y: e.clientY - r.top };
         pane.setPointerCapture(e.pointerId);
@@ -1233,7 +1236,7 @@ export class MindMap {
         return;
       }
       if (this.dragCand) {
-        // plain click on a node: selection (spec 3.3 / 3.3.1)
+        // ノードの素のクリック: 選択
         const id = this.dragCand.id;
         this.dragCand = null;
         const sel = this.host.selection();
@@ -1243,7 +1246,7 @@ export class MindMap {
           const b = this.order.indexOf(id);
           if (a !== -1 && b !== -1) {
             const [lo, hi] = a < b ? [a, b] : [b, a];
-            // display order = document order = md line order (spec 3.3.1)
+            // 画面の並び = 文書順 = md の行順
             this.host.setSelection(
               this.order.slice(lo, hi + 1),
               this.host.anchor(),
@@ -1281,10 +1284,10 @@ export class MindMap {
       if ((e.target as Element).classList?.contains("link-open")) return;
       // カードはラベルではなく元テキストを直すので、専用の入力欄を開く。
       // 編集の場所を 2 つ持たない — 隣に本物のエディタが出ている
-      const card = MindMap.span(this.markAt(e.clientX, e.clientY, "data-card"));
+      const card = this.cardAt(e.clientX, e.clientY, "data-card");
       if (card) {
         e.preventDefault();
-        this.beginCardEdit({ node: card[0], index: card[1] });
+        this.beginCardEdit(card);
         return;
       }
       // hit-test by position: pointer capture retargets the event to the
@@ -1331,20 +1334,20 @@ export class MindMap {
       }
       const t = e.target as Element;
       // × は選ばれているカードにだけ出ている。押されたらその行ごと消す
-      const kill = MindMap.span(this.markAt(e.clientX, e.clientY, "data-kill"));
+      const kill = this.cardAt(e.clientX, e.clientY, "data-kill");
       if (kill) {
-        this.host.deleteCard({ node: kill[0], index: kill[1] });
+        this.host.deleteCard(kill);
         return;
       }
-      const pick = MindMap.span(this.markAt(e.clientX, e.clientY, "data-card"));
+      const pick = this.cardAt(e.clientX, e.clientY, "data-card");
       if (pick) {
-        const ref = { node: pick[0], index: pick[1] };
         // pointerdown が「いま掴んでいるカードの上」を dragCand の対象から
         // 外している（下記 pointerdown 参照）ので、素のノード選択は起きず
         // picked はここに来るまで書き換わっていない
         const now = this.host.pickedCard();
-        const same = now !== null && now.node === ref.node && now.index === ref.index;
-        this.host.pickCard(same ? null : ref);
+        const same =
+          now !== null && now.node === pick.node && now.index === pick.index;
+        this.host.pickCard(same ? null : pick);
         return;
       }
       if (!t.classList?.contains("link-open")) return;
@@ -1368,8 +1371,8 @@ export class MindMap {
       this.showMenu(e.clientX, e.clientY);
     });
 
-    // node label editor: Enter / Esc / Mod+Enter all COMMIT (mmm.md そのに:
-    // enter決定。キャンセルは存在しない); Tab does nothing
+    // ラベルの入力欄。Enter / Esc / Mod+Enter はどれも**確定**で、
+    // キャンセルは存在しない。Tab は何もしない
     // IME の変換中は文書へ書き込まない。
     // 変換中の中間候補まで rename すると、(a) 未確定の文字列が「唯一の真実」
     // であるはずの markdown に流れ込み、(b) 候補が変わるたびに全再描画が走る。
@@ -1567,9 +1570,8 @@ export class MindMap {
       e.preventDefault();
       return;
     }
-    // Enter: add a sibling below (mmm.md そのに: enterで兄弟追加、復活)。
-    // 名前が無いノードでは、まずそこを埋める — 空のまま足しても名無しが
-    // 2 つ並ぶだけで、次に打つ場所が決まらない
+    // Enter: 下に兄弟を足す。ただし名前が無いノードでは、まずそこを埋める
+    // — 空のまま足しても名無しが 2 つ並ぶだけで、次に打つ場所が決まらない
     if (key === "Enter") {
       if (nodes.length === 0) this.host.addRoot();
       else if (blank) this.host.editRequested(anchor);
@@ -1703,7 +1705,7 @@ export class MindMap {
       const nd = byId.get(nid);
       if (!nd) continue;
       for (const m of nodes) {
-        if (m.hs >= nd.hs && m.hs < nd.subEnd) subtree.add(m.id);
+        if (m.from >= nd.from && m.from < nd.to) subtree.add(m.id);
       }
     }
     this.dragging = { ids, subtree };
@@ -1727,7 +1729,7 @@ export class MindMap {
       pos: 0 | 1 | 2 | 3;
     } | null = null;
     const SLOP = 16;
-    const BAND = 40; // wide before/after zones (mmm.md そのに: さらに拡大)
+    const BAND = 40; // 前後への挿入を狙える帯の広さ
     // pointer position relative to a box's center
     const local = (b: Box) => {
       const c = centerOf(b);
@@ -1812,7 +1814,7 @@ export class MindMap {
       }
     }
     // outward zone: hovering just beyond a node's outer edge (along its
-    // growth axis) also means "as child" (mmm.md 課題)
+    // growth axis) also means "as child"
     //
     // よく使う操作なので広めに取る。重なったときは文書順ではなく近い方を選ぶ。
     // 判定の優先順は 4 段:
@@ -1863,7 +1865,7 @@ export class MindMap {
     const ambiguous = rival - best <= AMBIGUOUS;
 
     this.dropTarget = target;
-    // indicator is mandatory (spec 3.3.2)
+    // 落とし先は必ず示す。示せないなら受け付けない
     this.clearDropMarks(false);
     if (!target) {
       this.dropLine.setAttribute("visibility", "hidden");
@@ -1907,7 +1909,7 @@ export class MindMap {
       this.dropHint.setAttribute("visibility", "hidden");
     } else if (target.pos === 0) {
       // ring on the target PLUS an insertion line on its outward side,
-      // where the new child will appear (mmm.md そのに)
+      // where the new child will appear
       this.markNode(target.id, "drop-child");
       const e = rightOf(b);
       const lx = e.x + GAP.x / 2;
@@ -1994,7 +1996,7 @@ export class MindMap {
       { label: "1 段上げ", run: () => this.host.outdentSelection() },
       "sep",
       {
-        // mmm.md その３: キーだけでなく UI からも指定・解除できるように
+        // キーだけでなく、ここからも指定・解除できるように
         label: anchorHidden ? "再表示（折り畳みを開く）" : "非表示（折り畳む）",
         key: "H",
         run: () => this.host.toggleHidden(this.host.anchor()),
