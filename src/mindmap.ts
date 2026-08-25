@@ -1571,7 +1571,7 @@ export class MindMap {
       "sep",
       { label: "Copy", key: "Mod+C", run: () => this.host.copySelection(false) },
       { label: "Cut", key: "Mod+X", run: () => this.host.copySelection(true) },
-      { label: "Paste as child", key: "Mod+V", run: () => this.host.paste(), disabled: multi },
+      { label: "Paste", key: "Mod+V", run: () => this.host.paste(), disabled: multi },
       "sep",
       // この枝の出し方。ヘッダの書き出しと同じ並びで、対象だけが違う。
       // 平らに 4 行足すと右クリックが伸びるので、入れ子に畳む
