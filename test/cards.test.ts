@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { core, idOf, initDoc, loadDoc } from "./_helpers.ts";
-import { cardRows, contentEnd } from "../src/map/cards.ts";
+import { cardRows, contentEnd, linkLine } from "../src/map/cards.ts";
 
 /** 1 ノードぶんのカードを取り出す小道具 */
 function rowsOf(md: string) {
@@ -105,4 +105,42 @@ test("contentEnd: 最後のノードなら、部分木の終わり（＝文書�
   const md = "# r\n\n## n\n\n[a](https://a.example)\n";
   const { end, node } = endOfNode(md, "n");
   assert.equal(end, node.to);
+});
+
+// ---------- linkLine ----------
+//
+// `Shift+L` が本文に書く 1 行。**題は空のまま残す**（名前を付けるのは
+// 呼んだ人の仕事）ので、`parseLink` が見せ方として補うホスト名とは別物。
+
+test("linkLine: 素の URL は題を空にして、そこを指す", () => {
+  const got = linkLine("https://example.com/a");
+  assert.deepEqual(got, { line: "[](https://example.com/a)", from: 1, to: 1 });
+});
+
+test("linkLine: 題つきならそのまま残し、題の範囲を返す", () => {
+  const got = linkLine("[名前](https://example.com/a)");
+  assert.ok(got);
+  assert.equal(got.line, "[名前](https://example.com/a)");
+  assert.equal(got.line.slice(got.from, got.to), "名前");
+});
+
+test("linkLine: 前後の空白は落とす", () => {
+  assert.deepEqual(linkLine("  https://e.com  "), {
+    line: "[](https://e.com)",
+    from: 1,
+    to: 1,
+  });
+});
+
+test("linkLine: リンクでなければ null", () => {
+  for (const bad of ["", "ただの文字", "example.com", "ftp://e.com", "https://e.com と文字"]) {
+    assert.equal(linkLine(bad), null, JSON.stringify(bad));
+  }
+});
+
+test("linkLine: 題が空でもホスト名を書き込まない（見せ方と文書は別）", () => {
+  const got = linkLine("[](https://example.com)");
+  assert.ok(got);
+  assert.equal(got.line, "[](https://example.com)");
+  assert.ok(!got.line.includes("example.com]"), "題にホスト名が入っている");
 });

@@ -64,10 +64,13 @@ export const cardInset = (r: CardRow): number =>
  */
 export const cardBleed = (r: CardRow): number => (r.kind === "code" ? 5 : 0);
 
+/** `[text](https://...)` の形。題は空でもよい */
+const LINK_MD = /^\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)$/;
+
 /** Label of the form `[text](https://...)` or a bare URL. */
 export function parseLink(label: string): LinkInfo | null {
   const t = label.trim();
-  const md = /^\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)$/.exec(t);
+  const md = LINK_MD.exec(t);
   let title = "";
   let url = "";
   if (md) {
@@ -87,6 +90,24 @@ export function parseLink(label: string): LinkInfo | null {
     return null;
   }
   return { title: title === "" ? host : title, url };
+}
+
+/**
+ * その文字列を、本文に書くリンク行にする。リンクでなければ null。
+ *
+ * **題は空のまま残す** — 名前を付けるのは呼んだ人の仕事で、ここは
+ * 「どこが題か」を `from`/`to` で教えるだけ（入力欄をその上で開くため）。
+ * `parseLink` が題の無いときにホスト名を代わりに返すのは**見せ方**の話で、
+ * 文書に書く文字ではない。
+ */
+export function linkLine(
+  text: string,
+): { line: string; from: number; to: number } | null {
+  const link = parseLink(text);
+  if (!link) return null;
+  const md = LINK_MD.exec(text.trim());
+  const title = md ? md[1] : "";
+  return { line: `[${title}](${link.url})`, from: 1, to: 1 + title.length };
 }
 
 /** Content line of the form `![alt](path)` with a LOCAL (relative) path.

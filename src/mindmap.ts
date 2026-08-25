@@ -44,6 +44,8 @@ export interface MapHost {
   imageUrl(path: string): string | null;
   /** その場で描いて、画像としてこのノードに貼る */
   addDrawing(id: number): void;
+  /** クリップボードの URL を、名前を付けられる形でこのノードに貼る */
+  addLink(id: number): void;
   /** その範囲を書き換える（カードをその場で直したとき） */
   replaceText(from: number, to: number, text: string): void;
   selection(): Set<number>;
@@ -441,7 +443,15 @@ export class MindMap {
   }
 
   /** カードをその場で開く。閉じるのは Esc / Mod+Enter / 他所クリック。 */
-  private beginCardEdit(ref: CardRef): void {
+  /**
+   * そのカードを、その場で直す入力欄で開く。`from`/`to` は入力欄の中で
+   * 最初に選んでおく範囲（省略すると末尾にカーソルを置く）。
+   */
+  editCard(ref: CardRef, from?: number, to?: number): void {
+    this.beginCardEdit(ref, from, to);
+  }
+
+  private beginCardEdit(ref: CardRef, from?: number, to?: number): void {
     const b = this.boxes.get(ref.node);
     const row = b?.rows[ref.index];
     const rect = this.cardWorld(ref);
@@ -453,10 +463,8 @@ export class MindMap {
     this.paintEditInk();
     this.positionCardEditor();
     this.cardEditor.focus();
-    this.cardEditor.setSelectionRange(
-      this.cardEditor.value.length,
-      this.cardEditor.value.length,
-    );
+    const end = this.cardEditor.value.length;
+    this.cardEditor.setSelectionRange(from ?? end, to ?? from ?? end);
   }
 
   /** 色付き層を今の中身で塗り直す（打つたびに呼ぶ） */
@@ -1289,6 +1297,13 @@ export class MindMap {
       e.preventDefault();
       return;
     }
+    // クリップボードの URL をリンクとして貼り、そのまま題を打てる状態にする。
+    // `D` と同じく**空ノードの打ち始めより前**に置く
+    if (key === "L" && !mod && !e.altKey && anchor !== -1 && sel.size <= 1) {
+      this.host.addLink(anchor);
+      e.preventDefault();
+      return;
+    }
     // 名前がまだ無いノード。ここでは「足す」より「埋める」ほうが要る
     const blank =
       anchor !== -1 &&
@@ -1581,6 +1596,12 @@ export class MindMap {
         label: "Draw",
         key: "Shift+D",
         run: () => this.host.addDrawing(anchor),
+        disabled: anchor === -1 || multi,
+      },
+      {
+        label: "Link",
+        key: "Shift+L",
+        run: () => this.host.addLink(anchor),
         disabled: anchor === -1 || multi,
       },
       "sep",

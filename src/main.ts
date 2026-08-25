@@ -25,7 +25,12 @@ import { initDrop } from "./app/dnd.ts";
 import { showDrawing } from "./app/draw.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { onLanguageReady } from "./map/highlight.ts";
-import { type CardRef, cardRowsOf, contentEndOf } from "./map/cards.ts";
+import {
+  type CardRef,
+  cardRowsOf,
+  contentEndOf,
+  linkLine,
+} from "./map/cards.ts";
 import { insertBlock, moveLine, removeLine } from "./edits.ts";
 
 /**
@@ -300,6 +305,23 @@ const host: MapHost = {
         drawingOpen = false;
         mapPane.focus();
       });
+  },
+  addLink(id) {
+    if (!byId.has(id)) return;
+    void (async () => {
+      const made = linkLine(await navigator.clipboard.readText());
+      if (made === null) {
+        flashFilename("Copy a link first");
+        return;
+      }
+      insertContentLine(id, made.line, nextTag());
+      // 足したカードはその本文の最後の 1 枚。そこを、題の上で開く
+      const index = cardRowsOf(doc, id).length - 1;
+      if (index >= 0) map.editCard({ node: id, index }, made.from, made.to);
+    })().catch((error: unknown) => {
+      console.error("link failed:", error);
+      flashFilename("Could not read the clipboard");
+    });
   },
   replaceText(from, to, text) {
     applySnap(core.replaceText(from, to, text, nextTag()), "core");
