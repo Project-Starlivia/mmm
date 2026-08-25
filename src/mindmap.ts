@@ -42,7 +42,6 @@ export interface MapHost {
   /** objectURL for a local image path (relative to the md); null while
    * loading / until folder permission is granted */
   imageUrl(path: string): string | null;
-  chooseImageFolder(): void;
   /** その場で描いて、画像としてこのノードに貼る */
   addDrawing(id: number): void;
   /** その範囲を書き換える（カードをその場で直したとき） */
@@ -1562,9 +1561,6 @@ export class MindMap {
       },
       { label: "Rename", key: "Mod+Enter", run: () => this.host.editRequested(anchor), disabled: multi },
       "sep",
-      { label: "Indent", run: () => this.host.indentSelection() },
-      { label: "Outdent", run: () => this.host.outdentSelection() },
-      "sep",
       {
         // キーだけでなく、ここからも指定・解除できるように
         label: folded ? "Show (unfold)" : "Hide (fold)",
@@ -1586,12 +1582,6 @@ export class MindMap {
         key: "Shift+D",
         run: () => this.host.addDrawing(anchor),
         disabled: anchor === -1 || multi,
-      },
-      {
-        // 画像の入口はクリックから外れた（クリックは選択）。ここが唯一の
-        // 出入り口になるので、ノードに画像が無くても出す
-        label: "Choose image folder",
-        run: () => this.host.chooseImageFolder(),
       },
       "sep",
       { label: "Delete", key: "Del", run: () => this.host.deleteSelection() },

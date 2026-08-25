@@ -47,6 +47,7 @@ const mapPane = el("map-pane", HTMLElement);
 const btnNew = el("btn-new", HTMLButtonElement);
 const btnOpen = el("btn-open", HTMLButtonElement);
 const btnSave = el("btn-save", HTMLButtonElement);
+const btnImages = el("btn-images", HTMLButtonElement);
 const btnUndo = el("btn-undo", HTMLButtonElement);
 const btnRedo = el("btn-redo", HTMLButtonElement);
 const elFilename = el("filename", HTMLElement);
@@ -286,7 +287,6 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
 
 const host: MapHost = {
   doc: () => doc,
-  chooseImageFolder: () => void assets.chooseFolder(),
   addDrawing(id) {
     if (!byId.has(id) || drawingOpen) return;
     drawingOpen = true;
@@ -675,6 +675,9 @@ async function attachImage(id: number, blob: Blob, tag = ""): Promise<void> {
 btnNew.addEventListener("click", () => void newFile());
 btnOpen.addEventListener("click", () => void openFile());
 btnSave.addEventListener("click", () => void saveFile());
+// 画像フォルダは**文書ぜんぶの設定**（この .md の画像がどこに居るか）なので、
+// 新規 / 開く / 保存 と同じ高さに置く
+btnImages.addEventListener("click", () => void assets.chooseFolder());
 elFilename.addEventListener("click", () => {
   void (async () => {
     if (!(await confirmDiscard())) return;

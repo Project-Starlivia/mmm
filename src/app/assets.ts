@@ -168,6 +168,13 @@ export function initAssets(deps: {
     },
 
     async chooseFolder() {
+      // 保存していない文書には**相対パスの基準になる場所が無い**。
+      // 押しても黙って何も起きないのは、入口がヘッダに出た今は通らない
+      // （理由は saveToDisk と同じなので、同じ言葉で言う）
+      if (!deps.hasFile()) {
+        deps.warn("Save the file first to add images");
+        return;
+      }
       try {
         await selectBinding();
       } catch {
