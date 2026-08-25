@@ -1546,10 +1546,20 @@ export class MindMap {
     const folded =
       this.host.doc().nodes.find((n) => n.id === anchor)?.hidden ?? false;
     return [
-      { label: "Add child", key: "Tab", run: () => this.host.addChild(anchor), disabled: multi },
-      { label: "Add below", key: "Enter", run: () => this.host.addSibling(anchor), disabled: multi },
-      { label: "Add above", key: "Shift+Enter", run: () => this.host.addSiblingBefore(anchor), disabled: multi },
-      { label: "Add parent", key: "Shift+Tab", run: () => this.host.addParent(anchor), disabled: multi },
+      // 押せば子が増え、開けば下も上も親も選べる。**まとめた名前そのものが、
+      // いちばん普通の 1 つでもある** — 子の追加は他の 3 つより桁違いに多い
+      {
+        label: "Add",
+        key: "Tab",
+        run: () => this.host.addChild(anchor),
+        disabled: multi,
+        items: [
+          { label: "Child", key: "Tab", run: () => this.host.addChild(anchor) },
+          { label: "Below", key: "Enter", run: () => this.host.addSibling(anchor) },
+          { label: "Above", key: "Shift+Enter", run: () => this.host.addSiblingBefore(anchor) },
+          { label: "Parent", key: "Shift+Tab", run: () => this.host.addParent(anchor) },
+        ],
+      },
       { label: "Rename", key: "Mod+Enter", run: () => this.host.editRequested(anchor), disabled: multi },
       "sep",
       { label: "Indent", run: () => this.host.indentSelection() },

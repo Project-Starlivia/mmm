@@ -9,10 +9,23 @@
 // 入れ子も同じ器で作る — 子メニューは `ContextMenu` そのもので、置く場所が
 // 親の行の隣になるだけ。**別の器を書き足さない。**
 
-/** 1 行。`sep` は区切り線、`items` を持つ行は入れ子 */
+/**
+ * 1 行。`sep` は区切り線、`items` を持つ行は入れ子。
+ *
+ * **入れ子の行も `run` を持てる** — 触れば開き、押せばその場で走る。
+ * 「まとめた名前そのものが、いちばん普通の 1 つでもある」形のため
+ * （`Add ▸` を押すと子ノードが増え、開けば下や上や親も選べる）。
+ * `run` の無い入れ子は開くだけ。
+ */
 export type MenuEntry =
   | { label: string; key?: string; run: () => void; disabled?: boolean }
-  | { label: string; items: MenuEntry[]; disabled?: boolean }
+  | {
+      label: string;
+      key?: string;
+      items: MenuEntry[];
+      run?: () => void;
+      disabled?: boolean;
+    }
   | "sep";
 
 const MARGIN = 8; // 画面の縁からこれだけは離す
@@ -56,7 +69,8 @@ export class ContextMenu {
       label.textContent = it.label;
       row.append(label);
       const nested = "items" in it;
-      const hint = nested ? "▸" : it.key;
+      // 押して走る行のキーと、開ける印は同居しうる（`Tab ▸`）
+      const hint = [it.key, nested ? "▸" : ""].filter(Boolean).join(" ");
       if (hint) {
         const key = document.createElement("span");
         key.className = "key";
@@ -69,13 +83,13 @@ export class ContextMenu {
         if (nested && !it.disabled) this.openSub(row, it.items);
       });
       row.addEventListener("click", () => {
-        // 入れ子の行は「開く」だけ。触るとすぐ閉じては選べない
-        if (nested) {
+        // 走るものが無い入れ子は「開く」だけ。触るとすぐ閉じては選べない
+        if (nested && !it.run) {
           if (!it.disabled) this.openSub(row, it.items);
           return;
         }
         this.hideAll();
-        it.run();
+        it.run?.();
       });
       this.el.append(row);
     }
