@@ -4,17 +4,27 @@
 // マップであることの一部ではない。
 //
 // **1 個しか作れない器にはしない**（id ではなく class）。マップの右クリックと、
-// 書き出しの形式選びが、同じ器を別々に持つ。
+// 書き出しの出し方選びが、同じ器を別々に持つ。
+//
+// 入れ子も同じ器で作る — 子メニューは `ContextMenu` そのもので、置く場所が
+// 親の行の隣になるだけ。**別の器を書き足さない。**
 
-/** 1 行。`sep` は区切り線 */
+/** 1 行。`sep` は区切り線、`items` を持つ行は入れ子 */
 export type MenuEntry =
   | { label: string; key?: string; run: () => void; disabled?: boolean }
+  | { label: string; items: MenuEntry[]; disabled?: boolean }
   | "sep";
 
 const MARGIN = 8; // 画面の縁からこれだけは離す
+/** 子メニューは親の行にこれだけ重ねて出す（縁の線をまたぐ量） */
+const OVERLAP = 4;
 
 export class ContextMenu {
   private el = document.createElement("div");
+  /** 開いている子メニュー。要るまで作らない（大半のメニューに入れ子は無い） */
+  private sub: ContextMenu | null = null;
+  /** 自分が誰の子か。子から選んだとき、親ごと閉じるために辿る */
+  private parent: ContextMenu | null = null;
 
   constructor() {
     this.el.className = "ctx-menu";
@@ -33,6 +43,7 @@ export class ContextMenu {
 
   /** その座標に開く。画面外へはみ出すときは内側へ寄せる */
   show(x: number, y: number, items: MenuEntry[]): void {
+    this.closeSub();
     this.el.replaceChildren();
     for (const it of items) {
       if (it === "sep") {
@@ -44,14 +55,26 @@ export class ContextMenu {
       const label = document.createElement("span");
       label.textContent = it.label;
       row.append(label);
-      if (it.key) {
+      const nested = "items" in it;
+      const hint = nested ? "▸" : it.key;
+      if (hint) {
         const key = document.createElement("span");
         key.className = "key";
-        key.textContent = it.key;
+        key.textContent = hint;
         row.append(key);
       }
+      // どの行へ移っても、開いていた子は閉じる。入れ子の行なら開き直す
+      row.addEventListener("pointerenter", () => {
+        this.closeSub();
+        if (nested && !it.disabled) this.openSub(row, it.items);
+      });
       row.addEventListener("click", () => {
-        this.hide();
+        // 入れ子の行は「開く」だけ。触るとすぐ閉じては選べない
+        if (nested) {
+          if (!it.disabled) this.openSub(row, it.items);
+          return;
+        }
+        this.hideAll();
         it.run();
       });
       this.el.append(row);
@@ -65,6 +88,7 @@ export class ContextMenu {
   }
 
   hide(): void {
+    this.closeSub();
     this.el.style.display = "none";
   }
 
@@ -73,10 +97,44 @@ export class ContextMenu {
     return this.el.style.display === "block";
   }
 
-  /** メニューの中で起きた出来事か（外を押したときだけ閉じるため）。
-   *  `EventTarget` をそのまま受けて、ここで確かめる — 呼び出し側に
-   *  `as Node` と名乗らせない */
+  /**
+   * メニューの中で起きた出来事か（外を押したときだけ閉じるため）。
+   * **子メニューの中も自分の中**として数える — そうしないと、子を押した
+   * 瞬間に親が閉じ、閉じるついでに子まで畳まれて選べない。
+   *
+   * `EventTarget` をそのまま受けて、ここで確かめる — 呼び出し側に
+   * `as Node` と名乗らせない
+   */
   contains(target: EventTarget | null): boolean {
-    return target instanceof Node && this.el.contains(target);
+    if (target instanceof Node && this.el.contains(target)) return true;
+    return this.sub?.contains(target) ?? false;
+  }
+
+  /** 親の行の右隣へ子を開く。器は使い回す（開くたびに作らない） */
+  private openSub(row: HTMLElement, items: MenuEntry[]): void {
+    if (!this.sub) {
+      this.sub = new ContextMenu();
+      this.sub.parent = this;
+    }
+    const r = row.getBoundingClientRect();
+    this.sub.show(r.right - OVERLAP, r.top - OVERLAP, items);
+    // 右に入らないときは**親の左へ回す**。`show` の寄せは画面の中へ入れる
+    // だけなので、そのままだと親に重なって文字を隠す
+    const w = this.sub.el.offsetWidth;
+    if (r.right - OVERLAP + w > window.innerWidth - MARGIN) {
+      const left = this.el.getBoundingClientRect().left - w + OVERLAP;
+      this.sub.el.style.left = `${Math.max(MARGIN, left)}px`;
+    }
+  }
+
+  /** いちばん上まで辿って閉じる。子から選んだら親も畳む */
+  private hideAll(): void {
+    let top: ContextMenu = this;
+    while (top.parent) top = top.parent;
+    top.hide();
+  }
+
+  private closeSub(): void {
+    this.sub?.hide();
   }
 }
