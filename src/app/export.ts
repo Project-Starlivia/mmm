@@ -3,21 +3,14 @@
 // 1 枚の <svg> にするのは map/toSvg.ts の仕事で、ここが持つのは
 // **その先の出し口**だけ — 直列化・ラスタ化・ダウンロード・クリップボード。
 //
-// 行き先で入口を分けてある。ファイルはツールバー（形式を ▾ で選ぶ）、
-// クリップボードは右クリックメニューのコピーの隣。**貼るためにコピーするのに
-// ダイアログが挟まるのは重い**ので、コピーは 1 クリックで終わらせる。
+// **出し方 4 通りの定義はここ 1 か所**。ヘッダも右クリックも同じ並びを開く。
+// 違うのは対象だけ — ヘッダは常に全体、右クリックは選んでいる枝。
+// 新規 / 開く / 保存 が文書ぜんぶを相手にするのと同じ高さにヘッダを置き、
+// 「これ」を相手にする操作は右クリックへ寄せる。
 
 import type { MindMap } from "../mindmap.ts";
-import { ContextMenu } from "../map/menu.ts";
-import { LS_FORMAT, load, store } from "./persist.ts";
-
-/** ファイルにできる形式。ラベルはそのままボタンの表示になる */
-export const FILE_FORMATS = [
-  { id: "svg", label: "SVG", mime: "image/svg+xml", ext: "svg" },
-  { id: "webp", label: "WebP", mime: "image/webp", ext: "webp" },
-] as const;
-
-type FormatId = (typeof FILE_FORMATS)[number]["id"];
+import { ContextMenu, type MenuEntry } from "../map/menu.ts";
+import { LS_WAY, load, store } from "./persist.ts";
 
 /**
  * ラスタの倍率。**選ばせない** — 書き出したものは画面で見えている通りで
@@ -25,6 +18,13 @@ type FormatId = (typeof FILE_FORMATS)[number]["id"];
  * 下限として 2 倍だけ取る。
  */
 const SCALE = 2;
+
+export interface ExportDeps {
+  map: MindMap;
+  /** ダウンロード名の元になる、いまのファイル名 */
+  name: () => string;
+  notify: (msg: string, isError?: boolean) => void;
+}
 
 function downloadBlob(blob: Blob, name: string): void {
   const a = document.createElement("a");
@@ -73,104 +73,153 @@ async function rasterize(svg: SVGSVGElement, mime: string): Promise<Blob> {
   });
 }
 
-export function initExport(deps: {
-  map: MindMap;
-  /** 書き出しボタン。表示はいまの形式そのもの（押す前に何が出るか見える） */
-  button: HTMLButtonElement;
-  /** 形式を選ぶ ▾ */
-  formatButton: HTMLButtonElement;
-  /** ダウンロード名の元になる、いまのファイル名 */
-  name: () => string;
-  notify: (msg: string, isError?: boolean) => void;
-}): void {
-  const menu = new ContextMenu();
-  let format: FormatId = pickFormat(load(LS_FORMAT));
+/**
+ * 出し方 4 通り。**行き先で選べる形式が違う**。
+ *
+ * `WebP` はクリップボードに置けない — Chromium の `ClipboardItem` が受け取る
+ * のは `image/png` と `image/svg+xml` だけ（`ClipboardItem.supports` に聞いた）。
+ * なのでコピー側の絵は PNG。
+ *
+ * SVG のコピーは `text/plain` にも同じものを載せる — Figma や Illustrator は
+ * 画像として受け取るより、SVG のソースを貼られたほうが確実に開く。
+ *
+ * `short` はボタンの表示。動詞を落とすだけで、`label`（並びの表示）と
+ * 同じことを指す — 書き出しボタンに形式名が出ていればダウンロードと読める。
+ */
+const WAYS = [
+  {
+    id: "svg-file",
+    short: "SVG",
+    label: "Download SVG",
+    done: "",
+    out: async (svg: SVGSVGElement, base: string): Promise<void> => {
+      downloadBlob(
+        new Blob([serialize(svg)], { type: "image/svg+xml" }),
+        `${base}.svg`,
+      );
+    },
+  },
+  {
+    id: "webp-file",
+    short: "WebP",
+    label: "Download WebP",
+    done: "",
+    out: async (svg: SVGSVGElement, base: string): Promise<void> => {
+      downloadBlob(await rasterize(svg, "image/webp"), `${base}.webp`);
+    },
+  },
+  {
+    id: "png-copy",
+    short: "Copy PNG",
+    label: "Copy PNG",
+    done: "Image copied",
+    out: async (svg: SVGSVGElement): Promise<void> => {
+      const png = await rasterize(svg, "image/png");
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+    },
+  },
+  {
+    id: "svg-copy",
+    short: "Copy SVG",
+    label: "Copy SVG",
+    done: "SVG copied",
+    out: async (svg: SVGSVGElement): Promise<void> => {
+      const text = serialize(svg);
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/svg+xml": new Blob([text], { type: "image/svg+xml" }),
+          "text/plain": new Blob([text], { type: "text/plain" }),
+        }),
+      ]);
+    },
+  },
+] as const;
 
+type Way = (typeof WAYS)[number];
+
+/** 覚えていた出し方。知らない値なら既定へ落とす（型は名乗らせず確かめる） */
+const wayOf = (saved: string | null): Way =>
+  WAYS.find((w) => w.id === saved) ?? WAYS[0];
+
+/** そのやり方で 1 回出す */
+function run(deps: ExportDeps, way: Way, whole: boolean): void {
+  void (async () => {
+    const svg = await deps.map.exportSvg(whole);
+    if (!svg) {
+      deps.notify("The map is empty");
+      return;
+    }
+    const base = deps.name().replace(/\.(md|markdown|txt)$/i, "") || "mmm";
+    await way.out(svg, base);
+    if (way.done !== "") deps.notify(way.done, false);
+  })().catch((error: unknown) => {
+    console.error("export failed:", error);
+    deps.notify("Export failed", true);
+  });
+}
+
+/**
+ * 出し方の並び。**ヘッダも右クリックも同じものを開く** — 違うのは対象だけで、
+ * `whole` なら全体、そうでなければ選んでいる枝。
+ * `chose` はヘッダ用（選んだものを次の既定にする）。
+ */
+export function exportWays(
+  deps: ExportDeps,
+  whole: boolean,
+  chose?: (way: Way) => void,
+): MenuEntry[] {
+  const entries: MenuEntry[] = [];
+  for (const [i, way] of WAYS.entries()) {
+    // ダウンロードとコピーのあいだに線を引く（行き先が変わるところ）
+    if (i === 2) entries.push("sep");
+    entries.push({
+      label: way.label,
+      run: () => {
+        chose?.(way);
+        run(deps, way, whole);
+      },
+    });
+  }
+  return entries;
+}
+
+/**
+ * ヘッダの書き出し。対象は常に全体。
+ *
+ * ボタンには**いまの出し方**が出ていて、押せばそれで出る。`▾` で選び直すと
+ * その場で出て、次からの既定になる — 押す前に何が起きるかが常に見えている。
+ */
+export function initExport(
+  deps: ExportDeps & { button: HTMLButtonElement; wayButton: HTMLButtonElement },
+): void {
+  const menu = new ContextMenu();
+  let way = wayOf(load(LS_WAY));
   const show = (): void => {
-    const f = formatOf(format);
-    deps.button.textContent = f.label;
-    deps.button.title = `選んでいる枝を ${f.label} でダウンロード（何も選んでいなければ全体）`;
+    deps.button.textContent = way.short;
+    deps.button.title = `Export the whole map — ${way.label}`;
   };
   show();
 
-  /** 書き出す元。空なら null を返して呼ぶ側に知らせる */
-  const source = async (): Promise<SVGSVGElement | null> => {
-    const svg = await deps.map.exportSvg();
-    if (!svg) deps.notify("マップが空です");
-    return svg;
-  };
-
-  const toFile = async (): Promise<void> => {
-    const svg = await source();
-    if (!svg) return;
-    const f = formatOf(format);
-    const blob =
-      f.id === "svg"
-        ? new Blob([serialize(svg)], { type: f.mime })
-        : await rasterize(svg, f.mime);
-    const base = deps.name().replace(/\.(md|markdown|txt)$/i, "") || "mmm";
-    downloadBlob(blob, `${base}.${f.ext}`);
-  };
-
-  deps.button.addEventListener("click", () => {
-    void toFile().catch((error: unknown) => {
-      console.error("export failed:", error);
-      deps.notify("エクスポートに失敗しました", true);
-    });
-  });
+  deps.button.addEventListener("click", () => run(deps, way, true));
 
   // 押し直したら閉じる。**閉じるのは document 側の pointerdown が済ませる**
   // ので、ここは「押した時点で開いていたか」だけを覚えて、開き直さない。
   // ボタン自身の pointerdown は document より先に届くので、まだ見える
   let wasOpen = false;
-  deps.formatButton.addEventListener("pointerdown", () => {
+  deps.wayButton.addEventListener("pointerdown", () => {
     wasOpen = menu.open;
   });
-  deps.formatButton.addEventListener("click", () => {
+  deps.wayButton.addEventListener("click", () => {
     if (wasOpen) return;
-    const r = deps.formatButton.getBoundingClientRect();
+    const r = deps.wayButton.getBoundingClientRect();
     menu.show(
       r.left,
       r.bottom + 4,
-      FILE_FORMATS.map((f) => ({
-        label: `${f.label} で書き出す`,
-        run: () => {
-          format = f.id;
-          store(LS_FORMAT, f.id);
-          show();
-        },
-      })),
+      exportWays(deps, true, (chosen) => {
+        way = chosen;
+        store(LS_WAY, chosen.id);
+        show();
+      }),
     );
   });
-}
-
-/**
- * 絵にしてクリップボードへ置く。
- *
- * **WebP はクリップボードに置けない**（Chromium 148 の `ClipboardItem.supports`
- * が false を返す）。置けるのは PNG と SVG だけなので、ここもその 2 つ。
- * SVG は `text/plain` にも同じものを載せる — Figma や Illustrator は
- * 画像として受け取るより、SVG のソースを貼られたほうが確実に開く。
- */
-export async function copyMapImage(
-  svg: SVGSVGElement,
-  as: "png" | "svg",
-): Promise<void> {
-  const item =
-    as === "svg"
-      ? new ClipboardItem({
-          "image/svg+xml": new Blob([serialize(svg)], { type: "image/svg+xml" }),
-          "text/plain": new Blob([serialize(svg)], { type: "text/plain" }),
-        })
-      : new ClipboardItem({ "image/png": await rasterize(svg, "image/png") });
-  await navigator.clipboard.write([item]);
-}
-
-const formatOf = (id: FormatId): (typeof FILE_FORMATS)[number] =>
-  FILE_FORMATS.find((f) => f.id === id) ?? FILE_FORMATS[0];
-
-/** 覚えていた形式。知らない値なら既定へ落とす（型は名乗らせず確かめる） */
-function pickFormat(saved: string | null): FormatId {
-  const hit = FILE_FORMATS.find((f) => f.id === saved);
-  return hit ? hit.id : FILE_FORMATS[0].id;
 }

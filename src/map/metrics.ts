@@ -42,7 +42,7 @@ export const ROW_HIDDEN: LabelRow = {
 export const rowOf = (n: NodeInfo): LabelRow => (n.hidden ? ROW_HIDDEN : ROW_NORMAL);
 
 /** ラベルが空のときに表示するプレースホルダ。表示箇所すべてがこれ 1 つを見る。 */
-export const EMPTY_LABEL = "（空）";
+export const EMPTY_LABEL = "(empty)";
 export const displayLabel = (label: string): string => (label === "" ? EMPTY_LABEL : label);
 
 // 実測用のキャンバスは**最初に測るときに**作る。読み込んだだけで DOM に

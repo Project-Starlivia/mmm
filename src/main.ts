@@ -15,7 +15,7 @@ import { MdEditor } from "./editor.ts";
 import { MindMap, type MapHost } from "./mindmap.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
-import { copyMapImage, initExport } from "./app/export.ts";
+import { exportWays, initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
 import { deriveName } from "./app/name.ts";
 import { initTheme } from "./app/theme.ts";
@@ -294,7 +294,7 @@ const host: MapHost = {
       .then((blob) => (blob === null ? undefined : attachImage(id, blob)))
       .catch((error: unknown) => {
         console.error("drawing failed:", error);
-        flashFilename("お絵描きを貼れませんでした");
+        flashFilename("Could not add the drawing");
       })
       .finally(() => {
         drawingOpen = false;
@@ -430,20 +430,8 @@ const host: MapHost = {
     void navigator.clipboard.writeText(text).catch(() => {});
     if (cut) host.deleteSelection();
   },
-  copyMap(as) {
-    void (async () => {
-      const svg = await map.exportSvg();
-      if (!svg) {
-        flashFilename("マップが空です");
-        return;
-      }
-      await copyMapImage(svg, as);
-      flashFilename(as === "svg" ? "SVG をコピーしました" : "画像をコピーしました", false);
-    })().catch((error: unknown) => {
-      console.error("copy failed:", error);
-      flashFilename("コピーに失敗しました");
-    });
-  },
+  // 右クリックに出す「この枝の出し方」。ヘッダと同じ並びで、対象だけが違う
+  exportWays: () => exportWays(exportDeps, false),
   paste() {
     // 貼り付け先は選んでいるノードの**子**。空の文書へはそのまま入れる
     if (anchorId === -1 && doc.nodes.length > 0) return;
@@ -527,6 +515,13 @@ const host: MapHost = {
 const editor = new MdEditor(mdPane, onUserEdits);
 const map = new MindMap(mapPane, host);
 
+/** 書き出しに要るもの。ヘッダ（全体）も右クリック（枝）も同じこれを使う */
+const exportDeps = {
+  map,
+  name: () => docName(),
+  notify: (msg: string, isError = true) => flashFilename(msg, isError),
+};
+
 // ---------- 改行の正規化 (F-010) ----------
 //
 // アプリの中では常に LF に統一する。CodeMirror は読み込んだ文書の改行を
@@ -575,7 +570,7 @@ async function openFile(): Promise<void> {
     if (doc) applyDoc(doc);
   } catch (err) {
     console.error("open failed:", err);
-    flashFilename("読み込み失敗");
+    flashFilename("Could not open the file");
   }
 }
 
@@ -605,7 +600,7 @@ async function saveFile(asNew = false): Promise<void> {
     }
     // 自分でキャンセルしたときは null が返るのでここには来ない。
     console.error("save failed:", err);
-    flashFilename(typeof err === "string" ? err : "保存失敗");
+    flashFilename(typeof err === "string" ? err : "Could not save");
   }
 }
 
@@ -634,13 +629,13 @@ async function newFile(): Promise<void> {
     mapPane.focus();
   } catch (err) {
     console.error("new file failed:", err);
-    flashFilename("新規作成に失敗しました");
+    flashFilename("Could not create a new file");
   }
 }
 
 async function confirmDiscard(): Promise<boolean> {
   if (core.getText() === savedText) return true;
-  return window.confirm("未保存の変更があります。破棄して続行しますか？");
+  return window.confirm("You have unsaved changes. Discard them and continue?");
 }
 
 // ---------- 画像（ローカルファースト） ----------
@@ -685,7 +680,7 @@ elFilename.addEventListener("click", () => {
     if (!(await confirmDiscard())) return;
     const doc = await io.restoreDoc();
     if (doc) applyDoc(doc);
-  })().catch(() => flashFilename("ファイルの許可を取得できませんでした"));
+  })().catch(() => flashFilename("Could not get permission for the file"));
 });
 
 window.addEventListener("beforeunload", (event) => {
@@ -723,11 +718,9 @@ const { togglePane, togglePaneVis } = initPanes({
 });
 
 initExport({
-  map,
+  ...exportDeps,
   button: el("btn-export", HTMLButtonElement),
-  formatButton: el("btn-export-format", HTMLButtonElement),
-  name: () => docName(),
-  notify: (msg, isError = true) => flashFilename(msg, isError),
+  wayButton: el("btn-export-way", HTMLButtonElement),
 });
 initTheme({
   logo: elLogo,
@@ -763,7 +756,7 @@ initShortcuts({
       if (doc && docGen === bootGen && core.getText() === "") applyDoc(doc);
     })
     .catch(() => {
-      flashFilename("前回のファイルを開けませんでした");
+      flashFilename("Could not reopen the last file");
     });
 }
 // フェンスの言語は後から読み込まれる。届いたら色を載せ直す

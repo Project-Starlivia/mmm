@@ -65,7 +65,10 @@ export interface Layout {
  * 畳んで埋もれているノードは `visible` に入らないため、畳んだまま書き出せば
  * 畳んだ姿がそのまま出る。
  */
-export function branchIds(layout: Layout, roots: Set<number>): Set<number> {
+export function branchIds(
+  layout: Layout,
+  roots: ReadonlySet<number>,
+): Set<number> {
   const out = new Set<number>();
   for (const n of layout.visible) {
     if (roots.size === 0) {

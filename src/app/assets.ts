@@ -105,11 +105,11 @@ export function initAssets(deps: {
       if (error instanceof DOMException && error.name === "AbortError") return null;
       throw error;
     }
-    const declared = window.prompt("md から見た画像フォルダの保存パス", "./");
+    const declared = window.prompt("Path to the image folder, relative to the .md", "./");
     if (declared === null) return null;
     const path = normalizePath(declared);
     if (!path) {
-      deps.warn("保存パスは相対パスで指定してください");
+      deps.warn("The path must be relative");
       return null;
     }
     const binding = { doc: file, directory, path };
@@ -171,20 +171,20 @@ export function initAssets(deps: {
       try {
         await selectBinding();
       } catch {
-        deps.warn("画像フォルダを開けませんでした");
+        deps.warn("Could not open the image folder");
       }
     },
 
     async saveToDisk(blob) {
       if (!deps.hasFile()) {
-        deps.warn("画像を置くには先にファイルを保存してください");
+        deps.warn("Save the file first to add images");
         return null;
       }
       let binding: AssetBinding | null;
       try {
         binding = await writableBinding();
       } catch {
-        deps.warn("画像フォルダを開けませんでした");
+        deps.warn("Could not open the image folder");
         return null;
       }
       if (!binding) return null;
@@ -194,7 +194,7 @@ export function initAssets(deps: {
       const initial =
         `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}` +
         `-${two(now.getHours())}${two(now.getMinutes())}${two(now.getSeconds())}`;
-      const typed = window.prompt("画像名（.webp）", initial);
+      const typed = window.prompt("Image name (.webp)", initial);
       if (typed === null) return null;
       const name = typed.trim().replace(/\.webp$/i, "");
       const parts = name.split("/").filter(Boolean);
@@ -202,7 +202,7 @@ export function initAssets(deps: {
         parts.length === 0 ||
         parts.some((part) => part === "." || part === ".." || /[\\:*?"<>|]/.test(part))
       ) {
-        deps.warn("その画像名は使えません");
+        deps.warn("That image name cannot be used");
         return null;
       }
       parts[parts.length - 1] += ".webp";
@@ -222,7 +222,7 @@ export function initAssets(deps: {
         assetUrls.set(bare(rel), URL.createObjectURL(out));
         return mdPath(rel);
       } catch {
-        deps.warn("画像の保存に失敗しました");
+        deps.warn("Could not save the image");
         return null;
       }
     },

@@ -63,7 +63,7 @@ export function showDrawing(): Promise<Blob | null> {
     panel.className = "popup";
     const title = document.createElement("div");
     title.className = "popup-title";
-    title.textContent = "お絵描き";
+    title.textContent = "Draw";
 
     // ---- 道具立て ----
     const bar = document.createElement("div");
@@ -76,11 +76,11 @@ export function showDrawing(): Promise<Blob | null> {
     width.min = String(MIN_W);
     width.max = String(MAX_W);
     width.value = String(DEFAULT_W);
-    width.title = "太さ";
-    const eraser = button("消しゴム");
-    const undo = button("取り消し");
+    width.title = "Width";
+    const eraser = button("Eraser");
+    const undo = button("Undo");
     undo.title = "Mod+Z";
-    const clear = button("クリア");
+    const clear = button("Clear");
     bar.append(color, width, eraser, undo, clear);
 
     // ---- 紙 ----
@@ -193,9 +193,9 @@ export function showDrawing(): Promise<Blob | null> {
     foot.className = "popup-foot";
     const hint = document.createElement("span");
     hint.className = "popup-hint";
-    hint.textContent = "Mod+Enter で確定 / Esc で破棄";
-    const btnCancel = button("キャンセル");
-    const btnOk = button("確定");
+    hint.textContent = "Mod+Enter to insert / Esc to discard";
+    const btnCancel = button("Cancel");
+    const btnOk = button("Insert");
     btnOk.className = "primary";
     foot.append(hint, btnCancel, btnOk);
 

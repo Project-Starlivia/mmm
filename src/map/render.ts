@@ -212,7 +212,7 @@ export class MapRenderer {
         : displayLabel(n.label);
       const t = svgEl("title");
       t.textContent = n.hidden
-        ? `${n.label}${buried ? `\n（${buried} 件を折り畳み中。Shift+H で戻す）` : "\n（非表示。Shift+H で戻す）"}`
+        ? `${n.label}${buried ? `\n(${buried} hidden — Shift+H to show)` : "\n(Hidden — Shift+H to show)"}`
         : n.label;
       g.append(label, t);
       // ラベルの下に、本文から起こしたカードを積む。**形は drawCard が持つ**

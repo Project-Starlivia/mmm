@@ -50,13 +50,13 @@ export function initDrop(deps: {
       if (images.length === 0) return;
       const node = deps.nodeAt(event.clientX, event.clientY);
       if (node === -1) {
-        deps.warn("画像はノードの上に落としてください");
+        deps.warn("Drop images onto a node");
         return;
       }
       await deps.addImages(images, node);
     })().catch((error) => {
       console.error("drop failed:", error);
-      deps.warn("ドロップしたファイルを開けませんでした");
+      deps.warn("Could not open the dropped file");
     });
   });
 }

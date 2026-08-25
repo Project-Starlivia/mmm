@@ -82,8 +82,11 @@ export interface MapHost {
    */
   move(ids: number[], target: number, pos: 0 | 1 | 2 | 3): void;
   copySelection(cut: boolean): void;
-  /** いま書き出す範囲（選んでいる枝、無ければ全体）を絵にしてクリップボードへ */
-  copyMap(as: "png" | "svg"): void;
+  /**
+   * 選んでいる枝の出し方の並び（右クリックに出す）。**形式も行き先も
+   * マップは知らない** — 並べるのがここ、中身を決めるのは app/export.ts。
+   */
+  exportWays(): MenuEntry[];
   paste(): void;
   editRequested(id: number): void;
   undo(): void;
@@ -245,7 +248,7 @@ export class MindMap {
     this.hint = document.createElement("div");
     this.hint.id = "map-hint";
     this.hint.innerHTML =
-      "Enter で最初のノードを作成<br>（または左のエディタに # 見出しを書く）";
+      "Press Enter to create the first node<br>(or write a # heading in the editor)";
     this.hint.style.display = "none";
     pane.append(this.hint);
 
@@ -531,14 +534,15 @@ export class MindMap {
   }
 
   /**
-   * 書き出し用の SVG。**選んでいる枝**、何も選んでいなければ全体。
+   * 書き出し用の SVG。`whole` なら全体、そうでなければ**選んでいる枝**
+   * （何も選んでいなければ全体）。
    *
    * 一時的な UI 状態（選択・ドロップ印）は入らない。computed style を属性へ
    * 焼き込み、画像サムネイルは data URL で埋めるので、この結果だけで単体
    * 表示できる（ダウンロードにもラスタ化にも同じものを使う）。空なら null。
    */
-  exportSvg(): Promise<SVGSVGElement | null> {
-    const ids = branchIds(this.layout, this.host.selection());
+  exportSvg(whole: boolean): Promise<SVGSVGElement | null> {
+    const ids = branchIds(this.layout, whole ? NO_IDS : this.host.selection());
     const boxes: Box[] = [];
     const nodes: SVGGElement[] = [];
     const edges: SVGPathElement[] = [];
@@ -1542,31 +1546,32 @@ export class MindMap {
     const folded =
       this.host.doc().nodes.find((n) => n.id === anchor)?.hidden ?? false;
     return [
-      { label: "子を追加", key: "Tab", run: () => this.host.addChild(anchor), disabled: multi },
-      { label: "下に追加", key: "Enter", run: () => this.host.addSibling(anchor), disabled: multi },
-      { label: "上に追加", key: "Shift+Enter", run: () => this.host.addSiblingBefore(anchor), disabled: multi },
-      { label: "親を作成", key: "Shift+Tab", run: () => this.host.addParent(anchor), disabled: multi },
-      { label: "名前を変更", key: "Mod+Enter", run: () => this.host.editRequested(anchor), disabled: multi },
+      { label: "Add child", key: "Tab", run: () => this.host.addChild(anchor), disabled: multi },
+      { label: "Add below", key: "Enter", run: () => this.host.addSibling(anchor), disabled: multi },
+      { label: "Add above", key: "Shift+Enter", run: () => this.host.addSiblingBefore(anchor), disabled: multi },
+      { label: "Add parent", key: "Shift+Tab", run: () => this.host.addParent(anchor), disabled: multi },
+      { label: "Rename", key: "Mod+Enter", run: () => this.host.editRequested(anchor), disabled: multi },
       "sep",
-      { label: "1 段下げ", run: () => this.host.indentSelection() },
-      { label: "1 段上げ", run: () => this.host.outdentSelection() },
+      { label: "Indent", run: () => this.host.indentSelection() },
+      { label: "Outdent", run: () => this.host.outdentSelection() },
       "sep",
       {
         // キーだけでなく、ここからも指定・解除できるように
-        label: folded ? "再表示（折り畳みを開く）" : "非表示（折り畳む）",
-        key: "H",
+        label: folded ? "Show (unfold)" : "Hide (fold)",
+        key: "Shift+H",
         run: () => this.host.toggleHidden(anchor),
         disabled: anchor === -1,
       },
       "sep",
-      { label: "コピー", key: "Mod+C", run: () => this.host.copySelection(false) },
-      { label: "カット", key: "Mod+X", run: () => this.host.copySelection(true) },
-      { label: "画像としてコピー", run: () => this.host.copyMap("png") },
-      { label: "SVG としてコピー", run: () => this.host.copyMap("svg") },
-      { label: "子として貼り付け", key: "Mod+V", run: () => this.host.paste(), disabled: multi },
+      { label: "Copy", key: "Mod+C", run: () => this.host.copySelection(false) },
+      { label: "Cut", key: "Mod+X", run: () => this.host.copySelection(true) },
+      { label: "Paste as child", key: "Mod+V", run: () => this.host.paste(), disabled: multi },
+      "sep",
+      // この枝の出し方。ヘッダの「書き出し」と同じ並びで、対象だけが違う
+      ...this.host.exportWays(),
       "sep",
       {
-        label: "お絵描き",
+        label: "Draw",
         key: "Shift+D",
         run: () => this.host.addDrawing(anchor),
         disabled: anchor === -1 || multi,
@@ -1574,11 +1579,11 @@ export class MindMap {
       {
         // 画像の入口はクリックから外れた（クリックは選択）。ここが唯一の
         // 出入り口になるので、ノードに画像が無くても出す
-        label: "画像フォルダを選ぶ",
+        label: "Choose image folder",
         run: () => this.host.chooseImageFolder(),
       },
       "sep",
-      { label: "削除", key: "Del", run: () => this.host.deleteSelection() },
+      { label: "Delete", key: "Del", run: () => this.host.deleteSelection() },
     ];
   }
 
