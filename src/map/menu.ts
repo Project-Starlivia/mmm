@@ -68,6 +68,11 @@ export class ContextMenu {
     this.el.style.display = "none";
   }
 
+  /** いま開いているか。同じボタンを押し直して閉じたい呼び出し側のため */
+  get open(): boolean {
+    return this.el.style.display === "block";
+  }
+
   /** メニューの中で起きた出来事か（外を押したときだけ閉じるため）。
    *  `EventTarget` をそのまま受けて、ここで確かめる — 呼び出し側に
    *  `as Node` と名乗らせない */

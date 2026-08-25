@@ -119,7 +119,15 @@ export function initExport(deps: {
     });
   });
 
+  // 押し直したら閉じる。**閉じるのは document 側の pointerdown が済ませる**
+  // ので、ここは「押した時点で開いていたか」だけを覚えて、開き直さない。
+  // ボタン自身の pointerdown は document より先に届くので、まだ見える
+  let wasOpen = false;
+  deps.formatButton.addEventListener("pointerdown", () => {
+    wasOpen = menu.open;
+  });
   deps.formatButton.addEventListener("click", () => {
+    if (wasOpen) return;
     const r = deps.formatButton.getBoundingClientRect();
     menu.show(
       r.left,
