@@ -9,7 +9,14 @@ import { tokenizeBlock, touchesFence } from "./map/highlight.ts";
 import { type Pt, type Rect, midOfPolyline, rightOf } from "./map/geometry.ts";
 import { edgePath, edgeSegs, flattenSegs } from "./map/edge.ts";
 import { type CardRef, type CardRow, CODE_LINE, rowH } from "./map/cards.ts";
-import { MONO_FONT, ROW_NORMAL, measure, rowOf, rowTop } from "./map/metrics.ts";
+import {
+  ROW_NORMAL,
+  labelFont,
+  measure,
+  monoFont,
+  rowOf,
+  rowTop,
+} from "./map/metrics.ts";
 import {
   type Box,
   type Layout,
@@ -118,6 +125,23 @@ function targetIn(e: Event, selector: string): Element | null {
   return e.target instanceof Element ? e.target.closest(selector) : null;
 }
 
+/**
+ * マップの操作の早見。**ここが唯一の書き場所**で、キーの割り当てを変えたら
+ * ここも直す（README とは別に、画面の中で確かめられることが要る）。
+ */
+const MAP_INFO = `
+<dl>
+  <dt>Move</dt>
+  <dd>Drag the background to select &middot; <kbd>Space</kbd> + drag or
+      middle-drag to pan &middot; wheel to pan</dd>
+  <dt>Add</dt>
+  <dd><kbd>Tab</kbd> child &middot; <kbd>Enter</kbd> below &middot;
+      <kbd>Shift</kbd>+<kbd>Enter</kbd> above &middot;
+      <kbd>Shift</kbd>+<kbd>Tab</kbd> parent &middot; or the <b>+</b> beside a node</dd>
+  <dt>Zoom</dt>
+  <dd><kbd>Mod</kbd> + wheel &middot; <kbd>Shift</kbd> + wheel scrolls sideways</dd>
+</dl>`;
+
 /** 空集合の使い回し（毎レンダで new しない） */
 const NO_IDS: ReadonlySet<number> = new Set<number>();
 
@@ -142,6 +166,9 @@ export class MindMap {
   private editInk: HTMLPreElement;
   private cardEditor: HTMLTextAreaElement;
   private hint: HTMLDivElement;
+  /** 操作の早見と、その出し入れ */
+  private info: HTMLDivElement;
+  private infoBtn: HTMLButtonElement;
   private menu = new ContextMenu();
 
   private tx = 60;
@@ -245,6 +272,25 @@ export class MindMap {
     this.cardEditor.spellcheck = false;
     this.editBox.append(this.editInk, this.cardEditor);
     pane.append(this.editBox);
+
+    // 操作の早見。**覚えていない人がその場で確かめる**ためのもので、
+     // 既定は閉じている（見えていなくてよい情報を常に置かない）
+    this.info = document.createElement("div");
+    this.info.id = "map-info";
+    this.info.hidden = true;
+    this.info.innerHTML = MAP_INFO;
+    pane.append(this.info);
+
+    this.infoBtn = document.createElement("button");
+    this.infoBtn.id = "map-info-btn";
+    this.infoBtn.type = "button";
+    this.infoBtn.textContent = "i";
+    this.infoBtn.title = "How to move around";
+    this.infoBtn.addEventListener("click", () => {
+      this.info.hidden = !this.info.hidden;
+      this.infoBtn.classList.toggle("on", !this.info.hidden);
+    });
+    pane.append(this.infoBtn);
 
     this.hint = document.createElement("div");
     this.hint.id = "map-hint";
@@ -497,7 +543,7 @@ export class MindMap {
     const lines = this.cardEditor.value.split("\n");
     const p = cardPlacement(rect, this.view(), {
       lines: lines.length,
-      widest: Math.max(...lines.map((l) => measure(MONO_FONT, l))),
+      widest: Math.max(...lines.map((l) => measure(monoFont(), l))),
     });
     const st = this.editBox.style;
     st.left = `${p.left}px`;
@@ -680,7 +726,7 @@ export class MindMap {
     const p = labelPlacement(
       b,
       this.view(),
-      measure(rowOf(b.n).font, this.editor.value),
+      measure(labelFont(rowOf(b.n)), this.editor.value),
     );
     const st = this.editor.style;
     st.left = `${p.left}px`;
@@ -1060,7 +1106,10 @@ export class MindMap {
     this.plusBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (this.hoverId === -1) return;
-      this.host.addChild(this.hoverId);
+      // 箱の脇なので、右クリックの `Add ▸` と同じ並びをその場で開く。
+      // 子 1 つだけなら `Tab` のほうが速い
+      const r = this.plusBtn.getBoundingClientRect();
+      this.menu.show(r.right + 4, r.top, this.addItems(this.hoverId));
     });
 
     // open link cards
@@ -1554,6 +1603,16 @@ export class MindMap {
   // ---------- context menu ----------
 
   /** そのノードに対して、いま何ができるか。並べ方はメニュー側が持つ */
+  /** ノードの足し方。右クリックの入れ子も、箱の脇の `+` も、同じ並びを開く */
+  private addItems(id: number): MenuEntry[] {
+    return [
+      { label: "Child", key: "Tab", run: () => this.host.addChild(id) },
+      { label: "Below", key: "Enter", run: () => this.host.addSibling(id) },
+      { label: "Above", key: "Shift+Enter", run: () => this.host.addSiblingBefore(id) },
+      { label: "Parent", key: "Shift+Tab", run: () => this.host.addParent(id) },
+    ];
+  }
+
   private menuItems(): MenuEntry[] {
     const anchor = this.host.anchor();
     const multi = this.host.selection().size > 1;
@@ -1567,12 +1626,7 @@ export class MindMap {
         key: "Tab",
         run: () => this.host.addChild(anchor),
         disabled: multi,
-        items: [
-          { label: "Child", key: "Tab", run: () => this.host.addChild(anchor) },
-          { label: "Below", key: "Enter", run: () => this.host.addSibling(anchor) },
-          { label: "Above", key: "Shift+Enter", run: () => this.host.addSiblingBefore(anchor) },
-          { label: "Parent", key: "Shift+Tab", run: () => this.host.addParent(anchor) },
-        ],
+        items: this.addItems(anchor),
       },
       { label: "Rename", key: "Mod+Enter", run: () => this.host.editRequested(anchor), disabled: multi },
       "sep",

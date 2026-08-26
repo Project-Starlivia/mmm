@@ -8,6 +8,14 @@
     <!-- CSS は head で読む。JS 経由の注入だと当たるまでの一瞬 unstyled が
          見える（dev で顕著）。vite が dev では render-blocking で配り、
          build ではハッシュ付きに差し替える。 -->
+    <!-- コードの字。**外へ 1 本だけ通信する**（swap なので、届くまでは
+         下の stack で読める。オフラインでもそのまま動く） -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap"
+    />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>

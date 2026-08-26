@@ -104,6 +104,10 @@ let drawingOpen = false;
 type Origin = "cm" | "load" | "core";
 
 function applySnap(snap: Snapshot, origin: Origin): void {
+  // 何も無いところに最初の 1 つが生まれた瞬間だけ、真ん中へ寄せる。
+  // `ensureVisible` は「見えるところまで」しか動かさないので、まっさらな
+  // 画面では端に置かれたように見える
+  const wasEmpty = doc.nodes.length === 0;
   doc = { text: core.getText(), nodes: snap.nodes, fences: snap.fences };
   byId = new Map(doc.nodes.map((n) => [n.id, n]));
   if (origin !== "cm" && origin !== "load") editor.applySets(snap.editSets);
@@ -135,6 +139,7 @@ function applySnap(snap: Snapshot, origin: Origin): void {
   btnRedo.disabled = !snap.canRedo;
   updateDirty();
   showName();
+  if (wasEmpty && doc.nodes.length > 0) map.fitView();
 }
 
 function updateDirty(): void {

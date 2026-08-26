@@ -21,7 +21,8 @@
   --edge: #4d5563;
   --dot: #262b33;
   --font: "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
-  --mono: Consolas, "SF Mono", "Cascadia Code", Menlo, monospace;
+  /* コードの字。**綴りはここ 1 つ** — 測る側（map/metrics.ts）も同じものを見る */
+  --mono: "JetBrains Mono", Consolas, "SF Mono", "Cascadia Code", Menlo, monospace;
   /* コードの色。既存の ink/accent とは別系統で、暗い地に載る想定 */
   --tok-keyword: #c792ea;
   --tok-string: #98c379;
@@ -248,6 +249,61 @@ html, body {
   display: none;
 }
 
+/* ========== 操作の早見 ==========
+   既定は閉じている。**覚えていない人がその場で確かめる**ためのもので、
+   常に置いておく情報ではない。 */
+
+#map-info-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  font-style: italic;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--ink-dim);
+  cursor: pointer;
+  z-index: 5;
+
+  &:hover { border-color: var(--accent); color: var(--ink); }
+  &.on { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+}
+
+#map-info {
+  position: absolute;
+  right: 10px;
+  bottom: 40px;
+  max-width: min(420px, calc(100% - 20px));
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--ink-dim);
+  user-select: none;
+  z-index: 5;
+
+  & dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; }
+  & dt { color: var(--ink); font-weight: 600; }
+  & dd { margin: 0; }
+  & kbd {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 0 4px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--ink);
+  }
+  & b { color: var(--ink); }
+}
+
 /* ========== 親子をつなぐ線 ========== */
 
 /* 線の太さはここが唯一の宣言。以前は同じ 1.7 が map/edge.ts にもあり、
@@ -335,7 +391,7 @@ html, body {
     cursor: pointer;
   }
   & text.code-line {
-    font-family: "Cascadia Code", Consolas, "JetBrains Mono", monospace;
+    font-family: var(--mono);
     font-size: 11px;
     fill: var(--ink);
     white-space: pre;
@@ -456,7 +512,7 @@ html, body {
   position: absolute;
   display: none;
   box-sizing: border-box;
-  font-family: "Cascadia Code", Consolas, "JetBrains Mono", monospace;
+  font-family: var(--mono);
   border: 1px solid var(--accent);
   border-radius: 5px;
   background: var(--bg);

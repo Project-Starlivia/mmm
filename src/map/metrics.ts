@@ -15,25 +15,42 @@ import { type CardRow, rowH, IMG_MIN_W } from "./cards.ts";
 
 export const HIDDEN_MAX_W = 150; // hidden nodes never grow past this
 
-const UI_FAMILY = '"Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif';
-export const CARD_FONT = `12px ${UI_FAMILY}`;
-export const MONO_FONT = '11px "Cascadia Code", Consolas, "JetBrains Mono", monospace';
+/**
+ * 字の綴りは **style.css の `--font` / `--mono` ひとつ**。幅を測る canvas は
+ * 文字列しか受け取らないので、そこから組み直す。起動後に 1 度だけ読む
+ * （テーマを変えても字は変わらないので、読み直す理由が無い）。
+ */
+const families = new Map<string, string>();
+function family(name: string, fallback: string): string {
+  const hit = families.get(name);
+  if (hit !== undefined) return hit;
+  const css = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+  const out = css === "" ? fallback : css;
+  families.set(name, out);
+  return out;
+}
+
+/** その行のラベルを測るための字 */
+export const labelFont = (row: LabelRow): string =>
+  `${row.fontPx}px ${family("--font", "sans-serif")}`;
+
+export const cardFont = (): string => `12px ${family("--font", "sans-serif")}`;
+export const monoFont = (): string => `11px ${family("--mono", "monospace")}`;
 
 export interface LabelRow {
   fontPx: number;
-  font: string; // measure() 用（fontPx から作る）
   padX: number; // 文字開始位置 = 箱の左 + padX
   rowH: number; // ラベル行の高さ
 }
 export const ROW_NORMAL: LabelRow = {
   fontPx: 13,
-  font: `13px ${UI_FAMILY}`,
   padX: 12,
   rowH: 30,
 };
 export const ROW_HIDDEN: LabelRow = {
   fontPx: 11,
-  font: `11px ${UI_FAMILY}`,
   // 通常ノードの余白比（padX/文字 = 0.92、行高/文字 = 2.31）に寄せてある。
   // 小さく見せたいからと詰めすぎると、+N バッジが窮屈になって読めない
   padX: 9,
@@ -102,8 +119,8 @@ export const collapsedBadge = (buried: number): string =>
 export function hiddenLabel(n: NodeInfo, buried: number): string {
   const raw = displayLabel(n.label);
   const badge = collapsedBadge(buried);
-  const budget = HIDDEN_MAX_W - ROW_HIDDEN.padX * 2 - measure(ROW_HIDDEN.font, badge);
-  return clipLabel(raw, ROW_HIDDEN.font, budget) + badge;
+  const budget = HIDDEN_MAX_W - ROW_HIDDEN.padX * 2 - measure(labelFont(ROW_HIDDEN), badge);
+  return clipLabel(raw, labelFont(ROW_HIDDEN), budget) + badge;
 }
 
 /**
@@ -124,22 +141,22 @@ export function nodeSize(n: NodeInfo, rows: CardRow[], buried: number): { w: num
     // 折り畳み表示: ラベルを詰めた幅だけ。カード類は持たない
     const w =
       Math.ceil(
-        Math.min(measure(ROW_HIDDEN.font, hiddenLabel(n, buried)), HIDDEN_MAX_W),
+        Math.min(measure(labelFont(ROW_HIDDEN), hiddenLabel(n, buried)), HIDDEN_MAX_W),
       ) +
       ROW_HIDDEN.padX * 2;
     return { w, h: ROW_HIDDEN.rowH };
   }
   const label = displayLabel(n.label);
-  let w = measure(ROW_NORMAL.font, label);
+  let w = measure(labelFont(ROW_NORMAL), label);
   for (const r of rows) {
     if (r.kind === "img" || r.kind === "svg") {
       w = Math.max(w, IMG_MIN_W);
     } else if (r.kind === "code") {
       for (const ln of r.lines) {
-        w = Math.max(w, measure(MONO_FONT, ln) + 12);
+        w = Math.max(w, measure(monoFont(), ln) + 12);
       }
     } else {
-      w = Math.max(w, measure(CARD_FONT, r.link.title) + 22);
+      w = Math.max(w, measure(cardFont(), r.link.title) + 22);
     }
   }
   // w はここまで content 幅（左右パディング抜き）。最終的な箱の幅は
