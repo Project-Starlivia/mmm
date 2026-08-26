@@ -166,16 +166,14 @@ pub fn set_list_from(b : Int) -> String {
 }
 
 ///|
-/// 文書ぜんぶをいまのモードの正規形に書き直す（構造行の接頭辞だけ。
-/// ラベルにも中身にも触らない）。1 回の undo で戻る。
+/// 文書ぜんぶをいまのモードの正規形に書き直す。1 回の undo で戻る。
+///
+/// **接頭辞だけでは足りない。** リストの形では、中身の行を項目の中身の列まで
+/// 字下げしないと、外の Markdown パーサはそこでリストを閉じてしまう
+/// （そのあとの項目は別のリストになり、深い字下げはコードブロックに化ける）。
+/// mmm の外で読めることがこの機能の目的なので、字下げと空行まで面倒を見る。
 pub fn reformat(tag : String) -> String {
-  let set : Array[Edit] = []
-  for i = 0; i < st.nodes.length(); i = i + 1 {
-    let e = prefix_edit(i, st.nodes[i].depth)
-    if e.insert != e.removed {
-      set.push(e)
-    }
-  }
+  let set = format_edits()
   if set.length() > 0 {
     apply_sets([set], tag)
   }

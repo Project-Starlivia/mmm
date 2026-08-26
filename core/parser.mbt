@@ -123,6 +123,10 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
   let mut head_depth = 0
   let levels : Array[Int] = [] // 入れ子の各段の字下げ幅（列）
   let mut list_from = 0
+  // いま開いている構造行の「中身の列」。フェンスの字下げをここから数える
+  // （見出しの下は 0、`  - x` の下は 4）
+  let mut content_col = 0
+  let mut fence_base = 0
   let mut in_fence = false
   let mut fence_char = 0
   let mut fence_len = 0
@@ -159,7 +163,7 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
         in_fence = false
         continue
       }
-      if fence_close_len(text, l, fence_char) >= fence_len {
+      if fence_close_len(text, l, fence_char, fence_base) >= fence_len {
         fences.push(Fence::{
           start: f_start,
           end: l.end,
@@ -171,9 +175,10 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
       }
       continue
     }
-    match fence_open(text, l) {
+    match fence_open(text, l, content_col) {
       Some(f) => {
         in_fence = true
+        fence_base = content_col
         fence_char = f.ch
         fence_len = f.len
         f_start = l.start
@@ -211,6 +216,7 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
       }
       head_depth = depth
       levels.clear()
+      content_col = 0
       out.push(head_at(text, l, depth, p, in_comment))
       continue
     }
@@ -240,6 +246,7 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
         if list_from == 0 || ld < list_from {
           list_from = ld
         }
+        content_col = ls - l.start
         out.push(head_at(text, l, ld, ls, in_comment))
       }
     }
@@ -357,12 +364,17 @@ fn is_comment_close(text : String, l : Line) -> Bool {
 }
 
 ///|
-/// 開きフェンスなら読み取る。行頭の空白は 3 つまで、フェンスは 3 本以上、
-/// バッククォートのフェンスは情報文字列にバッククォートを含めない。
-fn fence_open(text : String, l : Line) -> FenceOpen? {
+/// 開きフェンスなら読み取る。フェンスは 3 本以上、バッククォートのフェンスは
+/// 情報文字列にバッククォートを含めない。
+///
+/// 行頭の空白は **`base` 列からさらに 3 つまで**。`base` は囲っているリスト
+/// 項目の中身の列（見出しの下なら 0）で、CommonMark が「項目の中では字下げを
+/// 項目の中身の列から数える」のと同じ。ここを 0 固定にしていたころ、
+/// リストの中のフェンスが認識されず、**中の `- x` がノードに化けていた**。
+fn fence_open(text : String, l : Line, base : Int) -> FenceOpen? {
   let mut p = l.start
   let mut indent = 0
-  while p < l.end && code_at(text, p) == 32 && indent < 3 {
+  while p < l.end && code_at(text, p) == 32 && indent < base + 3 {
     p = p + 1
     indent = indent + 1
   }
@@ -396,10 +408,10 @@ fn fence_open(text : String, l : Line) -> FenceOpen? {
 
 ///|
 /// Length of a closing fence run of `fence_char`, or 0 if not a closing fence.
-fn fence_close_len(text : String, l : Line, fence_char : Int) -> Int {
+fn fence_close_len(text : String, l : Line, fence_char : Int, base : Int) -> Int {
   let mut p = l.start
   let mut indent = 0
-  while p < l.end && code_at(text, p) == 32 && indent < 3 {
+  while p < l.end && code_at(text, p) == 32 && indent < base + 3 {
     p = p + 1
     indent = indent + 1
   }

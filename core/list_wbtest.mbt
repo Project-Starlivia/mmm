@@ -104,7 +104,7 @@ test "reformat converts the whole document and round-trips" {
   ignore(reformat(""))
   assert_eq(
     get_text(),
-    "- root\n\n  - branch A\n\n[a](https://a.example)\n\n    - leaf\n",
+    "- root\n  - branch A\n\n    [a](https://a.example)\n\n    - leaf\n",
   )
   assert_eq(tree_sig(), sig) // モードを替えてもマップは 1 ピクセルも変わらない
   ignore(set_list_from(0))
@@ -115,7 +115,7 @@ test "reformat converts the whole document and round-trips" {
   ignore(undo())
   assert_eq(
     get_text(),
-    "- root\n\n  - branch A\n\n[a](https://a.example)\n\n    - leaf\n",
+    "- root\n  - branch A\n\n    [a](https://a.example)\n\n    - leaf\n",
   )
 }
 
@@ -137,6 +137,49 @@ test "move across the boundary rewrites the prefix" {
   ignore(move_nodes([3], 4, 0))
   assert_eq(get_text(), "# r\n\n## a\n\n## b\n\n- x\n")
   assert_eq(tree_sig(), "1:r:-1|2:a:1|2:b:1|3:x:4|")
+}
+
+///|
+/// 整形した list 形が、**外の Markdown パーサでも同じ木に読める**こと。
+///
+/// 判定材料は 3 つ。中身の行が項目の中身の列（ラベルの始まる列）まで
+/// 字下げされていること、ラベルと中身の間に空行があること、兄弟の間に
+/// 空行が無いこと。1 つでも崩れると、外のパーサはそこでリストを閉じ、
+/// 続く項目は別のリスト・深い字下げはコードブロックに化ける。
+test "list form is readable by an outside Markdown parser" {
+  ignore(init_doc("# root\n\n## a\n\ntext\n\n### leaf\n\n## b\n"))
+  ignore(set_list_from(1))
+  ignore(reformat(""))
+  assert_eq(get_text(), "- root\n  - a\n\n    text\n\n    - leaf\n  - b\n")
+}
+
+///|
+/// フェンスの中はコード。**空行を足したり詰めたりしない**（足していた頃、
+/// `const x = 1;` の前後に空行が入ってコードが変わっていた）。
+/// 字下げは塊ごと動くので、中の相対的な字下げは保たれる。
+test "fences move as a block and keep their body untouched" {
+  let head = "# r\n\n## a\n\n```ts\nif (x) {\n  y();\n}\n```\n"
+  ignore(init_doc(head))
+  ignore(set_list_from(1))
+  ignore(reformat(""))
+  assert_eq(
+    get_text(),
+    "- r\n  - a\n\n    ```ts\n    if (x) {\n      y();\n    }\n    ```\n",
+  )
+  // 字下げされたフェンスも、コアはフェンスとして読む（中の `- x` が
+  // ノードに化けない）
+  assert_eq(st.nodes.length(), 2)
+  ignore(set_list_from(0))
+  ignore(reformat(""))
+  assert_eq(get_text(), head) // 往復でバイト一致
+}
+
+///|
+/// 字下げされたフェンスの中の構造めいた行は、構造にならない。
+test "structure lines inside an indented fence stay code" {
+  ignore(init_doc("- r\n  - a\n\n    ```\n    - not a node\n    # nor this\n    ```\n"))
+  assert_eq(st.nodes.length(), 2)
+  assert_eq(st.nodes[1].label, "a")
 }
 
 ///|
