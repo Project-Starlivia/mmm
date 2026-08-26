@@ -32,6 +32,29 @@ const MARGIN = 8; // 画面の縁からこれだけは離す
 /** 子メニューは親の行にこれだけ重ねて出す（縁の線をまたぐ量） */
 const OVERLAP = 4;
 
+/**
+ * そのボタンでメニューを開く。**押し直したら閉じる** — 閉じるのは document 側の
+ * `pointerdown` が済ませるので、押した時点で開いていたかだけを覚えて開き直さない
+ * （ボタン自身の `pointerdown` は document より先に届く）。
+ *
+ * 並びは開くたびに作る。押した瞬間の文書に合わせるため。
+ */
+export function openOnClick(
+  button: HTMLButtonElement,
+  items: () => MenuEntry[],
+): void {
+  const menu = new ContextMenu();
+  let wasOpen = false;
+  button.addEventListener("pointerdown", () => {
+    wasOpen = menu.open;
+  });
+  button.addEventListener("click", () => {
+    if (wasOpen) return;
+    const r = button.getBoundingClientRect();
+    menu.show(r.left, r.bottom + 4, items());
+  });
+}
+
 export class ContextMenu {
   private el = document.createElement("div");
   /** 開いている子メニュー。要るまで作らない（大半のメニューに入れ子は無い） */

@@ -25,6 +25,7 @@ import { initDrop } from "./app/dnd.ts";
 import { showDrawing } from "./app/draw.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { onLanguageReady } from "./map/highlight.ts";
+import { openOnClick } from "./map/menu.ts";
 import {
   type CardRef,
   cardRowsOf,
@@ -47,12 +48,13 @@ function el<T extends Element>(id: string, kind: abstract new () => T): T {
   throw new Error(`#${id} が ${kind.name} ではない`);
 }
 
+/** ヘルプの行き先。ここ 1 か所 */
+const REPO = "https://github.com/Project-Starlivia/mmm";
+
 const mdPane = el("md-pane", HTMLElement);
 const mapPane = el("map-pane", HTMLElement);
-const btnNew = el("btn-new", HTMLButtonElement);
-const btnOpen = el("btn-open", HTMLButtonElement);
-const btnSave = el("btn-save", HTMLButtonElement);
-const btnImages = el("btn-images", HTMLButtonElement);
+const btnFile = el("btn-file", HTMLButtonElement);
+const btnHelp = el("btn-help", HTMLButtonElement);
 const btnUndo = el("btn-undo", HTMLButtonElement);
 const btnRedo = el("btn-redo", HTMLButtonElement);
 const elFilename = el("filename", HTMLElement);
@@ -694,12 +696,20 @@ async function attachImage(id: number, blob: Blob, tag = ""): Promise<void> {
   if (rel !== null && byId.has(id)) insertContentLine(id, `![](${rel})`, tag);
 }
 
-btnNew.addEventListener("click", () => void newFile());
-btnOpen.addEventListener("click", () => void openFile());
-btnSave.addEventListener("click", () => void saveFile());
-// 画像フォルダは**文書ぜんぶの設定**（この .md の画像がどこに居るか）なので、
-// 新規 / 開く / 保存 と同じ高さに置く
-btnImages.addEventListener("click", () => void assets.chooseFolder());
+// 文書に何かする道は File にまとめる。**画像フォルダもここ** —
+// 「この .md の画像がどこに居るか」は文書ぜんぶの設定で、新規 / 開く / 保存と
+// 同じ高さのもの
+openOnClick(btnFile, () => [
+  { label: "New", key: "Mod+Alt+N", run: () => void newFile() },
+  { label: "Open", key: "Mod+O", run: () => void openFile() },
+  { label: "Save", key: "Mod+S", run: () => void saveFile() },
+  { label: "Save as", key: "Mod+Shift+S", run: () => void saveFile(true) },
+  "sep",
+  { label: "Image folder", run: () => void assets.chooseFolder() },
+]);
+btnHelp.addEventListener("click", () => {
+  window.open(REPO, "_blank", "noopener");
+});
 elFilename.addEventListener("click", () => {
   void (async () => {
     if (!(await confirmDiscard())) return;

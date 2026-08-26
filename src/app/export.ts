@@ -9,7 +9,7 @@
 // 「これ」を相手にする操作は右クリックへ寄せる。
 
 import type { MindMap } from "../mindmap.ts";
-import { ContextMenu, type MenuEntry } from "../map/menu.ts";
+import { type MenuEntry, openOnClick } from "../map/menu.ts";
 import { LS_WAY, load, store } from "./persist.ts";
 
 /**
@@ -83,14 +83,18 @@ async function rasterize(svg: SVGSVGElement, mime: string): Promise<Blob> {
  * SVG のコピーは `text/plain` にも同じものを載せる — Figma や Illustrator は
  * 画像として受け取るより、SVG のソースを貼られたほうが確実に開く。
  *
- * `short` はボタンの表示。動詞を落とすだけで、`label`（並びの表示）と
- * 同じことを指す — 書き出しボタンに形式名が出ていればダウンロードと読める。
+ * `short` はボタンの表示。`label`（並びの表示）から動詞だけを落としたもので、
+ * **行き先の印は落とさない** — ⤓ と ⧉ が、押したら何が起きるかを言う。
  */
+/** 行き先の印。**形式ではなく行き先**に付く — 落とすのか、貼れるようにするのか */
+const DOWN = "⤓";
+const COPY = "⧉";
+
 const WAYS = [
   {
     id: "svg-file",
-    short: "SVG",
-    label: "Download SVG",
+    short: `${DOWN} SVG`,
+    label: `${DOWN} Download SVG`,
     done: "",
     out: async (svg: SVGSVGElement, base: string): Promise<void> => {
       downloadBlob(
@@ -101,8 +105,8 @@ const WAYS = [
   },
   {
     id: "webp-file",
-    short: "WebP",
-    label: "Download WebP",
+    short: `${DOWN} WebP`,
+    label: `${DOWN} Download WebP`,
     done: "",
     out: async (svg: SVGSVGElement, base: string): Promise<void> => {
       downloadBlob(await rasterize(svg, "image/webp"), `${base}.webp`);
@@ -110,8 +114,8 @@ const WAYS = [
   },
   {
     id: "png-copy",
-    short: "Copy PNG",
-    label: "Copy PNG",
+    short: `${COPY} PNG`,
+    label: `${COPY} Copy PNG`,
     done: "Image copied",
     out: async (svg: SVGSVGElement): Promise<void> => {
       const png = await rasterize(svg, "image/png");
@@ -120,8 +124,8 @@ const WAYS = [
   },
   {
     id: "svg-copy",
-    short: "Copy SVG",
-    label: "Copy SVG",
+    short: `${COPY} SVG`,
+    label: `${COPY} Copy SVG`,
     done: "SVG copied",
     out: async (svg: SVGSVGElement): Promise<void> => {
       const text = serialize(svg);
@@ -192,7 +196,6 @@ export function exportWays(
 export function initExport(
   deps: ExportDeps & { button: HTMLButtonElement; wayButton: HTMLButtonElement },
 ): void {
-  const menu = new ContextMenu();
   let way = wayOf(load(LS_WAY));
   const show = (): void => {
     deps.button.textContent = way.short;
@@ -202,24 +205,11 @@ export function initExport(
 
   deps.button.addEventListener("click", () => run(deps, way, true));
 
-  // 押し直したら閉じる。**閉じるのは document 側の pointerdown が済ませる**
-  // ので、ここは「押した時点で開いていたか」だけを覚えて、開き直さない。
-  // ボタン自身の pointerdown は document より先に届くので、まだ見える
-  let wasOpen = false;
-  deps.wayButton.addEventListener("pointerdown", () => {
-    wasOpen = menu.open;
-  });
-  deps.wayButton.addEventListener("click", () => {
-    if (wasOpen) return;
-    const r = deps.wayButton.getBoundingClientRect();
-    menu.show(
-      r.left,
-      r.bottom + 4,
-      exportWays(deps, true, (chosen) => {
-        way = chosen;
-        store(LS_WAY, chosen.id);
-        show();
-      }),
-    );
-  });
+  openOnClick(deps.wayButton, () =>
+    exportWays(deps, true, (chosen) => {
+      way = chosen;
+      store(LS_WAY, chosen.id);
+      show();
+    }),
+  );
 }

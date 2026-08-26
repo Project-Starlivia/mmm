@@ -67,15 +67,15 @@ html, body {
 
 #app { display: flex; flex-direction: column; height: 100vh; }
 
-/* ========== 上の帯 ========== */
+/* ========== 上と下の帯 ==========
+   上は「文書に何かする」、下は「いま何を見ているか」。**ボタンの見た目は
+   同じものなので、規則も 1 つ**。違うのは何を置くかだけ。 */
 
-#topbar {
+#topbar, #statusbar {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
   background: var(--panel);
-  border-bottom: 1px solid var(--line);
   user-select: none;
   flex: none;
 
@@ -123,6 +123,32 @@ html, body {
       color: var(--ink-dim);
       text-decoration: line-through;
     }
+  }
+}
+
+#topbar { padding: 6px 12px; border-bottom: 1px solid var(--line); }
+/* 下の帯は低頻度のものだけなので、上より薄く座らせる */
+#statusbar { padding: 3px 12px; border-top: 1px solid var(--line); }
+
+/* 2 つのボタンを 1 つに見せる。枠を重ねて、継ぎ目だけが仕切りになる */
+.split {
+  display: inline-flex;
+
+  & button {
+    border-radius: 0;
+    position: relative;
+
+    &:first-child { border-start-start-radius: 6px; border-end-start-radius: 6px; }
+    &:last-child {
+      border-start-end-radius: 6px;
+      border-end-end-radius: 6px;
+      /* 枠を 1 本ぶん重ねる。2 本並ぶと「別のボタン」に見える */
+      margin-left: -1px;
+      padding-left: 7px;
+      padding-right: 7px;
+    }
+    /* 触っている側の枠を前に出す（重ねた相手に隠されないように） */
+    &:hover:not(:disabled) { z-index: 1; }
   }
 }
 
@@ -578,3 +604,20 @@ html, body {
   margin-top: 12px;
 }
 .popup-hint { flex: 1; font-size: 11px; color: var(--ink-dim); }
+
+/* ========== 狭いとき ==========
+   片方だけを出す。**どちらを出すかは JS で持たない** — マップが on なら
+   マップ、off なら md。切り替えは下の帯の MD / Map がそのまま担う。 */
+
+@media (max-width: 720px) {
+  #topbar { gap: 6px; padding: 6px 8px; }
+  /* 名前はタブが言っている。狭いところで二重に場所を取らない */
+  #filename, #dirty { display: none; }
+
+  /* 並べないので、掴んで動かす境目も意味を失う */
+  #splitter { display: none; }
+  #panes:not(.no-map) #md-pane { display: none; }
+  #md-pane, #map-pane { flex: 1; min-width: 0; }
+
+  #statusbar { padding: 4px 8px; }
+}
