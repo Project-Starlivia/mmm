@@ -173,7 +173,7 @@ pub fn set_list_from(b : Int) -> String {
 /// （そのあとの項目は別のリストになり、深い字下げはコードブロックに化ける）。
 /// mmm の外で読めることがこの機能の目的なので、字下げと空行まで面倒を見る。
 pub fn reformat(tag : String) -> String {
-  let set = format_edits()
+  let set = reformat_edits()
   if set.length() > 0 {
     apply_sets([set], tag)
   }
@@ -238,6 +238,34 @@ pub fn add_root(tag : String) -> String {
 pub fn rename_node(id : Int, label : String, tag : String) -> String {
   cmd_rename(id, label, tag)
   take_snapshot()
+}
+
+///|
+/// そのノードの本文の末尾へ 1 行を追加する。**貼り付け・ドロップ・
+/// お絵描き・その場でのリンクが通る唯一の道**（画像 / URL / `Shift+L`）。
+///
+/// リストの形で書かれたノードなら、その項目の中身の列まで字下げする。
+/// TS 側が `insertBlock` で自前に組んでいた頃は常に列 0 で書いていたため、
+/// リストの中に貼ると外の Markdown パーサがそこでリストを閉じ、続く兄弟が
+/// 迷子になっていた（実際に踏んだ）。
+pub fn insert_content(id : Int, line : String, tag : String) -> String {
+  let i = find_node(id)
+  if i >= 0 {
+    apply_sets([[append_content_edit(i, line)]], tag)
+  }
+  take_snapshot()
+}
+
+///|
+/// 深さ `depth` の新しい構造行（見出しかリスト項目か）を、**いまの文書の
+/// モード**で 1 行ぶん書く。ラベルは正規化する（rename と同じ）。
+///
+/// 貼り付けの「見出し無しテキスト → 子ノードを並べる」が使う。以前は
+/// `#`.repeat(depth) を直に書いていたため、リストの形の文書に貼ると
+/// **見出しがリストの入れ子をリセットして以降の兄弟が丸ごと迷子になる**
+/// という、書式の見た目ではなく木そのものを壊す不具合になっていた。
+pub fn format_line(depth : Int, label : String) -> String {
+  prefix_for(depth) + sanitize_label(label)
 }
 
 ///|

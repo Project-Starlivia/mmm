@@ -692,11 +692,16 @@ function insertParagraph(at: number, body: string, tag = ""): void {
   applySnap(core.replaceText(e.from, e.to, e.insert, tag), "core");
 }
 
-/** Append a line at the END of a node's own attached content (before its
- * first child heading), as one undo entry. */
+/**
+ * そのノードの本文の末尾へ 1 行を追加する（画像・URL・お絵描き・
+ * `Shift+L` が通る唯一の道）。字下げも含めた形はコアが決める —
+ * **リストの形のノードへ、列 0 のまま書いてはいけない**。列 0 のまま
+ * 書くと、外の Markdown パーサはそこでリストを閉じ、続く兄弟が迷子になる
+ * （実際に踏んだ）。
+ */
 function insertContentLine(id: number, line: string, tag = ""): void {
   if (!byId.has(id)) return;
-  insertParagraph(contentEnd(id), line, tag);
+  applySnap(core.insertContent(id, line, tag), "core");
 }
 
 /**

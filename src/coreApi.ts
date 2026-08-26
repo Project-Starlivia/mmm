@@ -82,6 +82,20 @@ export const core = {
   setListFrom: (b: number): Snapshot => snap(mbt.setListFrom(b)),
   /** 文書ぜんぶをいまのモードの正規形へ（構造行の接頭辞だけ）。undo 1 回 */
   reformat: (tag = ""): Snapshot => snap(mbt.reformat(tag)),
+  /**
+   * そのノードの本文の末尾へ 1 行を追加する。**貼り付け・ドロップ・
+   * お絵描き・その場でのリンクが通る唯一の道**。リストの形で書かれた
+   * ノードなら、その項目の中身の列まで字下げする（TS 側で組むと、外の
+   * Markdown パーサがそこでリストを閉じ、続く兄弟が迷子になる）。
+   */
+  insertContent: (id: number, line: string, tag = ""): Snapshot =>
+    snap(mbt.insertContent(id, line, tag)),
+  /**
+   * 深さ `depth` の新しい構造行（見出しかリスト項目か）を、いまの文書の
+   * モードで 1 行ぶん書く。ラベルは正規化する。
+   */
+  formatLine: (depth: number, label: string): string =>
+    mbt.formatLine(depth, label),
   getText: (): string => mbt.getText(),
   replaceText: (from: number, to: number, insert: string, tag = ""): Snapshot =>
     snap(mbt.replaceText(from, to, insert, tag)),

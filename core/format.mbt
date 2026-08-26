@@ -14,14 +14,13 @@
 // 差を保つので、フェンスの中の相対的な字下げは崩れない。
 
 ///|
-/// その節点の中身を置く列。見出しの下は 0、`  - x` の下はその項目の
-/// ラベルが始まる列（= 印の列 + 2）。
-fn content_col_of(i : Int) -> Int {
-  let nd = st.nodes[i]
-  if st.list_from == 0 || nd.depth < st.list_from {
+/// 深さ `depth` の節点が中身を置く列。見出しの下は 0、`  - x` の下は
+/// その項目のラベルが始まる列（= 印の列 + 2）。
+fn content_col_for(depth : Int) -> Int {
+  if st.list_from == 0 || depth < st.list_from {
     return 0
   }
-  2 * (nd.depth - st.list_from) + 2
+  2 * (depth - st.list_from) + 2
 }
 
 ///|
@@ -52,7 +51,13 @@ fn indent_of(a : Int, b : Int) -> (Int, Int) {
 ///
 /// 構造行は接頭辞を、中身の行は字下げを書き直し、行の間の空行を
 /// 「どちらかが中身なら 1 つ、構造どうしなら 0（リストの形のみ）」に揃える。
-fn format_edits() -> Array[Edit] {
+///
+/// `depth_of(i)` はノード i を**どの深さとして**書くかを決める。文書全体の
+/// reformat では `st.nodes[i].depth`（そのまま）を渡す。貼り付けの relevel
+/// では、断片を単独で読み直した depth ではなく、**貼り先での本当の深さ**を
+/// 外から渡す — 断片だけを再走査すると、周りの見出しが無い分、入れ子の
+/// 段数が浅く数え直されてしまうため（実際に踏んだ）。
+fn format_edits(depth_of : (Int) -> Int) -> Array[Edit] {
   let set : Array[Edit] = []
   let lines = scan_lines(st.text)
   let n = st.nodes.length()
@@ -84,6 +89,8 @@ fn format_edits() -> Array[Edit] {
       base[o] = col
     }
   }
+  // 出す形の唯一の分岐点。ここだけ depth_of を通す
+  let content_col = fn(o : Int) -> Int { content_col_for(depth_of(o)) }
   // フェンスの中の行（開き行の次から閉じ行まで）。**中身はコードなので、
   // 空行を足したり詰めたりしてはいけない**。字下げだけ塊で動かす
   let inside : Array[Bool] = Array::make(lines.length(), false)
@@ -107,7 +114,7 @@ fn format_edits() -> Array[Edit] {
     if inside[li] {
       // 空行かどうかに関わらず、行の並びには触らない
       if !blank_line(l.start, l.end) {
-        indent_edit(set, o, l, base)
+        indent_edit(set, o, l, base, content_col)
       }
       prev_seen = true
       prev_struct = false
@@ -152,15 +159,22 @@ fn format_edits() -> Array[Edit] {
     prev_struct = is_struct[li]
     // ---- 行そのもの ----
     if is_struct[li] {
-      let e = prefix_edit(o, st.nodes[o].depth)
+      let e = prefix_edit(o, depth_of(o))
       if e.insert != e.removed {
         set.push(e)
       }
     } else {
-      indent_edit(set, o, l, base)
+      indent_edit(set, o, l, base, content_col)
     }
   }
   set
+}
+
+///|
+/// 文書ぜんぶを、いま各ノードが持つ深さのまま正規形に整える
+/// （`reformat` の中身。identity の depth_of で `format_edits` を呼ぶだけ）。
+fn reformat_edits() -> Array[Edit] {
+  format_edits(fn(i) { st.nodes[i].depth })
 }
 
 ///|
@@ -172,12 +186,50 @@ fn indent_edit(
   o : Int,
   l : Line,
   base : Array[Int],
+  content_col : (Int) -> Int,
 ) -> Unit {
   let (col, text_at) = indent_of(l.start, l.end)
-  let want = content_col_of(o) + col - (if base[o] < 0 { col } else { base[o] })
+  let want = content_col(o) + col - (if base[o] < 0 { col } else { base[o] })
   let indent = spaces(if want < 0 { 0 } else { want })
   let old = slice(st.text, l.start, text_at)
   if indent != old {
     set.push(Edit::{ from: l.start, to: text_at, insert: indent, removed: old })
   }
+}
+
+///|
+/// そのノードの本文の末尾。次に構造行が来る手前（無ければ自分の末尾）。
+/// TS 側 map/cards.ts の contentEnd と同じ式 — 挿入位置の計算にだけ要る。
+fn content_end_of(i : Int) -> Int {
+  if i + 1 < st.nodes.length() && st.nodes[i + 1].from < st.nodes[i].to {
+    st.nodes[i + 1].from
+  } else {
+    st.nodes[i].to
+  }
+}
+
+///|
+/// ノード i の本文の末尾へ、1 行を追加する編集。前後の空行の出し分けは
+/// 見出しの挿入（insert_heading_edit）と同じ式。
+///
+/// **リストの形で書かれたノードなら、その項目の中身の列まで字下げする。**
+/// 字下げしないと、外の Markdown パーサはそこでリストを閉じ、続く兄弟が
+/// 迷子になる（貼り付け・ドロップ・お絵描き・リンクで実際に踏んだ）。
+fn append_content_edit(i : Int, line : String) -> Edit {
+  let at = content_end_of(i)
+  let col = content_col_for(st.nodes[i].depth)
+  let body = if col > 0 { spaces(col) + line } else { line }
+  let sb = StringBuilder::new()
+  if at > 0 && code_at(st.text, at - 1) != 10 {
+    sb.write_string(eol)
+    sb.write_string(eol)
+  } else if !preceded_by_blank(at) {
+    sb.write_string(eol)
+  }
+  sb.write_string(body)
+  sb.write_string(eol)
+  if at != st.text.length() {
+    sb.write_string(eol)
+  }
+  Edit::{ from: at, to: at, insert: sb.to_string(), removed: "" }
 }

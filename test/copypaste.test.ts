@@ -207,3 +207,50 @@ test("X5: ランダム文書のコピー→貼り付けで木が壊れない", (
   }
   assert.deepEqual(failures, [], `コピー→貼り付けが木を壊す:\n  ${failures.join("\n  ")}`);
 });
+
+// ---------------------------------------------------------------
+// X6: リストの形の文書に貼っても、木が壊れない
+//
+// 見出しの形しか無かった頃は「新しい行 = # を直に書く」で足りたが、
+// リストの形の文書にそのまま `#` を書くと、見出しがリストの入れ子を
+// リセットしてしまい、貼った先より後ろの兄弟が丸ごと迷子になっていた
+// （tab 階層が壊れるバグの実体）。
+// ---------------------------------------------------------------
+
+test("X6: リスト文書へ見出し無しテキストを貼っても、後ろの兄弟の深さが動かない", () => {
+  const s = initDoc("- root\n  - a\n    - b\n    - c\n  - d\n");
+  const b = nodeOf(s.nodes, "b");
+  const action = decidePaste("hello\nworld", { depth: b.depth }, true);
+  assert.equal(action.kind, "children");
+  const e = insertBlock(getText(), b.to, (action as { body: string }).body);
+  const snap = core.replaceText(e.from, e.to, e.insert, "");
+  const byLabel = new Map(snap.nodes.map((n) => [n.label, n]));
+  // c と d は貼り付け前とまったく同じ深さ・親のまま
+  assert.equal(byLabel.get("c")?.depth, 3);
+  assert.equal(byLabel.get("c")?.parent, byLabel.get("a")?.id);
+  assert.equal(byLabel.get("d")?.depth, 2);
+  assert.equal(byLabel.get("d")?.parent, byLabel.get("root")?.id);
+  // 貼った内容はリストの形（# ではない）で、b の子になっている
+  assert.equal(byLabel.get("hello")?.parent, b.id);
+  assert.match(getText().split("\n").find((l) => l.includes("hello")) ?? "", /^\s*-\s/);
+});
+
+test("X6: 空のリスト文書へ貼った最初の行は、その文書の形（-）で書かれる", () => {
+  core.initDoc("");
+  core.setListFrom(1);
+  const action = decidePaste("hello\nworld", null, false);
+  assert.equal(action.kind, "rootTree");
+  assert.match((action as { body: string }).body, /^- hello/);
+});
+
+test("X6: リストの項目へ URL を貼ると、その項目の中身の列まで字下げされる", () => {
+  const s = initDoc("- root\n  - a\n    - b\n    - c\n  - d\n");
+  const b = nodeOf(s.nodes, "b");
+  const snap = core.insertContent(b.id, "https://example.com/x", "");
+  const byLabel = new Map(snap.nodes.map((n) => [n.label, n]));
+  // c と d は動かない
+  assert.equal(byLabel.get("c")?.depth, 3);
+  assert.equal(byLabel.get("d")?.depth, 2);
+  const line = getText().split("\n").find((l) => l.includes("example.com"));
+  assert.match(line ?? "", /^ {6}https:\/\//); // b の中身の列 = 6
+});

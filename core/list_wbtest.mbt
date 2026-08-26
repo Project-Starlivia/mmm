@@ -185,6 +185,19 @@ test "structure lines inside an indented fence stay code" {
 ///|
 test "pasted list fragments relevel into the document form" {
   ignore(init_doc("# r\n\n## a\n")) // 見出しの文書（listFrom 0）
-  // リストの断片を深さ 3 に合わせると、見出しに書き直される
-  assert_eq(relevel_text("- p\n  - q\n", 3), "### p\n#### q\n")
+  // リストの断片を深さ 3 に合わせると、見出しに書き直される。
+  // 見出しの形は「ブロックの間は空行 1 つ」なので、詰めて書かれていた
+  // リストの断片も、書き直すときに空行が入る
+  assert_eq(relevel_text("- p\n  - q\n", 3), "### p\n\n#### q\n")
+}
+
+///|
+/// リストの文書へ、見出しで書かれた断片（本文つき）を貼ると、本文の
+/// 字下げも新しい深さの列に合わせて書き直される。**接頭辞だけでは
+/// 足りない** — 貼り付けでも reformat と同じ規則を通す。
+test "pasted heading fragments with content indent into the list form" {
+  ignore(init_doc("- root\n  - a\n"))
+  assert_eq(st.list_from, 1)
+  let pasted = relevel_text("## x\n\nhttps://e.example\n\n### z\n", 3)
+  assert_eq(pasted, "    - x\n\n      https://e.example\n\n      - z\n")
 }

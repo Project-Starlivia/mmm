@@ -37,15 +37,19 @@ export function decidePaste(
       .map((l) => l.trim())
       .filter((l) => l !== "");
     if (labels.length === 0) return { kind: "noop" };
+    // 新しい行の形（見出しかリスト項目か・字下げ）は**いまの文書のモード**
+    // が決める。以前ここで `#` を直に書いていたころ、リストの形の文書に
+    // 貼ると見出しがリストの入れ子をリセットして、以降の兄弟が丸ごと
+    // 迷子になっていた（木そのものが壊れる不具合だった）
     if (!anchor) {
       const body = [
-        `# ${labels[0]}`,
-        ...labels.slice(1).map((l) => `## ${l}`),
+        core.formatLine(1, labels[0]),
+        ...labels.slice(1).map((l) => core.formatLine(2, l)),
       ].join("\n\n");
       return { kind: "rootTree", body };
     }
-    const hashes = "#".repeat(anchor.depth + 1);
-    const body = labels.map((l) => `${hashes} ${l}`).join("\n\n");
+    const depth = anchor.depth + 1;
+    const body = labels.map((l) => core.formatLine(depth, l)).join("\n\n");
     return { kind: "children", body };
   }
 

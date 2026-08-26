@@ -38,6 +38,18 @@ pub fn add_child(id : Int, tag : String) -> String {
 }
 
 ///|
+#export_name("insertContent")
+pub fn insert_content(id : Int, line : String, tag : String) -> String {
+  @core.insert_content(id, line, tag)
+}
+
+///|
+#export_name("formatLine")
+pub fn format_line(depth : Int, label : String) -> String {
+  @core.format_line(depth, label)
+}
+
+///|
 #export_name("addSibling")
 pub fn add_sibling(id : Int, tag : String) -> String {
   @core.add_sibling(id, tag)
