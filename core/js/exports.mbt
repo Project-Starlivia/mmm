@@ -8,6 +8,18 @@ pub fn init_doc(text : String) -> String {
 }
 
 ///|
+#export_name("setListFrom")
+pub fn set_list_from(b : Int) -> String {
+  @core.set_list_from(b)
+}
+
+///|
+#export_name("reformat")
+pub fn reformat(tag : String) -> String {
+  @core.reformat(tag)
+}
+
+///|
 #export_name("getText")
 pub fn get_text() -> String {
   @core.get_text()

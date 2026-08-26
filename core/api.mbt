@@ -74,6 +74,8 @@ fn take_snapshot() -> String {
   put_bool(sb, "canUndo", st.undo.length() > 0)
   sb.write_string(",")
   put_bool(sb, "canRedo", st.redo.length() > 0)
+  sb.write_string(",")
+  put_int(sb, "listFrom", st.list_from)
   sb.write_string(",\"editSets\":[")
   for i = 0; i < st.last_sets.length(); i = i + 1 {
     sep(sb, i)
@@ -148,8 +150,35 @@ pub fn init_doc(text : String) -> String {
   st.nodes = []
   st.last_sets = []
   rebuild_nodes(Map([]))
+  // 開いたときだけの自動判定。以降どれだけ編集してもモードは動かない
+  st.list_from = st.scan_list_from
   st.rev = st.rev + 1
   st.focus = -1
+  take_snapshot()
+}
+
+///|
+/// 書き方のモードを変える。0 = 全部見出し、n = 深さ n 以上をリストで書く。
+/// テキストには触らない — 揃えるのは reformat の仕事。
+pub fn set_list_from(b : Int) -> String {
+  st.list_from = if b < 0 { 0 } else { b }
+  take_snapshot()
+}
+
+///|
+/// 文書ぜんぶをいまのモードの正規形に書き直す（構造行の接頭辞だけ。
+/// ラベルにも中身にも触らない）。1 回の undo で戻る。
+pub fn reformat(tag : String) -> String {
+  let set : Array[Edit] = []
+  for i = 0; i < st.nodes.length(); i = i + 1 {
+    let e = prefix_edit(i, st.nodes[i].depth)
+    if e.insert != e.removed {
+      set.push(e)
+    }
+  }
+  if set.length() > 0 {
+    apply_sets([set], tag)
+  }
   take_snapshot()
 }
 

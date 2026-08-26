@@ -19,7 +19,12 @@ function assertTreeSane(nodes: NodeInfo[], text: string, tag: string): void {
     prevFrom = n.from;
     assert.ok(n.to <= text.length, `${tag}: to が本文長超過 (id=${n.id})`);
     const line = text.slice(n.from, n.headEnd);
-    assert.match(line, /^#+(\s|$)/, `${tag}: 見出し行でない (id=${n.id}, ${JSON.stringify(line)})`);
+    // 構造行は見出しかリスト項目（list-form 以降、リストも構造）
+    assert.match(
+      line,
+      /^(#+|\s*[-*+])(\s|$)/,
+      `${tag}: 構造行でない (id=${n.id}, ${JSON.stringify(line)})`,
+    );
     if (n.parent !== -1) {
       const p = byId.get(n.parent);
       assert.ok(p, `${tag}: 親 ${n.parent} が存在しない (id=${n.id})`);

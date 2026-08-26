@@ -11,6 +11,42 @@ fn hashes(n : Int) -> String {
 }
 
 ///|
+fn spaces(n : Int) -> String {
+  let sb = StringBuilder::new()
+  for i = 0; i < n; i = i + 1 {
+    sb.write_string(" ")
+  }
+  sb.to_string()
+}
+
+///|
+/// 深さ d の構造行の接頭辞。**書く形はモード（st.list_from）が決める** —
+/// 深さ b 未満は `#`、b 以上は 2 スペース刻みの `- `。
+/// 読みは常に両方を受けるので、ここが書きの唯一の分岐になる。
+fn prefix_for(depth : Int) -> String {
+  let b = st.list_from
+  if b == 0 || depth < b {
+    hashes(depth) + " "
+  } else {
+    spaces(2 * (depth - b)) + "- "
+  }
+}
+
+///|
+/// ノード i の構造行を深さ new_depth の接頭辞に書き直す編集。
+/// `#` を 1 本ずつ足し引きしていた頃と違い、**形の境界をまたぐ変更**
+/// （見出し → リスト項目）も同じ 1 つの編集になる。
+fn prefix_edit(i : Int, new_depth : Int) -> Edit {
+  let nd = st.nodes[i]
+  Edit::{
+    from: nd.from,
+    to: nd.label_start,
+    insert: prefix_for(new_depth),
+    removed: slice(st.text, nd.from, nd.label_start),
+  }
+}
+
+///|
 fn sanitize_label(label : String) -> String {
   let sb = StringBuilder::new()
   for ch in label.iter() {
@@ -77,8 +113,7 @@ fn insert_heading_edit(at : Int, depth : Int) -> (Edit, Int) {
     sb.write_string(br)
     prefix_len = br.length()
   }
-  sb.write_string(hashes(depth))
-  sb.write_string(" ")
+  sb.write_string(prefix_for(depth))
   sb.write_string(br)
   if at != st.text.length() {
     sb.write_string(br)

@@ -2,14 +2,15 @@
 // どれもノードの範囲 [from, to) に対する編集で、行を動かさない。
 
 ///|
-/// 書き換えるのは、その見出しの 1 行だけ。
+/// 書き換えるのは、その構造行の 1 行だけ。接頭辞も正規形に揃える
+/// （どの形で書くかはモードの仕事 — prefix_for に一任）。
 fn cmd_rename(id : Int, label : String, tag : String) -> Unit {
   let i = find_node(id)
   if i < 0 {
     return
   }
   let nd = st.nodes[i]
-  let line = hashes(nd.depth) + " " + sanitize_label(label)
+  let line = prefix_for(nd.depth) + sanitize_label(label)
   let old = slice(st.text, nd.from, nd.head_end)
   if line == old {
     return

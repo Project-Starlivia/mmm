@@ -14,12 +14,7 @@ fn cmd_indent(ids : Array[Int]) -> Unit {
     if prev_sibling(k) >= 0 {
       keep.push(st.nodes[k].id)
       for m in subtree_of(k) {
-        set.push(Edit::{
-          from: st.nodes[m].from,
-          to: st.nodes[m].from,
-          insert: "#",
-          removed: "",
-        })
+        set.push(prefix_edit(m, st.nodes[m].depth + 1))
       }
     }
   }
@@ -67,12 +62,7 @@ fn cmd_outdent(ids : Array[Int]) -> Unit {
       // already the last block in the parent: pure depth change
       let set : Array[Edit] = []
       for m in subtree_of(i) {
-        set.push(Edit::{
-          from: st.nodes[m].from,
-          to: st.nodes[m].from + 1,
-          insert: "",
-          removed: "#",
-        })
+        set.push(prefix_edit(m, st.nodes[m].depth - 1))
       }
       apply_sets([set], "")
       focus_node_at(nd.from)
@@ -118,14 +108,13 @@ fn move_block(i : Int, at : Int, new_depth : Int) -> Unit {
   for m in heads {
     let h = st.nodes[m]
     rels.push((h.id, h.from - nd.from + acc))
-    acc = acc + delta
+    // 接頭辞を目的の深さの正規形に書き直す。長さの差を積んで、
+    // 各構造行の新しい相対位置（rels）を出す
+    let np = prefix_for(h.depth + delta)
+    acc = acc + np.length() - (h.label_start - h.from)
     sb.write_string(slice(st.text, pos, h.from))
-    if delta > 0 {
-      sb.write_string(hashes(delta))
-      pos = h.from
-    } else {
-      pos = h.from - delta // skip -delta '#' chars
-    }
+    sb.write_string(np)
+    pos = h.label_start
   }
   sb.write_string(slice(st.text, pos, nd.to))
   let mut moved = sb.to_string()

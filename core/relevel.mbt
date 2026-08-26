@@ -12,8 +12,11 @@ fn has_any_heading(text : String) -> Bool {
 }
 
 ///|
-/// いちばん浅い見出しが `target_depth` になるよう、断片全体をずらす。
-/// 見出しが無ければそのまま返す。深さは 1 を下回らない。
+/// いちばん浅い構造行が `target_depth` になるよう、断片全体をずらす。
+/// 構造が無ければそのまま返す。深さは 1 を下回らない。
+///
+/// 接頭辞は**いまの文書のモード**の正規形で書き直す — リストの断片を
+/// 見出しの文書に貼れば見出しに、逆なら逆になる。
 fn relevel(text : String, target_depth : Int) -> String {
   let heads = scan_doc(text, scan_lines(text)).heads
   if heads.length() == 0 {
@@ -26,18 +29,22 @@ fn relevel(text : String, target_depth : Int) -> String {
     }
   }
   let delta = target_depth - min_depth
-  if delta == 0 {
-    return text
-  }
   let edits : Array[Edit] = []
   for h in heads {
     let depth = if h.depth + delta < 1 { 1 } else { h.depth + delta }
-    edits.push(Edit::{
-      from: h.from,
-      to: h.from + h.depth,
-      insert: hashes(depth),
-      removed: slice(text, h.from, h.from + h.depth),
-    })
+    let np = prefix_for(depth)
+    let old = slice(text, h.from, h.label_start)
+    if np != old {
+      edits.push(Edit::{
+        from: h.from,
+        to: h.label_start,
+        insert: np,
+        removed: old,
+      })
+    }
+  }
+  if edits.length() == 0 {
+    return text
   }
   apply_edit_set(text, edits)
 }

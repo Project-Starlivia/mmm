@@ -195,8 +195,8 @@ test("X5: ランダム文書のコピー→貼り付けで木が壊れない", (
     // 内部整合性
     for (const n of after.nodes) {
       const line = text.slice(n.from, n.headEnd);
-      if (!/^#+(\s|$)/.test(line)) {
-        failures.push(`seed=${seed}: 貼り付け後に見出しでない行がノード化 ${JSON.stringify(line)}`);
+      if (!/^(#+|\s*[-*+])(\s|$)/.test(line)) {
+        failures.push(`seed=${seed}: 貼り付け後に構造でない行がノード化 ${JSON.stringify(line)}`);
         break;
       }
     }

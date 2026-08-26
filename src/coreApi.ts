@@ -54,6 +54,9 @@ export interface Snapshot {
   focus: number;
   canUndo: boolean;
   canRedo: boolean;
+  /** 書き方のモード = 深さ n 以上をリストで書く（0 は全部見出し）。
+   *  開いたときに検知され、あとは setListFrom でしか動かない */
+  listFrom: number;
   editSets: EditOp[][];
   nodes: NodeInfo[];
   fences: FenceSpan[];
@@ -75,6 +78,10 @@ const snap = (s: string): Snapshot => JSON.parse(s);
 
 export const core = {
   initDoc: (text: string): Snapshot => snap(mbt.initDoc(text)),
+  /** 書き方のモードを変える。テキストは触らない（揃えるのは reformat） */
+  setListFrom: (b: number): Snapshot => snap(mbt.setListFrom(b)),
+  /** 文書ぜんぶをいまのモードの正規形へ（構造行の接頭辞だけ）。undo 1 回 */
+  reformat: (tag = ""): Snapshot => snap(mbt.reformat(tag)),
   getText: (): string => mbt.getText(),
   replaceText: (from: number, to: number, insert: string, tag = ""): Snapshot =>
     snap(mbt.replaceText(from, to, insert, tag)),

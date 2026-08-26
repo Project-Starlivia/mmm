@@ -18,10 +18,11 @@ fn slice(s : String, a : Int, b : Int) -> String {
 /// 削除・コピー・移動・折り畳みはすべてこの区間に対する編集になる。
 priv struct Node {
   mut id : Int
-  depth : Int // テキストに書かれている `#` の数
+  depth : Int // `#` の数、またはリスト項目なら 見出し + 1 + 入れ子
   label : String
-  from : Int // 区間の始まり = 見出し行の行頭
-  head_end : Int // 見出し行の行末（改行の手前）。ラベルを書き換える範囲
+  from : Int // 区間の始まり = 構造行の行頭
+  label_start : Int // 接頭辞（`## ` / `  - `）の終わり。深さの変更はここまでを書き直す
+  head_end : Int // 構造行の行末（改行の手前）。ラベルを書き換える範囲
   // 区間の終わり。ふつうは「深さが自分以下の次の見出し」の手前だが、
   // hide のマーカーを片方だけ含んでしまう位置では、そこで切り上げる
   // （含めると、畳んだノードを消したときにマーカーが対で孤立する）
@@ -45,6 +46,11 @@ priv struct St {
   mut hide_regions : Array[HideRegion] // <!-- … --> marker spans
   mut fences : Array[Fence] // ``` … ``` spans
   mut index_of : Map[Int, Int] // node id -> 添字
+  // 書き方のモード = 「深さ list_from 以上をリストで書く」。0 は全部見出し。
+  // **読みには一切関与しない**（パーサは常に両方を読む）。変わるのは
+  // init_doc の検知と set_list_from だけ — 編集中にモードは動かない
+  mut list_from : Int
+  mut scan_list_from : Int // 直近の走査の検知結果。init_doc だけが写し取る
 }
 
 ///|
@@ -61,6 +67,8 @@ let st : St = {
   hide_regions: [],
   fences: [],
   index_of: Map([]),
+  list_from: 0,
+  scan_list_from: 0,
 }
 
 ///|
@@ -75,6 +83,7 @@ fn rebuild_nodes(id_at : Map[Int, Int]) -> Unit {
   let regions = scan.hides
   st.hide_regions = regions
   st.fences = scan.fences
+  st.scan_list_from = scan.list_from
   // Offsets that are NOT nodes but must still stop a subtree.
   //
   // A node's range [from, to) is what delete / copy / move / hide all
@@ -158,6 +167,7 @@ fn rebuild_nodes(id_at : Map[Int, Int]) -> Unit {
       depth: h.depth,
       label: h.label,
       from: h.from,
+      label_start: h.label_start,
       head_end: h.head_end,
       to: range_end[i],
       parent: -1,

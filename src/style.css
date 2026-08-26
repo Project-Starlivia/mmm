@@ -202,6 +202,7 @@ html, body {
   flex: 0 0 var(--md-width, 42%);
   min-width: 200px;
   background: var(--panel);
+  position: relative; /* 右上の書き方ボタン（#form-picker）の座標系 */
 
   & .cm-editor {
     height: 100%;
@@ -219,6 +220,40 @@ html, body {
 #panes.no-map #md-pane { flex: 1; }
 /* マップで選んでいるノードの、md 側での対応範囲 */
 .cm-mmm-selected { background: var(--accent-soft); }
+
+/* 木の書き方（H / n+ / L）。低頻度なので沈ませて、触れたら起きる */
+#form-picker {
+  position: absolute;
+  top: 6px;
+  right: 16px;
+  display: flex;
+  z-index: 10;
+  opacity: 0.5;
+
+  &:hover { opacity: 1; }
+  & button {
+    font: inherit;
+    font-size: 11px;
+    min-width: 26px;
+    padding: 2px 6px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink-dim);
+    cursor: pointer;
+
+    /* 枠を重ねて 1 つの塊に（帯の .group と同じ理屈） */
+    &:not(:first-child) { margin-left: -1px; }
+    &:first-child { border-start-start-radius: 6px; border-end-start-radius: 6px; }
+    &:last-child { border-start-end-radius: 6px; border-end-end-radius: 6px; }
+    &:hover { border-color: var(--accent); color: var(--ink); z-index: 1; }
+    &.on {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--ink);
+      z-index: 1;
+    }
+  }
+}
 
 /* ========== マップのペイン ========== */
 

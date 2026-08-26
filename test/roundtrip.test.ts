@@ -131,22 +131,30 @@ test("P2c: ノードのオフセットと親子関係が常に整合する", () 
       assert.ok(n.headEnd >= n.from, `${tag}: headEnd < from (id=${n.id})`);
       assert.ok(n.to >= n.headEnd, `${tag}: to < headEnd (id=${n.id})`);
       assert.ok(n.to <= text.length, `${tag}: to が本文長を超える (id=${n.id})`);
-      // 見出し行が本当に見出しであること
+      // 構造行が本当に構造であること（見出し、またはリスト項目）
       const line = text.slice(n.from, n.headEnd);
-      assert.match(line, /^#+(\s|$)/, `${tag}: hs..headEnd が見出し行でない (id=${n.id}, ${JSON.stringify(line)})`);
+      assert.match(
+        line,
+        /^(#+|\s*[-*+])(\s|$)/,
+        `${tag}: from..headEnd が構造行でない (id=${n.id}, ${JSON.stringify(line)})`,
+      );
       // depth は「# の数」そのものではない。`---` で始まる束の中では、
       // 束の先頭を深さ 2 として相対的に読み替える（2026-08-12 の記法変更）。
       // 読み替えは持ち上げる方向にしか働かないので、depth が # の数を
       // 超えることはない。深さ 1 は必ず `#` 1 個。
-      const hashes = line.match(/^#+/)![0].length;
-      assert.ok(
-        n.depth <= hashes,
-        `${tag}: depth が # の数を超えている (id=${n.id}, depth=${n.depth}, #=${hashes})`,
-      );
-      assert.ok(n.depth >= 1, `${tag}: depth が 1 未満 (id=${n.id})`);
-      if (hashes === 1) {
-        assert.equal(n.depth, 1, `${tag}: # 1 個なのに depth が 1 でない (id=${n.id})`);
+      // 見出し行に限り、depth は # の数を超えない（リスト項目の深さは
+      // 囲う見出し + 入れ子で決まるので、この検査は当てはまらない）
+      const hashes = line.match(/^#+/)?.[0].length ?? 0;
+      if (hashes > 0) {
+        assert.ok(
+          n.depth <= hashes,
+          `${tag}: depth が # の数を超えている (id=${n.id}, depth=${n.depth}, #=${hashes})`,
+        );
+        if (hashes === 1) {
+          assert.equal(n.depth, 1, `${tag}: # 1 個なのに depth が 1 でない (id=${n.id})`);
+        }
       }
+      assert.ok(n.depth >= 1, `${tag}: depth が 1 未満 (id=${n.id})`);
       if (n.parent !== -1) {
         const p = byId.get(n.parent);
         assert.ok(p, `${tag}: parent id ${n.parent} が存在しない (id=${n.id})`);

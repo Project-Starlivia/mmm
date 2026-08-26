@@ -22,6 +22,7 @@ import { initTheme } from "./app/theme.ts";
 import { sweep } from "./app/persist.ts";
 import { decidePaste } from "./app/paste.ts";
 import { initDrop } from "./app/dnd.ts";
+import { initForm } from "./app/form.ts";
 import { showDrawing } from "./app/draw.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { onLanguageReady } from "./map/highlight.ts";
@@ -136,6 +137,7 @@ function applySnap(snap: Snapshot, origin: Origin): void {
   if (selChanged) syncSelectionViews(false, true);
   updateDirty();
   showName();
+  form.show(snap.listFrom);
   if (wasEmpty && doc.nodes.length > 0) map.fitView();
 }
 
@@ -540,6 +542,19 @@ const host: MapHost = {
 
 const editor = new MdEditor(mdPane, onUserEdits);
 const map = new MindMap(mapPane, host);
+
+/**
+ * 木の書き方（H / n+ / L）。押すとモードを変えて文書ぜんぶを書き直す。
+ * 1 回の undo で戻る（モード自体は undo で戻らないが、読みはモードを
+ * 知らないので、テキストが戻ればマップも戻る）。
+ */
+const form = initForm({
+  pane: mdPane,
+  apply: (b) => {
+    core.setListFrom(b);
+    applySnap(core.reformat(nextTag()), "core");
+  },
+});
 
 /** 書き出しに要るもの。ヘッダ（全体）も右クリック（枝）も同じこれを使う */
 const exportDeps = {

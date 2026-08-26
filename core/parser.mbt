@@ -1,6 +1,14 @@
-// 行の走査。構造の判定は `^(#+)\s+(.*)$` の 1 本だけ。深さに上限を置かない
-// ので既成の Markdown パーサは使えないが、必要なのは行のオフセットと
-// フェンス / hide 領域の追跡だけなので、これで足りる。
+// 行の走査。構造になるのは見出し `^(#+)\s+…` とリスト項目 `^\s*[-*+]\s…` の
+// 2 つ。深さに上限を置かないので既成の Markdown パーサは使えないが、必要なのは
+// 行のオフセットとフェンス / hide 領域の追跡だけなので、これで足りる。
+//
+// リストの深さは「直近の見出しの深さ + 1 + 入れ子段数」。**見出しは入れ子を
+// リセットする**ので、見出しとリストが混ざった文書も同じ式で読める。
+// 入れ子は字下げのスタックで数える — 2 スペース決め打ちにせず、前の項目より
+// 深ければ子、浅ければ戻る（他所の 4 スペースもタブも読める）。
+//
+// 「本文」という概念は持たない。`- x` は必ずノード（mmm は散文を編集する
+// 道具ではない）。根拠と決めは docs/superpowers/specs/2026-08-25-list-form.md。
 
 ///|
 priv struct Line {
@@ -37,6 +45,9 @@ priv struct Heading {
   depth : Int
   from : Int // heading line start offset
   head_end : Int // heading line end offset (excl newline)
+  // ラベルの始まり = 接頭辞（`## ` や `  - `）の終わり。深さの変更は
+  // [from, label_start) をまるごと書き直す
+  label_start : Int
   content_start : Int // offset just after the heading line's newline
   label : String
   hidden : Bool // inside a <!-- … --> hide region
@@ -92,6 +103,9 @@ priv struct Scan {
   heads : Array[Heading]
   hides : Array[HideRegion]
   fences : Array[Fence]
+  // リスト項目が現れた最も浅い深さ（無ければ 0）。**開いたときのモード判定**の
+  // ため — 使うのは init_doc だけだが、走査は 1 度で済ませる
+  list_from : Int
 }
 
 ///|
@@ -105,6 +119,10 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
   let out : Array[Heading] = []
   let regions : Array[HideRegion] = []
   let fences : Array[Fence] = []
+  // リストの深さの材料。見出しが来たら両方リセットする
+  let mut head_depth = 0
+  let levels : Array[Int] = [] // 入れ子の各段の字下げ幅（列）
+  let mut list_from = 0
   let mut in_fence = false
   let mut fence_char = 0
   let mut fence_len = 0
@@ -191,20 +209,39 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
       while p < l.end && is_space(code_at(text, p)) {
         p = p + 1
       }
-      let mut label_end = l.end
-      // also trim a trailing \r (a file ending in "\r" with no final \n)
-      while label_end > p &&
-            (is_space(code_at(text, label_end - 1)) || code_at(text, label_end - 1) == 13) {
-        label_end = label_end - 1
+      head_depth = depth
+      levels.clear()
+      out.push(head_at(text, l, depth, p, in_comment))
+      continue
+    }
+    // ^\s*[-*+](\s|行末) はリスト項目。`---`（区切り線）や `**強調**` は
+    // 印の直後が空白でないので構造にならない
+    let mut q = l.start
+    let mut col = 0
+    while q < l.end && is_space(code_at(text, q)) {
+      col = col + (if code_at(text, q) == 9 { 2 } else { 1 })
+      q = q + 1
+    }
+    if q < l.end {
+      let c = code_at(text, q)
+      if (c == 45 || c == 42 || c == 43) &&
+        (q + 1 == l.end || is_space(code_at(text, q + 1))) {
+        while levels.length() > 0 && levels[levels.length() - 1] > col {
+          ignore(levels.unsafe_pop())
+        }
+        if levels.length() == 0 || levels[levels.length() - 1] < col {
+          levels.push(col)
+        }
+        let ld = head_depth + levels.length()
+        let mut ls = q + 1
+        while ls < l.end && is_space(code_at(text, ls)) {
+          ls = ls + 1
+        }
+        if list_from == 0 || ld < list_from {
+          list_from = ld
+        }
+        out.push(head_at(text, l, ld, ls, in_comment))
       }
-      out.push(Heading::{
-        depth,
-        from: l.start,
-        head_end: l.end,
-        content_start: l.next,
-        label: slice(text, p, label_end),
-        hidden: in_comment,
-      })
     }
   }
   if in_comment {
@@ -231,7 +268,36 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
       info: f_info,
     })
   }
-  Scan::{ heads: out, hides: regions, fences }
+  Scan::{ heads: out, hides: regions, fences, list_from }
+}
+
+///|
+/// 構造行 1 つぶんの Heading。ラベルは末尾の空白（と、\n 無しで終わる
+/// ファイルの \r）を落とす。見出しもリスト項目も同じ形に落ちる。
+fn head_at(
+  text : String,
+  l : Line,
+  depth : Int,
+  label_start : Int,
+  hidden : Bool,
+) -> Heading {
+  let mut label_end = l.end
+  while label_end > label_start &&
+        (
+          is_space(code_at(text, label_end - 1)) ||
+          code_at(text, label_end - 1) == 13
+        ) {
+    label_end = label_end - 1
+  }
+  Heading::{
+    depth,
+    from: l.start,
+    head_end: l.end,
+    label_start,
+    content_start: l.next,
+    label: slice(text, label_start, label_end),
+    hidden,
+  }
 }
 
 ///|
