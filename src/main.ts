@@ -26,6 +26,7 @@ import { showDrawing } from "./app/draw.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 import { openOnClick } from "./map/menu.ts";
+import { label } from "./icons.ts";
 import {
   type CardRef,
   cardRowsOf,
@@ -55,8 +56,6 @@ const mdPane = el("md-pane", HTMLElement);
 const mapPane = el("map-pane", HTMLElement);
 const btnFile = el("btn-file", HTMLButtonElement);
 const btnHelp = el("btn-help", HTMLButtonElement);
-const btnUndo = el("btn-undo", HTMLButtonElement);
-const btnRedo = el("btn-redo", HTMLButtonElement);
 const elFilename = el("filename", HTMLElement);
 const elDirty = el("dirty", HTMLElement);
 const elLogo = el("logo", SVGSVGElement);
@@ -135,8 +134,6 @@ function applySnap(snap: Snapshot, origin: Origin): void {
   map.render();
   // render がクラスまで塗り終えているので、ここで塗り直さない
   if (selChanged) syncSelectionViews(false, true);
-  btnUndo.disabled = !snap.canUndo;
-  btnRedo.disabled = !snap.canRedo;
   updateDirty();
   showName();
   if (wasEmpty && doc.nodes.length > 0) map.fitView();
@@ -581,8 +578,6 @@ function doRedo(): void {
   applySnap(core.redo(), "core");
   syncSelectionViews(false);
 }
-btnUndo.addEventListener("click", doUndo);
-btnRedo.addEventListener("click", doRedo);
 
 // ---------- file I/O ----------
 
@@ -704,6 +699,8 @@ async function attachImage(id: number, blob: Blob, tag = ""): Promise<void> {
 // 文書に何かする道は File にまとめる。**画像フォルダもここ** —
 // 「この .md の画像がどこに居るか」は文書ぜんぶの設定で、新規 / 開く / 保存と
 // 同じ高さのもの
+btnFile.replaceChildren(...label("Files", "folder"));
+btnHelp.title = "Open the repository";
 openOnClick(btnFile, () => [
   { label: "New", key: "Mod+Alt+N", run: () => void newFile() },
   { label: "Open", key: "Mod+O", run: () => void openFile() },

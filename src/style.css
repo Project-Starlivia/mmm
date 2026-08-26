@@ -84,6 +84,10 @@ html, body {
     font: inherit;
     font-size: 13px;
     padding: 3px 10px;
+    /* 絵と字を並べる。絵が先か後かは、入れる側が決める */
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     border: 1px solid var(--line);
     border-radius: 6px;
     background: var(--panel);
@@ -131,26 +135,33 @@ html, body {
 /* 下の帯は低頻度のものだけなので、上より薄く座らせる */
 #statusbar { padding: 3px 12px; border-top: 1px solid var(--line); }
 
-/* 2 つのボタンを 1 つに見せる。枠を重ねて、継ぎ目だけが仕切りになる */
-.split {
+/* 並んだボタンを 1 つの塊に見せる。**枠を重ねて、継ぎ目だけが仕切り**になる
+   — 枠が 2 本並ぶと「別のボタン」に見える */
+.group {
   display: inline-flex;
 
   & button {
     border-radius: 0;
     position: relative;
 
+    /* 端だけ丸める */
     &:first-child { border-start-start-radius: 6px; border-end-start-radius: 6px; }
-    &:last-child {
-      border-start-end-radius: 6px;
-      border-end-end-radius: 6px;
-      /* 枠を 1 本ぶん重ねる。2 本並ぶと「別のボタン」に見える */
-      margin-left: -1px;
-      padding-left: 7px;
-      padding-right: 7px;
-    }
+    &:last-child { border-start-end-radius: 6px; border-end-end-radius: 6px; }
+    &:not(:first-child) { margin-left: -1px; }
     /* 触っている側の枠を前に出す（重ねた相手に隠されないように） */
     &:hover:not(:disabled) { z-index: 1; }
   }
+  /* 開く印だけの列は、字を持たないので詰める */
+  & #btn-export-way { padding-left: 6px; padding-right: 6px; }
+}
+
+/* ボタンとメニューの絵。**塗らずに線で引く**ので、文字色をそのまま継ぐ */
+.icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  display: block;
+  color: inherit;
 }
 
 #logo {
@@ -584,8 +595,14 @@ html, body {
     font-size: 13px;
     cursor: pointer;
     display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
+
+    /* 行の頭の絵。字より控えめに座らせる */
+    & > .icon { margin-right: -10px; color: var(--ink-dim); }
+    /* 字は伸びて、キーの表示を右端へ押しやる */
+    & > span:not(.key) { flex: 1; }
 
     & .key { color: var(--ink-dim); font-size: 11px; }
     &:hover { background: var(--accent-soft); }

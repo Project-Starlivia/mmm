@@ -9,6 +9,8 @@
 // 入れ子も同じ器で作る — 子メニューは `ContextMenu` そのもので、置く場所が
 // 親の行の隣になるだけ。**別の器を書き足さない。**
 
+import { type IconName, icon } from "../icons.ts";
+
 /**
  * 1 行。`sep` は区切り線、`items` を持つ行は入れ子。
  *
@@ -18,10 +20,18 @@
  * `run` の無い入れ子は開くだけ。
  */
 export type MenuEntry =
-  | { label: string; key?: string; run: () => void; disabled?: boolean }
   | {
       label: string;
       key?: string;
+      /** 行の頭の絵。無ければ字だけ */
+      mark?: IconName;
+      run: () => void;
+      disabled?: boolean;
+    }
+  | {
+      label: string;
+      key?: string;
+      mark?: IconName;
       items: MenuEntry[];
       run?: () => void;
       disabled?: boolean;
@@ -88,6 +98,7 @@ export class ContextMenu {
       }
       const row = document.createElement("div");
       row.className = "item" + (it.disabled ? " disabled" : "");
+      if (it.mark) row.append(icon(it.mark));
       const label = document.createElement("span");
       label.textContent = it.label;
       row.append(label);

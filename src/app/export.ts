@@ -10,6 +10,7 @@
 
 import type { MindMap } from "../mindmap.ts";
 import { type MenuEntry, openOnClick } from "../map/menu.ts";
+import { type IconName, icon, label } from "../icons.ts";
 import { LS_WAY, load, store } from "./persist.ts";
 
 /**
@@ -83,18 +84,23 @@ async function rasterize(svg: SVGSVGElement, mime: string): Promise<Blob> {
  * SVG のコピーは `text/plain` にも同じものを載せる — Figma や Illustrator は
  * 画像として受け取るより、SVG のソースを貼られたほうが確実に開く。
  *
- * `short` はボタンの表示。`label`（並びの表示）から動詞だけを落としたもので、
- * **行き先の印は落とさない** — ⤓ と ⧉ が、押したら何が起きるかを言う。
+ * `short` はボタンの表示で、`label`（並びの表示）から動詞を落としたもの。
+ * **行き先は `mark` の絵が言う** — 落とすのか、貼れるようにするのか。
+ * 形式ではなく行き先に印が付く。
  */
-/** 行き先の印。**形式ではなく行き先**に付く — 落とすのか、貼れるようにするのか */
-const DOWN = "⤓";
-const COPY = "⧉";
-
-const WAYS = [
+const WAYS: readonly {
+  id: string;
+  short: string;
+  mark: IconName;
+  label: string;
+  done: string;
+  out: (svg: SVGSVGElement, base: string) => Promise<void>;
+}[] = [
   {
     id: "svg-file",
-    short: `${DOWN} SVG`,
-    label: `${DOWN} Download SVG`,
+    short: "SVG",
+    mark: "download",
+    label: "Download SVG",
     done: "",
     out: async (svg: SVGSVGElement, base: string): Promise<void> => {
       downloadBlob(
@@ -105,8 +111,9 @@ const WAYS = [
   },
   {
     id: "webp-file",
-    short: `${DOWN} WebP`,
-    label: `${DOWN} Download WebP`,
+    short: "WebP",
+    mark: "download",
+    label: "Download WebP",
     done: "",
     out: async (svg: SVGSVGElement, base: string): Promise<void> => {
       downloadBlob(await rasterize(svg, "image/webp"), `${base}.webp`);
@@ -114,8 +121,9 @@ const WAYS = [
   },
   {
     id: "png-copy",
-    short: `${COPY} PNG`,
-    label: `${COPY} Copy PNG`,
+    short: "PNG",
+    mark: "copy",
+    label: "Copy PNG",
     done: "Image copied",
     out: async (svg: SVGSVGElement): Promise<void> => {
       const png = await rasterize(svg, "image/png");
@@ -124,8 +132,9 @@ const WAYS = [
   },
   {
     id: "svg-copy",
-    short: `${COPY} SVG`,
-    label: `${COPY} Copy SVG`,
+    short: "SVG",
+    mark: "copy",
+    label: "Copy SVG",
     done: "SVG copied",
     out: async (svg: SVGSVGElement): Promise<void> => {
       const text = serialize(svg);
@@ -178,6 +187,7 @@ export function exportWays(
     if (i === 2) entries.push("sep");
     entries.push({
       label: way.label,
+      mark: way.mark,
       run: () => {
         chose?.(way);
         run(deps, way, whole);
@@ -196,9 +206,11 @@ export function exportWays(
 export function initExport(
   deps: ExportDeps & { button: HTMLButtonElement; wayButton: HTMLButtonElement },
 ): void {
+  deps.wayButton.replaceChildren(icon("chevron"));
   let way = wayOf(load(LS_WAY));
   const show = (): void => {
-    deps.button.textContent = way.short;
+    // 形式が文字、行き先が絵。押す前に何が起きるかが見えている
+    deps.button.replaceChildren(...label(way.short, way.mark, true));
     deps.button.title = `Export the whole map — ${way.label}`;
   };
   show();
