@@ -75,3 +75,32 @@ test("clear ですべて忘れる", () => {
   f.clear();
   assert.equal(f.pinching, false);
 });
+
+test("only: 0 本なら null", () => {
+  const f = new Fingers();
+  assert.equal(f.only(), null);
+});
+
+test("only: 1 本ならその位置", () => {
+  const f = new Fingers();
+  f.down(1, 10, 20);
+  assert.deepEqual(f.only(), { x: 10, y: 20 });
+});
+
+test("only: 2 本なら null", () => {
+  const f = new Fingers();
+  f.down(1, 0, 0);
+  f.down(2, 100, 0);
+  assert.equal(f.only(), null);
+});
+
+test("only: 2 本目を離すと、残った指の動いた後の位置が出る", () => {
+  // 着地した場所ではなく、離すまでに動いた「いま」の位置でないと、
+  // パンを立て直したときに指の下から地図がずれる
+  const f = new Fingers();
+  f.down(1, 0, 0);
+  f.down(2, 100, 0);
+  f.move(1, 30, 40);
+  f.up(2);
+  assert.deepEqual(f.only(), { x: 30, y: 40 });
+});

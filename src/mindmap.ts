@@ -1083,7 +1083,24 @@ export class MindMap {
         const wasPinching = this.fingers.pinching;
         this.fingers.up(e.pointerId);
         // 2 本目を離した指で、選択やドラッグの後始末を走らせない
-        if (wasPinching) return;
+        if (wasPinching) {
+          // 組が壊れて 1 本だけ残ったなら、そこから 1 本パンを立て直す。
+          // 実機では残った指の pointerdown は来ない（触れたままなので）ので、
+          // ここで自分から panning を立てないと、指が動いても地図が固まる。
+          // 残った指は capture を持っていないが、ペインの上に指があるあいだは
+          // pointermove がそのまま届くので実害は無い
+          const solo = this.fingers.only();
+          if (!this.fingers.pinching && solo) {
+            const r = pane.getBoundingClientRect();
+            this.panning = {
+              px: solo.x + r.left,
+              py: solo.y + r.top,
+              ox: this.tx,
+              oy: this.ty,
+            };
+          }
+          return;
+        }
       }
       if (this.cardDrag) {
         const from = this.cardDrag.ref;

@@ -20,6 +20,17 @@ export class Fingers {
     return this.pair !== null;
   }
 
+  /**
+   * ちょうど 1 本だけ生きていれば、その「いま」の位置。0 本 or 2 本以上
+   * なら null。組が壊れて 1 本に戻ったとき、その指から 1 本パンを
+   * 立て直すために使う（実機では、残った指の pointerdown は来ない）
+   */
+  only(): { x: number; y: number } | null {
+    if (this.at.size !== 1) return null;
+    for (const p of this.at.values()) return p;
+    return null;
+  }
+
   /** 2 本以上あって組が無いなら、いま生きている先頭の 2 本で組む */
   private form(): void {
     if (this.pair !== null || this.at.size < 2) return;
