@@ -53,6 +53,10 @@ function el<T extends Element>(id: string, kind: abstract new () => T): T {
 /** ヘルプの行き先。ここ 1 か所 */
 const REPO = "https://github.com/Project-Starlivia/mmm";
 
+/** File System Access API が無いブラウザで、Files のできない行と
+ *  ショートカットの両方がこの理由を言う。英語の文言はここ 1 か所だけ */
+const NO_FILE_ACCESS = "This browser cannot open or save files";
+
 const mdPane = el("md-pane", HTMLElement);
 const mapPane = el("map-pane", HTMLElement);
 const btnFile = el("btn-file", HTMLButtonElement);
@@ -603,6 +607,13 @@ function applyDoc(doc: Doc): void {
 }
 
 async function openFile(): Promise<void> {
+  // Files のメニューを経ずショートカットから来ることもある。無効な行は
+  // 押せないだけで理由を言うが、ショートカットは黙って何も起きない
+  // だけになってしまう — 同じ理由をここでも言う
+  if (!io.canOpen()) {
+    flashFilename(NO_FILE_ACCESS);
+    return;
+  }
   try {
     if (!(await confirmDiscard())) return;
     const doc = await io.openDialog();
@@ -647,6 +658,12 @@ async function saveFile(asNew = false): Promise<void> {
   const text = core.getText();
   try {
     if (asNew || savedName === null) {
+      // ここだけがピッカーを要る道。既存のハンドルへ書くだけの下の枝は
+      // API が無くても困らないので、ここでしか確かめない
+      if (!io.canSaveAs()) {
+        flashFilename(NO_FILE_ACCESS);
+        return;
+      }
       const doc = await io.saveAs(docName(), text);
       if (!doc) return; // キャンセル
       savedName = doc.name; // ここで初めて名前が決まる
@@ -758,7 +775,7 @@ openOnClick(btnFile, () => {
     { label: "Open", key: "Mod+O", run: () => void openFile(), disabled: !canOpen },
     ...(canOpen && canSave
       ? []
-      : [{ caption: "This browser cannot open or save files" }]),
+      : [{ caption: NO_FILE_ACCESS }]),
     { caption: savedName ?? "not saved yet" },
     { label: "Rename", run: () => void renameFile(), disabled: savedName === null },
     { label: "Save", key: "Mod+S", run: () => void saveFile(), disabled: !canSave },
