@@ -323,6 +323,10 @@ html, body {
   outline: none;
   background-color: var(--bg);
   background-image: radial-gradient(circle, var(--dot) 1px, transparent 1px);
+  /* 指やペンでも動かせるように、ブラウザのスクロール/ズームへ渡さない
+     （`.popup-canvas` と同じ理由）。**md ペインには敷かない** —
+     CodeMirror のネイティブなスクロールを奪わない */
+  touch-action: none;
 
   &.pane-focused { box-shadow: inset 0 0 0 2px var(--accent-soft); }
 }

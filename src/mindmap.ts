@@ -144,6 +144,13 @@ const NO_IDS: ReadonlySet<number> = new Set<number>();
  *  わずかに動いてもドラッグに化けないよう、ノードにもカードにも同じ値を使う */
 const DRAG_SLOP2 = 64;
 
+/** 指のときの閾値。マウスより揺れるので、タップが勝手にドラッグへ化ける */
+const TOUCH_SLOP2 = 256;
+
+/** その出来事に効く閾値（px の 2 乗） */
+const slopOf = (e: PointerEvent): number =>
+  e.pointerType === "touch" ? TOUCH_SLOP2 : DRAG_SLOP2;
+
 export class MindMap {
   private pane: HTMLElement;
   private host: MapHost;
@@ -909,10 +916,15 @@ export class MindMap {
       if (this.isEditingLabel()) this.host.commitEdit();
       pane.focus();
 
-      // パンは 2 つ入り口を持つ: 中クリックはマウスだけで完結し、
-      // Space+ドラッグはキーボードに手がある時に届く。担当する手が
-      // 違うので、片方だけでは塞がる場面がある
-      if (e.button === 1 || (e.button === 0 && this.spaceDown)) {
+      // パンは 3 つ入り口を持つ: 中クリックはマウスだけで完結し、Space+ドラッグは
+      // キーボードに手がある時に届き、**指は背景をなぞる**。担当する手が違うので、
+      // どれか 1 つでは塞がる場面がある（指には中ボタンも Space も無く、背景の
+      // ドラッグを矩形選択に取られると、地図が 1mm も動かせない）
+      const touchPan =
+        e.pointerType === "touch" &&
+        this.nodeAt(e.clientX, e.clientY) === -1 &&
+        this.cardAt(e.clientX, e.clientY, "data-card") === null;
+      if (e.button === 1 || (e.button === 0 && this.spaceDown) || touchPan) {
         this.panning = {
           px: e.clientX,
           py: e.clientY,
@@ -962,7 +974,7 @@ export class MindMap {
         const dx = e.clientX - this.cardDrag.px;
         const dy = e.clientY - this.cardDrag.py;
         // 一度でも越えたらドラッグ。戻ってきても掴んだままにする
-        if (!this.cardDrag.moved && dx * dx + dy * dy <= DRAG_SLOP2) return;
+        if (!this.cardDrag.moved && dx * dx + dy * dy <= slopOf(e)) return;
         this.cardDrag.moved = true;
         this.cardDrop = this.cardSlotAt(e.clientX, e.clientY);
         this.showCardDrop();
@@ -1023,7 +1035,7 @@ export class MindMap {
       if (this.dragCand && !this.dragging) {
         const dx = e.clientX - this.dragCand.px;
         const dy = e.clientY - this.dragCand.py;
-        if (dx * dx + dy * dy > DRAG_SLOP2) this.startDrag();
+        if (dx * dx + dy * dy > slopOf(e)) this.startDrag();
       }
       if (this.dragging) {
         this.lastPointer = { x: e.clientX, y: e.clientY };
