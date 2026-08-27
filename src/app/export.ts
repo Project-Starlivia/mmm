@@ -10,6 +10,7 @@
 
 import type { MindMap } from "../mindmap.ts";
 import { type MenuEntry, openOnClick } from "../map/menu.ts";
+import type { RadialEntry } from "../map/radialMenu.ts";
 import { type IconName, icon, label } from "../icons.ts";
 import { LS_WAY, load, store } from "./persist.ts";
 
@@ -202,10 +203,14 @@ export function exportWays(
  *
  * ボタンには**いまの出し方**が出ていて、押せばそれで出る。`▾` で選び直すと
  * その場で出て、次からの既定になる — 押す前に何が起きるかが常に見えている。
+ *
+ * 戻り値はキーボードショートカット（`Mod+E` / `Mod+Shift+E`）用。**出し方
+ * 4 通りの定義は増やさない** — `run` はこのボタンと同じものを走らせるだけ、
+ * `ways` は `WAYS` をラジアルメニュー用の形へ薄く写すだけ
  */
 export function initExport(
   deps: ExportDeps & { button: HTMLButtonElement; wayButton: HTMLButtonElement },
-): void {
+): { run: () => void; ways: () => RadialEntry[] } {
   deps.wayButton.replaceChildren(icon("chevron"));
   let way = wayOf(load(LS_WAY));
   const show = (): void => {
@@ -215,13 +220,26 @@ export function initExport(
   };
   show();
 
+  const remember = (chosen: Way): void => {
+    way = chosen;
+    store(LS_WAY, chosen.id);
+    show();
+  };
+
   deps.button.addEventListener("click", () => run(deps, way, true));
 
-  openOnClick(deps.wayButton, () =>
-    exportWays(deps, true, (chosen) => {
-      way = chosen;
-      store(LS_WAY, chosen.id);
-      show();
-    }),
-  );
+  openOnClick(deps.wayButton, () => exportWays(deps, true, remember));
+
+  return {
+    run: () => run(deps, way, true),
+    ways: () =>
+      WAYS.map((w) => ({
+        mark: w.mark,
+        label: w.short,
+        run: () => {
+          remember(w);
+          run(deps, w, true);
+        },
+      })),
+  };
 }

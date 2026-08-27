@@ -8,6 +8,9 @@
 //   単語移動で、書いている最中に一番使う）。`Ctrl+数字`（タブ切替）/ `Ctrl+J`
 //   （ダウンロード）/ `Ctrl+Shift+R`（再読込）はブラウザの予約で、`Ctrl+\` は
 //   JIS 配列で物理位置が変わる。消去法で残るのが `Alt+数字`
+// - 書き出しは `Mod+E`。`E` はブラウザに予約されておらず（`Ctrl+S`/`Ctrl+O`
+//   と同じく preventDefault で上書きできる）、JIS 配列でも物理位置が動かない。
+//   `Shift` で出し方を選び直すのは `Mod+S`/`Mod+Shift+S` と同じ形
 
 export function initShortcuts(deps: {
   save: (asNew: boolean) => void;
@@ -19,6 +22,8 @@ export function initShortcuts(deps: {
   togglePaneVis: (which: "md" | "map") => void;
   undo: () => void;
   redo: () => void;
+  /** 素の Mod+E はいまの出し方で即書き出し、Shift はラジアルメニューで選び直す */
+  export: (pickWay: boolean) => void;
   /**
    * その場の入力欄（ラベル / カード）が開いているか。開いている間の
    * `Mod+Z` は**その欄のネイティブな undo**に任せる — 文書の undo を
@@ -46,6 +51,9 @@ export function initShortcuts(deps: {
       } else if (key === "/") {
         e.preventDefault();
         deps.togglePane();
+      } else if (key === "e") {
+        e.preventDefault();
+        deps.export(e.shiftKey);
       } else if (key === "z" || key === "y") {
         if (deps.isEditing()) return;
         e.preventDefault();

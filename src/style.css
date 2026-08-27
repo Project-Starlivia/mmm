@@ -661,6 +661,42 @@ html, body {
   & hr { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
 }
 
+/* ========== ラジアルメニュー（Mod+Shift+E、書き出しの形式選び） ========== */
+
+.radial-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+  /* 器自体は素通し。掴めるのは中の扇形と中心だけ */
+  pointer-events: none;
+  user-select: none;
+
+  & .entry {
+    cursor: pointer;
+
+    & .sector {
+      fill: var(--panel);
+      stroke: var(--line);
+      stroke-width: 1.5;
+      pointer-events: auto;
+    }
+    & .icon { color: var(--ink-dim); }
+    & text { fill: var(--ink-dim); font-family: var(--font); font-size: 12px; }
+
+    &:hover .sector { fill: var(--accent-soft); }
+    &:hover .icon { color: var(--ink); }
+    &:hover text { fill: var(--ink); }
+  }
+
+  & .hub {
+    fill: var(--bg);
+    stroke: var(--line);
+    cursor: pointer;
+    pointer-events: auto;
+  }
+}
+
 /* ========== お絵描き（app/draw.ts） ========== */
 
 /* 紙の色はキャンバス自身が最初に塗る。CSS にも置くと、出来上がる画像の色と
