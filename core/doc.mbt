@@ -27,6 +27,12 @@ priv struct Node {
   // hide のマーカーを片方だけ含んでしまう位置では、そこで切り上げる
   // （含めると、畳んだノードを消したときにマーカーが対で孤立する）
   to : Int
+  content_start : Int // 本文の始まり = 構造行の改行の直後
+  // 本文の終わり。has_content と同じ規則（次の見出し・to・境界のうち
+  // いちばん手前）。**この 1 フィールドが snapshot に出るまで、TS 側が
+  // 同じ規則を再導出していた** — 境界を知らないまま再導出すると、区切り
+  // 直後のノードに落としたカードが区切りの向こう側へ着地して消える
+  content_end : Int
   mut parent : Int // node id, or -1
   has_content : Bool
   hidden : Bool // inside a <!-- … --> hide region
@@ -196,6 +202,8 @@ fn rebuild_nodes(id_at : Map[Int, Int]) -> Unit {
       label_start: h.label_start,
       head_end: h.head_end,
       to: range_end[i],
+      content_start: h.content_start,
+      content_end,
       parent: -1,
       has_content,
       hidden: h.hidden,

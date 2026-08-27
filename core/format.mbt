@@ -198,29 +198,16 @@ fn indent_edit(
 }
 
 ///|
-/// そのノードの本文の末尾。次に構造行が来る手前（無ければ自分の末尾）、
-/// ただし区切り行はどのノードの本文にも属さないので、その手前にある
-/// 最初の境界でも頭打ちにする（cap_at_first_bound — doc.mbt の
-/// has_content と同じ規則）。TS 側 map/cards.ts の contentEnd は
-/// 境界を持たないカード表示専用の式で、これとは別。
-fn content_end_of(i : Int) -> Int {
-  let natural = if i + 1 < st.nodes.length() && st.nodes[i + 1].from < st.nodes[i].to {
-    st.nodes[i + 1].from
-  } else {
-    st.nodes[i].to
-  }
-  cap_at_first_bound(st.bounds, st.nodes[i].from, natural)
-}
-
-///|
 /// ノード i の本文の末尾へ、1 行を追加する編集。前後の空行の出し分けは
-/// block_insert（heading.mbt）に任せる。
+/// block_insert（heading.mbt）に任せる。着地点は Node.content_end
+/// （doc.mbt が has_content と同じ規則で計算し、snapshot にも同じ値を出す
+/// — ここで再導出しない）。
 ///
 /// **リストの形で書かれたノードなら、その項目の中身の列まで字下げする。**
 /// 字下げしないと、外の Markdown パーサはそこでリストを閉じ、続く兄弟が
 /// 迷子になる（貼り付け・ドロップ・お絵描き・リンクで実際に踏んだ）。
 fn append_content_edit(i : Int, line : String) -> Edit {
-  let at = content_end_of(i)
+  let at = st.nodes[i].content_end
   let col = content_col_for(st.nodes[i].depth)
   let body = if col > 0 { spaces(col) + line } else { line }
   let (insert, _) = block_insert(at, body + eol)

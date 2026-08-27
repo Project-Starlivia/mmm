@@ -17,6 +17,8 @@ const node = (id: number, depth: number, parent: number): NodeInfo => ({
   from: id * 10,
   headEnd: id * 10 + 5,
   to: id * 10 + 9,
+  contentStart: id * 10 + 6,
+  contentEnd: id * 10 + 9,
   hasContent: false,
   hidden: false,
   group: 0,

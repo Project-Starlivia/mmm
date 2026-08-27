@@ -90,7 +90,7 @@ test "ルート直後の境界は、ルートの本文に数えない" {
 
 ///|
 test "本文の追記は、ルートの境界の手前に書く" {
-  // content_end_of も has_content と同じ規則（境界で頭打ち）を見ないと、
+  // Node.content_end も has_content と同じ規則（境界で頭打ち）を見ないと、
   // 追記した本文がルート自身の境界の下、次のグループの前に紛れ込む
   ignore(init_doc("# r\n\n---\n---\n\n## a\n"))
   ignore(insert_content(st.nodes[0].id, "![](x.png)", ""))

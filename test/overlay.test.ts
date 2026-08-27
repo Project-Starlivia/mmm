@@ -27,6 +27,8 @@ const NODE: NodeInfo = {
   from: 0,
   headEnd: 0,
   to: 0,
+  contentStart: 0,
+  contentEnd: 0,
   hasContent: false,
   hidden: false,
   group: 0,

@@ -25,6 +25,13 @@ export interface NodeInfo {
   headEnd: number;
   /** 区間の終わり = 部分木の終わり */
   to: number;
+  /** 本文の始まり = 見出し行の改行の直後 */
+  contentStart: number;
+  /** 本文の終わり（次の見出し・部分木の終わり・区切り行の境界のうち
+   *  いちばん手前）。**この規則はコアだけが持つ**（core/doc.mbt）。
+   *  末尾へ追記する位置・カード行を切り出す境界は、ここを読むだけで
+   *  常に一致する — TS 側で再導出しない */
+  contentEnd: number;
   hasContent: boolean;
   hidden: boolean;
   /** その枝が属するグループ（木ごとに 0 始まり。境界を 1 つ越えるたび +1） */
