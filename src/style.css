@@ -82,7 +82,11 @@ html, body {
   padding: 6px 12px;
   border-bottom: 1px solid var(--line);
 
-  & button {
+  /* 土台の見た目。**わざと弱くする** — `:where()` で `#topbar` の強さを
+     捨てて (0,0,1) にし、`.group` や `.menu-name` が**ただのクラスのまま**
+     上書きできるようにする。id の強さを残すと、後から足した塊の指定が
+     黙って負ける（実際に書き出しの 2 つが別々の丸い枠に見えていた） */
+  :where(&) button {
     font: inherit;
     font-size: 13px;
     padding: 3px 10px;
