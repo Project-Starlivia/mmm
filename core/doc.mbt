@@ -180,11 +180,13 @@ fn rebuild_nodes(id_at : Map[Int, Int]) -> Unit {
       }
     }
     // attached content: non-blank text between the heading line and whichever
-    // comes first — the next heading or the end of this node's own range
+    // comes first — the next heading, the end of this node's own range, or
+    // （区切り行は本文に属さないので）その手前にある最初の境界
     let mut content_end = if i + 1 < hn { heads[i + 1].from } else { n }
     if range_end[i] < content_end {
       content_end = range_end[i]
     }
+    content_end = cap_at_first_bound(bounds, h.content_start, content_end)
     let has_content = !is_blank_range(h.content_start, content_end)
     nodes.push(Node::{
       id,

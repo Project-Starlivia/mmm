@@ -198,14 +198,18 @@ fn indent_edit(
 }
 
 ///|
-/// そのノードの本文の末尾。次に構造行が来る手前（無ければ自分の末尾）。
-/// TS 側 map/cards.ts の contentEnd と同じ式 — 挿入位置の計算にだけ要る。
+/// そのノードの本文の末尾。次に構造行が来る手前（無ければ自分の末尾）、
+/// ただし区切り行はどのノードの本文にも属さないので、その手前にある
+/// 最初の境界でも頭打ちにする（cap_at_first_bound — doc.mbt の
+/// has_content と同じ規則）。TS 側 map/cards.ts の contentEnd は
+/// 境界を持たないカード表示専用の式で、これとは別。
 fn content_end_of(i : Int) -> Int {
-  if i + 1 < st.nodes.length() && st.nodes[i + 1].from < st.nodes[i].to {
+  let natural = if i + 1 < st.nodes.length() && st.nodes[i + 1].from < st.nodes[i].to {
     st.nodes[i + 1].from
   } else {
     st.nodes[i].to
   }
+  cap_at_first_bound(st.bounds, st.nodes[i].from, natural)
 }
 
 ///|

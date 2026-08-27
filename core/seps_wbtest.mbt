@@ -74,6 +74,23 @@ test "境界で範囲が切れても親子は変わらない" {
 }
 
 ///|
+test "ルート直後の境界は、ルートの本文に数えない" {
+  // ルートの範囲は境界で切られない（子を全部含む）ので、has_content の
+  // 判定を素朴に「次の見出しの手前」で取ると、区切り行が本文に見えてしまう
+  ignore(init_doc("# r\n\n---\n---\n\n## a\n"))
+  assert_eq(st.nodes[0].has_content, false)
+}
+
+///|
+test "本文の追記は、ルートの境界の手前に書く" {
+  // content_end_of も has_content と同じ規則（境界で頭打ち）を見ないと、
+  // 追記した本文がルート自身の境界の下、次のグループの前に紛れ込む
+  ignore(init_doc("# r\n\n---\n---\n\n## a\n"))
+  ignore(insert_content(st.nodes[0].id, "![](x.png)", ""))
+  assert_eq(get_text(), "# r\n\n![](x.png)\n\n---\n---\n\n## a\n")
+}
+
+///|
 test "各木が自分の区切りを読む" {
   // 2 つ目の `#` の下の区切りも、その木の中で効く
   let s = sides_of("# r\n\n## a\n\n# r2\n\n## b\n\n---\n---\n\n## c\n")
