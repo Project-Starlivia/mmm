@@ -19,6 +19,9 @@ const PATHS = {
   copy: "M5.5 2.5h8v8M2.5 5.5h8v8h-8z",
   /** 開く印 */
   chevron: "m3.5 6 4.5 4.5L12.5 6",
+  /** 十字とその中心の輪。視点を寄せる先を示す */
+  target:
+    "M8 2v2.5M8 11.5v2M2 8h2.5M11.5 8h2M6 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
 } as const;
 
 export type IconName = keyof typeof PATHS;

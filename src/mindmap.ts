@@ -6,7 +6,13 @@
 
 import type { DocView } from "./coreApi.ts";
 import { tokenizeBlock, touchesFence } from "./map/highlight.ts";
-import { type Pt, type Rect, midOfPolyline, rightOf } from "./map/geometry.ts";
+import {
+  type Pt,
+  type Rect,
+  midOfPolyline,
+  rightOf,
+  unionRect,
+} from "./map/geometry.ts";
 import { edgePath, edgeSegs, flattenSegs } from "./map/edge.ts";
 import { type CardRef, type CardRow, CODE_LINE, rowH } from "./map/cards.ts";
 import {
@@ -25,23 +31,28 @@ import {
   cardRect,
   edgeEnds,
   layoutMap,
+  rootId,
 } from "./map/layout.ts";
 import { type DropTarget, resolveDrop } from "./map/drop.ts";
 import { arrowTarget, extendSelection, isArrowKey } from "./map/navigate.ts";
 import { cardPlacement, labelPlacement } from "./map/overlay.ts";
 import {
   type View,
+  centerOn,
   fitToPane,
   panBy,
   panToShow,
   toWorld,
   zoomAt,
 } from "./map/view.ts";
+import { indicatorFor, isVisible } from "./map/indicator.ts";
 import { ContextMenu, type MenuEntry } from "./map/menu.ts";
 import { MapRenderer } from "./map/render.ts";
 import { CardPick } from "./map/pick.ts";
 import { mapToSvg } from "./map/toSvg.ts";
 import { svgEl } from "./map/svg.ts";
+import { icon } from "./icons.ts";
+import { paneTool } from "./app/paneTool.ts";
 
 export interface MapHost {
   /** いまの文書（テキスト・ノード・フェンスの組）。必ず同じ rev のもの */
@@ -149,6 +160,7 @@ export class MindMap {
   private editInk: HTMLPreElement;
   private cardEditor: HTMLTextAreaElement;
   private hint: HTMLDivElement;
+  private indicatorEl: HTMLDivElement;
   private menu = new ContextMenu();
 
   private tx = 60;
@@ -260,6 +272,20 @@ export class MindMap {
     this.hint.style.display = "none";
     pane.append(this.hint);
 
+    this.indicatorEl = document.createElement("div");
+    this.indicatorEl.id = "map-indicator";
+    this.indicatorEl.style.display = "none";
+    pane.append(this.indicatorEl);
+
+    const centerTool = paneTool("map-center");
+    const centerBtn = document.createElement("button");
+    centerBtn.type = "button";
+    centerBtn.title = "Center on the selection, or the root — Home";
+    centerBtn.append(icon("target"));
+    centerBtn.addEventListener("click", () => this.centerOnTarget());
+    centerTool.append(centerBtn);
+    pane.append(centerTool);
+
     this.bindEvents();
     this.applyTransform();
     // a fitView requested while the pane had no size runs once it gets one
@@ -281,6 +307,7 @@ export class MindMap {
     this.tx = v.tx;
     this.ty = v.ty;
     this.applyTransform();
+    this.updateIndicator();
   }
 
   /** ペインの大きさ（画面 px） */
@@ -345,6 +372,7 @@ export class MindMap {
 
     this.updatePlus();
     this.positionEditor();
+    this.updateIndicator();
   }
 
   /**
@@ -628,6 +656,57 @@ export class MindMap {
   ensureVisible(id: number): void {
     const b = this.boxes.get(id);
     if (b) this.setView(panToShow(this.view(), b, this.paneSize(), SHOW_MARGIN));
+  }
+
+  /** 選んでいるノードの箱（複数なら外接）。無ければ空配列。 */
+  private selectionBoxes(): Rect[] {
+    const boxes: Rect[] = [];
+    for (const id of this.host.selection()) {
+      const b = this.boxes.get(id);
+      if (b) boxes.push(b);
+    }
+    return boxes;
+  }
+
+  /** 寄せる/指す先: 選択があればその外接、無ければルート。文書が空なら null。 */
+  private targetBox(): Rect | null {
+    const sel = this.selectionBoxes();
+    if (sel.length > 0) return unionRect(sel);
+    const rid = rootId(this.layout);
+    return rid === null ? null : (this.boxes.get(rid) ?? null);
+  }
+
+  /** 選択（無ければルート）が画面の中心に来るよう寄せる。拡大率は変えない。 */
+  centerOnTarget(): void {
+    const box = this.targetBox();
+    if (box) this.setView(centerOn(this.view(), box, this.paneSize()));
+  }
+
+  /**
+   * 画面外にある対象を控えめな針で指す。**対象そのものが画面内かは見ない** —
+   * 選択があるときは「選んだどれかが見えているか」、無いときは「ノードが
+   * 1 つでも見えているか」で判断する(でないと非選択時にルートがずっと
+   * 見えっぱなしで邪魔になる)。
+   */
+  private updateIndicator(): void {
+    const target = this.targetBox();
+    if (!target) {
+      this.indicatorEl.style.display = "none";
+      return;
+    }
+    const pane = this.paneSize();
+    const view = this.view();
+    const sel = this.selectionBoxes();
+    const checked = sel.length > 0 ? sel : [...this.boxes.values()];
+    if (checked.some((b) => isVisible(b, view, pane))) {
+      this.indicatorEl.style.display = "none";
+      return;
+    }
+    const ind = indicatorFor(target, view, pane);
+    this.indicatorEl.style.display = "block";
+    this.indicatorEl.style.left = `${ind.x}px`;
+    this.indicatorEl.style.top = `${ind.y}px`;
+    this.indicatorEl.style.transform = `translate(-50%, -50%) rotate(${ind.angle}deg)`;
   }
 
   // ---------- label editing ----------
@@ -1294,6 +1373,13 @@ export class MindMap {
     const sel = this.host.selection();
     const nodes = this.host.doc().nodes;
 
+    // 選択（無ければルート）を画面の中心へ。マップにしか効かないので、
+    // どこにフォーカスがあっても効く app/shortcuts.ts ではなくここに置く
+    if (key === "Home" && !mod && !e.altKey) {
+      this.centerOnTarget();
+      e.preventDefault();
+      return;
+    }
     // comment-out hide/show for the subtree (= collapse)
     if (key === "H" && !mod && !e.altKey && anchor !== -1) {
       this.host.toggleHidden(anchor);
@@ -1633,5 +1719,6 @@ export class MindMap {
   refreshSelection(): void {
     this.renderer.refreshSelection(this.host.selection());
     this.showPick();
+    this.updateIndicator();
   }
 }

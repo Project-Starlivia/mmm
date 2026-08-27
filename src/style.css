@@ -221,6 +221,9 @@ html, body {
 #panes.no-map #md-pane { flex: 1; }
 /* マップで選んでいるノードの、md 側での対応範囲 */
 .cm-mmm-selected { background: var(--accent-soft); }
+/* フォーカスの輪。#md-pane 自身は CodeMirror の背景に隠れて見えないので
+   .cm-editor に当てる(map 側の同じ印は #map-pane.pane-focused が持つ) */
+#md-pane.pane-focused .cm-editor { box-shadow: inset 0 0 0 2px var(--accent-soft); }
 
 /* ペインの隅に浮く小さな道具。**そのペインにだけ効くもの**はここに住む
    （帯に出るのは文書ぜんぶに効くものだけ）。低頻度なので沈ませて、
@@ -324,7 +327,26 @@ html, body {
   &.pane-focused { box-shadow: inset 0 0 0 2px var(--accent-soft); }
 }
 
+/* 視点を選択(無ければルート)へ寄せる。md 側の書き方(#form-picker)と
+   同じ形式(上端 6px・右寄せ)を、境目を挟んで反対側にも置く */
+#map-center { top: 6px; right: 8px; }
+
 #map-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* 画面外にある対象(選択、無ければルート)を指す控えめな針。コンパスの針の
+   ように細長いひし形 1 つ。**出っぱなし**になるので中央には浮かせず、
+   縁に貼って真ん中を塞がない(map/indicator.ts が位置と向きを計算する) */
+#map-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 9px;
+  background: var(--accent);
+  clip-path: polygon(0 50%, 38% 15%, 100% 50%, 38% 85%);
+  opacity: 0.5;
+  pointer-events: none;
+}
 
 #map-hint {
   position: absolute;
