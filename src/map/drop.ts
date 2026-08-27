@@ -82,8 +82,35 @@ function local(at: Pt, b: Box) {
   };
 }
 
-/** いちばん近い木の根（複数の木が縦に積まれているので、どれの脇かを決める） */
+/** 非 Mod の外側ゾーンと同じ範囲（成長軸は REACH、それ以外は SLACK まで）に、
+ *  ポインタがその箱から見て収まっているか */
+function withinReach(at: Pt, b: Box): boolean {
+  const { du, dv, hu, hv } = local(at, b);
+  return Math.abs(du) - hu <= REACH && Math.abs(dv) - hv <= SLACK;
+}
+
+/**
+ * いちばん近い木の根（複数の木が縦に積まれているので、どれの脇かを決める）。
+ * どの根からも遠い空所では `-1`（= 見つからない）を返す — この上限が無いと、
+ * Mod を押したままの空振り（キャンセルのつもり）が必ずどこかの根への移動
+ * として成立してしまう。
+ *
+ * 上限は「掴んでいる木も含めて」どれかの根に届いているかで見る。掴んでいる
+ * 根の真上で離したときは、そこは紛れもなく木の上（キャンセルしたい空所ではない）
+ * なので、その場合は掴んでいない側の根を距離に関わらず探しに行く。
+ */
 function nearestRoot(scene: DropScene): number {
+  let reachable = false;
+  for (const id of scene.order) {
+    if (scene.parentOf.get(id) !== undefined) continue;
+    const b = scene.boxes.get(id);
+    if (b && withinReach(scene.at, b)) {
+      reachable = true;
+      break;
+    }
+  }
+  if (!reachable) return -1;
+
   let best = Infinity;
   let hit = -1;
   for (const id of scene.order) {

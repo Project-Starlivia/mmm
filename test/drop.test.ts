@@ -219,6 +219,15 @@ test("Mod で根そのものを掴んでいれば、その根は nearestRoot の
 test("Mod でも、枝が 1 つも無い側は「その側の末尾」に落ちる", () => {
   const root = box(1, 1, 0, 100);
   const a = box(2, 2, 145, 100);
-  const s = scene([root, a], [[2, 1]], { x: -200, y: 100 }, { newGroup: true });
+  // 根の届く範囲（REACH/SLACK 相当）の内側で、まだ何も無い左側
+  const s = scene([root, a], [[2, 1]], { x: -150, y: 100 }, { newGroup: true });
   assert.deepEqual(resolveDrop(s).drop, { kind: "side", root: 1, left: true });
+});
+
+test("Mod を押していても、どの木からも遠い空所ではキャンセルできる", () => {
+  // nearestRoot に上限が無いと、Mod を押したまま空振りしても必ずどこかの
+  // 根への移動が成立してしまい、ドラッグを諦める手段が無くなる
+  const root = box(1, 1, 0, 100);
+  const s = scene([root], [], { x: 900, y: 900 }, { newGroup: true });
+  assert.equal(resolveDrop(s).drop, null);
 });
