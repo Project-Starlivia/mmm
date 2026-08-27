@@ -116,8 +116,28 @@ export function initPanes(args: {
     if (next) applyPaneVis({ ...next });
   };
 
+  /**
+   * そのペインを表に出す。**「隠す」と違い `project` のフォールバックに
+   * 任せてはいけない** — フォールバックは「行き先を言っていない要求」
+   * （境目をまたいだ・両方消えた）のためのもので、「このペインを出したい」
+   * という名指しの要求に使うと、常にマップへ落ちて要求を無視してしまう
+   * （狭いときに md を指名しても、`project` の目には「両方」にしか見えず、
+   * マップが残る側へ丸められる）。だから行き先は先にここで決める:
+   * 広ければ今の相方はそのまま、狭ければ「両方」という居場所が無いので
+   * 指名したペイン以外は自動で退く。
+   */
+  const reveal = (which: "md" | "map"): void => {
+    const list = spots();
+    const want: Vis =
+      list.length === 3
+        ? { ...paneVis, [which]: true }
+        : { md: which === "md", map: which === "map" };
+    applyPaneVis(want);
+  };
+
   const togglePaneVis = (which: "md" | "map"): void => {
-    applyPaneVis({ ...paneVis, [which]: !paneVis[which] });
+    if (paneVis[which]) applyPaneVis({ ...paneVis, [which]: false });
+    else reveal(which);
   };
 
   goLeft.addEventListener("click", () => slide(-1));
@@ -126,10 +146,10 @@ export function initPanes(args: {
   // Mod+/: jump to the other pane, revealing it if hidden
   const togglePane = (): void => {
     if (mdPane.contains(document.activeElement)) {
-      if (!paneVis.map) applyPaneVis({ ...paneVis, map: true });
+      reveal("map");
       mapPane.focus();
     } else {
-      if (!paneVis.md) applyPaneVis({ ...paneVis, md: true });
+      reveal("md");
       args.focusEditor();
     }
   };
