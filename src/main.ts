@@ -105,65 +105,58 @@ function declaredFolder(): string | null {
   return raw === null ? null : normalizePath(raw);
 }
 
-// 頭の宣言が変わったら、本文の画像パスをそれに追従させる。
-//
-// **打鍵のたびには走らせない。** 入力が止まってから 1 回だけ当てる
-// （Undo も 1 回で全部戻る）。ただし debounce だけでは「値を選んで消す →
-// 少し考える → 打ち直す」というリズムは守れない（打鍵の連続ではないので
-// 400ms の間隔に収まらない）。この隙を塞ぐのは `normalizePath`（app/head.ts）
-// 側の役目 — 空値は `./` ではなく null（宣言なし）として返し、
-// `followDeclaration` を早期 return させることで、フォルダの外の画像が
-// 巻き込まれる窓そのものを無くす。
-
-const FOLLOW_MS = 400;
-
-/** 本文がいま映している宣言。文書を開いた時点の値から始まる */
+/** 本文がいま映している宣言。打鍵の最中だけ、頭の言い分より遅れる */
 let appliedFolder: string | null = null;
-let followTimer = -1;
-
-function cancelFollow(): void {
-  if (followTimer === -1) return;
-  window.clearTimeout(followTimer);
-  followTimer = -1;
-}
 
 /**
- * 宣言の引っ越しに本文を追従させ、フォルダを結び直す。
+ * 頭の宣言に本文の画像パスを追従させ、画像を読み直す。
  *
- * ここが触る `assets` / `nextTag` はこの下で作られるが、呼ばれるのは
- * タイマーが落ちたとき＝モジュールを読み終えた後なので届く。
+ * **打鍵のたびに走る。** 待たない代わりに、その打鍵が使った `tag` に
+ * 相乗りする — コアは同じ tag の編集を 1 エントリに併合するので、頭の
+ * 打鍵と本文の書き換えは同じ Undo に入り、打鍵が続くかぎり増えない。
+ *
+ * 書き換えは頭より後ろにしか起きないので、CM 側の挿入位置はずれない。
+ * だから origin は `follow` — 打鍵の連なりを切らせない（`applySnap`）。
  */
-function followDeclaration(): void {
+function followDeclaration(tag: string): void {
   const next = declaredFolder();
-  if (next === null) return; // 読めない綴りでは何もしない
+  if (next === null) return; // 読めない綴り（空・絶対パス・URL）では何もしない
   const prev = appliedFolder;
-  // **当てる前に進める。** 下の replaceText が applySnap を呼び返すので、
-  // ここが古いままだと自分の書き換えを見てもう一度予約してしまう
   appliedFolder = next;
-  if (prev !== null && prev !== next) {
+  // 行って戻っただけなら何も変わっていない。ここで止めないと、動いていない
+  // 画像を読み直すだけの往復になる
+  if (prev === next) return;
+  // 初めての宣言（prev が null）では、どこから動かすのか分からないので
+  // 本文には触らない。読み直しだけする
+  if (prev !== null) {
+    // 後ろから。前から当てると後続のオフセットが挿入ぶんだけずれる。
+    // 編集ごとに applySnap を呼ぶと画像の枚数だけ再描画が走るので、
+    // 各回の editSets を繋いで最後に 1 度だけ渡す（並びがそのまま適用順）
     const edits = retarget(doc, prev, next);
-    const tag = nextTag();
-    // 後ろから。前から当てると後続のオフセットが挿入ぶんだけずれる
+    let snap: Snapshot | null = null;
+    const sets: EditOp[][] = [];
     for (let i = edits.length - 1; i >= 0; i--) {
       const e = edits[i];
-      applySnap(core.replaceText(e.from, e.to, e.insert, tag), "core");
+      snap = core.replaceText(e.from, e.to, e.insert, tag);
+      sets.push(...snap.editSets);
     }
+    if (snap) applySnap({ ...snap, editSets: sets }, "follow");
   }
-  // 行って戻っただけ（例: 値を変えてまた元に戻す）なら retarget は 0 件。
-  // ここで止めないと、変わっていない画像を無駄にもう一度読み直すことになる
-  if (prev === next) return;
   assets.clear(); // 宣言が変わった。画像を読み直す
 }
 
 // ---------- sync ----------
 
 /**
- * そのスナップショットを誰が起こしたか。振る舞いが変わるのは 3 通りだけ。
- * - `cm`   … MD ペインの打鍵。CodeMirror には既に入っているので送り返さない
- * - `load` … 文書まるごとの入れ替え。setText が済んでいる
- * - `core` … それ以外（マップの操作・undo/redo）。MD ペインへ差分を送る
+ * そのスナップショットを誰が起こしたか。振る舞いが変わるのは 4 通りだけ。
+ * - `cm`     … MD ペインの打鍵。CodeMirror には既に入っているので送り返さない
+ * - `load`   … 文書まるごとの入れ替え。setText が済んでいる
+ * - `follow` … 直前の打鍵に本文が追いついた分（頭の宣言の引っ越し）。
+ *              MD ペインへ差分は送るが、**打鍵の連なりは切らない** —
+ *              書き換えは頭より後ろにしか起きず、挿入位置がずれないため
+ * - `core`   … それ以外（マップの操作・undo/redo）。MD ペインへ差分を送る
  */
-type Origin = "cm" | "load" | "core";
+type Origin = "cm" | "load" | "follow" | "core";
 
 function applySnap(snap: Snapshot, origin: Origin): void {
   // 何も無いところに最初の 1 つが生まれた瞬間だけ、真ん中へ寄せる。
@@ -192,25 +185,21 @@ function applySnap(snap: Snapshot, origin: Origin): void {
     picked = null;
     selChanged = true;
   }
-  // structural edits from elsewhere invalidate the typing-merge chain
-  if (origin !== "cm") editKind = "";
+  // 打鍵と、その打鍵に本文が追いついた分**以外**で文書が変わったなら、
+  // 打鍵の連なりは切れ（次の打鍵は新しい Undo エントリから）、本文はもう
+  // その宣言を映している（読み込み・undo/redo・フォルダ選択のどれでも）。
+  // 打鍵のときだけ据え置くのは、直後の followDeclaration に「どこから」を
+  // 渡すため
+  if (origin !== "cm" && origin !== "follow") {
+    editKind = "";
+    appliedFolder = declaredFolder();
+  }
   map.render();
   // render がクラスまで塗り終えているので、ここで塗り直さない
   if (selChanged) syncSelectionViews(false, true);
   updateDirty();
   showName();
   form.show(snap.listFrom);
-  // 文書ごと入れ替わったなら、本文はもうその宣言を映している（追従は不要）
-  if (origin === "load") {
-    cancelFollow();
-    appliedFolder = declaredFolder();
-  } else if (declaredFolder() !== appliedFolder) {
-    cancelFollow();
-    followTimer = window.setTimeout(() => {
-      followTimer = -1;
-      followDeclaration();
-    }, FOLLOW_MS);
-  }
   if (wasEmpty && doc.nodes.length > 0) map.fitView();
 }
 
@@ -352,7 +341,13 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
       editTag = tag;
       editPos = e.from;
     } else {
+      // 選択の置き換えなど、前後の打鍵と連ねない 1 編集。**それでも名前は
+      // 要る** — 空の tag はコアで併合されない決まりなので（history.mbt）、
+      // 空のままだと直後の追従が別の Undo エントリになり、1 回戻したときに
+      // 頭と本文が食い違う。他と重ならない名前を配れば、連ならないまま
+      // 追従だけが同じエントリに入る
       editKind = "";
+      tag = nextTag();
     }
   } else {
     editKind = "";
@@ -365,6 +360,9 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
     delta += e.insert.length - (e.to - e.from);
   }
   if (snap) applySnap(snap, "cm");
+  // 頭を打ったなら、本文をその場で追いつかせる。**同じ tag を渡す** —
+  // 打鍵と書き換えが 1 つの Undo に収まる
+  followDeclaration(tag);
 }
 
 // ---------- mindmap host ----------
