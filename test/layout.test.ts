@@ -137,6 +137,21 @@ test("ルートの左右に 1 本ずつなら、線は真っすぐ出る", () =>
   }
 });
 
+test("反対側の重さが偏っていても、1 本だけの側の線は真っすぐ", () => {
+  // 根の中心は「採用した側の最初と最後の子の中心の中間」であって、幾何学的な
+  // 中心ではない。採用した側（右）の子どうしで部分木の重さが偏っていると
+  // （最初の子だけ子孫が深い）、この中間点は空間の真ん中からずれる。左に
+  // 1 本だけの枝は箱の中で独立して中央寄せされるので、ずれた根とは噛み合わず
+  // 曲がっていた
+  const md =
+    "# r\n\n## heavy\n\n### x\n\n#### y\n\n##### z\n\n## light1\n\n## light2\n\n---\n---\n\n## lone\n";
+  const doc = loadDoc(md);
+  const L = layoutMap(doc);
+  const ends = edgeEnds(L, nodeOf(doc.nodes, "lone").id);
+  assert.ok(ends, "lone のエッジが無い");
+  assert.equal(ends.from.y, ends.to.y, "lone の線が曲がっている");
+});
+
 test("同じ側に 2 本あれば、これまでどおり付け根を散らす", () => {
   const doc = loadDoc("# r\n\n## a\n\n## b\n");
   const L = layoutMap(doc);

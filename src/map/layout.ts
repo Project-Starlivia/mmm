@@ -304,6 +304,23 @@ export function layoutMap(doc: DocView): Layout {
         centerY = (centers[0] + centers[centers.length - 1]) / 2;
       }
     }
+    // 枝が 1 本だけの側は、根の中心へきっちり合わせる。
+    //
+    // 上の式は「最初と最後の子の中心の中間」であって、幾何学的な中心ではない
+    // ——採用した側の子どうしで部分木の重さが偏っていると（例: 最初の子だけ
+    // 子孫が深い）、この中間点は空間の真ん中からずれる。複数本の枝はどのみち
+    // fanOf が扇状に散らす前提なので曲がっていても構わないが、**1 本だけの
+    // 側には曲がる理由が無い**（先の「ルートの左右に 1 本ずつ」の直しと同じ
+    // 見立て）。採用した側自身が 1 本だけなら delta は自然に 0 になる。
+    for (const s of sides) {
+      const total = s.groups.reduce((n, g) => n + g.length, 0);
+      if (total !== 1) continue;
+      const lone = s.groups[0][0];
+      const b = boxes.get(lone.id);
+      if (!b) continue;
+      const dy = centerY - (b.y + b.h / 2);
+      if (dy !== 0) shiftSubtree(lone, dy);
+    }
     boxes.set(root.id, {
       n: root,
       x: 0,
@@ -313,6 +330,13 @@ export function layoutMap(doc: DocView): Layout {
       rows: rowsOf.get(root.id) ?? [],
     });
     return centerY;
+  };
+
+  /** その枝と子孫すべての箱を縦にずらす。孤立した 1 本を根の中心に揃えるため */
+  const shiftSubtree = (n: NodeInfo, dy: number): void => {
+    const b = boxes.get(n.id);
+    if (b) b.y += dy;
+    for (const k of kidsOf(n)) shiftSubtree(k, dy);
   };
 
   if (root) placeTree(root, -treeH(root) / 2);
