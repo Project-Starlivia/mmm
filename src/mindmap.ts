@@ -9,6 +9,7 @@ import { tokenizeBlock, touchesFence } from "./map/highlight.ts";
 import {
   type Pt,
   type Rect,
+  entryEdgeOf,
   growthEdgeOf,
   leftOf,
   midOfPolyline,
@@ -1623,11 +1624,17 @@ export class MindMap {
     }
 
     if (drop.kind === "side") {
-      // ルートの脇。その側の辺のすぐ外に、末尾への挿入線を出す
+      // ルートの脇 = **その側の末尾へ**。子にする（pos 0）とまったく同じで、
+      // その側に枝があれば着地点はその列の下端なので、同じ言い方で描く。
       // （行き先は箱から選んでいるので必ず在るが、描き直しと競っていれば
       // 消えていることもある。そのときは印を出さない）
       const rb = this.boxes.get(drop.root);
       if (!rb) return;
+      const last = this.lastKidOf(drop.root, drop.left);
+      if (last) {
+        this.insertMark(last, true, drop.root);
+        return;
+      }
       const p = drop.left ? leftOf(rb) : rightOf(rb);
       const lx = p.x + (GAP.x / 2) * (drop.left ? -1 : 1);
       const half = 16;
@@ -1713,11 +1720,13 @@ export class MindMap {
   /**
    * その親の子のうち、いちばん下の箱。子が無ければ null。
    * 新しい子はそこに足されるので、印もそこへ出す。
+   * `left` を渡すと、その側の子だけを見る（ルートは両側へ伸びるため）。
    */
-  private lastKidOf(parent: number): Box | null {
+  private lastKidOf(parent: number, left?: boolean): Box | null {
     let hit: Box | null = null;
     for (const b of this.boxes.values()) {
       if (this.layout.parentOf.get(b.n.id) !== parent) continue;
+      if (left !== undefined && b.n.left !== left) continue;
       if (!hit || b.y + b.h > hit.y + hit.h) hit = b;
     }
     return hit;
@@ -1729,19 +1738,31 @@ export class MindMap {
    * 挿入線だけだと「上の親の末尾」と「下の親の先頭」が同じ場所に出て区別が
    * つかないので、**どの親につくのかを必ず線で言う**。「子にする」も着地点は
    * 同じ形（子の列の下端）なので、ここを通って同じ見た目になる。
+   *
+   * 線の横の伸びは**箱ではなく列**から取る。箱ごとに中心と幅で引いていたころは、
+   * 行き先が隣の兄弟へ移るたびに幅の差だけ線が伸び縮みして、数 px カクついた。
+   * 列は付け根の辺（`entryEdgeOf`）を共有し、幅も兄弟の最大で固定できる。
    */
   private insertMark(b: Box, below: boolean, parentId: number): void {
-    const cx = b.x + b.w / 2;
+    const dir = dirOf(b.n);
+    const near = entryEdgeOf(b, dir).x; // 親を向いた辺。列で共通
+    let span = 0;
+    for (const k of this.boxes.values()) {
+      if (this.layout.parentOf.get(k.n.id) !== parentId) continue;
+      if (k.n.left !== b.n.left) continue;
+      span = Math.max(span, k.w);
+    }
+    span = Math.max(span, 80);
     const cy = b.y + b.h / 2;
     const off = (b.h / 2 + GAP.y / 2) * (below ? 1 : -1);
-    const half = Math.max(b.w / 2, 40);
-    this.dropLine.setAttribute("x1", String(cx - half));
+    const OVER = 8; // 付け根側へのはみ出し。線が列に載っているように見せる
+    this.dropLine.setAttribute("x1", String(near - OVER * dir));
     this.dropLine.setAttribute("y1", String(cy + off));
-    this.dropLine.setAttribute("x2", String(cx + half));
+    this.dropLine.setAttribute("x2", String(near + span * dir));
     this.dropLine.setAttribute("y2", String(cy + off));
     this.dropLine.setAttribute("visibility", "visible");
 
-    const to = { x: cx - (b.w / 2) * dirOf(b.n), y: cy + off };
+    const to = { x: near, y: cy + off };
     const p = this.boxes.get(parentId);
     if (!p) {
       this.dropHint.setAttribute("visibility", "hidden");

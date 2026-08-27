@@ -156,11 +156,18 @@ test("同じ列に積まれた 2 つの stack の谷間は、近いほうの端�
   assert.deepEqual(near2.drop, { kind: "node", id: 5, pos: 1 });
 });
 
-test("Shift なら線への割り込みが最優先", () => {
-  // 親(1) → 子(2) の線の中ほど。素の状態では根の脇（外側ゾーン）が勝つ場所
-  const at = { x: 122, y: 90 };
+test("線の中ほどは、Shift 無しでも割り込みになる", () => {
+  // 線は箱の帯には勝てないが、外側ゾーンより先。親の帯が線を丸ごと覆って
+  // いたころは、親が子を持つほど f3/g3 のような割り込みが一切狙えなかった
+  const d = resolveDrop(scene(TREE, LINKS, { x: 122, y: 90 }));
+  assert.deepEqual(d.drop, { kind: "node", id: 2, pos: 3 });
+});
+
+test("Shift は線の狙い所を広げる", () => {
+  // 端から 30% を外す既定では届かない、線の端寄り。Shift だと 10% まで縮む
+  const at = { x: 138, y: 76 };
   const plain = resolveDrop(scene(TREE, LINKS, at));
-  assert.deepEqual(plain.drop, { kind: "side", root: 1, left: false });
+  assert.notDeepEqual(plain.drop, { kind: "node", id: 2, pos: 3 });
   const shifted = resolveDrop(scene(TREE, LINKS, at, { preferEdge: true }));
   assert.deepEqual(shifted.drop, { kind: "node", id: 2, pos: 3 });
 });
@@ -229,12 +236,32 @@ test("子がいる枝の通路は、指した高さがそのまま行き先", ()
     [4, 2],
     [5, 2],
   ];
-  const at = (y: number) => resolveDrop(scene(boxes, links, { x: 130, y })).drop;
+  // 帯の**子側**（真ん中は線への割り込みが持つ）。付け根から 3 分の 2 あたり
+  const at = (y: number) => resolveDrop(scene(boxes, links, { x: 145, y })).drop;
   // e の下寄り → e の後ろ / f の上寄り → f の手前 / f と g の間 → g の手前
   assert.deepEqual(at(-71), { kind: "node", id: 3, pos: 2 });
   assert.deepEqual(at(-56), { kind: "node", id: 4, pos: 1 });
   assert.deepEqual(at(-31), { kind: "node", id: 4, pos: 2 });
   assert.deepEqual(at(-16), { kind: "node", id: 5, pos: 1 });
+});
+
+test("帯の真ん中は線への割り込み、子側は前後への挿入", () => {
+  // 線は端から 30% を狙い所から外すので、帯は自然と三層になる
+  // （付け根側 = 親のゾーン / 真ん中 = 線 / 子側 = 前後への挿入）
+  const root = box(1, 1, 0, 100, 31);
+  const a = box(2, 2, 76, -55, 31);
+  const e = box(3, 3, 152, -95, 31);
+  const f = box(4, 3, 152, -55, 31);
+  const g = box(5, 3, 152, -15, 31);
+  const boxes = [root, a, e, f, g];
+  const links: [number, number][] = [
+    [2, 1],
+    [3, 2],
+    [4, 2],
+    [5, 2],
+  ];
+  const mid = resolveDrop(scene(boxes, links, { x: 130, y: -40 }));
+  assert.deepEqual(mid.drop, { kind: "node", id: 4, pos: 3 });
 });
 
 test("左の枝では、外側ゾーンも左へ伸びる", () => {

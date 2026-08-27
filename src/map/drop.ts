@@ -289,14 +289,21 @@ function findOpenEnd(scene: DropScene): DropTarget | null {
 /**
  * どこへ落とすか。優先順は 5 段:
  *   1. 箱の中
- *   2. 外側ゾーンの近い側（NEAR まで）… 前後への挿入より強い
- *   3. 前後への挿入（箱の上下の帯）
- *   4. 外側ゾーンの遠い側（REACH まで）… 誰も取らない空間の受け皿
+ *   2. 前後への挿入（箱の上下の帯）
+ *   3. 線への割り込み（Shift ならここが 1 番）
+ *   4. 外側ゾーン（REACH まで）… 近い側は NEAR まで帯より強い
  *   5. 列の上端の上 / 下端の下（OPEN まで）… 誰も取らなかった空白
  *
  * 近くを子に振らないと、次の列の子の帯に吸われて「右に置いたのに兄弟になる」
  * が起きる。逆に遠くまで子を優先させると前後への挿入がほぼ出せなくなるので、
  * そこは前後に譲る。
+ *
+ * **線は外側ゾーンより先**。後ろに置いていたころは、親が子を持つほど親の帯が
+ * 線を丸ごと覆い、その子への割り込みが一切狙えなかった（子が 3 つあれば
+ * 真ん中の子の線は帯のど真ん中を通る）。線は端から 30% を狙い所から外すので、
+ * 先に置いても帯は三層に分かれるだけで消えない —
+ * **付け根側 = 親のゾーン / 真ん中 = 線 / 子側 = 前後への挿入**。
+ * 子を 1 つも持たない枝からは線が出ないので、その帯は丸ごと親のまま。
  */
 export function resolveDrop(scene: DropScene): DropDecision {
   // ポインタがその箱の中心より左か。**側を決めるのはここだけ**
@@ -313,8 +320,9 @@ export function resolveDrop(scene: DropScene): DropDecision {
 
   // Shift = 線への割り込みを最優先。見つかったかどうかは後の段でも使う
   // （見つかった線を、外側ゾーンや帯が黙って横取りしない）
-  const edgeTarget = scene.preferEdge ? findEdge(scene) : null;
-  let target: DropTarget | null = edgeTarget;
+  const edgeTarget = findEdge(scene);
+  let target: DropTarget | null = scene.preferEdge ? edgeTarget : null;
+  const shiftWon = target !== null;
 
   // 帯は隣の兄弟と重なるので、最初に見つかった相手ではなく「いちばん近い」
   // 相手を選ぶ。文書順で決めていたころは、親が違う子スタックの境目で
@@ -334,7 +342,7 @@ export function resolveDrop(scene: DropScene): DropDecision {
       b.n.depth === 1 ? 0 : dv < -hv * 0.4 ? 1 : dv > hv * 0.4 ? 2 : 0;
     if (dist < best) {
       best = dist;
-      if (!edgeTarget) target = { id, pos };
+      if (!shiftWon) target = { id, pos };
     }
   }
 
@@ -369,7 +377,7 @@ export function resolveDrop(scene: DropScene): DropDecision {
     target = outTarget;
   }
 
-  if (!target) target = findEdge(scene);
+  if (!target) target = edgeTarget;
 
   // 誰も取らなかった空白は、開いている側の上下端が受ける
   if (!target) target = findOpenEnd(scene);
