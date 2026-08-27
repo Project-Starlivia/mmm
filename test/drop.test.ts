@@ -231,3 +231,15 @@ test("Mod を押していても、どの木からも遠い空所ではキャン�
   const s = scene([root], [], { x: 900, y: 900 }, { newGroup: true });
   assert.equal(resolveDrop(s).drop, null);
 });
+
+test("Mod: 根から縦に離れた枝の近くへ落としても、新しいグループとして拾う", () => {
+  // 複数グループが縦に積まれた実際の文書では、根自身の箱は小さく、
+  // グループはそこから遠く離れた位置にも並ぶ。「木から遠いか」を根の
+  // 小さい箱だけで測ると、根の近くにしか Mod+ドロップが効かなくなる
+  const root = box(1, 1, 0, 0, 80, 30);
+  const kids = Array.from({ length: 8 }, (_, i) => box(10 + i, 2, 125, i * 60));
+  const links: [number, number][] = kids.map((k) => [k.n.id, 1]);
+  const s = scene([root, ...kids], links, { x: 175, y: 420 }, { newGroup: true });
+  const d = resolveDrop(s).drop;
+  assert.ok(d && d.kind !== "node", `根から遠い枝の近くで Mod+ドロップが効かない: ${JSON.stringify(d)}`);
+});
