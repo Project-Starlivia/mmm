@@ -82,6 +82,19 @@ priv struct Fence {
 }
 
 ///|
+/// 区切り行（thematic break）の**連続したかたまり** = 1 つの境界の候補。
+///
+/// 「連続」は間に挟まる空行と hide マーカー行を透過して数える — 畳んだだけで
+/// 境界が死んだり 2 つに割れたりしないように（v1 で実際に踏んだ）。
+/// **構造として効くかどうかの判定はここではしない**（木とルートの深さを
+/// 知らないとできない。core/seps.mbt が持つ）。
+priv struct SepRun {
+  start : Int // かたまりの最初の区切り行の行頭
+  mut end : Int // 最後の区切り行の次の行頭
+  mut lines : Int // 区切りとして数えた行数（1 = 分割、2 以上 = 分割 + 切り替え）
+}
+
+///|
 /// 開きフェンスの読み取り結果。閉じを見つけるのに要る文字と本数、
 /// そして情報文字列。
 priv struct FenceOpen {
@@ -106,6 +119,7 @@ priv struct Scan {
   // リスト項目が現れた最も浅い深さ（無ければ 0）。**開いたときのモード判定**の
   // ため — 使うのは init_doc だけだが、走査は 1 度で済ませる
   list_from : Int
+  seps : Array[SepRun]
 }
 
 ///|
@@ -133,6 +147,11 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
   let mut f_start = 0
   let mut f_body = 0
   let mut f_info = ""
+  let seps : Array[SepRun] = []
+  // 区切り行のかたまりが続いているか（空行と hide マーカーは切らない）
+  let mut run_open = false
+  // 直前の行が本文の行か。`---` が setext 見出しの下線になるのはこのときだけ
+  let mut prev_text = false
   let mut in_comment = false
   let mut c_open = 0
   let mut c_open_next = 0
@@ -161,6 +180,8 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
         })
         in_comment = false
         in_fence = false
+        run_open = false
+        prev_text = false
         continue
       }
       if fence_close_len(text, l, fence_char, fence_base) >= fence_len {
@@ -173,6 +194,8 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
         })
         in_fence = false
       }
+      run_open = false
+      prev_text = false
       continue
     }
     match fence_open(text, l, content_col) {
@@ -184,6 +207,8 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
         f_start = l.start
         f_body = l.next
         f_info = f.info
+        run_open = false
+        prev_text = false
         continue
       }
       None => ()
@@ -192,6 +217,7 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
       in_comment = true
       c_open = l.start
       c_open_next = l.next
+      prev_text = false
       continue
     }
     if in_comment && is_comment_close(text, l) {
@@ -202,6 +228,30 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
         close_next: l.next,
       })
       in_comment = false
+      prev_text = false
+      continue
+    }
+    // ---- 区切り行（thematic break）----
+    // かたまりに数えるだけ。**構造として効くかどうかは core/seps.mbt** が
+    // 木の形を見て決める（ここは行の並びしか知らない）
+    let mark = thematic_break_at(text, l, content_col)
+    if mark != 0 {
+      if prev_text && mark == 45 {
+        // 直前が本文の行の `---` は CommonMark の setext 見出しの下線。
+        // 区切りとして数えない（下線は段落を閉じるので、次の行から数え直す）
+        prev_text = false
+        run_open = false
+        continue
+      }
+      if run_open && seps.length() > 0 {
+        let r = seps[seps.length() - 1]
+        r.end = l.next
+        r.lines = r.lines + 1
+      } else {
+        seps.push(SepRun::{ start: l.start, end: l.next, lines: 1 })
+      }
+      run_open = true
+      prev_text = false
       continue
     }
     // strict ^(#+)\s+(.*)$ with no leading spaces allowed
@@ -218,6 +268,8 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
       levels.clear()
       content_col = 0
       out.push(head_at(text, l, depth, p, in_comment))
+      run_open = false
+      prev_text = false
       continue
     }
     // ^\s*[-*+](\s|行末) はリスト項目。`---`（区切り線）や `**強調**` は
@@ -248,7 +300,19 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
         }
         content_col = ls - l.start
         out.push(head_at(text, l, ld, ls, in_comment))
+        run_open = false
+        prev_text = false
+        continue
       }
+    }
+    // ここへ来るのは構造にならない行。本文の行はかたまりを切り、
+    // 空行は切らない（区切りの連続は空行を挟んでも 1 つの境界）
+    let (ta, tb) = trimmed_span(text, l)
+    if ta < tb {
+      run_open = false
+      prev_text = true
+    } else {
+      prev_text = false
     }
   }
   if in_comment {
@@ -275,7 +339,7 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
       info: f_info,
     })
   }
-  Scan::{ heads: out, hides: regions, fences, list_from }
+  Scan::{ heads: out, hides: regions, fences, list_from, seps }
 }
 
 ///|
@@ -430,4 +494,43 @@ fn fence_close_len(text : String, l : Line, fence_char : Int, base : Int) -> Int
     q = q + 1
   }
   len
+}
+
+///|
+/// thematic break の行なら、その印の文字コード（`-` = 45 / `*` = 42 / `_` = 95）。
+/// 違えば 0。
+///
+/// **同じ印が 3 つ以上続く形だけ**を見る。`- - -` のように間を空けた形は
+/// CommonMark では同じ thematic break だが、mmm の読みでは前からリスト項目
+/// （`-` + 空白）なので、そちらの読みを変えないためにここでは拾わない。
+/// 道具が書くのは常に `---` の形なので、書き手側で困ることは無い。
+///
+/// 行頭の空白は **`base` 列からさらに 3 つまで**。`base` は囲っているリスト
+/// 項目の中身の列で、フェンス（`fence_open`）と同じ数え方 — リストの形の
+/// 文書では、区切りもその列に書かれるため。
+fn thematic_break_at(text : String, l : Line, base : Int) -> Int {
+  let mut p = l.start
+  let mut indent = 0
+  while p < l.end && is_space(code_at(text, p)) && indent < base + 3 {
+    indent = indent + (if code_at(text, p) == 9 { 2 } else { 1 })
+    p = p + 1
+  }
+  // base+3 を越えて空白が続く = 外のパーサではコードブロック
+  if p >= l.end || is_space(code_at(text, p)) {
+    return 0
+  }
+  let c = code_at(text, p)
+  if c != 45 && c != 42 && c != 95 {
+    return 0
+  }
+  let (a, b) = trim_range(text, p, l.end)
+  if b - a < 3 {
+    return 0
+  }
+  for q = a; q < b; q = q + 1 {
+    if code_at(text, q) != c {
+      return 0
+    }
+  }
+  c
 }
