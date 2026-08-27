@@ -152,6 +152,43 @@ test("反対側の重さが偏っていても、1 本だけの側の線は真っ
   assert.equal(ends.from.y, ends.to.y, "lone の線が曲がっている");
 });
 
+// 枝分かれのある重い部分木。1 子の連なりでは heightOf が増えないので、
+// 「重さが偏る」を作るには枝分かれが要る
+const HEAVY =
+  "## h\n\n### x1\n\n#### y1\n\n#### y2\n\n### x2\n\n#### y3\n\n#### y4\n\n";
+
+test("どの側も、第 1 子と最終子の中心の中点が根の中心に乗る", () => {
+  // 根は自分の中心をこの尺度で決める。だから**両側ともこの尺度で揃っていな
+  // ければ扇の中心が根からずれる** = 線が曲がる。側の縦位置を「合計の高さの
+  // 幾何学的な中央寄せ」で決めていたころは中心の尺度が 2 つあり、根が尺度を
+  // コピーする採用側しか噛み合っていなかった（本数に関わらず起きる）。
+  for (const md of [
+    `# r\n\n${HEAVY}## l\n\n---\n---\n\n## lone\n`,
+    `# r\n\n${HEAVY}## l\n\n---\n---\n\n## c1\n\n## c2\n`,
+    `# r\n\n## l\n\n${HEAVY}---\n---\n\n## c1\n\n## c2\n`,
+    `# r\n\n## a\n\n---\n---\n\n${HEAVY}## l\n`,
+  ]) {
+    const doc = loadDoc(md);
+    const L = layoutMap(doc);
+    const root = doc.nodes.find((n) => n.depth === 1 && n.parent === -1);
+    assert.ok(root, "根が無い");
+    const rb = L.boxes.get(root.id);
+    assert.ok(rb, "根の箱が無い");
+    const rc = rb.y + rb.h / 2;
+    for (const left of [false, true]) {
+      const cy: number[] = [];
+      for (const n of doc.nodes) {
+        if (n.parent !== root.id || n.left !== left) continue;
+        const b = L.boxes.get(n.id);
+        if (b) cy.push(b.y + b.h / 2);
+      }
+      if (cy.length === 0) continue;
+      const mid = (cy[0] + cy[cy.length - 1]) / 2;
+      assert.equal(mid, rc, `${left ? "左" : "右"}(${cy.length}本)の中点がずれた`);
+    }
+  }
+});
+
 test("同じ側に 2 本あれば、これまでどおり付け根を散らす", () => {
   const doc = loadDoc("# r\n\n## a\n\n## b\n");
   const L = layoutMap(doc);
