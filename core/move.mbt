@@ -477,6 +477,11 @@ fn cmd_move_side_end(ids : Array[Int], root : Int, left : Bool) -> Unit {
     for k in normalize_selection(ids) {
       order.push(st.nodes[k].id)
     }
+    // 行き先（その側の最後の枝、無ければルート）が動かす範囲の中にあれば
+    // 何もしない（cmd_move / cmd_move_as_parent と同じ判定）
+    if !move_lands_outside(order, if last >= 0 { last } else { root }) {
+      return
+    }
     let rehide = unhide_for_move(order)
     if last >= 0 {
       // その側の最後のグループの末尾へ（区切りは書かない）
@@ -536,11 +541,21 @@ fn cmd_move_new_group(
     return
   }
   let root_id = st.nodes[root_index_of(ti)].id
+  // target はルート直下でなければならない。深い場所を渡されると、区切りが
+  // 枝の中に書かれてしまう（valid_bounds には落ちて側は動かないが、
+  // 掃除の効かない無効な `---` が文書に溜まっていく）
+  if st.nodes[ti].parent != root_id {
+    return
+  }
   with_sweep(fn() {
     // 1) まず動かす。境界を書くのは、位置が決まってから
     let order : Array[Int] = []
     for k in normalize_selection(ids) {
       order.push(st.nodes[k].id)
+    }
+    // 行き先が動かす範囲の中にあれば何もしない（cmd_move と同じ判定）
+    if !move_lands_outside(order, target) {
+      return
     }
     let rehide = unhide_for_move(order)
     // 動かした枝がそのグループで唯一のメンバーだったときは、両脇の境界が

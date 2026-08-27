@@ -636,3 +636,30 @@ test "先頭のグループを右へ戻すと、効果の無い境界は残ら�
   assert_eq(side_of("a"), false)
   assert_eq(side_of("b"), true)
 }
+
+///|
+test "move_new_group は、target が動かす範囲の中にあると丸ごと何もしない" {
+  // target = a（選んだ 2 つのうちの 1 つ自身）。move_steps の 1 ノードずつの
+  // ガードは a だけを飛ばして続行してしまうので、単独選択では隠れる —
+  // 後続の c が「動いていない a の手前」へ動いてしまう事故は、複数選択で
+  // 初めて表に出る。move_lands_outside はコマンドの入口で丸ごと弾くので、
+  // a も c も一切動かない
+  let src = "# r\n\n## a\n\n## b\n\n## c\n"
+  ignore(init_doc(src))
+  let a = st.nodes[1].id
+  let c = st.nodes[3].id
+  ignore(move_new_group([a, c], a, true, false))
+  assert_eq(get_text(), src)
+}
+
+///|
+test "move_new_group の target はルート直下でなければならない" {
+  // a1 はルート直下ではない（a の子）。深い target を渡しても何もしない —
+  // 何もしないので、区切りが枝の中に書かれて溜まることも無い
+  let src = "# r\n\n## a\n\n### a1\n\n## b\n"
+  ignore(init_doc(src))
+  let a1 = st.nodes[2].id
+  let b = st.nodes[3].id
+  ignore(move_new_group([b], a1, true, false))
+  assert_eq(get_text(), src)
+}
