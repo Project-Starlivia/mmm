@@ -12,6 +12,7 @@ import {
   midOfPolyline,
   rightOf,
   round2,
+  unionRect,
 } from "../src/map/geometry.ts";
 import { edgePath, edgeSegs, flattenSegs } from "../src/map/edge.ts";
 
@@ -69,4 +70,21 @@ test("d 属性は始点から始まり、終点で終わる", () => {
 test("座標は小数 2 桁に丸める（d 属性を短く保つため）", () => {
   assert.equal(round2(1.23456), 1.23);
   assert.equal(round2(-1.005), -1);
+});
+
+test("複数の箱を包む最小の箱", () => {
+  const r = unionRect([
+    { x: 0, y: 10, w: 20, h: 5 },
+    { x: 100, y: 0, w: 10, h: 40 },
+  ]);
+  assert.deepEqual(r, { x: 0, y: 0, w: 110, h: 40 });
+});
+
+test("箱が1つなら、その箱そのもの", () => {
+  const box = { x: 5, y: 5, w: 20, h: 20 };
+  assert.deepEqual(unionRect([box]), box);
+});
+
+test("箱が無ければ null", () => {
+  assert.equal(unionRect([]), null);
 });

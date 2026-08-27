@@ -1,5 +1,6 @@
 // 木 → 箱の配置。**左右の振り分けはここでしか見えない**（core が出すのは
 // 「どっち側か」だけで、実際にどこへ置くかはこの層が決める）。
+// あわせて rootId（視点を寄せる/指す先の既定）。
 //
 // 寸法の実測だけは canvas が要るので身代わりを立てる（stubCanvas）。
 //
@@ -7,8 +8,15 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadDoc, nodeOf, stubCanvas } from "./_helpers.ts";
-import { GAP, edgeEnds, layoutMap } from "../src/map/layout.ts";
+import { type NodeInfo, idOf, loadDoc, nodeOf, stubCanvas } from "./_helpers.ts";
+import {
+  type Box,
+  type Layout,
+  GAP,
+  edgeEnds,
+  layoutMap,
+  rootId,
+} from "../src/map/layout.ts";
 import { leftOf, rightOf } from "../src/map/geometry.ts";
 
 stubCanvas();
@@ -125,4 +133,34 @@ test("左だけの文書でも、ルートは枝の中心に立つ", () => {
     root.y + root.h / 2,
     (a.y + a.h / 2 + (b.y + b.h / 2)) / 2,
   );
+});
+
+// ---- rootId ----
+
+/** rootId が読むのは boxes の n だけ。寸法は要らない。 */
+function layoutOf(nodes: NodeInfo[]): Layout {
+  const boxes = new Map<number, Box>();
+  for (const n of nodes) boxes.set(n.id, { n, x: 0, y: 0, w: 0, h: 0, rows: [] });
+  return {
+    visible: nodes,
+    boxes,
+    parentOf: new Map(),
+    buriedCount: new Map(),
+    fanOf: new Map(),
+    seams: [],
+  };
+}
+
+test("ルートは深さ1で親を持たないノード", () => {
+  const { nodes } = loadDoc("# 根\n\n## 枝\n");
+  assert.equal(rootId(layoutOf(nodes)), idOf(nodes, "根"));
+});
+
+test("複数の # があっても、最初の深さ1が主ルート", () => {
+  const { nodes } = loadDoc("# 根\n\n# 別の根\n");
+  assert.equal(rootId(layoutOf(nodes)), idOf(nodes, "根"));
+});
+
+test("箱が無ければ null（空文書）", () => {
+  assert.equal(rootId(layoutOf([])), null);
 });

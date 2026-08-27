@@ -33,6 +33,13 @@ export interface CardRef {
   index: number;
 }
 
+/**
+ * 先頭の `./` を落とした形。`./x` と `x` は同じ場所を指すので、比べる前に
+ * 必ずこの形へ寄せる。**カードが持つのも、画像の鍵になるのもこの形**
+ * （md へ書き戻すときだけ `app/assets.ts` の `mdPath` が `./` を付け直す）。
+ */
+export const bare = (path: string): string => path.replace(/^\.\//, "");
+
 const LINK_ROW = 26; // height of one link-card row under the label
 const IMG_H = 64; // thumbnail height inside an image row
 const IMG_ROW = IMG_H + 12; // height of one image row under the label
@@ -110,25 +117,57 @@ export function linkLine(
   return { line: `[${title}](${link.url})`, from: 1, to: 1 + title.length };
 }
 
+/** 1 行から読み取った、ローカル画像の指し方。 */
+export interface ImageRef {
+  /** 先頭の `./` を落とした形。カードの鍵になる */
+  path: string;
+  /** 拡張子込みのファイル名 */
+  name: string;
+  /** md に書かれているままの綴り */
+  raw: string;
+  /** 行頭から見た `raw` の範囲。`line.slice(from, to)` が `raw` になる */
+  from: number;
+  to: number;
+  /** 既に `<…>` で囲まれているか。書き換え側が二重に囲まないために要る */
+  bracketed: boolean;
+}
+
+/**
+ * `![]()` に書く destination の綴り。空白を含むなら CommonMark の `<…>` で
+ * 囲む — 裸のままだと下の `IMG_LINE` が読めず、カードが消えて以後の
+ * `retarget`（app/head.ts）からも見えなくなる。
+ */
+export const imageDest = (path: string): string =>
+  /\s/.test(path) ? `<${path}>` : path;
+
+// `d` フラグは捕獲の位置を返させるため。宣言フォルダの引っ越しで
+// **destination だけ**を差し替えるのに要る（app/head.ts の retarget）
+const IMG_LINE = /^!\[[^\]]*\]\((?:<([^>]+)>|([^)\s]+))\)$/d;
+
 /** Content line of the form `![alt](path)` with a LOCAL (relative) path.
  * External images (http/data URLs) are ignored — no external traffic.
  * `<path with space>` is CommonMark's escape for a destination containing
  * whitespace, so only the unescaped form forbids spaces. */
-export function parseImage(line: string): { path: string; name: string } | null {
-  const m = /^!\[[^\]]*\]\((?:<([^>]+)>|([^)\s]+))\)$/.exec(line.trim());
+export function parseImage(line: string): ImageRef | null {
+  const lead = line.length - line.trimStart().length;
+  const m = IMG_LINE.exec(line.trim());
   if (!m) return null;
-  let path = m[1] ?? m[2];
+  const bracketed = m[1] !== undefined;
+  const raw = m[1] ?? m[2];
   // A real URI scheme (http:, data:, ...) is always 2+ letters before the
   // colon; a single letter is a Windows drive (`C:\...`), which is a local
   // path, not an external one.
-  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(path);
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(raw);
   if (scheme && scheme[1].length > 1) return null;
-  if (path.startsWith("./")) path = path.slice(2);
+  // 位置は捕獲した組の側にある。`<…>` で囲まれていれば 1、裸なら 2
+  const span = m.indices?.[1] ?? m.indices?.[2];
+  if (!span) return null;
+  const path = bare(raw);
   if (path === "") return null;
   // Windows のパスは `\` 区切りでも来る（ドライブレターや `..\..\x.png`）
   // split は必ず 1 つ以上返すが、型は言い切らないので素直に受ける
   const name = path.split(/[\\/]/).pop() ?? path;
-  return { path, name };
+  return { path, name, raw, from: lead + span[0], to: lead + span[1], bracketed };
 }
 
 /**

@@ -6,7 +6,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { core, idOf, initDoc, loadDoc, nodeOf } from "./_helpers.ts";
-import { cardRows, cardRowsOf, contentEndOf, linkLine } from "../src/map/cards.ts";
+import {
+  cardRows,
+  cardRowsOf,
+  contentEndOf,
+  linkLine,
+  parseImage,
+} from "../src/map/cards.ts";
 import { moveLine } from "../src/edits.ts";
 
 /** 1 ノードぶんのカードを取り出す小道具 */
@@ -136,7 +142,15 @@ test("moveCardTo 相当: カードなしルートへ落とすと区切りの手�
   const after = core.replaceText(e.from, e.to, e.insert, "");
   const newRoot = nodeOf(after.nodes, "r");
   assert.equal(newRoot.hasContent, true, "カードは root の本文として着地したはず");
-  const rows = cardRows({ text: core.getText(), nodes: after.nodes, fences: after.fences }, new Set());
+  const rows = cardRows(
+    {
+      text: core.getText(),
+      nodes: after.nodes,
+      fences: after.fences,
+      head: after.head,
+    },
+    new Set(),
+  );
   assert.equal(rows.get(newRoot.id)?.[0]?.kind, "img", "地図上は root のカードとして見えるはず");
   assert.equal(rows.get(idOf(after.nodes, "a"))?.length, 0, "## a 側にはもう残っていない");
 });
@@ -177,4 +191,13 @@ test("linkLine: 題が空でもホスト名を書き込まない（見せ方と�
   assert.ok(got);
   assert.equal(got.line, "[](https://example.com)");
   assert.ok(!got.line.includes("example.com]"), "題にホスト名が入っている");
+});
+
+test("parseImage: 位置が増えても path/name の意味は変わらない", () => {
+  const img = parseImage("![](sub/a.PNG)");
+  assert.ok(img);
+  assert.equal(img.path, "sub/a.PNG");
+  assert.equal(img.name, "a.PNG");
+  assert.equal(parseImage("![](https://example.com/a.png)"), null);
+  assert.equal(parseImage("just text"), null);
 });

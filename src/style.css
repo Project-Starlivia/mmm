@@ -221,6 +221,9 @@ html, body {
 #panes.no-map #md-pane { flex: 1; }
 /* マップで選んでいるノードの、md 側での対応範囲 */
 .cm-mmm-selected { background: var(--accent-soft); }
+/* フォーカスの輪。#md-pane 自身は CodeMirror の背景に隠れて見えないので
+   .cm-editor に当てる(map 側の同じ印は #map-pane.pane-focused が持つ) */
+#md-pane.pane-focused .cm-editor { box-shadow: inset 0 0 0 2px var(--accent-soft); }
 
 /* ペインの隅に浮く小さな道具。**そのペインにだけ効くもの**はここに住む
    （帯に出るのは文書ぜんぶに効くものだけ）。低頻度なので沈ませて、
@@ -324,7 +327,26 @@ html, body {
   &.pane-focused { box-shadow: inset 0 0 0 2px var(--accent-soft); }
 }
 
+/* 視点を選択(無ければルート)へ寄せる。md 側の書き方(#form-picker)と
+   同じ形式(上端 6px・右寄せ)を、境目を挟んで反対側にも置く */
+#map-center { top: 6px; right: 8px; }
+
 #map-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* 画面外にある対象(選択、無ければルート)を指す控えめな針。コンパスの針の
+   ように細長いひし形 1 つ。**出っぱなし**になるので中央には浮かせず、
+   縁に貼って真ん中を塞がない(map/indicator.ts が位置と向きを計算する) */
+#map-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 9px;
+  background: var(--accent);
+  clip-path: polygon(0 50%, 38% 15%, 100% 50%, 38% 85%);
+  opacity: 0.5;
+  pointer-events: none;
+}
 
 #map-hint {
   position: absolute;
@@ -674,6 +696,42 @@ html, body {
   & hr { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
 }
 
+/* ========== ラジアルメニュー（Mod+Shift+E、書き出しの形式選び） ========== */
+
+.radial-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+  /* 器自体は素通し。掴めるのは中の扇形と中心だけ */
+  pointer-events: none;
+  user-select: none;
+
+  & .entry {
+    cursor: pointer;
+
+    & .sector {
+      fill: var(--panel);
+      stroke: var(--line);
+      stroke-width: 1.5;
+      pointer-events: auto;
+    }
+    & .icon { color: var(--ink-dim); }
+    & text { fill: var(--ink-dim); font-family: var(--font); font-size: 12px; }
+
+    &:hover .sector { fill: var(--accent-soft); }
+    &:hover .icon { color: var(--ink); }
+    &:hover text { fill: var(--ink); }
+  }
+
+  & .hub {
+    fill: var(--bg);
+    stroke: var(--line);
+    cursor: pointer;
+    pointer-events: auto;
+  }
+}
+
 /* ========== お絵描き（app/draw.ts） ========== */
 
 /* 紙の色はキャンバス自身が最初に塗る。CSS にも置くと、出来上がる画像の色と
@@ -689,6 +747,9 @@ html, body {
   z-index: 40;
 }
 
+/* 窓の中身は**すべてこの下**に置く。ボタンの下地（`& button`）を、
+   インクや太さの見た目が上書きする関係になるので、同じ入れ子の中に
+   居ないと勝ち負けが場所で決まってしまう */
 .popup {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -712,34 +773,106 @@ html, body {
     &:hover { background: var(--accent-soft); border-color: var(--accent); }
     &.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   }
-}
 
-.popup-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
-.popup-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  & .popup-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+
+  /* 道具立て。**塊は 3 つ** — インク / 太さ / やり直す。前の 2 つは
+     「描くために選ぶもの」なので寄せて置き、やり直すものだけを右へ離す */
+  & .draw-tools {
+    display: flex;
+    /* **高さは字のあるボタンが決める**（背を伸ばす、で揃える）。太さの点は
+       大きさが 3 通りあるので、点に高さを決めさせると背丈が揃わない */
+    align-items: stretch;
+    gap: 14px;
+    margin-bottom: 10px;
+  }
+  & .draw-inks,
+  & .draw-nibs {
+    display: inline-flex;
+    gap: 6px;
+  }
+  & .draw-inks { align-items: center; }
+  /* Undo と Clear だけは 1 つの塊。継ぎ目は帯の書き出しと同じ `.group` */
+  & .draw-actions { margin-left: auto; }
+
+  /* インクの丸。色は draw.ts が `--ink-swatch` で渡す（綴りは 1 か所） */
+  & .draw-ink {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--ink-swatch);
+    /* 暗い色でも器から浮くように、縁は薄く 1 本 */
+    border: 1px solid var(--line);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    /* 触っても**塗りは変えない** — 色そのものが中身なので、下地に
+       すり替えると何色か分からなくなる */
+    &:hover { background: var(--ink-swatch); border-color: var(--ink-dim); }
+    /* 選ばれている印も同じ理由で塗りを覆わず、外側に輪を回す。
+       **器の色で隙間を空けてから**輪を引く — ブランドカラーの筆は輪と
+       同じ色になりうるので、地続きだと選ばれているのか分からない */
+    &.on {
+      box-shadow:
+        0 0 0 2px var(--panel),
+        0 0 0 4px var(--accent);
+    }
+  }
+
+  /* 消しゴムだけは色を持てないので、丸の中に絵を入れる（紙の色で塗ると
+     明るいテーマで器と同じ色になって消える）。
+     **触ったとき・選ばれたときの変化は色の丸とまったく同じ**（縁と輪）で、
+     絵が濃くなるだけ — 同じ並びに居るものが、別の変わり方をしない */
+  & .draw-eraser {
+    background: var(--panel);
+    color: var(--ink-dim);
+
+    &:hover { background: var(--panel); color: var(--ink); }
+    &.on { color: var(--ink); }
+    & .icon { width: 13px; height: 13px; }
+  }
+
+  /* 太さ。字ではなく**その太さの点そのもの**を出す */
+  & .draw-nib {
+    width: 30px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    &::before {
+      content: "";
+      width: var(--nib);
+      height: var(--nib);
+      border-radius: 50%;
+      background: currentColor;
+    }
+    &.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  }
+
+  & .draw-paper {
+    display: block;
+    /* 窓が狭ければ縮む。出来上がる絵の大きさは変わらない（draw.ts が持つ） */
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: crosshair;
+    /* 指やペンでも描けるように、ブラウザのスクロール/ズームへ渡さない */
+    touch-action: none;
+  }
+
+  & .popup-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+  }
+  & .popup-hint { flex: 1; font-size: 11px; color: var(--ink-dim); }
 }
-.popup-canvas {
-  display: block;
-  /* 窓が狭ければ縮む。出来上がる絵の大きさは変わらない（draw.ts が持つ） */
-  max-width: 100%;
-  height: auto;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  cursor: crosshair;
-  /* 指やペンでも描けるように、ブラウザのスクロール/ズームへ渡さない */
-  touch-action: none;
-}
-.popup-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-.popup-hint { flex: 1; font-size: 11px; color: var(--ink-dim); }
 
 /* ========== 狭いとき ==========
    片方だけを出す。**どちらを出すかは JS で持たない** — マップが on なら

@@ -95,6 +95,22 @@ priv struct SepRun {
 }
 
 ///|
+/// 文書の頭 — 先頭の `---` から次の `---` まで（YAML frontmatter）。
+///
+/// **中は一切走査しない。** 他所の md が持つ `tags:` 配下の `- 設計` は、
+/// 走査すればリスト項目としてノードになる（`^\s*[-*+]\s` は構造なので）。
+/// 頭は文書の設定であって木ではないので、区間ごと外す。
+///
+/// 開きも閉じも**ちょうど 3 本**の `---` の行。閉じないまま文書が終われば
+/// 頭ではない（先頭の `---` はただの区切り線に戻る）。
+priv struct Head {
+  start : Int // 開き `---` 行の行頭
+  end : Int // 閉じ `---` 行の行末（改行の手前）
+  body_start : Int // 中身の最初の行頭
+  body_end : Int // 中身の最後の行末。中身が無ければ body_start より手前
+}
+
+///|
 /// 開きフェンスの読み取り結果。閉じを見つけるのに要る文字と本数、
 /// そして情報文字列。
 priv struct FenceOpen {
@@ -116,6 +132,7 @@ priv struct Scan {
   heads : Array[Heading]
   hides : Array[HideRegion]
   fences : Array[Fence]
+  head : Head? // 文書の頭。無ければ None
   // リスト項目が現れた最も浅い深さ（無ければ 0）。**開いたときのモード判定**の
   // ため — 使うのは init_doc だけだが、走査は 1 度で済ませる
   list_from : Int
@@ -155,7 +172,12 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
   let mut in_comment = false
   let mut c_open = 0
   let mut c_open_next = 0
-  for idx = 0; idx < lines.length(); idx = idx + 1 {
+  // 頭は行走査より先に決める。中は見ないので、走査はその次の行から始める
+  let (head, first) = match scan_head(text, lines) {
+    Some((h, next)) => (Some(h), next)
+    None => (None, 0)
+  }
+  for idx = first; idx < lines.length(); idx = idx + 1 {
     let l = lines[idx]
     if in_fence {
       // 中身の終わりは「1 つ前の行の行末」。閉じ方が何であれ同じなので
@@ -339,7 +361,7 @@ fn scan_doc(text : String, lines : Array[Line]) -> Scan {
       info: f_info,
     })
   }
-  Scan::{ heads: out, hides: regions, fences, list_from, seps }
+  Scan::{ heads: out, hides: regions, fences, head, list_from, seps }
 }
 
 ///|
@@ -425,6 +447,42 @@ fn is_comment_close(text : String, l : Line) -> Bool {
     dashes = dashes + 1
   }
   dashes >= 2 && p + 1 == b && code_at(text, p) == 62
+}
+
+///|
+/// ちょうど 3 本の `-` だけの行か。前後の空白は落として見る。
+/// `----` は開きも閉じもしない（Jekyll と同じ）。
+fn is_head_marker(text : String, l : Line) -> Bool {
+  let (a, b) = trimmed_span(text, l)
+  b - a == 3 &&
+  code_at(text, a) == 45 &&
+  code_at(text, a + 1) == 45 &&
+  code_at(text, a + 2) == 45
+}
+
+///|
+/// 先頭の頭を読む。区間と「次に走査を始める行の添字」を返す。
+/// 先頭が `---` でない / 閉じが無い なら None。
+fn scan_head(text : String, lines : Array[Line]) -> (Head, Int)? {
+  if lines.length() == 0 || !is_head_marker(text, lines[0]) {
+    return None
+  }
+  for i = 1; i < lines.length(); i = i + 1 {
+    if is_head_marker(text, lines[i]) {
+      return Some(
+        (
+          Head::{
+            start: lines[0].start,
+            end: lines[i].end,
+            body_start: lines[0].next,
+            body_end: lines[i - 1].end,
+          },
+          i + 1,
+        ),
+      )
+    }
+  }
+  None
 }
 
 ///|

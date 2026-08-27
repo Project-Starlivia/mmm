@@ -142,7 +142,24 @@ fn take_snapshot() -> String {
     put_str(sb, "info", f.info)
     sb.write_string("}")
   }
-  sb.write_string("]}")
+  sb.write_string("],")
+  // 頭は 1 つしか無いので配列にしない。**位置だけ**で、中身の解釈はしない
+  // （`image-folder` という綴りをコアは知らない）
+  match st.head {
+    Some(h) => {
+      sb.write_string("\"head\":{")
+      put_int(sb, "from", h.start)
+      sb.write_string(",")
+      put_int(sb, "to", h.end)
+      sb.write_string(",")
+      put_int(sb, "bodyFrom", h.body_start)
+      sb.write_string(",")
+      put_int(sb, "bodyTo", h.body_end)
+      sb.write_string("}")
+    }
+    None => sb.write_string("\"head\":null")
+  }
+  sb.write_string("}")
   st.last_sets = []
   st.focus = -1
   sb.to_string()

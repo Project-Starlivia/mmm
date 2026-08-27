@@ -4,3 +4,4 @@ core/_build/
 .wrangler/
 .idea/
 .worktrees/
+.superpowers/

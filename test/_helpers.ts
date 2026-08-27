@@ -29,7 +29,12 @@ export const getText = () => core.getText();
 /** initDoc して、いまの文書をテキスト・ノード・フェンスの組で返す。 */
 export function loadDoc(md: string): DocView {
   const snap = core.initDoc(md);
-  return { text: core.getText(), nodes: snap.nodes, fences: snap.fences };
+  return {
+    text: core.getText(),
+    nodes: snap.nodes,
+    fences: snap.fences,
+    head: snap.head,
+  };
 }
 
 /** ラベルからノードを引く。無ければ分かりやすく失敗させる。
