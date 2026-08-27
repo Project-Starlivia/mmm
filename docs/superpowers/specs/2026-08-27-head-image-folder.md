@@ -188,6 +188,12 @@ retarget(doc: DocView, from: string, to: string): TextEdit[]
 読めない値（`/` 始まり・`http://`）では**何もしない** — 書き換えも、フォルダの
 結び付けも。`normalizePath` が既に null を返す。
 
+**空（trim 後が空文字）も null。** 値を選んで消した直後の頭がこれにあたる。
+400ms の debounce が守るのは打鍵の連続だけで、「選んで消す → 少し考える →
+打ち直す」というリズムは素通りする。ここを `./` に倒すと、その一瞬だけ
+宣言が md と同じ場所を指したことになり、フォルダの外の画像まで retarget の
+対象に巻き込む窓が開いてしまう。
+
 ## 発火 — 入力が止まったら 1 回
 
 `applySnap` の後、頭の区間のテキストが前回と違えばタイマーを張り直す（400ms）。
@@ -195,7 +201,9 @@ retarget(doc: DocView, from: string, to: string): TextEdit[]
 
 1. いまの宣言値 `next` を読む
 2. `applied`（本文がいま映している値）と違えば `retarget(applied, next)` を適用
-3. `applied = next`、フォルダを結び直して画像を読み直す
+3. `applied = next`。**フォルダは結び直さない** — 同じハンドルのまま
+   `assets.clear()` で読み直すだけ（フォルダ名が変わったわけではなく、
+   md から見た相対の綴りが変わっただけなので）
 
 `applied` の初期値は**文書を開いた瞬間の宣言値**。だから開いた直後に本文が
 勝手に動くことは無い。書き換えが 0 件でも `applied` は進める。

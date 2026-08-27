@@ -33,6 +33,7 @@ import {
   type CardRef,
   cardRowsOf,
   contentEndOf,
+  imageDest,
   linkLine,
 } from "./map/cards.ts";
 import { insertBlock, moveLine, removeLine } from "./edits.ts";
@@ -106,9 +107,13 @@ function declaredFolder(): string | null {
 
 // 頭の宣言が変わったら、本文の画像パスをそれに追従させる。
 //
-// **打鍵のたびには走らせない。** 消して打ち直す途中の中途半端な値をすべて
-// 経由すると、宣言が一瞬 `./` に落ちた隙にフォルダの外の画像まで巻き込む。
-// 入力が止まってから 1 回だけ当てる（Undo も 1 回で全部戻る）。
+// **打鍵のたびには走らせない。** 入力が止まってから 1 回だけ当てる
+// （Undo も 1 回で全部戻る）。ただし debounce だけでは「値を選んで消す →
+// 少し考える → 打ち直す」というリズムは守れない（打鍵の連続ではないので
+// 400ms の間隔に収まらない）。この隙を塞ぐのは `normalizePath`（app/head.ts）
+// 側の役目 — 空値は `./` ではなく null（宣言なし）として返し、
+// `followDeclaration` を早期 return させることで、フォルダの外の画像が
+// 巻き込まれる窓そのものを無くす。
 
 const FOLLOW_MS = 400;
 
@@ -144,6 +149,9 @@ function followDeclaration(): void {
       applySnap(core.replaceText(e.from, e.to, e.insert, tag), "core");
     }
   }
+  // 行って戻っただけ（例: 値を変えてまた元に戻す）なら retarget は 0 件。
+  // ここで止めないと、変わっていない画像を無駄にもう一度読み直すことになる
+  if (prev === next) return;
   assets.clear(); // 宣言が変わった。画像を読み直す
 }
 
@@ -808,7 +816,25 @@ async function attachImage(id: number, blob: Blob, tag = ""): Promise<void> {
   if (!byId.has(id)) return;
   const rel = await assets.saveToDisk(blob);
   // 置いているあいだに消えていることがある
-  if (rel !== null && byId.has(id)) insertContentLine(id, `![](${rel})`, tag);
+  if (rel !== null && byId.has(id)) insertContentLine(id, `![](${imageDest(rel)})`, tag);
+}
+
+/**
+ * Files メニューの画像フォルダの見出し。「宣言」（頭）と「許可」（フォルダ
+ * ハンドル）は別々に食い違いうるので、4 通りをそれぞれ言い分ける。
+ *
+ * **とくに「許可はあるが宣言が無い」を黙らせない。** `AssetBinding.path` が
+ * 落ちた設計上、頭を持たない既存文書は宣言が無いまま `declaredPath()` が
+ * `./` に倒れる（app/assets.ts）。以前 `img/` 相当で結んでいた人はここが
+ * 外れて画像が黙って空になるが、フォルダ名は出てしまうので「結び付いて
+ * いるのに映らない」といういちばん気付きにくい状態になる。ここで
+ * "not declared" と名乗らせて、頭に宣言が無いことを見えるようにする。
+ */
+function folderCaption(): string {
+  const name = assets.folderName();
+  const declared = declaredFolder() !== null;
+  if (name === null) return declared ? "folder not linked" : "none";
+  return declared ? name : `${name}, not declared`;
 }
 
 // 文書に何かする道は Files にまとめる。**画像フォルダもここ** —
@@ -824,11 +850,7 @@ openOnClick(btnFile, () => [
   { label: "Rename", run: () => void renameFile(), disabled: savedName === null },
   { label: "Save", key: "Mod+S", run: () => void saveFile() },
   { label: "Save as", key: "Mod+Shift+S", run: () => void saveFile(true) },
-  {
-    caption:
-      assets.folderName() ??
-      (declaredFolder() === null ? "none" : "folder not linked"),
-  },
+  { caption: folderCaption() },
   { label: "Images Folder", run: () => void assets.chooseFolder() },
 ]);
 

@@ -86,3 +86,26 @@ test "貼り付け断片の頭も構造に数えない" {
   assert_eq(has_headings("---\ntags:\n  - a\n---\n\ntext\n"), false)
   assert_eq(has_headings("---\ntags:\n  - a\n---\n\n# r\n"), true)
 }
+
+///|
+/// 割り切りの固定: 閉じないまま本文まで走った頭は、本文の最初の `---` を
+/// 道連れに閉じる（Jekyll / Obsidian と同じ）。ここでは 2 本目の `---` が
+/// 「区切り線」のつもりでも頭として吸われ、その手前の `# r` ごと消える。
+/// オフセットは手で数えて確かめた値（core/parser.mbt の scan_head 参照）。
+test "先頭が --- で後ろにもう 1 本あれば、間の見出しごと頭に吸われる" {
+  ignore(init_doc("---\n\n# r\n\n## a\n\n---\n\n## b\n"))
+  assert_eq(head_sig(), "0:4:15:19")
+  assert_eq(st.nodes.length(), 1)
+  assert_eq(st.nodes[0].label, "b")
+}
+
+///|
+/// Pandoc 形式の `...` は閉じ記号として見ない（is_head_marker はダッシュ
+/// 3 本だけを見る）ので、閉じないまま本文の最初の `---` まで走り、`# r` を
+/// 巻き込む。
+test "Pandoc の `...` は頭を閉じず、本文の最初の --- まで走る" {
+  ignore(init_doc("---\ntitle: x\n...\n\n# r\n\n---\n\n## a\n"))
+  assert_eq(head_sig(), "0:4:22:26")
+  assert_eq(st.nodes.length(), 1)
+  assert_eq(st.nodes[0].label, "a")
+}

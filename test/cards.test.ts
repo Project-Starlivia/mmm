@@ -150,6 +150,6 @@ test("parseImage: 位置が増えても path/name の意味は変わらない", 
   assert.ok(img);
   assert.equal(img.path, "sub/a.PNG");
   assert.equal(img.name, "a.PNG");
-  assert.equal(parseImage("https://example.com/a.png"), null);
+  assert.equal(parseImage("![](https://example.com/a.png)"), null);
   assert.equal(parseImage("just text"), null);
 });

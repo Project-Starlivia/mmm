@@ -13,7 +13,7 @@
 
 import type { DocView, HeadSpan } from "../coreApi.ts";
 import type { TextEdit } from "../edits.ts";
-import { bare, parseImage } from "../map/cards.ts";
+import { bare, imageDest, parseImage } from "../map/cards.ts";
 
 /** 頭に置く「画像フォルダの場所」の設定名。**綴りはここ 1 つ** */
 export const IMAGE_FOLDER = "image-folder";
@@ -25,16 +25,23 @@ const KEY_LINE = new RegExp(`^${IMAGE_FOLDER}[ \\t]*:(.*)$`);
 /** 中身の範囲。中身が無い頭では bodyTo が bodyFrom より手前にある */
 const bodyEnd = (head: HeadSpan): number => Math.max(head.bodyFrom, head.bodyTo);
 
-/** YAML の値 1 つ。囲まれていれば剥がし、裸なら ` #` から後ろを落とす。 */
+/**
+ * YAML の値 1 つ。**コメントを落としてから**引用符を剥がす。
+ *
+ * 逆順（引用符を先に剥がす）だと `"./My Images/" # main` のように
+ * 両方が同時に来る形を取りこぼす — 末尾が `"` でなく `n`（`main` の頭
+ * 文字が来る前）になるので引用符ぶんの分岐に入れず、コメント落としの
+ * 分岐に流れて `"..."` を剥がさないまま返してしまっていた。
+ */
 function unquote(raw: string): string {
-  const v = raw.trim();
+  const hash = raw.search(/\s#/);
+  const v = (hash === -1 ? raw : raw.slice(0, hash)).trim();
   const q = v[0];
   if (v.length >= 2 && (q === '"' || q === "'") && v[v.length - 1] === q) {
     const inner = v.slice(1, -1);
     return q === '"' ? inner.replace(/\\(["\\])/g, "$1") : inner;
   }
-  const hash = v.search(/\s#/);
-  return (hash === -1 ? v : v.slice(0, hash)).trim();
+  return v;
 }
 
 /** 値を YAML の 1 行として書く形。囲む必要が無ければ裸で書く。 */
@@ -80,12 +87,22 @@ export function setImageFolder(
 }
 
 /**
- * 宣言の綴りを決める唯一の場所。末尾に `/` を足し、空と `.` は `./` にする。
+ * 宣言の綴りを決める唯一の場所。末尾に `/` を足し、`.` は `./` にする。
  * 絶対パスと URL は md からの相対ではないので null（呼び出し側は何もしない）。
+ *
+ * **空（trim 後が空文字）も null。** 空値は「宣言」ではなく「書きかけの
+ * 行」— 値を選んで消した直後の頭がこれにあたる。ここを `./` に倒すと、
+ * 「消して打ち直す」1 呼吸のあいだ宣言が md と同じ場所を指したことになり、
+ * その隙に `followDeclaration`（main.ts）が宣言フォルダの外の画像まで
+ * retarget の対象に巻き込んでしまう。400ms の debounce が守るのは打鍵の
+ * 連続だけで、このリズムは素通りするので、ここで null にして
+ * `followDeclaration` の早期 return に委ねる。
  */
 export function normalizePath(value: string): string | null {
-  let path = value.trim().replace(/\\/g, "/");
-  if (path === "" || path === ".") path = "./";
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  let path = trimmed.replace(/\\/g, "/");
+  if (path === ".") path = "./";
   if (path.startsWith("/") || /^[a-z]+:\/\//i.test(path)) return null;
   return path.endsWith("/") ? path : `${path}/`;
 }
@@ -134,7 +151,13 @@ export function retarget(doc: DocView, from: string, to: string): TextEdit[] {
     if (!img) continue;
     const rest = under(img.raw, from);
     if (rest === null) continue;
-    out.push({ from: start + img.from, to: start + img.to, insert: `${to}${rest}` });
+    const next = `${to}${rest}`;
+    // img.from/to は `<…>` の**内側**を指す。既に囲まれていれば中身だけ
+    // 差し替えれば済み、囲まれていなければ差し替え先に `<…>` を含める
+    // （空白を含むフォルダへ引っ越すと、裸のままでは IMG_LINE が二度と
+    // 読めなくなる — カードが消え、次の retarget でも拾えなくなる）
+    const insert = img.bracketed ? next : imageDest(next);
+    out.push({ from: start + img.from, to: start + img.to, insert });
   }
   return out;
 }

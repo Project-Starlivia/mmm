@@ -61,6 +61,15 @@ test("imageFolder: 裸の値は ` #` からがコメント", () => {
   assert.equal(folderOf("---\nimage-folder: ./img/ # ここ\n---\n\n# r\n"), "./img/");
 });
 
+test("imageFolder: 引用符付きの値の後ろのコメントも、引用符ごと落とす", () => {
+  // 引用符を先に剥がす実装だと、末尾が `"` でなく `n`（main の頭文字）に
+  // なるため引用符の分岐に入れず、`"..."` が剥がれ残っていた
+  assert.equal(
+    folderOf('---\nimage-folder: "./My Images/" # main\n---\n\n# r\n'),
+    "./My Images/",
+  );
+});
+
 test("imageFolder: 入れ子のキーは読まない（トップレベルだけ）", () => {
   assert.equal(folderOf("---\nmmm:\n  image-folder: ./img/\n---\n\n# r\n"), null);
 });
@@ -114,12 +123,25 @@ test("IMAGE_FOLDER: 設定名は 1 か所でしか綴られない", () => {
   assert.ok(written("# r\n", "./img/").includes(`${IMAGE_FOLDER}: `));
 });
 
-test("normalizePath: 末尾に / を足し、空と . は ./ にする", () => {
+test("normalizePath: 末尾に / を足す。. は ./ にする", () => {
   assert.equal(normalizePath("img"), "img/");
   assert.equal(normalizePath("./img/"), "./img/");
-  assert.equal(normalizePath(""), "./");
   assert.equal(normalizePath("."), "./");
   assert.equal(normalizePath("..\\pics"), "../pics/");
+});
+
+test("normalizePath: 空（書きかけの行）は宣言として読まない", () => {
+  // 値を選んで消した直後の頭がこれにあたる。./ に倒すと、その一瞬だけ
+  // 宣言が md と同じ場所を指したことになり、フォルダの外の画像まで
+  // followDeclaration（main.ts）の retarget に巻き込まれる（Critical 1）
+  assert.equal(normalizePath(""), null);
+  assert.equal(normalizePath("   "), null);
+});
+
+test("normalizePath: imageFolder の結果を通すと、値を消した直後は宣言が消える", () => {
+  const raw = folderOf("---\nimage-folder:\n---\n\n# r\n");
+  assert.equal(raw, ""); // キー自体はまだあるので unquote は "" を返す
+  assert.equal(normalizePath(raw ?? ""), null);
 });
 
 test("normalizePath: 相対でないものは null", () => {
@@ -206,6 +228,25 @@ test("retarget: 頭の中は触らない", () => {
 test("retarget: 裸の綴りも `./` 付きも同じ場所として動かす", () => {
   const md = "# r\n\n![](img/a.webp)\n";
   assert.equal(moved(md, "./img/", "./assets/"), "# r\n\n![](./assets/a.webp)\n");
+});
+
+test("retarget: 空白を含むフォルダへ引っ越すと `<…>` で囲み、parseImage で読み戻せる", () => {
+  // 裸のまま書くと IMG_LINE（cards.ts）が読めず、カードが消えて以後の
+  // retarget からも見えなくなる（Important 2）
+  const md = "# r\n\n![](./img/a.webp)\n";
+  const out = moved(md, "./img/", "./My Images/");
+  assert.equal(out, "# r\n\n![](<./My Images/a.webp>)\n");
+  const img = parseImage("![](<./My Images/a.webp>)");
+  assert.ok(img);
+  assert.equal(img.path, "My Images/a.webp");
+});
+
+test("retarget: 既に `<…>` で囲まれた行は二重に囲まない", () => {
+  const md = "# r\n\n![](<./img/a b.webp>)\n";
+  assert.equal(
+    moved(md, "./img/", "./assets/"),
+    "# r\n\n![](<./assets/a b.webp>)\n",
+  );
 });
 
 test("retarget: 同じ宣言なら編集は 0 件", () => {

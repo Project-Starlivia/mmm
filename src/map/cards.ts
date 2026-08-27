@@ -128,7 +128,17 @@ export interface ImageRef {
   /** 行頭から見た `raw` の範囲。`line.slice(from, to)` が `raw` になる */
   from: number;
   to: number;
+  /** 既に `<…>` で囲まれているか。書き換え側が二重に囲まないために要る */
+  bracketed: boolean;
 }
+
+/**
+ * `![]()` に書く destination の綴り。空白を含むなら CommonMark の `<…>` で
+ * 囲む — 裸のままだと下の `IMG_LINE` が読めず、カードが消えて以後の
+ * `retarget`（app/head.ts）からも見えなくなる。
+ */
+export const imageDest = (path: string): string =>
+  /\s/.test(path) ? `<${path}>` : path;
 
 // `d` フラグは捕獲の位置を返させるため。宣言フォルダの引っ越しで
 // **destination だけ**を差し替えるのに要る（app/head.ts の retarget）
@@ -142,6 +152,7 @@ export function parseImage(line: string): ImageRef | null {
   const lead = line.length - line.trimStart().length;
   const m = IMG_LINE.exec(line.trim());
   if (!m) return null;
+  const bracketed = m[1] !== undefined;
   const raw = m[1] ?? m[2];
   // A real URI scheme (http:, data:, ...) is always 2+ letters before the
   // colon; a single letter is a Windows drive (`C:\...`), which is a local
@@ -156,7 +167,7 @@ export function parseImage(line: string): ImageRef | null {
   // Windows のパスは `\` 区切りでも来る（ドライブレターや `..\..\x.png`）
   // split は必ず 1 つ以上返すが、型は言い切らないので素直に受ける
   const name = path.split(/[\\/]/).pop() ?? path;
-  return { path, name, raw, from: lead + span[0], to: lead + span[1] };
+  return { path, name, raw, from: lead + span[0], to: lead + span[1], bracketed };
 }
 
 /**

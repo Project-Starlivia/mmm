@@ -29,9 +29,12 @@ fn relevel(text : String, target_depth : Int) -> String {
   let saved_nodes = st.nodes
   let saved_fences = st.fences
   let saved_hides = st.hide_regions
+  let saved_head = st.head
   let saved_index = st.index_of
   let saved_next_id = st.next_id
   st.text = text
+  // rebuild_nodes が st の欄を増やしたら、ここにも同じ欄を足すこと
+  // （st.head を一度足し忘れ、断片の頭の区間が文書の頭として残った）
   rebuild_nodes(Map([]))
   let out = if st.nodes.length() == 0 {
     text
@@ -54,6 +57,7 @@ fn relevel(text : String, target_depth : Int) -> String {
   st.nodes = saved_nodes
   st.fences = saved_fences
   st.hide_regions = saved_hides
+  st.head = saved_head
   st.index_of = saved_index
   st.next_id = saved_next_id
   out
