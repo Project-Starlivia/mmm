@@ -324,6 +324,18 @@ pub fn move_side_end(ids : Array[Int], root : Int, left : Bool) -> String {
 }
 
 ///|
+/// Mod+ドロップ: 選んだ枝を、target の直前 / 直後へ新しいグループとして置く。
+pub fn move_new_group(
+  ids : Array[Int],
+  target : Int,
+  before : Bool,
+  left : Bool,
+) -> String {
+  cmd_move_new_group(ids, target, before, left)
+  take_snapshot()
+}
+
+///|
 pub fn toggle_hidden(id : Int) -> String {
   cmd_toggle_hidden(id)
   take_snapshot()

@@ -478,3 +478,123 @@ fn cmd_move_side_end(ids : Array[Int], root : Int, left : Bool) -> Unit {
     }
   })
 }
+
+///|
+/// 選んだ枝を、`target` の直前 / 直後へ**新しいグループ**として置く。
+///
+/// 決め方は 1 つ: **置いた場所の手前と後ろの境界を、側がつながるように直す
+/// （無ければ足す）**。既にあるグループの真ん中に置けば、その規則の結果と
+/// してそのグループが 2 つに割れる（割るための特別な処理は持たない）。
+fn cmd_move_new_group(
+  ids : Array[Int],
+  target : Int,
+  before : Bool,
+  left : Bool,
+) -> Unit {
+  let ti = find_node(target)
+  if ti < 0 {
+    return
+  }
+  let root_id = st.nodes[root_index_of(ti)].id
+  with_sweep(fn() {
+    // 1) まず動かす。境界を書くのは、位置が決まってから
+    let order : Array[Int] = []
+    for k in normalize_selection(ids) {
+      order.push(st.nodes[k].id)
+    }
+    let rehide = unhide_for_move(order)
+    // 動かした枝がその側で唯一のメンバーだったときは、両脇の境界が
+    // くっついて生の行数がそのまま flip として読めてしまう（xor 前の値）。
+    // ここで一度畳んでおかないと、直後に読む prev/next の側が
+    // まだ畳んでいない生の値のままになり、want の判定を誤る
+    let move_marks = sep_marks()
+    let move_base = st.last_sets.length()
+    let first = move_steps(ids, target, if before { 1 } else { 2 })
+    for id in rehide {
+      cmd_toggle_hidden(id)
+    }
+    sweep_seps(move_marks, move_base)
+    let ri = find_node(root_id)
+    if first < 0 || ri < 0 {
+      return
+    }
+    let root_depth = st.nodes[ri].depth
+    // 2) 動かした塊の範囲。**id は移動をまたいで生きている**ので、
+    //    動かしたものを引き直して端を取る
+    let mut head_from = -1
+    let mut tail_to = -1
+    for id in order {
+      let i = find_node(id)
+      if i < 0 {
+        continue
+      }
+      let nd = st.nodes[i]
+      if head_from < 0 || nd.from < head_from {
+        head_from = nd.from
+      }
+      if nd.to > tail_to {
+        tail_to = nd.to
+      }
+    }
+    if head_from < 0 {
+      return
+    }
+    // 3) 塊の手前・後ろにある「ルート直下の枝」の側
+    let mut prev : Node? = None
+    let mut next : Node? = None
+    for nd in st.nodes {
+      if nd.parent != root_id {
+        continue
+      }
+      if nd.to <= head_from {
+        prev = Some(nd)
+      } else if nd.from >= tail_to && next is None {
+        next = Some(nd)
+      }
+    }
+    // 4) 手前と後ろの境界を、側がつながるように直す。
+    //    後ろから積む（編集集合は昇順でなければならない）
+    let bounds = tree_bounds(ri)
+    let set : Array[Edit] = []
+    match next {
+      Some(nx) => {
+        let want = left != nx.left
+        // 塊と次の枝の**間**に境界があればそれを直す。無ければ足す
+        match first_bound_after(bounds, tail_to) {
+          Some(b) =>
+            if b.start < nx.from {
+              set.push(set_sep_edit(b, root_depth, want))
+            } else {
+              set.push(insert_sep_edit(tail_to, root_depth, want))
+            }
+          None => set.push(insert_sep_edit(tail_to, root_depth, want))
+        }
+      }
+      None => () // 末尾に置いた = 後ろの境界は要らない
+    }
+    match prev {
+      Some(pv) => {
+        let want = pv.left != left
+        match last_bound_before(bounds, head_from) {
+          Some(b) =>
+            if b.start >= pv.to {
+              set.push(set_sep_edit(b, root_depth, want))
+            } else {
+              set.push(insert_sep_edit(head_from, root_depth, want))
+            }
+          None => set.push(insert_sep_edit(head_from, root_depth, want))
+        }
+      }
+      None =>
+        // 手前に枝が無い = 先頭のグループ。側は右から始まるので、
+        // 左にしたいときだけルート直後に切り替えを書く
+        if left {
+          set.push(insert_sep_edit(head_from, root_depth, true))
+        }
+    }
+    if set.length() > 0 {
+      sort_edits(set)
+      apply_sets([set], "")
+    }
+  })
+}

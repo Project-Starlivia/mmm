@@ -128,6 +128,17 @@ pub fn move_side_end(ids : Array[Int], root : Int, left : Bool) -> String {
 }
 
 ///|
+#export_name("moveNewGroup")
+pub fn move_new_group(
+  ids : Array[Int],
+  target : Int,
+  before : Bool,
+  left : Bool,
+) -> String {
+  @core.move_new_group(ids, target, before, left)
+}
+
+///|
 #export_name("toggleHidden")
 pub fn toggle_hidden(id : Int) -> String {
   @core.toggle_hidden(id)

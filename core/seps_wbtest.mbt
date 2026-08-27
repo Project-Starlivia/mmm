@@ -314,3 +314,70 @@ test "move_side_end は 1 回の undo で戻る" {
   ignore(undo())
   assert_eq(get_text(), src)
 }
+
+///|
+test "グループの真ん中に落とすと、そのグループを割って入る" {
+  ignore(init_doc("# r\n\n## a\n\n## b\n\n## c\n"))
+  // c を a と b の間へ、同じ側の新しいグループとして
+  ignore(move_new_group([st.nodes[3].id], st.nodes[2].id, true, false))
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## c\n\n---\n\n## b\n")
+  assert_eq(side_of("a"), false)
+  assert_eq(side_of("c"), false)
+  assert_eq(side_of("b"), false)
+}
+
+///|
+test "反対側の新しいグループとして落とす" {
+  ignore(init_doc("# r\n\n## a\n\n## b\n\n## c\n"))
+  ignore(move_new_group([st.nodes[3].id], st.nodes[2].id, true, true))
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n---\n\n## c\n\n---\n---\n\n## b\n")
+  assert_eq(side_of("c"), true)
+  assert_eq(side_of("b"), false)
+}
+
+///|
+test "末尾に落とせば、後ろの境界は要らない" {
+  ignore(init_doc("# r\n\n## a\n\n## b\n"))
+  ignore(move_new_group([st.nodes[1].id], st.nodes[2].id, false, false))
+  assert_eq(get_text(), "# r\n\n## b\n\n---\n\n## a\n")
+}
+
+///|
+test "複数選択は文書順のまま 1 つの新しいグループになる" {
+  ignore(init_doc("# r\n\n## a\n\n## b\n\n## c\n\n## d\n"))
+  ignore(
+    move_new_group([st.nodes[1].id, st.nodes[2].id], st.nodes[4].id, true, true),
+  )
+  assert_eq(get_text(), "# r\n\n## c\n\n---\n---\n\n## a\n\n## b\n\n---\n---\n\n## d\n")
+  assert_eq(side_of("a"), true)
+  assert_eq(side_of("b"), true)
+  assert_eq(side_of("d"), false)
+}
+
+///|
+test "移動元の単独グループが空になっても、指定した側を誤らない" {
+  // b だけの中間グループを c の後ろへ、同じ側の新しいグループとして動かす。
+  // 空いた b の両脇の境界（a-b, b-c）はその場でくっついて 1 本の生の
+  // かたまりになる。まだ畳んでいない生の行数のまま読むと 2 行 = 切り替えに
+  // 見えてしまい、それを元に c から後ろの側を判定すると誤る
+  // （畳んだ後の正しい値は 1 行 = 分割のまま、側は変わらない）
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n"))
+  let b = st.nodes[2].id
+  let c = st.nodes[3].id
+  ignore(move_new_group([b], c, false, false))
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## c\n\n---\n\n## b\n")
+  assert_eq(side_of("a"), false)
+  assert_eq(side_of("c"), false)
+  assert_eq(side_of("b"), false)
+}
+
+///|
+test "move_new_group で移動元グループが空になっても undo は 1 回" {
+  let src = "# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n"
+  ignore(init_doc(src))
+  let b = st.nodes[2].id
+  let c = st.nodes[3].id
+  ignore(move_new_group([b], c, false, false))
+  ignore(undo())
+  assert_eq(get_text(), src)
+}

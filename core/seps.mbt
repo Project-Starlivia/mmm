@@ -209,6 +209,29 @@ fn tree_bounds(root : Int) -> Array[Bound] {
   out
 }
 
+///|
+/// `at` より手前で終わっている最後の境界。
+fn last_bound_before(bounds : Array[Bound], at : Int) -> Bound? {
+  let mut hit : Bound? = None
+  for b in bounds {
+    if b.end <= at {
+      hit = Some(b)
+    }
+  }
+  hit
+}
+
+///|
+/// `at` 以降から始まる最初の境界。
+fn first_bound_after(bounds : Array[Bound], at : Int) -> Bound? {
+  for b in bounds {
+    if b.start >= at {
+      return Some(b)
+    }
+  }
+  None
+}
+
 // ---- 掃除 ----
 //
 // **不変条件: どの操作の前後でも、操作対象でないグループの側は変わらない。**

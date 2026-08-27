@@ -127,6 +127,13 @@ export const core = {
   /** ルート脇へ落とした: その側の末尾へ（要るときだけ切り替えの `---` を書く） */
   moveSideEnd: (ids: number[], root: number, left: boolean): Snapshot =>
     snap(mbt.moveSideEnd(ids, root, left)),
+  /** Mod+ドロップ: 選んだ枝を target の直前/直後へ新しいグループとして置く */
+  moveNewGroup: (
+    ids: number[],
+    target: number,
+    before: boolean,
+    left: boolean,
+  ): Snapshot => snap(mbt.moveNewGroup(ids, target, before, left)),
   toggleHidden: (id: number): Snapshot => snap(mbt.toggleHidden(id)),
   undo: (): Snapshot => snap(mbt.undo()),
   redo: (): Snapshot => snap(mbt.redo()),
