@@ -963,6 +963,10 @@ export class MindMap {
           if (!at) return;
           const id = this.nodeAt(at.x, at.y);
           if (id === -1) return;
+          // メニューを開いた時点でこのジェスチャーは使い切った。指を離した
+          // ときの pointerup が素のタップ選択として同じノードをもう一度
+          // 選び直す（reveal も二重に走る）のを止める
+          this.dragCand = null;
           if (!this.host.selection().has(id)) this.host.setSelection([id], id);
           this.suppressContextMenu = true;
           this.menu.show(at.x, at.y, this.menuItems());
@@ -1316,11 +1320,22 @@ export class MindMap {
       // 長押しでもう開いている — ネイティブの contextmenu が追いかけて
       // 来ても、同じメニューを開き直して瞬く/ずれることはさせない
       if (this.suppressContextMenu) return;
+      // 逆向きの対称: ネイティブの contextmenu が長押しタイマーより先に
+      // 届いた場合、このジェスチャーはもう届いたので、後からタイマーが
+      // 追い打ちで同じメニューを開き直さないよう見張りを解く
+      this.dropHold();
       const id = this.nodeAt(e.clientX, e.clientY);
       if (id === -1) {
         this.hideMenu();
         return;
       }
+      // タッチの長押しでも contextmenu は届きうる（ネイティブがタイマーより
+      // 先に届いた場合）。そのときは pointerdown が仕込んだ dragCand が
+      // まだ残っているので、消しておかないと指を離した pointerup が素の
+      // タップ選択として同じノードをもう一度選び直してしまう
+      // （マウスの右クリックは button !== 0 で dragCand をそもそも
+      // 仕込まないので、ここは無害）
+      this.dragCand = null;
       if (!this.host.selection().has(id)) this.host.setSelection([id], id);
       this.menu.show(e.clientX, e.clientY, this.menuItems());
     });
