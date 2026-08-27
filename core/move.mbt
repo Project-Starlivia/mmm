@@ -37,6 +37,16 @@ fn cmd_indent(ids : Array[Int]) -> Unit {
 ///|
 /// Outdent: the subtree moves to just after its parent's subtree and every
 /// heading in it loses one '#'. Runs per node inside one transaction.
+///
+/// **掃除を通さない**（with_sweep で包んでいない）。段上げは深さを浅く
+/// するだけで境界を空けないので、ふだんは掃除の出番が無い —
+/// ただし手書きの無効な `---`（valid_bounds を満たしていなかった行）を
+/// 段上げが**有効化してしまう**ことはある。見出しが浅くなってルート直下の
+/// 深さに達すると、次の再構築でその `---` がそのまま境界として読まれる
+/// （例: `## a` の下の深い `---` は無効だが、その直後の見出しを 2 回
+/// 段上げしてルート直下まで浅くすると有効になり、後続グループの側が
+/// 動く）。これはテキストから素直に導き直した結果であり、掃除で防ぐ
+/// 種類の副作用ではないので、挙動はそのままにする。
 fn cmd_outdent(ids : Array[Int]) -> Unit {
   let idxs = normalize_selection(ids)
   let todo : Array[Int] = []

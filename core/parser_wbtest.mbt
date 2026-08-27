@@ -60,3 +60,11 @@ test "リストの形の文書では、項目の中身の列に書かれた区�
   let md = "- root\n\n  - a\n\n  ---\n\n  - b\n"
   assert_eq(sep_runs_of(md).length(), 1)
 }
+
+///|
+test "列 0 でタブ字下げされた `---` は境界にならない（外はコードブロック）" {
+  // タブは 4 桁展開なので、列 0 での 1 個のタブはそれだけで
+  // base+3（=3）を越える。fence_open と同じく、タブが混じった時点で
+  // 区切りとしては数えない
+  assert_eq(sep_runs_of("# r\n\n## a\n\n\t---\n\n## b\n").length(), 0)
+}

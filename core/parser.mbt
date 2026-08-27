@@ -506,16 +506,20 @@ fn fence_close_len(text : String, l : Line, fence_char : Int, base : Int) -> Int
 /// 道具が書くのは常に `---` の形なので、書き手側で困ることは無い。
 ///
 /// 行頭の空白は **`base` 列からさらに 3 つまで**。`base` は囲っているリスト
-/// 項目の中身の列で、フェンス（`fence_open`）と同じ数え方 — リストの形の
-/// 文書では、区切りもその列に書かれるため。
+/// 項目の中身の列で、フェンス（`fence_open`）と**同じ数え方** — 数えるのは
+/// 半角スペースだけで、タブは数えない（外の CommonMark パーサはタブを
+/// 4 桁に展開するので、行頭にタブが 1 つでもあれば base+3 の枠は必ず
+/// 越える。数えずに素通りさせると、その先の判定 `is_space` がタブを
+/// 拾って「空白が続く = コードブロック」に落ちる）。リストの形の文書では、
+/// 区切りもこの列に書かれるため。
 fn thematic_break_at(text : String, l : Line, base : Int) -> Int {
   let mut p = l.start
   let mut indent = 0
-  while p < l.end && is_space(code_at(text, p)) && indent < base + 3 {
-    indent = indent + (if code_at(text, p) == 9 { 2 } else { 1 })
+  while p < l.end && code_at(text, p) == 32 && indent < base + 3 {
+    indent = indent + 1
     p = p + 1
   }
-  // base+3 を越えて空白が続く = 外のパーサではコードブロック
+  // base+3 を越えて空白が続く / タブが混じる = 外のパーサではコードブロック
   if p >= l.end || is_space(code_at(text, p)) {
     return 0
   }
