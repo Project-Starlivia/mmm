@@ -83,47 +83,37 @@ html, body {
   padding: 6px 12px;
   border-bottom: 1px solid var(--line);
 
-  /* 土台の見た目。**わざと弱くする** — `:where()` で `#topbar` の強さを
-     捨てて (0,0,1) にし、`.group` や `.menu-name` が**ただのクラスのまま**
-     上書きできるようにする。id の強さを残すと、後から足した塊の指定が
-     黙って負ける（実際に書き出しの 2 つが別々の丸い枠に見えていた） */
+  /* **帯のボタンはみな枠を持たない字**。押すものではなく「開くところ」だと
+     佇まいで言う（ネイティブのメニューバーと同じ）。枠は透明で置いておく —
+     太さの分だけ場所を取らせておけば、`.group` が継ぎ目の 1 本だけを
+     色付けできる。
+
+     `:where()` で `#topbar` の強さを捨てて (0,0,1) にしてある。土台は
+     **いちばん弱い**のが正しく、`.group` が**ただのクラスのまま**上書き
+     できる（id の強さを残すと、後から足した塊の指定が黙って負ける） */
   :where(&) button {
     font: inherit;
     font-size: 13px;
-    padding: 3px 10px;
+    padding: 3px 8px;
     /* 絵と字を並べる。絵が先か後かは、入れる側が決める */
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    border: 1px solid var(--line);
+    border: 1px solid transparent;
     border-radius: 6px;
-    background: var(--panel);
-    color: var(--ink);
-    cursor: pointer;
-
-    &:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); }
-    &:disabled { opacity: 0.4; cursor: default; }
-  }
-
-  /* 名前の隣に並ぶ字のメニュー。**枠を持たない** — 押すものではなく
-     「開くところ」に見せたい（ネイティブのメニューバーと同じ佇まい） */
-  & button.menu-name {
-    border-color: transparent;
     background: none;
     color: var(--ink-dim);
-    padding: 3px 8px;
+    cursor: pointer;
 
-    &:hover:not(:disabled) {
-      background: var(--accent-soft);
-      border-color: transparent;
-      color: var(--ink);
-    }
+    &:hover:not(:disabled) { background: var(--accent-soft); color: var(--ink); }
+    &:disabled { opacity: 0.4; cursor: default; }
   }
 }
 
-/* 並んだボタンを 1 つの塊に見せる。**枠を重ねて、継ぎ目だけが仕切り**になる
-   — 枠が 2 本並ぶと「別のボタン」に見える。
-   帯の書き出し（SVG ⤓ │ ▾）と、md の書き方（H │ n+ │ L）が使う */
+/* 並んだボタンを 1 つの塊に見せる。**言うのは継ぎ目の 1 本だけ** —
+   枠が 2 本並ぶと「別のボタン」に見えるので、枠は重ねて 1 本にし、
+   帯のように枠が透明なところでは、その継ぎ目だけに色を付ける。
+   帯の書き出し（SVG ⤓ │ ⌄）と、md の書き方（H │ n+ │ L）が使う */
 .group {
   display: inline-flex;
 
@@ -138,6 +128,9 @@ html, body {
     /* 触っている側の枠を前に出す（重ねた相手に隠されないように） */
     &:hover:not(:disabled) { z-index: 1; }
   }
+  /* 継ぎ目。枠を持つボタン（md の書き方）では既にこの色なので変わらず、
+     枠が透明な帯のボタンでは、ここだけが 1 本の仕切りとして出る */
+  & button + button { border-left-color: var(--line); }
 }
 
 /* ボタンとメニューの絵。**塗らずに線で引く**ので、文字色をそのまま継ぐ */

@@ -29,16 +29,16 @@
         <span id="dirty" hidden>●</span>
         <span class="spacer"></span>
         <!-- 道具はまとめて右へ。左は「いま何を開いているか」だけにする。
-             Files と ⋯ は枠を持たない字（ネイティブのメニューバーと
-             同じ佇まい）で、押すと下に開く -->
-        <button id="btn-file" class="menu-name">Files</button>
+             帯のボタンはみな枠を持たない字（ネイティブのメニューバーと
+             同じ佇まい）で、Files と ⋯ は押すと下に開く -->
+        <button id="btn-file">Files</button>
         <!-- 書き出しだけは 1 つの操作の 2 面（出し方 / 選び直し）なので、
              枠を重ねて塊に見せる。中身の絵と文字は src/icons.ts から入れる -->
         <span class="group">
           <button id="btn-export"></button>
           <button id="btn-export-way" title="Choose how to export"></button>
         </span>
-        <button id="btn-more" class="menu-name" title="More">⋯</button>
+        <button id="btn-more" title="More">⋯</button>
       </header>
       <main id="panes">
         <section id="md-pane"></section>
