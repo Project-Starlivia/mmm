@@ -15,7 +15,7 @@ import { MdEditor } from "./editor.ts";
 import { MindMap, type MapHost } from "./mindmap.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
-import { imageFolder, normalizePath, setImageFolder } from "./app/head.ts";
+import { imageFolder, normalizePath, retarget, setImageFolder } from "./app/head.ts";
 import { exportWays, initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
 import { deriveName } from "./app/name.ts";
@@ -104,6 +104,49 @@ function declaredFolder(): string | null {
   return raw === null ? null : normalizePath(raw);
 }
 
+// 頭の宣言が変わったら、本文の画像パスをそれに追従させる。
+//
+// **打鍵のたびには走らせない。** 消して打ち直す途中の中途半端な値をすべて
+// 経由すると、宣言が一瞬 `./` に落ちた隙にフォルダの外の画像まで巻き込む。
+// 入力が止まってから 1 回だけ当てる（Undo も 1 回で全部戻る）。
+
+const FOLLOW_MS = 400;
+
+/** 本文がいま映している宣言。文書を開いた時点の値から始まる */
+let appliedFolder: string | null = null;
+let followTimer = -1;
+
+function cancelFollow(): void {
+  if (followTimer === -1) return;
+  window.clearTimeout(followTimer);
+  followTimer = -1;
+}
+
+/**
+ * 宣言の引っ越しに本文を追従させ、フォルダを結び直す。
+ *
+ * ここが触る `assets` / `nextTag` はこの下で作られるが、呼ばれるのは
+ * タイマーが落ちたとき＝モジュールを読み終えた後なので届く。
+ */
+function followDeclaration(): void {
+  const next = declaredFolder();
+  if (next === null) return; // 読めない綴りでは何もしない
+  const prev = appliedFolder;
+  // **当てる前に進める。** 下の replaceText が applySnap を呼び返すので、
+  // ここが古いままだと自分の書き換えを見てもう一度予約してしまう
+  appliedFolder = next;
+  if (prev !== null && prev !== next) {
+    const edits = retarget(doc, prev, next);
+    const tag = nextTag();
+    // 後ろから。前から当てると後続のオフセットが挿入ぶんだけずれる
+    for (let i = edits.length - 1; i >= 0; i--) {
+      const e = edits[i];
+      applySnap(core.replaceText(e.from, e.to, e.insert, tag), "core");
+    }
+  }
+  assets.clear(); // 宣言が変わった。画像を読み直す
+}
+
 // ---------- sync ----------
 
 /**
@@ -149,6 +192,17 @@ function applySnap(snap: Snapshot, origin: Origin): void {
   updateDirty();
   showName();
   form.show(snap.listFrom);
+  // 文書ごと入れ替わったなら、本文はもうその宣言を映している（追従は不要）
+  if (origin === "load") {
+    cancelFollow();
+    appliedFolder = declaredFolder();
+  } else if (declaredFolder() !== appliedFolder) {
+    cancelFollow();
+    followTimer = window.setTimeout(() => {
+      followTimer = -1;
+      followDeclaration();
+    }, FOLLOW_MS);
+  }
   if (wasEmpty && doc.nodes.length > 0) map.fitView();
 }
 
