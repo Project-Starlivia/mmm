@@ -25,6 +25,7 @@ import { decidePaste } from "./app/paste.ts";
 import { initDrop } from "./app/dnd.ts";
 import { initForm } from "./app/form.ts";
 import { showDrawing } from "./app/draw.ts";
+import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 import { openOnClick } from "./map/menu.ts";
@@ -52,8 +53,13 @@ function el<T extends Element>(id: string, kind: abstract new () => T): T {
   throw new Error(`#${id} が ${kind.name} ではない`);
 }
 
-/** ヘルプの行き先。ここ 1 か所 */
+/** リポジトリの行き先。ここ 1 か所 */
 const REPO = "https://github.com/Project-Starlivia/mmm";
+
+/** 新しいタブで開く。`⋯` の外部リンクが通る唯一の道 */
+function openExternal(url: string): void {
+  window.open(url, "_blank", "noopener");
+}
 
 const mdPane = el("md-pane", HTMLElement);
 const mapPane = el("map-pane", HTMLElement);
@@ -768,6 +774,27 @@ async function newFile(): Promise<void> {
   }
 }
 
+/**
+ * いまの本文へのリンクをクリップボードへ。保存の有無を問わない —
+ * 見出しから導いた仮の名前しか無い文書でも、そのまま渡せる。
+ * 画像は付いてこない（`![](...)` は相対パスで、相手の環境には無い）ので、
+ * 貼ってある文書ではそう伝える。
+ */
+async function copyLink(): Promise<void> {
+  try {
+    const text = core.getText();
+    const link = `${location.origin}${location.pathname}${await toHash(text)}`;
+    await navigator.clipboard.writeText(link);
+    if (hasImages(text)) flashFilename("Link copied — images won't travel", false);
+    else if (link.length > LINK_WARN_LENGTH)
+      flashFilename("Link copied — some apps may cut this", false);
+    else flashFilename("Link copied", false);
+  } catch (err) {
+    console.error("copy link failed:", err);
+    flashFilename("Could not copy the link");
+  }
+}
+
 async function confirmDiscard(): Promise<boolean> {
   if (core.getText() === savedText) return true;
   return window.confirm("You have unsaved changes. Discard them and continue?");
@@ -853,14 +880,21 @@ openOnClick(btnFile, () => [
 ]);
 
 // 低頻度だが消したくないものの受け皿。Undo/Redo にボタンは無く（キーが
-// 本道）、ここが押せる保険になる
+// 本道）、ここが押せる保険になる。3 つの塊 — 戻す / 見た目 / 外に開く
 openOnClick(btnMore, () => [
   { label: "Undo", key: "Mod+Z", run: doUndo },
   { label: "Redo", key: "Mod+Shift+Z", run: doRedo },
   "sep",
+  { label: "Brand color", run: () => theme.pickColor() },
   { label: theme.isLight() ? "Dark theme" : "Light theme", run: () => theme.toggle() },
   "sep",
-  { label: "Help", run: () => window.open(REPO, "_blank", "noopener") },
+  { label: "Copy link", run: () => void copyLink() },
+  "sep",
+  {
+    label: "Shortcuts",
+    run: () => openExternal(`${REPO}/blob/main/docs/shortcuts.md`),
+  },
+  { label: "GitHub", run: () => openExternal(REPO) },
 ]);
 elFilename.addEventListener("click", () => {
   void (async () => {
@@ -932,18 +966,28 @@ initShortcuts({
   sweep(); // 役目を終えた localStorage のキーを捨てる
   loadText("", null); // 空 = まだ何も無い。dirty も立たない
   const bootGen = docGen;
-  void io
-    .startupDoc()
-    .then((doc) => {
-      // 読み終わるまでに打ち始めていたら、それを消してまで開かない。
-      // 同じ理由で、その間に New/Open/Drop で別の文書を開いていた場合も
-      // （それが空文書でも）上書きしない — その操作は必ず loadText を通るので
-      // docGen が進んでいるはず
-      if (doc && docGen === bootGen && core.getText() === "") applyDoc(doc);
-    })
-    .catch(() => {
-      flashFilename("Could not reopen the last file");
-    });
+  void fromHash(location.hash).then((shared) => {
+    if (shared !== null) {
+      // リンクで開いた。ハッシュはその場で消す — 文書の身元はあくまで
+      // ファイルハンドル 1 つで、リンクは入口でしかない。前回ファイルの
+      // 復元もしない（リンクを踏んだのに別の文書が出てくるのは筋が通らない）
+      history.replaceState(null, "", location.pathname + location.search);
+      if (docGen === bootGen && core.getText() === "") loadText(shared, null);
+      return;
+    }
+    void io
+      .startupDoc()
+      .then((doc) => {
+        // 読み終わるまでに打ち始めていたら、それを消してまで開かない。
+        // 同じ理由で、その間に New/Open/Drop で別の文書を開いていた場合も
+        // （それが空文書でも）上書きしない — その操作は必ず loadText を通るので
+        // docGen が進んでいるはず
+        if (doc && docGen === bootGen && core.getText() === "") applyDoc(doc);
+      })
+      .catch(() => {
+        flashFilename("Could not reopen the last file");
+      });
+  });
 }
 // フェンスの言語は後から読み込まれる。届いたら色を載せ直す
 onLanguageReady(() => map.render());

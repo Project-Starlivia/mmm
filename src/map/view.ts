@@ -5,7 +5,7 @@
 // カーソル基点のズームや端寄せは符号を 1 つ間違えても動いてしまい、目でしか
 // 気づけないので、値として試験できる形が要る。
 
-import type { Rect } from "./geometry.ts";
+import { type Rect, unionRect } from "./geometry.ts";
 
 /** world → 画面: `screen = world * k + t` */
 export interface View {
@@ -89,25 +89,21 @@ export function fitToPane(
   pane: Pane,
   margin: number,
 ): View | null {
-  let x0 = Infinity;
-  let y0 = Infinity;
-  let x1 = -Infinity;
-  let y1 = -Infinity;
-  let any = false;
-  for (const b of boxes) {
-    any = true;
-    x0 = Math.min(x0, b.x);
-    y0 = Math.min(y0, b.y);
-    x1 = Math.max(x1, b.x + b.w);
-    y1 = Math.max(y1, b.y + b.h);
-  }
-  if (!any) return null;
-  const kx = (pane.width - margin * 2) / Math.max(1, x1 - x0);
-  const ky = (pane.height - margin * 2) / Math.max(1, y1 - y0);
+  const r = unionRect(boxes);
+  if (!r) return null;
+  const kx = (pane.width - margin * 2) / Math.max(1, r.w);
+  const ky = (pane.height - margin * 2) / Math.max(1, r.h);
   const k = Math.max(MIN_ZOOM, Math.min(1, kx, ky));
+  return centerOn({ k, tx: 0, ty: 0 }, r, pane);
+}
+
+/** その箱を画面の中心に置く（拡大率は変えない）。 */
+export function centerOn(view: View, box: Rect, pane: Pane): View {
+  const cx = box.x + box.w / 2;
+  const cy = box.y + box.h / 2;
   return {
-    k,
-    tx: pane.width / 2 - ((x0 + x1) / 2) * k,
-    ty: pane.height / 2 - ((y0 + y1) / 2) * k,
+    k: view.k,
+    tx: pane.width / 2 - cx * view.k,
+    ty: pane.height / 2 - cy * view.k,
   };
 }

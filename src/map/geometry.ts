@@ -19,6 +19,23 @@ export const round2 = (v: number): number => Math.round(v * 100) / 100;
 /** 箱の中心 */
 export const centerOf = (b: Rect): Pt => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
 
+/** 複数の箱を包む最小の箱。1 つも無ければ null。 */
+export function unionRect(boxes: Iterable<Rect>): Rect | null {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  let any = false;
+  for (const b of boxes) {
+    any = true;
+    x0 = Math.min(x0, b.x);
+    y0 = Math.min(y0, b.y);
+    x1 = Math.max(x1, b.x + b.w);
+    y1 = Math.max(y1, b.y + b.h);
+  }
+  return any ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+}
+
 // 木は左から右へ伸びる。線が箱に触れるのは左右の辺の中点だけで、
 // 任意方向へ出る一般形は左右振り分けを持っていた頃の名残だった。
 
