@@ -27,6 +27,7 @@ import { showDrawing } from "./app/draw.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 import { openOnClick } from "./map/menu.ts";
+import { RadialMenu } from "./map/radialMenu.ts";
 import {
   type CardRef,
   cardRowsOf,
@@ -807,11 +808,12 @@ const { togglePane, togglePaneVis } = initPanes({
   focusEditor: () => editor.focus(),
 });
 
-initExport({
+const exportApi = initExport({
   ...exportDeps,
   button: el("btn-export", HTMLButtonElement),
   wayButton: el("btn-export-way", HTMLButtonElement),
 });
+const radialMenu = new RadialMenu();
 const theme = initTheme({
   logo: elLogo,
   setEditorTheme: (dark) => editor.setTheme(dark),
@@ -824,6 +826,7 @@ initShortcuts({
   togglePaneVis,
   undo: doUndo,
   redo: doRedo,
+  export: (pickWay) => (pickWay ? radialMenu.show(exportApi.ways()) : exportApi.run()),
   isEditing: () => map.isEditing() || drawingOpen,
 });
 
