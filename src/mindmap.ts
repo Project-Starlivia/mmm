@@ -42,9 +42,11 @@ import {
   fitToPane,
   panBy,
   panToShow,
+  pinch,
   toWorld,
   zoomAt,
 } from "./map/view.ts";
+import { Fingers } from "./map/gesture.ts";
 import { indicatorFor, isVisible } from "./map/indicator.ts";
 import { ContextMenu, type MenuEntry } from "./map/menu.ts";
 import { MapRenderer } from "./map/render.ts";
@@ -187,6 +189,8 @@ export class MindMap {
 
   // interaction state
   private spaceDown = false;
+  /** 2 本目の指。1 本のあいだは何も言わないので、既存の状態は増えない */
+  private fingers = new Fingers();
   // ドラッグ中の最後のポインタ位置。Shift の押し外しだけで判定を
   // 出し直したいので覚えておく
   private lastPointer: { x: number; y: number } | null = null;
@@ -297,6 +301,12 @@ export class MindMap {
   private toWorld(clientX: number, clientY: number): { x: number; y: number } {
     const r = this.pane.getBoundingClientRect();
     return toWorld(this.view(), clientX - r.left, clientY - r.top);
+  }
+
+  /** ペインの左上から測った画面 px（`map/view.ts` が使う座標系） */
+  private local(clientX: number, clientY: number): { x: number; y: number } {
+    const r = this.pane.getBoundingClientRect();
+    return { x: clientX - r.left, y: clientY - r.top };
   }
 
   /** 新しい見え方を受け取って画面へ反映する */
@@ -908,6 +918,21 @@ export class MindMap {
         e.stopPropagation();
         return;
       }
+      if (e.pointerType === "touch") {
+        const p = this.local(e.clientX, e.clientY);
+        this.fingers.down(e.pointerId, p.x, p.y);
+        // 2 本目が乗った時点で、1 本ぶんの操作はすべて畳む。**指を足しただけで
+        // ノードが動いたり範囲が選ばれたりしない**
+        if (this.fingers.pinching) {
+          this.panning = null;
+          this.rubberStart = null;
+          this.rubber.style.display = "none";
+          this.dragCand = null;
+          if (this.dragging) this.stopDragVisuals();
+          pane.style.cursor = "";
+          return;
+        }
+      }
       // 入力欄の中のクリックはカーソルを置くためのもので、確定ではない。
       // ここで pane.focus() まで進むと、押した瞬間に blur して閉じてしまう
       if (e.target === this.editor) return;
@@ -970,6 +995,16 @@ export class MindMap {
     });
 
     pane.addEventListener("pointermove", (e) => {
+      if (e.pointerType === "touch") {
+        const p = this.local(e.clientX, e.clientY);
+        const g = this.fingers.move(e.pointerId, p.x, p.y);
+        if (g) {
+          this.setView(pinch(this.view(), g.from, g.to));
+          return;
+        }
+        // 2 本乗っているあいだは、1 本ぶんの続きを進めない
+        if (this.fingers.pinching) return;
+      }
       if (this.cardDrag) {
         const dx = e.clientX - this.cardDrag.px;
         const dy = e.clientY - this.cardDrag.py;
@@ -1044,6 +1079,12 @@ export class MindMap {
     });
 
     pane.addEventListener("pointerup", (e) => {
+      if (e.pointerType === "touch") {
+        const wasPinching = this.fingers.pinching;
+        this.fingers.up(e.pointerId);
+        // 2 本目を離した指で、選択やドラッグの後始末を走らせない
+        if (wasPinching) return;
+      }
       if (this.cardDrag) {
         const from = this.cardDrag.ref;
         const to = this.cardDrop;
@@ -1117,6 +1158,7 @@ export class MindMap {
 
     pane.addEventListener("pointercancel", () => {
       // pen/touch cancellation must not leave a drag/pan/rubber stuck
+      this.fingers.clear();
       this.panning = null;
       this.rubberStart = null;
       this.rubber.style.display = "none";
