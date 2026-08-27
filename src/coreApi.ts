@@ -49,6 +49,23 @@ export interface FenceSpan {
   info: string;
 }
 
+/**
+ * 文書の頭（YAML frontmatter）の一区間。
+ * **どこからどこまでが頭かを決めるのはコアだけ**（core/parser.mbt）— この
+ * 境界の内側は走査されないので、`tags:` 配下の `- a` がノードになるか
+ * どうかがここで決まる。中身の綴りは解釈しない。
+ */
+export interface HeadSpan {
+  /** 開き `---` 行の行頭 */
+  from: number;
+  /** 閉じ `---` 行の行末（改行の手前） */
+  to: number;
+  /** 中身の最初の行頭 */
+  bodyFrom: number;
+  /** 中身の最後の行末。中身が無ければ bodyFrom より手前 */
+  bodyTo: number;
+}
+
 export interface Snapshot {
   rev: number;
   focus: number;
@@ -60,6 +77,8 @@ export interface Snapshot {
   editSets: EditOp[][];
   nodes: NodeInfo[];
   fences: FenceSpan[];
+  /** 文書の頭。無ければ null */
+  head: HeadSpan | null;
 }
 
 /**
@@ -70,6 +89,7 @@ export interface DocView {
   text: string;
   nodes: NodeInfo[];
   fences: FenceSpan[];
+  head: HeadSpan | null;
 }
 
 // The JSON contract (field names/shapes) is defined by core/api.mbt's

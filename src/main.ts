@@ -64,7 +64,7 @@ const elLogo = el("logo", SVGSVGElement);
 // ---------- app state ----------
 
 /** いまの文書（テキスト・ノード・フェンスの組）。スナップショットごと差し替える */
-let doc: DocView = { text: "", nodes: [], fences: [] };
+let doc: DocView = { text: "", nodes: [], fences: [], head: null };
 let byId = new Map<number, NodeInfo>();
 let selection = new Set<number>();
 let anchorId = -1;
@@ -108,7 +108,7 @@ function applySnap(snap: Snapshot, origin: Origin): void {
   // `ensureVisible` は「見えるところまで」しか動かさないので、まっさらな
   // 画面では端に置かれたように見える
   const wasEmpty = doc.nodes.length === 0;
-  doc = { text: core.getText(), nodes: snap.nodes, fences: snap.fences };
+  doc = { text: core.getText(), nodes: snap.nodes, fences: snap.fences, head: snap.head };
   byId = new Map(doc.nodes.map((n) => [n.id, n]));
   if (origin !== "cm" && origin !== "load") editor.applySets(snap.editSets);
   // prune selection to surviving nodes
