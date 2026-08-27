@@ -1644,6 +1644,7 @@ export class MindMap {
       this.dropLine.setAttribute("y2", String(p.y + half));
       this.dropLine.setAttribute("visibility", "visible");
       this.dropHint.setAttribute("visibility", "hidden");
+      this.markNode(drop.root, "drop-parent");
       return;
     }
 
@@ -1663,6 +1664,9 @@ export class MindMap {
       this.dropLine.classList.add("slot");
       this.dropLine.setAttribute("visibility", "visible");
       this.dropHint.setAttribute("visibility", "hidden");
+      // 新しいグループでも、親になるのはその木の根
+      const gp = this.layout.parentOf.get(drop.target);
+      if (gp !== undefined) this.markNode(gp, "drop-parent");
       return;
     }
 
@@ -1674,7 +1678,8 @@ export class MindMap {
 
     if (drop.pos === 3) {
       // 線への割り込み。線そのものを光らせて、その真ん中に印を出す。
-      // 「この線の途中に入る」以外の読み方がないので、親の枠までは出さない。
+      // 割り込んだものの親になるのは**その線の上の親**なので、枠はそこに出す
+      // （落とした先が誰の子になるかは、どの落とし方でも同じ言い方で示す）。
       this.dropEdgeId = drop.id;
       this.renderer.edgeEl(drop.id)?.classList.add("drop-edge");
       const pts = this.edgePolyline(drop.id);
@@ -1692,6 +1697,8 @@ export class MindMap {
       this.dropLine.setAttribute("y2", String(m.y + (tx / tl) * half));
       this.dropLine.setAttribute("visibility", "visible");
       this.dropHint.setAttribute("visibility", "hidden");
+      const ep = this.layout.parentOf.get(drop.id);
+      if (ep !== undefined) this.markNode(ep, "drop-parent");
     } else if (drop.pos === 0) {
       // 「その子にする」の着地点は**その親の子の列のいちばん下**。子がいれば
       // 「最後の子の後ろに入れる」と同じ場所なので、同じ言い方で描く。
@@ -1709,8 +1716,10 @@ export class MindMap {
         this.dropLine.setAttribute("x2", String(lx));
         this.dropLine.setAttribute("y2", String(e.y + half));
         this.dropLine.setAttribute("visibility", "visible");
-        // 線が親の辺に接しているので、どこにつくかは見れば分かる
+        // 線が親の辺に接しているので、接続の曲線までは要らない。
+        // ただし「誰の子になるか」の枠は、他の落とし方と同じように出す
         this.dropHint.setAttribute("visibility", "hidden");
+        this.markNode(drop.id, "drop-parent");
       }
     } else {
       this.insertMark(b, drop.pos === 2, this.layout.parentOf.get(drop.id) ?? -1);
@@ -1721,10 +1730,15 @@ export class MindMap {
    * その親の子のうち、いちばん下の箱。子が無ければ null。
    * 新しい子はそこに足されるので、印もそこへ出す。
    * `left` を渡すと、その側の子だけを見る（ルートは両側へ伸びるため）。
+   *
+   * **掴んでいる部分木は数に入れない。** 掴んだ枝の箱は元の場所に描かれた
+   * ままなので、数に入れると「自分の下に入る」という印が出る — 掴んだ本人は
+   * これから居なくなるので、着地点は残るほうの末尾でなければならない。
    */
   private lastKidOf(parent: number, left?: boolean): Box | null {
     let hit: Box | null = null;
     for (const b of this.boxes.values()) {
+      if (this.dragging?.subtree.has(b.n.id)) continue;
       if (this.layout.parentOf.get(b.n.id) !== parent) continue;
       if (left !== undefined && b.n.left !== left) continue;
       if (!hit || b.y + b.h > hit.y + hit.h) hit = b;
@@ -1748,6 +1762,7 @@ export class MindMap {
     const near = entryEdgeOf(b, dir).x; // 親を向いた辺。列で共通
     let span = 0;
     for (const k of this.boxes.values()) {
+      if (this.dragging?.subtree.has(k.n.id)) continue;
       if (this.layout.parentOf.get(k.n.id) !== parentId) continue;
       if (k.n.left !== b.n.left) continue;
       span = Math.max(span, k.w);
