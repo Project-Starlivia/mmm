@@ -151,7 +151,6 @@ export class MindMap {
   private renderer = new MapRenderer();
   private dropLine: SVGLineElement;
   private dropHint: SVGPathElement; // どの親につくかを示す予告の曲線
-  private plusBtn: SVGGElement;
   /** 選んでいるカードに被せる枠と ×（常に高々 1 枚なので 1 個だけ持つ） */
   private pick = new CardPick();
   private rubber: HTMLDivElement;
@@ -202,7 +201,6 @@ export class MindMap {
   // 描き直しで要素が作り直されても paintState が同じ印を戻す
   private dropMarks = new Map<number, "drop-child" | "drop-parent">();
   private dropEdgeId: number | null = null;
-  private hoverId = -1;
   /** その場で直しているカード（位置は毎回引き直す） */
   private editingCard: CardRef | null = null;
 
@@ -220,24 +218,12 @@ export class MindMap {
     this.viewport = svgEl("g");
     this.dropLine = svgEl("line", { id: "drop-line", visibility: "hidden" });
     this.dropHint = svgEl("path", { id: "drop-hint", visibility: "hidden" });
-    // crosshair drawn with lines so the glyph is perfectly centered
-    const makePlus = (): SVGGElement => {
-      const btn = svgEl("g", { class: "plus-btn", visibility: "hidden" });
-      btn.append(
-        svgEl("circle", { r: "9" }),
-        svgEl("line", { x1: "-4", y1: "0", x2: "4", y2: "0" }),
-        svgEl("line", { x1: "0", y1: "-4", x2: "0", y2: "4" }),
-      );
-      return btn;
-    };
-    this.plusBtn = makePlus();
     this.viewport.append(
       this.renderer.edgeLayer,
       this.renderer.nodeLayer,
       this.pick.el,
       this.dropHint,
       this.dropLine,
-      this.plusBtn,
     );
     this.svg.append(this.viewport);
     pane.append(this.svg);
@@ -370,7 +356,6 @@ export class MindMap {
     });
     this.paintState();
 
-    this.updatePlus();
     this.positionEditor();
     this.updateIndicator();
   }
@@ -778,22 +763,6 @@ export class MindMap {
     st.paddingRight = `${p.padding}px`;
   }
 
-  // ---------- hover plus button ----------
-
-  private updatePlus(): void {
-    const b = this.hoverId !== -1 ? this.boxes.get(this.hoverId) : undefined;
-    if (!b || this.dragging || this.isEditing()) {
-      this.plusBtn.setAttribute("visibility", "hidden");
-      return;
-    }
-    this.plusBtn.setAttribute("visibility", "visible");
-    const p = rightOf(b);
-    this.plusBtn.setAttribute(
-      "transform",
-      `translate(${p.x + 14} ${p.y})`,
-    );
-  }
-
   // ---------- events ----------
 
   /** 出来事の配線。ひとかたまりに見えるが、**本当に 1 つの状態機械なのは
@@ -1100,8 +1069,7 @@ export class MindMap {
   }
 
   /**
-   * 押して離す以外のマウス操作 — ダブルクリック、ホバーと `+` ボタン、
-   * リンクとカードのクリック。
+   * 押して離す以外のマウス操作 — ダブルクリック、リンクとカードのクリック。
    */
   private bindClick(): void {
     const pane = this.pane;
@@ -1124,32 +1092,6 @@ export class MindMap {
       this.dragCand = null;
       if (this.dragging) this.stopDragVisuals();
       this.host.editRequested(id);
-    });
-
-    pane.addEventListener("pointerover", (e) => {
-      const hit = targetIn(e, "g.node");
-      const next =
-        hit instanceof SVGGElement
-          ? Number(hit.dataset.id)
-          : this.overPlus(e)
-            ? this.hoverId
-            : -1;
-      if (next !== this.hoverId) {
-        this.hoverId = next;
-        this.updatePlus();
-      }
-    });
-
-    this.plusBtn.addEventListener("pointerdown", (e) => {
-      e.stopPropagation();
-    });
-    this.plusBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (this.hoverId === -1) return;
-      // 箱の脇なので、右クリックの `Add ▸` と同じ並びをその場で開く。
-      // 子 1 つだけなら `Tab` のほうが速い
-      const r = this.plusBtn.getBoundingClientRect();
-      this.menu.show(r.right + 4, r.top, this.addItems(this.hoverId));
     });
 
     // open link cards
@@ -1280,10 +1222,6 @@ export class MindMap {
     const pane = this.pane;
     pane.addEventListener("keydown", (e) => this.onKeydown(e));
 
-  }
-
-  private overPlus(e: Event): boolean {
-    return targetIn(e, ".plus-btn") !== null;
   }
 
   /** Node whose box contains the given client position, or -1. Iterates in
@@ -1538,7 +1476,6 @@ export class MindMap {
     }
     this.dragging = { ids, subtree };
     for (const id of subtree) this.markNode(id, "dragging");
-    this.updatePlus();
   }
 
   /**

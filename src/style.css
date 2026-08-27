@@ -538,13 +538,6 @@ html, body {
 
 /* ========== 落とし先の示し ========== */
 
-.plus-btn {
-  cursor: pointer;
-
-  & circle { fill: var(--accent); }
-  & line { stroke: #fff; stroke-width: 2; stroke-linecap: round; }
-}
-
 #drop-line {
   stroke: var(--accent);
   stroke-width: 3;
