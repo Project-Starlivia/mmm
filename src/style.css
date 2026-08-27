@@ -310,8 +310,24 @@ html, body {
   & button:disabled { display: none; }
 }
 /* 片方だけの時は、境目が窓の縁に来る。はみ出さないよう縁の内側へ留める */
-#panes.no-map #pane-switch { left: auto; right: 8px; transform: none; }
 #panes.no-md #pane-switch { left: 8px; transform: none; }
+/* md を出しているときの右端は CodeMirror のスクローラの帯（15〜17px）で、
+   ブラウザが押下を横取りする（z-index では前に出せない）。
+   `#md-pane .pane-tool` と同じだけ避ける */
+#panes.no-map #pane-switch { left: auto; right: 28px; transform: none; }
+
+/* 狭いときは、居場所が 2 つしか無い（`app/panes.ts` の `spotsFor`）。
+   **分割線は線としての性質だけを落とす** — 動かせない境目を「掴めます」と
+   いう顔で見せない。要素は 0 幅で残す: flex がそれを縁まで押し出すので、
+   `#pane-switch` は今までどおり同じ 1 か所に居られる（角と角に分けると、
+   片方だけスクロールバー避けの分ずれて見える）。
+   居場所が 2 つなら `button:disabled { display: none }` により、
+   **画面に出る矢印は常に 1 本**になる */
+.narrow #splitter {
+  width: 0;
+  background: none;
+  cursor: default;
+}
 
 /* ========== マップのペイン ========== */
 
@@ -804,8 +820,5 @@ html, body {
   /* 名前はタブが言っている。狭いところで二重に場所を取らない */
   #filename, #dirty { display: none; }
 
-  /* 並べないので、掴んで動かす境目も意味を失う */
-  #splitter { display: none; }
-  #panes:not(.no-map) #md-pane { display: none; }
   #md-pane, #map-pane { flex: 1; min-width: 0; }
 }
