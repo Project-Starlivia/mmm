@@ -981,12 +981,12 @@ export function parseImage(line: string): ImageRef | null {
 
 - [ ] **Step 4: `src/app/head.ts` に `retarget` を足す**
 
-import を差し替える:
+import を差し替える（Task 3 で入れた `bare` を落とさないこと — `under` が使っている）:
 
 ```ts
 import type { DocView, HeadSpan } from "../coreApi.ts";
 import type { TextEdit } from "../edits.ts";
-import { parseImage } from "../map/cards.ts";
+import { bare, parseImage } from "../map/cards.ts";
 ```
 
 ファイル末尾に足す:
@@ -1144,6 +1144,14 @@ export function folderFromDoc(segments: string[]): string {
   const up = Math.max(0, segments.length - 1);
   return up === 0 ? "./" : "../".repeat(up);
 }
+```
+
+`normalizePath` を import から落とす（下で `selectBinding` を書き直すと、
+assets.ts に使い手がいなくなる。宣言の正規化は `main.ts` の `declaredFolder` が
+持つ。`noUnusedLocals` が付いているので、残すと型チェックが落ちる）:
+
+```ts
+import { under } from "./head.ts";
 ```
 
 `initAssets` のシグネチャを差し替える:
