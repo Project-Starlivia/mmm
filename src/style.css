@@ -194,8 +194,14 @@ html, body {
   &:hover, &.dragging { background: var(--accent); }
 }
 /* 片方だけのときは幅を動かせない。押せば分割へ戻るので、掴む形ではなく
-   押す形のカーソルにする */
-#panes.no-map #splitter, #panes.no-md #splitter { cursor: pointer; }
+   押す形のカーソルにする。**狭いときは対象外** — `:root:not(.narrow)` を
+   付けないと `#panes.no-map`/`#panes.no-md`（詳細度 (2,1,0)）が
+   `.narrow #splitter`（詳細度 (1,1,0)）に必ず勝ってしまい、狭いときの
+   `cursor: default` が一度も効かない死んだ規則になる。狭いときは押しても
+   分割へは戻らない（`pointerdown` が早期リターンする）ので、この
+   「押せば戻る」形のカーソルを見せるべきでもない */
+:root:not(.narrow) #panes.no-map #splitter,
+:root:not(.narrow) #panes.no-md #splitter { cursor: pointer; }
 
 /* ========== md のペイン ========== */
 

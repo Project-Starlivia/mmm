@@ -50,6 +50,30 @@ export function project(v: Vis, list: readonly Vis[]): Vis {
 const spotOf = (list: readonly Vis[], v: Vis): number =>
   list.findIndex((s) => s.md === v.md && s.map === v.map);
 
+/**
+ * `which` を出す / 引っ込める一手の行き先。**`project` のフォールバックには
+ * 任せない** — あちらは「行き先を言っていない要求」（境目をまたいだ・
+ * 両方消えた）専用で、常にマップへ丸めてしまうので、「md を出したい」
+ * のような名指しの要求に使うと要求そのものが無視される。
+ *
+ * 決め方は 2 つだけ:
+ * - **引っ込める。** 最後の 1 枚（もう片方が既に消えている）なら
+ *   「両方消えた」は作らないので、「もう片方を出す」一手として読む —
+ *   幅に関係なく、消される側の逆が残る。もう片方も出ていれば、ただ
+ *   その 1 枚だけを消す。
+ * - **出す。** 居場所が 2 つ（狭い）なら「両方」という置き場が無いので、
+ *   そのペイン 1 枚だけになる。3 つ（広い）なら相方はそのまま、その
+ *   ペインを足すだけ。
+ */
+export function toggled(v: Vis, which: "md" | "map", list: readonly Vis[]): Vis {
+  const other = which === "md" ? "map" : "md";
+  if (v[which]) {
+    if (!v[other]) return { md: which === "map", map: which === "md" };
+    return { ...v, [which]: false };
+  }
+  return list.length === 3 ? { ...v, [which]: true } : { md: which === "md", map: which === "map" };
+}
+
 /** その一手で何が起きるかを言う（矢印は向きを変えないので、言葉が担う） */
 function describe(from: Vis | undefined, to: Vis | undefined): string {
   if (!from || !to) return "";
@@ -116,28 +140,8 @@ export function initPanes(args: {
     if (next) applyPaneVis({ ...next });
   };
 
-  /**
-   * そのペインを表に出す。**「隠す」と違い `project` のフォールバックに
-   * 任せてはいけない** — フォールバックは「行き先を言っていない要求」
-   * （境目をまたいだ・両方消えた）のためのもので、「このペインを出したい」
-   * という名指しの要求に使うと、常にマップへ落ちて要求を無視してしまう
-   * （狭いときに md を指名しても、`project` の目には「両方」にしか見えず、
-   * マップが残る側へ丸められる）。だから行き先は先にここで決める:
-   * 広ければ今の相方はそのまま、狭ければ「両方」という居場所が無いので
-   * 指名したペイン以外は自動で退く。
-   */
-  const reveal = (which: "md" | "map"): void => {
-    const list = spots();
-    const want: Vis =
-      list.length === 3
-        ? { ...paneVis, [which]: true }
-        : { md: which === "md", map: which === "map" };
-    applyPaneVis(want);
-  };
-
   const togglePaneVis = (which: "md" | "map"): void => {
-    if (paneVis[which]) applyPaneVis({ ...paneVis, [which]: false });
-    else reveal(which);
+    applyPaneVis(toggled(paneVis, which, spots()));
   };
 
   goLeft.addEventListener("click", () => slide(-1));
@@ -146,10 +150,10 @@ export function initPanes(args: {
   // Mod+/: jump to the other pane, revealing it if hidden
   const togglePane = (): void => {
     if (mdPane.contains(document.activeElement)) {
-      reveal("map");
+      if (!paneVis.map) applyPaneVis(toggled(paneVis, "map", spots()));
       mapPane.focus();
     } else {
-      reveal("md");
+      if (!paneVis.md) applyPaneVis(toggled(paneVis, "md", spots()));
       args.focusEditor();
     }
   };
