@@ -417,21 +417,28 @@ fn cmd_flip_side(id : Int) -> Unit {
   if g < bounds.length() {
     set.push(set_sep_edit(bounds[g], root.depth, !bounds[g].flip))
   }
-  if g > 0 {
-    set.push(set_sep_edit(bounds[g - 1], root.depth, !bounds[g - 1].flip))
-  } else {
-    // 先頭のグループ: その最初の枝の手前へ切り替えを書き足す
-    let mut first_from = -1
-    for nd in st.nodes {
-      if nd.parent == root_id && nd.group == 0 {
-        first_from = nd.from
-        break
-      }
+  // 手前の境界は、このグループが**反対側**になるように整える。
+  // 先頭のグループでは「要らない境界は消す」まで含めて before_sep_edit が持つ
+  let mut first_from = -1
+  for nd in st.nodes {
+    if nd.parent == root_id && nd.group == g {
+      first_from = nd.from
+      break
     }
-    if first_from < 0 {
-      return // 直下の枝が無い = 動かすものが無い
+  }
+  if first_from < 0 {
+    return // 直下の枝が無い = 動かすものが無い
+  }
+  let mut prev : Node? = None
+  for nd in st.nodes {
+    if nd.parent == root_id && nd.to <= first_from {
+      prev = Some(nd)
     }
-    set.push(insert_sep_edit(first_from, root.depth, true))
+  }
+  match
+    before_sep_edit(bounds, prev, first_from, root.depth, !st.nodes[i].left) {
+    Some(e) => set.push(e)
+    None => ()
   }
   if set.length() == 0 {
     return
@@ -460,19 +467,12 @@ fn cmd_move_side_end(ids : Array[Int], root : Int, left : Bool) -> Unit {
   if ri < 0 {
     return
   }
-  // その側の最後の直下の枝と、側を問わない最後の直下の枝
-  // （後者は「無い側」に書く境界の flip を出すのに要る）
+  // その側の最後の直下の枝
   let mut last = -1
-  let mut has_any = false
-  let mut last_left = false
   for i = 0; i < st.nodes.length(); i = i + 1 {
     let nd = st.nodes[i]
-    if nd.parent == root {
-      has_any = true
-      last_left = nd.left
-      if nd.left == left {
-        last = nd.id
-      }
+    if nd.parent == root && nd.left == left {
+      last = nd.id
     }
   }
   with_sweep(fn() {
@@ -485,16 +485,34 @@ fn cmd_move_side_end(ids : Array[Int], root : Int, left : Bool) -> Unit {
       // その側の最後のグループの末尾へ（区切りは書かない）
       ignore(move_steps(ids, last, 2))
     } else {
-      // その側は空。ルートの最後の子にしてから、手前の側との差で境界を書く。
-      // 枝が 1 つも無いルートは、手前 = 右（false）とみなす
-      let prev_left = if has_any { last_left } else { false }
-      let flip = prev_left != left
+      // その側は空。ルートの最後の子にしてから、手前の境界を整える
       let first = move_steps(ids, root, 0)
-      if first >= 0 && flip {
-        let i = find_node(first)
-        if i >= 0 {
-          let at = st.nodes[i].from
-          apply_sets([[insert_sep_edit(at, st.nodes[find_node(root)].depth, true)]], "")
+      if first >= 0 {
+        // 塊の範囲は、動かしたものを id で引き直して出す（id は移動をまたいで生きる）
+        let mut head_from = -1
+        for id in order {
+          let i = find_node(id)
+          if i >= 0 && (head_from < 0 || st.nodes[i].from < head_from) {
+            head_from = st.nodes[i].from
+          }
+        }
+        let ri2 = find_node(root)
+        if head_from >= 0 && ri2 >= 0 {
+          // **手前の枝は、動かした後に本当に前に居るもの**。動かす塊自身を
+          // 数えると、塊が全部だったとき「自分の今の側」を手前と誤読する
+          let mut prev : Node? = None
+          for nd in st.nodes {
+            if nd.parent == root && nd.to <= head_from {
+              prev = Some(nd)
+            }
+          }
+          match
+            before_sep_edit(
+              tree_bounds(ri2), prev, head_from, st.nodes[ri2].depth, left,
+            ) {
+            Some(e) => apply_sets([[e]], "")
+            None => ()
+          }
         }
       }
     }
@@ -597,38 +615,9 @@ fn cmd_move_new_group(
       }
       None => () // 末尾に置いた = 後ろの境界は要らない
     }
-    match prev {
-      Some(pv) => {
-        let want = pv.left != left
-        match last_bound_before(bounds, head_from) {
-          Some(b) =>
-            if b.start >= pv.to {
-              set.push(set_sep_edit(b, root_depth, want))
-            } else {
-              set.push(insert_sep_edit(head_from, root_depth, want))
-            }
-          None => set.push(insert_sep_edit(head_from, root_depth, want))
-        }
-      }
-      None => {
-        // 手前に枝が無い = 先頭のグループ。虚の「手前」は側 false（右）から
-        // 始まると考える。ここでも Some(pv) の腕とまったく同じ規則
-        // 「既にある境界は必ず正す」にかける — 手前に枝が無くても、
-        // ルート直後に境界が既にある（左始まりの文書）ことはあるため、
-        // それを無視すると古い側がそのまま塊に被ってしまう
-        // （手前に「境界を正す相手」が居ない、というだけで判定式は同じ）。
-        // 違いは「境界が無いとき」だけ: 新しく書くのは側を変えたいときに限る
-        // （書く境界の位置は head_from = 枝自身の行頭。ルート見出しの直後は
-        // ブロックの境目ではないため書けない — cmd_flip_side と同じ理由）
-        let want = left
-        match last_bound_before(bounds, head_from) {
-          Some(b) => set.push(set_sep_edit(b, root_depth, want))
-          None =>
-            if want {
-              set.push(insert_sep_edit(head_from, root_depth, want))
-            }
-        }
-      }
+    match before_sep_edit(bounds, prev, head_from, root_depth, left) {
+      Some(e) => set.push(e)
+      None => ()
     }
     if set.length() > 0 {
       sort_edits(set)

@@ -490,11 +490,14 @@ test "手前に枝が無くても、既にある先頭の境界は必ず正す�
   // 効いている（左始まりの表現）。それを無視すると x は古い切り替えを
   // そのまま被って左に着地し、後ろの腕が a との間に書く境界も古い a.left
   // を基準にしてしまい、無関係な a の側まで変わってしまう
+  //
+  // 「正す」の中身は**消す**こと。x を右にしたい先頭では切り替えが要らず、
+  // 先頭の境界の効果は切り替えだけなので、残せば何の意味も持たない行になる
   ignore(init_doc("# r\n\n---\n---\n\n## a\n\n## x\n"))
   let a = st.nodes[1].id
   let x = st.nodes[2].id
   ignore(move_new_group([x], a, true, false))
-  assert_eq(get_text(), "# r\n\n---\n\n## x\n\n---\n---\n\n## a\n")
+  assert_eq(get_text(), "# r\n\n## x\n\n---\n---\n\n## a\n")
   assert_eq(side_of("x"), false) // 指定どおり右
   assert_eq(side_of("a"), true) // 操作対象でない a の側は変わらない
 }
@@ -589,5 +592,47 @@ test "壁を越えた並べ替えも undo は 1 回で戻る" {
   ignore(reorder_node(st.nodes[2].id, -1, true))
   ignore(undo())
   assert_eq(get_text(), src)
+  assert_eq(side_of("b"), true)
+}
+
+///|
+/// 先頭の境界は「切り替えが要るなら 1 本、要らないなら無い」。
+/// 効果の無い細い境界を残さないし、打ち消すためにもう 1 本足したりもしない。
+test "その側の枝を全部反対側へ送ると、先頭の境界は消える" {
+  ignore(init_doc("# r\n\n---\n---\n\n## a\n"))
+  ignore(move_side_end([st.nodes[1].id], st.nodes[0].id, false))
+  assert_eq(get_text(), "# r\n\n## a\n")
+  assert_eq(side_of("a"), false)
+}
+
+///|
+test "枝が複数でも、全部送れば先頭の境界は消える" {
+  ignore(init_doc("# r\n\n---\n---\n\n## a\n\n## b\n"))
+  ignore(
+    move_side_end([st.nodes[1].id, st.nodes[2].id], st.nodes[0].id, false),
+  )
+  assert_eq(get_text(), "# r\n\n## a\n\n## b\n")
+  assert_eq(side_of("a"), false)
+  assert_eq(side_of("b"), false)
+}
+
+///|
+/// 反転は自分自身が逆操作。2 回かければ**バイト単位で**元に戻る。
+test "flip_side を 2 回かけると元のテキストに戻る" {
+  let src = "# r\n\n## a\n"
+  ignore(init_doc(src))
+  ignore(flip_side(st.nodes[1].id))
+  assert_eq(get_text(), "# r\n\n---\n---\n\n## a\n")
+  ignore(flip_side(st.nodes[1].id))
+  assert_eq(get_text(), src)
+}
+
+///|
+test "先頭のグループを右へ戻すと、効果の無い境界は残らない" {
+  ignore(init_doc("# r\n\n---\n---\n\n## a\n\n## b\n"))
+  // a を先頭の右の新グループへ。先頭の切り替えは要らなくなるので消える
+  ignore(move_new_group([st.nodes[1].id], st.nodes[2].id, true, false))
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n---\n\n## b\n")
+  assert_eq(side_of("a"), false)
   assert_eq(side_of("b"), true)
 }

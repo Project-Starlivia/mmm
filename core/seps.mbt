@@ -241,6 +241,53 @@ fn first_bound_after(bounds : Array[Bound], at : Int) -> Bound? {
   None
 }
 
+///|
+/// `at` から始まる塊が `left` の側になるように、**その手前の境界**を整える編集。
+/// 直すところが無ければ None。
+///
+/// 塊を置く・動かす・裏返すコマンドは全部これを通る。手前の境界をどうするかは
+/// 置き方によらず同じ問いなので、**規則はここ 1 か所にしか無い**。
+///
+/// `prev` は塊の直前にあるルート直下の枝。無い（塊が先頭）なら None を渡す。
+///
+/// - **手前に枝がある** … そこがグループの切れ目なので、境界は必ず 1 本要る。
+///   同じ側なら分割の 1 本、違う側なら切り替え
+/// - **手前に枝が無い（先頭）** … 文書は右から始まるので、境界の効果は
+///   **切り替えだけ**。在るべき姿は「左にしたいなら 1 本、右にしたいなら**無い**」。
+///   要らない境界は書き直さずに**消す** — 何の効果も持たない行を残すのは、
+///   打ち消すためにもう 1 本足すのと同じ種類の誤り
+fn before_sep_edit(
+  bounds : Array[Bound],
+  prev : Node?,
+  at : Int,
+  root_depth : Int,
+  left : Bool,
+) -> Edit? {
+  let want = match prev {
+    Some(pv) => pv.left != left
+    None => left // 虚の「手前」は右
+  }
+  // 手前の枝と塊のあいだにある境界だけが、この塊の側を決めている
+  let hit = match last_bound_before(bounds, at) {
+    Some(b) =>
+      match prev {
+        Some(pv) => if b.start >= pv.to { Some(b) } else { None }
+        None => Some(b)
+      }
+    None => None
+  }
+  let lead = prev is None
+  match hit {
+    Some(b) =>
+      if lead && !want {
+        Some(remove_sep_edit(b))
+      } else {
+        Some(set_sep_edit(b, root_depth, want))
+      }
+    None => if lead && !want { None } else { Some(insert_sep_edit(at, root_depth, want)) }
+  }
+}
+
 // ---- 掃除 ----
 //
 // **不変条件: どの操作の前後でも、操作対象でないグループの側は変わらない。**
