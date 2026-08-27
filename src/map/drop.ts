@@ -5,7 +5,7 @@
 // 塗る仕事から切り離して、ここだけを単体で試せるようにしてある。
 
 import { type Pt, centerOf, distToSeg } from "./geometry.ts";
-import { type Box, GAP } from "./layout.ts";
+import { type Box, GAP, dirOf } from "./layout.ts";
 
 /**
  * 落とし先。
@@ -54,10 +54,19 @@ const NEAR = REACH * 0.4; // ここまでは前後への挿入より子を優先
 const SLACK = 18; // 外側ゾーンが兄弟軸方向に箱からはみ出してよい量
 const AMBIGUOUS = 26; // 候補どうしがこれより競っていれば迷う場面とみなす
 
-/** 箱の中心から見たポインタの位置と、箱の半分の大きさ */
+/**
+ * 箱の中心から見たポインタの位置と、箱の半分の大きさ。
+ * `du` は**その枝が伸びる向き**を正とする（左の枝では左が正）ので、
+ * 外側ゾーンの式を左右で書き分けなくてよい。
+ */
 function local(at: Pt, b: Box) {
   const c = centerOf(b);
-  return { du: at.x - c.x, dv: at.y - c.y, hu: b.w / 2, hv: b.h / 2 };
+  return {
+    du: (at.x - c.x) * dirOf(b.n),
+    dv: at.y - c.y,
+    hu: b.w / 2,
+    hv: b.h / 2,
+  };
 }
 
 /**

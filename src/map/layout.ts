@@ -355,6 +355,8 @@ export function edgeEnds(L: Layout, id: number): { from: Pt; to: Pt } | null {
   const pid = L.parentOf.get(id);
   const p = pid === undefined ? undefined : L.boxes.get(pid);
   if (!b || !p) return null;
-  const e = rightOf(p);
-  return { from: { x: e.x, y: e.y + (L.fanOf.get(id) ?? 0) }, to: leftOf(b) };
+  // 線は「親の、子が伸びる側の辺」から出て「子の、親を向いた辺」へ入る
+  const out = dirOf(b.n) === 1 ? rightOf(p) : leftOf(p);
+  const into = dirOf(b.n) === 1 ? leftOf(b) : rightOf(b);
+  return { from: { x: out.x, y: out.y + (L.fanOf.get(id) ?? 0) }, to: into };
 }

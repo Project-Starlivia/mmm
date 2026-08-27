@@ -105,3 +105,18 @@ test("1 つしか選んでいなければ、戻っても縮まない", () => {
   // 自分だけを外して空にはしない
   assert.deepEqual(extendSelection(new Set([2]), 2, 2), [2]);
 });
+
+test("左の枝では、矢印は画面の向きに従う", () => {
+  // r(1) ← a(2) ← a1(3) の並び（a は左の枝）
+  const nodes = [
+    { ...node(1, 1, -1), left: false },
+    { ...node(2, 2, 1), left: true },
+    { ...node(3, 3, 2), left: true },
+  ];
+  const L = layoutOf(nodes);
+  // 左の枝では ← が子、→ が親
+  assert.equal(arrowTarget(nodes, L, 2, "ArrowLeft"), 3);
+  assert.equal(arrowTarget(nodes, L, 2, "ArrowRight"), 1);
+  // 右のまま（ルート）は従来どおり → が子
+  assert.equal(arrowTarget(nodes, L, 1, "ArrowRight"), 2);
+});

@@ -147,3 +147,12 @@ test("親が違う候補が競っているときだけ、どの親につくか�
   );
   assert.equal(d.ambiguous, true);
 });
+
+test("左の枝では、外側ゾーンも左へ伸びる", () => {
+  // ルート(1) の左に子(2)。子の左 30px は「2 の子にする」ゾーン
+  const root = box(1, 1, 0, 100);
+  const kid = { ...box(2, 2, -145, 100) };
+  kid.n = { ...kid.n, left: true };
+  const s = scene([root, kid], [[2, 1]], { x: -175, y: 115 });
+  assert.deepEqual(resolveDrop(s).target, { id: 2, pos: 0 });
+});

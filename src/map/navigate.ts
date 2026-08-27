@@ -48,7 +48,9 @@ export function arrowTarget(
     const step = key === "ArrowUp" ? -1 : 1;
     return level[(i + step + level.length) % level.length].id;
   }
-  if (key === "ArrowLeft") return cur.parent;
+  // 左右は**画面の向き**で読む。左の枝では ← が子、→ が親
+  const toParent = key === (cur.left ? "ArrowRight" : "ArrowLeft");
+  if (toParent) return cur.parent;
   const kid = nodes.find((n) => n.parent === anchor && layout.boxes.has(n.id));
   return kid?.id ?? order[0];
 }
