@@ -49,6 +49,7 @@ import { indicatorFor, isVisible } from "./map/indicator.ts";
 import { ContextMenu, type MenuEntry } from "./map/menu.ts";
 import { MapRenderer } from "./map/render.ts";
 import { CardPick } from "./map/pick.ts";
+import { AddButtons } from "./map/addButtons.ts";
 import { mapToSvg } from "./map/toSvg.ts";
 import { svgEl } from "./map/svg.ts";
 import { icon } from "./icons.ts";
@@ -153,6 +154,9 @@ export class MindMap {
   private dropHint: SVGPathElement; // どの親につくかを示す予告の曲線
   /** 選んでいるカードに被せる枠と ×（常に高々 1 枚なので 1 個だけ持つ） */
   private pick = new CardPick();
+  /** 選んでいるノードの上下左右に出る `+`（出すかどうかは人が決める） */
+  private adds = new AddButtons();
+  private addsOn = false;
   private rubber: HTMLDivElement;
   private editor: HTMLInputElement;
   private editBox: HTMLDivElement;
@@ -222,6 +226,7 @@ export class MindMap {
       this.renderer.edgeLayer,
       this.renderer.nodeLayer,
       this.pick.el,
+      this.adds.el,
       this.dropHint,
       this.dropLine,
     );
@@ -294,6 +299,7 @@ export class MindMap {
     this.ty = v.ty;
     this.applyTransform();
     this.updateIndicator();
+    this.updateAdds();
   }
 
   /** ペインの大きさ（画面 px） */
@@ -410,6 +416,7 @@ export class MindMap {
       this.renderer.edgeEl(this.dropEdgeId)?.classList.add("drop-edge");
     }
     this.showPick();
+    this.updateAdds();
   }
 
   /** 選んでいるカードの上に印を置き直す（レイアウトか選択が動いたら呼ぶ） */
@@ -485,6 +492,7 @@ export class MindMap {
     this.cardEditor.focus();
     const end = this.cardEditor.value.length;
     this.cardEditor.setSelectionRange(from ?? end, to ?? from ?? end);
+    this.updateAdds();
   }
 
   /** 色付き層を今の中身で塗り直す（打つたびに呼ぶ） */
@@ -544,6 +552,7 @@ export class MindMap {
   private endCardEdit(): void {
     this.editingCard = null;
     this.editBox.style.display = "none";
+    this.updateAdds();
   }
 
   /** Center the whole tree in the pane (file open / initial view). If the
@@ -708,6 +717,7 @@ export class MindMap {
     // never select-all; caret at the end
     const pos = this.editor.value.length;
     this.editor.setSelectionRange(pos, pos);
+    this.updateAdds();
   }
 
   /** 入力欄の現在値を文書へ反映する（変換確定後にだけ呼ぶ）。 */
@@ -727,6 +737,7 @@ export class MindMap {
     this.editingTag = "";
     this.editor.style.display = "none";
     this.pane.focus();
+    this.updateAdds();
   }
 
   /** ラベルの入力欄が開いているか（確定は host.commitEdit が持つ）。 */
@@ -761,6 +772,39 @@ export class MindMap {
     st.fontSize = `${p.fontSize}px`;
     st.paddingLeft = `${p.padding}px`;
     st.paddingRight = `${p.padding}px`;
+  }
+
+  // ---------- 選択ノードの `+` ----------
+
+  /**
+   * 出すかどうかを切り替える。**保存も既定の判定もここは知らない** —
+   * 「いま出すか」だけを受け取る（main.ts が持ち主）。
+   */
+  setAddButtons(on: boolean): void {
+    this.addsOn = on;
+    this.updateAdds();
+  }
+
+  /**
+   * 出す条件は「迷いようが無いとき」だけ — 選択がちょうど 1 つ、カードを
+   * 選んでいない、編集中でない、ドラッグ中でない。
+   */
+  private updateAdds(): void {
+    const id = this.host.anchor();
+    const b = this.boxes.get(id);
+    if (
+      !this.addsOn ||
+      !b ||
+      this.host.selection().size !== 1 ||
+      this.host.pickedCard() !== null ||
+      this.dragging ||
+      this.isEditing()
+    ) {
+      this.adds.hide();
+      return;
+    }
+    // ルートは親で包めない（core の cmd_add_parent が深さ 1 を弾く）
+    this.adds.show(b, this.k, b.n.depth > 1);
   }
 
   // ---------- events ----------
@@ -852,6 +896,11 @@ export class MindMap {
       // 使われないまま残っていたら、ここで落とす（残すとユーザーの
       // 次の 1 クリックを食う）
       this.suppressClick = false;
+      // `+` の上での押下は、そのボタンのもの。下のキャンバスへ渡さない
+      if (targetIn(e, "[data-add]")) {
+        e.stopPropagation();
+        return;
+      }
       // 入力欄の中のクリックはカーソルを置くためのもので、確定ではない。
       // ここで pane.focus() まで進むと、押した瞬間に blur して閉じてしまう
       if (e.target === this.editor) return;
@@ -1100,6 +1149,18 @@ export class MindMap {
     pane.addEventListener("click", (e) => {
       if (this.suppressClick) {
         this.suppressClick = false;
+        return;
+      }
+      // `+` は選んでいるノードにだけ出ている。押されたらその向きに 1 つ足す
+      const add = targetIn(e, "[data-add]")?.getAttribute("data-add");
+      if (add === "child" || add === "below" || add === "above" || add === "parent") {
+        const id = this.host.anchor();
+        if (id !== -1) {
+          if (add === "child") this.host.addChild(id);
+          else if (add === "below") this.host.addSibling(id);
+          else if (add === "above") this.host.addSiblingBefore(id);
+          else this.host.addParent(id);
+        }
         return;
       }
       // × は選ばれているカードにだけ出ている。押されたらその行ごと消す
@@ -1476,6 +1537,7 @@ export class MindMap {
     }
     this.dragging = { ids, subtree };
     for (const id of subtree) this.markNode(id, "dragging");
+    this.updateAdds();
   }
 
   /**
@@ -1582,6 +1644,7 @@ export class MindMap {
     this.lastPointer = null;
     this.dropLine.setAttribute("visibility", "hidden");
     this.dropHint.setAttribute("visibility", "hidden");
+    this.updateAdds();
   }
 
   // ---------- context menu ----------
@@ -1656,5 +1719,6 @@ export class MindMap {
     this.renderer.refreshSelection(this.host.selection());
     this.showPick();
     this.updateIndicator();
+    this.updateAdds();
   }
 }

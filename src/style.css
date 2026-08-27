@@ -536,6 +536,18 @@ html, body {
   }
 }
 
+/* 選んでいるノードの上下左右に出る `+`。**的は見た目より広い** —
+   指は 9px の丸の縁を正確には狙えないので、透明な当たり判定を被せる
+   （見えている丸まで指の的の大きさにすると、ノードより目立つ） */
+.add-btn {
+  cursor: pointer;
+
+  & .hit { fill: transparent; }
+  & .face { fill: var(--accent); }
+  & line { stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+  &:hover .face { filter: brightness(1.25); }
+}
+
 /* ========== 落とし先の示し ========== */
 
 #drop-line {
