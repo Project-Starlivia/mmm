@@ -35,7 +35,7 @@ fn valid_bounds(
   let mut k = 0
   for r in seps {
     // k = そのかたまりより後ろの最初のノード。区切りもノードも文書順なので
-    // 巻き戻らない(両方を 1 度ずつ歩けば足りる)
+    // 巻き戻らない（両方を 1 度ずつ歩けば足りる）
     while k < hn && heads[k].from < r.start {
       k = k + 1
     }
@@ -192,6 +192,9 @@ fn remove_sep_edit(b : Bound) -> Edit {
 
 ///|
 /// ノード添字 → その木の根の添字。
+///
+/// 前提: `parent` の連なりは非巡回（`rebuild_nodes` がスタック走査で組むため
+/// 常に成立）。巡回していたら下の while は無限ループになる。
 fn root_index_of(i : Int) -> Int {
   let mut k = i
   while st.nodes[k].parent != -1 {

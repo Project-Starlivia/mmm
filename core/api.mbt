@@ -305,7 +305,7 @@ pub fn move_as_parent(ids : Array[Int], target : Int) -> String {
 
 ///|
 /// dir: -1 = 前の兄弟と入れ替え、1 = 次の兄弟と。
-/// `cross` ならグループの壁を越える（Mod+Alt+↑↓）。
+/// `cross` ならグループの壁を越える（越えた先のグループの側になる）。
 pub fn reorder_node(id : Int, dir : Int, cross : Bool) -> String {
   cmd_reorder(id, dir, cross)
   take_snapshot()
@@ -326,7 +326,7 @@ pub fn move_side_end(ids : Array[Int], root : Int, left : Bool) -> String {
 }
 
 ///|
-/// Mod+ドロップ: 選んだ枝を、target の直前 / 直後へ新しいグループとして置く。
+/// 選んだ枝を、target の直前 / 直後へ新しいグループとして置く。
 pub fn move_new_group(
   ids : Array[Int],
   target : Int,
