@@ -89,8 +89,10 @@ export async function mapToSvg(args: {
   // カードの選択枠と × は、ノードの中ではなく world に浮かぶ別の印なので、
   // 呼ぶ側が渡してくるエッジ / ノードには最初から入っていない
   // 継ぎ目は親子の線と同じ「そのまま写す」経路（PROPS の焼き込み）を通す。
-  // 意味は違っても、扱い方は edges 側と同じなので同じ器に入れる
-  for (const orig of [...markEls, ...edgeEls]) {
+  // 意味は違っても、扱い方は edges 側と同じなので同じ器に入れる。
+  // 画面では edgeLayer → seamLayer の順に重ねて継ぎ目を線の上に出すので、
+  // ここも同じ順（先に置いたものが下）で揃える
+  for (const orig of [...edgeEls, ...markEls]) {
     const copy = orig.cloneNode(true);
     if (!(copy instanceof SVGElement)) return null;
     inline(orig, copy);
