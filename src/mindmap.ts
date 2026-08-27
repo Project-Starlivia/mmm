@@ -925,8 +925,35 @@ export class MindMap {
    */
   private bindPointer(): void {
     const pane = this.pane;
-    // `+` ボタンとリンクの ↗ は pointerdown を止めるので、ここへ来るのは
-    // ペイン / ノード / 入力欄の上での押下だけ
+
+    // **生きている指は、1 本残らずここに載る。** 台帳がこの不変を失うと、
+    // 載らなかった指の pointermove が下の「1 本ぶん」の流れへ落ち、**別の指の
+    // 始点**との差でパンやドラッグが進む（2 本目のタップで地図が指の間隔ぶん
+    // 跳ぶ、頼んでいない `host.move()` が走る）。
+    //
+    // だから **capture で取る。** ペインの上には pointerdown を止めるものが
+    // 3 つある（`+` / リンクの ↗ / `.pane-tool`）ので、下の pointerdown には
+    // 届かない指がある。どれにも止められない場所はここしかない。
+    pane.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (e.pointerType !== "touch") return;
+        const p = this.local(e.clientX, e.clientY);
+        this.fingers.down(e.pointerId, p.x, p.y);
+        if (!this.fingers.pinching) return;
+        // 2 本目が乗ったら長押しも畳む — 2 本を静止で構えたまま待たれても、
+        // 頼んでいないメニューは開かない
+        this.dropHold();
+        // 2 本目が乗った時点で、1 本ぶんの操作はすべて畳む。**指を足しただけで
+        // ノードが動いたり範囲が選ばれたりしない**
+        this.cancelPointerOp();
+      },
+      true,
+    );
+
+    // ここへ来るのは、上の 3 つに止められなかった押下だけ（ペイン / ノード /
+    // 入力欄の上）。**台帳は capture 側で済んでいる**ので、ここが見るのは
+    // 「いま何本目か」の答えだけ
     pane.addEventListener("pointerdown", (e) => {
       // 新しい操作の始まり。前の操作が立てた「次の click は捨てる」印が
       // 使われないまま残っていたら、ここで落とす（残すとユーザーの
@@ -934,28 +961,15 @@ export class MindMap {
       this.suppressClick = false;
       // 長押しメニューの「開き直させない」印も、次の押下でかならず下ろす
       this.suppressContextMenu = false;
-      // `+` の上での押下は、そのボタンのもの。下のキャンバスへ渡さない
-      if (targetIn(e, "[data-add]")) {
-        e.stopPropagation();
-        return;
-      }
+      // `+` の上での押下は、そのボタンのもの。**折り返すだけにする** —
+      // このリスナ自身がペインの担当なので、下の選択やパンの仕込みを止めるのは
+      // この `return`。`stopPropagation` を足しても下へは効かず、上の document で
+      // 待っている「外を押されたら閉じる」（map/menu.ts と map/radialMenu.ts）を
+      // 殺すだけになる（長押しで開いたメニューを残したまま `+` が効いていた）
+      if (targetIn(e, "[data-add]")) return;
       if (e.pointerType === "touch") {
-        const p = this.local(e.clientX, e.clientY);
-        this.fingers.down(e.pointerId, p.x, p.y);
-        // 2 本目が乗った時点で、1 本ぶんの操作はすべて畳む。**指を足しただけで
-        // ノードが動いたり範囲が選ばれたりしない**
-        if (this.fingers.pinching) {
-          // 2 本目が乗ったら長押しも畳む — 2 本を静止で構えたまま
-          // 待たれても、頼んでいないメニューは開かない
-          this.dropHold();
-          this.panning = null;
-          this.rubberStart = null;
-          this.rubber.style.display = "none";
-          this.dragCand = null;
-          if (this.dragging) this.stopDragVisuals();
-          pane.style.cursor = "";
-          return;
-        }
+        // 2 本乗っているあいだは、1 本ぶんの操作を新しく始めない
+        if (this.fingers.pinching) return;
         this.holdAt = { x: e.clientX, y: e.clientY };
         this.hold = setTimeout(() => {
           const at = this.holdAt;
@@ -1129,29 +1143,7 @@ export class MindMap {
       // return するので、後ろに置くと長押しの見張りが残ったまま生き残り、
       // 何も無いところで後からメニューが開いてしまう
       this.dropHold();
-      if (e.pointerType === "touch") {
-        const wasPinching = this.fingers.pinching;
-        this.fingers.up(e.pointerId);
-        // 2 本目を離した指で、選択やドラッグの後始末を走らせない
-        if (wasPinching) {
-          // 組が壊れて 1 本だけ残ったなら、そこから 1 本パンを立て直す。
-          // 実機では残った指の pointerdown は来ない（触れたままなので）ので、
-          // ここで自分から panning を立てないと、指が動いても地図が固まる。
-          // 残った指は capture を持っていないが、ペインの上に指があるあいだは
-          // pointermove がそのまま届くので実害は無い
-          const solo = this.fingers.only();
-          if (!this.fingers.pinching && solo) {
-            const r = pane.getBoundingClientRect();
-            this.panning = {
-              px: solo.x + r.left,
-              py: solo.y + r.top,
-              ox: this.tx,
-              oy: this.ty,
-            };
-          }
-          return;
-        }
-      }
+      if (e.pointerType === "touch" && this.liftFinger(e.pointerId)) return;
       if (this.cardDrag) {
         const from = this.cardDrag.ref;
         const to = this.cardDrop;
@@ -1223,20 +1215,65 @@ export class MindMap {
       }
     });
 
-    pane.addEventListener("pointercancel", () => {
-      // pen/touch cancellation must not leave a drag/pan/rubber stuck
+    // 攫われたポインタが、ドラッグ / パン / 矩形選択を掴んだままにしない。
+    // **攫われるのも 1 本ずつ**（Chromium は pointercancel をポインタごとに
+    // 投げる）なので、台帳から抜くのはその 1 本だけ — 台帳ごと捨てると、
+    // ピンチの片方が攫われただけで**まだ触れている指まで台帳から消え**、
+    // その指の move が 1 本ぶんの流れへ落ちて地図が固まっていた
+    pane.addEventListener("pointercancel", (e) => {
       this.dropHold();
-      this.fingers.clear();
-      this.panning = null;
-      this.rubberStart = null;
-      this.rubber.style.display = "none";
-      this.dragCand = null;
-      if (this.dragging) this.stopDragVisuals();
-      this.cardDrag = null;
-      this.cardDrop = null;
-      this.dropLine.setAttribute("visibility", "hidden");
-      pane.style.cursor = "";
+      if (e.pointerType === "touch" && this.liftFinger(e.pointerId)) return;
+      this.cancelPointerOp();
     });
+  }
+
+  /**
+   * 台帳から 1 本抜く。**組が壊れて 1 本だけ残ったら、その指から 1 本パンを
+   * 立て直す** — 実機では残った指の pointerdown は来ない（触れたままなので）
+   * ので、ここで自分から `panning` を立てないと、指が動いても地図が固まる。
+   * 残った指は capture を持っていないが、ペインの上に指があるあいだは
+   * pointermove がそのまま届くので実害は無い。
+   *
+   * 2 本目だった指なら true。**呼び出し側は 1 本ぶんの後始末を走らせない** —
+   * 抜けたのは組の片割れで、選択もドロップもその指のものではない。
+   */
+  private liftFinger(id: number): boolean {
+    const wasPinching = this.fingers.pinching;
+    this.fingers.up(id);
+    if (!wasPinching) return false;
+    const solo = this.fingers.only();
+    if (solo && !this.fingers.pinching) {
+      const r = this.pane.getBoundingClientRect();
+      this.panning = {
+        px: solo.x + r.left,
+        py: solo.y + r.top,
+        ox: this.tx,
+        oy: this.ty,
+      };
+    }
+    return true;
+  }
+
+  /**
+   * いま進んでいる 1 本ぶんの操作を、**何も起こさずに**畳む。パン / 矩形選択 /
+   * ノードのドラッグ / カードのドラッグは同時に高々 1 つなので、まとめて 1 か所。
+   *
+   * 呼ぶのは 2 つ — 2 本目の指が乗ったとき（指を足しただけで文書が動かない）と、
+   * ポインタが攫われたとき。どちらも「この操作は無かったことにする」で、
+   * 落とし先も選択も確定しない。**1 つでも取りこぼすと、押している指が無いのに
+   * 状態だけが生き残る**（cardDrag を残していた頃は、ピンチのあと `panning` が
+   * 古い差分を抱えたままになり、次のタップで地図が跳んだ）。
+   */
+  private cancelPointerOp(): void {
+    this.panning = null;
+    this.rubberStart = null;
+    this.rubber.style.display = "none";
+    this.dragCand = null;
+    if (this.dragging) this.stopDragVisuals();
+    this.cardDrag = null;
+    this.cardDrop = null;
+    this.dropLine.setAttribute("visibility", "hidden");
+    this.pane.style.cursor = "";
   }
 
   /**

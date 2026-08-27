@@ -68,9 +68,4 @@ export class Fingers {
     this.pair = null;
     this.form();
   }
-
-  clear(): void {
-    this.at.clear();
-    this.pair = null;
-  }
 }

@@ -68,14 +68,6 @@ test("3 本目は組に入れない — 最初の 2 本を使い続ける", () =
   assert.deepEqual(f.move(2, 140, 0)?.to.b, { x: 140, y: 0 });
 });
 
-test("clear ですべて忘れる", () => {
-  const f = new Fingers();
-  f.down(1, 0, 0);
-  f.down(2, 100, 0);
-  f.clear();
-  assert.equal(f.pinching, false);
-});
-
 test("only: 0 本なら null", () => {
   const f = new Fingers();
   assert.equal(f.only(), null);

@@ -5,19 +5,23 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { type AddDir, addSpots } from "../src/map/addButtons.ts";
-
-type AddSpotList = ReturnType<typeof addSpots>;
+import { type AddDir, type AddSpot, addSpots } from "../src/map/addButtons.ts";
 
 const BOX = { x: 100, y: 200, w: 60, h: 20 };
 
 const dirs = (canParent: boolean): AddDir[] =>
   addSpots(BOX, { x: 10, y: 10 }, canParent).map((s) => s.dir);
 
-const at = (dir: AddDir): { x: number; y: number } => {
-  const found = addSpots(BOX, { x: 10, y: 10 }, true).find((s) => s.dir === dir);
+/** その向きの置き場所。無ければ試験の前提が崩れているので落とす */
+const spotOf = (list: AddSpot[], dir: AddDir): AddSpot => {
+  const found = list.find((s) => s.dir === dir);
   if (!found) throw new Error(`${dir} が無い`);
-  return { x: found.x, y: found.y };
+  return found;
+};
+
+const at = (dir: AddDir): { x: number; y: number } => {
+  const { x, y } = spotOf(addSpots(BOX, { x: 10, y: 10 }, true), dir);
+  return { x, y };
 };
 
 test("マップが伸びる向きと木の意味が一致する", () => {
@@ -38,22 +42,19 @@ test("ルートには親を足せないので、その置き場所も出さな�
 test("隙間は箱の外側へ開く", () => {
   const wide = addSpots(BOX, { x: 40, y: 40 }, true);
   const near = addSpots(BOX, { x: 10, y: 10 }, true);
-  const x = (list: AddSpotList, dir: AddDir): number => {
-    const found = list.find((s) => s.dir === dir);
-    if (!found) throw new Error(`${dir} が無い`);
-    return found.x;
-  };
-  assert.ok(x(wide, "child") > x(near, "child"));
-  assert.ok(x(wide, "parent") < x(near, "parent"));
+  assert.ok(spotOf(wide, "child").x > spotOf(near, "child").x);
+  assert.ok(spotOf(wide, "parent").x < spotOf(near, "parent").x);
 });
 
-test("上下の隙間が 0 なら、丸の中心は箱の縁ちょうどに乗る", () => {
+test("左右と上下は、それぞれの隙間を読む", () => {
   // 兄弟の縦間隔は 10px しかない。丸を箱の外に出すと隣の箱に食い込むので、
-  // 中心を縁の上に置いて丸を内外に半分ずつ張り出させる
+  // 中心を縁の上に置いて丸を内外に半分ずつ張り出させる。
+  //
+  // **左右と上下を違えた隙間で見る。** 揃った隙間だけで試すと、左右が
+  // うっかり `gap.y` を読んでいても誰も落ちない
   const spots = addSpots(BOX, { x: 10, y: 0 }, true);
-  const above = spots.find((s) => s.dir === "above");
-  const below = spots.find((s) => s.dir === "below");
-  if (!above || !below) throw new Error("above/below が無い");
-  assert.equal(above.y, BOX.y);
-  assert.equal(below.y, BOX.y + BOX.h);
+  assert.equal(spotOf(spots, "above").y, BOX.y);
+  assert.equal(spotOf(spots, "below").y, BOX.y + BOX.h);
+  assert.equal(spotOf(spots, "child").x, BOX.x + BOX.w + 10);
+  assert.equal(spotOf(spots, "parent").x, BOX.x - 10);
 });

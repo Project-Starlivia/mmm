@@ -346,7 +346,11 @@ html, body {
    メディアクエリで見る（狭くしただけのデスクトップの窓を太らせない）。
    狭いところでは、切り替えの矢印がペインを行き来する唯一の手段になる */
 @media (pointer: coarse) {
-  .pane-tool button { min-height: 44px; }
+  /* **縦だけ太らせても的にはならない。** 26px 幅のままだと、隙間なく 3 つ
+     並ぶ書き方ピッカー（H / n+ / L）は隣を押しやすく、外すと文書ぜんぶの
+     木の書き方が入れ替わる — マップ側のどのボタンより取り返しが遠い。
+     幅も 44px にする（3 つで 132px。いちばん狭い窓でも収まる） */
+  .pane-tool button { min-height: 44px; min-width: 44px; }
   #pane-switch button { width: 44px; height: 44px; }
   #pane-switch button .icon { width: 16px; height: 16px; }
 }
@@ -834,8 +838,15 @@ html, body {
 .popup-hint { flex: 1; font-size: 11px; color: var(--ink-dim); }
 
 /* ========== 狭いとき ==========
-   片方だけを出す。**どちらを出すかは JS で持たない** — マップが on なら
-   マップ、off なら md。切り替えは Alt+1 / Alt+2 がそのまま担う。 */
+   **どちらのペインを出すかは、ここでは決めない。** 居場所（狭ければ
+   「md だけ / マップだけ」の 2 つ）を持つのは `app/panes.ts` の
+   `spotsFor` / `project` / `toggled` で、結果は `.pane-off` として降りてくる
+   — 隠す規則は幅に関わらず 1 つきり（上の `.pane-off`）。
+   ここに残るのは、狭さそのものから決まる詰め方だけ。
+
+   幅で振る舞いを変えるものは `<html class="narrow">` を見る（`720px` の
+   唯一の源は `app/panes.ts` の `matchMedia`）。この照会が持つのは、
+   クラスを要さない純粋な見た目だけ。 */
 
 @media (max-width: 720px) {
   #topbar { gap: 6px; padding: 6px 8px; }
