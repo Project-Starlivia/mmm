@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import {
   MAX_ZOOM,
   MIN_ZOOM,
+  centerOn,
   fitToPane,
   panBy,
   panToShow,
@@ -110,4 +111,13 @@ test("大きい文書は収まるまで引くが、下限では止まる", () =>
 
 test("箱が無ければ見え方を決めない", () => {
   assert.equal(fitToPane([], PANE, 60), null);
+});
+
+test("寄せる先は箱の中心を画面の中心に置く。倍率は変えない", () => {
+  const v = centerOn({ k: 2, tx: 999, ty: 999 }, BOX, PANE);
+  assert.equal(v.k, 2);
+  const cx = BOX.x + BOX.w / 2;
+  const cy = BOX.y + BOX.h / 2;
+  assert.ok(Math.abs(cx * v.k + v.tx - PANE.width / 2) < 1e-9);
+  assert.ok(Math.abs(cy * v.k + v.ty - PANE.height / 2) < 1e-9);
 });
