@@ -109,10 +109,17 @@ export function initPanes(args: {
   }
 
   // ---- スプリッタ ----
-  // 幅を変えるだけ。開閉は境目の矢印と Alt+1 / Alt+2、Mod+/ が持つ。
-  // 片方が消えているときは動かす幅が無いので、掴んでも何もしない
+  // 両方出ているときは幅を変えるだけ。開閉は境目の矢印と Alt+1 / Alt+2、
+  // Mod+/ が持つ。
+  //
+  // **片方だけのときは、押せば分割へ戻る。** 動かす幅が無いので掴んでも
+  // 何もできないが、縁に寄った分割線はそこに見えている — 戻すための
+  // 取っ手として使えるほうが、細い矢印 1 つを狙わせるより易しい
   splitter.addEventListener("pointerdown", (e) => {
-    if (!paneVis.md || !paneVis.map) return;
+    if (!paneVis.md || !paneVis.map) {
+      applyPaneVis({ md: true, map: true });
+      return;
+    }
     splitter.classList.add("dragging");
     splitter.setPointerCapture(e.pointerId);
     const onMove = (ev: PointerEvent): void => {

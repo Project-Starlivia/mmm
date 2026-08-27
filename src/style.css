@@ -193,6 +193,9 @@ html, body {
 
   &:hover, &.dragging { background: var(--accent); }
 }
+/* 片方だけのときは幅を動かせない。押せば分割へ戻るので、掴む形ではなく
+   押す形のカーソルにする */
+#panes.no-map #splitter, #panes.no-md #splitter { cursor: pointer; }
 
 /* ========== md のペイン ========== */
 
@@ -243,7 +246,6 @@ html, body {
        ここでは**触らない**（両方が丸めを書くと順番で勝ち負けが変わる） */
     &:only-child { border-radius: 6px; }
     &:hover:not(:disabled) { border-color: var(--accent); color: var(--ink); z-index: 1; }
-    &:disabled { opacity: 0.35; cursor: default; }
     &.on {
       background: var(--accent-soft);
       border-color: var(--accent);
@@ -298,6 +300,11 @@ html, body {
       &.point-right { transform: rotate(-90deg); }
     }
   }
+  /* **押せないなら出さない。** 端では、その先がもう無い — 沈んだまま
+     残しても、押して何も起きない一手を誘うだけ。
+     `.pane-tool` 側ではなくここに書く: 上の配置指定が id を含むので、
+     クラスだけの指定では負けて `display` が通らない */
+  & button:disabled { display: none; }
 }
 /* 片方だけの時は、境目が窓の縁に来る。はみ出さないよう縁の内側へ留める */
 #panes.no-map #pane-switch { left: auto; right: 8px; transform: none; }
