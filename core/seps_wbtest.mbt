@@ -113,7 +113,7 @@ fn side_of(label : String) -> Bool {
       return nd.left
     }
   }
-  false
+  abort("side_of: label not found: " + label)
 }
 
 ///|
@@ -220,4 +220,23 @@ test "2 つの末尾境界が同時に空いても、1 つの生ランとして�
   let c = st.nodes[3].id
   ignore(delete_nodes([b, c]))
   assert_eq(get_text(), "# r\n\n## a\n")
+}
+
+///|
+test "move_as_parent は 2 重に積んだ with_sweep でも掃除が走り、undo は 1 回" {
+  // b, c だけの 2 グループ（分割 + 切り替え）で、c を b の子にする。
+  // move_as_parent([b], c) は b を c の直前へ動かしてから c を 1 段下げる
+  // ので、b-c 間にあった 2 つの境界（a-b, b-c）が同時に空いてくっつき、
+  // 掃除（xor で 1 つに畳む）が実際に走る。cmd_move_as_parent は
+  // begin_tx の中で cmd_indent（それ自身も with_sweep で包まれている）を
+  // 呼ぶので、with_sweep の枠が 2 重に積まれる唯一の場所になる。内側の枠が
+  // commit を辞退して undo が 1 回にまとまることをここで見張る
+  let src = "# r\n\n## a\n\n---\n\n## b\n\n---\n---\n\n## c\n"
+  ignore(init_doc(src))
+  let b = st.nodes[2].id
+  let c = st.nodes[3].id
+  ignore(move_as_parent([b], c))
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n---\n\n## b\n\n### c\n")
+  ignore(undo())
+  assert_eq(get_text(), src)
 }

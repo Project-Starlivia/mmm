@@ -221,6 +221,12 @@ fn tree_bounds(root : Int) -> Array[Bound] {
 // **触ってよいのは「直前まで境界として効いていた行」だけ。** 見分けるために、
 // 編集の前に境界の位置を控え、ノード id と同じ仕掛け（map_offsets）で編集を
 // またいで写す。手で書いた本文の `---` は控えに入らないので、決して触らない。
+//
+// ただし書き直し・削除は、境界 1 つぶんの区切り行のかたまり（run,
+// `[b.start, b.end)`）ごと行う。手書きの `---` が空いたグループを挟んで
+// 目印つきの境界と地続きに融合していれば、その行も同じ run に含まれて
+// 書き直しの対象になる —— 融合した時点でその行はもう独立した本文ではなく、
+// 境界の意味（行数）の一部になっているため。
 
 ///|
 /// 掃除の目印 = 編集前に効いていた境界。位置は `map_offsets` で写すので
@@ -266,18 +272,18 @@ fn root_depth_at(at : Int) -> Int {
 
 ///|
 /// 編集集合は昇順・非重複でなければならない（apply_edit_set の約束）。
-fn sort_edits(set : Array[Edit]) -> Array[Edit] {
-  let out = set
-  for i = 1; i < out.length(); i = i + 1 {
-    let e = out[i]
+/// **`set` をその場で並べ替える**（呼び出し側の配列そのものが変わる。
+/// 新しい配列を返しているのではない）。
+fn sort_edits(set : Array[Edit]) -> Unit {
+  for i = 1; i < set.length(); i = i + 1 {
+    let e = set[i]
     let mut j = i - 1
-    while j >= 0 && out[j].from > e.from {
-      out[j + 1] = out[j]
+    while j >= 0 && set[j].from > e.from {
+      set[j + 1] = set[j]
       j = j - 1
     }
-    out[j + 1] = e
+    set[j + 1] = e
   }
-  out
 }
 
 ///|
@@ -288,8 +294,10 @@ fn sort_edits(set : Array[Edit]) -> Array[Edit] {
 ///   - いま効いている境界に**目印が 2 つ以上**入っている = 空いてくっついた。
 ///     正しい flip は行数ではなく**元の flip の xor**（1 本 + 1 本 = 2 行だが、
 ///     反転 0 回なので分割のまま、という食い違いがここで起きる）
-///   - 目印がどの境界にも入っていない = 効かなくなった（末尾のグループが
-///     空いた）。その行は消す
+///   - 目印がどの境界にも入っていない = もう境界として効いていない
+///     （末尾のグループが空いた場合だけでなく、段下げで見出しの親が
+///     ルートでなくなり valid_bounds の判定そのものを満たさなくなる
+///     場合も含む）。その行は消す
 fn sweep_seps(marks : SepMarks, from_set : Int) -> Unit {
   for k = from_set; k < st.last_sets.length(); k = k + 1 {
     map_offsets(marks.at, st.last_sets[k])
@@ -364,7 +372,8 @@ fn sweep_seps(marks : SepMarks, from_set : Int) -> Unit {
     }
   }
   if set.length() > 0 {
-    apply_sets([sort_edits(set)], "")
+    sort_edits(set)
+    apply_sets([set], "")
   }
 }
 
