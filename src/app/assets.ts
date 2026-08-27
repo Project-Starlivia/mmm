@@ -22,6 +22,29 @@ export function mdPath(rel: string): string {
 const bare = (path: string): string => path.replace(/^\.\//, "");
 
 /**
+ * 読みに行ってよい絵の種類。**綴りはここ 1 つ**で、種類の判定も
+ * `<image>` に載せる MIME も同じ表から引く。
+ */
+const IMAGE_TYPES: Readonly<Record<string, string>> = {
+  webp: "image/webp",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  avif: "image/avif",
+  svg: "image/svg+xml",
+  bmp: "image/bmp",
+  ico: "image/x-icon",
+};
+
+/** その名前が指す絵の種類。絵でなければ null */
+export function imageType(name: string): string | null {
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0) return null;
+  return IMAGE_TYPES[name.slice(dot + 1).toLowerCase()] ?? null;
+}
+
+/**
  * md に書かれたパスが、宣言した保存パスの下に収まるか。
  * 収まればフォルダからの相対を断片で返し、外れていれば null。
  *
@@ -37,6 +60,11 @@ export function assetTarget(declared: string, path: string): string[] | null {
   if (parts.length === 0) return null;
   // フォルダの外へ出る綴りは受け取らない（宣言の外は見に行かない）
   if (parts.some((part) => part === "." || part === "..")) return null;
+  // **絵でないものは読みに行かない。** `![](notes.txt)` と書けば、マップに
+  // 何も出ないまま中身が読まれ、書き出した SVG に base64 で載ってしまう
+  // （`<image>` は描けなくてもデータは埋まる）。宣言したフォルダの中に
+  // 限られるとはいえ、絵を置く場所として渡したフォルダなので、絵だけ見る
+  if (!imageType(parts[parts.length - 1] ?? "")) return null;
   return parts;
 }
 
@@ -145,10 +173,13 @@ export function initAssets(deps: {
       if (!parts) return;
       if ((await binding.directory.queryPermission({ mode: "read" })) !== "granted") return;
       const file = await nestedFile(binding.directory, parts, false);
+      // 種類は名前から引く（`assetTarget` を通った時点で必ず絵）。
+      // 以前はすべて `image/webp` と名乗らせていて、png も jpg も嘘だった
+      const type = imageType(parts[parts.length - 1] ?? "") ?? "image/webp";
       const blob = await (await file.getFile()).arrayBuffer();
       const old = assetUrls.get(path);
       if (old) URL.revokeObjectURL(old);
-      assetUrls.set(path, URL.createObjectURL(new Blob([blob], { type: "image/webp" })));
+      assetUrls.set(path, URL.createObjectURL(new Blob([blob], { type })));
       deps.refresh();
     } catch {
       /* 不在・許可待ち — プレースホルダのまま */

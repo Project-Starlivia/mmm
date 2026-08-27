@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assetTarget, mdPath } from "../src/app/assets.ts";
+import { assetTarget, imageType, mdPath } from "../src/app/assets.ts";
 
 test("mdPath: 同階層から下は ./ を付け、既に ./ があれば重ねない", () => {
   assert.equal(mdPath("a.png"), "./a.png");
@@ -39,6 +39,26 @@ test("assetTarget: 宣言の外を指すものは受け取らない", () => {
   assert.equal(assetTarget("assets/", "a.webp"), null);
   assert.equal(assetTarget("./", "../a.webp"), null);
   assert.equal(assetTarget("./", ""), null);
+});
+
+test("imageType: 絵の名前からその種類を引く", () => {
+  assert.equal(imageType("a.webp"), "image/webp");
+  assert.equal(imageType("a.PNG"), "image/png");
+  assert.equal(imageType("a.jpeg"), "image/jpeg");
+});
+
+test("imageType: 絵でないものは null", () => {
+  assert.equal(imageType("notes.txt"), null);
+  assert.equal(imageType("id_rsa"), null);
+  assert.equal(imageType(".env"), null);
+  assert.equal(imageType("a.webp.txt"), null);
+});
+
+test("assetTarget: 絵でないものは、宣言の中にあっても読みに行かない", () => {
+  // マップには何も出ないまま中身が読まれ、書き出した SVG に載ってしまう
+  assert.equal(assetTarget("./", "notes.txt"), null);
+  assert.equal(assetTarget("./", "sub/id_rsa"), null);
+  assert.equal(assetTarget("assets/", "assets/.env"), null);
 });
 
 test("assetTarget: 上へ出る宣言は、その中に収まる限り受け取る", () => {
