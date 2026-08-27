@@ -347,6 +347,43 @@ test "空のルートの左へ落とすと、左始まりの文書になる" {
 }
 
 ///|
+test "子の無いルートの右脇へ落としても、境界を書かない（右は既定の側）" {
+  // r には子が 1 つも無い。右脇へ落とすのはルートの既定の側と同じなので、
+  // 境界は要らない。flip を決め打ちしていたころは、右に落としたのに
+  // 左始まりの境界を書いてしまっていた
+  ignore(init_doc("# r\n\n# r2\n\n## b\n"))
+  let r = st.nodes[0].id
+  let b = st.nodes[2].id
+  ignore(move_side_end([b], r, false))
+  assert_eq(get_text(), "# r\n\n## b\n\n# r2\n")
+  assert_eq(side_of("b"), false)
+}
+
+///|
+test "子の無いルートの左脇へ落とすと、切り替えを書く（右が既定の側なので）" {
+  ignore(init_doc("# r\n\n# r2\n\n## b\n"))
+  let r = st.nodes[0].id
+  let b = st.nodes[2].id
+  ignore(move_side_end([b], r, true))
+  assert_eq(get_text(), "# r\n\n---\n---\n\n## b\n\n# r2\n")
+  assert_eq(side_of("b"), true)
+}
+
+///|
+test "その側の最後のグループが文書の最後のグループでなくても、そこへ入る" {
+  // 右の最後のグループ（a）は文書の最後のグループ（x, y の左グループ）
+  // ではない。右へ落とした x は文書末尾ではなく a の直後に入るべきで、
+  // 残った y の側は変わらない
+  ignore(init_doc("# r\n\n## a\n\n---\n---\n\n## x\n\n## y\n"))
+  let root = st.nodes[0].id
+  let x = st.nodes[2].id
+  ignore(move_side_end([x], root, false))
+  assert_eq(get_text(), "# r\n\n## a\n\n## x\n\n---\n---\n\n## y\n")
+  assert_eq(side_of("x"), false)
+  assert_eq(side_of("y"), true)
+}
+
+///|
 test "move_side_end は 1 回の undo で戻る" {
   let src = "# r\n\n## a\n\n## b\n"
   ignore(init_doc(src))

@@ -440,19 +440,29 @@ fn cmd_flip_side(id : Int) -> Unit {
 ///   - その側にグループがある → 区切りは書かない。最後のグループの末尾へ入れる
 ///   - その側にグループが無い → ルートの範囲の末尾に切り替え + 枝
 ///
-/// 「無い側」に置くとき手前は必ず反対側なので、**素のドラッグが書く境界は
-/// 常に切り替え**（分割を書くことは無い）。
+/// 「無い側」に置くとき、書く境界の flip は**手前（ルート直下の最後の枝）の
+/// 側との差**から出す。ルートに枝が 1 つも無ければ、手前は無いのでルート
+/// 自身の側（右）とみなす — その場合、右脇へ落とすのは手前と同じ側なので
+/// 境界は要らない（何も書かない）。枝が 1 つでもあれば、その側は必ず目的の
+/// 側と反対（でなければ「無い側」ではない）なので、常に切り替えになる。
 fn cmd_move_side_end(ids : Array[Int], root : Int, left : Bool) -> Unit {
   let ri = find_node(root)
   if ri < 0 {
     return
   }
-  // その側の最後の直下の枝
+  // その側の最後の直下の枝と、側を問わない最後の直下の枝
+  // （後者は「無い側」に書く境界の flip を出すのに要る）
   let mut last = -1
+  let mut has_any = false
+  let mut last_left = false
   for i = 0; i < st.nodes.length(); i = i + 1 {
     let nd = st.nodes[i]
-    if nd.parent == root && nd.left == left {
-      last = nd.id
+    if nd.parent == root {
+      has_any = true
+      last_left = nd.left
+      if nd.left == left {
+        last = nd.id
+      }
     }
   }
   with_sweep(fn() {
@@ -465,9 +475,12 @@ fn cmd_move_side_end(ids : Array[Int], root : Int, left : Bool) -> Unit {
       // その側の最後のグループの末尾へ（区切りは書かない）
       ignore(move_steps(ids, last, 2))
     } else {
-      // その側は空。ルートの最後の子にしてから、その手前に切り替えを書く
+      // その側は空。ルートの最後の子にしてから、手前の側との差で境界を書く。
+      // 枝が 1 つも無いルートは、手前 = 右（false）とみなす
+      let prev_left = if has_any { last_left } else { false }
+      let flip = prev_left != left
       let first = move_steps(ids, root, 0)
-      if first >= 0 {
+      if first >= 0 && flip {
         let i = find_node(first)
         if i >= 0 {
           let at = st.nodes[i].from
