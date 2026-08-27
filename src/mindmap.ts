@@ -6,7 +6,13 @@
 
 import type { DocView } from "./coreApi.ts";
 import { tokenizeBlock, touchesFence } from "./map/highlight.ts";
-import { type Pt, type Rect, midOfPolyline, rightOf } from "./map/geometry.ts";
+import {
+  type Pt,
+  type Rect,
+  leftOf,
+  midOfPolyline,
+  rightOf,
+} from "./map/geometry.ts";
 import { edgePath, edgeSegs, flattenSegs } from "./map/edge.ts";
 import { type CardRef, type CardRow, CODE_LINE, rowH } from "./map/cards.ts";
 import {
@@ -23,6 +29,7 @@ import {
   GAP,
   branchIds,
   cardRect,
+  dirOf,
   edgeEnds,
   layoutMap,
 } from "./map/layout.ts";
@@ -222,6 +229,7 @@ export class MindMap {
     this.plusBtn = makePlus();
     this.viewport.append(
       this.renderer.edgeLayer,
+      this.renderer.seamLayer,
       this.renderer.nodeLayer,
       this.pick.el,
       this.dropHint,
@@ -573,7 +581,14 @@ export class MindMap {
       const edge = up !== undefined && ids.has(up) ? this.renderer.edgeEl(id) : undefined;
       if (edge) edges.push(edge);
     }
-    return mapToSvg({ boxes, edges, nodes, pane: this.pane });
+    return mapToSvg({
+      boxes,
+      edges,
+      nodes,
+      // 継ぎ目はルート直下の furniture なので、枝だけの書き出しには入れない
+      marks: whole ? this.renderer.seamElements() : [],
+      pane: this.pane,
+    });
   }
 
   /**
@@ -709,11 +724,9 @@ export class MindMap {
       return;
     }
     this.plusBtn.setAttribute("visibility", "visible");
-    const p = rightOf(b);
-    this.plusBtn.setAttribute(
-      "transform",
-      `translate(${p.x + 14} ${p.y})`,
-    );
+    const dir = dirOf(b.n);
+    const p = dir === 1 ? rightOf(b) : leftOf(b);
+    this.plusBtn.setAttribute("transform", `translate(${p.x + 14 * dir} ${p.y})`);
   }
 
   // ---------- events ----------
@@ -1499,7 +1512,10 @@ export class MindMap {
         this.dropHint.setAttribute("visibility", "hidden");
         return;
       }
-      this.dropHint.setAttribute("d", edgePath(rightOf(p), to));
+      // ルートは両側へ伸びるので、親自身の向き（left フラグ）では出口が
+      // 決まらない。**落とし先に近いほうの辺**から出す
+      const out = to.x < p.x + p.w / 2 ? leftOf(p) : rightOf(p);
+      this.dropHint.setAttribute("d", edgePath(out, to));
       this.dropHint.setAttribute("visibility", "visible");
       this.markNode(parentId, "drop-parent");
     };
@@ -1528,8 +1544,9 @@ export class MindMap {
       // ring on the target PLUS an insertion line on its outward side,
       // where the new child will appear
       this.markNode(target.id, "drop-child");
-      const e = rightOf(b);
-      const lx = e.x + GAP.x / 2;
+      const dir = dirOf(b.n);
+      const e = dir === 1 ? rightOf(b) : leftOf(b);
+      const lx = e.x + (GAP.x / 2) * dir;
       const ly = e.y;
       const half = 16;
       this.dropLine.setAttribute("x1", String(lx));
@@ -1549,7 +1566,7 @@ export class MindMap {
       this.dropLine.setAttribute("x2", String(cx + half));
       this.dropLine.setAttribute("y2", String(cy + off));
       this.dropLine.setAttribute("visibility", "visible");
-      showHint({ x: cx - b.w / 2, y: cy + off });
+      showHint({ x: cx - (b.w / 2) * dirOf(b.n), y: cy + off });
     }
   }
 

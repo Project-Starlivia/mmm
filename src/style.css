@@ -359,6 +359,13 @@ html, body {
   stroke-linecap: round;
 }
 
+/* グループの継ぎ目。同じ側の列の中で、どこからが別のまとまりかを言う */
+.group-seam {
+  stroke: var(--line);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
 /* ========== ノードとカード ==========
    形は map/render.ts と map/drawCard.ts が作る。ここが持つのは、
    状態で変わるだけの定数（角丸・色・破線）。 */
