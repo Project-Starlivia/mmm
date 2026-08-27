@@ -9,9 +9,11 @@ import {
   IMAGE_FOLDER,
   imageFolder,
   normalizePath,
+  retarget,
   setImageFolder,
   under,
 } from "../src/app/head.ts";
+import { parseImage } from "../src/map/cards.ts";
 
 test("DocView.head: 頭の区間がコアから届く", () => {
   const doc = loadDoc("---\nimage-folder: ./img/\n---\n\n# r\n");
@@ -131,4 +133,89 @@ test("under: 宣言の下なら残りを返し、外なら null", () => {
   assert.equal(under("a.webp", "./"), "a.webp");
   assert.equal(under("./other/b.webp", "./img/"), null);
   assert.equal(under("./img/", "./img/"), null);
+});
+
+/** retarget の結果を後ろから当てて、書き換え後のテキストを返す小道具 */
+function moved(md: string, from: string, to: string): string {
+  const doc = loadDoc(md);
+  const edits = retarget(doc, from, to);
+  let out = doc.text;
+  for (let i = edits.length - 1; i >= 0; i--) {
+    const e = edits[i];
+    out = out.slice(0, e.from) + e.insert + out.slice(e.to);
+  }
+  return out;
+}
+
+test("parseImage: 行内の destination の位置を返す", () => {
+  const img = parseImage("![alt](./img/a.webp)");
+  assert.ok(img);
+  assert.equal(img.raw, "./img/a.webp");
+  assert.equal("![alt](./img/a.webp)".slice(img.from, img.to), "./img/a.webp");
+  assert.equal(img.path, "img/a.webp");
+  assert.equal(img.name, "a.webp");
+});
+
+test("parseImage: 字下げされた行でも位置が合う", () => {
+  const line = "  ![](<./my img/a.webp>)";
+  const img = parseImage(line);
+  assert.ok(img);
+  assert.equal(line.slice(img.from, img.to), "./my img/a.webp");
+});
+
+test("retarget: 宣言の下だけ接頭辞を差し替える", () => {
+  const md = "# r\n\n![](./img/a.webp)\n\n![](./img/sub/b.png)\n";
+  assert.equal(
+    moved(md, "./img/", "./assets/"),
+    "# r\n\n![](./assets/a.webp)\n\n![](./assets/sub/b.png)\n",
+  );
+});
+
+test("retarget: 宣言の外は触らない", () => {
+  const md = "# r\n\n![](./img/a.webp)\n\n![](./other/b.webp)\n";
+  assert.equal(
+    moved(md, "./img/", "./assets/"),
+    "# r\n\n![](./assets/a.webp)\n\n![](./other/b.webp)\n",
+  );
+});
+
+test("retarget: 外部 URL は触らない", () => {
+  const md = "# r\n\n![](https://example.com/a.png)\n\n![](data:image/png;base64,AA)\n";
+  assert.equal(moved(md, "./", "./img/"), md);
+});
+
+test("retarget: フェンスの中は触らない", () => {
+  const md = "# r\n\n```md\n![](./img/a.webp)\n```\n\n![](./img/b.webp)\n";
+  assert.equal(
+    moved(md, "./img/", "./assets/"),
+    "# r\n\n```md\n![](./img/a.webp)\n```\n\n![](./assets/b.webp)\n",
+  );
+});
+
+test("retarget: 頭の中は触らない", () => {
+  // 頭の 2 行目は YAML として意味を持たないが、**画像リンクとして完全に成立
+  // した行**でないと「区間ごと飛ばしている」ことの証明にならない（頭の外に
+  // 同じ行があれば必ず書き換わる、というのが下の比較の意味）
+  const md = "---\n![](./img/a.webp)\n---\n\n![](./img/b.webp)\n";
+  assert.equal(
+    moved(md, "./img/", "./assets/"),
+    "---\n![](./img/a.webp)\n---\n\n![](./assets/b.webp)\n",
+  );
+});
+
+test("retarget: 裸の綴りも `./` 付きも同じ場所として動かす", () => {
+  const md = "# r\n\n![](img/a.webp)\n";
+  assert.equal(moved(md, "./img/", "./assets/"), "# r\n\n![](./assets/a.webp)\n");
+});
+
+test("retarget: 同じ宣言なら編集は 0 件", () => {
+  const doc = loadDoc("# r\n\n![](./img/a.webp)\n");
+  assert.deepEqual(retarget(doc, "./img/", "./img/"), []);
+});
+
+test("retarget: 返す編集は文書順で、範囲が重ならない", () => {
+  const doc = loadDoc("# r\n\n![](./img/a.webp)\n\n![](./img/b.webp)\n");
+  const edits = retarget(doc, "./img/", "./assets/");
+  assert.equal(edits.length, 2);
+  assert.ok(edits[0].to <= edits[1].from);
 });

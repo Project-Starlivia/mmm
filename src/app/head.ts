@@ -11,9 +11,9 @@
 // 引用符・キーの順序が消える。「未編集行のバイト列は決して再整形されない」
 // というコアの約束を、TS 側で破ることになる。読むのは 1 キー、書くのも 1 行。
 
-import type { HeadSpan } from "../coreApi.ts";
+import type { DocView, HeadSpan } from "../coreApi.ts";
 import type { TextEdit } from "../edits.ts";
-import { bare } from "../map/cards.ts";
+import { bare, parseImage } from "../map/cards.ts";
 
 /** 頭に置く「画像フォルダの場所」の設定名。**綴りはここ 1 つ** */
 export const IMAGE_FOLDER = "image-folder";
@@ -103,4 +103,38 @@ export function under(path: string, folder: string): string | null {
   if (!rest.startsWith(prefix)) return null;
   const tail = rest.slice(prefix.length);
   return tail === "" ? null : tail;
+}
+
+/**
+ * 宣言フォルダの引っ越しに、本文の画像リンクを追従させる。
+ *
+ * 対象は「**いま宣言しているフォルダの下にある**画像リンク」だけ。`./img/`
+ * から動かすなら `./other/b.webp` は動かない。宣言が `./` のときだけ全部が
+ * 対象になるが、それは「画像は md と同じ場所にある」と宣言している状態
+ * なので、意味のとおり。
+ *
+ * 頭とフェンスの中は見ない（どちらも区間はコアが答える）。外部 URL は
+ * `parseImage` が弾く。
+ *
+ * 返す編集は文書順。**後ろから**適用すること — 前から当てると、後続の
+ * オフセットが挿入ぶんだけずれる。
+ */
+export function retarget(doc: DocView, from: string, to: string): TextEdit[] {
+  const out: TextEdit[] = [];
+  if (from === to) return out;
+  const inSkipped = (at: number): boolean =>
+    (doc.head !== null && at >= doc.head.from && at < doc.head.to) ||
+    doc.fences.some((f) => at >= f.from && at < f.to);
+  let at = 0;
+  for (const line of doc.text.split("\n")) {
+    const start = at;
+    at += line.length + 1;
+    if (inSkipped(start)) continue;
+    const img = parseImage(line);
+    if (!img) continue;
+    const rest = under(img.raw, from);
+    if (rest === null) continue;
+    out.push({ from: start + img.from, to: start + img.to, insert: `${to}${rest}` });
+  }
+  return out;
 }

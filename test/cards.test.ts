@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { core, idOf, initDoc, loadDoc } from "./_helpers.ts";
-import { cardRows, contentEnd, linkLine } from "../src/map/cards.ts";
+import { cardRows, contentEnd, linkLine, parseImage } from "../src/map/cards.ts";
 
 /** 1 ノードぶんのカードを取り出す小道具 */
 function rowsOf(md: string) {
@@ -143,4 +143,13 @@ test("linkLine: 題が空でもホスト名を書き込まない（見せ方と�
   assert.ok(got);
   assert.equal(got.line, "[](https://example.com)");
   assert.ok(!got.line.includes("example.com]"), "題にホスト名が入っている");
+});
+
+test("parseImage: 位置が増えても path/name の意味は変わらない", () => {
+  const img = parseImage("![](sub/a.PNG)");
+  assert.ok(img);
+  assert.equal(img.path, "sub/a.PNG");
+  assert.equal(img.name, "a.PNG");
+  assert.equal(parseImage("https://example.com/a.png"), null);
+  assert.equal(parseImage("just text"), null);
 });
