@@ -932,7 +932,7 @@ export class MindMap {
     // 跳ぶ、頼んでいない `host.move()` が走る）。
     //
     // だから **capture で取る。** ペインの上には pointerdown を止めるものが
-    // 3 つある（`+` / リンクの ↗ / `.pane-tool`）ので、下の pointerdown には
+    // 2 つある（リンクの ↗ / `.pane-tool`）ので、下の pointerdown には
     // 届かない指がある。どれにも止められない場所はここしかない。
     pane.addEventListener(
       "pointerdown",
@@ -951,7 +951,7 @@ export class MindMap {
       true,
     );
 
-    // ここへ来るのは、上の 3 つに止められなかった押下だけ（ペイン / ノード /
+    // ここへ来るのは、上の 2 つに止められなかった押下だけ（ペイン / ノード /
     // 入力欄の上）。**台帳は capture 側で済んでいる**ので、ここが見るのは
     // 「いま何本目か」の答えだけ
     pane.addEventListener("pointerdown", (e) => {
