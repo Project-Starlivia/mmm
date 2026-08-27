@@ -33,7 +33,7 @@ import {
   edgeEnds,
   layoutMap,
 } from "./map/layout.ts";
-import { type DropTarget, resolveDrop } from "./map/drop.ts";
+import { type Drop, resolveDrop } from "./map/drop.ts";
 import { arrowTarget, extendSelection, isArrowKey } from "./map/navigate.ts";
 import { cardPlacement, labelPlacement } from "./map/overlay.ts";
 import {
@@ -88,7 +88,13 @@ export interface MapHost {
   deleteSelection(): void;
   indentSelection(): void;
   outdentSelection(): void;
-  reorder(id: number, dir: -1 | 1): void;
+  reorder(id: number, dir: -1 | 1, cross: boolean): void;
+  /** ルート脇へ落とした: その側の末尾へ */
+  moveSideEnd(ids: number[], root: number, left: boolean): void;
+  /** Mod を押したまま落とした: そこに新しいグループ */
+  moveNewGroup(ids: number[], target: number, before: boolean, left: boolean): void;
+  /** そのノードの属するグループを、丸ごと反対側へ */
+  flipSide(id: number): void;
   toggleHidden(id: number): void; // comment-out hide/show for the subtree
   /**
    * pos 0 = target の子にする
@@ -192,7 +198,7 @@ export class MindMap {
   // ドラッグでカードを動かした直後、pointerup に続いて発火するネイティブの
   // click が、落とし先の座標にあるカードをふらっと選び直すのを止める印
   private suppressClick = false;
-  private dropTarget: DropTarget | null = null;
+  private drop: Drop | null = null;
   // ドロップ中の一時的なノード印。**どれに付けたかを覚えておくのは、
   // 外すときに全ノードを舐めないため**（マウス移動のたびに外して付け直す）。
   // 描き直しで要素が作り直されても paintState が同じ印を戻す
@@ -749,11 +755,16 @@ export class MindMap {
    */
   private bindDragKeys(): void {
     const pane = this.pane;
-    // Shift を押す/離すだけで、指を動かさずに判定を切り替えたい
+    // Shift / Mod を押す/離すだけで、指を動かさずに判定を切り替えたい
     const onDragMod = (e: KeyboardEvent): void => {
       if (!this.dragging || !this.lastPointer) return;
-      if (e.key !== "Shift") return;
-      this.updateDrop(this.lastPointer.x, this.lastPointer.y, e.type === "keydown");
+      if (e.key !== "Shift" && e.key !== "Control" && e.key !== "Meta") return;
+      this.updateDrop(
+        this.lastPointer.x,
+        this.lastPointer.y,
+        e.shiftKey,
+        e.ctrlKey || e.metaKey,
+      );
     };
     window.addEventListener("keydown", onDragMod);
     window.addEventListener("keyup", onDragMod);
@@ -944,7 +955,7 @@ export class MindMap {
       }
       if (this.dragging) {
         this.lastPointer = { x: e.clientX, y: e.clientY };
-        this.updateDrop(e.clientX, e.clientY, e.shiftKey);
+        this.updateDrop(e.clientX, e.clientY, e.shiftKey, e.ctrlKey || e.metaKey);
       }
     });
 
@@ -978,14 +989,19 @@ export class MindMap {
         return;
       }
       if (this.dragging) {
-        // 離す直前にも判定し直す（Shift を押したまま指を動かさず離したとき用）
+        // 離す直前にも判定し直す（Shift/Mod を押したまま指を動かさず離したとき用）
         if (this.lastPointer) {
-          this.updateDrop(e.clientX, e.clientY, e.shiftKey);
+          this.updateDrop(e.clientX, e.clientY, e.shiftKey, e.ctrlKey || e.metaKey);
         }
-        const drop = this.dropTarget;
+        const drop = this.drop;
         const ids = this.dragging.ids;
         this.stopDragVisuals();
-        if (drop) this.host.move(ids, drop.id, drop.pos);
+        if (drop?.kind === "node") this.host.move(ids, drop.id, drop.pos);
+        else if (drop?.kind === "side") {
+          this.host.moveSideEnd(ids, drop.root, drop.left);
+        } else if (drop?.kind === "group") {
+          this.host.moveNewGroup(ids, drop.target, drop.before, drop.left);
+        }
         this.dragCand = null;
         return;
       }
@@ -1420,11 +1436,11 @@ export class MindMap {
 
     // movement: arrows. 上下は同じ深さの列を縦に辿る
     if (!isArrowKey(key)) return;
-    // 並べ替えは Alt+↑↓（Alt+←→ はブラウザの戻る/進むなので取らない）
-    if (e.altKey && !mod && (key === "ArrowUp" || key === "ArrowDown")) {
+    // 並べ替えは Alt+↑↓。Mod を足すとグループの壁を越える
+    if (e.altKey && (key === "ArrowUp" || key === "ArrowDown")) {
       e.preventDefault();
       if (anchor !== -1 && sel.size === 1) {
-        this.host.reorder(anchor, key === "ArrowUp" ? -1 : 1);
+        this.host.reorder(anchor, key === "ArrowUp" ? -1 : 1, mod);
       }
       return;
     }
@@ -1474,11 +1490,16 @@ export class MindMap {
    * **どこへ落とすかの判断は map/drop.ts の純関数**が持つ。ここは世界座標へ
    * 直して渡し、返ってきた行き先を線と枠で示すところだけ。
    */
-  private updateDrop(clientX: number, clientY: number, preferEdge = false): void {
+  private updateDrop(
+    clientX: number,
+    clientY: number,
+    preferEdge = false,
+    newGroup = false,
+  ): void {
     // 呼び出し側は全員 `if (this.dragging)` の中からしか呼ばない
     const dragging = this.dragging;
     if (!dragging) return;
-    const { target, ambiguous } = resolveDrop({
+    const { drop, ambiguous } = resolveDrop({
       at: this.toWorld(clientX, clientY),
       order: this.order,
       boxes: this.boxes,
@@ -1486,26 +1507,67 @@ export class MindMap {
       dragging: dragging.subtree,
       single: dragging.ids.length === 1,
       preferEdge,
+      newGroup,
       polyline: (id) => this.edgePolyline(id),
     });
 
-    this.dropTarget = target;
+    this.drop = drop;
     // 落とし先は必ず示す。示せないなら受け付けない
     this.clearDropMarks(false);
-    if (!target) {
+    this.dropLine.classList.remove("slot");
+    if (!drop) {
       this.dropLine.setAttribute("visibility", "hidden");
       this.dropHint.setAttribute("visibility", "hidden");
       return;
     }
+
+    if (drop.kind === "side") {
+      // ルートの脇。その側の辺のすぐ外に、末尾への挿入線を出す
+      // （行き先は箱から選んでいるので必ず在るが、描き直しと競っていれば
+      // 消えていることもある。そのときは印を出さない）
+      const rb = this.boxes.get(drop.root);
+      if (!rb) return;
+      const p = drop.left ? leftOf(rb) : rightOf(rb);
+      const lx = p.x + (GAP.x / 2) * (drop.left ? -1 : 1);
+      const half = 16;
+      this.dropLine.setAttribute("x1", String(lx));
+      this.dropLine.setAttribute("y1", String(p.y - half));
+      this.dropLine.setAttribute("x2", String(lx));
+      this.dropLine.setAttribute("y2", String(p.y + half));
+      this.dropLine.setAttribute("visibility", "visible");
+      this.dropHint.setAttribute("visibility", "hidden");
+      return;
+    }
+
+    if (drop.kind === "group") {
+      // Mod を押したまま落とした: target の手前/後ろに新しいグループができる。
+      // 「隣に入る」との違いは、太さ（.slot）だけで言う
+      const b = this.boxes.get(drop.target);
+      if (!b) return;
+      const cx = b.x + b.w / 2;
+      const cy = b.y + b.h / 2;
+      const off = (b.h / 2 + GAP.y / 2) * (drop.before ? -1 : 1);
+      const half = Math.max(b.w / 2, 40);
+      this.dropLine.setAttribute("x1", String(cx - half));
+      this.dropLine.setAttribute("y1", String(cy + off));
+      this.dropLine.setAttribute("x2", String(cx + half));
+      this.dropLine.setAttribute("y2", String(cy + off));
+      this.dropLine.classList.add("slot");
+      this.dropLine.setAttribute("visibility", "visible");
+      this.dropHint.setAttribute("visibility", "hidden");
+      return;
+    }
+
+    // kind === "node": 従来どおり（0 = 子 / 1,2 = 前後挿入 / 3 = 線への割り込み）
     // 行き先は箱から選んでいるので必ず在るが、描き直しと競っていれば
     // 消えていることもある。そのときは印を出さない
-    const b = this.boxes.get(target.id);
+    const b = this.boxes.get(drop.id);
     if (!b) return;
 
     // 挿入線だけだと「上の親の末尾」と「下の親の先頭」が同じ場所に出て
     // 区別できない。どの親につくのかを、その親からの予告線と枠で示す。
     const parentId =
-      target.pos === 0 ? target.id : (this.layout.parentOf.get(target.id) ?? -1);
+      drop.pos === 0 ? drop.id : (this.layout.parentOf.get(drop.id) ?? -1);
     const showHint = (to: { x: number; y: number }): void => {
       const p = ambiguous ? this.boxes.get(parentId) : undefined;
       if (!p) {
@@ -1520,12 +1582,12 @@ export class MindMap {
       this.markNode(parentId, "drop-parent");
     };
 
-    if (target.pos === 3) {
+    if (drop.pos === 3) {
       // 線への割り込み。線そのものを光らせて、その真ん中に印を出す。
       // 「この線の途中に入る」以外の読み方がないので、親の枠までは出さない。
-      this.dropEdgeId = target.id;
-      this.renderer.edgeEl(target.id)?.classList.add("drop-edge");
-      const pts = this.edgePolyline(target.id);
+      this.dropEdgeId = drop.id;
+      this.renderer.edgeEl(drop.id)?.classList.add("drop-edge");
+      const pts = this.edgePolyline(drop.id);
       if (!pts) return;
       const m = midOfPolyline(pts);
       // 印は線に直交させる（線の向きは中央付近の傾きから取る）
@@ -1540,10 +1602,10 @@ export class MindMap {
       this.dropLine.setAttribute("y2", String(m.y + (tx / tl) * half));
       this.dropLine.setAttribute("visibility", "visible");
       this.dropHint.setAttribute("visibility", "hidden");
-    } else if (target.pos === 0) {
+    } else if (drop.pos === 0) {
       // ring on the target PLUS an insertion line on its outward side,
       // where the new child will appear
-      this.markNode(target.id, "drop-child");
+      this.markNode(drop.id, "drop-child");
       const dir = dirOf(b.n);
       const e = dir === 1 ? rightOf(b) : leftOf(b);
       const lx = e.x + (GAP.x / 2) * dir;
@@ -1559,7 +1621,7 @@ export class MindMap {
       // 兄弟軸の上に挿入線を引く（相手の手前 / 後ろ）
       const cx = b.x + b.w / 2;
       const cy = b.y + b.h / 2;
-      const off = (b.h / 2 + GAP.y / 2) * (target.pos === 1 ? -1 : 1);
+      const off = (b.h / 2 + GAP.y / 2) * (drop.pos === 1 ? -1 : 1);
       const half = Math.max(b.w / 2, 40);
       this.dropLine.setAttribute("x1", String(cx - half));
       this.dropLine.setAttribute("y1", String(cy + off));
@@ -1573,9 +1635,10 @@ export class MindMap {
   private stopDragVisuals(): void {
     this.clearDropMarks(true); // dragging の部分木を読むので dragging を消す前に
     this.dragging = null;
-    this.dropTarget = null;
+    this.drop = null;
     this.lastPointer = null;
     this.dropLine.setAttribute("visibility", "hidden");
+    this.dropLine.classList.remove("slot");
     this.dropHint.setAttribute("visibility", "hidden");
   }
 
@@ -1614,6 +1677,11 @@ export class MindMap {
         label: folded ? "Show (unfold)" : "Hide (fold)",
         key: "Shift+H",
         run: () => this.host.toggleHidden(anchor),
+        disabled: anchor === -1,
+      },
+      {
+        label: "Flip side",
+        run: () => this.host.flipSide(anchor),
         disabled: anchor === -1,
       },
       "sep",

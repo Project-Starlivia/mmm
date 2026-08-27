@@ -437,8 +437,17 @@ const host: MapHost = {
     applySnap(core.outdentNodes([...selection]), "core");
     syncSelectionViews(false);
   },
-  reorder(id, dir) {
-    runCmd(() => core.reorderNode(id, dir));
+  reorder(id, dir, cross) {
+    runCmd(() => core.reorderNode(id, dir, cross));
+  },
+  moveSideEnd(ids, root, left) {
+    runCmd(() => core.moveSideEnd(ids, root, left));
+  },
+  moveNewGroup(ids, target, before, left) {
+    runCmd(() => core.moveNewGroup(ids, target, before, left));
+  },
+  flipSide(id) {
+    runCmd(() => core.flipSide(id));
   },
   toggleHidden(id) {
     runCmd(() => core.toggleHidden(id));
