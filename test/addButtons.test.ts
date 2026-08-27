@@ -12,10 +12,10 @@ type AddSpotList = ReturnType<typeof addSpots>;
 const BOX = { x: 100, y: 200, w: 60, h: 20 };
 
 const dirs = (canParent: boolean): AddDir[] =>
-  addSpots(BOX, 10, canParent).map((s) => s.dir);
+  addSpots(BOX, { x: 10, y: 10 }, canParent).map((s) => s.dir);
 
 const at = (dir: AddDir): { x: number; y: number } => {
-  const found = addSpots(BOX, 10, true).find((s) => s.dir === dir);
+  const found = addSpots(BOX, { x: 10, y: 10 }, true).find((s) => s.dir === dir);
   if (!found) throw new Error(`${dir} が無い`);
   return { x: found.x, y: found.y };
 };
@@ -36,8 +36,8 @@ test("ルートには親を足せないので、その置き場所も出さな�
 });
 
 test("隙間は箱の外側へ開く", () => {
-  const wide = addSpots(BOX, 40, true);
-  const near = addSpots(BOX, 10, true);
+  const wide = addSpots(BOX, { x: 40, y: 40 }, true);
+  const near = addSpots(BOX, { x: 10, y: 10 }, true);
   const x = (list: AddSpotList, dir: AddDir): number => {
     const found = list.find((s) => s.dir === dir);
     if (!found) throw new Error(`${dir} が無い`);
@@ -45,4 +45,15 @@ test("隙間は箱の外側へ開く", () => {
   };
   assert.ok(x(wide, "child") > x(near, "child"));
   assert.ok(x(wide, "parent") < x(near, "parent"));
+});
+
+test("上下の隙間が 0 なら、丸の中心は箱の縁ちょうどに乗る", () => {
+  // 兄弟の縦間隔は 10px しかない。丸を箱の外に出すと隣の箱に食い込むので、
+  // 中心を縁の上に置いて丸を内外に半分ずつ張り出させる
+  const spots = addSpots(BOX, { x: 10, y: 0 }, true);
+  const above = spots.find((s) => s.dir === "above");
+  const below = spots.find((s) => s.dir === "below");
+  if (!above || !below) throw new Error("above/below が無い");
+  assert.equal(above.y, BOX.y);
+  assert.equal(below.y, BOX.y + BOX.h);
 });

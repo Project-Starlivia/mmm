@@ -30,23 +30,35 @@ export interface AddSpot {
  * `leftOf` が唯一の出所（`rightOf` のコメントが、まさにこの呼び出しを
  * 見越している）。ここで座標を計算し直さない。
  */
-export function addSpots(b: Rect, gap: number, canParent: boolean): AddSpot[] {
+export function addSpots(
+  b: Rect,
+  gap: { x: number; y: number },
+  canParent: boolean,
+): AddSpot[] {
   const cx = b.x + b.w / 2;
   const r = rightOf(b);
   const spots: AddSpot[] = [
-    { dir: "child", x: r.x + gap, y: r.y },
-    { dir: "above", x: cx, y: b.y - gap },
-    { dir: "below", x: cx, y: b.y + b.h + gap },
+    { dir: "child", x: r.x + gap.x, y: r.y },
+    { dir: "above", x: cx, y: b.y - gap.y },
+    { dir: "below", x: cx, y: b.y + b.h + gap.y },
   ];
   if (canParent) {
     const l = leftOf(b);
-    spots.push({ dir: "parent", x: l.x - gap, y: l.y });
+    spots.push({ dir: "parent", x: l.x - gap.x, y: l.y });
   }
   return spots;
 }
 
-/** 縁から中心までの画面距離 */
-const GAP = 26;
+/**
+ * 縁から中心までの画面距離。左右と上下で別の値にする — layout.ts の
+ * `GAP` が言うとおり、親子の横の通り道は 45px あるが兄弟の縦の間隔は
+ * 10px しかない。横の 26px は通り道の中に収まるが、縦にそのまま使うと
+ * 半径 9px の丸が隣の兄弟の箱に食い込む。
+ */
+/** 左右（子・親）: 縁から中心まで 26px 外へ */
+const GAP_X = 26;
+/** 上下（兄弟）: 縁ちょうどに中心を置く。丸は縁から 9px しかはみ出さない */
+const GAP_Y = 0;
 /** 指の的。見えている丸（R）より広く取る */
 const HIT = 22;
 /** 見えている丸の半径。的いっぱいの丸を 4 つ並べると、ノードより目立つ */
@@ -113,7 +125,7 @@ export class AddButtons {
     this.el.setAttribute("visibility", "visible");
     // 置き場所の算術は canParent に関わらず 4 つとも引く。出す/隠すは
     // このあとの表示切り替えだけの仕事にする（算術と見た目を混ぜない）
-    for (const spot of addSpots(b, GAP / k, true)) {
+    for (const spot of addSpots(b, { x: GAP_X / k, y: GAP_Y / k }, true)) {
       const btn = this.groups[spot.dir];
       const on = spot.dir !== "parent" || canParent;
       btn.setAttribute("visibility", on ? "inherit" : "hidden");
