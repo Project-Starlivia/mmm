@@ -2,7 +2,7 @@
 // 分からなければダーク）。どちらも保存して、次のセッションでもそのまま。
 
 import { LS_COLOR, LS_THEME, load, store } from "./persist.ts";
-import { logoInner, logoSvg } from "../logo.ts";
+import { logoInner, logoSvg } from "./logo.ts";
 
 /** 既定のブランドカラー。style.css の `--accent` の初期値と同じ。 */
 const DEFAULT_COLOR = "#5932ff";

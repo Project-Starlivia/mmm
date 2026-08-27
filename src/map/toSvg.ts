@@ -10,19 +10,11 @@
 // 板を敷かないので、角丸にする／しないの検討も要らない。
 
 import type { Rect } from "./geometry.ts";
-import { LOGO_PATH } from "../logo.ts";
 import { SVG_NS, svgEl } from "./svg.ts";
 
 /** 透かしの出所。配り先（wrangler.jsonc の `workers_dev` 名）を変えたらここも */
 const WATERMARK_URL = "https://mmm.chiwawaz.workers.dev/";
 
-/** 透かしの寸法。ロゴの原寸（144 四方、絵の高さ 143.36）から縮める */
-const WM_LOGO_H = 13;
-const WM_LOGO_SCALE = WM_LOGO_H / 143.36;
-const WM_LOGO_W = 132.352 * WM_LOGO_SCALE;
-const WM_GAP = 5;
-const WM_FONT = 11;
-const WM_PAD_R = 8;
 /** 本文の下端から透かしの帯までの高さ。M（余白）に足す */
 const WM_BAND = 22;
 
@@ -156,29 +148,19 @@ function watermark(right: number, bandTop: number, pane: HTMLElement): SVGAEleme
   const ink = cs.getPropertyValue("--ink-dim").trim();
   const font = cs.getPropertyValue("--font").trim();
   const centerY = bandTop + WM_BAND / 2;
-  const logoX = right - WM_PAD_R - WM_LOGO_W;
-  const logoY = centerY - WM_LOGO_H / 2;
-
-  const path = document.createElementNS(SVG_NS, "path");
-  path.setAttribute("d", LOGO_PATH);
-  const mark = svgEl("g", {
-    transform: `translate(${logoX}, ${logoY}) scale(${WM_LOGO_SCALE})`,
-    fill: ink,
-  });
-  mark.append(path);
 
   const text = svgEl("text", {
-    x: logoX - WM_GAP,
+    x: right - 8,
     y: centerY,
     "text-anchor": "end",
     "dominant-baseline": "central",
     "font-family": font,
-    "font-size": WM_FONT,
+    "font-size": 11,
     fill: ink,
   });
   text.textContent = "made with mmm";
 
   const link = svgEl("a", { href: WATERMARK_URL });
-  link.append(text, mark);
+  link.append(text);
   return link;
 }

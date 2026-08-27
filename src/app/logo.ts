@@ -1,5 +1,4 @@
-// ロゴの唯一の源。topbar・favicon・exe アイコン・書き出しの透かしは
-// 全てここから導出する。
+// ロゴの唯一の源。topbar・favicon・exe アイコンは全てここから導出する。
 //
 // "mmm" は markdown / mindmap / **mirror**。ロゴは JetBrains Mono の m を
 // 左右反転したもの（ステムが右）。パスは既に反転済みなので scale は正のまま
