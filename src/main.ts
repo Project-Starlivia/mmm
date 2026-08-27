@@ -24,6 +24,7 @@ import { decidePaste } from "./app/paste.ts";
 import { initDrop } from "./app/dnd.ts";
 import { initForm } from "./app/form.ts";
 import { showDrawing } from "./app/draw.ts";
+import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 import { openOnClick } from "./map/menu.ts";
@@ -702,6 +703,27 @@ async function newFile(): Promise<void> {
   }
 }
 
+/**
+ * いまの本文へのリンクをクリップボードへ。保存の有無を問わない —
+ * 見出しから導いた仮の名前しか無い文書でも、そのまま渡せる。
+ * 画像は付いてこない（`![](...)` は相対パスで、相手の環境には無い）ので、
+ * 貼ってある文書ではそう伝える。
+ */
+async function copyLink(): Promise<void> {
+  try {
+    const text = core.getText();
+    const link = `${location.origin}${location.pathname}${await toHash(text)}`;
+    await navigator.clipboard.writeText(link);
+    if (hasImages(text)) flashFilename("Link copied — images won't travel", false);
+    else if (link.length > LINK_WARN_LENGTH)
+      flashFilename("Link copied — some apps may cut this", false);
+    else flashFilename("Link copied", false);
+  } catch (err) {
+    console.error("copy link failed:", err);
+    flashFilename("Could not copy the link");
+  }
+}
+
 async function confirmDiscard(): Promise<boolean> {
   if (core.getText() === savedText) return true;
   return window.confirm("You have unsaved changes. Discard them and continue?");
@@ -771,6 +793,8 @@ openOnClick(btnMore, () => [
   "sep",
   { label: "Brand color", run: () => theme.pickColor() },
   { label: theme.isLight() ? "Dark theme" : "Light theme", run: () => theme.toggle() },
+  "sep",
+  { label: "Copy link", run: () => void copyLink() },
   "sep",
   {
     label: "Shortcuts",
@@ -848,18 +872,28 @@ initShortcuts({
   sweep(); // 役目を終えた localStorage のキーを捨てる
   loadText("", null); // 空 = まだ何も無い。dirty も立たない
   const bootGen = docGen;
-  void io
-    .startupDoc()
-    .then((doc) => {
-      // 読み終わるまでに打ち始めていたら、それを消してまで開かない。
-      // 同じ理由で、その間に New/Open/Drop で別の文書を開いていた場合も
-      // （それが空文書でも）上書きしない — その操作は必ず loadText を通るので
-      // docGen が進んでいるはず
-      if (doc && docGen === bootGen && core.getText() === "") applyDoc(doc);
-    })
-    .catch(() => {
-      flashFilename("Could not reopen the last file");
-    });
+  void fromHash(location.hash).then((shared) => {
+    if (shared !== null) {
+      // リンクで開いた。ハッシュはその場で消す — 文書の身元はあくまで
+      // ファイルハンドル 1 つで、リンクは入口でしかない。前回ファイルの
+      // 復元もしない（リンクを踏んだのに別の文書が出てくるのは筋が通らない）
+      history.replaceState(null, "", location.pathname + location.search);
+      if (docGen === bootGen && core.getText() === "") loadText(shared, null);
+      return;
+    }
+    void io
+      .startupDoc()
+      .then((doc) => {
+        // 読み終わるまでに打ち始めていたら、それを消してまで開かない。
+        // 同じ理由で、その間に New/Open/Drop で別の文書を開いていた場合も
+        // （それが空文書でも）上書きしない — その操作は必ず loadText を通るので
+        // docGen が進んでいるはず
+        if (doc && docGen === bootGen && core.getText() === "") applyDoc(doc);
+      })
+      .catch(() => {
+        flashFilename("Could not reopen the last file");
+      });
+  });
 }
 // フェンスの言語は後から読み込まれる。届いたら色を載せ直す
 onLanguageReady(() => map.render());
