@@ -240,3 +240,41 @@ test "move_as_parent は 2 重に積んだ with_sweep でも掃除が走り、un
   ignore(undo())
   assert_eq(get_text(), src)
 }
+
+///|
+test "flip_side はそのグループだけを反対側へ移す" {
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n---\n\n## c\n"))
+  // 真ん中のグループ [b] だけ左へ。a と c の側は動かない
+  ignore(flip_side(st.nodes[2].id))
+  assert_eq(side_of("a"), false)
+  assert_eq(side_of("b"), true)
+  assert_eq(side_of("c"), true)
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n---\n\n## b\n\n---\n\n## c\n")
+}
+
+///|
+test "先頭のグループを反対側へ移すと、ルート直後に境界ができる" {
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n"))
+  ignore(flip_side(st.nodes[1].id))
+  assert_eq(get_text(), "# r\n\n---\n---\n\n## a\n\n---\n---\n\n## b\n")
+  assert_eq(side_of("a"), true)
+  assert_eq(side_of("b"), false)
+}
+
+///|
+test "グループが 1 つだけなら、全部が反対側へ" {
+  ignore(init_doc("# r\n\n## a\n\n## b\n"))
+  ignore(flip_side(st.nodes[1].id))
+  assert_eq(get_text(), "# r\n\n---\n---\n\n## a\n\n## b\n")
+  assert_eq(side_of("a"), true)
+  assert_eq(side_of("b"), true)
+}
+
+///|
+test "flip_side は 1 回の undo で戻る" {
+  let src = "# r\n\n## a\n\n---\n\n## b\n"
+  ignore(init_doc(src))
+  ignore(flip_side(st.nodes[1].id))
+  ignore(undo())
+  assert_eq(get_text(), src)
+}

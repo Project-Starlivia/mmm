@@ -116,6 +116,12 @@ pub fn reorder_node(id : Int, dir : Int) -> String {
 }
 
 ///|
+#export_name("flipSide")
+pub fn flip_side(id : Int) -> String {
+  @core.flip_side(id)
+}
+
+///|
 #export_name("toggleHidden")
 pub fn toggle_hidden(id : Int) -> String {
   @core.toggle_hidden(id)

@@ -310,6 +310,13 @@ pub fn reorder_node(id : Int, dir : Int) -> String {
 }
 
 ///|
+/// そのノードの属するグループを、丸ごとルートの反対側へ。
+pub fn flip_side(id : Int) -> String {
+  cmd_flip_side(id)
+  take_snapshot()
+}
+
+///|
 pub fn toggle_hidden(id : Int) -> String {
   cmd_toggle_hidden(id)
   take_snapshot()

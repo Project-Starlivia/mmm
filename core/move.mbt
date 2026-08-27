@@ -378,3 +378,55 @@ fn cmd_reorder(id : Int, dir : Int) -> Unit {
   })
   commit_tx()
 }
+
+///|
+/// そのノードの属するグループを**丸ごと反対側へ**。
+///
+/// 実体は「両脇の境界の flip を反転する」だけ。両方を反転するので、
+/// **そのグループだけが移り、下のグループは 1 つも動かない**。
+/// 手前に境界が無い（= 先頭のグループ）ときは、そのグループの**最初の枝の
+/// 手前**に切り替えを書き足す — 「全部左」はこれで表せる。
+///
+/// 書き足す位置を「ルート見出しの直後」にしないのは、そこが**ブロックの
+/// 境目ではない**ため（見出しの次の行は空行で、そこへ入れると空行が 2 つ
+/// 並ぶ）。枝の行頭は必ずブロックの境目なので、前後の空行が正しく出る。
+fn cmd_flip_side(id : Int) -> Unit {
+  let i = find_node(id)
+  if i < 0 {
+    return
+  }
+  let ri = root_index_of(i)
+  let root = st.nodes[ri]
+  let root_id = root.id
+  let g = st.nodes[i].group
+  let bounds = tree_bounds(ri)
+  let set : Array[Edit] = []
+  // 後ろの境界（あれば）を先に積む — 編集は昇順でなければならない
+  if g < bounds.length() {
+    set.push(set_sep_edit(bounds[g], root.depth, !bounds[g].flip))
+  }
+  if g > 0 {
+    set.push(set_sep_edit(bounds[g - 1], root.depth, !bounds[g - 1].flip))
+  } else {
+    // 先頭のグループ: その最初の枝の手前へ切り替えを書き足す
+    let mut first_from = -1
+    for nd in st.nodes {
+      if nd.parent == root_id && nd.group == 0 {
+        first_from = nd.from
+        break
+      }
+    }
+    if first_from < 0 {
+      return // 直下の枝が無い = 動かすものが無い
+    }
+    set.push(insert_sep_edit(first_from, root.depth, true))
+  }
+  if set.length() == 0 {
+    return
+  }
+  with_sweep(fn() {
+    sort_edits(set)
+    apply_sets([set], "")
+  })
+  st.focus = id
+}
