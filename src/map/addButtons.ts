@@ -54,8 +54,20 @@ const R = 9;
 /** 十字の腕の長さ */
 const ARM = 4;
 
-/** 常に作る 4 つの向き（DOM を作る順） */
-const ALL_DIRS: AddDir[] = ["child", "above", "below", "parent"];
+/** 1 つぶんの `<g>` を作る。的・見えている丸・十字の線 2 本、向きは固定 */
+function makeButton(dir: AddDir): SVGGElement {
+  const btn = svgEl("g", { class: "add-btn", "data-add": dir });
+  // `svgEl` は数も受ける。**呼ぶ側に `String(...)` を書かせない**
+  // （map/svg.ts の明文の規約 — 意味を持たない皮を積まない）
+  btn.append(
+    // 的は見た目より広い。指は 9px の丸の縁を正確には狙えない
+    svgEl("circle", { class: "hit", r: HIT }),
+    svgEl("circle", { class: "face", r: R }),
+    svgEl("line", { x1: -ARM, y1: 0, x2: ARM, y2: 0 }),
+    svgEl("line", { x1: 0, y1: -ARM, x2: 0, y2: ARM }),
+  );
+  return btn;
+}
 
 export class AddButtons {
   /** viewport（world 座標）に入れる。ノード層より上に置くこと */
@@ -66,51 +78,56 @@ export class AddButtons {
    * 丸ごと作り直され、コードが無言で再トークナイズされていた）と同じ罠を
    * ここでも踏まない。`show` は毎回呼ばれる（パン・ズームのたびに
    * `updateAdds` が走る）ので、作り直しは的の数ぶん無駄な DOM 生成になる。
+   *
+   * `Record` で持つ（`Map` にしない）。4 つの向きぶん過不足なく埋めて
+   * 型で持つので、「無かったら」を書かずに済む — 実際に無いことはない。
    */
-  private groups = new Map<AddDir, SVGGElement>();
+  private groups: Record<AddDir, SVGGElement> = {
+    child: makeButton("child"),
+    above: makeButton("above"),
+    below: makeButton("below"),
+    parent: makeButton("parent"),
+  };
 
   constructor() {
-    for (const dir of ALL_DIRS) {
-      const btn = svgEl("g", { class: "add-btn", visibility: "hidden" });
-      // `svgEl` は数も受ける。**呼ぶ側に `String(...)` を書かせない**
-      // （map/svg.ts の明文の規約 — 意味を持たない皮を積まない）
-      btn.append(
-        // 的は見た目より広い。指は 9px の丸の縁を正確には狙えない
-        svgEl("circle", { class: "hit", r: HIT }),
-        svgEl("circle", { class: "face", r: R }),
-        svgEl("line", { x1: -ARM, y1: 0, x2: ARM, y2: 0 }),
-        svgEl("line", { x1: 0, y1: -ARM, x2: 0, y2: ARM }),
-      );
-      this.groups.set(dir, btn);
-      this.el.append(btn);
-    }
+    this.el.append(
+      this.groups.child,
+      this.groups.above,
+      this.groups.below,
+      this.groups.parent,
+    );
   }
 
   /**
    * `b` の周りに置く。`k` はいまの倍率で、**打ち消して**画面上の大きさを
    * 一定に保つ（`MIN_ZOOM` まで引いても押せる粒でなくならない）。
    * 作り直すのは向き・位置ではなく、既に居る 4 つの transform と表示だけ。
+   *
+   * 出す子には `visibility: inherit` を与える —「見えている」を子に書き込むと、
+   * あとで `hide()` がコンテナだけを隠しても、子に残った明示の `visible` が
+   * 継承より優先されて描かれ続ける（CSS の visibility は先祖のではなく自分の
+   * 値を見る）。子は「隠す/隠さない」の 2 値だけを持ち、「見せる」判断は
+   * コンテナの 1 か所に集める。
    */
   show(b: Rect, k: number, canParent: boolean): void {
     this.el.setAttribute("visibility", "visible");
     // 置き場所の算術は canParent に関わらず 4 つとも引く。出す/隠すは
     // このあとの表示切り替えだけの仕事にする（算術と見た目を混ぜない）
     for (const spot of addSpots(b, GAP / k, true)) {
-      const btn = this.groups.get(spot.dir);
-      if (!btn) continue;
+      const btn = this.groups[spot.dir];
       const on = spot.dir !== "parent" || canParent;
-      btn.setAttribute("visibility", on ? "visible" : "hidden");
+      btn.setAttribute("visibility", on ? "inherit" : "hidden");
       btn.setAttribute("transform", `translate(${spot.x} ${spot.y}) scale(${1 / k})`);
-      // `data-add` はヒットテストの入口（bindClick/bindPointer が探す）。
-      // ルートの親口のように隠れている的は、押せてはいけない
-      if (on) btn.setAttribute("data-add", spot.dir);
-      else btn.removeAttribute("data-add");
     }
   }
 
+  /**
+   * コンテナを隠すだけ。子には触らない — `inherit` な子はコンテナに連れられて
+   * 隠れ、`hidden` 固定の子（親の口が無いときの `parent`）はそのまま隠れている。
+   * `visibility: hidden` は当たり判定にも乗らないので、`data-add`（コンストラクタで
+   * 一度だけ付ける）を都度外し・付け直す必要はない。
+   */
   hide(): void {
     this.el.setAttribute("visibility", "hidden");
-    // 隠れていても当たり判定は残るので、押せなくしておく
-    for (const btn of this.groups.values()) btn.removeAttribute("data-add");
   }
 }
