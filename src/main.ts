@@ -19,7 +19,7 @@ import { exportWays, initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
 import { deriveName } from "./app/name.ts";
 import { initTheme } from "./app/theme.ts";
-import { sweep } from "./app/persist.ts";
+import { LS_ADDS, load, store, sweep } from "./app/persist.ts";
 import { decidePaste } from "./app/paste.ts";
 import { initDrop } from "./app/dnd.ts";
 import { initForm } from "./app/form.ts";
@@ -765,6 +765,8 @@ openOnClick(btnMore, () => [
   { label: "Redo", key: "Mod+Shift+Z", run: doRedo },
   "sep",
   { label: theme.isLight() ? "Dark theme" : "Light theme", run: () => theme.toggle() },
+  // 見た目の好み同士なのでテーマの隣。**押せばどうなるか**を名乗る（テーマと同じ流儀）
+  { label: addsOn ? "Hide add buttons" : "Show add buttons", run: () => setAdds(!addsOn) },
   "sep",
   { label: "Help", run: () => window.open(REPO, "_blank", "noopener") },
 ]);
@@ -818,6 +820,32 @@ const theme = initTheme({
   logo: elLogo,
   setEditorTheme: (dark) => editor.setTheme(dark),
 });
+
+// **物理キーボードの有無は Web からは分からない。**代わりに「主たるポインタが
+// 指か」を見る。Surface はキーボードを外すと OS が主ポインタを指へ切り替える
+// ので、この 1 本で狙いどおりに振れる。近似であることは承知の上で、外れても
+// 人が押して直せる形にしてある（`⋯` の 1 行）。
+//
+// `any-pointer` ではなく `pointer` を使う: マウスも刺さっている機械で
+// 「指もある」だけを理由に出しっぱなしにはしない。
+const TOUCH_FIRST = "(pointer: coarse) and (hover: none)";
+
+// localStorage の中身は何でもありうる。名乗らせずに確かめる
+const savedAdds = load(LS_ADDS);
+let addsOn =
+  savedAdds === "on"
+    ? true
+    : savedAdds === "off"
+      ? false
+      : (window.matchMedia?.(TOUCH_FIRST).matches ?? false);
+
+const setAdds = (on: boolean): void => {
+  addsOn = on;
+  store(LS_ADDS, on ? "on" : "off");
+  map.setAddButtons(on);
+};
+map.setAddButtons(addsOn);
+
 initShortcuts({
   save: (asNew) => void saveFile(asNew),
   open: () => void openFile(),
