@@ -440,9 +440,6 @@ fn cmd_flip_side(id : Int) -> Unit {
     Some(e) => set.push(e)
     None => ()
   }
-  if set.length() == 0 {
-    return
-  }
   with_sweep(fn() {
     sort_edits(set)
     apply_sets([set], "")
