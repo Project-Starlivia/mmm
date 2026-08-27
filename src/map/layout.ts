@@ -328,17 +328,22 @@ export function layoutMap(doc: DocView): Layout {
 
   const parentOf = new Map<number, number>();
   const fanOf = new Map<number, number>();
-  // 付け根をずらすのは「同じ親から出る線が 2 本以上」あるときだけ。
+  // 付け根をずらすのは「**同じ辺から**出る線が 2 本以上」あるときだけ。
+  // 扇は出口が重なるのをほどくためのものなので、**側でまとめる** — ルートは
+  // 左右の両辺から線を出す唯一のノードで、反対の辺から出る線は元から重ならない。
+  // 親 id だけでまとめていたころは、左右に 1 本ずつのルートでも 2 本と数えて
+  // 互いに散らし、**どちらの線も真っすぐ出なかった**。
   // 箱そのものを持ち回るので、id で引き直して「必ず在るはず」を言わなくてよい
-  const fans = new Map<number, { parent: Box; kids: Box[] }>();
+  const fans = new Map<string, { parent: Box; kids: Box[] }>();
   for (const [id, b] of boxes) {
     const pid = b.n.parent;
     const parent = pid === -1 ? undefined : boxes.get(pid);
     if (!parent) continue;
     parentOf.set(id, pid);
-    const fan = fans.get(pid);
+    const key = `${pid},${b.n.left}`;
+    const fan = fans.get(key);
     if (fan) fan.kids.push(b);
-    else fans.set(pid, { parent, kids: [b] });
+    else fans.set(key, { parent, kids: [b] });
   }
   const centerY = (b: Box): number => b.y + b.h / 2;
   for (const { parent, kids } of fans.values()) {

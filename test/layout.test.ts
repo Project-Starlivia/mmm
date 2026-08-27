@@ -124,6 +124,28 @@ test("左の枝の edgeEnds は、親の左辺から出て子の右辺へ入る"
   assert.deepEqual(ends.to, rightOf(ab));
 });
 
+test("ルートの左右に 1 本ずつなら、線は真っすぐ出る", () => {
+  // 扇（fanOf）は「同じ出口で重なる線をほどく」ためのもの。左右は**別の辺**
+  // から出るので元から重ならない。親 id だけでまとめていたころは、各側 1 本
+  // ずつしか無いのに互いに散らされ、両方の線が曲がっていた
+  const doc = loadDoc("# r\n\n## a\n\n---\n---\n\n## b\n");
+  const L = layoutMap(doc);
+  for (const label of ["a", "b"]) {
+    const ends = edgeEnds(L, nodeOf(doc.nodes, label).id);
+    assert.ok(ends, `${label} のエッジが無い`);
+    assert.equal(ends.from.y, ends.to.y, `${label} の線が曲がっている`);
+  }
+});
+
+test("同じ側に 2 本あれば、これまでどおり付け根を散らす", () => {
+  const doc = loadDoc("# r\n\n## a\n\n## b\n");
+  const L = layoutMap(doc);
+  const a = L.fanOf.get(nodeOf(doc.nodes, "a").id);
+  const b = L.fanOf.get(nodeOf(doc.nodes, "b").id);
+  assert.ok(a !== undefined && b !== undefined, "扇が働いていない");
+  assert.notEqual(a, b);
+});
+
 test("左だけの文書でも、ルートは枝の中心に立つ", () => {
   const md = "# r\n\n---\n---\n\n## a\n\n## b\n";
   const root = boxOf(md, "r");
