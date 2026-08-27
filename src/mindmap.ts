@@ -1586,8 +1586,7 @@ export class MindMap {
 
   // ---------- context menu ----------
 
-  /** そのノードに対して、いま何ができるか。並べ方はメニュー側が持つ */
-  /** ノードの足し方。右クリックの入れ子も、箱の脇の `+` も、同じ並びを開く */
+  /** ノードの足し方。右クリックの入れ子 `Add ▸` が開く並び。並べ方はメニュー側が持つ */
   private addItems(id: number): MenuEntry[] {
     return [
       { label: "Child", key: "Tab", run: () => this.host.addChild(id) },
