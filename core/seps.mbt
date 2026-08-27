@@ -273,14 +273,36 @@ fn dangling_run_at(at : Int) -> Bound? {
 }
 
 ///|
-/// その位置を含む木の、ルートの深さ（境界を書く列を決めるのに要る）。
-fn root_depth_at(at : Int) -> Int {
+/// その位置を含む木の、ルートの添字。木が無ければ -1。
+fn root_index_at(at : Int) -> Int {
   for i = st.nodes.length() - 1; i >= 0; i = i - 1 {
     if st.nodes[i].from < at {
-      return st.nodes[root_index_of(i)].depth
+      return root_index_of(i)
     }
   }
-  1
+  -1
+}
+
+///|
+/// その位置を含む木の、ルートの深さ（境界を書く列を決めるのに要る）。
+fn root_depth_at(at : Int) -> Int {
+  let ri = root_index_at(at)
+  if ri < 0 {
+    1
+  } else {
+    st.nodes[ri].depth
+  }
+}
+
+///|
+/// `at` と同じ木の中で、`at` 以降にある最初の生きた境界。無ければ `None`。
+/// 掃除が、無効になった境界の反転ぶんを畳む先を探すのに使う。
+fn next_live_bound_after(at : Int) -> Bound? {
+  let ri = root_index_at(at)
+  if ri < 0 {
+    return None
+  }
+  first_bound_after(tree_bounds(ri), at)
 }
 
 ///|
@@ -303,37 +325,77 @@ fn sort_edits(set : Array[Edit]) -> Unit {
 /// 空いたグループの境界を畳む。`from_set` 以降に積まれた編集集合をまたいで
 /// 目印を写してから、いまの文書と突き合わせる。
 ///
-/// 判断は 2 つだけ:
+/// 判断は 3 つ:
 ///   - いま効いている境界に**目印が 2 つ以上**入っている = 空いてくっついた。
 ///     正しい flip は行数ではなく**元の flip の xor**（1 本 + 1 本 = 2 行だが、
 ///     反転 0 回なので分割のまま、という食い違いがここで起きる）
 ///   - 目印がどの境界にも入っていない = もう境界として効いていない
 ///     （末尾のグループが空いた場合だけでなく、段下げで見出しの親が
 ///     ルートでなくなり valid_bounds の判定そのものを満たさなくなる
-///     場合も含む）。その行は消す
+///     場合も含む）。その行は消すが、**反転ぶんは捨てない** — 同じ木の中で
+///     それより後ろにある最初の生きた境界へ xor で畳む（無ければそこで
+///     初めて捨てる）。隣り合わずに無効化した境界も、隣り合って空いた
+///     境界とまったく同じ「反転を次へ渡す」規則の対象であり、経路が違う
+///     だけで特別扱いする理由が無い
 fn sweep_seps(marks : SepMarks, from_set : Int) -> Unit {
   for k = from_set; k < st.last_sets.length(); k = k + 1 {
     map_offsets(marks.at, st.last_sets[k])
   }
-  let set : Array[Edit] = []
-  for b in st.bounds {
-    let mut hit = 0
-    let mut flip = false
-    for k = 0; k < marks.at.length(); k = k + 1 {
-      let m = marks.at[k]
+  let nb = st.bounds.length()
+  let hit : Array[Int] = Array::make(nb, 0)
+  let flip : Array[Bool] = Array::make(nb, false)
+  // どの生きた境界にも入らなかった目印（添字）。除去と、後ろへの畳み込みの
+  // 両方がこれを見る
+  let dead : Array[Int] = []
+  for k = 0; k < marks.at.length(); k = k + 1 {
+    let m = marks.at[k]
+    if m < 0 {
+      continue // 編集そのものに飲まれて消えた -> 畳む先も無い
+    }
+    let mut found = -1
+    for i = 0; i < nb; i = i + 1 {
+      let b = st.bounds[i]
       if m >= b.start && m < b.end {
-        hit = hit + 1
-        if marks.flip[k] {
-          flip = !flip
-        }
+        found = i
+        break
       }
     }
+    if found >= 0 {
+      hit[found] = hit[found] + 1
+      if marks.flip[k] {
+        flip[found] = !flip[found]
+      }
+    } else {
+      dead.push(k)
+    }
+  }
+  // 生きていない目印は、同じ木の中でそれより後ろにある最初の生きた境界へ
+  // 反転ぶんを畳む
+  let folded : Array[Bool] = Array::make(nb, false)
+  for k in dead {
+    match next_live_bound_after(marks.at[k]) {
+      Some(b) =>
+        for i = 0; i < nb; i = i + 1 {
+          if st.bounds[i].start == b.start {
+            folded[i] = true
+            if marks.flip[k] {
+              flip[i] = !flip[i]
+            }
+            break
+          }
+        }
+      None => ()
+    }
+  }
+  let set : Array[Edit] = []
+  for i = 0; i < nb; i = i + 1 {
     // 目印が 2 つ以上 = 空いてくっついた。空行を挟んで地続きになった生の
     // 区切り行は、行数で読むと桁が合わない（1 本 + 1 本 = 2 行だが反転
     // 0 回）だけでなく、挟まった空行も正規形には無いので、xor が今の
-    // flip とたまたま一致していても正規形に書き直して余りを削る
-    if hit >= 2 {
-      set.push(set_sep_edit(b, root_depth_at(b.start), flip))
+    // flip とたまたま一致していても正規形に書き直して余りを削る。
+    // 畳み込みを受けた境界も、反転ぶんが変わりうるので同じく書き直す
+    if hit[i] >= 2 || folded[i] {
+      set.push(set_sep_edit(st.bounds[i], root_depth_at(st.bounds[i].start), flip[i]))
     }
   }
   // 複数の目印が「もう効いていない」側に落ちても、地続きの生ランは 1 つに
@@ -341,21 +403,8 @@ fn sweep_seps(marks : SepMarks, from_set : Int) -> Unit {
   // 同じランを 2 度消そうとすると編集が重なって apply_edit_set が壊れるので、
   // ランの開始位置で重複を弾く
   let removed_runs : Array[Int] = []
-  for k = 0; k < marks.at.length(); k = k + 1 {
+  for k in dead {
     let m = marks.at[k]
-    if m < 0 {
-      continue // 編集そのものに飲まれて消えた
-    }
-    let mut alive = false
-    for b in st.bounds {
-      if m >= b.start && m < b.end {
-        alive = true
-        break
-      }
-    }
-    if alive {
-      continue
-    }
     match dangling_run_at(m) {
       Some(b) => {
         let mut seen = false

@@ -147,12 +147,52 @@ test "分割 + 分割 は分割 1 つに畳む" {
 }
 
 ///|
-test "段下げでグループが空になっても掃除が効く" {
-  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n---\n\n## c\n"))
-  // b を 1 段下げると a の子になり、グループ 1 が空く
+test "段下げはグループの壁で止まる（分割の壁でも）" {
+  // b の前の兄弟 a は別グループ（分割だけの壁でも Tab は止まる）。
+  // 段下げ自体がグループを空けることはもう無い — 空にできる相手（前の
+  // 兄弟）は必ず壁の向こうなので、壁で先に止まる
+  let src = "# r\n\n## a\n\n---\n\n## b\n\n---\n---\n\n## c\n"
+  ignore(init_doc(src))
   ignore(indent_nodes([st.nodes[2].id]))
-  assert_eq(get_text(), "# r\n\n## a\n\n### b\n\n---\n---\n\n## c\n")
+  assert_eq(get_text(), src)
   assert_eq(side_of("c"), true)
+}
+
+///|
+test "複数選択の Tab はグループの壁を越えない（無関係なグループの側を変えない）" {
+  // r / a(右) / 切り替え / c(左) / 分割 / d(左)。indent([a, c]): a は前の
+  // 兄弟が無いので元から対象外、c は前の兄弟 a が別グループなので壁で
+  // 止まる。どちらも実行されないので、操作対象のはずだった c はもちろん、
+  // 操作対象でない d の側も変わらない（cmd_indent に壁が無かったころは
+  // c の段下げだけ通ってしまい、d が右へ飛んでいた）
+  let src = "# r\n\n## a\n\n---\n---\n\n## c\n\n---\n\n## d\n"
+  ignore(init_doc(src))
+  let a = st.nodes[1].id
+  let c = st.nodes[2].id
+  ignore(indent_nodes([a, c]))
+  assert_eq(get_text(), src)
+  assert_eq(side_of("a"), false)
+  assert_eq(side_of("c"), true)
+  assert_eq(side_of("d"), true)
+}
+
+///|
+test "隣り合わずに無効化した境界も、後ろの生きた境界へ反転を畳む" {
+  // cmd_indent は壁で止まるようになったので、「境界が隣り合わずに無効に
+  // なる」経路（段下げで見出しの親がルートでなくなる）はもう通れない。
+  // sweep_seps 自体の規則を直に確かめるため、その経路が作る状況（c を
+  // a の子にする深さ編集）を生の編集で再現する。a-c の切り替えが無効に
+  // なっても、その反転ぶんは c-d の分割へ畳まれて切り替えになり、
+  // 操作対象でない d の側は変わらない
+  ignore(init_doc("# r\n\n## a\n\n---\n---\n\n## c\n\n---\n\n## d\n"))
+  assert_eq(side_of("c"), true)
+  assert_eq(side_of("d"), true)
+  let marks = sep_marks()
+  let base = st.last_sets.length()
+  apply_sets([[prefix_edit(2, st.nodes[2].depth + 1)]], "")
+  sweep_seps(marks, base)
+  assert_eq(get_text(), "# r\n\n## a\n\n### c\n\n---\n---\n\n## d\n")
+  assert_eq(side_of("d"), true)
 }
 
 ///|

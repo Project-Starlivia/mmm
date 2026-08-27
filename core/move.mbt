@@ -6,13 +6,18 @@
 /// Indent: subtree headings gain one '#'; the node becomes the last child
 /// of its previous sibling. No line moves. Skips nodes with no previous
 /// sibling.
+///
+/// **グループの壁で止まる**（`Tab` は Alt+↑↓ と同じ扱い。cmd_reorder と同じ
+/// 判定）。壁を越えて子にすると、その境界を巻き込んで無関係なグループの側
+/// まで動いてしまう — 壁を越える版は存在しない（Mod+Alt+↑↓ に Tab 相当は無い）。
 fn cmd_indent(ids : Array[Int]) -> Unit {
   with_sweep(fn() {
     let idxs = normalize_selection(ids)
     let set : Array[Edit] = []
     let keep : Array[Int] = []
     for k in idxs {
-      if prev_sibling(k) >= 0 {
+      let peer = prev_sibling(k)
+      if peer >= 0 && st.nodes[peer].group == st.nodes[k].group {
         keep.push(st.nodes[k].id)
         for m in subtree_of(k) {
           set.push(prefix_edit(m, st.nodes[m].depth + 1))
