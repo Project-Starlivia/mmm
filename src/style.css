@@ -128,10 +128,24 @@ html, body {
     /* 触っている側の枠を前に出す（重ねた相手に隠されないように） */
     &:hover:not(:disabled) { z-index: 1; }
   }
-  /* 継ぎ目。枠を持つボタン（md の書き方）では既にこの色なので変わらず、
-     枠が透明な帯のボタンでは、ここだけが 1 本の仕切りとして出る */
-  & button + button { border-left-color: var(--line); }
+  /* 継ぎ目。**上下いっぱいの罫線にはしない** — ボタンそのものの縁と
+     見分けが付かなくなる。ボタンの縁（border）は高さいっぱいにしか
+     引けないので、色は付けず透明のまま、代わりに `::before` で
+     短い 1 本を真ん中に浮かせる */
+  & button + button::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 5px;
+    bottom: 5px;
+    width: 1px;
+    background: var(--line);
+  }
 }
+
+/* 開き方を選び直すだけの矢印ボタン。**押す絵 1 つだけ**なので、字を持つ
+   隣（SVG ⤓）と同じ横幅は要らない — 絵の分だけに詰める */
+.icon-only { padding-left: 4px; padding-right: 4px; }
 
 /* ボタンとメニューの絵。**塗らずに線で引く**ので、文字色をそのまま継ぐ */
 .icon {
