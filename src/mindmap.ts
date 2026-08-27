@@ -1680,8 +1680,11 @@ export class MindMap {
   private menuItems(): MenuEntry[] {
     const anchor = this.host.anchor();
     const multi = this.host.selection().size > 1;
-    const folded =
-      this.host.doc().nodes.find((n) => n.id === anchor)?.hidden ?? false;
+    const node = this.host.doc().nodes.find((n) => n.id === anchor);
+    const folded = node?.hidden ?? false;
+    // 根はどのグループにも属さない（コアでは group 0 に丸められる）ので、
+    // Flip side を出すと「先頭のグループが動く」という別の意味に化ける
+    const isRoot = node?.parent === -1;
     return [
       // 押せば子が増え、開けば下も上も親も選べる。**まとめた名前そのものが、
       // いちばん普通の 1 つでもある** — 子の追加は他の 3 つより桁違いに多い
@@ -1704,7 +1707,7 @@ export class MindMap {
       {
         label: "Flip side",
         run: () => this.host.flipSide(anchor),
-        disabled: anchor === -1,
+        disabled: anchor === -1 || isRoot,
       },
       "sep",
       { label: "Copy", key: "Mod+C", run: () => this.host.copySelection(false) },
