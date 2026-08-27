@@ -777,10 +777,6 @@ openOnClick(btnMore, () => [
     run: () => openExternal(`${REPO}/blob/main/docs/shortcuts.md`),
   },
   { label: "Help", run: () => openExternal(REPO) },
-  {
-    label: "License",
-    run: () => openExternal(`${REPO}/blob/main/README.md#ライセンス`),
-  },
 ]);
 elFilename.addEventListener("click", () => {
   void (async () => {
