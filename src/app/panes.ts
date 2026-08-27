@@ -1,18 +1,42 @@
 // ペインの表示/非表示 (コードとノードのビュー) とスプリッタ。
-// 「両方消えた」状態は作らない。片方を消したら残りが受け皿になる。
+//
+// **見え方は「分割線の居場所」ひとつで言い切れる。** 「両方消えた」は
+// 作らないので、辿り着ける形は 3 つしかなく、左から順に並べると
+// そのまま分割線を左右に動かす話になる（`SPOTS`）。
+//
+// だから**矢印は向きを変えない**。`‹` はいつでも「分割線を左へ 1 つ」、
+// `›` はいつでも「右へ 1 つ」で、いま押せるかどうかだけが変わる
+// （端では止まる）。以前は md 用 / マップ用の 2 本が状態で向きを反転して
+// いて、両方開いていると `‹` の下に `›` が出る — 押すと閉じるのに
+// 広がって見え、どちらがどちらかも並び順を覚えるしかなかった。
+//
 // どちらを出しているかは覚えない — 毎回、両方から始まる。
-//
-// **開閉の矢印は分割線にくっつける。** 前は md の右下・マップの左下と
-// 別々の角に置いていて、片方だけスクロールバーを避けて内側へ寄っていた
-// せいで、2 つの位置がずれて見えた。**分割線（splitter）を隠さずに
-// 置き続ける** — 片方のペインを消しても flex がその境目まで splitter を
-// 押し出すので、矢印はいつも同じ 1 か所（境目）に居られる。
-//
-// **矢印の向きが状態を言う** — 開いていれば消える先、消えていれば
-// 出てくる先を指す。字は要らない。
 
 import { icon } from "../icons.ts";
 import { paneTool } from "./paneTool.ts";
+
+/** 分割線の居場所。左端 = md が無い / 真ん中 = 両方 / 右端 = マップが無い */
+const SPOTS = [
+  { md: false, map: true },
+  { md: true, map: true },
+  { md: true, map: false },
+] as const;
+
+type Vis = { md: boolean; map: boolean };
+
+const spotOf = (v: Vis): number =>
+  SPOTS.findIndex((s) => s.md === v.md && s.map === v.map);
+
+/** その一手で何が起きるかを言う（矢印は向きを変えないので、言葉が担う） */
+function describe(from: number, to: number): string {
+  const a = SPOTS[from];
+  const b = SPOTS[to];
+  if (a === undefined || b === undefined) return "";
+  if (a.md !== b.md) {
+    return b.md ? "Show the Markdown pane" : "Hide the Markdown pane";
+  }
+  return b.map ? "Show the map" : "Hide the map";
+}
 
 export function initPanes(args: {
   mdPane: HTMLElement;
@@ -26,29 +50,36 @@ export function initPanes(args: {
   togglePaneVis: (which: "md" | "map") => void;
 } {
   const { mdPane, mapPane, panesEl, splitter } = args;
-  let paneVis = { md: true, map: true };
+  let paneVis: Vis = { md: true, map: true };
 
   const arrows = paneTool("pane-switch");
-  const arrowMd = arrowButton();
-  const arrowMap = arrowButton();
-  arrows.append(arrowMd, arrowMap);
+  const goLeft = arrowButton("left");
+  const goRight = arrowButton("right");
+  arrows.append(goLeft, goRight);
   splitter.append(arrows);
 
-  const applyPaneVis = (v: { md: boolean; map: boolean }): void => {
+  const applyPaneVis = (v: Vis): void => {
     if (!v.md && !v.map) v = { md: true, map: true };
     paneVis = v;
     mdPane.classList.toggle("pane-off", !v.md);
     mapPane.classList.toggle("pane-off", !v.map);
     panesEl.classList.toggle("no-map", !v.map);
     panesEl.classList.toggle("no-md", !v.md);
-    // 開いていれば消える先（外向き）、消えていれば出てくる先（内向き）を指す
-    pointArrow(arrowMd, v.md ? "left" : "right");
-    arrowMd.title = v.md ? "Hide the Markdown pane (Alt+1)" : "Show the Markdown pane (Alt+1)";
-    pointArrow(arrowMap, v.map ? "right" : "left");
-    arrowMap.title = v.map ? "Hide the map pane (Alt+2)" : "Show the map pane (Alt+2)";
+    // 端では、その先が無いので押せない
+    const spot = spotOf(v);
+    goLeft.disabled = spot <= 0;
+    goRight.disabled = spot >= SPOTS.length - 1;
+    goLeft.title = describe(spot, spot - 1);
+    goRight.title = describe(spot, spot + 1);
     // focus must not stay in a hidden pane
     if (!v.md && mdPane.contains(document.activeElement)) mapPane.focus();
     if (!v.map && mapPane.contains(document.activeElement)) args.focusEditor();
+  };
+
+  /** 分割線を 1 つ動かす。端は動かない */
+  const slide = (step: -1 | 1): void => {
+    const next = SPOTS[spotOf(paneVis) + step];
+    if (next) applyPaneVis({ ...next });
   };
 
   const togglePaneVis = (which: "md" | "map"): void => {
@@ -58,8 +89,8 @@ export function initPanes(args: {
     applyPaneVis(next);
   };
 
-  arrowMd.addEventListener("click", () => togglePaneVis("md"));
-  arrowMap.addEventListener("click", () => togglePaneVis("map"));
+  goLeft.addEventListener("click", () => slide(-1));
+  goRight.addEventListener("click", () => slide(1));
 
   // Mod+/: jump to the other pane, revealing it if hidden
   const togglePane = (): void => {
@@ -103,22 +134,18 @@ export function initPanes(args: {
     splitter.addEventListener("pointercancel", onUp);
   });
 
-  // 点き具合を最初に一度そろえる（既定でも必ず通す）
+  // 押せる / 押せないを最初に一度そろえる（既定でも必ず通す）
   applyPaneVis(paneVis);
 
   return { togglePane, togglePaneVis };
 }
 
-function arrowButton(): HTMLButtonElement {
+/** 絵は下向きの chevron 1 つだけ。左右は回して作る（線を増やさない） */
+function arrowButton(dir: "left" | "right"): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.append(icon("chevron"));
+  const svg = icon("chevron");
+  svg.classList.add(dir === "left" ? "point-left" : "point-right");
+  button.append(svg);
   return button;
-}
-
-/** 絵は 1 つだけ（下向き）なので、左右は回して作る */
-function pointArrow(button: HTMLButtonElement, dir: "left" | "right"): void {
-  const svg = button.querySelector(".icon");
-  svg?.classList.toggle("point-left", dir === "left");
-  svg?.classList.toggle("point-right", dir === "right");
 }

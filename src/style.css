@@ -242,7 +242,8 @@ html, body {
     /* 単独なら自分で丸まる。並ぶときの端の丸めは `.group` が持つので、
        ここでは**触らない**（両方が丸めを書くと順番で勝ち負けが変わる） */
     &:only-child { border-radius: 6px; }
-    &:hover { border-color: var(--accent); color: var(--ink); z-index: 1; }
+    &:hover:not(:disabled) { border-color: var(--accent); color: var(--ink); z-index: 1; }
+    &:disabled { opacity: 0.35; cursor: default; }
     &.on {
       background: var(--accent-soft);
       border-color: var(--accent);
@@ -264,15 +265,19 @@ html, body {
 
 /* 分割線にくっつく開閉の矢印。**splitter を隠さない**からこそ、片方の
    ペインを消しても flex がその境目まで splitter を押し出し、矢印はいつも
-   同じ 1 か所に居られる（前は角と角で、片方だけスクロールバー避けの分
-   ずれて見えた）。上が md 側、下がマップ側 — 縦に並べて境目の細い線の
-   上に置く。開いていれば消える側（外向き）、消えていれば出てくる側
-   （内向き）を矢印が指す */
+   同じ 1 か所に居られる（角と角に分けると、片方だけスクロールバー避けの
+   分ずれて見える）。
+
+   **下端に置く。** 真ん中は本文と地図のいちばん見たいところで、そこに
+   浮かせると読む邪魔をする。
+
+   `‹ ›` を横に並べる。**向きは変えない** — 左はいつでも「分割線を左へ」、
+   右はいつでも「右へ」で、端に着いたら押せなくなるだけ。分割線（5px）より
+   広いので左右へはみ出すが、浮いている道具なので構わない */
 #pane-switch {
-  top: 50%;
+  bottom: 12px;
   left: 50%;
-  transform: translate(-50%, -50%);
-  flex-direction: column;
+  transform: translateX(-50%);
   gap: 2px;
 
   & button {
@@ -294,10 +299,9 @@ html, body {
     }
   }
 }
-/* 片方だけの時は、境目が窓の縁に来る。矢印がそこへ張り付いてはみ出さない
-   よう、縁からの一定距離に留める */
-#panes.no-map #pane-switch { left: auto; right: 8px; transform: translateY(-50%); }
-#panes.no-md #pane-switch { left: 8px; transform: translateY(-50%); }
+/* 片方だけの時は、境目が窓の縁に来る。はみ出さないよう縁の内側へ留める */
+#panes.no-map #pane-switch { left: auto; right: 8px; transform: none; }
+#panes.no-md #pane-switch { left: 8px; transform: none; }
 
 /* ========== マップのペイン ========== */
 
