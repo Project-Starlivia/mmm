@@ -1,0 +1,87 @@
+# 押されたものを確かめ、main のものだけを配る。
+#
+# **1 つのファイルにまとめてある。** ワークフローをまたぐと順番を約束できず
+# （`needs` は同じファイルの中だけ）、確かめ終わる前に配り始めてしまう。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# 同じブランチで重なったら古いほうは捨てる。走り終えた順に上書きされて、
+# 新しいはずが古い中身になるのを避ける
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # MoonBit は公式の GitHub Action が無いので、配布スクリプトで入れる。
+      # 置き場所は $HOME/.moon/bin で、PATH に通すのはこちらの仕事
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - run: moon version
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # コアの JS はここで作る。型検査もテストもこれが無いと始まらない
+      - run: pnpm run core
+
+      - name: Type check（src と test の両方）
+        run: pnpm run check
+      - name: Core tests（MoonBit）
+        run: pnpm run test:core
+      - name: UI tests（TypeScript）
+        run: pnpm test
+
+      # 配信されるものが実際に組み上がることまで見る
+      - name: Build
+        run: pnpm exec vite build
+
+      # 配る中身をそのまま渡す。deploy 側で組み直すと、
+      # 確かめたものと配るものが別々になりうる
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 1
+
+  deploy:
+    needs: check
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # 確かめたものを降ろすだけ。ここでは組み直さない
+      - uses: actions/download-artifact@v5
+        with:
+          name: dist
+          path: dist
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy

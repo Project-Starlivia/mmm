@@ -1,0 +1,20 @@
+{
+  // mmm はブラウザだけで動く。サーバに置くものは無いので、**Worker の
+  // コードそのものを持たない**（`main` が無い = 静的配信だけ）。
+  // ファイルは Cloudflare が直接返す。
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "mmm",
+  "compatibility_date": "2026-08-27",
+  "assets": {
+    "directory": "./dist",
+
+    // mmm の入口は `/` の 1 つだけ。クライアント側のルーティングは持たない
+    // ので、無い場所に来たら**素直に 404 を返す**。
+    // `single-page-application` にすると、綴り違いにもアプリを返してしまい
+    // 「見つからなかった」ことが伝わらない。
+    "not_found_handling": "none"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

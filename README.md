@@ -98,6 +98,39 @@ pnpm run dev        # コアをビルドしてから vite（http://localhost:131
   カード抽出 / 全コピー / 全段下げを測る。`pnpm run perf -- fixtures` で
   `test/fixtures/*.md` も）。負荷サンプルの作り直しは `pnpm run fixtures`
 
+### 配る
+
+**Cloudflare Workers の静的アセット**に置く（`wrangler.jsonc`）。mmm は
+ブラウザだけで動くので**サーバ側のコードは 1 行も持たない** — `main` の無い
+配信だけの Worker で、ファイルは Cloudflare が直接返す。
+
+入口は `/` の 1 つだけで、クライアント側のルーティングは持たない。だから
+`not_found_handling` は `none` にしてある — 無い場所には素直に 404 を返す
+（`single-page-application` にすると綴り違いにもアプリを返してしまい、
+「見つからなかった」ことが伝わらない）。
+
+```
+pnpm run deploy       # ビルドしてから配る
+pnpm run deploy:dry   # 配らずに設定と中身だけ確かめる
+```
+
+**`main` に入ったものは GitHub Actions が自動で配る**（`.github/workflows/ci.yml`）。
+1 つのファイルに `check` と `deploy` の 2 つを置いてあり、`deploy` は
+`needs: check` で待つ — ワークフローをまたぐと順番を約束できず、確かめ
+終わる前に配り始めてしまう。**配るのは `check` が組んだ dist そのもの**
+（artifact で渡す）で、組み直さない。確かめたものと配るものが別々になる
+余地を残さないため。
+
+MoonBit は公式の GitHub Action が無いので、配布スクリプトで入れて
+`$HOME/.moon/bin` を PATH に通している。
+
+要る Secrets は 2 つ:
+
+| 名前 | 何か |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | **Edit Cloudflare Workers** 権限のトークン |
+| `CLOUDFLARE_ACCOUNT_ID` | ダッシュボード右下の Account ID |
+
 ## 使い方
 
 **画面に出る文字は英語**(ボタン・メニュー・通知)。docs とコード内のコメントは

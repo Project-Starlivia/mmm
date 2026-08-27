@@ -1,2 +1,5 @@
 allowBuilds:
   esbuild: true
+  # workerd は `wrangler dev`（ローカルの Workers ランタイム）にだけ要る。
+  # mmm の dev は vite で、wrangler は deploy にしか使わないので組まない
+  workerd: false
