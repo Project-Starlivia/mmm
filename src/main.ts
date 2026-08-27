@@ -50,8 +50,13 @@ function el<T extends Element>(id: string, kind: abstract new () => T): T {
   throw new Error(`#${id} が ${kind.name} ではない`);
 }
 
-/** ヘルプの行き先。ここ 1 か所 */
+/** リポジトリの行き先。ここ 1 か所 */
 const REPO = "https://github.com/Project-Starlivia/mmm";
+
+/** 新しいタブで開く。`⋯` の外部リンクが通る唯一の道 */
+function openExternal(url: string): void {
+  window.open(url, "_blank", "noopener");
+}
 
 const mdPane = el("md-pane", HTMLElement);
 const mapPane = el("map-pane", HTMLElement);
@@ -759,14 +764,23 @@ openOnClick(btnFile, () => [
 ]);
 
 // 低頻度だが消したくないものの受け皿。Undo/Redo にボタンは無く（キーが
-// 本道）、ここが押せる保険になる
+// 本道）、ここが押せる保険になる。3 つの塊 — 戻す / 見た目 / 外に開く
 openOnClick(btnMore, () => [
   { label: "Undo", key: "Mod+Z", run: doUndo },
   { label: "Redo", key: "Mod+Shift+Z", run: doRedo },
   "sep",
+  { label: "Brand color", run: () => theme.pickColor() },
   { label: theme.isLight() ? "Dark theme" : "Light theme", run: () => theme.toggle() },
   "sep",
-  { label: "Help", run: () => window.open(REPO, "_blank", "noopener") },
+  {
+    label: "Shortcuts",
+    run: () => openExternal(`${REPO}/blob/main/docs/shortcuts.md`),
+  },
+  { label: "Help", run: () => openExternal(REPO) },
+  {
+    label: "License",
+    run: () => openExternal(`${REPO}/blob/main/README.md#ライセンス`),
+  },
 ]);
 elFilename.addEventListener("click", () => {
   void (async () => {
