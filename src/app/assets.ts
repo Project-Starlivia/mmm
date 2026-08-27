@@ -8,6 +8,8 @@ import { io } from "./io.ts";
 export interface Assets {
   imageUrl(path: string): string | null;
   clear(): void;
+  /** いま結び付いている画像フォルダの名前。未設定なら null */
+  folderName(): string | null;
   chooseFolder(): Promise<void>;
   saveToDisk(blob: Blob): Promise<string | null>;
 }
@@ -165,7 +167,13 @@ export function initAssets(deps: {
     clear() {
       releaseUrls();
       cachedBinding = undefined;
+      // 捨てたその場で引き直す。`folderName()` は同期で答えるしかなく、
+      // 「まだ引いていない」と「無い」を区別できない — 人が
+      // メニューを開くより先に決着させて、嘘を言わせない
+      void storedBinding().catch(() => {});
     },
+
+    folderName: () => (cachedBinding ? cachedBinding.directory.name : null),
 
     async chooseFolder() {
       // 保存していない文書には**相対パスの基準になる場所が無い**。

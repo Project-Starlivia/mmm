@@ -15,6 +15,8 @@ declare global {
     requestPermission(
       descriptor?: FileSystemHandlePermissionDescriptor,
     ): Promise<PermissionState>;
+    /** 同じフォルダの中での改名。Chromium だけが持つので任意 */
+    move?: (name: string) => Promise<void>;
   }
 
   interface Window {
@@ -131,5 +133,22 @@ export const io = {
       if (isCancel(error)) return null;
       throw error;
     }
+  },
+
+  /**
+   * いま開いているファイル**そのもの**の名前を変える（`move` は同じ
+   * フォルダの中での改名になる）。保存していなければ何もしない — 名前を
+   * 変える相手がディスクに無い。
+   *
+   * `move` は Chromium だけが持つ（Firefox / Safari は OPFS の中にしか
+   * 無い）。mmm は元から Chromium 限定と言い切っているので前提は変わらないが、
+   * 無い環境で黙って何も起きないのは通らないので、無ければそう言う。
+   */
+  async rename(name: string): Promise<string | null> {
+    if (!current) return null;
+    if (typeof current.move !== "function") throw new Error("no-rename");
+    await current.move(name);
+    await handles.saveFile(current);
+    return current.name;
   },
 };

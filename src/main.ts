@@ -27,7 +27,6 @@ import { showDrawing } from "./app/draw.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 import { openOnClick } from "./map/menu.ts";
-import { label } from "./icons.ts";
 import {
   type CardRef,
   cardRowsOf,
@@ -56,7 +55,7 @@ const REPO = "https://github.com/Project-Starlivia/mmm";
 const mdPane = el("md-pane", HTMLElement);
 const mapPane = el("map-pane", HTMLElement);
 const btnFile = el("btn-file", HTMLButtonElement);
-const btnHelp = el("btn-help", HTMLButtonElement);
+const btnMore = el("btn-more", HTMLButtonElement);
 const elFilename = el("filename", HTMLElement);
 const elDirty = el("dirty", HTMLElement);
 const elLogo = el("logo", SVGSVGElement);
@@ -614,6 +613,31 @@ async function openFile(): Promise<void> {
 }
 
 /**
+ * いま開いているファイル**そのもの**の名前を変える（同じフォルダの中での
+ * 改名）。保存していなければ相手がディスクに無いので、Files のその行は
+ * 無効になっている。本文の見出しから導く名前とは別の話。
+ */
+async function renameFile(): Promise<void> {
+  if (savedName === null) return;
+  const typed = window.prompt("New file name", savedName);
+  if (typed === null) return;
+  const name = typed.trim();
+  if (name === "" || name === savedName) return;
+  try {
+    const next = await io.rename(name);
+    if (next === null) return;
+    savedName = next;
+    showName();
+  } catch (error) {
+    flashFilename(
+      error instanceof Error && error.message === "no-rename"
+        ? "Renaming needs a Chromium browser"
+        : "Could not rename the file",
+    );
+  }
+}
+
+/**
  * 保存。`asNew`（別名で保存）と、まだ名前の無い文書はダイアログを出す。
  * ダイアログの初期値はいまの名前 — 保存済みならそのファイル名、まだなら
  * 本文から導いたもの（app/name.ts）。
@@ -716,22 +740,33 @@ async function attachImage(id: number, blob: Blob, tag = ""): Promise<void> {
   if (rel !== null && byId.has(id)) insertContentLine(id, `![](${rel})`, tag);
 }
 
-// 文書に何かする道は File にまとめる。**画像フォルダもここ** —
+// 文書に何かする道は Files にまとめる。**画像フォルダもここ** —
 // 「この .md の画像がどこに居るか」は文書ぜんぶの設定で、新規 / 開く / 保存と
-// 同じ高さのもの
-btnFile.replaceChildren(...label("Files", "folder"));
-btnHelp.title = "Open the repository";
+// 同じ高さのもの。
+//
+// 見出し（caption）は「続く行たちが何に効くか」を言う。保存していない文書に
+// 名前を変える相手は無いので、そのときは見出しがそう言い、行は無効になる。
 openOnClick(btnFile, () => [
   { label: "New", key: "Mod+Alt+N", run: () => void newFile() },
   { label: "Open", key: "Mod+O", run: () => void openFile() },
+  { caption: savedName ?? "not saved yet" },
+  { label: "Rename", run: () => void renameFile(), disabled: savedName === null },
   { label: "Save", key: "Mod+S", run: () => void saveFile() },
   { label: "Save as", key: "Mod+Shift+S", run: () => void saveFile(true) },
-  "sep",
-  { label: "Image folder", run: () => void assets.chooseFolder() },
+  { caption: assets.folderName() ?? "none" },
+  { label: "Images Folder", run: () => void assets.chooseFolder() },
 ]);
-btnHelp.addEventListener("click", () => {
-  window.open(REPO, "_blank", "noopener");
-});
+
+// 低頻度だが消したくないものの受け皿。Undo/Redo にボタンは無く（キーが
+// 本道）、ここが押せる保険になる
+openOnClick(btnMore, () => [
+  { label: "Undo", key: "Mod+Z", run: doUndo },
+  { label: "Redo", key: "Mod+Shift+Z", run: doRedo },
+  "sep",
+  { label: theme.isLight() ? "Dark theme" : "Light theme", run: () => theme.toggle() },
+  "sep",
+  { label: "Help", run: () => window.open(REPO, "_blank", "noopener") },
+]);
 elFilename.addEventListener("click", () => {
   void (async () => {
     if (!(await confirmDiscard())) return;
@@ -769,8 +804,6 @@ const { togglePane, togglePaneVis } = initPanes({
   mapPane,
   panesEl: el("panes", HTMLElement),
   splitter: el("splitter", HTMLElement),
-  mdButton: el("btn-view-md", HTMLButtonElement),
-  mapButton: el("btn-view-map", HTMLButtonElement),
   focusEditor: () => editor.focus(),
 });
 
@@ -779,9 +812,8 @@ initExport({
   button: el("btn-export", HTMLButtonElement),
   wayButton: el("btn-export-way", HTMLButtonElement),
 });
-initTheme({
+const theme = initTheme({
   logo: elLogo,
-  themeButton: el("btn-theme", HTMLButtonElement),
   setEditorTheme: (dark) => editor.setTheme(dark),
 });
 initShortcuts({

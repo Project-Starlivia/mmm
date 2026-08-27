@@ -1,21 +1,22 @@
 // ペインの表示/非表示 (コードとノードのビュー) とスプリッタ。
 // 「両方消えた」状態は作らない。片方を消したら残りが受け皿になる。
 // どちらを出しているかは覚えない — 毎回、両方から始まる。
+//
+// **ボタンは持たない。** 切り替える手段（キー・メニュー・帯）は時期によって
+// 変わるので、ここは「切り替える」「いまどちらが出ているか」だけを渡す。
 
 export function initPanes(args: {
   mdPane: HTMLElement;
   mapPane: HTMLElement;
   panesEl: HTMLElement;
   splitter: HTMLElement;
-  mdButton: HTMLButtonElement;
-  mapButton: HTMLButtonElement;
   /** md 側のフォーカスは CodeMirror が持つので注入 */
   focusEditor: () => void;
 }): {
   togglePane: () => void;
   togglePaneVis: (which: "md" | "map") => void;
 } {
-  const { mdPane, mapPane, panesEl, splitter, mdButton, mapButton } = args;
+  const { mdPane, mapPane, panesEl, splitter } = args;
   let paneVis = { md: true, map: true };
 
   const applyPaneVis = (v: { md: boolean; map: boolean }): void => {
@@ -25,13 +26,6 @@ export function initPanes(args: {
     mapPane.classList.toggle("pane-off", !v.map);
     splitter.classList.toggle("pane-off", !v.md || !v.map);
     panesEl.classList.toggle("no-map", !v.map);
-    // 押されているかどうかが、見た目で分かること
-    mdButton.classList.toggle("on", v.md);
-    mdButton.classList.toggle("off", !v.md);
-    mdButton.setAttribute("aria-pressed", String(v.md));
-    mapButton.classList.toggle("on", v.map);
-    mapButton.classList.toggle("off", !v.map);
-    mapButton.setAttribute("aria-pressed", String(v.map));
     // focus must not stay in a hidden pane
     if (!v.md && mdPane.contains(document.activeElement)) mapPane.focus();
     if (!v.map && mapPane.contains(document.activeElement)) args.focusEditor();
@@ -43,9 +37,6 @@ export function initPanes(args: {
     if (!next.md && !next.map) next[which === "md" ? "map" : "md"] = true;
     applyPaneVis(next);
   };
-
-  mdButton.addEventListener("click", () => togglePaneVis("md"));
-  mapButton.addEventListener("click", () => togglePaneVis("map"));
 
   // Mod+/: jump to the other pane, revealing it if hidden
   const togglePane = (): void => {
@@ -86,9 +77,6 @@ export function initPanes(args: {
     splitter.addEventListener("pointerup", onUp);
     splitter.addEventListener("pointercancel", onUp);
   });
-
-  // ボタンのオン/オフ表示を初期化するため、既定でも必ず一度通す
-  applyPaneVis({ md: true, map: true });
 
   return { togglePane, togglePaneVis };
 }

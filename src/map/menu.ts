@@ -12,12 +12,16 @@
 import { type IconName, icon } from "../icons.ts";
 
 /**
- * 1 行。`sep` は区切り線、`items` を持つ行は入れ子。
+ * 1 行。`sep` は区切り線、`items` を持つ行は入れ子、`caption` は見出し。
  *
  * **入れ子の行も `run` を持てる** — 触れば開き、押せばその場で走る。
  * 「まとめた名前そのものが、いちばん普通の 1 つでもある」形のため
  * （`Add ▸` を押すと子ノードが増え、開けば下や上や親も選べる）。
  * `run` の無い入れ子は開くだけ。
+ *
+ * `caption` は**続く行たちが何に効くか**を言う、押せない見出し
+ * （`current file.md` の下に Rename / Save が並ぶ、など）。区切り線と違って
+ * 名前を持てるので、「どれに効くのか」が要る並びで区切りの代わりに置く。
  */
 export type MenuEntry =
   | {
@@ -36,6 +40,7 @@ export type MenuEntry =
       run?: () => void;
       disabled?: boolean;
     }
+  | { caption: string }
   | "sep";
 
 const MARGIN = 8; // 画面の縁からこれだけは離す
@@ -94,6 +99,13 @@ export class ContextMenu {
     for (const it of items) {
       if (it === "sep") {
         this.el.append(document.createElement("hr"));
+        continue;
+      }
+      if ("caption" in it) {
+        const cap = document.createElement("div");
+        cap.className = "caption";
+        cap.textContent = it.caption;
+        this.el.append(cap);
         continue;
       }
       const row = document.createElement("div");

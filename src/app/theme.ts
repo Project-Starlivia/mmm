@@ -45,10 +45,9 @@ export type Theme = "light" | "dark";
 export function initTheme(args: {
   /** topbar の `<svg id="logo">`。中身は logo.ts が入れる */
   logo: SVGSVGElement;
-  themeButton: HTMLButtonElement;
   setEditorTheme: (dark: boolean) => void;
-}): void {
-  const { logo, themeButton } = args;
+}): { toggle: () => void; isLight: () => boolean } {
+  const { logo } = args;
 
   // ロゴの形の源は logo.ts ひとつ。topbar も favicon もここから作る
   // （静的ファイルに複製すると、以前のように片方だけ左右が反転していても
@@ -86,17 +85,17 @@ export function initTheme(args: {
   });
 
   // ---- ライト / ダーク ----
+  // **ボタンは持たない。** どう見せるかは呼ぶ側の仕事で、ここは
+  // 「切り替える」「いまどちらか」だけを渡す（テーマの置き場所は
+  // 帯だったりメニューだったり変わるので、器に縛られない）
+  const isLight = (): boolean =>
+    document.documentElement.classList.contains("light");
   const applyTheme = (t: Theme): void => {
     document.documentElement.classList.toggle("light", t === "light");
     args.setEditorTheme(t !== "light");
-    themeButton.textContent = t === "light" ? "◐" : "◑";
     store(LS_THEME, t);
   };
-  themeButton.addEventListener("click", () => {
-    applyTheme(
-      document.documentElement.classList.contains("light") ? "dark" : "light",
-    );
-  });
+  const toggle = (): void => applyTheme(isLight() ? "dark" : "light");
 
   // ---- 復元 ----
   // localStorage の中身は何でもありうる（人が書き替えられるし、昔の版が
@@ -107,4 +106,5 @@ export function initTheme(args: {
   const osLight = window.matchMedia?.("(prefers-color-scheme: light)").matches;
   applyTheme(saved ?? (osLight ? "light" : "dark"));
   applyColor(load(LS_COLOR) ?? DEFAULT_COLOR);
+  return { toggle, isLight };
 }
