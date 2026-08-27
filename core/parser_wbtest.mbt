@@ -68,3 +68,13 @@ test "列 0 でタブ字下げされた `---` は境界にならない（外は�
   // 区切りとしては数えない
   assert_eq(sep_runs_of("# r\n\n## a\n\n\t---\n\n## b\n").length(), 0)
 }
+
+///|
+test "base+3 を越えて半角スペースで字下げした `---` は境界にならない" {
+  // base(=0)+3 桁までは thematic break のまま（CommonMark の許容と同じ）。
+  // 4 つ目からは字下げコードブロックの領域なので、外のパーサに合わせて
+  // 区切りとしては数えない
+  assert_eq(sep_runs_of("# r\n\n## a\n\n    ---\n\n## b\n").length(), 0)
+  // 3 つまでは許容範囲のまま
+  assert_eq(sep_runs_of("# r\n\n## a\n\n   ---\n\n## b\n").length(), 1)
+}

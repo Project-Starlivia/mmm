@@ -663,3 +663,38 @@ test "move_new_group の target はルート直下でなければならない" {
   ignore(move_new_group([b], a1, true, false))
   assert_eq(get_text(), src)
 }
+
+///|
+test "見出しの無い文書に区切りだけあっても、境界は 1 つも無くクラッシュもしない" {
+  // valid_bounds は「区切りの後ろの最初の見出し」を探すので、見出しが
+  // 1 つも無ければ全部の区切りが k>=hn で落ちる。ノードも境界も空のまま
+  ignore(init_doc("---\n\n---\n\n---\n"))
+  assert_eq(st.nodes.length(), 0)
+  assert_eq(st.bounds.length(), 0)
+}
+
+///|
+test "outdent は掃除を通さない — 無効だった `---` を有効化しても放置する（docstring の例）" {
+  // `## a` の下、深い階層にある `---` は元は無効（次の見出し x の親が
+  // ルートでない）。x を 2 回段上げしてルート直下の深さまで浅くすると、
+  // 次の再構築でその `---` がそのまま境界として読まれるようになる。
+  // cmd_outdent は掃除を通さないので、これはそのまま起きる — 意図した挙動
+  let src = "# r\n\n## a\n\n### mid\n\n---\n\n#### x\n"
+  ignore(init_doc(src))
+  let x = st.nodes[3].id // r, a, mid, x
+  ignore(outdent_nodes([x]))
+  ignore(outdent_nodes([x]))
+  assert_eq(get_text(), "# r\n\n## a\n\n### mid\n\n---\n\n## x\n")
+  assert_eq(side_of("x"), false) // 区切りは 1 本（分割）なので側は変わらない
+}
+
+///|
+test "cross は dir=1（下方向）でも壁を越え、越えた先の側になる" {
+  // 既存の cross テストは dir=-1 だけを見ていた。切り替え境界を下方向に
+  // 越えるときも、越えた先の側になることを確かめる
+  ignore(init_doc("# r\n\n## a\n\n---\n---\n\n## b\n"))
+  assert_eq(side_of("a"), false)
+  ignore(reorder_node(st.nodes[1].id, 1, true)) // a を下へ、cross で b の後ろへ
+  assert_eq(get_text(), "# r\n\n---\n---\n\n## b\n\n## a\n")
+  assert_eq(side_of("a"), true)
+}
