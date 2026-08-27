@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assetTarget, imageType, mdPath } from "../src/app/assets.ts";
+import { assetTarget, folderFromDoc, imageType, mdPath } from "../src/app/assets.ts";
 
 test("mdPath: 同階層から下は ./ を付け、既に ./ があれば重ねない", () => {
   assert.equal(mdPath("a.png"), "./a.png");
@@ -64,4 +64,19 @@ test("assetTarget: 絵でないものは、宣言の中にあっても読みに�
 test("assetTarget: 上へ出る宣言は、その中に収まる限り受け取る", () => {
   assert.deepEqual(assetTarget("../pics/", "../pics/a.webp"), ["a.webp"]);
   assert.deepEqual(assetTarget("../pics/", "../pics/sub/a.webp"), ["sub", "a.webp"]);
+});
+
+// `directory.resolve(md)` が返すのは「フォルダ → md」の断片。md から見た
+// フォルダはその逆なので、**末尾のファイル名を除いた数**だけ上へ戻る。
+test("folderFromDoc: md がフォルダ直下なら ./", () => {
+  assert.equal(folderFromDoc(["a.md"]), "./");
+});
+
+test("folderFromDoc: md が 1 段深ければ ../", () => {
+  assert.equal(folderFromDoc(["notes", "a.md"]), "../");
+  assert.equal(folderFromDoc(["a", "b", "c.md"]), "../../");
+});
+
+test("folderFromDoc: 断片が空でも ./ に倒す", () => {
+  assert.equal(folderFromDoc([]), "./");
 });

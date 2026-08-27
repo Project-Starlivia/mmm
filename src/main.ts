@@ -15,6 +15,7 @@ import { MdEditor } from "./editor.ts";
 import { MindMap, type MapHost } from "./mindmap.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
+import { imageFolder, normalizePath, retarget, setImageFolder } from "./app/head.ts";
 import { exportWays, initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
 import { deriveName } from "./app/name.ts";
@@ -33,6 +34,7 @@ import {
   type CardRef,
   cardRowsOf,
   contentEndOf,
+  imageDest,
   linkLine,
 } from "./map/cards.ts";
 import { insertBlock, moveLine, removeLine } from "./edits.ts";
@@ -70,7 +72,7 @@ const elLogo = el("logo", SVGSVGElement);
 // ---------- app state ----------
 
 /** いまの文書（テキスト・ノード・フェンスの組）。スナップショットごと差し替える */
-let doc: DocView = { text: "", nodes: [], fences: [] };
+let doc: DocView = { text: "", nodes: [], fences: [], head: null };
 let byId = new Map<number, NodeInfo>();
 let selection = new Set<number>();
 let anchorId = -1;
@@ -98,23 +100,76 @@ let savedName: string | null = null;
  */
 let drawingOpen = false;
 
+// ---------- 画像フォルダの宣言（文書の頭） ----------
+//
+// 宣言の持ち主は .md の頭（app/head.ts）。ここは「頭が何を言っているか」を
+// 一言で引ける場所。実際の読み書きは app/assets.ts が持つ。
+
+/** いま頭が言っている宣言。読めない綴り（絶対パス・URL）なら null */
+function declaredFolder(): string | null {
+  const raw = imageFolder(doc.text, doc.head);
+  return raw === null ? null : normalizePath(raw);
+}
+
+/** 本文がいま映している宣言。打鍵の最中だけ、頭の言い分より遅れる */
+let appliedFolder: string | null = null;
+
+/**
+ * 頭の宣言に本文の画像パスを追従させ、画像を読み直す。
+ *
+ * **打鍵のたびに走る。** 待たない代わりに、その打鍵が使った `tag` に
+ * 相乗りする — コアは同じ tag の編集を 1 エントリに併合するので、頭の
+ * 打鍵と本文の書き換えは同じ Undo に入り、打鍵が続くかぎり増えない。
+ *
+ * 書き換えは頭より後ろにしか起きないので、CM 側の挿入位置はずれない。
+ * だから origin は `follow` — 打鍵の連なりを切らせない（`applySnap`）。
+ */
+function followDeclaration(tag: string): void {
+  const next = declaredFolder();
+  if (next === null) return; // 読めない綴り（空・絶対パス・URL）では何もしない
+  const prev = appliedFolder;
+  appliedFolder = next;
+  // 行って戻っただけなら何も変わっていない。ここで止めないと、動いていない
+  // 画像を読み直すだけの往復になる
+  if (prev === next) return;
+  // 初めての宣言（prev が null）では、どこから動かすのか分からないので
+  // 本文には触らない。読み直しだけする
+  if (prev !== null) {
+    // 後ろから。前から当てると後続のオフセットが挿入ぶんだけずれる。
+    // 編集ごとに applySnap を呼ぶと画像の枚数だけ再描画が走るので、
+    // 各回の editSets を繋いで最後に 1 度だけ渡す（並びがそのまま適用順）
+    const edits = retarget(doc, prev, next);
+    let snap: Snapshot | null = null;
+    const sets: EditOp[][] = [];
+    for (let i = edits.length - 1; i >= 0; i--) {
+      const e = edits[i];
+      snap = core.replaceText(e.from, e.to, e.insert, tag);
+      sets.push(...snap.editSets);
+    }
+    if (snap) applySnap({ ...snap, editSets: sets }, "follow");
+  }
+  assets.clear(); // 宣言が変わった。画像を読み直す
+}
 
 // ---------- sync ----------
 
 /**
- * そのスナップショットを誰が起こしたか。振る舞いが変わるのは 3 通りだけ。
- * - `cm`   … MD ペインの打鍵。CodeMirror には既に入っているので送り返さない
- * - `load` … 文書まるごとの入れ替え。setText が済んでいる
- * - `core` … それ以外（マップの操作・undo/redo）。MD ペインへ差分を送る
+ * そのスナップショットを誰が起こしたか。振る舞いが変わるのは 4 通りだけ。
+ * - `cm`     … MD ペインの打鍵。CodeMirror には既に入っているので送り返さない
+ * - `load`   … 文書まるごとの入れ替え。setText が済んでいる
+ * - `follow` … 直前の打鍵に本文が追いついた分（頭の宣言の引っ越し）。
+ *              MD ペインへ差分は送るが、**打鍵の連なりは切らない** —
+ *              書き換えは頭より後ろにしか起きず、挿入位置がずれないため
+ * - `core`   … それ以外（マップの操作・undo/redo）。MD ペインへ差分を送る
  */
-type Origin = "cm" | "load" | "core";
+type Origin = "cm" | "load" | "follow" | "core";
 
 function applySnap(snap: Snapshot, origin: Origin): void {
   // 何も無いところに最初の 1 つが生まれた瞬間だけ、真ん中へ寄せる。
   // `ensureVisible` は「見えるところまで」しか動かさないので、まっさらな
   // 画面では端に置かれたように見える
   const wasEmpty = doc.nodes.length === 0;
-  doc = { text: core.getText(), nodes: snap.nodes, fences: snap.fences };
+  doc = { text: core.getText(), nodes: snap.nodes, fences: snap.fences, head: snap.head };
   byId = new Map(doc.nodes.map((n) => [n.id, n]));
   if (origin !== "cm" && origin !== "load") editor.applySets(snap.editSets);
   // prune selection to surviving nodes
@@ -136,8 +191,15 @@ function applySnap(snap: Snapshot, origin: Origin): void {
     picked = null;
     selChanged = true;
   }
-  // structural edits from elsewhere invalidate the typing-merge chain
-  if (origin !== "cm") editKind = "";
+  // 打鍵と、その打鍵に本文が追いついた分**以外**で文書が変わったなら、
+  // 打鍵の連なりは切れ（次の打鍵は新しい Undo エントリから）、本文はもう
+  // その宣言を映している（読み込み・undo/redo・フォルダ選択のどれでも）。
+  // 打鍵のときだけ据え置くのは、直後の followDeclaration に「どこから」を
+  // 渡すため
+  if (origin !== "cm" && origin !== "follow") {
+    editKind = "";
+    appliedFolder = declaredFolder();
+  }
   map.render();
   // render がクラスまで塗り終えているので、ここで塗り直さない
   if (selChanged) syncSelectionViews(false, true);
@@ -285,7 +347,13 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
       editTag = tag;
       editPos = e.from;
     } else {
+      // 選択の置き換えなど、前後の打鍵と連ねない 1 編集。**それでも名前は
+      // 要る** — 空の tag はコアで併合されない決まりなので（history.mbt）、
+      // 空のままだと直後の追従が別の Undo エントリになり、1 回戻したときに
+      // 頭と本文が食い違う。他と重ならない名前を配れば、連ならないまま
+      // 追従だけが同じエントリに入る
       editKind = "";
+      tag = nextTag();
     }
   } else {
     editKind = "";
@@ -298,6 +366,9 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
     delta += e.insert.length - (e.to - e.from);
   }
   if (snap) applySnap(snap, "cm");
+  // 頭を打ったなら、本文をその場で追いつかせる。**同じ tag を渡す** —
+  // 打鍵と書き換えが 1 つの Undo に収まる
+  followDeclaration(tag);
 }
 
 // ---------- mindmap host ----------
@@ -736,6 +807,11 @@ const assets = initAssets({
   hasFile: () => savedName !== null,
   warn: (m) => flashFilename(m),
   refresh: () => map.render(),
+  declared: () => declaredFolder(),
+  declare: (value) => {
+    const e = setImageFolder(doc.text, doc.head, value);
+    applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
+  },
 });
 
 /** `body` を独立した段落として `at` へ挿し込む（式は src/edits.ts）。 */
@@ -765,7 +841,25 @@ async function attachImage(id: number, blob: Blob, tag = ""): Promise<void> {
   if (!byId.has(id)) return;
   const rel = await assets.saveToDisk(blob);
   // 置いているあいだに消えていることがある
-  if (rel !== null && byId.has(id)) insertContentLine(id, `![](${rel})`, tag);
+  if (rel !== null && byId.has(id)) insertContentLine(id, `![](${imageDest(rel)})`, tag);
+}
+
+/**
+ * Files メニューの画像フォルダの見出し。「宣言」（頭）と「許可」（フォルダ
+ * ハンドル）は別々に食い違いうるので、4 通りをそれぞれ言い分ける。
+ *
+ * **とくに「許可はあるが宣言が無い」を黙らせない。** `AssetBinding.path` が
+ * 落ちた設計上、頭を持たない既存文書は宣言が無いまま `declaredPath()` が
+ * `./` に倒れる（app/assets.ts）。以前 `img/` 相当で結んでいた人はここが
+ * 外れて画像が黙って空になるが、フォルダ名は出てしまうので「結び付いて
+ * いるのに映らない」といういちばん気付きにくい状態になる。ここで
+ * "not declared" と名乗らせて、頭に宣言が無いことを見えるようにする。
+ */
+function folderCaption(): string {
+  const name = assets.folderName();
+  const declared = declaredFolder() !== null;
+  if (name === null) return declared ? "folder not linked" : "none";
+  return declared ? name : `${name}, not declared`;
 }
 
 // 文書に何かする道は Files にまとめる。**画像フォルダもここ** —
@@ -781,7 +875,7 @@ openOnClick(btnFile, () => [
   { label: "Rename", run: () => void renameFile(), disabled: savedName === null },
   { label: "Save", key: "Mod+S", run: () => void saveFile() },
   { label: "Save as", key: "Mod+Shift+S", run: () => void saveFile(true) },
-  { caption: assets.folderName() ?? "none" },
+  { caption: folderCaption() },
   { label: "Images Folder", run: () => void assets.chooseFolder() },
 ]);
 

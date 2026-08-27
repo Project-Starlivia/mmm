@@ -35,7 +35,7 @@ core/   MoonBit — ドキュメントモデル。テキストが唯一の真実
                 フェンス区間・id 保持)
 src/    TypeScript — UI
   coreApi.ts   MoonBit core への型付きラッパー。DocView(テキスト+ノード+
-               フェンス)は必ず同じ rev の組で持ち回る
+               フェンス+頭)は必ず同じ rev の組で持ち回る
   editor.ts    Markdown ペイン(CodeMirror 6、履歴はコアに委譲。フェンスの
                中は map/highlight.ts と同じ言語表で色を付ける)
   mindmap.ts   マインドマップペイン(見た目の状態と入力処理)
@@ -55,7 +55,9 @@ src/    TypeScript — UI
                highlight(コードの色分け) / toSvg(1 枚の svg にする) / svg(要素を作る)
   main.ts      束ねる場所(選択・同期・ファイル I/O)
   app/         その子系統 — name(文書の名前) / persist(テーマと色) /
-               theme(テーマ・ブランドカラー・ロゴ) / panes(ペイン) / assets(画像) /
+               theme(テーマ・ブランドカラー・ロゴ) / panes(ペイン) /
+               head(文書の頭の設定。画像フォルダの場所はここが宣言) /
+               assets(画像) /
                io(File System Access API の窓口) / handles(ハンドルを IndexedDB に
                置く層) / logo(ロゴの唯一の源) / paste(貼り付けの振り分け) /
                dnd(落とされたファイルの振り分け) / shortcuts(全体のキー) /

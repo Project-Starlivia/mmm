@@ -45,6 +45,7 @@ priv struct St {
   mut tx : Entry? // open transaction accumulating steps
   mut hide_regions : Array[HideRegion] // <!-- … --> marker spans
   mut fences : Array[Fence] // ``` … ``` spans
+  mut head : Head? // 文書の頭（YAML frontmatter）の区間。無ければ None
   mut index_of : Map[Int, Int] // node id -> 添字
   // 書き方のモード = 「深さ list_from 以上をリストで書く」。0 は全部見出し。
   // **読みには一切関与しない**（パーサは常に両方を読む）。変わるのは
@@ -66,6 +67,7 @@ let st : St = {
   tx: None,
   hide_regions: [],
   fences: [],
+  head: None,
   index_of: Map([]),
   list_from: 0,
   scan_list_from: 0,
@@ -83,6 +85,7 @@ fn rebuild_nodes(id_at : Map[Int, Int]) -> Unit {
   let regions = scan.hides
   st.hide_regions = regions
   st.fences = scan.fences
+  st.head = scan.head
   st.scan_list_from = scan.list_from
   // Offsets that are NOT nodes but must still stop a subtree.
   //
