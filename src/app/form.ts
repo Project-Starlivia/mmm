@@ -5,6 +5,8 @@
 // **読みはモードを知らない**ので、押して変わるのは書かれ方だけ —
 // マップは 1 ピクセルも動かない。
 
+import { paneTool } from "./paneTool.ts";
+
 export interface FormDeps {
   /** ボタンを住まわせるペイン（md ペイン） */
   pane: HTMLElement;
@@ -20,11 +22,10 @@ export function initForm(deps: FormDeps): {
   /** いまのモードをボタンに映す（applySnap から毎回呼ばれる） */
   show: (listFrom: number) => void;
 } {
-  const box = document.createElement("div");
-  box.id = "form-picker";
   // ペインの隅の道具（pane-tool）で、3 つが 1 つの塊に見える（group）。
   // 住む場所だけが `#form-picker` の持ちもの
-  box.className = "pane-tool group";
+  const box = paneTool("form-picker");
+  box.classList.add("group");
   const bHead = button("H", "Write the tree as headings");
   const bHybrid = button("2+", "Headings above, list items below — press again to move the boundary");
   const bList = button("L", "Write the tree as a list");
