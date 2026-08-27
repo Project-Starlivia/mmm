@@ -56,9 +56,11 @@ src/    TypeScript — UI
                highlight(コードの色分け) / toSvg(1 枚の svg にする) / svg(要素を作る)
   main.ts      束ねる場所(選択・同期・ファイル I/O)
   app/         その子系統 — name(文書の名前) / persist(テーマと色) /
-               theme(テーマ・ブランドカラー・ロゴ) / panes(ペイン) / assets(画像) /
-               io(File System Access API の窓口) / handles(ハンドルを IndexedDB に
-               置く層) / logo(ロゴの唯一の源) / paste(貼り付けの振り分け) /
+               theme(テーマ・ブランドカラー・ロゴ) / panes(ペイン) /
+               head(文書の頭の設定。画像フォルダの場所はここが宣言) /
+               assets(画像) / io(File System Access API の窓口) /
+               handles(ハンドルを IndexedDB に置く層) /
+               logo(ロゴの唯一の源) / paste(貼り付けの振り分け) /
                dnd(落とされたファイルの振り分け) / shortcuts(全体のキー) /
                export(マップを外へ出す。ファイルにもクリップボードにも) /
                draw(その場で描く窓) / form(木の書き方 H / n+ / L の切り替え) /

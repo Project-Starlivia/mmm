@@ -4,6 +4,8 @@
 
 import { handles, type AssetBinding } from "./handles.ts";
 import { io } from "./io.ts";
+import { bare } from "../map/cards.ts";
+import { normalizePath, under } from "./head.ts";
 
 export interface Assets {
   imageUrl(path: string): string | null;
@@ -17,9 +19,6 @@ export interface Assets {
 export function mdPath(rel: string): string {
   return rel.startsWith("../") ? rel : `./${rel.replace(/^\.\//, "")}`;
 }
-
-/** 先頭の `./` を落とした形。`./x` と `x` は同じ場所を指す。 */
-const bare = (path: string): string => path.replace(/^\.\//, "");
 
 /**
  * 読みに行ってよい絵の種類。**綴りはここ 1 つ**で、種類の判定も
@@ -48,15 +47,13 @@ export function imageType(name: string): string | null {
  * md に書かれたパスが、宣言した保存パスの下に収まるか。
  * 収まればフォルダからの相対を断片で返し、外れていれば null。
  *
- * 同じ場所を指す綴りが `./x` と `x` の 2 通りあるので、**必ず裸に寄せてから**
- * 比べる。md に書くのは `./x`、カード側が持つのは `x` と非対称なため、
- * どちらか片方だけを見ると既定の保存パス `./` で必ず外れる。
+ * 「その綴りは宣言の下か」の判定は app/head.ts の `under` が唯一の持ち主。
+ * ここが足すのは、**フォルダの中として受け取ってよいか**の柵だけ。
  */
 export function assetTarget(declared: string, path: string): string[] | null {
-  const prefix = bare(declared);
-  const rest = bare(path);
-  if (!rest.startsWith(prefix)) return null;
-  const parts = rest.slice(prefix.length).split("/").filter(Boolean);
+  const rest = under(path, declared);
+  if (rest === null) return null;
+  const parts = rest.split("/").filter(Boolean);
   if (parts.length === 0) return null;
   // フォルダの外へ出る綴りは受け取らない（宣言の外は見に行かない）
   if (parts.some((part) => part === "." || part === "..")) return null;
@@ -67,13 +64,6 @@ export function assetTarget(declared: string, path: string): string[] | null {
   if (!imageType(parts[parts.length - 1] ?? "")) return null;
   return parts;
 }
-
-const normalizePath = (value: string): string | null => {
-  let path = value.trim().replace(/\\/g, "/");
-  if (path === "" || path === ".") path = "./";
-  if (path.startsWith("/") || /^[a-z]+:\/\//i.test(path)) return null;
-  return path.endsWith("/") ? path : `${path}/`;
-};
 
 async function nestedFile(
   root: FileSystemDirectoryHandle,

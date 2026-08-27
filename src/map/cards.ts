@@ -33,6 +33,13 @@ export interface CardRef {
   index: number;
 }
 
+/**
+ * 先頭の `./` を落とした形。`./x` と `x` は同じ場所を指すので、比べる前に
+ * 必ずこの形へ寄せる。**カードが持つのも、画像の鍵になるのもこの形**
+ * （md へ書き戻すときだけ `app/assets.ts` の `mdPath` が `./` を付け直す）。
+ */
+export const bare = (path: string): string => path.replace(/^\.\//, "");
+
 const LINK_ROW = 26; // height of one link-card row under the label
 const IMG_H = 64; // thumbnail height inside an image row
 const IMG_ROW = IMG_H + 12; // height of one image row under the label
@@ -123,7 +130,7 @@ export function parseImage(line: string): { path: string; name: string } | null 
   // path, not an external one.
   const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(path);
   if (scheme && scheme[1].length > 1) return null;
-  if (path.startsWith("./")) path = path.slice(2);
+  path = bare(path);
   if (path === "") return null;
   // Windows のパスは `\` 区切りでも来る（ドライブレターや `..\..\x.png`）
   // split は必ず 1 つ以上返すが、型は言い切らないので素直に受ける
