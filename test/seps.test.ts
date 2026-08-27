@@ -37,9 +37,7 @@ test("リストの形で境界を書いても、外のパーサの木は変わ�
   // b を左へ（切り替えの境界が書かれる）
   core.moveSideEnd([idOf(snap.nodes, "b")], idOf(snap.nodes, "root"), true);
   const after = itemsOf(getText());
-  assert.deepEqual(
-    after.map((i) => i.depth),
-    before.map((i) => i.depth),
-    `字下げが崩れている:\n${getText()}`,
-  );
+  // depth だけでなくラベルも比べる。深さの並びが偶然一致しても、
+  // どの項目がどのラベルかが入れ替わっていては壊れているのと同じ
+  assert.deepEqual(after, before, `字下げまたはラベルが崩れている:\n${getText()}`);
 });
