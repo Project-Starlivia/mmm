@@ -9,6 +9,7 @@ import { tokenizeBlock, touchesFence } from "./map/highlight.ts";
 import {
   type Pt,
   type Rect,
+  growthEdgeOf,
   leftOf,
   midOfPolyline,
   rightOf,
@@ -731,7 +732,7 @@ export class MindMap {
     }
     this.plusBtn.setAttribute("visibility", "visible");
     const dir = dirOf(b.n);
-    const p = dir === 1 ? rightOf(b) : leftOf(b);
+    const p = growthEdgeOf(b, dir);
     this.plusBtn.setAttribute("transform", `translate(${p.x + 14 * dir} ${p.y})`);
   }
 
@@ -1607,7 +1608,7 @@ export class MindMap {
       // where the new child will appear
       this.markNode(drop.id, "drop-child");
       const dir = dirOf(b.n);
-      const e = dir === 1 ? rightOf(b) : leftOf(b);
+      const e = growthEdgeOf(b, dir);
       const lx = e.x + (GAP.x / 2) * dir;
       const ly = e.y;
       const half = 16;

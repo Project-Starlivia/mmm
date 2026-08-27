@@ -29,6 +29,18 @@ export const rightOf = (b: Rect): Pt => ({ x: b.x + b.w, y: b.y + b.h / 2 });
 /** 左辺の中点 */
 export const leftOf = (b: Rect): Pt => ({ x: b.x, y: b.y + b.h / 2 });
 
+// dir（右 = 1 / 左 = -1）を受けて左右どちらの辺を使うか決める箇所は、
+// 育つ辺と入る辺のこの 2 つだけにする。**鏡映（左右の入れ替え）を書いていいのはここだけ**
+// — 呼び出し側は「育つ辺」「入る辺」としか言わない。
+
+/** 箱から、その枝が dir 方向へ**育っていく**辺の中点 */
+export const growthEdgeOf = (b: Rect, dir: 1 | -1): Pt =>
+  dir === 1 ? rightOf(b) : leftOf(b);
+
+/** 箱へ、dir 方向の枝が**入ってくる**辺の中点（`growthEdgeOf` の反対側） */
+export const entryEdgeOf = (b: Rect, dir: 1 | -1): Pt =>
+  dir === 1 ? leftOf(b) : rightOf(b);
+
 /** 点 p から線分 ab までの距離 */
 export function distToSeg(p: Pt, a: Pt, b: Pt): number {
   const vx = b.x - a.x;

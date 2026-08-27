@@ -3,7 +3,7 @@
 
 import type { DocView, NodeInfo } from "../coreApi.ts";
 import { type CardRow, cardBleed, cardInset, cardRows, rowH } from "./cards.ts";
-import { type Pt, type Rect, leftOf, rightOf } from "./geometry.ts";
+import { type Pt, type Rect, entryEdgeOf, growthEdgeOf } from "./geometry.ts";
 import { ROW_NORMAL, nodeSize, rowTop } from "./metrics.ts";
 
 export const GAP = {
@@ -356,7 +356,8 @@ export function edgeEnds(L: Layout, id: number): { from: Pt; to: Pt } | null {
   const p = pid === undefined ? undefined : L.boxes.get(pid);
   if (!b || !p) return null;
   // 線は「親の、子が伸びる側の辺」から出て「子の、親を向いた辺」へ入る
-  const out = dirOf(b.n) === 1 ? rightOf(p) : leftOf(p);
-  const into = dirOf(b.n) === 1 ? leftOf(b) : rightOf(b);
+  const dir = dirOf(b.n);
+  const out = growthEdgeOf(p, dir);
+  const into = entryEdgeOf(b, dir);
   return { from: { x: out.x, y: out.y + (L.fanOf.get(id) ?? 0) }, to: into };
 }

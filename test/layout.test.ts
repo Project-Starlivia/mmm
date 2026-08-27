@@ -8,7 +8,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadDoc, nodeOf, stubCanvas } from "./_helpers.ts";
-import { GAP, layoutMap } from "../src/map/layout.ts";
+import { GAP, edgeEnds, layoutMap } from "../src/map/layout.ts";
+import { leftOf, rightOf } from "../src/map/geometry.ts";
 
 stubCanvas();
 
@@ -97,6 +98,22 @@ test("継ぎ目の線は、左の列でも境目に出る（列の右端 - 幅�
   // 左向きの箱は右辺 (x+w) が列の共通の辺（root と向かい合う辺）になる。
   // 継ぎ目もその辺に右端を揃える
   assert.equal(L.seams[0].x + L.seams[0].w, b.x + b.w);
+});
+
+test("左の枝の edgeEnds は、親の左辺から出て子の右辺へ入る", () => {
+  // 右の枝（edgeEnds の通常経路）は golden 群で間接に踏まれているが、
+  // ミラーした側は edgeEnds を直接見て確かめないと片方だけ直したときに気づけない
+  const doc = loadDoc("# r\n\n---\n---\n\n## a\n");
+  const L = layoutMap(doc);
+  const r = nodeOf(doc.nodes, "r");
+  const a = nodeOf(doc.nodes, "a");
+  const rb = L.boxes.get(r.id);
+  const ab = L.boxes.get(a.id);
+  assert.ok(rb && ab);
+  const ends = edgeEnds(L, a.id);
+  assert.ok(ends);
+  assert.deepEqual(ends.from, leftOf(rb));
+  assert.deepEqual(ends.to, rightOf(ab));
 });
 
 test("左だけの文書でも、ルートは枝の中心に立つ", () => {
