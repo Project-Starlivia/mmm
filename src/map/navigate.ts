@@ -4,7 +4,7 @@
 // — Shift はそこを選択に足すだけなので、道筋と広げ方を別々に覚えなくてよい。
 
 import type { NodeInfo } from "../coreApi.ts";
-import type { Layout } from "./layout.ts";
+import { type Layout, dirOf } from "./layout.ts";
 
 const ARROWS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"] as const;
 
@@ -21,9 +21,10 @@ export const isArrowKey = (key: string): key is ArrowKey =>
  * - 上下 … **同じ深さの列**を文書順（= 画面の上から下）に辿り、端でループする。
  *   兄弟に限らず**いとこも含む** — 見えている限り、その階層は 1 本の列。
  *   親が畳まれて埋もれたノードは列に入れない（選べないものへは飛べない）
- * - 左 … 親へ
- * - 右 … 最初の子へ。子が無ければ先頭へ回る（上下が列の中で回るのと同じで、
- *   行き止まりで無反応になるより一周できるほうが迷わない）
+ * - 左右 … **画面の向き**で読む。右の枝（ルート含む）では左が親・右が子だが、
+ *   左の枝ではその鏡像（← が子・→ が親）になる。子が無ければ先頭へ回る
+ *   （上下が列の中で回るのと同じで、行き止まりで無反応になるより一周できる
+ *   ほうが迷わない）
  *
  * `nodes` は**全ノード**（畳んで埋もれたものも含む）。埋もれた子へ飛ばない
  * 判定に、見えているかどうかの照合が要る。
@@ -48,8 +49,8 @@ export function arrowTarget(
     const step = key === "ArrowUp" ? -1 : 1;
     return level[(i + step + level.length) % level.length].id;
   }
-  // 左右は**画面の向き**で読む。左の枝では ← が子、→ が親
-  const toParent = key === (cur.left ? "ArrowRight" : "ArrowLeft");
+  // 左右は**画面の向き**で読む。側を読むのは dirOf だけ、という不変条件を守る
+  const toParent = key === (dirOf(cur) === -1 ? "ArrowRight" : "ArrowLeft");
   if (toParent) return cur.parent;
   const kid = nodes.find((n) => n.parent === anchor && layout.boxes.has(n.id));
   return kid?.id ?? order[0];
