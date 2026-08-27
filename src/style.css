@@ -121,7 +121,8 @@ html, body {
 }
 
 /* 並んだボタンを 1 つの塊に見せる。**枠を重ねて、継ぎ目だけが仕切り**になる
-   — 枠が 2 本並ぶと「別のボタン」に見える */
+   — 枠が 2 本並ぶと「別のボタン」に見える。
+   帯の書き出し（SVG ⤓ │ ▾）と、md の書き方（H │ n+ │ L）が使う */
 .group {
   display: inline-flex;
 
@@ -187,7 +188,7 @@ html, body {
   flex: 0 0 var(--md-width, 42%);
   min-width: 200px;
   background: var(--panel);
-  position: relative; /* 右上の書き方ボタン（#form-picker）の座標系 */
+  position: relative; /* 隅に浮く道具（.pane-tool）の座標系 */
 
   & .cm-editor {
     height: 100%;
@@ -206,13 +207,13 @@ html, body {
 /* マップで選んでいるノードの、md 側での対応範囲 */
 .cm-mmm-selected { background: var(--accent-soft); }
 
-/* 木の書き方（H / n+ / L）。低頻度なので沈ませて、触れたら起きる */
-#form-picker {
+/* ペインの隅に浮く小さな道具。**そのペインにだけ効くもの**はここに住む
+   （帯に出るのは文書ぜんぶに効くものだけ）。低頻度なので沈ませて、
+   触れたら起きる — 消さずに優先度だけ下げる、いつもの手 */
+.pane-tool {
   position: absolute;
-  top: 6px;
-  right: 16px;
-  display: flex;
   z-index: 10;
+  display: flex;
   opacity: 0.5;
 
   &:hover { opacity: 1; }
@@ -226,10 +227,9 @@ html, body {
     color: var(--ink-dim);
     cursor: pointer;
 
-    /* 枠を重ねて 1 つの塊に（帯の .group と同じ理屈） */
-    &:not(:first-child) { margin-left: -1px; }
-    &:first-child { border-start-start-radius: 6px; border-end-start-radius: 6px; }
-    &:last-child { border-start-end-radius: 6px; border-end-end-radius: 6px; }
+    /* 単独なら自分で丸まる。並ぶときの端の丸めは `.group` が持つので、
+       ここでは**触らない**（両方が丸めを書くと順番で勝ち負けが変わる） */
+    &:only-child { border-radius: 6px; }
     &:hover { border-color: var(--accent); color: var(--ink); z-index: 1; }
     &.on {
       background: var(--accent-soft);
@@ -239,6 +239,16 @@ html, body {
     }
   }
 }
+
+/* 木の書き方（H / n+ / L）は md の右上 */
+#form-picker { top: 6px; right: 16px; }
+
+/* 隣のペインの出し入れ。**境目を挟んで向かい合い、指したほうを動かす** —
+   md の右下がマップ、マップの左下が MD。片方だけのときは、残ったほうの
+   ボタンが「もう片方を出す」になる（自分を消すボタンだと、消えた先に
+   戻す手が無くなる） */
+#switch-map { right: 16px; bottom: 10px; }
+#switch-md { left: 12px; bottom: 10px; }
 
 /* ========== マップのペイン ========== */
 
