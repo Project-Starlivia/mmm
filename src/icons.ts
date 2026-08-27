@@ -22,6 +22,9 @@ const PATHS = {
   /** 十字とその中心の輪。視点を寄せる先を示す */
   target:
     "M8 2v2.5M8 11.5v2M2 8h2.5M11.5 8h2M6 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
+  /** 紙に着いた消しゴム。**床の線が要る** — 傾いた四角だけでは
+      「消す」ではなく、ただの箱に見える */
+  eraser: "M2.5 13.5h11M5 11.5 9.5 7l3 3-1.5 1.5zM8 8.5l3 3",
 } as const;
 
 export type IconName = keyof typeof PATHS;

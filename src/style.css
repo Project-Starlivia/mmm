@@ -791,22 +791,38 @@ html, body {
     background: var(--ink-swatch);
     /* 暗い色でも器から浮くように、縁は薄く 1 本 */
     border: 1px solid var(--line);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 
     /* 触っても**塗りは変えない** — 色そのものが中身なので、下地に
        すり替えると何色か分からなくなる */
     &:hover { background: var(--ink-swatch); border-color: var(--ink-dim); }
-    /* 選ばれている印も同じ理由で塗りを覆わず、外側に輪を回す */
+    /* 選ばれている印も同じ理由で塗りを覆わず、外側に輪を回す。
+       **器の色で隙間を空けてから**輪を引く — ブランドカラーの筆は輪と
+       同じ色になりうるので、地続きだと選ばれているのか分からない */
     &.on {
-      border-color: var(--panel);
-      box-shadow: 0 0 0 2px var(--accent);
+      box-shadow:
+        0 0 0 2px var(--panel),
+        0 0 0 4px var(--accent);
     }
   }
 
-  /* 消しゴムだけは字。紙の色の丸は、明るいテーマで器と同じ色になって消える */
-  & .draw-eraser.on {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
+  /* 消しゴムだけは色を持てないので、丸の中に絵を入れる（紙の色で塗ると
+     明るいテーマで器と同じ色になって消える） */
+  & .draw-eraser {
+    background: var(--panel);
+    color: var(--ink-dim);
+
+    &:hover { background: var(--accent-soft); color: var(--ink); }
+    /* 選ばれたら塗り潰す。色を持たないので、色を隠さないための輪は要らない */
+    &.on {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: none;
+    }
+    & .icon { width: 13px; height: 13px; }
   }
 
   /* 太さ。字ではなく**その太さの点そのもの**を出す */

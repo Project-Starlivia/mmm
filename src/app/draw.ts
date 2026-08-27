@@ -12,7 +12,9 @@
 //
 // **道具は選ばせるのではなく、絞って並べる。** OS のカラーピッカーと生の
 // スライダーは「何でも選べます」としか言っておらず、選ぶ手間だけを渡して
-// くる。紙の上で読める 5 色と、3 段の太さだけを出す。
+// くる。紙の上で読める色と、3 段の太さだけを出す。
+
+import { icon } from "../icons.ts";
 
 /** 世界ではなくキャンバスの中の座標（CSS ピクセル） */
 interface Pt {
@@ -31,33 +33,50 @@ const HEIGHT = 440;
 const PAPER = "#ffffff";
 /** 拡大しても粗くならない範囲。上げすぎると重くなるだけ */
 const MAX_DPR = 2;
-/** 消しゴムは同じ太さでは細すぎて使えない */
-const ERASER_SCALE = 4;
 
 /**
- * 出せるインク。**紙の上で読める色だけ**を並べる — 選べるものを絞ること
+ * 出せる色。**紙の上で読める色だけ**を並べる — 選べるものを絞ること
  * そのものが道具の言い分で、「何色でもどうぞ」は言い分が無いのと同じ。
  * 先頭が既定。
  */
 const PALETTE = ["#111111", "#d92d20", "#1570ef", "#0f9d58", "#e07000"] as const;
 
-/** 線の太さ。細・中・太の 3 段だけ */
-const WIDTHS = [2, 4, 8] as const;
-/** 既定は真ん中 */
-const DEFAULT_NIB = 1;
+/**
+ * ブランドカラーも 1 本の筆にする。**綴りは持たない** — ロゴと同じ
+ * `--accent` を引くので、色を変えれば筆も変わる。
+ *
+ * 引いた値は**名乗らせず確かめる**。6 桁の hex でなければ既定へ落とさず、
+ * その筆を出さない（読めない色を黙って別の色にすり替えない）。
+ * 並びの**末尾**に置くのは、既定にすると淡いブランドカラーのときに
+ * 紙の上で消えるため — 選べば使えるが、黙って選ばれてはいない。
+ */
+function brandInk(): string | null {
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue("--accent")
+    .trim();
+  return /^#[0-9a-f]{6}$/i.test(value) ? value : null;
+}
 
 /**
- * 描くもの。**消しゴムは紙の色の 6 番目のインク**でしかない（下の
- * `pointerdown` は実際、色と太さを差し替えているだけ）。同じ並びの中に
- * 置けば「消しながら色を選ぶ」のような、意味の無い組み合わせが最初から
- * 作れない — 別の切り替えとして持つと、そこは自分で塞ぐことになる。
+ * 太さは細・中・太の 3 段。**その段が何 px になるかはインクが決める** —
+ * 消しゴムはペンと同じ太さでは細すぎて使えない。掛け算を隠さず表で持ち、
+ * ボタンの点も選んだインクに合わせて太る（見えている点が、出てくる太さ）。
+ */
+const PEN_NIBS = [2, 4, 8] as const;
+const ERASER_NIBS = [8, 16, 24] as const;
+/** 既定は真ん中 */
+const DEFAULT_STEP = 1;
+
+/**
+ * 描くもの。**消しゴムは紙の色のインク**でしかない（下の `pointerdown` は
+ * 実際、色と太さを差し替えているだけ）。同じ並びの中に置けば「消しながら
+ * 色を選ぶ」のような、意味の無い組み合わせが最初から作れない — 別の
+ * 切り替えとして持つと、そこは自分で塞ぐことになる。
  */
 type Ink = { kind: "pen"; color: string } | { kind: "eraser" };
 
-const INKS: readonly Ink[] = [
-  ...PALETTE.map((color): Ink => ({ kind: "pen", color })),
-  { kind: "eraser" },
-];
+const nibsOf = (ink: Ink): readonly number[] =>
+  ink.kind === "eraser" ? ERASER_NIBS : PEN_NIBS;
 
 function button(label: string): HTMLButtonElement {
   const b = document.createElement("button");
@@ -74,7 +93,7 @@ function picker<T>(
   values: readonly T[],
   face: (value: T) => HTMLButtonElement,
   chosen: number,
-  onPick: (value: T) => void,
+  onPick: (value: T, index: number) => void,
 ): HTMLButtonElement[] {
   const buttons = values.map((value, i) => {
     const b = face(value);
@@ -82,7 +101,7 @@ function picker<T>(
     b.addEventListener("click", () => {
       for (const other of buttons) other.classList.remove("on");
       b.classList.add("on");
-      onPick(value);
+      onPick(value, i);
     });
     return b;
   });
@@ -90,17 +109,19 @@ function picker<T>(
 }
 
 /**
- * インク 1 つぶんの見た目。色は丸、**消しゴムだけは字** — 紙の色の丸は
- * 明るいテーマで器と同じ色になり、消えてしまう。
+ * インク 1 つぶんの見た目。**どれも同じ大きさの丸** — 消しゴムは色を持てない
+ * ので、中に絵を入れる（紙の色で塗った丸は、明るいテーマで器と同じ色になって
+ * 消える）。
  */
 function inkFace(value: Ink): HTMLButtonElement {
-  if (value.kind === "eraser") {
-    const b = button("Eraser");
-    b.className = "draw-eraser";
-    return b;
-  }
   const b = document.createElement("button");
   b.type = "button";
+  if (value.kind === "eraser") {
+    b.className = "draw-ink draw-eraser";
+    b.title = "Eraser";
+    b.append(icon("eraser"));
+    return b;
+  }
   b.className = "draw-ink";
   // 色そのものは道具の持ち物。CSS には形だけを置く
   b.style.setProperty("--ink-swatch", value.color);
@@ -111,13 +132,12 @@ function inkFace(value: Ink): HTMLButtonElement {
 /**
  * 太さ 1 つぶんの見た目。**その太さの点そのもの**を出す
  * （字で "2px" と書くより、出てくる線の太さが直に分かる）。
+ * 実際の大きさは選んでいるインクで変わるので、`--nib` は後から入れる。
  */
-function nibFace(value: number): HTMLButtonElement {
+function nibFace(): HTMLButtonElement {
   const b = document.createElement("button");
   b.type = "button";
   b.className = "draw-nib";
-  b.style.setProperty("--nib", `${value}px`);
-  b.title = `${value}px`;
   return b;
 }
 
@@ -148,27 +168,46 @@ export function showDrawing(): Promise<Blob | null> {
     // 並びは 3 つの塊 — **何で描くか**（インク）と**どのくらいで**（太さ）を
     // 左に置き、**やり直すもの**（Undo / Clear）だけを右へ離す。描くために
     // 選ぶものと、描いたものを取り消すものは種類が違う。
-    let ink: Ink = INKS[0];
-    let nib: number = WIDTHS[DEFAULT_NIB];
+    //
+    // 筆の並びは**窓を開くたびに組む** — ブランドカラーはその間に変わりうる。
+    const brand = brandInk();
+    const palette = brand === null ? PALETTE : [...PALETTE, brand];
+    const inkList: readonly Ink[] = [
+      ...palette.map((color): Ink => ({ kind: "pen", color })),
+      { kind: "eraser" },
+    ];
+
+    let ink: Ink = inkList[0];
+    let step = DEFAULT_STEP;
 
     const bar = document.createElement("div");
     bar.className = "draw-tools";
 
+    const nibButtons = picker(PEN_NIBS, nibFace, DEFAULT_STEP, (_, i) => {
+      step = i;
+    });
+    /** ボタンの点を、いま選んでいるインクの太さに合わせる */
+    const syncNibs = (): void => {
+      const table = nibsOf(ink);
+      nibButtons.forEach((b, i) => {
+        b.style.setProperty("--nib", `${table[i]}px`);
+        b.title = `${table[i]}px`;
+      });
+    };
+
     const inks = document.createElement("div");
     inks.className = "draw-inks";
     inks.append(
-      ...picker(INKS, inkFace, 0, (value) => {
+      ...picker(inkList, inkFace, 0, (value) => {
         ink = value;
+        syncNibs();
       }),
     );
 
     const nibs = document.createElement("div");
     nibs.className = "draw-nibs";
-    nibs.append(
-      ...picker(WIDTHS, nibFace, DEFAULT_NIB, (value) => {
-        nib = value;
-      }),
-    );
+    nibs.append(...nibButtons);
+    syncNibs();
 
     const undo = button("Undo");
     undo.title = "Mod+Z";
@@ -241,7 +280,7 @@ export function showDrawing(): Promise<Blob | null> {
         kind: "line",
         points: [at(e)],
         color: ink.kind === "eraser" ? PAPER : ink.color,
-        width: ink.kind === "eraser" ? nib * ERASER_SCALE : nib,
+        width: nibsOf(ink)[step],
       };
       strokes.push(drawing);
       paint(drawing);
