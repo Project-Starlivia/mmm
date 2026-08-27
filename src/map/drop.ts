@@ -87,6 +87,7 @@ function nearestRoot(scene: DropScene): number {
   let best = Infinity;
   let hit = -1;
   for (const id of scene.order) {
+    if (scene.dragging.has(id)) continue;
     if (scene.parentOf.get(id) !== undefined) continue;
     const b = scene.boxes.get(id);
     if (!b) continue;
@@ -180,6 +181,9 @@ function findEdge(scene: DropScene): DropTarget | null {
  * そこは前後に譲る。
  */
 export function resolveDrop(scene: DropScene): DropDecision {
+  // ポインタがその箱の中心より左か。**側を決めるのはここだけ**
+  const sideOf = (b: Box): boolean => scene.at.x < centerOf(b).x;
+
   // Mod を押している間は、スロットだけが生きる（深いところの行き先は休む）
   if (scene.newGroup) {
     const near = nearestRoot(scene);
@@ -187,7 +191,7 @@ export function resolveDrop(scene: DropScene): DropDecision {
     const rb = scene.boxes.get(near);
     if (!rb) return { drop: null, ambiguous: false };
     return {
-      drop: findSlot(scene, near, scene.at.x < centerOf(rb).x),
+      drop: findSlot(scene, near, sideOf(rb)),
       ambiguous: false,
     };
   }
@@ -269,8 +273,7 @@ export function resolveDrop(scene: DropScene): DropDecision {
       return { kind: "node", id: t.id, pos: 0 };
     }
     const rb = scene.boxes.get(t.id);
-    const left = rb ? scene.at.x < centerOf(rb).x : false;
-    return { kind: "side", root: t.id, left };
+    return { kind: "side", root: t.id, left: rb ? sideOf(rb) : false };
   };
   return {
     drop: target ? asDrop(target) : null,

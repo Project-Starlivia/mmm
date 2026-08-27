@@ -178,14 +178,37 @@ test("Mod を押していれば、枝の隣が新しいグループのスロッ�
   const root = box(1, 1, 0, 100);
   const a = box(2, 2, 145, 60);
   const b = box(3, 2, 145, 140);
+  // a（実在する枝）を掴んで b の近くへ落とす。掴んでいるものはスロット探しから除く
   const s = scene([root, a, b], [[2, 1], [3, 1]], { x: 195, y: 130 }, {
     newGroup: true,
-    dragging: new Set([9]),
+    dragging: new Set([2]),
   });
   // b の上半分 = b の手前へ新しいグループ
   assert.deepEqual(resolveDrop(s).drop, {
     kind: "group",
     target: 3,
+    before: true,
+    left: false,
+  });
+});
+
+test("Mod で根そのものを掴んでいれば、その根は nearestRoot の候補から外れる", () => {
+  // 木が縦に 2 つ。掴んでいるのは根(1)自身で、ポインタもその真上。
+  // 除外していなければ最短距離で根(1)が拾われてしまうが、
+  // 正しくは掴んでいない側の根(5)まで見に行く
+  const rootA = box(1, 1, 0, 100);
+  const kidA = box(2, 2, 145, 100);
+  const rootB = box(5, 1, 0, 300);
+  const kidB = box(4, 2, 145, 300);
+  const s = scene(
+    [rootA, kidA, rootB, kidB],
+    [[2, 1], [4, 5]],
+    { x: 50, y: 115 },
+    { newGroup: true, dragging: new Set([1, 2]) },
+  );
+  assert.deepEqual(resolveDrop(s).drop, {
+    kind: "group",
+    target: 4,
     before: true,
     left: false,
   });
