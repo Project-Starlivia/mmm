@@ -6,10 +6,14 @@ const STORE_NAME = "handles";
 const FILE_KEY = "file";
 const ASSETS_KEY = "assets";
 
+/**
+ * 画像フォルダの結び付け。**持つのは許可だけ** — 「md から見てどこか」は
+ * .md の頭が宣言する（app/head.ts）。以前はここが `path` も持っていて、
+ * 別マシンで開くと宣言ごと消えていた。
+ */
 export interface AssetBinding {
   doc: FileSystemFileHandle;
   directory: FileSystemDirectoryHandle;
-  path: string;
 }
 
 function database(): Promise<IDBDatabase> {
@@ -77,9 +81,7 @@ const isBinding = (v: unknown): v is AssetBinding =>
   "doc" in v &&
   v.doc instanceof FileSystemFileHandle &&
   "directory" in v &&
-  v.directory instanceof FileSystemDirectoryHandle &&
-  "path" in v &&
-  typeof v.path === "string";
+  v.directory instanceof FileSystemDirectoryHandle;
 
 export const handles = {
   async file(): Promise<FileSystemFileHandle | null> {

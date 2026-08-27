@@ -15,6 +15,7 @@ import { MdEditor } from "./editor.ts";
 import { MindMap, type MapHost } from "./mindmap.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
+import { imageFolder, normalizePath, setImageFolder } from "./app/head.ts";
 import { exportWays, initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
 import { deriveName } from "./app/name.ts";
@@ -92,6 +93,16 @@ let savedName: string | null = null;
  */
 let drawingOpen = false;
 
+// ---------- 画像フォルダの宣言（文書の頭） ----------
+//
+// 宣言の持ち主は .md の頭（app/head.ts）。ここは「頭が何を言っているか」を
+// 一言で引ける場所。実際の読み書きは app/assets.ts が持つ。
+
+/** いま頭が言っている宣言。読めない綴り（絶対パス・URL）なら null */
+function declaredFolder(): string | null {
+  const raw = imageFolder(doc.text, doc.head);
+  return raw === null ? null : normalizePath(raw);
+}
 
 // ---------- sync ----------
 
@@ -709,6 +720,11 @@ const assets = initAssets({
   hasFile: () => savedName !== null,
   warn: (m) => flashFilename(m),
   refresh: () => map.render(),
+  declared: () => declaredFolder(),
+  declare: (value) => {
+    const e = setImageFolder(doc.text, doc.head, value);
+    applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
+  },
 });
 
 /** `body` を独立した段落として `at` へ挿し込む（式は src/edits.ts）。 */
@@ -754,7 +770,11 @@ openOnClick(btnFile, () => [
   { label: "Rename", run: () => void renameFile(), disabled: savedName === null },
   { label: "Save", key: "Mod+S", run: () => void saveFile() },
   { label: "Save as", key: "Mod+Shift+S", run: () => void saveFile(true) },
-  { caption: assets.folderName() ?? "none" },
+  {
+    caption:
+      assets.folderName() ??
+      (declaredFolder() === null ? "none" : "folder not linked"),
+  },
   { label: "Images Folder", run: () => void assets.chooseFolder() },
 ]);
 

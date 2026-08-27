@@ -1,11 +1,14 @@
 // Markdown からの相対パスで画像を読み書きする。
-// ブラウザはファイルの親へ辿れないため、ユーザーが選んだフォルダと
-// 「md から見た保存パス」の組を宣言として扱う。
+//
+// **宣言（md から見てどこか）は .md の頭が持ち、許可（そのフォルダを読み書き
+// してよい）だけをここが持つ。** ブラウザはパス文字列からフォルダハンドルを
+// 作れないので、2 つに分かれること自体は避けられない — どちらが何の真実かを
+// 言い切ることで、食い違いを事故にしない。
 
 import { handles, type AssetBinding } from "./handles.ts";
 import { io } from "./io.ts";
 import { bare } from "../map/cards.ts";
-import { normalizePath, under } from "./head.ts";
+import { under } from "./head.ts";
 
 export interface Assets {
   imageUrl(path: string): string | null;
@@ -18,6 +21,17 @@ export interface Assets {
 
 export function mdPath(rel: string): string {
   return rel.startsWith("../") ? rel : `./${rel.replace(/^\.\//, "")}`;
+}
+
+/**
+ * 選んだフォルダから md までの断片を、md から見たフォルダの相対に読み替える。
+ * `FileSystemDirectoryHandle.resolve` が返すのは「フォルダ → md」なので、
+ * **末尾のファイル名を除いた数**だけ上へ戻る（`["notes","a.md"]` なら md は
+ * 1 段深いところに居るので `../`）。
+ */
+export function folderFromDoc(segments: string[]): string {
+  const up = Math.max(0, segments.length - 1);
+  return up === 0 ? "./" : "../".repeat(up);
 }
 
 /**
@@ -97,9 +111,17 @@ export function initAssets(deps: {
   hasFile: () => boolean;
   warn: (msg: string) => void;
   refresh: () => void;
+  /** いま頭が言っている宣言（正規化済み）。無ければ null */
+  declared: () => string | null;
+  /** 頭に宣言を書き込む */
+  declare: (value: string) => void;
 }): Assets {
   const assetUrls = new Map<string, string | null>();
   let cachedBinding: AssetBinding | null | undefined;
+
+  // 宣言が無いのは「md と同じ場所」— prompt の既定値がずっと `./` だった
+  // のと同じ意味。頭を持たない古い文書がそのまま読めるように、ここで倒す
+  const declaredPath = (): string => deps.declared() ?? "./";
 
   const releaseUrls = (): void => {
     for (const url of assetUrls.values()) if (url) URL.revokeObjectURL(url);
@@ -125,14 +147,14 @@ export function initAssets(deps: {
       if (error instanceof DOMException && error.name === "AbortError") return null;
       throw error;
     }
-    const declared = window.prompt("Path to the image folder, relative to the .md", "./");
-    if (declared === null) return null;
-    const path = normalizePath(declared);
-    if (!path) {
-      deps.warn("The path must be relative");
-      return null;
+    // 宣言はもう頭が持つ。まだ何も言っていない文書にだけ、ここで書き込む。
+    // md がそのフォルダの中に居れば正確に逆算でき、居なければ md の隣に
+    // 置いた `img/` という、いちばん普通の形を書く
+    if (deps.declared() === null) {
+      const segments = await directory.resolve(file);
+      deps.declare(segments ? folderFromDoc(segments) : `./${directory.name}/`);
     }
-    const binding = { doc: file, directory, path };
+    const binding = { doc: file, directory };
     await handles.saveAssets(binding);
     cachedBinding = binding;
     releaseUrls();
@@ -159,7 +181,7 @@ export function initAssets(deps: {
     try {
       const binding = await storedBinding();
       if (!binding) return;
-      const parts = assetTarget(binding.path, path);
+      const parts = assetTarget(declaredPath(), path);
       if (!parts) return;
       if ((await binding.directory.queryPermission({ mode: "read" })) !== "granted") return;
       const file = await nestedFile(binding.directory, parts, false);
@@ -252,7 +274,7 @@ export function initAssets(deps: {
         } finally {
           await stream.close();
         }
-        const rel = `${binding.path}${parts.join("/")}`;
+        const rel = `${declaredPath()}${parts.join("/")}`;
         // 鍵はカード側が問い合わせてくる形（裸）に合わせる。
         // md へ書くのは mdPath の形（`./x`）。
         assetUrls.set(bare(rel), URL.createObjectURL(out));
