@@ -5,6 +5,12 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "mmm",
   "compatibility_date": "2026-08-27",
+
+  // 配り先は `mmm.<アカウント名>.workers.dev`。**書かなくても既定でそうなる**
+  // が、選んだ結果であって書き忘れではないことを残すために明示する。
+  // 独自ドメインへ移すときは、ここを `routes` に replace する
+  // （`[{ "pattern": "mmm.example.com", "custom_domain": true }]`）
+  "workers_dev": true,
   "assets": {
     "directory": "./dist",
 

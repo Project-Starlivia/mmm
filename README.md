@@ -109,6 +109,10 @@ pnpm run dev        # コアをビルドしてから vite（http://localhost:131
 （`single-page-application` にすると綴り違いにもアプリを返してしまい、
 「見つからなかった」ことが伝わらない）。
 
+配り先は **`mmm.<アカウント名>.workers.dev`**（`workers_dev: true`）。書かなく
+ても既定でそうなるが、選んだ結果であって書き忘れではないことを残すために
+明示してある。独自ドメインへ移すときは `routes` に差し替える。
+
 ```
 pnpm run deploy       # ビルドしてから配る
 pnpm run deploy:dry   # 配らずに設定と中身だけ確かめる
