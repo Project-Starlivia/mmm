@@ -240,12 +240,13 @@ export function resolveDrop(scene: DropScene): DropDecision {
     // 根は両方向に伸びる木の付け根なので、成長軸の判定を絶対値で見る
     // （`local` の du は dirOf で片側だけ正にしてあるので、根では素のままだと右側しか拾えない）
     const isRoot = scene.parentOf.get(id) === undefined;
-    const du2 = isRoot ? Math.abs(du) : du;
-    if (du2 <= hu || du2 > hu + REACH || Math.abs(dv) > hv + SLACK) continue;
-    const d = du2 - hu + Math.max(0, Math.abs(dv) - hv) * 2;
+    const growOffset = isRoot ? Math.abs(du) : du;
+    if (growOffset <= hu || growOffset > hu + REACH || Math.abs(dv) > hv + SLACK)
+      continue;
+    const d = growOffset - hu + Math.max(0, Math.abs(dv) - hv) * 2;
     if (d < bestOut) {
       bestOut = d;
-      outU = du2 - hu;
+      outU = growOffset - hu;
       outTarget = { id, pos: 0 };
     }
   }
