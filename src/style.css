@@ -189,6 +189,7 @@ html, body {
   cursor: col-resize;
   background: var(--line);
   transition: background 0.15s;
+  position: relative; /* 境目にくっつく開閉の矢印（#pane-switch）の座標系 */
 
   &:hover, &.dragging { background: var(--accent); }
 }
@@ -261,12 +262,42 @@ html, body {
 /* 木の書き方（H / n+ / L）は md の右上 */
 #form-picker { top: 6px; }
 
-/* 隣のペインの出し入れ。**境目を挟んで向かい合い、指したほうを動かす** —
-   md の右下がマップ、マップの左下が MD。片方だけのときは、残ったほうの
-   ボタンが「もう片方を出す」になる（自分を消すボタンだと、消えた先に
-   戻す手が無くなる） */
-#switch-map { bottom: 10px; }
-#switch-md { left: 12px; bottom: 10px; }
+/* 分割線にくっつく開閉の矢印。**splitter を隠さない**からこそ、片方の
+   ペインを消しても flex がその境目まで splitter を押し出し、矢印はいつも
+   同じ 1 か所に居られる（前は角と角で、片方だけスクロールバー避けの分
+   ずれて見えた）。上が md 側、下がマップ側 — 縦に並べて境目の細い線の
+   上に置く。開いていれば消える側（外向き）、消えていれば出てくる側
+   （内向き）を矢印が指す */
+#pane-switch {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  flex-direction: column;
+  gap: 2px;
+
+  & button {
+    width: 18px;
+    height: 18px;
+    min-width: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+
+    & .icon {
+      width: 10px;
+      height: 10px;
+      /* 絵は下向き 1 つだけ。左右はここで回して作る（線を増やさない） */
+      &.point-left { transform: rotate(90deg); }
+      &.point-right { transform: rotate(-90deg); }
+    }
+  }
+}
+/* 片方だけの時は、境目が窓の縁に来る。矢印がそこへ張り付いてはみ出さない
+   よう、縁からの一定距離に留める */
+#panes.no-map #pane-switch { left: auto; right: 8px; transform: translateY(-50%); }
+#panes.no-md #pane-switch { left: 8px; transform: translateY(-50%); }
 
 /* ========== マップのペイン ========== */
 

@@ -2,15 +2,16 @@
 // 「両方消えた」状態は作らない。片方を消したら残りが受け皿になる。
 // どちらを出しているかは覚えない — 毎回、両方から始まる。
 //
-// **切り替えのボタンはここが建てる。** 帯に出す気は無い（そのペインにだけ
-// 効くものなので、そのペインの中に住む）。境目を挟んで向かい合う 2 つで、
-// **どちらも指したほうを動かす** — md の右下がマップ、マップの左下が MD。
-// 自分を消すボタンにすると、消えた先に戻す手が無くなる。
+// **開閉の矢印は分割線にくっつける。** 前は md の右下・マップの左下と
+// 別々の角に置いていて、片方だけスクロールバーを避けて内側へ寄っていた
+// せいで、2 つの位置がずれて見えた。**分割線（splitter）を隠さずに
+// 置き続ける** — 片方のペインを消しても flex がその境目まで splitter を
+// 押し出すので、矢印はいつも同じ 1 か所（境目）に居られる。
 //
-// **字が動作をそのまま言う**（Hide Map ⇄ Show Map）。点け消しの色だけでは
-// 「いま押すと開くのか閉じるのか」が読めない — 同じ `Map` の字が、
-// 場面によって逆のことをしていた。
+// **矢印の向きが状態を言う** — 開いていれば消える先、消えていれば
+// 出てくる先を指す。字は要らない。
 
+import { icon } from "../icons.ts";
 import { paneTool } from "./paneTool.ts";
 
 export function initPanes(args: {
@@ -27,22 +28,24 @@ export function initPanes(args: {
   const { mdPane, mapPane, panesEl, splitter } = args;
   let paneVis = { md: true, map: true };
 
-  // 指す先はペインの隣。md の中のボタンはマップを出し入れする
-  const swMap = paneSwitch("switch-map", "Toggle the map pane (Alt+2)");
-  const swMd = paneSwitch("switch-md", "Toggle the Markdown pane (Alt+1)");
-  mdPane.append(swMap.box);
-  mapPane.append(swMd.box);
+  const arrows = paneTool("pane-switch");
+  const arrowMd = arrowButton();
+  const arrowMap = arrowButton();
+  arrows.append(arrowMd, arrowMap);
+  splitter.append(arrows);
 
   const applyPaneVis = (v: { md: boolean; map: boolean }): void => {
     if (!v.md && !v.map) v = { md: true, map: true };
     paneVis = v;
     mdPane.classList.toggle("pane-off", !v.md);
     mapPane.classList.toggle("pane-off", !v.map);
-    splitter.classList.toggle("pane-off", !v.md || !v.map);
     panesEl.classList.toggle("no-map", !v.map);
-    // 字が「いま押すと何が起きるか」を言う
-    swMap.button.textContent = v.map ? "Hide Map" : "Show Map";
-    swMd.button.textContent = v.md ? "Hide MD" : "Show MD";
+    panesEl.classList.toggle("no-md", !v.md);
+    // 開いていれば消える先（外向き）、消えていれば出てくる先（内向き）を指す
+    pointArrow(arrowMd, v.md ? "left" : "right");
+    arrowMd.title = v.md ? "Hide the Markdown pane (Alt+1)" : "Show the Markdown pane (Alt+1)";
+    pointArrow(arrowMap, v.map ? "right" : "left");
+    arrowMap.title = v.map ? "Hide the map pane (Alt+2)" : "Show the map pane (Alt+2)";
     // focus must not stay in a hidden pane
     if (!v.md && mdPane.contains(document.activeElement)) mapPane.focus();
     if (!v.map && mapPane.contains(document.activeElement)) args.focusEditor();
@@ -55,8 +58,8 @@ export function initPanes(args: {
     applyPaneVis(next);
   };
 
-  swMap.button.addEventListener("click", () => togglePaneVis("map"));
-  swMd.button.addEventListener("click", () => togglePaneVis("md"));
+  arrowMd.addEventListener("click", () => togglePaneVis("md"));
+  arrowMap.addEventListener("click", () => togglePaneVis("map"));
 
   // Mod+/: jump to the other pane, revealing it if hidden
   const togglePane = (): void => {
@@ -75,8 +78,10 @@ export function initPanes(args: {
   }
 
   // ---- スプリッタ ----
-  // 幅を変えるだけ。開閉は隅のボタンと Alt+1 / Alt+2、Mod+/ が持つ
+  // 幅を変えるだけ。開閉は境目の矢印と Alt+1 / Alt+2、Mod+/ が持つ。
+  // 片方が消えているときは動かす幅が無いので、掴んでも何もしない
   splitter.addEventListener("pointerdown", (e) => {
+    if (!paneVis.md || !paneVis.map) return;
     splitter.classList.add("dragging");
     splitter.setPointerCapture(e.pointerId);
     const onMove = (ev: PointerEvent): void => {
@@ -104,15 +109,16 @@ export function initPanes(args: {
   return { togglePane, togglePaneVis };
 }
 
-/** 隅に浮く 1 つボタン。器と中身を返す（字は呼ぶ側が状態に合わせて入れる） */
-function paneSwitch(
-  id: string,
-  title: string,
-): { box: HTMLElement; button: HTMLButtonElement } {
-  const box = paneTool(id);
+function arrowButton(): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.title = title;
-  box.append(button);
-  return { box, button };
+  button.append(icon("chevron"));
+  return button;
+}
+
+/** 絵は 1 つだけ（下向き）なので、左右は回して作る */
+function pointArrow(button: HTMLButtonElement, dir: "left" | "right"): void {
+  const svg = button.querySelector(".icon");
+  svg?.classList.toggle("point-left", dir === "left");
+  svg?.classList.toggle("point-right", dir === "right");
 }
