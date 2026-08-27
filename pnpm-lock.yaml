@@ -232,6 +232,9 @@ importers:
         specifier: ^1.2.3
         version: 1.2.3
     devDependencies:
+      '@lezer/markdown':
+        specifier: ^1.7.2
+        version: 1.7.2
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
