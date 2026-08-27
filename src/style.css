@@ -809,19 +809,15 @@ html, body {
   }
 
   /* 消しゴムだけは色を持てないので、丸の中に絵を入れる（紙の色で塗ると
-     明るいテーマで器と同じ色になって消える） */
+     明るいテーマで器と同じ色になって消える）。
+     **触ったとき・選ばれたときの変化は色の丸とまったく同じ**（縁と輪）で、
+     絵が濃くなるだけ — 同じ並びに居るものが、別の変わり方をしない */
   & .draw-eraser {
     background: var(--panel);
     color: var(--ink-dim);
 
-    &:hover { background: var(--accent-soft); color: var(--ink); }
-    /* 選ばれたら塗り潰す。色を持たないので、色を隠さないための輪は要らない */
-    &.on {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-      box-shadow: none;
-    }
+    &:hover { background: var(--panel); color: var(--ink); }
+    &.on { color: var(--ink); }
     & .icon { width: 13px; height: 13px; }
   }
 
