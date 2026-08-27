@@ -89,6 +89,14 @@ export function branchIds(
   return out;
 }
 
+/** ルート = 深さ 1 でどの親も持たないノード。無ければ null（空文書）。 */
+export function rootId(layout: Layout): number | null {
+  for (const [id, b] of layout.boxes) {
+    if (b.n.depth === 1 && b.n.parent === -1) return id;
+  }
+  return null;
+}
+
 const gapBefore = (i: number): number => (i === 0 ? 0 : GAP.y);
 
 function collapseHidden(nodes: NodeInfo[]): {
