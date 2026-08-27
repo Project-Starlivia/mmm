@@ -125,23 +125,6 @@ function targetIn(e: Event, selector: string): Element | null {
   return e.target instanceof Element ? e.target.closest(selector) : null;
 }
 
-/**
- * マップの操作の早見。**ここが唯一の書き場所**で、キーの割り当てを変えたら
- * ここも直す（README とは別に、画面の中で確かめられることが要る）。
- */
-const MAP_INFO = `
-<dl>
-  <dt>Move</dt>
-  <dd>Drag the background to select &middot; <kbd>Space</kbd> + drag or
-      middle-drag to pan &middot; wheel to pan</dd>
-  <dt>Add</dt>
-  <dd><kbd>Tab</kbd> child &middot; <kbd>Enter</kbd> below &middot;
-      <kbd>Shift</kbd>+<kbd>Enter</kbd> above &middot;
-      <kbd>Shift</kbd>+<kbd>Tab</kbd> parent &middot; or the <b>+</b> beside a node</dd>
-  <dt>Zoom</dt>
-  <dd><kbd>Mod</kbd> + wheel &middot; <kbd>Shift</kbd> + wheel scrolls sideways</dd>
-</dl>`;
-
 /** 空集合の使い回し（毎レンダで new しない） */
 const NO_IDS: ReadonlySet<number> = new Set<number>();
 
@@ -166,9 +149,6 @@ export class MindMap {
   private editInk: HTMLPreElement;
   private cardEditor: HTMLTextAreaElement;
   private hint: HTMLDivElement;
-  /** 操作の早見と、その出し入れ */
-  private info: HTMLDivElement;
-  private infoBtn: HTMLButtonElement;
   private menu = new ContextMenu();
 
   private tx = 60;
@@ -272,25 +252,6 @@ export class MindMap {
     this.cardEditor.spellcheck = false;
     this.editBox.append(this.editInk, this.cardEditor);
     pane.append(this.editBox);
-
-    // 操作の早見。**覚えていない人がその場で確かめる**ためのもので、
-     // 既定は閉じている（見えていなくてよい情報を常に置かない）
-    this.info = document.createElement("div");
-    this.info.id = "map-info";
-    this.info.hidden = true;
-    this.info.innerHTML = MAP_INFO;
-    pane.append(this.info);
-
-    this.infoBtn = document.createElement("button");
-    this.infoBtn.id = "map-info-btn";
-    this.infoBtn.type = "button";
-    this.infoBtn.textContent = "i";
-    this.infoBtn.title = "How to move around";
-    this.infoBtn.addEventListener("click", () => {
-      this.info.hidden = !this.info.hidden;
-      this.infoBtn.classList.toggle("on", !this.info.hidden);
-    });
-    pane.append(this.infoBtn);
 
     this.hint = document.createElement("div");
     this.hint.id = "map-hint";
