@@ -20,18 +20,18 @@ declare global {
   }
 
   interface Window {
-    showOpenFilePicker(options?: {
+    showOpenFilePicker?: (options?: {
       multiple?: boolean;
       types?: { description?: string; accept: Record<string, string[]> }[];
-    }): Promise<FileSystemFileHandle[]>;
-    showSaveFilePicker(options?: {
+    }) => Promise<FileSystemFileHandle[]>;
+    showSaveFilePicker?: (options?: {
       suggestedName?: string;
       types?: { description?: string; accept: Record<string, string[]> }[];
-    }): Promise<FileSystemFileHandle>;
-    showDirectoryPicker(options?: {
+    }) => Promise<FileSystemFileHandle>;
+    showDirectoryPicker?: (options?: {
       startIn?: FileSystemHandle;
       mode?: "read" | "readwrite";
-    }): Promise<FileSystemDirectoryHandle>;
+    }) => Promise<FileSystemDirectoryHandle>;
   }
 
   interface DataTransferItem {
@@ -105,9 +105,16 @@ export const io = {
     await handles.clearFile();
   },
 
+  /** このブラウザがファイルを開けるか。**スマホには無い** —
+   *  `docs/web.md` のとおりフォールバックは持たないので、無いなら無いと言う */
+  canOpen: (): boolean => typeof window.showOpenFilePicker === "function",
+  canSaveAs: (): boolean => typeof window.showSaveFilePicker === "function",
+
   async openDialog(): Promise<Doc | null> {
+    const pick = window.showOpenFilePicker;
+    if (!pick) return null;
     try {
-      const [file] = await window.showOpenFilePicker({ multiple: false, types: MARKDOWN });
+      const [file] = await pick({ multiple: false, types: MARKDOWN });
       return file ? use(file) : null;
     } catch (error) {
       if (isCancel(error)) return null;
@@ -123,8 +130,10 @@ export const io = {
   },
 
   async saveAs(suggested: string, text: string): Promise<Doc | null> {
+    const pick = window.showSaveFilePicker;
+    if (!pick) return null;
     try {
-      const file = await window.showSaveFilePicker({ suggestedName: suggested, types: MARKDOWN });
+      const file = await pick({ suggestedName: suggested, types: MARKDOWN });
       await write(file, text);
       current = file;
       await handles.saveFile(file);

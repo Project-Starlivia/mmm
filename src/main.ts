@@ -26,7 +26,7 @@ import { initForm } from "./app/form.ts";
 import { showDrawing } from "./app/draw.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { onLanguageReady } from "./map/highlight.ts";
-import { openOnClick } from "./map/menu.ts";
+import { type MenuEntry, openOnClick } from "./map/menu.ts";
 import { RadialMenu } from "./map/radialMenu.ts";
 import {
   type CardRef,
@@ -747,16 +747,31 @@ async function attachImage(id: number, blob: Blob, tag = ""): Promise<void> {
 //
 // 見出し（caption）は「続く行たちが何に効くか」を言う。保存していない文書に
 // 名前を変える相手は無いので、そのときは見出しがそう言い、行は無効になる。
-openOnClick(btnFile, () => [
-  { label: "New", key: "Mod+Alt+N", run: () => void newFile() },
-  { label: "Open", key: "Mod+O", run: () => void openFile() },
-  { caption: savedName ?? "not saved yet" },
-  { label: "Rename", run: () => void renameFile(), disabled: savedName === null },
-  { label: "Save", key: "Mod+S", run: () => void saveFile() },
-  { label: "Save as", key: "Mod+Shift+S", run: () => void saveFile(true) },
-  { caption: assets.folderName() ?? "none" },
-  { label: "Images Folder", run: () => void assets.chooseFolder() },
-]);
+openOnClick(btnFile, () => {
+  // **無いものを黙って落とさない。** スマホのブラウザには File System
+  // Access API が無く、`docs/web.md` のとおり 2 本目の道は作らない。
+  // 押せない理由だけは言う
+  const canOpen = io.canOpen();
+  const canSave = io.canSaveAs();
+  const entries: MenuEntry[] = [
+    { label: "New", key: "Mod+Alt+N", run: () => void newFile() },
+    { label: "Open", key: "Mod+O", run: () => void openFile(), disabled: !canOpen },
+    ...(canOpen && canSave
+      ? []
+      : [{ caption: "This browser cannot open or save files" }]),
+    { caption: savedName ?? "not saved yet" },
+    { label: "Rename", run: () => void renameFile(), disabled: savedName === null },
+    { label: "Save", key: "Mod+S", run: () => void saveFile(), disabled: !canSave },
+    { label: "Save as", key: "Mod+Shift+S", run: () => void saveFile(true), disabled: !canSave },
+    { caption: assets.folderName() ?? "none" },
+    {
+      label: "Images Folder",
+      run: () => void assets.chooseFolder(),
+      disabled: !assets.canChooseFolder(),
+    },
+  ];
+  return entries;
+});
 
 // 低頻度だが消したくないものの受け皿。Undo/Redo にボタンは無く（キーが
 // 本道）、ここが押せる保険になる

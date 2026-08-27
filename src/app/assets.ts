@@ -10,6 +10,8 @@ export interface Assets {
   clear(): void;
   /** いま結び付いている画像フォルダの名前。未設定なら null */
   folderName(): string | null;
+  /** このブラウザがフォルダを選べるか */
+  canChooseFolder(): boolean;
   chooseFolder(): Promise<void>;
   saveToDisk(blob: Blob): Promise<string | null>;
 }
@@ -128,9 +130,11 @@ export function initAssets(deps: {
   async function selectBinding(): Promise<AssetBinding | null> {
     const file = io.currentFile();
     if (!file) return null;
+    const pick = window.showDirectoryPicker;
+    if (!pick) return null;
     let directory: FileSystemDirectoryHandle;
     try {
-      directory = await window.showDirectoryPicker({ startIn: file, mode: "readwrite" });
+      directory = await pick({ startIn: file, mode: "readwrite" });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return null;
       throw error;
@@ -205,6 +209,8 @@ export function initAssets(deps: {
     },
 
     folderName: () => (cachedBinding ? cachedBinding.directory.name : null),
+
+    canChooseFolder: (): boolean => typeof window.showDirectoryPicker === "function",
 
     async chooseFolder() {
       // 保存していない文書には**相対パスの基準になる場所が無い**。
