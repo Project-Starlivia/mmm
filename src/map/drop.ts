@@ -230,6 +230,32 @@ function openEnds(scene: DropScene): { up: Set<number>; down: Set<number> } {
 }
 
 /**
+ * 通路（親の外側ゾーン）の縦の位置から、その親の子のどの隣かを決める。
+ * 子が 1 つも無ければ `null`（= 「最初の子にする」に落ちる）。
+ *
+ * 子は縦に積まれるので、いちばん近い子の上半分/下半分で手前/後ろが決まる。
+ * これは箱の帯（前後への挿入）とまったく同じ読み方で、場所が通路に変わる
+ * だけ — 通路と子の列で意味が変わらないので、指した高さがそのまま着地点。
+ */
+function slotAmongKids(scene: DropScene, parent: number): DropTarget | null {
+  let best = Infinity;
+  let hit: DropTarget | null = null;
+  for (const id of scene.order) {
+    if (scene.dragging.has(id)) continue;
+    if (scene.parentOf.get(id) !== parent) continue;
+    const b = scene.boxes.get(id);
+    if (!b) continue;
+    const c = centerOf(b);
+    const d = Math.abs(scene.at.y - c.y);
+    if (d < best) {
+      best = d;
+      hit = { id, pos: scene.at.y < c.y ? 1 : 2 };
+    }
+  }
+  return hit;
+}
+
+/**
  * 列の上端より上 / 下端より下の空白。**誰も取らなかったときだけ**拾う
  * 最後の受け皿なので、外側ゾーン（子にする）も線への割り込みも奪わない。
  *
@@ -331,7 +357,12 @@ export function resolveDrop(scene: DropScene): DropDecision {
     if (d < bestOut) {
       bestOut = d;
       outU = growOffset - hu;
-      outTarget = { id, pos: 0 };
+      // 既に子がいるなら、通路の**縦の位置**で「どの子の隣か」まで決める。
+      // 通路は子の列そのものではないが、縦は子の列とそのまま同じ意味を持つ
+      // （子は縦に積まれるので）。ここを一律「末尾に足す」に潰していたころは、
+      // 通路のどこを指しても印が最後の子の下に 1 点で出て、指した場所と
+      // 着地点が対応しなかった。根は側とグループの話が乗るので触らない
+      outTarget = (isRoot ? null : slotAmongKids(scene, id)) ?? { id, pos: 0 };
     }
   }
   if (outTarget && !edgeTarget && best > 0 && (outU <= NEAR || !target)) {

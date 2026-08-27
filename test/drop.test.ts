@@ -206,11 +206,35 @@ test("隣の列の枝は、その先の列の兄弟挿入を横取りしない",
   assert.deepEqual(d.drop, { kind: "node", id: 4, pos: 2 });
 });
 
-test("親と子の列のあいだの通路は、子にするゾーンのまま", () => {
-  // b の右辺(107) と f の列(152) のあいだ。ここを取り上げると、子の無い枝に
-  // 最初の子を足す手が無くなる
+test("子の無い枝の通路は、その最初の子にするゾーン", () => {
+  // b の右辺(107) と f の列(152) のあいだ。隣に並ぶ子がいないので、通路は
+  // 丸ごと「最初の子にする」。ここを取り上げると子を足す手が無くなる
   const d = resolveDrop(scene(COLS, COL_LINKS, { x: 130, y: 135 }));
   assert.deepEqual(d.drop, { kind: "node", id: 3, pos: 0 });
+});
+
+test("子がいる枝の通路は、指した高さがそのまま行き先", () => {
+  // 通路のどの高さも「末尾に足す」に潰していたころは、e の隣を指しても
+  // f の隣を指しても印が最後の子の下に 1 点で出て、指した場所と着地点が
+  // 対応しなかった（「引っ張られる」の正体）
+  const root = box(1, 1, 0, 100, 31);
+  const a = box(2, 2, 76, -55, 31); // 子 3 つ (-95..15) の中心に立つ
+  const e = box(3, 3, 152, -95, 31);
+  const f = box(4, 3, 152, -55, 31);
+  const g = box(5, 3, 152, -15, 31);
+  const boxes = [root, a, e, f, g];
+  const links: [number, number][] = [
+    [2, 1],
+    [3, 2],
+    [4, 2],
+    [5, 2],
+  ];
+  const at = (y: number) => resolveDrop(scene(boxes, links, { x: 130, y })).drop;
+  // e の下寄り → e の後ろ / f の上寄り → f の手前 / f と g の間 → g の手前
+  assert.deepEqual(at(-71), { kind: "node", id: 3, pos: 2 });
+  assert.deepEqual(at(-56), { kind: "node", id: 4, pos: 1 });
+  assert.deepEqual(at(-31), { kind: "node", id: 4, pos: 2 });
+  assert.deepEqual(at(-16), { kind: "node", id: 5, pos: 1 });
 });
 
 test("左の枝では、外側ゾーンも左へ伸びる", () => {
