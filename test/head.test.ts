@@ -70,6 +70,30 @@ test("imageFolder: 引用符付きの値の後ろのコメントも、引用符�
   );
 });
 
+test("imageFolder: 引用符の中の ` #` は値の一部（コメントではない）", () => {
+  // コメントを先に落とす実装だと、閉じ引用符の手前にある ` #` で
+  // 切ってしまい、引用符が剥がれ残ったまま途中で切れた値になっていた
+  // （quote() は空白・#・: のどれかを含む値を引用符で囲むので、
+  // 囲まれた値の中に # が来る形はふつうに起こる）
+  assert.equal(
+    folderOf('---\nimage-folder: "./My Folder #1/"\n---\n\n# r\n'),
+    "./My Folder #1/",
+  );
+});
+
+test("imageFolder: 裸 / 裸+コメント / 引用符 / 引用符+コメント の 4 形", () => {
+  assert.equal(folderOf("---\nimage-folder: ./img/\n---\n\n# r\n"), "./img/");
+  assert.equal(folderOf("---\nimage-folder: ./img/ # ここ\n---\n\n# r\n"), "./img/");
+  assert.equal(
+    folderOf('---\nimage-folder: "./My Folder #1/"\n---\n\n# r\n'),
+    "./My Folder #1/",
+  );
+  assert.equal(
+    folderOf('---\nimage-folder: "./My Folder #1/" # ここ\n---\n\n# r\n'),
+    "./My Folder #1/",
+  );
+});
+
 test("imageFolder: 入れ子のキーは読まない（トップレベルだけ）", () => {
   assert.equal(folderOf("---\nmmm:\n  image-folder: ./img/\n---\n\n# r\n"), null);
 });
@@ -113,7 +137,13 @@ test("setImageFolder: 囲む必要が無ければ裸で書く", () => {
 });
 
 test("setImageFolder → imageFolder は往復する", () => {
-  for (const value of ["./img/", "../pics/", "./My Images/", './a"b/']) {
+  for (const value of [
+    "./img/",
+    "../pics/",
+    "./My Images/",
+    './a"b/',
+    "./My Folder #1/", // 引用符の中に # を含む形（Important の再発防止）
+  ]) {
     assert.equal(folderOf(written("# r\n", value)), value, value);
   }
 });

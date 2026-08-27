@@ -26,22 +26,38 @@ const KEY_LINE = new RegExp(`^${IMAGE_FOLDER}[ \\t]*:(.*)$`);
 const bodyEnd = (head: HeadSpan): number => Math.max(head.bodyFrom, head.bodyTo);
 
 /**
- * YAML の値 1 つ。**コメントを落としてから**引用符を剥がす。
+ * YAML の値 1 つ。**引用符で始まっていれば、閉じ引用符までが値**
+ * （中の ` #` はコメントではない）。それ以外（裸）は ` #` から後ろを
+ * コメントとして落とす。この 1 つの規則で 4 つの形すべてを覆う:
+ * 裸 / 裸+コメント / 引用符 / 引用符+コメント。
  *
- * 逆順（引用符を先に剥がす）だと `"./My Images/" # main` のように
- * 両方が同時に来る形を取りこぼす — 末尾が `"` でなく `n`（`main` の頭
- * 文字が来る前）になるので引用符ぶんの分岐に入れず、コメント落としの
- * 分岐に流れて `"..."` を剥がさないまま返してしまっていた。
+ * 「コメントを先に落としてから引用符を剥がす」順だと、`"./My Folder #1/"`
+ * のように**引用符の中に ` #` を含む値**を、閉じ引用符の手前で切ってしまい
+ * 壊す（quote() は空白・`#`・`:` のどれかを含む値を引用符で囲むので、
+ * 囲まれた値の中に `#` が来る形は普通に起こる）。逆に「引用符を先に
+ * 剥がす」だけだと、引用符の後ろにコメントが続く形（`"..." # main`）を
+ * 取りこぼす。**閉じ引用符の位置を実際に探す**ことでどちらも起きない。
  */
 function unquote(raw: string): string {
-  const hash = raw.search(/\s#/);
-  const v = (hash === -1 ? raw : raw.slice(0, hash)).trim();
+  const v = raw.trim();
   const q = v[0];
-  if (v.length >= 2 && (q === '"' || q === "'") && v[v.length - 1] === q) {
-    const inner = v.slice(1, -1);
-    return q === '"' ? inner.replace(/\\(["\\])/g, "$1") : inner;
+  if (q === '"' || q === "'") {
+    // 閉じ引用符を探す。`"` は quote() が `\"` / `\\` で書くので、その
+    // エスケープぶんは飛ばす（`'` は YAML 側でエスケープを持たない）
+    let i = 1;
+    while (i < v.length && v[i] !== q) {
+      if (q === '"' && v[i] === "\\" && i + 1 < v.length) i++;
+      i++;
+    }
+    if (i < v.length) {
+      const inner = v.slice(1, i);
+      return q === '"' ? inner.replace(/\\(["\\])/g, "$1") : inner;
+    }
+    // 閉じ引用符が無い壊れた記法。ベストエフォートでそのまま返す
+    return v;
   }
-  return v;
+  const hash = v.search(/\s#/);
+  return (hash === -1 ? v : v.slice(0, hash)).trim();
 }
 
 /** 値を YAML の 1 行として書く形。囲む必要が無ければ裸で書く。 */
