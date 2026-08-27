@@ -147,16 +147,21 @@ export function initAssets(deps: {
       if (error instanceof DOMException && error.name === "AbortError") return null;
       throw error;
     }
+    const binding = { doc: file, directory };
+    await handles.saveAssets(binding);
+    cachedBinding = binding;
     // 宣言はもう頭が持つ。まだ何も言っていない文書にだけ、ここで書き込む。
     // md がそのフォルダの中に居れば正確に逆算でき、居なければ md の隣に
-    // 置いた `img/` という、いちばん普通の形を書く
+    // 置いた `img/` という、いちばん普通の形を書く。
+    //
+    // **結び付けを確定してから書く。** 書き込みは applySnap から map.render()
+    // まで同期で抜け、そこで起きる loadAsset が storedBinding() を読む —
+    // 先に書くと、その再入が古い結び付けを掴んだまま新しい宣言パスで
+    // 読みに行く窓が開く
     if (deps.declared() === null) {
       const segments = await directory.resolve(file);
       deps.declare(segments ? folderFromDoc(segments) : `./${directory.name}/`);
     }
-    const binding = { doc: file, directory };
-    await handles.saveAssets(binding);
-    cachedBinding = binding;
     releaseUrls();
     deps.refresh();
     return binding;
