@@ -134,20 +134,10 @@ fn sep_body(root_depth : Int, flip : Bool) -> String {
 
 ///|
 /// 境界をブロックの境目 `at` へ書き入れる編集。前後の空行の出し分けは
-/// 見出しの挿入（insert_heading_edit）と同じ式。
+/// block_insert（heading.mbt）に任せる。
 fn insert_sep_edit(at : Int, root_depth : Int, flip : Bool) -> Edit {
-  let sb = StringBuilder::new()
-  if at > 0 && code_at(st.text, at - 1) != 10 {
-    sb.write_string(eol)
-    sb.write_string(eol)
-  } else if !preceded_by_blank(at) {
-    sb.write_string(eol)
-  }
-  sb.write_string(sep_body(root_depth, flip))
-  if at != st.text.length() {
-    sb.write_string(eol)
-  }
-  Edit::{ from: at, to: at, insert: sb.to_string(), removed: "" }
+  let (insert, _) = block_insert(at, sep_body(root_depth, flip))
+  Edit::{ from: at, to: at, insert, removed: "" }
 }
 
 ///|

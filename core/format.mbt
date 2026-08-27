@@ -210,7 +210,7 @@ fn content_end_of(i : Int) -> Int {
 
 ///|
 /// ノード i の本文の末尾へ、1 行を追加する編集。前後の空行の出し分けは
-/// 見出しの挿入（insert_heading_edit）と同じ式。
+/// block_insert（heading.mbt）に任せる。
 ///
 /// **リストの形で書かれたノードなら、その項目の中身の列まで字下げする。**
 /// 字下げしないと、外の Markdown パーサはそこでリストを閉じ、続く兄弟が
@@ -219,17 +219,6 @@ fn append_content_edit(i : Int, line : String) -> Edit {
   let at = content_end_of(i)
   let col = content_col_for(st.nodes[i].depth)
   let body = if col > 0 { spaces(col) + line } else { line }
-  let sb = StringBuilder::new()
-  if at > 0 && code_at(st.text, at - 1) != 10 {
-    sb.write_string(eol)
-    sb.write_string(eol)
-  } else if !preceded_by_blank(at) {
-    sb.write_string(eol)
-  }
-  sb.write_string(body)
-  sb.write_string(eol)
-  if at != st.text.length() {
-    sb.write_string(eol)
-  }
-  Edit::{ from: at, to: at, insert: sb.to_string(), removed: "" }
+  let (insert, _) = block_insert(at, body + eol)
+  Edit::{ from: at, to: at, insert, removed: "" }
 }
