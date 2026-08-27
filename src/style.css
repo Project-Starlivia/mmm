@@ -96,11 +96,12 @@ html, body {
     font-size: 13px;
     padding: 3px 8px;
     /* 絵と字を並べる。絵が先か後かは、入れる側が決める。
-       間は空けない — 絵と字は 1 つの塊（「SVG」という形式の名前に、
-       それを表す絵が添えてあるだけ）で、離すと 2 つの別物に見える */
+       間はわずかだけ — 絵と字は 1 つの塊（「SVG」という形式の名前に、
+       それを表す絵が添えてあるだけ）で、離しすぎると 2 つの別物に見える。
+       0 だと絵と字が触れてかえって読みにくいので、詰めるが接しはしない */
     display: inline-flex;
     align-items: center;
-    gap: 0;
+    gap: 2px;
     border: 1px solid transparent;
     border-radius: 6px;
     background: none;
