@@ -264,6 +264,13 @@ html, body {
   }
 }
 
+/* **指にホバーは無い。** 沈めたままだと、起こす手段が無いまま半透明で
+   居続ける（ペイン切り替えの矢印・書き方ピッカー・視点を寄せるボタン、
+   3 つとも）。触って起こせないなら、最初から起きている */
+@media (hover: none) {
+  .pane-tool { opacity: 1; }
+}
+
 /* md の道具は**スクロールバーの内側**へ寄せる。CodeMirror のスクローラは
    環境により 15〜17px を取り、その帯はブラウザが押下を横取りするので
    （z-index では前に出せない）、幅を避けた位置から置く。
@@ -333,6 +340,15 @@ html, body {
   width: 0;
   background: none;
   cursor: default;
+}
+
+/* 指の的。**幅ではなく入力の質で決まる話**なので `.narrow` ではなく
+   メディアクエリで見る（狭くしただけのデスクトップの窓を太らせない）。
+   狭いところでは、切り替えの矢印がペインを行き来する唯一の手段になる */
+@media (pointer: coarse) {
+  .pane-tool button { min-height: 44px; }
+  #pane-switch button { width: 44px; height: 44px; }
+  #pane-switch button .icon { width: 16px; height: 16px; }
 }
 
 /* ========== マップのペイン ========== */
