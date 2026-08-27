@@ -278,3 +278,39 @@ test "flip_side は 1 回の undo で戻る" {
   ignore(undo())
   assert_eq(get_text(), src)
 }
+
+///|
+test "その側にグループがあれば、最後のグループの末尾へ入れるだけ" {
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n## c\n"))
+  // c を右（既にある側）の末尾へ = 何も書かれない。既に末尾なので変化なし
+  ignore(move_side_end([st.nodes[3].id], st.nodes[0].id, false))
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## b\n\n## c\n")
+  // a を右の末尾へ = グループ 1 の末尾に移る
+  ignore(move_side_end([st.nodes[1].id], st.nodes[0].id, false))
+  assert_eq(get_text(), "# r\n\n---\n\n## b\n\n## c\n\n## a\n")
+}
+
+///|
+test "その側にグループが無ければ、切り替えの境界ごと書く" {
+  ignore(init_doc("# r\n\n## a\n\n## b\n"))
+  ignore(move_side_end([st.nodes[2].id], st.nodes[0].id, true))
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n---\n\n## b\n")
+  assert_eq(side_of("b"), true)
+}
+
+///|
+test "空のルートの左へ落とすと、左始まりの文書になる" {
+  ignore(init_doc("# r\n\n## a\n"))
+  ignore(move_side_end([st.nodes[1].id], st.nodes[0].id, true))
+  assert_eq(get_text(), "# r\n\n---\n---\n\n## a\n")
+  assert_eq(side_of("a"), true)
+}
+
+///|
+test "move_side_end は 1 回の undo で戻る" {
+  let src = "# r\n\n## a\n\n## b\n"
+  ignore(init_doc(src))
+  ignore(move_side_end([st.nodes[2].id], st.nodes[0].id, true))
+  ignore(undo())
+  assert_eq(get_text(), src)
+}

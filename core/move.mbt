@@ -430,3 +430,51 @@ fn cmd_flip_side(id : Int) -> Unit {
   })
   st.focus = id
 }
+
+///|
+/// 選んだ枝を、その側の**末尾**へ。ルートの脇へ素でドラッグしたときの実体。
+///
+/// 規則は 2 つだけ:
+///   - その側にグループがある → 区切りは書かない。最後のグループの末尾へ入れる
+///   - その側にグループが無い → ルートの範囲の末尾に切り替え + 枝
+///
+/// 「無い側」に置くとき手前は必ず反対側なので、**素のドラッグが書く境界は
+/// 常に切り替え**（分割を書くことは無い）。
+fn cmd_move_side_end(ids : Array[Int], root : Int, left : Bool) -> Unit {
+  let ri = find_node(root)
+  if ri < 0 {
+    return
+  }
+  // その側の最後の直下の枝
+  let mut last = -1
+  for i = 0; i < st.nodes.length(); i = i + 1 {
+    let nd = st.nodes[i]
+    if nd.parent == root && nd.left == left {
+      last = nd.id
+    }
+  }
+  with_sweep(fn() {
+    let order : Array[Int] = []
+    for k in normalize_selection(ids) {
+      order.push(st.nodes[k].id)
+    }
+    let rehide = unhide_for_move(order)
+    if last >= 0 {
+      // その側の最後のグループの末尾へ（区切りは書かない）
+      ignore(move_steps(ids, last, 2))
+    } else {
+      // その側は空。ルートの最後の子にしてから、その手前に切り替えを書く
+      let first = move_steps(ids, root, 0)
+      if first >= 0 {
+        let i = find_node(first)
+        if i >= 0 {
+          let at = st.nodes[i].from
+          apply_sets([[insert_sep_edit(at, st.nodes[find_node(root)].depth, true)]], "")
+        }
+      }
+    }
+    for id in rehide {
+      cmd_toggle_hidden(id)
+    }
+  })
+}

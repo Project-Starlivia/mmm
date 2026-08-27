@@ -317,6 +317,13 @@ pub fn flip_side(id : Int) -> String {
 }
 
 ///|
+/// ルート脇へ落とした: その側の末尾へ（要るときだけ切り替えの `---` を書く）。
+pub fn move_side_end(ids : Array[Int], root : Int, left : Bool) -> String {
+  cmd_move_side_end(ids, root, left)
+  take_snapshot()
+}
+
+///|
 pub fn toggle_hidden(id : Int) -> String {
   cmd_toggle_hidden(id)
   take_snapshot()

@@ -124,6 +124,9 @@ export const core = {
     snap(mbt.reorderNode(id, dir)),
   /** そのノードの属するグループを、丸ごとルートの反対側へ */
   flipSide: (id: number): Snapshot => snap(mbt.flipSide(id)),
+  /** ルート脇へ落とした: その側の末尾へ（要るときだけ切り替えの `---` を書く） */
+  moveSideEnd: (ids: number[], root: number, left: boolean): Snapshot =>
+    snap(mbt.moveSideEnd(ids, root, left)),
   toggleHidden: (id: number): Snapshot => snap(mbt.toggleHidden(id)),
   undo: (): Snapshot => snap(mbt.undo()),
   redo: (): Snapshot => snap(mbt.redo()),

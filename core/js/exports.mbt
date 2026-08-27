@@ -122,6 +122,12 @@ pub fn flip_side(id : Int) -> String {
 }
 
 ///|
+#export_name("moveSideEnd")
+pub fn move_side_end(ids : Array[Int], root : Int, left : Bool) -> String {
+  @core.move_side_end(ids, root, left)
+}
+
+///|
 #export_name("toggleHidden")
 pub fn toggle_hidden(id : Int) -> String {
   @core.toggle_hidden(id)
