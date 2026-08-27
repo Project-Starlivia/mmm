@@ -441,6 +441,15 @@ fn sweep_seps(marks : SepMarks, from_set : Int) -> Unit {
   // 生きていない目印は、同じ木の中でそれより後ろにある最初の生きた境界へ
   // 反転ぶんを畳む
   let folded : Array[Bool] = Array::make(nb, false)
+  // `hit[i] == 0` の境界は、まだどの目印も flip を運んでいない
+  // （= 配列の初期値 false のまま）。そこへ畳み込むと、種が false 決め打ちに
+  // なって「いま実際にある flip」を無視してしまう。畳み込みの前に、今の
+  // 実体の flip を種にしておけば、直後の xor が正しく「実体に対する xor」になる
+  for i = 0; i < nb; i = i + 1 {
+    if hit[i] == 0 {
+      flip[i] = st.bounds[i].flip
+    }
+  }
   for k in dead {
     match next_live_bound_after(marks.at[k]) {
       Some(b) =>
