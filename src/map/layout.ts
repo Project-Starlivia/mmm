@@ -3,14 +3,30 @@
 
 import type { DocView, NodeInfo } from "../coreApi.ts";
 import { type CardRow, cardBleed, cardInset, cardRows, rowH } from "./cards.ts";
-import { type Pt, type Rect, leftOf, rightOf } from "./geometry.ts";
+import { type Pt, type Rect, entryEdgeOf, growthEdgeOf } from "./geometry.ts";
 import { ROW_NORMAL, nodeSize, rowTop } from "./metrics.ts";
 
 export const GAP = {
   x: 45,
   y: 10,
+  /** 同じ側の、グループとグループの間 */
+  group: 26,
   root: 34,
 };
+
+/** その枝が伸びる向き（右 = 1 / 左 = -1）。**側を読むのはここだけ** */
+export const dirOf = (n: NodeInfo): 1 | -1 => (n.left ? -1 : 1);
+
+/**
+ * グループの継ぎ目に引く水平線。**同じ側の列の中の継ぎ目すべて**に出るので、
+ * 意味の境界（`---` の位置）と 1 対 1 ではない — 右 A・左 B・右 C の並びでは、
+ * 右の列の A と C の間に 1 本出る。線は見せ方であって意味ではない。
+ */
+export interface Seam {
+  x: number;
+  y: number;
+  w: number;
+}
 
 /**
  * 親の辺のうち、何割を「付け根の帯」に使うか。子が複数あるとき、線の出口を
@@ -55,6 +71,8 @@ export interface Layout {
   buriedCount: Map<number, number>;
   /** 子 → 親の辺の上での、付け根のずらし量(px) */
   fanOf: Map<number, number>;
+  /** 同じ側の列の中の、グループの継ぎ目 */
+  seams: Seam[];
 }
 
 /**
@@ -139,6 +157,7 @@ export function layoutMap(doc: DocView): Layout {
   const kidsOf = (n: NodeInfo): NodeInfo[] => children.get(n.id) ?? [];
   const root = tops.find((n) => n.depth === 1) ?? null;
   const boxes = new Map<number, Box>();
+  const seams: Seam[] = [];
 
   // 寸法と部分木の高さは**要るときに測って覚える**。先に表を埋めてから
   // 引き直す形だと「必ず入っているはず」を `!` で言い張ることになり、
@@ -173,25 +192,36 @@ export function layoutMap(doc: DocView): Layout {
     return sum;
   }
 
-  const place = (n: NodeInfo, left: number, top: number): number => {
+  /**
+   * 枝を `dir` 方向へ置く。`nearX` は**親と向かい合う辺**の x
+   * （右向きなら箱の左辺、左向きなら右辺）。左右で式を分けないための座標。
+   */
+  const place = (
+    n: NodeInfo,
+    nearX: number,
+    top: number,
+    dir: 1 | -1,
+  ): number => {
     const size = sizeOf(n);
+    const x = dir === 1 ? nearX : nearX - size.w;
     const kids = kidsOf(n);
     let centerY: number;
     if (kids.length === 0) {
       centerY = top + size.h / 2;
     } else {
       let y = top + Math.max(0, (size.h - stackH(kids)) / 2);
+      const childNear = dir === 1 ? x + size.w + GAP.x : x - GAP.x;
       const centers: number[] = [];
       for (let i = 0; i < kids.length; i++) {
         y += gapBefore(i);
-        centers.push(place(kids[i], left + size.w + GAP.x, y));
+        centers.push(place(kids[i], childNear, y, dir));
         y += heightOf(kids[i]);
       }
       centerY = (centers[0] + centers[centers.length - 1]) / 2;
     }
     boxes.set(n.id, {
       n,
-      x: left,
+      x,
       y: centerY - size.h / 2,
       w: size.w,
       h: size.h,
@@ -200,15 +230,100 @@ export function layoutMap(doc: DocView): Layout {
     return centerY;
   };
 
-  if (root) place(root, 0, -heightOf(root) / 2);
+  /** ルート直下の枝を、側ごとにグループへ切り分ける（文書順） */
+  const sideGroups = (root: NodeInfo, left: boolean): NodeInfo[][] => {
+    const out: NodeInfo[][] = [];
+    for (const k of kidsOf(root)) {
+      if (k.left !== left) continue;
+      const last = out[out.length - 1];
+      if (last && last[0].group === k.group) last.push(k);
+      else out.push([k]);
+    }
+    return out;
+  };
+
+  /** グループ列を縦に積んだ高さ（グループの間は GAP.group） */
+  const groupsH = (groups: NodeInfo[][]): number => {
+    let sum = 0;
+    for (let g = 0; g < groups.length; g++) {
+      sum += (g === 0 ? 0 : GAP.group) + stackH(groups[g]);
+    }
+    return sum;
+  };
+
+  /** 木ぜんぶが縦にどれだけ要るか（左右のうち高いほう） */
+  const treeH = (root: NodeInfo): number =>
+    Math.max(
+      sizeOf(root).h,
+      groupsH(sideGroups(root, false)),
+      groupsH(sideGroups(root, true)),
+    );
+
+  /**
+   * 木の根を置く。**グループと左右はルート直下にしか無い**ので、根の子だけが
+   * ここを通り、孫から下は `place` がそのまま面倒を見る。区切りの無い文書では
+   * 右のグループが 1 つあるだけになり、置き方は従来（片側 1 列）と一致する。
+   */
+  const placeTree = (root: NodeInfo, top: number): number => {
+    const size = sizeOf(root);
+    const span = treeH(root);
+    const sides = [
+      { left: false, dir: 1 as const, groups: sideGroups(root, false) },
+      { left: true, dir: -1 as const, groups: sideGroups(root, true) },
+    ];
+    let centerY = top + span / 2;
+    for (const s of sides) {
+      if (s.groups.length === 0) continue;
+      const nearX = s.dir === 1 ? size.w + GAP.x : -GAP.x;
+      let y = top + Math.max(0, (span - groupsH(s.groups)) / 2);
+      const centers: number[] = [];
+      for (let g = 0; g < s.groups.length; g++) {
+        if (g > 0) {
+          // 継ぎ目の線は、隣り合うグループの間の真ん中に、
+          // その 2 グループでいちばん広い枝の幅で引く
+          const near = [...s.groups[g - 1], ...s.groups[g]];
+          const w = Math.max(...near.map((k) => sizeOf(k).w));
+          seams.push({
+            x: s.dir === 1 ? nearX : nearX - w,
+            y: y + GAP.group / 2,
+            w,
+          });
+          y += GAP.group;
+        }
+        const kids = s.groups[g];
+        for (let i = 0; i < kids.length; i++) {
+          y += gapBefore(i);
+          centers.push(place(kids[i], nearX, y, s.dir));
+          y += heightOf(kids[i]);
+        }
+      }
+      // 根の中心は右の枝に合わせる（右が無ければ左）。区切りの無い文書で
+      // 従来と 1px も変えないための取り決めで、両側にあるときも
+      // 「どちらに合わせるか」を決めておかないと揺れる
+      if (!s.left || sides[0].groups.length === 0) {
+        centerY = (centers[0] + centers[centers.length - 1]) / 2;
+      }
+    }
+    boxes.set(root.id, {
+      n: root,
+      x: 0,
+      y: centerY - size.h / 2,
+      w: size.w,
+      h: size.h,
+      rows: rowsOf.get(root.id) ?? [],
+    });
+    return centerY;
+  };
+
+  if (root) placeTree(root, -treeH(root) / 2);
 
   let bottom = 0;
   for (const box of boxes.values()) bottom = Math.max(bottom, box.y + box.h);
   let top = boxes.size > 0 ? bottom + GAP.root * 2 : 0;
   for (const tree of tops) {
     if (tree === root) continue;
-    place(tree, 0, top);
-    top += heightOf(tree) + GAP.root;
+    placeTree(tree, top);
+    top += treeH(tree) + GAP.root;
   }
 
   const parentOf = new Map<number, number>();
@@ -235,7 +350,7 @@ export function layoutMap(doc: DocView): Layout {
     }
   }
 
-  return { visible, boxes, parentOf, buriedCount, fanOf };
+  return { visible, boxes, parentOf, buriedCount, fanOf, seams };
 }
 
 /**
@@ -248,6 +363,9 @@ export function edgeEnds(L: Layout, id: number): { from: Pt; to: Pt } | null {
   const pid = L.parentOf.get(id);
   const p = pid === undefined ? undefined : L.boxes.get(pid);
   if (!b || !p) return null;
-  const e = rightOf(p);
-  return { from: { x: e.x, y: e.y + (L.fanOf.get(id) ?? 0) }, to: leftOf(b) };
+  // 線は「親の、子が伸びる側の辺」から出て「子の、親を向いた辺」へ入る
+  const dir = dirOf(b.n);
+  const out = growthEdgeOf(p, dir);
+  const into = entryEdgeOf(b, dir);
+  return { from: { x: out.x, y: out.y + (L.fanOf.get(id) ?? 0) }, to: into };
 }

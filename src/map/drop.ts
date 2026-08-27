@@ -5,10 +5,10 @@
 // 塗る仕事から切り離して、ここだけを単体で試せるようにしてある。
 
 import { type Pt, centerOf, distToSeg } from "./geometry.ts";
-import { type Box, GAP } from "./layout.ts";
+import { type Box, GAP, dirOf } from "./layout.ts";
 
 /**
- * 落とし先。
+ * ノード相手の落とし先。
  * - `0` = target の子にする
  * - `1` = target の直前へ挿入 / `2` = 直後へ挿入
  * - `3` = target の親として割り込む（A→B の線へのドロップ）
@@ -17,6 +17,17 @@ export interface DropTarget {
   id: number;
   pos: 0 | 1 | 2 | 3;
 }
+
+/**
+ * 落とし先。**3 つだけ**:
+ * - `node` … 従来どおり（0 = 子 / 1 = 直前 / 2 = 直後 / 3 = 線への割り込み）
+ * - `side` … ルートの脇。その側の末尾へ（区切りは要るときだけ書かれる）
+ * - `group` … Mod を押したまま落とした。そこに新しいグループ
+ */
+export type Drop =
+  | { kind: "node"; id: number; pos: 0 | 1 | 2 | 3 }
+  | { kind: "side"; root: number; left: boolean }
+  | { kind: "group"; target: number; before: boolean; left: boolean };
 
 /** 判定に要るものすべて。世界座標で話す。 */
 export interface DropScene {
@@ -33,12 +44,14 @@ export interface DropScene {
   single: boolean;
   /** Shift を押しているか */
   preferEdge: boolean;
+  /** ドロップの瞬間に Mod を押しているか（新しいグループとして落とす） */
+  newGroup: boolean;
   /** 子 id → その親へのエッジの折れ線 */
   polyline: (id: number) => Pt[] | null;
 }
 
 export interface DropDecision {
-  target: DropTarget | null;
+  drop: Drop | null;
   /**
    * 別の親になる候補がすぐ隣にいるか。挿入線だけだと「上の親の末尾」と
    * 「下の親の先頭」が同じ場所に出て区別できないので、迷う場面でだけ
@@ -54,10 +67,96 @@ const NEAR = REACH * 0.4; // ここまでは前後への挿入より子を優先
 const SLACK = 18; // 外側ゾーンが兄弟軸方向に箱からはみ出してよい量
 const AMBIGUOUS = 26; // 候補どうしがこれより競っていれば迷う場面とみなす
 
-/** 箱の中心から見たポインタの位置と、箱の半分の大きさ */
+/**
+ * 箱の中心から見たポインタの位置と、箱の半分の大きさ。
+ * `du` は**その枝が伸びる向き**を正とする（左の枝では左が正）ので、
+ * 外側ゾーンの式を左右で書き分けなくてよい。
+ */
 function local(at: Pt, b: Box) {
   const c = centerOf(b);
-  return { du: at.x - c.x, dv: at.y - c.y, hu: b.w / 2, hv: b.h / 2 };
+  return {
+    du: (at.x - c.x) * dirOf(b.n),
+    dv: at.y - c.y,
+    hu: b.w / 2,
+    hv: b.h / 2,
+  };
+}
+
+/** 非 Mod の外側ゾーンと同じ範囲（成長軸は REACH、それ以外は SLACK まで）に、
+ *  ポインタがその箱から見て収まっているか */
+function withinReach(at: Pt, b: Box): boolean {
+  const { du, dv, hu, hv } = local(at, b);
+  return Math.abs(du) - hu <= REACH && Math.abs(dv) - hv <= SLACK;
+}
+
+/**
+ * いちばん近い木の根（複数の木が縦に積まれているので、どれの脇かを決める）。
+ * どの木からも遠い空所では `-1`（= 見つからない）を返す — この上限が無いと、
+ * Mod を押したままの空振り（キャンセルのつもり）が必ずどこかの根への移動
+ * として成立してしまう。
+ *
+ * 「木から遠いか」は**根自身の箱ではなく、木のどの箱でも**測る。グループが
+ * 複数あれば枝は根から縦に大きく離れた位置にも並ぶので、根の小さい箱だけを
+ * 基準にすると、根のすぐ近くにしか Mod+ドロップが効かなくなる
+ * （新しいグループを作る Mod+ドロップの狙い所そのものが遠い枝の隣であるため）。
+ *
+ * 上限は「掴んでいる木も含めて」どれかの箱に届いているかで見る。掴んでいる
+ * 木の真上で離したときは、そこは紛れもなく木の上（キャンセルしたい空所ではない）
+ * なので、その場合は掴んでいない側の木を距離に関わらず探しに行く。
+ */
+function nearestRoot(scene: DropScene): number {
+  let reachable = false;
+  for (const id of scene.order) {
+    const b = scene.boxes.get(id);
+    if (b && withinReach(scene.at, b)) {
+      reachable = true;
+      break;
+    }
+  }
+  if (!reachable) return -1;
+
+  let best = Infinity;
+  let hit = -1;
+  for (const id of scene.order) {
+    if (scene.dragging.has(id)) continue;
+    if (scene.parentOf.get(id) !== undefined) continue;
+    const b = scene.boxes.get(id);
+    if (!b) continue;
+    const c = centerOf(b);
+    const d = Math.hypot(scene.at.x - c.x, scene.at.y - c.y);
+    if (d < best) {
+      best = d;
+      hit = id;
+    }
+  }
+  return hit;
+}
+
+/**
+ * Mod を押したまま落とすときのスロット。**ルート直下の並びの隙間**が全部
+ * 候補になり、いちばん近い枝の上半分/下半分で「手前/後ろ」が決まる。
+ * その側に枝がまだ無ければ「その側の末尾」（= 同じ結果に落ちる縮退）。
+ */
+function findSlot(scene: DropScene, root: number, left: boolean): Drop {
+  let best = Infinity;
+  let target = -1;
+  let before = false;
+  for (const id of scene.order) {
+    if (scene.dragging.has(id)) continue;
+    if (scene.parentOf.get(id) !== root) continue;
+    const b = scene.boxes.get(id);
+    if (!b || b.n.left !== left) continue;
+    const c = centerOf(b);
+    const d = Math.abs(scene.at.y - c.y);
+    if (d < best) {
+      best = d;
+      target = id;
+      before = scene.at.y < c.y;
+    }
+  }
+  return target === -1
+    ? { kind: "side", root, left }
+    : { kind: "group", target, before, left };
 }
 
 /**
@@ -113,6 +212,21 @@ function findEdge(scene: DropScene): DropTarget | null {
  * そこは前後に譲る。
  */
 export function resolveDrop(scene: DropScene): DropDecision {
+  // ポインタがその箱の中心より左か。**側を決めるのはここだけ**
+  const sideOf = (b: Box): boolean => scene.at.x < centerOf(b).x;
+
+  // Mod を押している間は、スロットだけが生きる（深いところの行き先は休む）
+  if (scene.newGroup) {
+    const near = nearestRoot(scene);
+    if (near === -1) return { drop: null, ambiguous: false };
+    const rb = scene.boxes.get(near);
+    if (!rb) return { drop: null, ambiguous: false };
+    return {
+      drop: findSlot(scene, near, sideOf(rb)),
+      ambiguous: false,
+    };
+  }
+
   // Shift = 線への割り込みを最優先。見つかったかどうかは後の段でも使う
   // （見つかった線を、外側ゾーンや帯が黙って横取りしない）
   const edgeTarget = scene.preferEdge ? findEdge(scene) : null;
@@ -154,11 +268,16 @@ export function resolveDrop(scene: DropScene): DropDecision {
     const b = scene.boxes.get(id);
     if (!b) continue;
     const { du, dv, hu, hv } = local(scene.at, b);
-    if (du <= hu || du > hu + REACH || Math.abs(dv) > hv + SLACK) continue;
-    const d = du - hu + Math.max(0, Math.abs(dv) - hv) * 2;
+    // 根は両方向に伸びる木の付け根なので、成長軸の判定を絶対値で見る
+    // （`local` の du は dirOf で片側だけ正にしてあるので、根では素のままだと右側しか拾えない）
+    const isRoot = scene.parentOf.get(id) === undefined;
+    const growOffset = isRoot ? Math.abs(du) : du;
+    if (growOffset <= hu || growOffset > hu + REACH || Math.abs(dv) > hv + SLACK)
+      continue;
+    const d = growOffset - hu + Math.max(0, Math.abs(dv) - hv) * 2;
     if (d < bestOut) {
       bestOut = d;
-      outU = du - hu;
+      outU = growOffset - hu;
       outTarget = { id, pos: 0 };
     }
   }
@@ -177,5 +296,19 @@ export function resolveDrop(scene: DropScene): DropDecision {
       if (c.parent !== chosen && c.dist < rival) rival = c.dist;
     }
   }
-  return { target, ambiguous: rival - best <= AMBIGUOUS };
+
+  // 木の根が相手の「子にする」は、**どちら側か**まで決まって初めて意味を持つ。
+  // ポインタが根の中心のどちら側にあるかで振り分ける（素のドラッグでの左右）
+  const asDrop = (t: DropTarget): Drop => {
+    if (t.pos !== 0) return { kind: "node", id: t.id, pos: t.pos };
+    if (scene.parentOf.get(t.id) !== undefined) {
+      return { kind: "node", id: t.id, pos: 0 };
+    }
+    const rb = scene.boxes.get(t.id);
+    return { kind: "side", root: t.id, left: rb ? sideOf(rb) : false };
+  };
+  return {
+    drop: target ? asDrop(target) : null,
+    ambiguous: rival - best <= AMBIGUOUS,
+  };
 }

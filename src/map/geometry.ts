@@ -36,14 +36,27 @@ export function unionRect(boxes: Iterable<Rect>): Rect | null {
   return any ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
 }
 
-// 木は左から右へ伸びる。線が箱に触れるのは左右の辺の中点だけで、
-// 任意方向へ出る一般形は左右振り分けを持っていた頃の名残だった。
+// 箱の左右の辺の中点。線が箱に触れるのはここだけで、任意方向へ出る一般形は
+// 要らない。**どちらの辺が「子へ出る」役でどちらが「親から入る」役かは、
+// その枝の向き（dirOf）で決まる** — 右の枝ならこの並びのまま、左の枝なら逆になる。
 
-/** 右辺の中点。子への線・`+` ボタンはここから出る */
+/** 右辺の中点 */
 export const rightOf = (b: Rect): Pt => ({ x: b.x + b.w, y: b.y + b.h / 2 });
 
-/** 左辺の中点。親からの線はここへ入る */
+/** 左辺の中点 */
 export const leftOf = (b: Rect): Pt => ({ x: b.x, y: b.y + b.h / 2 });
+
+// dir（右 = 1 / 左 = -1）を受けて左右どちらの辺を使うか決める箇所は、
+// 育つ辺と入る辺のこの 2 つだけにする。**鏡映（左右の入れ替え）を書いていいのはここだけ**
+// — 呼び出し側は「育つ辺」「入る辺」としか言わない。
+
+/** 箱から、その枝が dir 方向へ**育っていく**辺の中点 */
+export const growthEdgeOf = (b: Rect, dir: 1 | -1): Pt =>
+  dir === 1 ? rightOf(b) : leftOf(b);
+
+/** 箱へ、dir 方向の枝が**入ってくる**辺の中点（`growthEdgeOf` の反対側） */
+export const entryEdgeOf = (b: Rect, dir: 1 | -1): Pt =>
+  dir === 1 ? leftOf(b) : rightOf(b);
 
 /** 点 p から線分 ab までの距離 */
 export function distToSeg(p: Pt, a: Pt, b: Pt): number {

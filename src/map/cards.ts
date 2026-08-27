@@ -245,20 +245,6 @@ function rowsOfContent(
   return list;
 }
 
-/**
- * そのノード（nodes[i]）の本文の終わり: 次ノードの見出し行頭、無ければ
- * そのノードの部分木の終わり。カード行を切り出す境界（cardRows）と、
- * カードの移動先を「そのノードの末尾」に決める境界（main.ts の
- * moveCardTo/insertContentLine）は同じ場所を指す — この式をここ以外に
- * 書かない。
- */
-export function contentEnd(nodes: NodeInfo[], i: number): number {
-  const n = nodes[i];
-  return i + 1 < nodes.length && nodes[i + 1].from < n.to
-    ? nodes[i + 1].from
-    : n.to;
-}
-
 /** フェンスを「開きフェンス行の行頭」で引けるようにする */
 const fenceIndex = (doc: DocView): Map<number, FenceSpan> => {
   const m = new Map<number, FenceSpan>();
@@ -266,7 +252,9 @@ const fenceIndex = (doc: DocView): Map<number, FenceSpan> => {
   return m;
 };
 
-/** ノード 1 つぶんのカード行。折り畳んだノードはラベルだけで中身を出さない。 */
+/** ノード 1 つぶんのカード行。折り畳んだノードはラベルだけで中身を出さない。
+ *  本文の範囲（contentStart/contentEnd）はコアが確定させた値をそのまま
+ *  読む — 区切り行の境界を頭打ちにする規則はコアだけが知っている。 */
 function rowsOfNode(
   doc: DocView,
   i: number,
@@ -274,12 +262,7 @@ function rowsOfNode(
 ): CardRow[] {
   const n = doc.nodes[i];
   if (!n.hasContent || n.hidden) return [];
-  const brk = doc.text.indexOf("\n", n.headEnd);
-  const start = brk === -1 ? -1 : brk + 1;
-  const end = contentEnd(doc.nodes, i);
-  return start > 0 && start < end
-    ? rowsOfContent(doc.text, start, end, fenceAt)
-    : [];
+  return rowsOfContent(doc.text, n.contentStart, n.contentEnd, fenceAt);
 }
 
 /**
@@ -308,8 +291,7 @@ export function cardRowsOf(doc: DocView, id: number): CardRow[] {
   return i === -1 ? [] : rowsOfNode(doc, i, fenceIndex(doc));
 }
 
-/** そのノードの本文の終わり。id から引くときはこちら。 */
+/** そのノードの本文の終わり（コアが確定させた contentEnd）。id から引くときはこちら。 */
 export function contentEndOf(nodes: NodeInfo[], id: number): number | null {
-  const i = nodes.findIndex((n) => n.id === id);
-  return i === -1 ? null : contentEnd(nodes, i);
+  return nodes.find((n) => n.id === id)?.contentEnd ?? null;
 }

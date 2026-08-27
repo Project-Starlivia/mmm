@@ -21,8 +21,12 @@ function box(id: number, depth: number, x: number, y: number, w = 100, h = 30): 
     from: 0,
     headEnd: 0,
     to: 0,
+    contentStart: 0,
+    contentEnd: 0,
     hasContent: false,
     hidden: false,
+    group: 0,
+    left: false,
     label: `n${id}`,
   };
   return { n, x, y, w, h, rows: [] };
@@ -48,6 +52,7 @@ function scene(
     dragging: new Set<number>(),
     single: true,
     preferEdge: false,
+    newGroup: false,
     polyline: (id) => {
       const b = boxMap.get(id);
       const pid = parentOf.get(id);
@@ -76,56 +81,58 @@ const LINKS: [number, number][] = [
 
 test("箱のまんなかに落とせば、その子になる", () => {
   const d = resolveDrop(scene(TREE, LINKS, { x: 195, y: 75 }));
-  assert.deepEqual(d.target, { id: 2, pos: 0 });
+  assert.deepEqual(d.drop, { kind: "node", id: 2, pos: 0 });
 });
 
 test("箱の上寄りは手前へ、下寄りは後ろへの挿入になる", () => {
   const up = resolveDrop(scene(TREE, LINKS, { x: 195, y: 62 }));
-  assert.deepEqual(up.target, { id: 2, pos: 1 });
+  assert.deepEqual(up.drop, { kind: "node", id: 2, pos: 1 });
   const down = resolveDrop(scene(TREE, LINKS, { x: 195, y: 88 }));
-  assert.deepEqual(down.target, { id: 2, pos: 2 });
+  assert.deepEqual(down.drop, { kind: "node", id: 2, pos: 2 });
 });
 
-test("ルートには兄弟が無いので、どこに落としても子になる", () => {
+test("ルートには兄弟が無いので、どこに落としてもその側の末尾へ", () => {
+  // 根の「子にする」(pos 0) は、どちら側かが決まって初めて意味を持つ
   const up = resolveDrop(scene(TREE, LINKS, { x: 50, y: 102 }));
-  assert.deepEqual(up.target, { id: 1, pos: 0 });
+  assert.deepEqual(up.drop, { kind: "side", root: 1, left: false });
   const down = resolveDrop(scene(TREE, LINKS, { x: 50, y: 128 }));
-  assert.deepEqual(down.target, { id: 1, pos: 0 });
+  assert.deepEqual(down.drop, { kind: "side", root: 1, left: false });
 });
 
 test("箱のすぐ右（子の伸びる方向）も子にする", () => {
   // 外側ゾーンの近い側。ここを兄弟に振ると「右に置いたのに兄弟になる」
   const d = resolveDrop(scene(TREE, LINKS, { x: 265, y: 75 }));
-  assert.deepEqual(d.target, { id: 2, pos: 0 });
+  assert.deepEqual(d.drop, { kind: "node", id: 2, pos: 0 });
 });
 
 test("どこからも遠ければ、落とし先を出さない", () => {
   const d = resolveDrop(scene(TREE, LINKS, { x: 900, y: 900 }));
-  assert.equal(d.target, null);
+  assert.equal(d.drop, null);
 });
 
 test("掴んでいる部分木は落とし先にならない", () => {
+  // 2 を外すと、この場所には代わりに拾えるほど近い相手が無い
   const d = resolveDrop(
     scene(TREE, LINKS, { x: 195, y: 75 }, { dragging: new Set([2]) }),
   );
-  assert.notEqual(d.target?.id, 2);
+  assert.equal(d.drop, null);
 });
 
 test("Shift なら線への割り込みが最優先", () => {
-  // 親(1) → 子(2) の線の中ほど。素の状態では「子にする」が勝つ場所
+  // 親(1) → 子(2) の線の中ほど。素の状態では根の脇（外側ゾーン）が勝つ場所
   const at = { x: 122, y: 90 };
   const plain = resolveDrop(scene(TREE, LINKS, at));
-  assert.notEqual(plain.target?.pos, 3);
+  assert.deepEqual(plain.drop, { kind: "side", root: 1, left: false });
   const shifted = resolveDrop(scene(TREE, LINKS, at, { preferEdge: true }));
-  assert.deepEqual(shifted.target, { id: 2, pos: 3 });
+  assert.deepEqual(shifted.drop, { kind: "node", id: 2, pos: 3 });
 });
 
 test("複数まとめて掴んでいるときは、線への割り込みを出さない", () => {
-  // 誰が親になるのかが決まらないため
+  // 誰が親になるのかが決まらないため。Shift の狙い所と同じ場所は根の脇に落ちる
   const d = resolveDrop(
     scene(TREE, LINKS, { x: 122, y: 90 }, { preferEdge: true, single: false }),
   );
-  assert.notEqual(d.target?.pos, 3);
+  assert.deepEqual(d.drop, { kind: "side", root: 1, left: false });
 });
 
 test("親が違う候補が競っているときだけ、どの親につくかを予告する", () => {
@@ -144,4 +151,95 @@ test("親が違う候補が競っているときだけ、どの親につくか�
     }),
   );
   assert.equal(d.ambiguous, true);
+});
+
+test("左の枝では、外側ゾーンも左へ伸びる", () => {
+  // ルート(1) の左に子(2)。子の左 30px は「2 の子にする」ゾーン
+  const root = box(1, 1, 0, 100);
+  const kid = { ...box(2, 2, -145, 100) };
+  kid.n = { ...kid.n, left: true };
+  const s = scene([root, kid], [[2, 1]], { x: -175, y: 115 });
+  assert.deepEqual(resolveDrop(s).drop, { kind: "node", id: 2, pos: 0 });
+});
+
+test("ルートの右脇へ落とすと、その側の末尾へ", () => {
+  const root = box(1, 1, 0, 100);
+  const kid = box(2, 2, 145, 100);
+  const s = scene([root, kid], [[2, 1]], { x: 60, y: 115 });
+  assert.deepEqual(resolveDrop(s).drop, { kind: "side", root: 1, left: false });
+});
+
+test("ルートの左脇へ落とすと、左の側の末尾へ", () => {
+  const root = box(1, 1, 0, 100);
+  const kid = box(2, 2, 145, 100);
+  const s = scene([root, kid], [[2, 1]], { x: -60, y: 115 });
+  assert.deepEqual(resolveDrop(s).drop, { kind: "side", root: 1, left: true });
+});
+
+test("Mod を押していれば、枝の隣が新しいグループのスロットになる", () => {
+  const root = box(1, 1, 0, 100);
+  const a = box(2, 2, 145, 60);
+  const b = box(3, 2, 145, 140);
+  // a（実在する枝）を掴んで b の近くへ落とす。掴んでいるものはスロット探しから除く
+  const s = scene([root, a, b], [[2, 1], [3, 1]], { x: 195, y: 130 }, {
+    newGroup: true,
+    dragging: new Set([2]),
+  });
+  // b の上半分 = b の手前へ新しいグループ
+  assert.deepEqual(resolveDrop(s).drop, {
+    kind: "group",
+    target: 3,
+    before: true,
+    left: false,
+  });
+});
+
+test("Mod で根そのものを掴んでいれば、その根は nearestRoot の候補から外れる", () => {
+  // 木が縦に 2 つ。掴んでいるのは根(1)自身で、ポインタもその真上。
+  // 除外していなければ最短距離で根(1)が拾われてしまうが、
+  // 正しくは掴んでいない側の根(5)まで見に行く
+  const rootA = box(1, 1, 0, 100);
+  const kidA = box(2, 2, 145, 100);
+  const rootB = box(5, 1, 0, 300);
+  const kidB = box(4, 2, 145, 300);
+  const s = scene(
+    [rootA, kidA, rootB, kidB],
+    [[2, 1], [4, 5]],
+    { x: 50, y: 115 },
+    { newGroup: true, dragging: new Set([1, 2]) },
+  );
+  assert.deepEqual(resolveDrop(s).drop, {
+    kind: "group",
+    target: 4,
+    before: true,
+    left: false,
+  });
+});
+
+test("Mod でも、枝が 1 つも無い側は「その側の末尾」に落ちる", () => {
+  const root = box(1, 1, 0, 100);
+  const a = box(2, 2, 145, 100);
+  // 根の届く範囲（REACH/SLACK 相当）の内側で、まだ何も無い左側
+  const s = scene([root, a], [[2, 1]], { x: -150, y: 100 }, { newGroup: true });
+  assert.deepEqual(resolveDrop(s).drop, { kind: "side", root: 1, left: true });
+});
+
+test("Mod を押していても、どの木からも遠い空所ではキャンセルできる", () => {
+  // nearestRoot に上限が無いと、Mod を押したまま空振りしても必ずどこかの
+  // 根への移動が成立してしまい、ドラッグを諦める手段が無くなる
+  const root = box(1, 1, 0, 100);
+  const s = scene([root], [], { x: 900, y: 900 }, { newGroup: true });
+  assert.equal(resolveDrop(s).drop, null);
+});
+
+test("Mod: 根から縦に離れた枝の近くへ落としても、新しいグループとして拾う", () => {
+  // 複数グループが縦に積まれた実際の文書では、根自身の箱は小さく、
+  // グループはそこから遠く離れた位置にも並ぶ。「木から遠いか」を根の
+  // 小さい箱だけで測ると、根の近くにしか Mod+ドロップが効かなくなる
+  const root = box(1, 1, 0, 0, 80, 30);
+  const kids = Array.from({ length: 8 }, (_, i) => box(10 + i, 2, 125, i * 60));
+  const links: [number, number][] = kids.map((k) => [k.n.id, 1]);
+  const s = scene([root, ...kids], links, { x: 175, y: 420 }, { newGroup: true });
+  const d = resolveDrop(s).drop;
+  assert.ok(d && d.kind !== "node", `根から遠い枝の近くで Mod+ドロップが効かない: ${JSON.stringify(d)}`);
 });

@@ -27,9 +27,19 @@ priv struct Node {
   // hide のマーカーを片方だけ含んでしまう位置では、そこで切り上げる
   // （含めると、畳んだノードを消したときにマーカーが対で孤立する）
   to : Int
+  content_start : Int // 本文の始まり = 構造行の改行の直後
+  // 本文の終わり。has_content と同じ規則（次の見出し・to・境界のうち
+  // いちばん手前）。**この 1 フィールドが snapshot に出るまで、TS 側が
+  // 同じ規則を再導出していた** — 境界を知らないまま再導出すると、区切り
+  // 直後のノードに落としたカードが区切りの向こう側へ着地して消える
+  content_end : Int
   mut parent : Int // node id, or -1
   has_content : Bool
   hidden : Bool // inside a <!-- … --> hide region
+  // その枝が属するグループと、伸びる側。**ルート直下で決まり、枝の中では
+  // 一定**（core/seps.mbt が配る）
+  mut group : Int
+  mut left : Bool
 }
 
 ///|
@@ -45,6 +55,8 @@ priv struct St {
   mut tx : Entry? // open transaction accumulating steps
   mut hide_regions : Array[HideRegion] // <!-- … --> marker spans
   mut fences : Array[Fence] // ``` … ``` spans
+  mut seps : Array[SepRun] // 生の区切りのかたまり（掃除が読む）
+  mut bounds : Array[Bound] // そのうち、構造として効いているもの
   mut head : Head? // 文書の頭（YAML frontmatter）の区間。無ければ None
   mut index_of : Map[Int, Int] // node id -> 添字
   // 書き方のモード = 「深さ list_from 以上をリストで書く」。0 は全部見出し。
@@ -67,6 +79,8 @@ let st : St = {
   tx: None,
   hide_regions: [],
   fences: [],
+  seps: [],
+  bounds: [],
   head: None,
   index_of: Map([]),
   list_from: 0,
@@ -147,6 +161,22 @@ fn rebuild_nodes(id_at : Map[Int, Int]) -> Unit {
     }
   }
 
+  // (3) 区切りの境界も範囲を切る。**区切り行はどのノードの範囲にも属さない**
+  //     ので、コピー・移動・削除が区切りを巻き込まない。ノードを作る前に
+  //     切るのは、has_content が確定した範囲を見る必要があるため
+  //     （切らずに数えると、区切り行が「中身」に見えてしまう）
+  let bounds = valid_bounds(
+    scan.seps,
+    heads,
+    parent_indices(
+      hn,
+      fn(i) { heads[i].depth },
+      fn(i) { heads[i].from },
+      fn(i) { range_end[i] },
+    ),
+  )
+  cut_ranges(bounds, heads, range_end)
+
   let nodes : Array[Node] = []
   for i = 0; i < hn; i = i + 1 {
     let h = heads[i]
@@ -159,11 +189,13 @@ fn rebuild_nodes(id_at : Map[Int, Int]) -> Unit {
       }
     }
     // attached content: non-blank text between the heading line and whichever
-    // comes first — the next heading or the end of this node's own range
+    // comes first — the next heading, the end of this node's own range, or
+    // （区切り行は本文に属さないので）その手前にある最初の境界
     let mut content_end = if i + 1 < hn { heads[i + 1].from } else { n }
     if range_end[i] < content_end {
       content_end = range_end[i]
     }
+    content_end = cap_at_first_bound(bounds, h.content_start, content_end)
     let has_content = !is_blank_range(h.content_start, content_end)
     nodes.push(Node::{
       id,
@@ -173,14 +205,21 @@ fn rebuild_nodes(id_at : Map[Int, Int]) -> Unit {
       label_start: h.label_start,
       head_end: h.head_end,
       to: range_end[i],
+      content_start: h.content_start,
+      content_end,
       parent: -1,
       has_content,
       hidden: h.hidden,
+      group: 0,
+      left: false,
     })
   }
   st.nodes = nodes
   reindex()
   recompute_parents()
+  st.seps = scan.seps
+  st.bounds = bounds
+  assign_groups(bounds)
 }
 
 ///|
@@ -195,29 +234,49 @@ fn is_blank_range(a : Int, b : Int) -> Bool {
 }
 
 ///|
+/// 深さと範囲から「親の添字」を出す（-1 は木の根）。並びは文書順。
+///
+/// **範囲が既に閉じた祖先は親にしない** — 子の範囲 ⊆ 親の範囲 を、範囲を
+/// 相手にするコマンド全部が前提にしているため。
+///
+/// ノードを作る前（境界の有効判定）と、作った後（親の付け直し）の両方から
+/// 使うので、添字と取り出し方だけを受ける形にしてある。
+fn parent_indices(
+  n : Int,
+  depth_at : (Int) -> Int,
+  from_at : (Int) -> Int,
+  to_at : (Int) -> Int,
+) -> Array[Int] {
+  let out = Array::make(n, -1)
+  let stack : Array[Int] = []
+  for i = 0; i < n; i = i + 1 {
+    while stack.length() > 0 &&
+          (
+            depth_at(stack[stack.length() - 1]) >= depth_at(i) ||
+            to_at(stack[stack.length() - 1]) <= from_at(i)
+          ) {
+      ignore(stack.unsafe_pop())
+    }
+    out[i] = if stack.length() > 0 { stack[stack.length() - 1] } else { -1 }
+    stack.push(i)
+  }
+  out
+}
+
+///|
 /// Recompute parent references from depths (stack, O(n)). A node with no
 /// shallower predecessor is a top-level tree of its own (nodes before the
 /// root form separate maps, not children of the root).
 fn recompute_parents() -> Unit {
-  // (depth, id, to) of open ancestors. to matters because a range
-  // can be cut short by a comment marker that would otherwise be split.
-  // An ancestor whose range already
-  // ended cannot be the parent — keeping it would produce a child that lies
-  // outside its parent's range, which every range-based command relies on.
-  let stack : Array[(Int, Int, Int)] = []
-  for i = 0; i < st.nodes.length(); i = i + 1 {
-    let nd = st.nodes[i]
-    while stack.length() > 0 &&
-          (stack[stack.length() - 1].0 >= nd.depth ||
-          stack[stack.length() - 1].2 <= nd.from) {
-      ignore(stack.unsafe_pop())
-    }
-    nd.parent = if stack.length() > 0 {
-      stack[stack.length() - 1].1
-    } else {
-      -1
-    }
-    stack.push((nd.depth, nd.id, nd.to))
+  let nodes = st.nodes
+  let pidx = parent_indices(
+    nodes.length(),
+    fn(i) { nodes[i].depth },
+    fn(i) { nodes[i].from },
+    fn(i) { nodes[i].to },
+  )
+  for i = 0; i < nodes.length(); i = i + 1 {
+    nodes[i].parent = if pidx[i] < 0 { -1 } else { nodes[pidx[i]].id }
   }
 }
 

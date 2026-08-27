@@ -81,6 +81,8 @@ function sameShape(a: NodeShape | undefined, b: NodeShape): boolean {
 
 export class MapRenderer {
   readonly edgeLayer = svgEl("g");
+  /** グループの継ぎ目。**文書から決まるもの**なのでここが描く */
+  readonly seamLayer = svgEl("g");
   readonly nodeLayer = svgEl("g");
 
   // 差分更新用: id → DOM
@@ -92,6 +94,12 @@ export class MapRenderer {
   private nodeTf = new Map<number, string>();
   private edgeD = new Map<number, string>();
   private domOrderSig = ""; // DOM の並び（= 重なり順）を直す判定用
+  private seamEls: SVGLineElement[] = [];
+
+  /** 書き出しに写すための、いまの継ぎ目 */
+  seamElements(): SVGLineElement[] {
+    return [...this.seamEls];
+  }
 
   /** id を指定して要素を引く（ドラッグ中の一時的な印を付けるのに使う） */
   nodeEl(id: number): SVGGElement | undefined {
@@ -260,6 +268,23 @@ export class MapRenderer {
       this.domOrderSig = orderSig;
     }
 
-
+    // ---- グループの継ぎ目 ----
+    // 本数は滅多に変わらないので、足りない/余っている分だけ作り足して捨てる
+    while (this.seamEls.length > L.seams.length) {
+      this.seamEls.pop()?.remove();
+    }
+    while (this.seamEls.length < L.seams.length) {
+      const line = svgEl("line", { class: "group-seam" });
+      this.seamLayer.append(line);
+      this.seamEls.push(line);
+    }
+    for (let i = 0; i < L.seams.length; i++) {
+      const s = L.seams[i];
+      const el = this.seamEls[i];
+      el.setAttribute("x1", String(s.x));
+      el.setAttribute("y1", String(s.y));
+      el.setAttribute("x2", String(s.x + s.w));
+      el.setAttribute("y2", String(s.y));
+    }
   }
 }

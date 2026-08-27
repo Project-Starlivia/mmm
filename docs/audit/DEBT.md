@@ -1308,6 +1308,10 @@ applyColor が起動時に link[rel=icon].href を data: URI で差し替える(
 
 **修正コスト**: NodeInfo に contentStart/contentEnd を追加 = core/api.mbt に 2 フィールド +8 行、src/coreApi.ts:13-24 の interface +2 行、TS 側 2 箇所の再導出を削除 -8 行。src/mindmap.ts:322 の indexOf も削除できる。
 
+**解消（2026-08-27）**: 記載どおりの形で直した。`Node`（core/doc.mbt:19-38）に `content_start` / `content_end` を追加し、`rebuild_nodes`（core/doc.mbt:191-206）が既に計算していた値をそのまま格納。`take_snapshot`（core/api.mbt:113-117）が `contentStart`/`contentEnd` として snapshot に出す。`src/coreApi.ts:26-34` の `NodeInfo` に同じ 2 フィールドを追加。TS 側の再導出はすべて削除: `src/map/cards.ts` の `contentEnd()`（旧 :216-221 の三項式）と `rowsOfNode` の `doc.text.indexOf("\n", n.headEnd)`（旧 :238-239、これが件の「別実装」）を削除し、`rowsOfNode`（:213-226）は `n.contentStart`/`n.contentEnd` を読むだけになった。`contentEndOf`（:255-257）も内部の再導出呼び出しをやめてフィールドを直接読む。`src/main.ts`/`src/mindmap.ts` 側は既に別コミットでこの式を持たなくなっていた（main.ts の `contentEnd()` は cards.ts の `contentEndOf` に委譲済み、mindmap.ts の `docText()`/ミニパーサは廃止済み）ので、触っていない。ついでに core 内にも同じ規則の再導出が 1 つ見つかった（core/format.mbt の `content_end_of`、`append_content_edit` 専用）— これも削除して `st.nodes[i].content_end` を直接読ませた（core/format.mbt:200-207）。
+
+これで見つかった実バグ: カードなしルート（左スタート文書、例 `# r\n\n---\n---\n\n## a\n\n![](x.png)\n`）へカードを「末尾へ落とす」と、境界を知らない旧 `contentEnd()` が区切りの下（`## a` の見出し）を指し、コアは区切りの向こうを本文と認めない（`cap_at_first_bound`）ため、落としたカードが地図のどこにも描かれず消えていた。`test/cards.test.ts`（`moveCardTo 相当: カードなしルートへ落とすと区切りの手前に着地し、地図から消えない`）が旧実装で RED（`at` が区切りの位置 5 ではなく `## a` の位置 14 を指す）→ 新実装で GREEN になることを確認済み。`moon test`（158/158）・`pnpm test`（170/170）とも全数通過、`moon check` の警告 0 も変わらず。
+
 ### D-抽象の漏れ-3 / CONFIRMED / `core/parser.mbt:100-135, core/parser.mbt:179-232, src/relevel.ts:5-33, src/mindmap.ts:334, core/cmds.mbt:78-85, src/main.ts:418-419, src/main.ts:732-733`
 
 **見出し/フェンス規則が 3 実装、空行パディング規則が 3 実装**

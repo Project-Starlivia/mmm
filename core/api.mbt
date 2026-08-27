@@ -111,9 +111,17 @@ fn take_snapshot() -> String {
     sb.write_string(",")
     put_int(sb, "to", nd.to)
     sb.write_string(",")
+    put_int(sb, "contentStart", nd.content_start)
+    sb.write_string(",")
+    put_int(sb, "contentEnd", nd.content_end)
+    sb.write_string(",")
     put_bool(sb, "hasContent", nd.has_content)
     sb.write_string(",")
     put_bool(sb, "hidden", nd.hidden)
+    sb.write_string(",")
+    put_int(sb, "group", nd.group)
+    sb.write_string(",")
+    put_bool(sb, "left", nd.left)
     sb.write_string(",")
     put_str(sb, "label", nd.label)
     sb.write_string("}")
@@ -317,8 +325,36 @@ pub fn move_as_parent(ids : Array[Int], target : Int) -> String {
 }
 
 ///|
-pub fn reorder_node(id : Int, dir : Int) -> String {
-  cmd_reorder(id, dir)
+/// dir: -1 = 前の兄弟と入れ替え、1 = 次の兄弟と。
+/// `cross` ならグループの壁を越える（越えた先のグループの側になる）。
+pub fn reorder_node(id : Int, dir : Int, cross : Bool) -> String {
+  cmd_reorder(id, dir, cross)
+  take_snapshot()
+}
+
+///|
+/// そのノードの属するグループを、丸ごとルートの反対側へ。
+pub fn flip_side(id : Int) -> String {
+  cmd_flip_side(id)
+  take_snapshot()
+}
+
+///|
+/// ルート脇へ落とした: その側の末尾へ（要るときだけ切り替えの `---` を書く）。
+pub fn move_side_end(ids : Array[Int], root : Int, left : Bool) -> String {
+  cmd_move_side_end(ids, root, left)
+  take_snapshot()
+}
+
+///|
+/// 選んだ枝を、target の直前 / 直後へ新しいグループとして置く。
+pub fn move_new_group(
+  ids : Array[Int],
+  target : Int,
+  before : Bool,
+  left : Bool,
+) -> String {
+  cmd_move_new_group(ids, target, before, left)
   take_snapshot()
 }
 

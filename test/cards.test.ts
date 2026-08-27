@@ -5,8 +5,15 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { core, idOf, initDoc, loadDoc } from "./_helpers.ts";
-import { cardRows, contentEnd, linkLine, parseImage } from "../src/map/cards.ts";
+import { core, idOf, initDoc, loadDoc, nodeOf } from "./_helpers.ts";
+import {
+  cardRows,
+  cardRowsOf,
+  contentEndOf,
+  linkLine,
+  parseImage,
+} from "../src/map/cards.ts";
+import { moveLine } from "../src/edits.ts";
 
 /** 1 ノードぶんのカードを取り出す小道具 */
 function rowsOf(md: string) {
@@ -68,13 +75,13 @@ test("cardRows: 複数行の svg も丸ごと指す", () => {
   assert.equal(text.slice(rows[0].from, rows[0].to), "<svg>\n  <rect/>\n</svg>");
 });
 
-// contentEnd は「そのノードの末尾へ落とした」カードの着地点でもある。
-// 間違うと、カードが黙って子ノードの中へ入る。
+// node.contentEnd（コアが確定させる）は「そのノードの末尾へ落とした」
+// カードの着地点でもある。間違うと、カードが黙って子ノードの中へ入る。
 const endOfNode = (md: string, label: string) => {
   const snap = initDoc(md);
   const i = snap.nodes.findIndex((n) => n.id === idOf(snap.nodes, label));
   return {
-    end: contentEnd(snap.nodes, i),
+    end: snap.nodes[i].contentEnd,
     node: snap.nodes[i],
     next: snap.nodes[i + 1],
     text: core.getText(),
@@ -105,6 +112,47 @@ test("contentEnd: 最後のノードなら、部分木の終わり（＝文書�
   const md = "# r\n\n## n\n\n[a](https://a.example)\n";
   const { end, node } = endOfNode(md, "n");
   assert.equal(end, node.to);
+});
+
+// バグの再現: 左スタート文書（区切り 2 本で以降のグループが反対側へ伸びる形。
+// flip_side / move_side_end / move_new_group が作る）で、カードなしのルートへ
+// カードを「末尾へ落とした」ときの着地点。main.ts の moveCardTo は
+// contentEndOf（= このファイルの contentEnd）を着地点にする。区切りを知らずに
+// 再導出していたころは、区切りの下にある次グループの見出しを指してしまい、
+// コアはその位置を root の本文と認めない（cap_at_first_bound）ので、
+// 落としたカードは地図のどこにも描かれず消えていた。
+test("moveCardTo 相当: カードなしルートへ落とすと区切りの手前に着地し、地図から消えない", () => {
+  const before = "# r\n\n---\n---\n\n## a\n\n![](x.png)\n";
+  const doc = loadDoc(before);
+  const root = nodeOf(doc.nodes, "r");
+  assert.equal(root.hasContent, false, "ルートはカードなしのはず（テストの前提）");
+
+  const row = cardRowsOf(doc, idOf(doc.nodes, "a"))[0];
+  assert.ok(row, "## a の画像行が取れるはず（テストの前提）");
+
+  const at = contentEndOf(doc.nodes, root.id);
+  assert.ok(at !== null);
+  // 区切りの手前（root の本文の終わり）を指す。区切りの下（## a の見出し）
+  // ではない
+  assert.equal(at, doc.text.indexOf("---"));
+  assert.notEqual(at, doc.text.indexOf("## a"));
+
+  const e = moveLine(doc.text, row.from, row.to, at);
+  assert.ok(e, "着地点が現在位置と違うので動くはず");
+  const after = core.replaceText(e.from, e.to, e.insert, "");
+  const newRoot = nodeOf(after.nodes, "r");
+  assert.equal(newRoot.hasContent, true, "カードは root の本文として着地したはず");
+  const rows = cardRows(
+    {
+      text: core.getText(),
+      nodes: after.nodes,
+      fences: after.fences,
+      head: after.head,
+    },
+    new Set(),
+  );
+  assert.equal(rows.get(newRoot.id)?.[0]?.kind, "img", "地図上は root のカードとして見えるはず");
+  assert.equal(rows.get(idOf(after.nodes, "a"))?.length, 0, "## a 側にはもう残っていない");
 });
 
 // ---------- linkLine ----------

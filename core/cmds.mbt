@@ -24,84 +24,86 @@ fn cmd_rename(id : Int, label : String, tag : String) -> Unit {
 
 ///|
 fn cmd_delete(ids : Array[Int]) -> Unit {
-  let idxs = normalize_selection(ids)
-  if idxs.length() == 0 {
-    return
-  }
-  // pick focus: first surviving node after the last deleted range,
-  // else the node before the first range, else none
-  let last = st.nodes[idxs[idxs.length() - 1]]
-  let first = st.nodes[idxs[0]]
-  let deleted : Map[Int, Bool] = Map([])
-  for k in idxs {
-    deleted[st.nodes[k].id] = true
-  }
-  let mut focus_id = -1
-  for nd in st.nodes {
-    if nd.from >= last.to && deleted.get(nd.id) is None {
-      focus_id = nd.id
-      break
+  with_sweep(fn() {
+    let idxs = normalize_selection(ids)
+    if idxs.length() == 0 {
+      return
     }
-  }
-  if focus_id == -1 {
-    for j = st.nodes.length() - 1; j >= 0; j = j - 1 {
-      let nd = st.nodes[j]
-      if nd.from < first.from && deleted.get(nd.id) is None {
+    // pick focus: first surviving node after the last deleted range,
+    // else the node before the first range, else none
+    let last = st.nodes[idxs[idxs.length() - 1]]
+    let first = st.nodes[idxs[0]]
+    let deleted : Map[Int, Bool] = Map([])
+    for k in idxs {
+      deleted[st.nodes[k].id] = true
+    }
+    let mut focus_id = -1
+    for nd in st.nodes {
+      if nd.from >= last.to && deleted.get(nd.id) is None {
         focus_id = nd.id
         break
       }
     }
-  }
-  let ranges : Array[(Int, Int)] = []
-  for k in idxs {
-    ranges.push((st.nodes[k].from, st.nodes[k].to))
-  }
-  // if deletion reaches EOF, the dangling separator blank must go too;
-  // apply the cleanup at the start of the contiguous chain ending at EOF
-  let lastr = ranges[ranges.length() - 1]
-  if lastr.1 == st.text.length() {
-    let mut ci = ranges.length() - 1
-    while ci > 0 && ranges[ci - 1].1 == ranges[ci].0 {
-      ci = ci - 1
+    if focus_id == -1 {
+      for j = st.nodes.length() - 1; j >= 0; j = j - 1 {
+        let nd = st.nodes[j]
+        if nd.from < first.from && deleted.get(nd.id) is None {
+          focus_id = nd.id
+          break
+        }
+      }
     }
-    let mut from = tidy_del_start(ranges[ci].0)
-    if ci > 0 && from < ranges[ci - 1].1 {
-      from = ranges[ci - 1].1
+    let ranges : Array[(Int, Int)] = []
+    for k in idxs {
+      ranges.push((st.nodes[k].from, st.nodes[k].to))
     }
-    ranges[ci] = (from, ranges[ci].1)
-  }
-  let set : Array[Edit] = []
-  for n = 0; n < idxs.length(); n = n + 1 {
-    let nd = st.nodes[idxs[n]]
-    let (from, to) = ranges[n]
-    // 単独 hide されたノードを削除するときは、範囲の外にあるマーカーが
-    // 対で孤立してしまう(範囲に含めていないのは、子を消しただけで
-    // マーカー対が残らないようにするため)。ここで対ごと一緒に消す。
-    // open は範囲より前・close は範囲より後なので、この位置に挟めば
-    // apply_edit_set が要求する昇順のまま保たれる
-    let hr = if nd.hidden { sole_hide_region(nd) } else { -1 }
-    if hr >= 0 {
-      let r = st.hide_regions[hr]
-      set.push(Edit::{
-        from: r.open_start,
-        to: r.open_next,
-        insert: "",
-        removed: slice(st.text, r.open_start, r.open_next),
-      })
+    // if deletion reaches EOF, the dangling separator blank must go too;
+    // apply the cleanup at the start of the contiguous chain ending at EOF
+    let lastr = ranges[ranges.length() - 1]
+    if lastr.1 == st.text.length() {
+      let mut ci = ranges.length() - 1
+      while ci > 0 && ranges[ci - 1].1 == ranges[ci].0 {
+        ci = ci - 1
+      }
+      let mut from = tidy_del_start(ranges[ci].0)
+      if ci > 0 && from < ranges[ci - 1].1 {
+        from = ranges[ci - 1].1
+      }
+      ranges[ci] = (from, ranges[ci].1)
     }
-    set.push(Edit::{ from, to, insert: "", removed: slice(st.text, from, to) })
-    if hr >= 0 {
-      let r = st.hide_regions[hr]
-      set.push(Edit::{
-        from: r.close_start,
-        to: r.close_next,
-        insert: "",
-        removed: slice(st.text, r.close_start, r.close_next),
-      })
+    let set : Array[Edit] = []
+    for n = 0; n < idxs.length(); n = n + 1 {
+      let nd = st.nodes[idxs[n]]
+      let (from, to) = ranges[n]
+      // 単独 hide されたノードを削除するときは、範囲の外にあるマーカーが
+      // 対で孤立してしまう(範囲に含めていないのは、子を消しただけで
+      // マーカー対が残らないようにするため)。ここで対ごと一緒に消す。
+      // open は範囲より前・close は範囲より後なので、この位置に挟めば
+      // apply_edit_set が要求する昇順のまま保たれる
+      let hr = if nd.hidden { sole_hide_region(nd) } else { -1 }
+      if hr >= 0 {
+        let r = st.hide_regions[hr]
+        set.push(Edit::{
+          from: r.open_start,
+          to: r.open_next,
+          insert: "",
+          removed: slice(st.text, r.open_start, r.open_next),
+        })
+      }
+      set.push(Edit::{ from, to, insert: "", removed: slice(st.text, from, to) })
+      if hr >= 0 {
+        let r = st.hide_regions[hr]
+        set.push(Edit::{
+          from: r.close_start,
+          to: r.close_next,
+          insert: "",
+          removed: slice(st.text, r.close_start, r.close_next),
+        })
+      }
     }
-  }
-  apply_sets([set], "")
-  st.focus = focus_id
+    apply_sets([set], "")
+    st.focus = focus_id
+  })
 }
 
 ///|
