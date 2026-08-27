@@ -36,6 +36,7 @@ function layoutOf(visible: NodeInfo[]): Layout {
     ),
     buriedCount: new Map(),
     fanOf: new Map(),
+    seams: [],
   };
 }
 

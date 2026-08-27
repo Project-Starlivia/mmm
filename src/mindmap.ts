@@ -108,6 +108,7 @@ const emptyLayout = (): Layout => ({
   parentOf: new Map(),
   buriedCount: new Map(),
   fanOf: new Map(),
+  seams: [],
 });
 
 /** 全体を収めるときの余白と、1 つを見せるときの余白（画面 px） */
