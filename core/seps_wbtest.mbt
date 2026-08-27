@@ -80,3 +80,27 @@ test "各木が自分の区切りを読む" {
   assert_eq(s[3], ("b", 0, false))
   assert_eq(s[4], ("c", 1, true))
 }
+
+///|
+test "境界の正規形は 1 行 / 2 行、列はルートの形に従う" {
+  ignore(init_doc("# r\n\n## a\n"))
+  assert_eq(sep_body(1, false), "---\n")
+  assert_eq(sep_body(1, true), "---\n---\n")
+  // リストの形では、ルート項目の中身の列まで字下げする
+  ignore(init_doc("- r\n\n  - a\n"))
+  assert_eq(sep_body(1, false), "  ---\n")
+}
+
+///|
+test "境界の書き足し・書き直し・削除" {
+  ignore(init_doc("# r\n\n## a\n\n## b\n"))
+  let b = st.nodes[1] // a
+  apply_sets([[insert_sep_edit(b.to, 1, false)]], "")
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## b\n")
+  // 1 本 → 2 本
+  apply_sets([[set_sep_edit(st.bounds[0], 1, true)]], "")
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n---\n\n## b\n")
+  // 消す（前後の空行を 1 つに戻す）
+  apply_sets([[remove_sep_edit(st.bounds[0])]], "")
+  assert_eq(get_text(), "# r\n\n## a\n\n## b\n")
+}

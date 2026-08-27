@@ -115,3 +115,96 @@ fn assign_groups(bounds : Array[Bound]) -> Unit {
     nd.left = left
   }
 }
+
+// ---- 境界を書く ----
+//
+// 書くのは**操作と掃除だけ**（ルート脇へのドラッグ / Mod+ドロップ / Flip side）。
+// md を手打ちしたときは読むだけで、勝手に書き直さない。
+
+///|
+/// 境界 1 つぶんの本文。`flip` なら 2 行、そうでなければ 1 行。
+///
+/// **列はルートの形が決める。** リスト項目のルートなら、その項目の中身の列まで
+/// 字下げする — 列 0 に書くと、外の CommonMark パーサはそこで外側のリストを
+/// 閉じ、木そのものが割れる（insert_content と同じ理屈）。
+fn sep_body(root_depth : Int, flip : Bool) -> String {
+  let line = spaces(content_col_for(root_depth)) + "---" + eol
+  if flip { line + line } else { line }
+}
+
+///|
+/// 境界をブロックの境目 `at` へ書き入れる編集。前後の空行の出し分けは
+/// 見出しの挿入（insert_heading_edit）と同じ式。
+fn insert_sep_edit(at : Int, root_depth : Int, flip : Bool) -> Edit {
+  let sb = StringBuilder::new()
+  if at > 0 && code_at(st.text, at - 1) != 10 {
+    sb.write_string(eol)
+    sb.write_string(eol)
+  } else if !preceded_by_blank(at) {
+    sb.write_string(eol)
+  }
+  sb.write_string(sep_body(root_depth, flip))
+  if at != st.text.length() {
+    sb.write_string(eol)
+  }
+  Edit::{ from: at, to: at, insert: sb.to_string(), removed: "" }
+}
+
+///|
+/// 既にある境界を、`flip` の正規形に書き直す編集。
+fn set_sep_edit(b : Bound, root_depth : Int, flip : Bool) -> Edit {
+  Edit::{
+    from: b.start,
+    to: b.end,
+    insert: sep_body(root_depth, flip),
+    removed: slice(st.text, b.start, b.end),
+  }
+}
+
+///|
+/// 境界を消す編集。**直後の空行も 1 つ道連れにする** — 残すと空行が 2 つ
+/// 並んで、次に書くものの前後の空行の判定が狂う。
+fn remove_sep_edit(b : Bound) -> Edit {
+  let n = st.text.length()
+  let mut to = b.end
+  // 直後の空行 1 つぶん（あれば）
+  let mut p = to
+  while p < n && is_space(code_at(st.text, p)) {
+    p = p + 1
+  }
+  if p < n && code_at(st.text, p) == 13 {
+    p = p + 1
+  }
+  if p < n && code_at(st.text, p) == 10 {
+    to = p + 1
+  }
+  Edit::{ from: b.start, to, insert: "", removed: slice(st.text, b.start, to) }
+}
+
+///|
+/// ノード添字 → その木の根の添字。
+fn root_index_of(i : Int) -> Int {
+  let mut k = i
+  while st.nodes[k].parent != -1 {
+    let up = find_node(st.nodes[k].parent)
+    if up < 0 {
+      break
+    }
+    k = up
+  }
+  k
+}
+
+///|
+/// その木（根の添字）の中にある境界だけ、文書順。グループ g の手前の境界は
+/// `tree_bounds(root)[g - 1]`（グループは 0 始まり、境界を 1 つ越えるたび +1）。
+fn tree_bounds(root : Int) -> Array[Bound] {
+  let nd = st.nodes[root]
+  let out : Array[Bound] = []
+  for b in st.bounds {
+    if b.start > nd.from && b.start < nd.to {
+      out.push(b)
+    }
+  }
+  out
+}
