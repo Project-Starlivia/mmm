@@ -120,8 +120,9 @@ export const core = {
   /** A→B の線への割り込み: ids を B の直前へ動かしてから B を 1 段下げる */
   moveAsParent: (ids: number[], target: number): Snapshot =>
     snap(mbt.moveAsParent(ids, target)),
-  reorderNode: (id: number, dir: -1 | 1): Snapshot =>
-    snap(mbt.reorderNode(id, dir)),
+  /** cross ならグループの壁を越える（Mod+Alt+↑↓） */
+  reorderNode: (id: number, dir: -1 | 1, cross = false): Snapshot =>
+    snap(mbt.reorderNode(id, dir, cross)),
   /** そのノードの属するグループを、丸ごとルートの反対側へ */
   flipSide: (id: number): Snapshot => snap(mbt.flipSide(id)),
   /** ルート脇へ落とした: その側の末尾へ（要るときだけ切り替えの `---` を書く） */

@@ -176,9 +176,9 @@ test "typing coalesces into one undo entry by tag" {
 ///|
 test "reorder swaps sibling blocks" {
   ignore(init_doc("# r\n\n## a\n\nbody a\n\n## b\n"))
-  ignore(reorder_node(3, -1))
+  ignore(reorder_node(3, -1, false))
   assert_eq(get_text(), "# r\n\n## b\n\n## a\n\nbody a\n")
-  ignore(reorder_node(3, 1))
+  ignore(reorder_node(3, 1, false))
   // b moved back down past a
   assert_eq(get_text(), "# r\n\n## a\n\nbody a\n\n## b\n")
 }
@@ -456,7 +456,7 @@ test "outdenting a folded node keeps it hidden and leaves no orphan marker" {
 test "reordering a folded node keeps it hidden and leaves no orphan marker" {
   ignore(init_doc("# r\n\n## a\n\n## b\n"))
   ignore(toggle_hidden(2)) // a
-  ignore(reorder_node(2, 1)) // swap with next sibling (b)
+  ignore(reorder_node(2, 1, false)) // swap with next sibling (b)
   assert_eq(get_text(), "# r\n\n## b\n\n<!--\n## a\n-->\n")
 }
 

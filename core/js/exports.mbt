@@ -111,8 +111,8 @@ pub fn move_as_parent(ids : Array[Int], target : Int) -> String {
 
 ///|
 #export_name("reorderNode")
-pub fn reorder_node(id : Int, dir : Int) -> String {
-  @core.reorder_node(id, dir)
+pub fn reorder_node(id : Int, dir : Int, cross : Bool) -> String {
+  @core.reorder_node(id, dir, cross)
 }
 
 ///|

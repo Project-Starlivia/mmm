@@ -348,7 +348,8 @@ fn move_steps(ids : Array[Int], target : Int, pos : Int) -> Int {
 
 ///|
 /// dir: -1 = swap with previous sibling, 1 = swap with next sibling.
-fn cmd_reorder(id : Int, dir : Int) -> Unit {
+/// `cross` ならグループの壁を越える（越えた先の側になる）。
+fn cmd_reorder(id : Int, dir : Int, cross : Bool) -> Unit {
   if find_node(id) < 0 {
     return
   }
@@ -358,18 +359,14 @@ fn cmd_reorder(id : Int, dir : Int) -> Unit {
     // 動かす前に外し、行き先で畳み直す（cmd_move と同じ手当て）
     let rehide = unhide_for_move([id])
     let i = find_node(id)
-    if i < 0 {
-      return
-    }
-    if dir < 0 {
-      let p = prev_sibling(i)
-      if p >= 0 {
-        move_block(i, st.nodes[p].from, st.nodes[i].depth)
-      }
-    } else {
-      let nx = next_sibling(i)
-      if nx >= 0 {
-        move_block(i, st.nodes[nx].to, st.nodes[i].depth)
+    if i >= 0 {
+      let peer = if dir < 0 { prev_sibling(i) } else { next_sibling(i) }
+      // グループの壁。越えるのは cross のときだけ（普段の並べ替えで
+      // 側が変わると、押した本人にも何が起きたか分からない）
+      let ok = peer >= 0 && (cross || st.nodes[peer].group == st.nodes[i].group)
+      if ok {
+        let at = if dir < 0 { st.nodes[peer].from } else { st.nodes[peer].to }
+        move_block(i, at, st.nodes[i].depth)
       }
     }
     for rid in rehide {

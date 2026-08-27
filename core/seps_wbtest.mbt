@@ -428,3 +428,65 @@ test "既存の境界を書き直す経路（2 つの既存グループの間に
   assert_eq(side_of("c"), false)
   assert_eq(side_of("b"), false)
 }
+
+///|
+test "並べ替えはグループの壁で止まる" {
+  let src = "# r\n\n## a\n\n---\n\n## b\n"
+  ignore(init_doc(src))
+  ignore(reorder_node(st.nodes[2].id, -1, false)) // b を上へ = 壁
+  assert_eq(get_text(), src)
+}
+
+///|
+test "cross なら壁を越え、越えた先の側になる" {
+  ignore(init_doc("# r\n\n## a\n\n---\n---\n\n## b\n"))
+  assert_eq(side_of("b"), true)
+  ignore(reorder_node(st.nodes[2].id, -1, true))
+  assert_eq(get_text(), "# r\n\n## b\n\n## a\n")
+  assert_eq(side_of("b"), false)
+}
+
+///|
+test "壁の無い深さでは cross の有無で変わらない" {
+  ignore(init_doc("# r\n\n## a\n\n### x\n\n### y\n"))
+  ignore(reorder_node(st.nodes[3].id, -1, false))
+  assert_eq(get_text(), "# r\n\n## a\n\n### y\n\n### x\n")
+}
+
+///|
+test "薄い境界を cross で越えても、分割だけなので側は変わらない" {
+  // 1 本の境界（切り替えなし）を越えるだけなら、越えた先も同じ側
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n"))
+  ignore(reorder_node(st.nodes[2].id, -1, true))
+  assert_eq(get_text(), "# r\n\n## b\n\n## a\n")
+  assert_eq(side_of("a"), false)
+  assert_eq(side_of("b"), false)
+}
+
+///|
+test "cross で真ん中のグループが空になっても、両脇の境界が畳まれて残る" {
+  // b だけの真ん中のグループを cross で抜けると、b の前後の境界が
+  // 隣り合って 1 つに畳まれる。操作対象でない a の側は変わらない
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n"))
+  ignore(reorder_node(st.nodes[2].id, 1, true))
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## c\n\n## b\n")
+  assert_eq(side_of("a"), false)
+}
+
+///|
+test "壁は dir=1（下方向）でも止まる" {
+  let src = "# r\n\n## a\n\n---\n\n## b\n"
+  ignore(init_doc(src))
+  ignore(reorder_node(st.nodes[1].id, 1, false)) // a を下へ = 壁
+  assert_eq(get_text(), src)
+}
+
+///|
+test "壁を越えた並べ替えも undo は 1 回で戻る" {
+  let src = "# r\n\n## a\n\n---\n---\n\n## b\n"
+  ignore(init_doc(src))
+  ignore(reorder_node(st.nodes[2].id, -1, true))
+  ignore(undo())
+  assert_eq(get_text(), src)
+  assert_eq(side_of("b"), true)
+}
