@@ -211,6 +211,11 @@ fn move_lands_outside(order : Array[Int], target : Int) -> Bool {
 
 ///|
 /// pos: 0 = as last child of target, 1 = before target, 2 = after target.
+///
+/// **落とし先が畳んであれば先に開く**（`unfold_before_add` と同じ理由）。
+/// 開かないと、挿入点が hide 領域の中に入り込み、動かしたノードがマップから
+/// 消えて `+N` バッジに呑まれるだけの結果になる — 予告線は普通の挿入に
+/// 見えるのに、実際は見えなくなる「惜しい」の中でも最悪の類。
 fn cmd_move(ids : Array[Int], target : Int, pos : Int) -> Unit {
   begin_tx("")
   with_sweep(fn() {
@@ -220,6 +225,10 @@ fn cmd_move(ids : Array[Int], target : Int, pos : Int) -> Unit {
     }
     if !move_lands_outside(order, target) {
       return
+    }
+    let ti = find_node(target)
+    if ti >= 0 && st.nodes[ti].hidden {
+      cmd_toggle_hidden(target)
     }
     let rehide = unhide_for_move(order)
     let first_focus = move_steps(ids, target, pos)

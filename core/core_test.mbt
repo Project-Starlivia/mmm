@@ -637,6 +637,20 @@ test "a move into its own subtree changes nothing" {
 }
 
 ///|
+/// 畳んだノードへドロップすると、そのまま呑まれてマップから消えていた
+/// （足す側の unfold_before_add と同じ手当てが move には無かった）。
+/// 先に開いてから子にする。
+test "moving onto a folded node unfolds it first" {
+  ignore(init_doc("# r\n\n## a\n\n## b\n"))
+  let s = toggle_hidden(2)
+  assert_eq(node_hidden(s, "a"), true)
+  let after = move_nodes([3], 2, 0)
+  assert_eq(node_hidden(after, "a"), false)
+  assert_eq(node_hidden(after, "b"), false)
+  assert_eq(get_text(), "# r\n\n## a\n\n### b\n")
+}
+
+///|
 /// 畳んだノードへの追加も、続く rename と 1 つの undo になる（tag を保つ）。
 test "adding into a folded node stays one undo with the rename" {
   ignore(init_doc("# r\n\n## a\n\n### a1\n"))
