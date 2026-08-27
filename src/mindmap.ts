@@ -1437,7 +1437,7 @@ export class MindMap {
 
     // movement: arrows. 上下は同じ深さの列を縦に辿る
     if (!isArrowKey(key)) return;
-    // 並べ替えは Alt+↑↓。Mod を足すとグループの壁を越える
+    // 並べ替えは Alt+↑↓（Alt+←→ はブラウザの戻る/進む）。Mod を足すとグループの壁を越える
     if (e.altKey && (key === "ArrowUp" || key === "ArrowDown")) {
       e.preventDefault();
       if (anchor !== -1 && sel.size === 1) {
