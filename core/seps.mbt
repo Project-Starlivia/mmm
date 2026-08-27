@@ -364,6 +364,27 @@ fn root_depth_at(at : Int) -> Int {
 }
 
 ///|
+/// その位置より手前に、同じ木のルート直下の枝が 1 つも無いか。
+///
+/// 真なら**先頭の境界** = グループの切れ目としては何も分けておらず、効果は
+/// 「そこから先を反対側にする」だけ。だから切り替えないなら仕事が無い。
+/// `before_sep_edit` が `prev is None` で見ているのと同じ見立てを、手前の枝を
+/// 呼び出し側から渡されない掃除のために、位置から引けるようにしたもの。
+fn leads_tree(at : Int) -> Bool {
+  let ri = root_index_at(at)
+  if ri < 0 {
+    return false
+  }
+  let root_id = st.nodes[ri].id
+  for nd in st.nodes {
+    if nd.parent == root_id && nd.to <= at {
+      return false
+    }
+  }
+  true
+}
+
+///|
 /// `at` と同じ木の中で、`at` 以降にある最初の生きた境界。無ければ `None`。
 /// 掃除が、無効になった境界の反転ぶんを畳む先を探すのに使う。
 fn next_live_bound_after(at : Int) -> Bound? {
@@ -473,7 +494,16 @@ fn sweep_seps(marks : SepMarks, from_set : Int) -> Unit {
     // flip とたまたま一致していても正規形に書き直して余りを削る。
     // 畳み込みを受けた境界も、反転ぶんが変わりうるので同じく書き直す
     if hit[i] >= 2 || folded[i] {
-      set.push(set_sep_edit(st.bounds[i], root_depth_at(st.bounds[i].start), flip[i]))
+      let b = st.bounds[i]
+      // 畳んだ結果が「先頭 + 切り替え無し」なら、その境界はもう何もしていない。
+      // 書き直して残すのは、打ち消すためにもう 1 本足すのと同じ種類の誤り
+      // （before_sep_edit が先頭に対して持っているのと同じ規則）。
+      // 中ほどの境界は切り替えなしでも継ぎ目とグループの壁になるので残す
+      if !flip[i] && leads_tree(b.start) {
+        set.push(remove_sep_edit(b))
+      } else {
+        set.push(set_sep_edit(b, root_depth_at(b.start), flip[i]))
+      }
     }
   }
   // 複数の目印が「もう効いていない」側に落ちても、地続きの生ランは 1 つに

@@ -651,6 +651,29 @@ test "moving onto a folded node unfolds it first" {
 }
 
 ///|
+/// 枝を全部同じ側へ寄せると、境界は 1 本も残らない。
+///
+/// 先頭の境界は効果が「切り替え」だけなので、切り替えないなら何もしていない。
+/// 掃除は隣り合った境界を xor で 1 つに畳むところまではやっていたが、畳んだ
+/// 結果が「先頭 + 切り替え無し」になっても消さず、効かない `---` が居残っていた。
+test "sweeping leaves no separator once every branch is on one side" {
+  ignore(init_doc("# r\n\n---\n---\n\n## a\n\n## b\n"))
+  ignore(move_side_end([3], 1, false)) // b を右へ
+  ignore(move_side_end([2], 1, false)) // a も右へ = 左が空
+  assert_eq(get_text(), "# r\n\n## b\n\n## a\n")
+}
+
+///|
+/// ただし中ほどの境界は、切り替えなしでも消さない — 継ぎ目の線を引き、
+/// グループの壁（Tab / Alt+↑↓ が止まる）になるので仕事をしている。
+test "a mid-document split survives the sweep even without a flip" {
+  let md = "# r\n\n## a\n\n---\n\n## b\n"
+  ignore(init_doc(md))
+  ignore(move_side_end([3], 1, false)) // b は既に右。掃除だけが走る
+  assert_eq(get_text(), md)
+}
+
+///|
 /// 畳んだノードへの追加も、続く rename と 1 つの undo になる（tag を保つ）。
 test "adding into a folded node stays one undo with the rename" {
   ignore(init_doc("# r\n\n## a\n\n### a1\n"))
