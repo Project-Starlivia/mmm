@@ -94,13 +94,11 @@ html, body {
   :where(&) button {
     font: inherit;
     font-size: 13px;
-    padding: 3px 6px;
-    /* 絵と字を並べる。絵が先か後かは、入れる側が決める。
-       間は詰め気味に — 開いて見える字と違い、書き出しは絵が付くぶん
-       もともと幅を食うので、ここが広いと 1 つだけ大きく見えてしまう */
+    padding: 3px 8px;
+    /* 絵と字を並べる。絵が先か後かは、入れる側が決める */
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     border: 1px solid transparent;
     border-radius: 6px;
     background: none;
