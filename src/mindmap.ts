@@ -140,6 +140,15 @@ function targetIn(e: Event, selector: string): Element | null {
   return e.target instanceof Element ? e.target.closest(selector) : null;
 }
 
+/**
+ * union の分岐が網羅されているかを、コンパイラに見張らせるための到達不能点。
+ * `x` の型が `never` にならなければ型エラーになる — variant を足したのに
+ * 振り分けを直し忘れたとき、実行時ではなくビルド時に気づける。
+ */
+function assertNever(x: never): never {
+  throw new Error(`unreachable: ${JSON.stringify(x)}`);
+}
+
 /** 空集合の使い回し（毎レンダで new しない） */
 const NO_IDS: ReadonlySet<number> = new Set<number>();
 
@@ -997,11 +1006,23 @@ export class MindMap {
         const drop = this.drop;
         const ids = this.dragging.ids;
         this.stopDragVisuals();
-        if (drop?.kind === "node") this.host.move(ids, drop.id, drop.pos);
-        else if (drop?.kind === "side") {
-          this.host.moveSideEnd(ids, drop.root, drop.left);
-        } else if (drop?.kind === "group") {
-          this.host.moveNewGroup(ids, drop.target, drop.before, drop.left);
+        // 行き先が無い（空所へ離した）ときは何もしない。あるときは 3 つの
+        // kind を漏れなく振り分ける — switch + assertNever で、4 つ目の
+        // variant が増えたら実行時ではなくビルド時に落ちるようにしてある
+        if (drop) {
+          switch (drop.kind) {
+            case "node":
+              this.host.move(ids, drop.id, drop.pos);
+              break;
+            case "side":
+              this.host.moveSideEnd(ids, drop.root, drop.left);
+              break;
+            case "group":
+              this.host.moveNewGroup(ids, drop.target, drop.before, drop.left);
+              break;
+            default:
+              assertNever(drop);
+          }
         }
         this.dragCand = null;
         return;
