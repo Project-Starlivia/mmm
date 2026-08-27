@@ -207,9 +207,11 @@ test "deleting adjacent blocks incl. the last one does not overlap edits" {
 }
 
 ///|
-test "thematic breaks are ordinary node content" {
+/// 区切りが有効な境界になった（2026-08-27, core/seps.mbt）ので、テキストには
+/// 残るがノードの範囲には含まれない。
+test "thematic breaks split ranges but stay in the raw text" {
   ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n"))
-  assert_eq(selection_text([2]).contains("---"), true)
+  assert_eq(selection_text([2]).contains("---"), false)
   assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## b\n")
 }
 
