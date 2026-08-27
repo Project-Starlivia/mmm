@@ -115,6 +115,10 @@ fn take_snapshot() -> String {
     sb.write_string(",")
     put_bool(sb, "hidden", nd.hidden)
     sb.write_string(",")
+    put_int(sb, "group", nd.group)
+    sb.write_string(",")
+    put_bool(sb, "left", nd.left)
+    sb.write_string(",")
     put_str(sb, "label", nd.label)
     sb.write_string("}")
   }

@@ -29,6 +29,8 @@ const NODE: NodeInfo = {
   to: 0,
   hasContent: false,
   hidden: false,
+  group: 0,
+  left: false,
   label: "ラベル",
 };
 const BOX: Box = { n: NODE, x: 40, y: 25, w: 120, h: 30, rows: [] };

@@ -19,6 +19,8 @@ const node = (id: number, depth: number, parent: number): NodeInfo => ({
   to: id * 10 + 9,
   hasContent: false,
   hidden: false,
+  group: 0,
+  left: false,
   label: `n${id}`,
 });
 

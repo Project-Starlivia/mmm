@@ -27,6 +27,10 @@ export interface NodeInfo {
   to: number;
   hasContent: boolean;
   hidden: boolean;
+  /** その枝が属するグループ（木ごとに 0 始まり。境界を 1 つ越えるたび +1） */
+  group: number;
+  /** ルートの反対側（左）へ伸びる枝か。**枝の中では一定**（core が導出済み） */
+  left: boolean;
   label: string;
 }
 

@@ -23,6 +23,8 @@ function box(id: number, depth: number, x: number, y: number, w = 100, h = 30): 
     to: 0,
     hasContent: false,
     hidden: false,
+    group: 0,
+    left: false,
     label: `n${id}`,
   };
   return { n, x, y, w, h, rows: [] };

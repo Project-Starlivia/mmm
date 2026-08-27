@@ -366,3 +366,15 @@ test("C12: 自分の子孫への移動が木を壊さない", () => {
   }
   assert.deepEqual(failures, [], `子孫への移動で木が壊れる:\n  ${failures.join("\n  ")}`);
 });
+
+test("スナップショットが枝ごとのグループと側を載せる", () => {
+  const snap = initDoc("# r\n\n## a\n\n---\n---\n\n## b\n\n### b1\n");
+  const by = (label: string) => nodeOf(snap.nodes, label);
+  assert.equal(by("a").group, 0);
+  assert.equal(by("a").left, false);
+  assert.equal(by("b").group, 1);
+  assert.equal(by("b").left, true);
+  // 枝の中も同じ値（UI は導き直さない）
+  assert.equal(by("b1").group, 1);
+  assert.equal(by("b1").left, true);
+});
