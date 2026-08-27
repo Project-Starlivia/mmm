@@ -698,3 +698,24 @@ test "cross は dir=1（下方向）でも壁を越え、越えた先の側に�
   assert_eq(get_text(), "# r\n\n---\n---\n\n## b\n\n## a\n")
   assert_eq(side_of("a"), true)
 }
+
+///|
+/// 文書の頭（frontmatter）と区切りの取り合わせ。頭は走査そのものから外れる
+/// ので、頭の `---` が境界に化けることも、後ろの境界が死ぬことも無い。
+test "文書の頭があっても、その後ろの区切りは普通に効く" {
+  ignore(init_doc("---\ntitle: x\n---\n\n# r\n\n## a\n\n---\n---\n\n## b\n"))
+  assert_eq(side_of("a"), false)
+  assert_eq(side_of("b"), true)
+}
+
+///|
+test "文書の頭の直後に切り替えを書けば、左始まりになる" {
+  ignore(init_doc("---\na: 1\n---\n\n# r\n\n---\n---\n\n## a\n"))
+  assert_eq(side_of("a"), true)
+}
+
+///|
+test "文書の頭の中の `- 項目` はノードにならない" {
+  ignore(init_doc("---\ntags:\n  - 設計\n---\n\n# r\n\n## a\n"))
+  assert_eq(st.nodes.length(), 2)
+}
