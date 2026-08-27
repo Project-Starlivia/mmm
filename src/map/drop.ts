@@ -52,21 +52,18 @@ export interface DropScene {
 
 export interface DropDecision {
   drop: Drop | null;
-  /**
-   * 別の親になる候補がすぐ隣にいるか。挿入線だけだと「上の親の末尾」と
-   * 「下の親の先頭」が同じ場所に出て区別できないので、迷う場面でだけ
-   * 「どの親につくのか」を予告線で足す。
-   */
-  ambiguous: boolean;
 }
 
 const SLOP = 16; // 箱の左右へのはみ出しをどこまで箱の内と見るか
 const BAND = 40; // 前後への挿入を狙える帯の広さ
 const OPEN = BAND * 5; // 開いている側では同じ帯をここまで広げる
 const REACH = GAP.x * 4 + 16; // 「子にする」外側ゾーンを成長軸方向にどこまで伸ばすか
-const NEAR = REACH * 0.4; // ここまでは前後への挿入より子を優先する
+// 子を優先するのは**親と子の列のあいだの通路**まで。次の列に入ったら、そこは
+// その列の住人（前後への挿入）のもの。通路より広く取っていたころは、列 N の
+// ノードが列 N+1 の兄弟挿入を横取りし、「下の兄弟にしたいのに隣の枝の子になる」
+// が起きていた（`f` の下の空きを、隣に並ぶ `b` が丸ごと持っていく）
+const NEAR = GAP.x;
 const SLACK = 18; // 外側ゾーンが兄弟軸方向に箱からはみ出してよい量
-const AMBIGUOUS = 26; // 候補どうしがこれより競っていれば迷う場面とみなす
 
 /**
  * 箱の中心から見たポインタの位置と、箱の半分の大きさ。
@@ -282,13 +279,10 @@ export function resolveDrop(scene: DropScene): DropDecision {
   // Mod を押している間は、スロットだけが生きる（深いところの行き先は休む）
   if (scene.newGroup) {
     const near = nearestRoot(scene);
-    if (near === -1) return { drop: null, ambiguous: false };
+    if (near === -1) return { drop: null };
     const rb = scene.boxes.get(near);
-    if (!rb) return { drop: null, ambiguous: false };
-    return {
-      drop: findSlot(scene, near, sideOf(rb)),
-      ambiguous: false,
-    };
+    if (!rb) return { drop: null };
+    return { drop: findSlot(scene, near, sideOf(rb)) };
   }
 
   // Shift = 線への割り込みを最優先。見つかったかどうかは後の段でも使う
@@ -296,14 +290,10 @@ export function resolveDrop(scene: DropScene): DropDecision {
   const edgeTarget = scene.preferEdge ? findEdge(scene) : null;
   let target: DropTarget | null = edgeTarget;
 
-  const parentFor = (id: number, pos: 0 | 1 | 2 | 3): number =>
-    pos === 0 ? id : (scene.parentOf.get(id) ?? -1);
-
   // 帯は隣の兄弟と重なるので、最初に見つかった相手ではなく「いちばん近い」
   // 相手を選ぶ。文書順で決めていたころは、親が違う子スタックの境目で
   // どちらに倒れるかが実質その場の運になっていた。
   let best = Infinity;
-  const cands: { dist: number; parent: number }[] = [];
   for (const id of scene.order) {
     if (scene.dragging.has(id)) continue;
     const b = scene.boxes.get(id);
@@ -316,7 +306,6 @@ export function resolveDrop(scene: DropScene): DropDecision {
     // ルートに兄弟は無い。上に落ちたものはすべて子になる
     const pos: 0 | 1 | 2 =
       b.n.depth === 1 ? 0 : dv < -hv * 0.4 ? 1 : dv > hv * 0.4 ? 2 : 0;
-    cands.push({ dist, parent: parentFor(id, pos) });
     if (dist < best) {
       best = dist;
       if (!edgeTarget) target = { id, pos };
@@ -351,23 +340,8 @@ export function resolveDrop(scene: DropScene): DropDecision {
 
   if (!target) target = findEdge(scene);
 
-  // 誰も取らなかった空白は、開いている側の上下端が受ける。**そこは遠くて
-  // 親が自明でない**ので、予告線は必ず出す（迷う場面の判定には回さない）
-  let openEnd = false;
-  if (!target) {
-    target = findOpenEnd(scene);
-    openEnd = target !== null;
-  }
-
-  // 迷う場面かどうかは、**行き先が決まってから**測る。外側ゾーンなどで
-  // 差し替えたあとに帯の時点の判定を使うと、予告線の出る/出ないが行き先とずれる
-  let rival = Infinity;
-  if (target) {
-    const chosen = parentFor(target.id, target.pos);
-    for (const c of cands) {
-      if (c.parent !== chosen && c.dist < rival) rival = c.dist;
-    }
-  }
+  // 誰も取らなかった空白は、開いている側の上下端が受ける
+  if (!target) target = findOpenEnd(scene);
 
   // 木の根が相手の「子にする」は、**どちら側か**まで決まって初めて意味を持つ。
   // ポインタが根の中心のどちら側にあるかで振り分ける（素のドラッグでの左右）
@@ -379,8 +353,5 @@ export function resolveDrop(scene: DropScene): DropDecision {
     const rb = scene.boxes.get(t.id);
     return { kind: "side", root: t.id, left: rb ? sideOf(rb) : false };
   };
-  return {
-    drop: target ? asDrop(target) : null,
-    ambiguous: openEnd || rival - best <= AMBIGUOUS,
-  };
+  return { drop: target ? asDrop(target) : null };
 }

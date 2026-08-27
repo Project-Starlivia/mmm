@@ -134,11 +134,6 @@ test("開いている側でも、OPEN を超えて離せばキャンセルでき
   assert.equal(d.drop, null);
 });
 
-test("開いている側は遠くて親が自明でないので、予告線を必ず出す", () => {
-  const d = resolveDrop(scene(TREE, LINKS, { x: 195, y: -40 }));
-  assert.equal(d.ambiguous, true);
-});
-
 test("同じ列に積まれた 2 つの stack の谷間は、近いほうの端が取る", () => {
   // 端は (親, 側) ごとに数える。列でいちばん上/下のノードだけを端に
   // すると、谷間の両側がどちらも端にならず死に地のまま残る
@@ -178,22 +173,44 @@ test("複数まとめて掴んでいるときは、線への割り込みを出�
   assert.deepEqual(d.drop, { kind: "side", root: 1, left: false });
 });
 
-test("親が違う候補が競っているときだけ、どの親につくかを予告する", () => {
-  // 2 と 3 のあいだ（どちらの親も 1 なので迷いようがない）
-  const same = resolveDrop(scene(TREE, LINKS, { x: 195, y: 110 }));
-  assert.equal(same.ambiguous, false);
-
-  // 別の親を持つ子どうしの境目。「上の親の末尾」と「下の親の先頭」が
-  // 同じ場所に出るので、どちらにつくのかを言わないと選べない
+test("別の親を持つ子どうしの境目は、近いほうにつく", () => {
+  // 「上の親の末尾」と「下の親の先頭」は同じ場所に出るので、距離で決める
   const otherRoot = box(5, 1, 0, 260);
   const otherKid = box(4, 2, 145, 200);
-  const d = resolveDrop(
-    scene([...TREE, otherRoot, otherKid], [...LINKS, [4, 5]], {
-      x: 195,
-      y: 190,
-    }),
-  );
-  assert.equal(d.ambiguous, true);
+  const boxes = [...TREE, otherRoot, otherKid];
+  const links: [number, number][] = [...LINKS, [4, 5]];
+  const up = resolveDrop(scene(boxes, links, { x: 195, y: 178 }));
+  assert.deepEqual(up.drop, { kind: "node", id: 3, pos: 2 });
+  const down = resolveDrop(scene(boxes, links, { x: 195, y: 196 }));
+  assert.deepEqual(down.drop, { kind: "node", id: 4, pos: 1 });
+});
+
+// 列 1 の枝の「子にする」ゾーンが、列 2 の兄弟挿入を横取りしていた。
+// 実寸に近い幅（31）と間隔で組む — 幅を広く取ると通路の比率が変わって
+// 再現しない
+const COL_ROOT = box(1, 1, 0, 100, 31);
+const COL_A = box(2, 2, 76, 60, 31);
+const COL_B = box(3, 2, 76, 120, 31);
+const COL_F = box(4, 3, 152, 60, 31);
+const COLS = [COL_ROOT, COL_A, COL_B, COL_F];
+const COL_LINKS: [number, number][] = [
+  [2, 1],
+  [3, 1],
+  [4, 2],
+];
+
+test("隣の列の枝は、その先の列の兄弟挿入を横取りしない", () => {
+  // f のすぐ下（f の箱の外）で、ちょうど b と同じ高さ。ここは f の弟の場所で
+  // あって、b の子の場所ではない
+  const d = resolveDrop(scene(COLS, COL_LINKS, { x: 167, y: 105 }));
+  assert.deepEqual(d.drop, { kind: "node", id: 4, pos: 2 });
+});
+
+test("親と子の列のあいだの通路は、子にするゾーンのまま", () => {
+  // b の右辺(107) と f の列(152) のあいだ。ここを取り上げると、子の無い枝に
+  // 最初の子を足す手が無くなる
+  const d = resolveDrop(scene(COLS, COL_LINKS, { x: 130, y: 135 }));
+  assert.deepEqual(d.drop, { kind: "node", id: 3, pos: 0 });
 });
 
 test("左の枝では、外側ゾーンも左へ伸びる", () => {

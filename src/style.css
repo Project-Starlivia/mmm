@@ -484,7 +484,6 @@ html, body {
     & rect.box { rx: 4px; stroke-dasharray: 4 3; }
     & text.label { fill: var(--ink-dim); }
   }
-  &.drop-child rect.box { stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 5 3; }
   &.dragging { opacity: 0.35; }
   &.drop-parent rect.box {
     stroke: var(--accent);
