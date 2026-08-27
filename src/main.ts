@@ -776,7 +776,7 @@ openOnClick(btnMore, () => [
     label: "Shortcuts",
     run: () => openExternal(`${REPO}/blob/main/docs/shortcuts.md`),
   },
-  { label: "Help", run: () => openExternal(REPO) },
+  { label: "GitHub", run: () => openExternal(REPO) },
 ]);
 elFilename.addEventListener("click", () => {
   void (async () => {

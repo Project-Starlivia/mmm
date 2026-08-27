@@ -156,7 +156,7 @@ mmm  empty.md              Files  [SVG ⤓ │ ▾]  ⋯
 
 `Files` は**文書ぜんぶに効くもの**を集める — New / Open / Rename / Save /
 Save as と、画像フォルダ。`⋯` は**低頻度だが消したくないもの** —
-Undo / Redo / ブランドカラー / テーマ / Shortcuts / Help。
+Undo / Redo / ブランドカラー / テーマ / Shortcuts / GitHub。
 消さずに、優先度だけ下げる。3 つの塊(戻す / 見た目 / 外に開く)に分けてある。
 
 **そのペインにだけ効くものは、帯に出さずペインの隅に浮かせる**(`.pane-tool`)。
@@ -190,7 +190,7 @@ md の右上に書き方(H / n+ / L)。普段は沈めておいて、触れた�
 **Undo / Redo に帯のボタンは無い**。`Mod+Z` / `Mod+Shift+Z` が本道で、
 `⋯` の中が押せる保険。
 
-`⋯` の Help はリポジトリを、Shortcuts は [shortcuts.md](shortcuts.md)
+`⋯` の GitHub はリポジトリを、Shortcuts は [shortcuts.md](shortcuts.md)
 を、それぞれ新しいタブで開く。**操作の早見は画面に持たない** — 覚え書きは
 docs 側にあり、画面には出しっぱなしにしない。
 
