@@ -381,3 +381,50 @@ test "move_new_group で移動元グループが空になっても undo は 1 �
   ignore(undo())
   assert_eq(get_text(), src)
 }
+
+///|
+test "手前に枝が無くても、既にある先頭の境界は必ず正す（左始まり→右の新グループ）" {
+  // 前提: r は右, 先頭の切り替え境界で a・x は左。x を a の手前へ、右の
+  // 新グループとして落とす。手前に枝は無いが、ルート直後には既に境界が
+  // 効いている（左始まりの表現）。それを無視すると x は古い切り替えを
+  // そのまま被って左に着地し、後ろの腕が a との間に書く境界も古い a.left
+  // を基準にしてしまい、無関係な a の側まで変わってしまう
+  ignore(init_doc("# r\n\n---\n---\n\n## a\n\n## x\n"))
+  let a = st.nodes[1].id
+  let x = st.nodes[2].id
+  ignore(move_new_group([x], a, true, false))
+  assert_eq(get_text(), "# r\n\n---\n\n## x\n\n---\n---\n\n## a\n")
+  assert_eq(side_of("x"), false) // 指定どおり右
+  assert_eq(side_of("a"), true) // 操作対象でない a の側は変わらない
+}
+
+///|
+test "手前に枝が無いとき、既存の境界がそのまま正しければ書き直すだけ（左始まり→左の新グループ）" {
+  // 同じ前提で、今度は左の新グループとして落とす。先頭の切り替えは
+  // そのままで正しいので、正規形への書き直し（内容は変わらない）になる。
+  // x と a の間は新しいグループの区切りとして 1 本増えるが、先頭の境界が
+  // 二重に増えることはない
+  ignore(init_doc("# r\n\n---\n---\n\n## a\n\n## x\n"))
+  let a = st.nodes[1].id
+  let x = st.nodes[2].id
+  ignore(move_new_group([x], a, true, true))
+  assert_eq(get_text(), "# r\n\n---\n---\n\n## x\n\n---\n\n## a\n")
+  assert_eq(side_of("x"), true)
+  assert_eq(side_of("a"), true)
+}
+
+///|
+test "既存の境界を書き直す経路（2 つの既存グループの間に割り込む）" {
+  // a --- b,c の b の手前へ c を新グループとして落とす。a-b の既存境界は
+  // 動かした塊の**手前**（a-c）に付け替えられ、b との間には新しく足す。
+  // set_sep_edit（既存の書き直し）と insert_sep_edit（新規）の両方を
+  // 1 回の呼び出しで踏む
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n## c\n"))
+  let b = st.nodes[2].id
+  let c = st.nodes[3].id
+  ignore(move_new_group([c], b, true, false))
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## c\n\n---\n\n## b\n")
+  assert_eq(side_of("a"), false)
+  assert_eq(side_of("c"), false)
+  assert_eq(side_of("b"), false)
+}

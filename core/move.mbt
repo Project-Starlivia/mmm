@@ -503,7 +503,7 @@ fn cmd_move_new_group(
       order.push(st.nodes[k].id)
     }
     let rehide = unhide_for_move(order)
-    // 動かした枝がその側で唯一のメンバーだったときは、両脇の境界が
+    // 動かした枝がそのグループで唯一のメンバーだったときは、両脇の境界が
     // くっついて生の行数がそのまま flip として読めてしまう（xor 前の値）。
     // ここで一度畳んでおかないと、直後に読む prev/next の側が
     // まだ畳んでいない生の値のままになり、want の判定を誤る
@@ -585,12 +585,25 @@ fn cmd_move_new_group(
           None => set.push(insert_sep_edit(head_from, root_depth, want))
         }
       }
-      None =>
-        // 手前に枝が無い = 先頭のグループ。側は右から始まるので、
-        // 左にしたいときだけルート直後に切り替えを書く
-        if left {
-          set.push(insert_sep_edit(head_from, root_depth, true))
+      None => {
+        // 手前に枝が無い = 先頭のグループ。虚の「手前」は側 false（右）から
+        // 始まると考える。ここでも Some(pv) の腕とまったく同じ規則
+        // 「既にある境界は必ず正す」にかける — 手前に枝が無くても、
+        // ルート直後に境界が既にある（左始まりの文書）ことはあるため、
+        // それを無視すると古い側がそのまま塊に被ってしまう
+        // （手前に「境界を正す相手」が居ない、というだけで判定式は同じ）。
+        // 違いは「境界が無いとき」だけ: 新しく書くのは側を変えたいときに限る
+        // （書く境界の位置は head_from = 枝自身の行頭。ルート見出しの直後は
+        // ブロックの境目ではないため書けない — cmd_flip_side と同じ理由）
+        let want = left
+        match last_bound_before(bounds, head_from) {
+          Some(b) => set.push(set_sep_edit(b, root_depth, want))
+          None =>
+            if want {
+              set.push(insert_sep_edit(head_from, root_depth, want))
+            }
         }
+      }
     }
     if set.length() > 0 {
       sort_edits(set)
