@@ -104,3 +104,120 @@ test "境界の書き足し・書き直し・削除" {
   apply_sets([[remove_sep_edit(st.bounds[0])]], "")
   assert_eq(get_text(), "# r\n\n## a\n\n## b\n")
 }
+
+///|
+/// ラベル → 側（左なら true）。
+fn side_of(label : String) -> Bool {
+  for nd in st.nodes {
+    if nd.label == label {
+      return nd.left
+    }
+  }
+  false
+}
+
+///|
+test "グループが空になったら、両脇の境界は xor で 1 つに畳む" {
+  // [a] 分割 [b] 切り替え [c] … b を消すと 分割+切り替え = 切り替え 1 つ
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n---\n\n## c\n"))
+  assert_eq(side_of("c"), true)
+  let b = st.nodes[2].id
+  ignore(delete_nodes([b]))
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n---\n\n## c\n")
+  assert_eq(side_of("c"), true) // 側は変わらない
+}
+
+///|
+test "切り替え + 切り替え は分割に畳む（反転 2 回 = 無し）" {
+  ignore(init_doc("# r\n\n## a\n\n---\n---\n\n## b\n\n---\n---\n\n## c\n"))
+  assert_eq(side_of("c"), false)
+  ignore(delete_nodes([st.nodes[2].id]))
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## c\n")
+  assert_eq(side_of("c"), false)
+}
+
+///|
+test "分割 + 分割 は分割 1 つに畳む" {
+  // 2 行続きに見えても、元が分割 2 つなら反転は 0 回。行数で読むと
+  // 「2 本 = 切り替え」に化けるので、ここを書き直すのが掃除の仕事
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n"))
+  ignore(delete_nodes([st.nodes[2].id]))
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## c\n")
+  assert_eq(side_of("c"), false)
+}
+
+///|
+test "段下げでグループが空になっても掃除が効く" {
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n---\n\n## c\n"))
+  // b を 1 段下げると a の子になり、グループ 1 が空く
+  ignore(indent_nodes([st.nodes[2].id]))
+  assert_eq(get_text(), "# r\n\n## a\n\n### b\n\n---\n---\n\n## c\n")
+  assert_eq(side_of("c"), true)
+}
+
+///|
+test "キーからの追加は、文書末尾のグループに入る" {
+  ignore(init_doc("# r\n\n## a\n\n---\n---\n\n## b\n"))
+  ignore(add_child(1, "")) // ルートに子を足す
+  assert_eq(get_text(), "# r\n\n## a\n\n---\n---\n\n## b\n\n## \n")
+  assert_eq(st.nodes[3].left, true) // 末尾のグループ = 左
+  // 兄弟の追加は、その枝のグループの中に入る（区切りは書かれない）
+  ignore(add_sibling(2, ""))
+  assert_eq(get_text(), "# r\n\n## a\n\n## \n\n---\n---\n\n## b\n\n## \n")
+}
+
+///|
+test "末尾のグループが空になったら、手前の境界ごと消す" {
+  ignore(init_doc("# r\n\n## a\n\n---\n---\n\n## b\n"))
+  ignore(delete_nodes([st.nodes[2].id]))
+  assert_eq(get_text(), "# r\n\n## a\n")
+}
+
+///|
+test "先頭の境界（左始まりの表現）は、そのまま残す" {
+  ignore(init_doc("# r\n\n---\n---\n\n## a\n\n## b\n"))
+  ignore(delete_nodes([st.nodes[2].id])) // b を消しても a はまだ居る
+  assert_eq(get_text(), "# r\n\n---\n---\n\n## a\n")
+  assert_eq(side_of("a"), true)
+}
+
+///|
+test "掃除まで含めて undo は 1 回" {
+  let src = "# r\n\n## a\n\n---\n\n## b\n\n---\n---\n\n## c\n"
+  ignore(init_doc(src))
+  ignore(delete_nodes([st.nodes[2].id]))
+  ignore(undo())
+  assert_eq(get_text(), src)
+}
+
+///|
+test "移動でグループが空になっても掃除が効く" {
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n---\n\n## c\n"))
+  // b を a の子にする（グループ 1 が空になる）
+  ignore(move_nodes([st.nodes[2].id], st.nodes[1].id, 0))
+  assert_eq(side_of("c"), true)
+  assert_eq(get_text(), "# r\n\n## a\n\n### b\n\n---\n---\n\n## c\n")
+}
+
+///|
+test "手で書いた本文の `---` には触らない" {
+  // 深い階層の `---` は境界ではない = 掃除の対象にもならない
+  let src = "# r\n\n## a\n\n### deep\n\n---\n\n#### x\n\n## b\n"
+  ignore(init_doc(src))
+  // ノードは r(0) a(1) deep(2) x(3) b(4) の順。消すのは x = 添字 3
+  ignore(delete_nodes([st.nodes[3].id])) // x を消す
+  assert_eq(get_text(), "# r\n\n## a\n\n### deep\n\n---\n\n## b\n")
+}
+
+///|
+test "2 つの末尾境界が同時に空いても、1 つの生ランとして畳む" {
+  // b, c を両方消すと、a-b と b-c の 2 つの境界が同時に効かなくなり、
+  // 間に何も残らないので地続きの 1 本の生ランに潰れる。2 つの目印が
+  // 同じランを指すことになるので、掃除が二重に消そうとして編集が
+  // 重ならないことを見張る（重なると apply_edit_set が壊れる）
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n"))
+  let b = st.nodes[2].id
+  let c = st.nodes[3].id
+  ignore(delete_nodes([b, c]))
+  assert_eq(get_text(), "# r\n\n## a\n")
+}

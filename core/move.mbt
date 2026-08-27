@@ -7,24 +7,26 @@
 /// of its previous sibling. No line moves. Skips nodes with no previous
 /// sibling.
 fn cmd_indent(ids : Array[Int]) -> Unit {
-  let idxs = normalize_selection(ids)
-  let set : Array[Edit] = []
-  let keep : Array[Int] = []
-  for k in idxs {
-    if prev_sibling(k) >= 0 {
-      keep.push(st.nodes[k].id)
-      for m in subtree_of(k) {
-        set.push(prefix_edit(m, st.nodes[m].depth + 1))
+  with_sweep(fn() {
+    let idxs = normalize_selection(ids)
+    let set : Array[Edit] = []
+    let keep : Array[Int] = []
+    for k in idxs {
+      if prev_sibling(k) >= 0 {
+        keep.push(st.nodes[k].id)
+        for m in subtree_of(k) {
+          set.push(prefix_edit(m, st.nodes[m].depth + 1))
+        }
       }
     }
-  }
-  if set.length() == 0 {
-    return
-  }
-  apply_sets([set], "")
-  if keep.length() > 0 {
-    st.focus = keep[0]
-  }
+    if set.length() == 0 {
+      return
+    }
+    apply_sets([set], "")
+    if keep.length() > 0 {
+      st.focus = keep[0]
+    }
+  })
 }
 
 ///|
@@ -196,23 +198,24 @@ fn move_lands_outside(order : Array[Int], target : Int) -> Bool {
 /// pos: 0 = as last child of target, 1 = before target, 2 = after target.
 fn cmd_move(ids : Array[Int], target : Int, pos : Int) -> Unit {
   begin_tx("")
-  let order : Array[Int] = []
-  for k in normalize_selection(ids) {
-    order.push(st.nodes[k].id)
-  }
-  if !move_lands_outside(order, target) {
-    commit_tx()
-    return
-  }
-  let rehide = unhide_for_move(order)
-  let first_focus = move_steps(ids, target, pos)
-  for id in rehide {
-    cmd_toggle_hidden(id)
-  }
+  with_sweep(fn() {
+    let order : Array[Int] = []
+    for k in normalize_selection(ids) {
+      order.push(st.nodes[k].id)
+    }
+    if !move_lands_outside(order, target) {
+      return
+    }
+    let rehide = unhide_for_move(order)
+    let first_focus = move_steps(ids, target, pos)
+    for id in rehide {
+      cmd_toggle_hidden(id)
+    }
+    if first_focus != -1 {
+      st.focus = first_focus
+    }
+  })
   commit_tx()
-  if first_focus != -1 {
-    st.focus = first_focus
-  }
 }
 
 ///|
@@ -221,28 +224,29 @@ fn cmd_move(ids : Array[Int], target : Int, pos : Int) -> Unit {
 /// undo も 1 回で戻したい → 2 つの編集を同じトランザクションに積む。
 fn cmd_move_as_parent(ids : Array[Int], target : Int) -> Unit {
   begin_tx("")
-  let order : Array[Int] = []
-  for k in normalize_selection(ids) {
-    order.push(st.nodes[k].id)
-  }
-  if !move_lands_outside(order, target) {
-    commit_tx()
-    return
-  }
-  let rehide = unhide_for_move(order)
-  let first_focus = move_steps(ids, target, 1)
-  // 移動が一切起きなかったときに indent だけ走らせると、B が無関係な
-  // 前の兄弟の下に潜ってしまう
-  if first_focus != -1 {
-    cmd_indent([target])
-  }
-  for id in rehide {
-    cmd_toggle_hidden(id)
-  }
+  with_sweep(fn() {
+    let order : Array[Int] = []
+    for k in normalize_selection(ids) {
+      order.push(st.nodes[k].id)
+    }
+    if !move_lands_outside(order, target) {
+      return
+    }
+    let rehide = unhide_for_move(order)
+    let first_focus = move_steps(ids, target, 1)
+    // 移動が一切起きなかったときに indent だけ走らせると、B が無関係な
+    // 前の兄弟の下に潜ってしまう
+    if first_focus != -1 {
+      cmd_indent([target])
+    }
+    for id in rehide {
+      cmd_toggle_hidden(id)
+    }
+    if first_focus != -1 {
+      st.focus = first_focus
+    }
+  })
   commit_tx()
-  if first_focus != -1 {
-    st.focus = first_focus
-  }
 }
 
 ///|
@@ -349,27 +353,28 @@ fn cmd_reorder(id : Int, dir : Int) -> Unit {
     return
   }
   begin_tx("")
-  // hide されたノード単独の並べ替えでマーカーが置き去りにならないよう、
-  // 動かす前に外し、行き先で畳み直す（cmd_move と同じ手当て）
-  let rehide = unhide_for_move([id])
-  let i = find_node(id)
-  if i < 0 {
-    commit_tx()
-    return
-  }
-  if dir < 0 {
-    let p = prev_sibling(i)
-    if p >= 0 {
-      move_block(i, st.nodes[p].from, st.nodes[i].depth)
+  with_sweep(fn() {
+    // hide されたノード単独の並べ替えでマーカーが置き去りにならないよう、
+    // 動かす前に外し、行き先で畳み直す（cmd_move と同じ手当て）
+    let rehide = unhide_for_move([id])
+    let i = find_node(id)
+    if i < 0 {
+      return
     }
-  } else {
-    let nx = next_sibling(i)
-    if nx >= 0 {
-      move_block(i, st.nodes[nx].to, st.nodes[i].depth)
+    if dir < 0 {
+      let p = prev_sibling(i)
+      if p >= 0 {
+        move_block(i, st.nodes[p].from, st.nodes[i].depth)
+      }
+    } else {
+      let nx = next_sibling(i)
+      if nx >= 0 {
+        move_block(i, st.nodes[nx].to, st.nodes[i].depth)
+      }
     }
-  }
-  for rid in rehide {
-    cmd_toggle_hidden(rid)
-  }
+    for rid in rehide {
+      cmd_toggle_hidden(rid)
+    }
+  })
   commit_tx()
 }

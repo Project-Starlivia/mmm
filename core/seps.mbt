@@ -208,3 +208,184 @@ fn tree_bounds(root : Int) -> Array[Bound] {
   }
   out
 }
+
+// ---- 掃除 ----
+//
+// **不変条件: どの操作の前後でも、操作対象でないグループの側は変わらない。**
+//
+// グループが空になると両脇の境界が隣り合う。読みの規則（1 本 = 分割 /
+// 2 本以上 = 切り替え）は足し算にならないので、隣り合ったものは xor して
+// 1 つに書き直す:
+//   分割 + 分割 = 分割 / 分割 + 切り替え = 切り替え / 切り替え + 切り替え = 分割
+//
+// **触ってよいのは「直前まで境界として効いていた行」だけ。** 見分けるために、
+// 編集の前に境界の位置を控え、ノード id と同じ仕掛け（map_offsets）で編集を
+// またいで写す。手で書いた本文の `---` は控えに入らないので、決して触らない。
+
+///|
+/// 掃除の目印 = 編集前に効いていた境界。位置は `map_offsets` で写すので
+/// `Array[Int]`、flip は**同じ添字**の別配列（組の配列にすると写せない）。
+priv struct SepMarks {
+  at : Array[Int]
+  flip : Array[Bool]
+}
+
+///|
+fn sep_marks() -> SepMarks {
+  let at : Array[Int] = []
+  let flip : Array[Bool] = []
+  for b in st.bounds {
+    at.push(b.start)
+    flip.push(b.flip)
+  }
+  SepMarks::{ at, flip }
+}
+
+///|
+/// 位置 `at` にある区切り行のかたまり（境界として効いていなくても拾う）。
+/// 掃除で「もう境界ではなくなった行」を消すのに使う。
+fn dangling_run_at(at : Int) -> Bound? {
+  for r in st.seps {
+    if at >= r.start && at < r.end {
+      return Some(Bound::{ start: r.start, end: r.end, flip: r.lines >= 2 })
+    }
+  }
+  None
+}
+
+///|
+/// その位置を含む木の、ルートの深さ（境界を書く列を決めるのに要る）。
+fn root_depth_at(at : Int) -> Int {
+  for i = st.nodes.length() - 1; i >= 0; i = i - 1 {
+    if st.nodes[i].from < at {
+      return st.nodes[root_index_of(i)].depth
+    }
+  }
+  1
+}
+
+///|
+/// 編集集合は昇順・非重複でなければならない（apply_edit_set の約束）。
+fn sort_edits(set : Array[Edit]) -> Array[Edit] {
+  let out = set
+  for i = 1; i < out.length(); i = i + 1 {
+    let e = out[i]
+    let mut j = i - 1
+    while j >= 0 && out[j].from > e.from {
+      out[j + 1] = out[j]
+      j = j - 1
+    }
+    out[j + 1] = e
+  }
+  out
+}
+
+///|
+/// 空いたグループの境界を畳む。`from_set` 以降に積まれた編集集合をまたいで
+/// 目印を写してから、いまの文書と突き合わせる。
+///
+/// 判断は 2 つだけ:
+///   - いま効いている境界に**目印が 2 つ以上**入っている = 空いてくっついた。
+///     正しい flip は行数ではなく**元の flip の xor**（1 本 + 1 本 = 2 行だが、
+///     反転 0 回なので分割のまま、という食い違いがここで起きる）
+///   - 目印がどの境界にも入っていない = 効かなくなった（末尾のグループが
+///     空いた）。その行は消す
+fn sweep_seps(marks : SepMarks, from_set : Int) -> Unit {
+  for k = from_set; k < st.last_sets.length(); k = k + 1 {
+    map_offsets(marks.at, st.last_sets[k])
+  }
+  let set : Array[Edit] = []
+  for b in st.bounds {
+    let mut hit = 0
+    let mut flip = false
+    for k = 0; k < marks.at.length(); k = k + 1 {
+      let m = marks.at[k]
+      if m >= b.start && m < b.end {
+        hit = hit + 1
+        if marks.flip[k] {
+          flip = !flip
+        }
+      }
+    }
+    // 目印が 2 つ以上 = 空いてくっついた。空行を挟んで地続きになった生の
+    // 区切り行は、行数で読むと桁が合わない（1 本 + 1 本 = 2 行だが反転
+    // 0 回）だけでなく、挟まった空行も正規形には無いので、xor が今の
+    // flip とたまたま一致していても正規形に書き直して余りを削る
+    if hit >= 2 {
+      set.push(set_sep_edit(b, root_depth_at(b.start), flip))
+    }
+  }
+  // 複数の目印が「もう効いていない」側に落ちても、地続きの生ランは 1 つに
+  // 潰れていることがある（隣り合う末尾グループが 2 つ同時に空く等）。
+  // 同じランを 2 度消そうとすると編集が重なって apply_edit_set が壊れるので、
+  // ランの開始位置で重複を弾く
+  let removed_runs : Array[Int] = []
+  for k = 0; k < marks.at.length(); k = k + 1 {
+    let m = marks.at[k]
+    if m < 0 {
+      continue // 編集そのものに飲まれて消えた
+    }
+    let mut alive = false
+    for b in st.bounds {
+      if m >= b.start && m < b.end {
+        alive = true
+        break
+      }
+    }
+    if alive {
+      continue
+    }
+    match dangling_run_at(m) {
+      Some(b) => {
+        let mut seen = false
+        for s in removed_runs {
+          if s == b.start {
+            seen = true
+            break
+          }
+        }
+        if seen {
+          continue
+        }
+        removed_runs.push(b.start)
+        // 末尾のグループが空になった: 後ろに続く見出しがもう無いので、
+        // 直後の空行ではなく手前の空行を EOF まで畳む
+        // （cmd_delete が EOF に届く削除で tidy_del_start を使うのと同じ理屈）
+        if b.end == st.text.length() {
+          let from = tidy_del_start(b.start)
+          set.push(
+            Edit::{ from, to: b.end, insert: "", removed: slice(st.text, from, b.end) },
+          )
+        } else {
+          set.push(remove_sep_edit(b))
+        }
+      }
+      None => ()
+    }
+  }
+  if set.length() > 0 {
+    apply_sets([sort_edits(set)], "")
+  }
+}
+
+///|
+/// 構造を変えるコマンドを、掃除つきで走らせる。掃除は同じトランザクションに
+/// 積むので **undo は 1 回**。既にトランザクションが開いていればそれに乗る。
+fn with_sweep(body : () -> Unit) -> Unit {
+  let opened = match st.tx {
+    None => {
+      begin_tx("")
+      true
+    }
+    Some(_) => false
+  }
+  let marks = sep_marks()
+  let base = st.last_sets.length()
+  body()
+  let keep = st.focus
+  sweep_seps(marks, base)
+  st.focus = keep
+  if opened {
+    commit_tx()
+  }
+}
