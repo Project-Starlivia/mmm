@@ -9,6 +9,10 @@
 // 描き直すだけ — 1 枚ずつ画像を控える形だと、720×440 の 2 倍解像度で
 // 1 手あたり 5MB になる。文書の undo が編集の集合を並べて再生するのと
 // 同じ考え方。
+//
+// **道具は選ばせるのではなく、絞って並べる。** OS のカラーピッカーと生の
+// スライダーは「何でも選べます」としか言っておらず、選ぶ手間だけを渡して
+// くる。紙の上で読める 5 色と、3 段の太さだけを出す。
 
 /** 世界ではなくキャンバスの中の座標（CSS ピクセル） */
 interface Pt {
@@ -30,16 +34,90 @@ const MAX_DPR = 2;
 /** 消しゴムは同じ太さでは細すぎて使えない */
 const ERASER_SCALE = 4;
 
-/** 道具立ての初期値 */
-const INK = "#111111";
-const MIN_W = 1;
-const MAX_W = 16;
-const DEFAULT_W = 3;
+/**
+ * 出せるインク。**紙の上で読める色だけ**を並べる — 選べるものを絞ること
+ * そのものが道具の言い分で、「何色でもどうぞ」は言い分が無いのと同じ。
+ * 先頭が既定。
+ */
+const PALETTE = ["#111111", "#d92d20", "#1570ef", "#0f9d58", "#e07000"] as const;
+
+/** 線の太さ。細・中・太の 3 段だけ */
+const WIDTHS = [2, 4, 8] as const;
+/** 既定は真ん中 */
+const DEFAULT_NIB = 1;
+
+/**
+ * 描くもの。**消しゴムは紙の色の 6 番目のインク**でしかない（下の
+ * `pointerdown` は実際、色と太さを差し替えているだけ）。同じ並びの中に
+ * 置けば「消しながら色を選ぶ」のような、意味の無い組み合わせが最初から
+ * 作れない — 別の切り替えとして持つと、そこは自分で塞ぐことになる。
+ */
+type Ink = { kind: "pen"; color: string } | { kind: "eraser" };
+
+const INKS: readonly Ink[] = [
+  ...PALETTE.map((color): Ink => ({ kind: "pen", color })),
+  { kind: "eraser" },
+];
 
 function button(label: string): HTMLButtonElement {
   const b = document.createElement("button");
   b.type = "button";
   b.textContent = label;
+  return b;
+}
+
+/**
+ * 小さな集合から 1 つだけ選ぶ並び。**インクも太さも同じ形**なので器は 1 つ。
+ * 選ばれているものに `on` が付き、選び直せば前の印は外れる。
+ */
+function picker<T>(
+  values: readonly T[],
+  face: (value: T) => HTMLButtonElement,
+  chosen: number,
+  onPick: (value: T) => void,
+): HTMLButtonElement[] {
+  const buttons = values.map((value, i) => {
+    const b = face(value);
+    b.classList.toggle("on", i === chosen);
+    b.addEventListener("click", () => {
+      for (const other of buttons) other.classList.remove("on");
+      b.classList.add("on");
+      onPick(value);
+    });
+    return b;
+  });
+  return buttons;
+}
+
+/**
+ * インク 1 つぶんの見た目。色は丸、**消しゴムだけは字** — 紙の色の丸は
+ * 明るいテーマで器と同じ色になり、消えてしまう。
+ */
+function inkFace(value: Ink): HTMLButtonElement {
+  if (value.kind === "eraser") {
+    const b = button("Eraser");
+    b.className = "draw-eraser";
+    return b;
+  }
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "draw-ink";
+  // 色そのものは道具の持ち物。CSS には形だけを置く
+  b.style.setProperty("--ink-swatch", value.color);
+  b.title = value.color;
+  return b;
+}
+
+/**
+ * 太さ 1 つぶんの見た目。**その太さの点そのもの**を出す
+ * （字で "2px" と書くより、出てくる線の太さが直に分かる）。
+ */
+function nibFace(value: number): HTMLButtonElement {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "draw-nib";
+  b.style.setProperty("--nib", `${value}px`);
+  b.title = `${value}px`;
   return b;
 }
 
@@ -66,27 +144,45 @@ export function showDrawing(): Promise<Blob | null> {
     title.textContent = "Draw";
 
     // ---- 道具立て ----
+    //
+    // 並びは 3 つの塊 — **何で描くか**（インク）と**どのくらいで**（太さ）を
+    // 左に置き、**やり直すもの**（Undo / Clear）だけを右へ離す。描くために
+    // 選ぶものと、描いたものを取り消すものは種類が違う。
+    let ink: Ink = INKS[0];
+    let nib: number = WIDTHS[DEFAULT_NIB];
+
     const bar = document.createElement("div");
-    bar.className = "popup-toolbar";
-    const color = document.createElement("input");
-    color.type = "color";
-    color.value = INK;
-    const width = document.createElement("input");
-    width.type = "range";
-    width.min = String(MIN_W);
-    width.max = String(MAX_W);
-    width.value = String(DEFAULT_W);
-    width.title = "Width";
-    const eraser = button("Eraser");
+    bar.className = "draw-tools";
+
+    const inks = document.createElement("div");
+    inks.className = "draw-inks";
+    inks.append(
+      ...picker(INKS, inkFace, 0, (value) => {
+        ink = value;
+      }),
+    );
+
+    const nibs = document.createElement("div");
+    nibs.className = "draw-nibs";
+    nibs.append(
+      ...picker(WIDTHS, nibFace, DEFAULT_NIB, (value) => {
+        nib = value;
+      }),
+    );
+
     const undo = button("Undo");
     undo.title = "Mod+Z";
     const clear = button("Clear");
-    bar.append(color, width, eraser, undo, clear);
+    const actions = document.createElement("div");
+    actions.className = "group draw-actions";
+    actions.append(undo, clear);
+
+    bar.append(inks, nibs, actions);
 
     // ---- 紙 ----
     const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
     const canvas = document.createElement("canvas");
-    canvas.className = "popup-canvas";
+    canvas.className = "draw-paper";
     canvas.width = WIDTH * dpr;
     canvas.height = HEIGHT * dpr;
     // 出来上がる絵は常に WIDTH×HEIGHT。表示だけは窓に入る大きさまで縮む
@@ -99,7 +195,6 @@ export function showDrawing(): Promise<Blob | null> {
     ctx.lineJoin = "round";
 
     const strokes: Stroke[] = [];
-    let erasing = false;
 
     /** 1 手ぶんを紙に載せる */
     const paint = (s: Stroke): void => {
@@ -142,12 +237,11 @@ export function showDrawing(): Promise<Blob | null> {
       // 押した瞬間にフォーカスが body へ逃げると Esc / Mod+Enter が死ぬ
       e.preventDefault();
       canvas.setPointerCapture(e.pointerId);
-      const w = Number(width.value);
       drawing = {
         kind: "line",
         points: [at(e)],
-        color: erasing ? PAPER : color.value,
-        width: erasing ? w * ERASER_SCALE : w,
+        color: ink.kind === "eraser" ? PAPER : ink.color,
+        width: ink.kind === "eraser" ? nib * ERASER_SCALE : nib,
       };
       strokes.push(drawing);
       paint(drawing);
@@ -171,11 +265,7 @@ export function showDrawing(): Promise<Blob | null> {
     canvas.addEventListener("pointerup", stop);
     canvas.addEventListener("pointercancel", stop);
 
-    // ---- 道具の配線 ----
-    eraser.addEventListener("click", () => {
-      erasing = !erasing;
-      eraser.classList.toggle("primary", erasing);
-    });
+    // ---- やり直す ----
     const undoOne = (): void => {
       if (strokes.length === 0) return;
       strokes.pop();
