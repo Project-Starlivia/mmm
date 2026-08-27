@@ -1082,20 +1082,29 @@ git commit -m "feat: ✨ 2 本指で拡大縮小できるようにする"
 - Consumes: 既存の `bindMenu()` の `contextmenu` ハンドラ、`slopOf`（Task 5）
 - Produces: なし
 
-**確認結果:** （Step 3 でここに 1 行書く）
+**確認結果:** 2026-08-27 / 実機が無いため Step 1 は判断不能と判断し、実装者への
+発注で Step 1 の条件分岐を外し Step 2 のタイマーを無条件実装に切り替えた。理由は
+(1) 実機タッチデバイスが環境に無く、合成 `PointerEvent` はブラウザのネイティブな
+長押しジェスチャ検出を再現できないため確認自体が不能、(2) 「二重に開く」懸念は
+そもそも `ContextMenu` インスタンスが 1 つしか無く `show()` の再呼び出しは
+同じ器を作り直すだけなので成立しない。あわせて、ネイティブの `contextmenu` が
+長押しタイマーを追いかけて来た場合にメニューが瞬く/ずれるのを防ぐ
+`suppressContextMenu` 印を追加要件として実装した。詳細は
+`.superpowers/sdd/2026-08-27-touch-support/task-7-report.md` 参照。
 
-**なぜ確かめてから書くか:** README が「Chromium 系でしか動かない」と言い切っている
-以上、長押し → `contextmenu` はブラウザが出す。**届くのに自前で書けば、同じメニューが
-2 回開く道を作る**ことになる。
+**なぜ確かめてから書くか（当初の想定。上記の理由で不採用）:** README が
+「Chromium 系でしか動かない」と言い切っている以上、長押し → `contextmenu` は
+ブラウザが出す。**届くのに自前で書けば、同じメニューが 2 回開く道を作る**
+ことになる、という想定だった。
 
-- [ ] **Step 1: 実機（またはタッチのある Chromium）で確かめる**
+- [x] ~~Step 1: 実機（またはタッチのある Chromium）で確かめる~~ — 実施せず（上記参照）
 
 `pnpm run dev` → ノードを長押しする。`touch-action: none`（Task 5）を敷いた状態で試すこと。
 
 Expected（届く場合）: 右クリックと同じメニューが指の位置に開く。
 → **その場合はコードを 1 行も足さない。Step 2 を飛ばして Step 3 へ。**
 
-- [ ] **Step 2: 届かなかったときだけ — 自前の長押し**
+- [x] **Step 2: 自前の長押し**（条件を外し、無条件で実装）
 
 `const TOUCH_SLOP2 = 256;` の隣に足す:
 
@@ -1153,19 +1162,21 @@ if (this.holdAt) {
 
 `pointerup` と `pointercancel` の先頭に `this.dropHold();` を足す。
 
-- [ ] **Step 3: 確かめたことを記録して、型と試験を通す**
+実装時に追加した点（ブリーフに無い、発注元の追加要件）:
+- `pointerdown` の `fingers.pinching` 分岐（2 本目の指が乗った直後）でも
+  `this.dropHold();` を呼ぶ — 2 本指で静止しても頼んでいないメニューを開かせない。
+- `suppressContextMenu` 印: 長押しタイマーがメニューを開いたら立て、次の
+  `pointerdown` で必ず下ろす。立っている間は `bindMenu()` の `contextmenu`
+  ハンドラを早期 return させ、ネイティブの `contextmenu` が追いかけて来ても
+  同じメニューを開き直させない（マウスの右クリックは pointerdown → contextmenu
+  の順で来るので、この印がマウス操作に影響することはない）。
 
-このタスクの **確認結果:** に 1 行書く。例:
-
-```
-**確認結果:** 2026-08-27 / Chrome on Android: `touch-action: none` でも
-contextmenu が届いたので、コードは 1 行も足していない。
-```
+- [x] **Step 3: 確かめたことを記録して、型と試験を通す**
 
 Run: `pnpm run check` → エラー無し
-Run: `pnpm test` → PASS
+Run: `pnpm test` → 188 tests, 188 pass, 0 fail
 
-- [ ] **Step 4: コミット**
+- [x] **Step 4: コミット**
 
 コードを足した場合:
 

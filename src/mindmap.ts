@@ -153,6 +153,9 @@ const TOUCH_SLOP2 = 256;
 const slopOf = (e: PointerEvent): number =>
   e.pointerType === "touch" ? TOUCH_SLOP2 : DRAG_SLOP2;
 
+/** 長押しと見なす時間（ms）。Chromium のネイティブと同じ体感に合わせる */
+const HOLD_MS = 500;
+
 export class MindMap {
   private pane: HTMLElement;
   private host: MapHost;
@@ -210,6 +213,15 @@ export class MindMap {
   // ドラッグでカードを動かした直後、pointerup に続いて発火するネイティブの
   // click が、落とし先の座標にあるカードをふらっと選び直すのを止める印
   private suppressClick = false;
+  /** 長押しの見張り。指が動くか離れたら取り消す */
+  private hold: ReturnType<typeof setTimeout> | null = null;
+  /** 見張りを始めた位置。閾値を越えて動いたら取り消す */
+  private holdAt: { x: number; y: number } | null = null;
+  // 長押しでメニューを開いた直後の印。ネイティブの contextmenu が追いかけて
+  // 来ても、同じメニューを開き直して瞬く/ずれるのを防ぐ。次の pointerdown で
+  // 必ず下ろす — マウスの右クリックは pointerdown → contextmenu の順で来る
+  // ので、この印が立ったままマウス操作に効くことはない
+  private suppressContextMenu = false;
   private dropTarget: DropTarget | null = null;
   // ドロップ中の一時的なノード印。**どれに付けたかを覚えておくのは、
   // 外すときに全ノードを舐めないため**（マウス移動のたびに外して付け直す）。
@@ -824,6 +836,13 @@ export class MindMap {
     this.adds.show(b, this.k, b.n.depth > 1);
   }
 
+  /** 長押しの見張りを解く。指が動いた・離れた・攫われた、のどれでも */
+  private dropHold(): void {
+    if (this.hold !== null) clearTimeout(this.hold);
+    this.hold = null;
+    this.holdAt = null;
+  }
+
   // ---------- events ----------
 
   /** 出来事の配線。ひとかたまりに見えるが、**本当に 1 つの状態機械なのは
@@ -913,6 +932,8 @@ export class MindMap {
       // 使われないまま残っていたら、ここで落とす（残すとユーザーの
       // 次の 1 クリックを食う）
       this.suppressClick = false;
+      // 長押しメニューの「開き直させない」印も、次の押下でかならず下ろす
+      this.suppressContextMenu = false;
       // `+` の上での押下は、そのボタンのもの。下のキャンバスへ渡さない
       if (targetIn(e, "[data-add]")) {
         e.stopPropagation();
@@ -924,6 +945,9 @@ export class MindMap {
         // 2 本目が乗った時点で、1 本ぶんの操作はすべて畳む。**指を足しただけで
         // ノードが動いたり範囲が選ばれたりしない**
         if (this.fingers.pinching) {
+          // 2 本目が乗ったら長押しも畳む — 2 本を静止で構えたまま
+          // 待たれても、頼んでいないメニューは開かない
+          this.dropHold();
           this.panning = null;
           this.rubberStart = null;
           this.rubber.style.display = "none";
@@ -932,6 +956,17 @@ export class MindMap {
           pane.style.cursor = "";
           return;
         }
+        this.holdAt = { x: e.clientX, y: e.clientY };
+        this.hold = setTimeout(() => {
+          const at = this.holdAt;
+          this.dropHold();
+          if (!at) return;
+          const id = this.nodeAt(at.x, at.y);
+          if (id === -1) return;
+          if (!this.host.selection().has(id)) this.host.setSelection([id], id);
+          this.suppressContextMenu = true;
+          this.menu.show(at.x, at.y, this.menuItems());
+        }, HOLD_MS);
       }
       // 入力欄の中のクリックはカーソルを置くためのもので、確定ではない。
       // ここで pane.focus() まで進むと、押した瞬間に blur して閉じてしまう
@@ -1004,6 +1039,13 @@ export class MindMap {
         }
         // 2 本乗っているあいだは、1 本ぶんの続きを進めない
         if (this.fingers.pinching) return;
+      }
+      // 閾値を越えたときだけ解く — 指はじっとしていても揺れるので、
+      // 微小な揺れで長押しが取り消されては困る
+      if (this.holdAt) {
+        const dx = e.clientX - this.holdAt.x;
+        const dy = e.clientY - this.holdAt.y;
+        if (dx * dx + dy * dy > slopOf(e)) this.dropHold();
       }
       if (this.cardDrag) {
         const dx = e.clientX - this.cardDrag.px;
@@ -1079,6 +1121,10 @@ export class MindMap {
     });
 
     pane.addEventListener("pointerup", (e) => {
+      // タッチのブロックより先に解く — ピンチ中の pointerup は下で早期
+      // return するので、後ろに置くと長押しの見張りが残ったまま生き残り、
+      // 何も無いところで後からメニューが開いてしまう
+      this.dropHold();
       if (e.pointerType === "touch") {
         const wasPinching = this.fingers.pinching;
         this.fingers.up(e.pointerId);
@@ -1175,6 +1221,7 @@ export class MindMap {
 
     pane.addEventListener("pointercancel", () => {
       // pen/touch cancellation must not leave a drag/pan/rubber stuck
+      this.dropHold();
       this.fingers.clear();
       this.panning = null;
       this.rubberStart = null;
@@ -1266,6 +1313,9 @@ export class MindMap {
     const pane = this.pane;
     pane.addEventListener("contextmenu", (e) => {
       e.preventDefault();
+      // 長押しでもう開いている — ネイティブの contextmenu が追いかけて
+      // 来ても、同じメニューを開き直して瞬く/ずれることはさせない
+      if (this.suppressContextMenu) return;
       const id = this.nodeAt(e.clientX, e.clientY);
       if (id === -1) {
         this.hideMenu();
