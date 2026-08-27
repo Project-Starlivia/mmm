@@ -5,9 +5,18 @@
 // **写すものは呼ぶ側が選ぶ。** 層をまるごと写していた頃は「全体」しか
 // 出せなかったが、枝だけを書き出したいときにここが決められることは無い
 // （どれが選ばれているかを知っているのはマップ側）。
+//
+// **地は持たない。** 貼り先の色にそのまま乗るよう透明のままにする —
+// 板を敷かないので、角丸にする／しないの検討も要らない。
 
 import type { Rect } from "./geometry.ts";
 import { SVG_NS, svgEl } from "./svg.ts";
+
+/** 透かしの出所。配り先（wrangler.jsonc の `workers_dev` 名）を変えたらここも */
+const WATERMARK_URL = "https://mmm.chiwawaz.workers.dev/";
+
+/** 本文の下端から透かしの帯までの高さ。M（余白）に足す */
+const WM_BAND = 22;
 
 export async function mapToSvg(args: {
   /** 収める範囲。写すノードの箱をそのまま渡す */
@@ -16,7 +25,7 @@ export async function mapToSvg(args: {
   edges: Iterable<SVGPathElement>;
   /** 写すノード */
   nodes: Iterable<SVGGElement>;
-  /** 地の色をここから読む */
+  /** 透かしの色（--ink-dim）・書体（--font）をここから読む */
   pane: HTMLElement;
 }): Promise<SVGSVGElement | null> {
   const boxes = [...args.boxes];
@@ -34,7 +43,7 @@ export async function mapToSvg(args: {
   }
   const M = 24;
   const w = Math.ceil(x1 - x0 + M * 2);
-  const h = Math.ceil(y1 - y0 + M * 2);
+  const h = Math.ceil(y1 - y0 + M * 2 + WM_BAND);
   // Iterable は 1 度しか回せないことがあるので、先に確定させる
   const edgeEls = [...args.edges];
   const nodeEls = [...args.nodes];
@@ -129,17 +138,29 @@ export async function mapToSvg(args: {
     width: w,
     height: h,
   });
-  const bgColor = getComputedStyle(args.pane).backgroundColor;
-  out.append(
-    svgEl("rect", {
-      x: x0 - M,
-      y: y0 - M,
-      width: w,
-      height: h,
-      fill: bgColor,
-    }),
-    edges,
-    nodesG,
-  );
+  out.append(edges, nodesG, watermark(x1 + M, y1 + M, args.pane));
   return out;
+}
+
+/** 右下の帯に置く「made with mmm」。`right`/`bandTop` は viewBox の右端・本文下端 */
+function watermark(right: number, bandTop: number, pane: HTMLElement): SVGAElement {
+  const cs = getComputedStyle(pane);
+  const ink = cs.getPropertyValue("--ink-dim").trim();
+  const font = cs.getPropertyValue("--font").trim();
+  const centerY = bandTop + WM_BAND / 2;
+
+  const text = svgEl("text", {
+    x: right - 8,
+    y: centerY,
+    "text-anchor": "end",
+    "dominant-baseline": "central",
+    "font-family": font,
+    "font-size": 11,
+    fill: ink,
+  });
+  text.textContent = "made with mmm";
+
+  const link = svgEl("a", { href: WATERMARK_URL });
+  link.append(text);
+  return link;
 }
