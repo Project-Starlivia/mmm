@@ -118,6 +118,49 @@ test("掴んでいる部分木は落とし先にならない", () => {
   assert.equal(d.drop, null);
 });
 
+test("列の上端より上・下端より下は、遠くても前後への挿入で受ける", () => {
+  // 兄弟は縦に積まれるので、上端の上と下端の下には競う相手が居ない。
+  // 帯の 40px で切ると、そこは誰も取らない広い死に地になっていた
+  const up = resolveDrop(scene(TREE, LINKS, { x: 195, y: -40 }));
+  assert.deepEqual(up.drop, { kind: "node", id: 2, pos: 1 });
+  const down = resolveDrop(scene(TREE, LINKS, { x: 195, y: 280 }));
+  assert.deepEqual(down.drop, { kind: "node", id: 3, pos: 2 });
+});
+
+test("開いている側でも、OPEN を超えて離せばキャンセルできる", () => {
+  // 無制限にすると、列の x に収まったまま上下へいくら離しても必ずどこかへ
+  // 落ちてしまい、ドラッグを諦める手が「横に外す」だけになる
+  const d = resolveDrop(scene(TREE, LINKS, { x: 195, y: -160 }));
+  assert.equal(d.drop, null);
+});
+
+test("開いている側は遠くて親が自明でないので、予告線を必ず出す", () => {
+  const d = resolveDrop(scene(TREE, LINKS, { x: 195, y: -40 }));
+  assert.equal(d.ambiguous, true);
+});
+
+test("同じ列に積まれた 2 つの stack の谷間は、近いほうの端が取る", () => {
+  // 端は (親, 側) ごとに数える。列でいちばん上/下のノードだけを端に
+  // すると、谷間の両側がどちらも端にならず死に地のまま残る
+  const root = box(1, 1, 0, 100);
+  const p1 = box(2, 2, 145, 40);
+  const p2 = box(3, 2, 145, 200);
+  const c1 = box(4, 3, 290, 20);
+  const c2 = box(5, 3, 290, 240);
+  const boxes = [root, p1, p2, c1, c2];
+  const links: [number, number][] = [
+    [2, 1],
+    [3, 1],
+    [4, 2],
+    [5, 3],
+  ];
+  // 上の stack 寄り → その下へ / 下の stack 寄り → その上へ
+  const near1 = resolveDrop(scene(boxes, links, { x: 335, y: 120 }));
+  assert.deepEqual(near1.drop, { kind: "node", id: 4, pos: 2 });
+  const near2 = resolveDrop(scene(boxes, links, { x: 335, y: 180 }));
+  assert.deepEqual(near2.drop, { kind: "node", id: 5, pos: 1 });
+});
+
 test("Shift なら線への割り込みが最優先", () => {
   // 親(1) → 子(2) の線の中ほど。素の状態では根の脇（外側ゾーン）が勝つ場所
   const at = { x: 122, y: 90 };

@@ -62,6 +62,7 @@ export interface DropDecision {
 
 const SLOP = 16; // 箱の左右へのはみ出しをどこまで箱の内と見るか
 const BAND = 40; // 前後への挿入を狙える帯の広さ
+const OPEN = BAND * 5; // 開いている側では同じ帯をここまで広げる
 const REACH = GAP.x * 4 + 16; // 「子にする」外側ゾーンを成長軸方向にどこまで伸ばすか
 const NEAR = REACH * 0.4; // ここまでは前後への挿入より子を優先する
 const SLACK = 18; // 外側ゾーンが兄弟軸方向に箱からはみ出してよい量
@@ -201,11 +202,74 @@ function findEdge(scene: DropScene): DropTarget | null {
 }
 
 /**
- * どこへ落とすか。優先順は 4 段:
+ * 列の上端 / 下端のノードと、その「開いている側」。
+ *
+ * 兄弟は縦に積まれるので、上端の**上**と下端の**下**には競う相手がそもそも
+ * 居ない。そこは帯を広げても何も奪わない。同じ親でも左右で別の列になるので、
+ * 端は (親, 側) ごとに数える。
+ *
+ * 上下は文書順ではなく**箱の y** で決める（見た目の端がそのまま端になる）。
+ * 掴んでいるノードも数に入れる — ドラッグ中もその箱は元の場所に描かれた
+ * ままなので、見た目の上下端は動かない。
+ */
+function openEnds(scene: DropScene): { up: Set<number>; down: Set<number> } {
+  const first = new Map<string, Box>();
+  const last = new Map<string, Box>();
+  for (const id of scene.order) {
+    const b = scene.boxes.get(id);
+    if (!b) continue;
+    const parent = scene.parentOf.get(id);
+    if (parent === undefined) continue; // 根に兄弟は無い
+    const key = `${parent},${b.n.left}`;
+    const f = first.get(key);
+    if (!f || b.y < f.y) first.set(key, b);
+    const l = last.get(key);
+    if (!l || b.y + b.h > l.y + l.h) last.set(key, b);
+  }
+  return {
+    up: new Set([...first.values()].map((b) => b.n.id)),
+    down: new Set([...last.values()].map((b) => b.n.id)),
+  };
+}
+
+/**
+ * 列の上端より上 / 下端より下の空白。**誰も取らなかったときだけ**拾う
+ * 最後の受け皿なので、外側ゾーン（子にする）も線への割り込みも奪わない。
+ *
+ * 横は帯と同じ「その列に居ること」（`hu + SLOP`）のまま。縦だけを `OPEN` まで
+ * 広げる。無制限にしないのは、**横に外す以外のキャンセルの手を残す**ため —
+ * 列の x に収まったまま上下にいくら離してもどこかへ落ちてしまう、では
+ * ドラッグを諦める手が横だけになる。
+ */
+function findOpenEnd(scene: DropScene): DropTarget | null {
+  const ends = openEnds(scene);
+  let best = Infinity;
+  let hit: DropTarget | null = null;
+  for (const id of scene.order) {
+    if (scene.dragging.has(id)) continue;
+    const b = scene.boxes.get(id);
+    if (!b) continue;
+    const { du, dv, hu, hv } = local(scene.at, b);
+    if (Math.abs(du) > hu + SLOP) continue;
+    const over = Math.abs(dv) - hv;
+    if (over <= 0 || over > OPEN) continue;
+    const up = dv < 0;
+    if (!(up ? ends.up : ends.down).has(id)) continue;
+    if (over < best) {
+      best = over;
+      hit = { id, pos: up ? 1 : 2 };
+    }
+  }
+  return hit;
+}
+
+/**
+ * どこへ落とすか。優先順は 5 段:
  *   1. 箱の中
  *   2. 外側ゾーンの近い側（NEAR まで）… 前後への挿入より強い
  *   3. 前後への挿入（箱の上下の帯）
  *   4. 外側ゾーンの遠い側（REACH まで）… 誰も取らない空間の受け皿
+ *   5. 列の上端の上 / 下端の下（OPEN まで）… 誰も取らなかった空白
  *
  * 近くを子に振らないと、次の列の子の帯に吸われて「右に置いたのに兄弟になる」
  * が起きる。逆に遠くまで子を優先させると前後への挿入がほぼ出せなくなるので、
@@ -287,6 +351,14 @@ export function resolveDrop(scene: DropScene): DropDecision {
 
   if (!target) target = findEdge(scene);
 
+  // 誰も取らなかった空白は、開いている側の上下端が受ける。**そこは遠くて
+  // 親が自明でない**ので、予告線は必ず出す（迷う場面の判定には回さない）
+  let openEnd = false;
+  if (!target) {
+    target = findOpenEnd(scene);
+    openEnd = target !== null;
+  }
+
   // 迷う場面かどうかは、**行き先が決まってから**測る。外側ゾーンなどで
   // 差し替えたあとに帯の時点の判定を使うと、予告線の出る/出ないが行き先とずれる
   let rival = Infinity;
@@ -309,6 +381,6 @@ export function resolveDrop(scene: DropScene): DropDecision {
   };
   return {
     drop: target ? asDrop(target) : null,
-    ambiguous: rival - best <= AMBIGUOUS,
+    ambiguous: openEnd || rival - best <= AMBIGUOUS,
   };
 }
