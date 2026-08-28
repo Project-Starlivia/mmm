@@ -149,12 +149,20 @@ fn cmd_toggle_hidden(id : Int) -> Unit {
     for r in st.hide_regions {
       let body_end = if r.close_start == -1 { n } else { r.close_start }
       if nd.from >= r.open_next && nd.from < body_end {
+        // 開きマーカーと中身のあいだの空行も一緒に消す。畳むときは
+        // `<!--` の直後に中身が来る形しか書かないので、そこに空行があるのは
+        // 手書き（か古い形）の余りで、残すと開くたびに空行が積み上がる
+        let head_end = if is_blank_range(r.open_next, nd.from) {
+          nd.from
+        } else {
+          r.open_next
+        }
         let edits : Array[Edit] = [
           Edit::{
             from: r.open_start,
-            to: r.open_next,
+            to: head_end,
             insert: "",
-            removed: slice(st.text, r.open_start, r.open_next),
+            removed: slice(st.text, r.open_start, head_end),
           },
         ]
         if r.close_start != -1 {

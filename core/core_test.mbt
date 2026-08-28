@@ -748,3 +748,62 @@ test "relevel never goes above depth one" {
   assert_eq(relevel_text("### a\n\n#### b\n", 1), "# a\n\n## b\n")
   assert_eq(relevel_text("# a\n\n## b\n", 1), "# a\n\n## b\n")
 }
+
+///|
+/// 落とし先が畳んであれば先に開く、を**落とし方によらず**守る。
+/// `cmd_move` にしかガードが無かったころは、割り込み・ルート脇・新しい
+/// グループの 3 つで挿入点が hide 領域の中に入り、見えていた枝が消えていた。
+test "every drop unfolds a folded landing spot first" {
+  // 線への割り込み
+  ignore(init_doc("# r\n\n<!--\n## a\n\n### a1\n\n-->\n## c\n"))
+  ignore(move_as_parent([4], 2))
+  assert_eq(get_text(), "# r\n\n## c\n\n### a\n\n#### a1\n")
+  // ルートの脇（着地点は自分で導いた「その側の末尾」）
+  ignore(init_doc("# r\n\n## a\n\n### a1\n\n<!--\n## z\n-->\n"))
+  ignore(move_side_end([2], 1, false))
+  assert_eq(get_text(), "# r\n\n## z\n\n## a\n\n### a1\n")
+}
+
+///|
+/// 割り込みで親になった枝は畳み直さない。畳み直すと、割り込まれた相手が
+/// 領域に呑まれて消える（`unfold_before_add` が「足したら開いたままにする」
+/// のと同じ理由）。
+test "a branch that gained a child is not folded back" {
+  ignore(init_doc("# r\n\n<!--\n## a\n\n### a1\n\n-->\n## b\n"))
+  ignore(move_as_parent([2], 4))
+  assert_eq(get_text(), "# r\n\n## a\n\n### a1\n\n### b\n")
+}
+
+///|
+/// 区切りは構造の話なので、畳んであるかに関わらず hide 領域の**外**に書く。
+/// 内側に書かれると `sole_hide_region` が外れ、次の一手でマーカーだけが
+/// 取り残されて、保存した .md が未閉じの HTML コメントになっていた。
+test "a separator is never written inside a hide region" {
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n"))
+  ignore(toggle_hidden(2))
+  ignore(flip_side(2))
+  assert_eq(get_text(), "# r\n\n---\n---\n\n<!--\n## a\n\n-->\n---\n---\n\n## b\n")
+}
+
+///|
+/// 次の枝が畳んでいても、手前の枝の範囲は境界で切れる。切れていなかった
+/// ころは `before_sep_edit` が既存の境界を「手前の枝の中」と誤読し、押す
+/// たびに新しい `---` を書いてファイルだけが太った（側は変わらない）。
+test "flipping a folded branch rewrites the boundary instead of adding one" {
+  let start = "# x\n\n## a\n\n---\n\n<!--\n\n## b\n\n-->\n"
+  ignore(init_doc(start))
+  ignore(flip_side(3))
+  assert_eq(get_text(), "# x\n\n## a\n\n---\n---\n\n<!--\n\n## b\n\n-->\n")
+  ignore(flip_side(3))
+  assert_eq(get_text(), start) // 往復で元へ戻る = 溜まらない
+}
+
+///|
+/// マーカーと中身のあいだに空行があっても「中身はちょうどこのノードだけ」と
+/// 認める。厳密一致だったころは、空行 1 行でマーカーが置き去りになり、
+/// hidden が黙って落ち、足した子が領域の中に生まれていた。
+test "a blank line after the open marker does not break the sole-region match" {
+  ignore(init_doc("# r\n\n<!--\n\n## a\n\n### a1\n\n-->\n\n## b\n"))
+  ignore(move_nodes([2], 4, 2))
+  assert_eq(get_text(), "# r\n\n## b\n\n<!--\n## a\n\n### a1\n-->\n")
+}

@@ -80,7 +80,14 @@ fn cut_ranges(
       if range_end[i] > f {
         break // 境界を越えて伸びる = この境界で終わっていない
       }
-      if range_end[i] == f {
+      // **`f` ちょうどでなくてもよい。** 次の枝が畳んであると、手前の枝の
+      // 範囲は `<!--` の行頭で止まる（doc.mbt の規則）ので `f` には届かない。
+      // 境界の後ろで `f` までのあいだ（空行・hide マーカーしか無い区間）で
+      // 終わっているなら、それはこの境界で終わっているのと同じこと。
+      // 厳密一致で見ていたころは、範囲が境界を跨いだままになり、
+      // `before_sep_edit` が既存の境界を「手前の枝の中」と誤読して
+      // 毎回新しい `---` を書いていた（押すたびにファイルが太る）。
+      if range_end[i] >= b.end && range_end[i] <= f {
         range_end[i] = b.start
       }
     }
@@ -155,8 +162,31 @@ fn sep_body(root_depth : Int, flip : Bool) -> String {
 /// 境界をブロックの境目 `at` へ書き入れる編集。前後の空行の出し分けは
 /// block_insert（heading.mbt）に任せる。
 fn insert_sep_edit(at : Int, root_depth : Int, flip : Bool) -> Edit {
-  let (insert, _) = block_insert(at, sep_body(root_depth, flip))
-  Edit::{ from: at, to: at, insert, removed: "" }
+  let put = outside_hide(at)
+  let (insert, _) = block_insert(put, sep_body(root_depth, flip))
+  Edit::{ from: put, to: put, insert, removed: "" }
+}
+
+///|
+/// 区切り行を書き入れてよい位置。`at` が hide 領域の中なら、開きマーカーの
+/// **手前**まで引き戻す。
+///
+/// 畳んだ枝の `from` は `<!--` の内側を指すので、そのまま挿入位置に使うと
+/// `---` がマーカーの内側に書かれる。そうなると `sole_hide_region` の
+/// 「中身はちょうどこのノードだけ」が外れ、次の一手でマーカーだけが
+/// 取り残されて、**保存した .md が未閉じの HTML コメントになる**
+/// （他のツールでは以降が丸ごと消える）。区切りは構造の話なので、
+/// 畳んであるかに関わらず領域の外に置くのが正しい。
+fn outside_hide(at : Int) -> Int {
+  let n = st.text.length()
+  let mut put = at
+  for r in st.hide_regions {
+    let end = if r.close_next == -1 { n } else { r.close_next }
+    if put > r.open_start && put < end {
+      put = r.open_start
+    }
+  }
+  put
 }
 
 ///|

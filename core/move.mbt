@@ -210,12 +210,24 @@ fn move_lands_outside(order : Array[Int], target : Int) -> Bool {
 }
 
 ///|
-/// pos: 0 = as last child of target, 1 = before target, 2 = after target.
+/// 落とし先が畳んであれば先に開く。**着地点を計算する前に呼ぶこと。**
 ///
-/// **落とし先が畳んであれば先に開く**（`unfold_before_add` と同じ理由）。
-/// 開かないと、挿入点が hide 領域の中に入り込み、動かしたノードがマップから
-/// 消えて `+N` バッジに呑まれるだけの結果になる — 予告線は普通の挿入に
-/// 見えるのに、実際は見えなくなる「惜しい」の中でも最悪の類。
+/// hide のマーカーはノードの範囲の外にあるので、畳んだままの相手の `to`
+/// （= 閉じマーカーの手前）へ挿し込むと、動かした枝が領域の中に入り、
+/// マップから消えて `+N` バッジに呑まれる。予告線は普通の挿入に見えるので
+/// 「惜しい」の中でも最悪の類。`unfold_before_add` と同じ理由。
+///
+/// **落とし先を自分で導き出すコマンドは、導き出した相手に対して呼ぶ**
+/// （`cmd_move_side_end` の `last` のように、利用者が指した相手とは限らない）。
+fn unfold_target(id : Int) -> Unit {
+  let i = find_node(id)
+  if i >= 0 && st.nodes[i].hidden {
+    cmd_toggle_hidden(id)
+  }
+}
+
+///|
+/// pos: 0 = as last child of target, 1 = before target, 2 = after target.
 fn cmd_move(ids : Array[Int], target : Int, pos : Int) -> Unit {
   begin_tx("")
   with_sweep(fn() {
@@ -226,10 +238,7 @@ fn cmd_move(ids : Array[Int], target : Int, pos : Int) -> Unit {
     if !move_lands_outside(order, target) {
       return
     }
-    let ti = find_node(target)
-    if ti >= 0 && st.nodes[ti].hidden {
-      cmd_toggle_hidden(target)
-    }
+    unfold_target(target)
     let rehide = unhide_for_move(order)
     let first_focus = move_steps(ids, target, pos)
     for id in rehide {
@@ -256,6 +265,7 @@ fn cmd_move_as_parent(ids : Array[Int], target : Int) -> Unit {
     if !move_lands_outside(order, target) {
       return
     }
+    unfold_target(target)
     let rehide = unhide_for_move(order)
     let first_focus = move_steps(ids, target, 1)
     // 移動が一切起きなかったときに indent だけ走らせると、B が無関係な
@@ -264,7 +274,12 @@ fn cmd_move_as_parent(ids : Array[Int], target : Int) -> Unit {
       cmd_indent([target])
     }
     for id in rehide {
-      cmd_toggle_hidden(id)
+      // **子が増えた枝は畳み直さない。** 割り込みでは掴んだ枝が相手の親に
+      // なるので、畳み直すと相手（と其の子孫）まで領域に呑まれて消える。
+      // `unfold_before_add` が「足したら開いたままにする」のと同じ理由。
+      if first_focus == -1 || id != first_focus {
+        cmd_toggle_hidden(id)
+      }
     }
     if first_focus != -1 {
       st.focus = first_focus
@@ -278,11 +293,18 @@ fn cmd_move_as_parent(ids : Array[Int], target : Int) -> Unit {
 /// （兄弟ごと包んでいるのではなく nd 単独）があればそれを返す。無ければ -1。
 /// move / delete / outdent / reorder が「マーカーだけ外に取り残す」事故を
 /// 避けるための共通の判定はここに一本化する。
+/// **位置のバイト厳密一致では狭すぎる。** マーカーと見出しのあいだに空行が
+/// 1 行あるだけで外れ、マーカーが置き去りになって空の対がゴミとして残り、
+/// hidden も黙って落ちていた（`docs/spec.md` はマーカーの判定を
+/// 「エディタや GitHub と同じ」= 寛容と明言しており、読む側は実際に緩い。
+/// 動かす/消す/足す側だけが厳しかった）。あいだが空白だけなら同じとみなす。
 fn sole_hide_region(nd : Node) -> Int {
   let mut idx = -1
   for i = 0; i < st.hide_regions.length(); i = i + 1 {
     let r = st.hide_regions[i]
-    if r.open_next == nd.from && r.close_start == nd.to {
+    let head_ok = r.open_next <= nd.from && is_blank_range(r.open_next, nd.from)
+    let tail_ok = r.close_start >= nd.to && is_blank_range(nd.to, r.close_start)
+    if head_ok && tail_ok {
       idx = i
       break
     }
@@ -491,6 +513,11 @@ fn cmd_move_side_end(ids : Array[Int], root : Int, left : Bool) -> Unit {
     if !move_lands_outside(order, if last >= 0 { last } else { root }) {
       return
     }
+    // 着地点は**こちらで導いた** `last`。それが畳んでいれば、その閉じマーカーの
+    // 手前へ挿し込むことになるので、先に開く
+    if last >= 0 {
+      unfold_target(last)
+    }
     let rehide = unhide_for_move(order)
     if last >= 0 {
       // その側の最後のグループの末尾へ（区切りは書かない）
@@ -566,6 +593,7 @@ fn cmd_move_new_group(
     if !move_lands_outside(order, target) {
       return
     }
+    unfold_target(target)
     let rehide = unhide_for_move(order)
     // 動かした枝がそのグループで唯一のメンバーだったときは、両脇の境界が
     // くっついて生の行数がそのまま flip として読めてしまう（xor 前の値）。
