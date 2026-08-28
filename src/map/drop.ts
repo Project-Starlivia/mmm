@@ -186,7 +186,9 @@ function findSlot(scene: DropScene, root: number, left: boolean): Drop {
  * 「子にする」から場所を取ると使いにくい、という実際の使用感を優先。
  * 押していれば先に判定し、狙える範囲も広げる。
  */
-function findEdge(scene: DropScene): DropTarget | null {
+function findEdge(
+  scene: DropScene,
+): { target: DropTarget; dist: number } | null {
   if (!scene.single) return null;
   let best = scene.preferEdge ? 30 : 16; // 線からこの距離まで拾う
   const band = scene.preferEdge ? 0.1 : 0.3; // 端から何割を狙い所から外すか
@@ -234,7 +236,7 @@ function findEdge(scene: DropScene): DropTarget | null {
       }
     }
   }
-  return onEdge === null ? null : { id: onEdge, pos: 3 };
+  return onEdge === null ? null : { target: { id: onEdge, pos: 3 }, dist: best };
 }
 
 /**
@@ -359,7 +361,8 @@ export function resolveDrop(scene: DropScene): DropDecision {
 
   // Shift = 線への割り込みを最優先。見つかったかどうかは後の段でも使う
   // （見つかった線を、外側ゾーンや帯が黙って横取りしない）
-  const edgeTarget = findEdge(scene);
+  const edge = findEdge(scene);
+  const edgeTarget = edge === null ? null : edge.target;
   let target: DropTarget | null = scene.preferEdge ? edgeTarget : null;
   const shiftWon = target !== null;
 
@@ -415,15 +418,17 @@ export function resolveDrop(scene: DropScene): DropDecision {
   // 外側ゾーンの**近い側は帯より強い**（右に置いたのに兄弟になる、を防ぐ）。
   // 遠い側は「誰も取らない空間の受け皿」なので、帯が居れば譲る。
   //
-  // **既知の穴**: `!edgeTarget` は「線が見つかったか」だけを見て外側ゾーンを
-  // 落とすが、線はすぐ下の `if (!target)` でしか据えられない。帯が既に
-  // 埋まっていると線も据えられず、調停していた二者のどちらでもない帯が残る
-  // — 通路の付け根側の細い帯で、着地する親が 1 段上へ黙って飛ぶ。
-  // 直すには「線が勝つ」か「外側ゾーンが勝つ」かを決める必要があり、
-  // どちらにしても通路の三層（付け根=親 / 真ん中=線 / 子側=前後）の
-  // 見え方が変わるので、意図して手を付けずに残してある。
-  if (outTarget && !edgeTarget && best > 0 && (outU <= NEAR || !target)) {
-    target = outTarget;
+  // 線と外側ゾーンは通路で完全に重なる（親の通路には必ずその親から子への線が
+  // 通り、`NEAR` は通路の幅そのもの）。**重なる二者は種類の順位ではなく
+  // 距離で決める** — どちらも「狙った物から何 px 離れているか」なので比べられる。
+  //
+  // 順位で書こうとすると循環する: 外側(近) > 帯 > 線 > 外側。実際、
+  // `!edgeTarget` で「線が居るなら外側ゾーンを引っ込める」と書いていたころは、
+  // 引っ込めた後に線を据えるとは限らず（すぐ下の `if (!target)` は帯が
+  // 埋まっていれば発火しない）、**調停していた二者のどちらでもない帯**が
+  // 残っていた。比べていない第三者の有無で勝敗が決まる形は順位ではない。
+  if (outTarget && best > 0 && (outU <= NEAR || !target)) {
+    target = edge !== null && edge.dist < outU ? edge.target : outTarget;
   }
 
   if (!target) target = edgeTarget;

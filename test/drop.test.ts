@@ -213,6 +213,34 @@ test("隣の列の枝は、その先の列の兄弟挿入を横取りしない",
   assert.deepEqual(d.drop, { kind: "node", id: 4, pos: 2 });
 });
 
+test("通路のどこで離しても、着地する親はその通路の主のまま", () => {
+  // 線と外側ゾーンは通路で完全に重なる（親の通路には必ずその親から子への線が
+  // 通り、NEAR は通路の幅そのもの）。「線が居るなら外側ゾーンを引っ込める」と
+  // 書いていたころは、引っ込めた後に線を据えるとは限らず、調停していた二者の
+  // どちらでもない**帯**が残って、付け根 16px だけ親が 1 段上へ飛んでいた
+  const root = box(1, 1, 0, 100, 31);
+  const a = box(2, 2, 76, -55, 31);
+  const kids = [3, 4, 5].map((id, i) => box(id, 3, 152, -95 + i * 40, 31));
+  const boxes = [root, a, ...kids];
+  const links: [number, number][] = [
+    [2, 1],
+    ...kids.map((k): [number, number] => [k.n.id, 2]),
+  ];
+  const kidIds = new Set(kids.map((k) => k.n.id));
+  for (let x = a.x + a.w; x < kids[0].x; x += 3) {
+    for (let y = -73; y <= -7; y += 3) {
+      const d = resolveDrop(scene(boxes, links, { x, y })).drop;
+      if (!d || d.kind !== "node") continue;
+      // 着地後の親は a（子にする / a の子の隣 / a の子の線への割り込み）
+      const parent = d.pos === 0 ? d.id : 2;
+      assert.ok(
+        parent === 2 && (d.id === 2 || kidIds.has(d.id)),
+        `(${x},${y}) の着地先 ${JSON.stringify(d)} は a の外`,
+      );
+    }
+  }
+});
+
 test("子の無い枝の通路は、その最初の子にするゾーン", () => {
   // b の右辺(107) と f の列(152) のあいだ。隣に並ぶ子がいないので、通路は
   // 丸ごと「最初の子にする」。ここを取り上げると子を足す手が無くなる
@@ -236,8 +264,9 @@ test("子がいる枝の通路は、指した高さがそのまま行き先", ()
     [4, 2],
     [5, 2],
   ];
-  // 帯の**子側**（真ん中は線への割り込みが持つ）。付け根から 3 分の 2 あたり
-  const at = (y: number) => resolveDrop(scene(boxes, links, { x: 145, y })).drop;
+  // 通路の**付け根側**。真ん中は線のほうが近いので線が取る（重なる二者は
+  // 距離で決める）。付け根側は線から遠いのでスロットが残る
+  const at = (y: number) => resolveDrop(scene(boxes, links, { x: 111, y })).drop;
   // e の下寄り → e の後ろ / f の上寄り → f の手前 / f と g の間 → g の手前
   assert.deepEqual(at(-71), { kind: "node", id: 3, pos: 2 });
   assert.deepEqual(at(-56), { kind: "node", id: 4, pos: 1 });
