@@ -845,3 +845,17 @@ test "a no-op drop does not unfold the landing spot" {
   ignore(move_nodes([3], 2, 0)) // a1 は既に a の最後の子
   assert_eq(get_text(), folded)
 }
+
+///|
+/// 並べ替えただけで、無関係なグループが反対側へ飛ばない。
+///
+/// 生の区切り行が生きた境界と地続きになると、1 本 + 1 本が 2 行 = 切り替えと
+/// 読まれる。その run に入る目印は 1 つだけなので、書き直しを「目印の数」で
+/// ゲートしていたころは素通りしていた。`sep_body` は空行を挟んだ形を書かない
+/// ので、正規形でないことがそのまま「勝手にくっついた」の印になる。
+/// 掴んだのは a1 だけなので、b は右のままでなければならない。
+test "a fused separator run does not flip an untouched group" {
+  ignore(init_doc("# r\n\n## a\n\n### a1\n\n---\n\n### a2\n\n---\n\n## b\n"))
+  ignore(reorder_node(3, 1, false))
+  assert_eq(get_text(), "# r\n\n## a\n\n### a2\n\n### a1\n\n---\n\n## b\n")
+}

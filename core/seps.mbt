@@ -415,6 +415,23 @@ fn leads_tree(at : Int) -> Bool {
 }
 
 ///|
+/// `at` から次のノードの行頭まで、空白しか無いか。
+///
+/// 先頭の境界を消してよいかの見張り。境界には「そこから先を反対側にする」の
+/// ほかに **`cap_at_first_bound` がルートの本文をそこで切り詰める**という
+/// 第 2 の効果があり、あいだに本文（画像・フェンス・リンク）があるまま消すと
+/// 根のカードがそれを飲み込む。
+fn blank_to_next_node(at : Int) -> Bool {
+  let mut next = st.text.length()
+  for nd in st.nodes {
+    if nd.from >= at && nd.from < next {
+      next = nd.from
+    }
+  }
+  is_blank_range(at, next)
+}
+
+///|
 /// `at` と同じ木の中で、`at` 以降にある最初の生きた境界。無ければ `None`。
 /// 掃除が、無効になった境界の反転ぶんを畳む先を探すのに使う。
 fn next_live_bound_after(at : Int) -> Bound? {
@@ -518,21 +535,33 @@ fn sweep_seps(marks : SepMarks, from_set : Int) -> Unit {
   }
   let set : Array[Edit] = []
   for i = 0; i < nb; i = i + 1 {
-    // 目印が 2 つ以上 = 空いてくっついた。空行を挟んで地続きになった生の
-    // 区切り行は、行数で読むと桁が合わない（1 本 + 1 本 = 2 行だが反転
-    // 0 回）だけでなく、挟まった空行も正規形には無いので、xor が今の
-    // flip とたまたま一致していても正規形に書き直して余りを削る。
-    // 畳み込みを受けた境界も、反転ぶんが変わりうるので同じく書き直す
-    if hit[i] >= 2 || folded[i] {
-      let b = st.bounds[i]
+    let b = st.bounds[i]
+    let depth = root_depth_at(b.start)
+    // 目印が 2 つ以上 = 空いてくっついた。畳み込みを受けたものも反転ぶんが
+    // 変わりうる。どちらも正規形に書き直して余りを削る。
+    //
+    // それに加えて**融合したラン**を拾う。空行を挟んで地続きになった生の
+    // 区切り行は 1 本 + 1 本 = 2 行 = 切り替えとして読まれるのに、その run に
+    // 入る目印は 1 つだけなので、数だけで見ていたころは素通りしていた
+    // （並べ替えただけで無関係なグループが反対側へ飛んでいた）。
+    // **`sep_body` は空行を挟んだ形を書かない**ので、正規形でないことが
+    // そのまま「勝手にくっついた」の印になる。目印が運ぶ意味と読みが食い違う
+    // ときだけ直す — コマンドが意図して書いた境界（必ず正規形）は触らない。
+    let raw = slice(st.text, b.start, b.end)
+    let normal = raw == sep_body(depth, true) || raw == sep_body(depth, false)
+    let fused = !normal && hit[i] >= 1 && b.flip != flip[i]
+    if hit[i] >= 2 || folded[i] || fused {
       // 畳んだ結果が「先頭 + 切り替え無し」なら、その境界はもう何もしていない。
       // 書き直して残すのは、打ち消すためにもう 1 本足すのと同じ種類の誤り
       // （before_sep_edit が先頭に対して持っているのと同じ規則）。
-      // 中ほどの境界は切り替えなしでも継ぎ目とグループの壁になるので残す
-      if !flip[i] && leads_tree(b.start) {
+      // 中ほどの境界は切り替えなしでも継ぎ目とグループの壁になるので残す。
+      // 境界と次の枝のあいだに本文があるときも消さない — 先頭の境界には
+      // 切り替えのほかに `cap_at_first_bound` がルートの本文をそこで
+      // 切り詰める効果があり、消すと根のカードがそれを飲み込む
+      if !flip[i] && leads_tree(b.start) && blank_to_next_node(b.end) {
         set.push(remove_sep_edit(b))
       } else {
-        set.push(set_sep_edit(b, root_depth_at(b.start), flip[i]))
+        set.push(set_sep_edit(b, depth, flip[i]))
       }
     }
   }
