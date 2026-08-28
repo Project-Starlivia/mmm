@@ -420,7 +420,9 @@ export function layoutMap(doc: DocView): Layout {
 
   let bottom = 0;
   if (root) bottom = placeTree(root, -treeH(root) / 2).bottom;
-  let top = boxes.size > 0 ? bottom + GAP.root * 2 : 0;
+  // 木と木の隙間は `GAP.root` ひとつ。ここだけ 2 倍だったころは、木を 3 本
+  // 以上並べると**最初の 1 か所だけ倍の隙間**が空いていた
+  let top = boxes.size > 0 ? bottom + GAP.root : 0;
   for (const tree of tops) {
     if (tree === root) continue;
     // 積む位置は**実測の下端**から。側を根へ揃えるとその側は `treeH` の

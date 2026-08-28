@@ -42,6 +42,10 @@ test("区切りが無ければ、今までどおり全部右へ伸びる", () =>
 // 縦の式（groupsH / treeH / placeTree）の退行を捕まえられないので、
 // 実際に走らせた値をそのまま golden にして数値ごと止める。孫・幅の違う兄弟・
 // 2 つ目の木（2 個目の `#`）を全部通す。
+//
+// 2 つ目の木の y は 123 → 89 に**意図して**下げた。木と木の隙間が最初の
+// 1 か所だけ `GAP.root * 2` になっていたのを 1 つに揃えたため（理由は
+// ソースにも spec にも無く、初期実装からの書き間違いだった）。
 test("区切りの無い本格的な文書は、全ノードの箱が golden の数値と一致する", () => {
   const md = "# root\n\n## a\n\n### a1\n\n### a22\n\n## bb\n\n# root2\n\n## c\n";
   const doc = loadDoc(md);
@@ -56,8 +60,8 @@ test("区切りの無い本格的な文書は、全ノードの箱が golden の
   assert.deepEqual(box("a1"), { x: 173, y: -55, w: 38, h: 30 });
   assert.deepEqual(box("a22"), { x: 173, y: -15, w: 45, h: 30 });
   assert.deepEqual(box("bb"), { x: 97, y: 25, w: 38, h: 30 });
-  assert.deepEqual(box("root2"), { x: 0, y: 123, w: 59, h: 30 });
-  assert.deepEqual(box("c"), { x: 104, y: 123, w: 31, h: 30 });
+  assert.deepEqual(box("root2"), { x: 0, y: 89, w: 59, h: 30 });
+  assert.deepEqual(box("c"), { x: 104, y: 89, w: 31, h: 30 });
 });
 
 test("切り替えの後ろの枝は、ルートの左へミラーで伸びる", () => {
@@ -222,6 +226,20 @@ test("グループの継ぎ目は、箱の上を横切らない", () => {
         s.y > b.y && s.y < b.y + b.h && s.x < b.x + b.w && s.x + s.w > b.x;
       assert.ok(!inside, `継ぎ目 y=${s.y} が ${b.n.label} の箱を横切る`);
     }
+  }
+});
+
+test("木を並べたときの隙間は、どこも同じ", () => {
+  // 最初の 1 か所だけ `GAP.root * 2` で、3 本以上並べると先頭だけ倍空いていた
+  const doc = loadDoc("# A\n\n# B\n\n# C\n\n# D\n");
+  const L = layoutMap(doc);
+  const rows = [...L.boxes.values()]
+    .filter((b) => b.n.parent === -1)
+    .sort((p, q) => p.y - q.y);
+  assert.equal(rows.length, 4);
+  for (let i = 1; i < rows.length; i++) {
+    const gap = rows[i].y - (rows[i - 1].y + rows[i - 1].h);
+    assert.equal(gap, GAP.root, `${rows[i].n.label} の手前の隙間`);
   }
 });
 
