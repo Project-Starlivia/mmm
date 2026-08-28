@@ -518,13 +518,6 @@ html, body {
 
   /* ---- いまの操作の状態（付けるのは mindmap.ts の paintState）----
      ここは順番が意味を持つ。同じ強さなので、後ろに書いたものが勝つ */
-  /* md のカーソルが居るノード。選択より**弱い**印で、太さは足さない —
-     操作の対象ではなく居場所を言うだけなので、選ばれたものと見紛わせない
-     （両方が当たるときは、後ろに書いた .selected が勝つ） */
-  &.caret rect.box {
-    stroke: color-mix(in srgb, var(--accent) 50%, var(--node-border));
-    fill: color-mix(in srgb, var(--accent) 9%, var(--node-bg));
-  }
   &.selected rect.box {
     stroke: var(--accent);
     stroke-width: 2;
@@ -606,6 +599,28 @@ html, body {
   & .face { fill: var(--accent); }
   & line { stroke: #fff; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
   &:hover .face { filter: brightness(1.25); }
+}
+
+/* ========== md のカーソルが居るところ ========== */
+
+/* 箱の**内側**に重なるもう 1 本の輪（置き場所は mindmap.ts）。
+   内側なのは、選択が外の枠だから — 外から掴むのが選択、中に居るのが
+   カーソルで、形がそのまま意味になる。だから両方が成り立つときも、
+   外が選択・内がカーソルでそのまま両方読める。
+
+   綴りは**ペインのフォーカス**（`#map-pane.pane-focused`）と同じ
+   accent-soft の 2px。「フォーカスはここ」という言葉は既にあるので、
+   ノードの大きさで同じことを言うだけにする。 */
+#caret-ring {
+  fill: none;
+  stroke: var(--accent-soft);
+  stroke-width: 2;
+  rx: 5px;
+  /* 印は乗っているだけ。掴めると、下のノードを選べなくなる */
+  pointer-events: none;
+
+  /* 畳んだノードは角の丸みも小さく、薄い。輪もそれに合わせる */
+  &.hidden-node { rx: 2px; opacity: 0.45; }
 }
 
 /* ========== 落とし先の示し ========== */

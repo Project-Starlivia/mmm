@@ -93,7 +93,6 @@ export class MapRenderer {
   // 起こすだけ無駄なので書かない（プロファイル上いちばん重い JS 呼び出しだった）
   private nodeTf = new Map<number, string>();
   private edgeD = new Map<number, string>();
-  private caretEl: SVGGElement | undefined; // md のカーソルの印を付けた相手
   private domOrderSig = ""; // DOM の並び（= 重なり順）を直す判定用
   private seamEls: SVGLineElement[] = [];
 
@@ -121,22 +120,6 @@ export class MapRenderer {
     for (const [id, g] of this.nodeEls) {
       g.classList.toggle("selected", sel.has(id));
     }
-  }
-
-  /**
-   * md のカーソルが居るノードの印（-1 でどこにも付かない）。**常に高々 1 つ**
-   * なので、付けた相手を覚えておいて外す — 打鍵のたびに全ノードを舐めない
-   * （ドロップ印が dropMarks を覚えているのと同じ理由）。
-   *
-   * 消えたノードの要素を握ったままになることがあるが、外れた要素から
-   * class を落とすのは無害。付け直す相手は毎回 id から引き直す。
-   */
-  refreshCaret(id: number): void {
-    const next = this.nodeEls.get(id);
-    if (next === this.caretEl) return;
-    this.caretEl?.classList.remove("caret");
-    this.caretEl = next;
-    next?.classList.add("caret");
   }
 
   private shapeOf(n: NodeInfo, b: Box, buried: number, p: Scene): NodeShape {

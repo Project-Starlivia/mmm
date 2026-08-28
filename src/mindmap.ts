@@ -138,6 +138,10 @@ const emptyLayout = (): Layout => ({
 const FIT_MARGIN = 60;
 const SHOW_MARGIN = 40;
 
+/** カーソルの輪を、箱の縁からどれだけ内側へ入れるか（world px）。
+ *  輪の太さと角丸は style.css の `#caret-ring` が持つ */
+const CARET_INSET = 2.5;
+
 /**
  * その出来事の的が `selector` に当てはまる要素（かその中）なら、それを返す。
  *
@@ -183,6 +187,8 @@ export class MindMap {
   private renderer = new MapRenderer();
   private dropLine: SVGLineElement;
   private dropHint: SVGPathElement; // どの親につくかを示す予告の曲線
+  /** md のカーソルが居るノードに重なる内側の輪（常に高々 1 つ） */
+  private caretRing: SVGRectElement;
   /** 選んでいるカードに被せる枠と ×（常に高々 1 枚なので 1 個だけ持つ） */
   private pick = new CardPick();
   /** 選んでいるノードの上下左右に出る `+`（出すかどうかは人が決める） */
@@ -252,7 +258,6 @@ export class MindMap {
   /**
    * md のカーソルが居るノード（-1 = md にカーソルが無い / どのノードでもない）。
    * **選択ではない** — 操作の対象は選択だけで、こちらは居場所を言うだけ。
-   * 描き直しで要素が作り直されても paintState が同じ印を戻す。
    */
   private caret = -1;
 
@@ -270,10 +275,12 @@ export class MindMap {
     this.viewport = svgEl("g");
     this.dropLine = svgEl("line", { id: "drop-line", visibility: "hidden" });
     this.dropHint = svgEl("path", { id: "drop-hint", visibility: "hidden" });
+    this.caretRing = svgEl("rect", { id: "caret-ring", visibility: "hidden" });
     this.viewport.append(
       this.renderer.edgeLayer,
       this.renderer.seamLayer,
       this.renderer.nodeLayer,
+      this.caretRing,
       this.pick.el,
       this.adds.el,
       this.dropHint,
@@ -461,7 +468,7 @@ export class MindMap {
    */
   private paintState(): void {
     this.renderer.refreshSelection(this.host.selection());
-    this.renderer.refreshCaret(this.caret);
+    this.showCaret();
     for (const id of this.dragging?.subtree ?? NO_IDS) {
       this.renderer.nodeEl(id)?.classList.add("dragging");
     }
@@ -2008,7 +2015,31 @@ export class MindMap {
    */
   setCaret(id: number): void {
     this.caret = id;
-    this.renderer.refreshCaret(id);
+    this.showCaret();
+  }
+
+  /**
+   * カーソルの輪を、そのノードの**内側**へ重ねる。内側に置くのは選択が
+   * 外の枠だから — 外から掴むのが選択、中に居るのがカーソルで、形がそのまま
+   * 意味になる。どちらを強くしても混ざらず、重なれば両方読める。
+   *
+   * ノードの子ではなく world に浮かぶ 1 個の印にする（`CardPick` と同じ）。
+   * 子にすると、カーソルが動くたびにそのノードの中身が丸ごと作り直される。
+   * 箱が無い（畳まれて描かれていない）なら出さない — 指す相手が画面に
+   * 居ないのに、印だけ置くことはしない。
+   */
+  private showCaret(): void {
+    const b = this.boxes.get(this.caret);
+    if (!b) {
+      this.caretRing.setAttribute("visibility", "hidden");
+      return;
+    }
+    this.caretRing.setAttribute("visibility", "visible");
+    this.caretRing.classList.toggle("hidden-node", b.n.hidden);
+    this.caretRing.setAttribute("x", String(b.x + CARET_INSET));
+    this.caretRing.setAttribute("y", String(b.y + CARET_INSET));
+    this.caretRing.setAttribute("width", String(b.w - CARET_INSET * 2));
+    this.caretRing.setAttribute("height", String(b.h - CARET_INSET * 2));
   }
 
   /** レイアウトを見直さない軽い塗り替え（矩形選択の途中で使う）。
