@@ -204,12 +204,30 @@ function findEdge(scene: DropScene): DropTarget | null {
       segLen.push(l);
       total += l;
     }
+    // 狙い所の弧長の窓。**区間を窓で切ってから測る** — 区間の中点が窓の中か
+    // どうかで捨てていたころは、真横に並ぶ親子（`edgeSegs` が 1 本の直線に
+    // 畳む = 折れ線が 2 点）だと中点が必ず 50% になり、端を外す規則が一度も
+    // 発火しなかった。線の端まで拾えてしまい、Shift 中は箱の内側まで
+    // 割り込みに飲まれていた。
+    const lo = total * band;
+    const hi = total * (1 - band);
     let acc = 0;
     for (let i = 1; i < pts.length; i++) {
-      const mid = acc + segLen[i - 1] / 2;
-      acc += segLen[i - 1];
-      if (mid < total * band || mid > total * (1 - band)) continue;
-      const d = distToSeg(scene.at, pts[i - 1], pts[i]);
+      const a0 = acc;
+      const a1 = acc + segLen[i - 1];
+      acc = a1;
+      const from = Math.max(a0, lo);
+      const to = Math.min(a1, hi);
+      if (to <= from || a1 === a0) continue;
+      const t0 = (from - a0) / (a1 - a0);
+      const t1 = (to - a0) / (a1 - a0);
+      const p = pts[i - 1];
+      const q = pts[i];
+      const at = (t: number) => ({
+        x: p.x + (q.x - p.x) * t,
+        y: p.y + (q.y - p.y) * t,
+      });
+      const d = distToSeg(scene.at, at(t0), at(t1));
       if (d < best) {
         best = d;
         onEdge = id;
@@ -394,6 +412,16 @@ export function resolveDrop(scene: DropScene): DropDecision {
       outTarget = (isRoot ? null : slotAmongKids(scene, id)) ?? { id, pos: 0 };
     }
   }
+  // 外側ゾーンの**近い側は帯より強い**（右に置いたのに兄弟になる、を防ぐ）。
+  // 遠い側は「誰も取らない空間の受け皿」なので、帯が居れば譲る。
+  //
+  // **既知の穴**: `!edgeTarget` は「線が見つかったか」だけを見て外側ゾーンを
+  // 落とすが、線はすぐ下の `if (!target)` でしか据えられない。帯が既に
+  // 埋まっていると線も据えられず、調停していた二者のどちらでもない帯が残る
+  // — 通路の付け根側の細い帯で、着地する親が 1 段上へ黙って飛ぶ。
+  // 直すには「線が勝つ」か「外側ゾーンが勝つ」かを決める必要があり、
+  // どちらにしても通路の三層（付け根=親 / 真ん中=線 / 子側=前後）の
+  // 見え方が変わるので、意図して手を付けずに残してある。
   if (outTarget && !edgeTarget && best > 0 && (outU <= NEAR || !target)) {
     target = outTarget;
   }
