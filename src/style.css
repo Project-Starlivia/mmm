@@ -611,12 +611,12 @@ html, body {
    カーソルで、形がそのまま意味になる。だから両方が成り立つときも、
    外が選択・内がカーソルでそのまま両方読める。
 
-   綴りは**ペインのフォーカス**（`#map-pane.pane-focused`）と同じ
-   accent-soft の 2px。「フォーカスはここ」という言葉は既にあるので、
-   ノードの大きさで同じことを言うだけにする。 */
+   **`--accent-soft` は借りない。** あれは面を塗るための薄さで（md 側の
+   ハイライトも矩形選択も面）、2px の線に使うと消える。内側に居る以上
+   選択と紛れようがないので、線として読める濃さを自分で持つ。 */
 .caret-ring {
   fill: none;
-  stroke: var(--accent-soft);
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
   stroke-width: 2;
   rx: 5px;
   /* 印は乗っているだけ。掴めると、下のノードを選べなくなる */
