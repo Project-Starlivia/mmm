@@ -946,3 +946,19 @@ test "a lead boundary that caps root content is kept" {
   ignore(move_side_end([3], 1, true))
   assert_eq(get_text().contains("# r\n\n---\n\n![](./x.png)"), true)
 }
+
+///|
+/// hide のマーカーを外すときは、マーカーと中身のあいだ・直後の空行も
+/// 一緒に片付ける。行だけ抜いていたころは空行が積み上がり、畳み直すたびに
+/// 1 行ずつ増えていた（絵は変わらないのでテキストだけが汚れる）。
+test "removing hide markers takes their blank padding with them" {
+  // 畳んで開いて畳む = 正規形に落ち着く（空行が増えない）
+  ignore(init_doc("# r\n\n<!--\n\n## a\n\n### a1\n\n-->\n\n## b\n"))
+  ignore(toggle_hidden(2))
+  ignore(toggle_hidden(2))
+  assert_eq(get_text(), "# r\n\n<!--\n## a\n\n### a1\n\n-->\n## b\n")
+  // 畳んだ枝を消すと、マーカーも空行も残らない
+  ignore(init_doc("# r\n\n<!--\n\n## a\n\n### a1\n\n-->\n\n## b\n"))
+  ignore(delete_nodes([2]))
+  assert_eq(get_text(), "# r\n\n## b\n")
+}
