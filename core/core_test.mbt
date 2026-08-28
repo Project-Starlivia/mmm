@@ -889,3 +889,16 @@ test "a flank drop lands on the side that was asked for" {
   let s = move_side_end([3], 1, true)
   assert_eq(node_left(s, "b"), true)
 }
+
+///|
+/// 親とその子孫を一緒に選んでも、割り込みの結果は親だけを選んだときと同じ。
+/// UI が「複数だと誰が親になるか決まらない」で割り込みを止めていた根拠が
+/// 成立していないことの裏づけ（コアは normalize_selection で畳む）。
+test "selecting a parent with its descendant is the same as the parent alone" {
+  ignore(init_doc("# r\n\n## a\n\n### a1\n\n## b\n"))
+  ignore(move_as_parent([2], 4))
+  let alone = get_text()
+  ignore(init_doc("# r\n\n## a\n\n### a1\n\n## b\n"))
+  ignore(move_as_parent([2, 3], 4))
+  assert_eq(get_text(), alone)
+}

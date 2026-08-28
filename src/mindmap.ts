@@ -204,7 +204,12 @@ export class MindMap {
     null;
   private rubberStart: { x: number; y: number } | null = null;
   private dragCand: { id: number; px: number; py: number } | null = null;
-  private dragging: { ids: number[]; subtree: Set<number> } | null = null;
+  private dragging: {
+    ids: number[];
+    /** ids のうち、祖先が一緒に選ばれていないもの（= コアが実際に動かす枝） */
+    roots: number[];
+    subtree: Set<number>;
+  } | null = null;
   /** カードのドラッグ。掴んだだけ（閾値を越えるまで）は drop を出さない */
   private cardDrag: {
     ref: CardRef;
@@ -1582,7 +1587,21 @@ export class MindMap {
         if (m.from >= nd.from && m.from < nd.to) subtree.add(m.id);
       }
     }
-    this.dragging = { ids, subtree };
+    // 祖先が一緒に選ばれている id は、コアの `normalize_selection` が落とす
+    // ので**別々の枝としては数えない**。「複数だと誰が親になるか決まらない」
+    // は本当に独立した枝が 2 つ以上あるときの話で、親＋子孫はコアから見れば
+    // 親 1 つと完全に同じ。数えていたころは、範囲選択で親と子を一緒に掴むと
+    // 線への割り込みだけが盤面から黙って消えていた。
+    const roots = ids.filter((nid) => {
+      const nd = byId.get(nid);
+      if (!nd) return false;
+      return !ids.some((other) => {
+        if (other === nid) return false;
+        const o = byId.get(other);
+        return o !== undefined && nd.from >= o.from && nd.from < o.to;
+      });
+    });
+    this.dragging = { ids, roots, subtree };
     for (const id of subtree) this.markNode(id, "dragging");
     this.updatePlus();
   }
@@ -1607,7 +1626,7 @@ export class MindMap {
       boxes: this.boxes,
       parentOf: this.layout.parentOf,
       dragging: dragging.subtree,
-      single: dragging.ids.length === 1,
+      single: dragging.roots.length === 1,
       preferEdge,
       newGroup,
       polyline: (id) => this.edgePolyline(id),
