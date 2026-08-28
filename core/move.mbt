@@ -546,8 +546,17 @@ fn cmd_move_side_end(ids : Array[Int], root : Int, left : Bool) -> Unit {
       // その側の最後のグループの末尾へ（区切りは書かない）
       ignore(move_steps(ids, last, 2))
     } else {
-      // その側は空。ルートの最後の子にしてから、手前の境界を整える
+      // その側は空。ルートの最後の子にしてから、手前の境界を整える。
+      //
+      // **側を読む前に一度掃除する。** 動かした枝が単独グループだったときは
+      // 両脇の境界が空行を挟んで地続きになり、生の行数がそのまま flip として
+      // 読めてしまう（1 本 + 1 本 = 2 行 = 切り替え）。畳む前の側で `prev` を
+      // 読むと `want` が反転し、**頼んだ側と反対に着地**していた。
+      // `cmd_move_new_group` は同じ理由で既にこの手当てを持っている。
+      let move_marks = sep_marks()
+      let move_base = st.last_sets.length()
       let first = move_steps(ids, root, 0)
+      sweep_seps(move_marks, move_base)
       if first >= 0 {
         // 塊の範囲は、動かしたものを id で引き直して出す（id は移動をまたいで生きる）
         let mut head_from = -1

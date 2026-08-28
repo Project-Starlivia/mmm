@@ -19,6 +19,23 @@ fn node_hidden(snap : String, label : String) -> Bool {
 }
 
 ///|
+/// スナップショットの中で、ラベル `label` のノードが左側か。
+/// 見方は `node_hidden` と同じ（ノード 1 つ = 1 つの `{…}` の中だけを見る）。
+fn node_left(snap : String, label : String) -> Bool {
+  let needle = "\"label\":\"" + label + "\""
+  let at = match snap.find(needle) {
+    Some(i) => i
+    None => abort("node_left: label not found in snapshot: " + label)
+  }
+  let head = snap[0:at]
+  let brace = match head.rev_find("{") {
+    Some(i) => i
+    None => abort("node_left: no enclosing { before label: " + label)
+  }
+  snap[brace:at].contains("\"left\":true")
+}
+
+///|
 test "parse basic structure" {
   ignore(init_doc("# root\n\n## a\n\n### b\n\nbody of b\n\n## c\n"))
   // root(1) a(2) b(3) c(4) — verify via selection_text of the whole doc
@@ -858,4 +875,17 @@ test "a fused separator run does not flip an untouched group" {
   ignore(init_doc("# r\n\n## a\n\n### a1\n\n---\n\n### a2\n\n---\n\n## b\n"))
   ignore(reorder_node(3, 1, false))
   assert_eq(get_text(), "# r\n\n## a\n\n### a2\n\n### a1\n\n---\n\n## b\n")
+}
+
+///|
+/// ルートの空いている脇へ落としたら、頼んだ側に着く。
+///
+/// 動かす枝が両脇を素の `---` で挟まれた単独グループだと、抜けたあとに
+/// 両脇の境界が空行を挟んで地続きになり、生の行数がそのまま切り替えとして
+/// 読める。畳む前の側で手前の枝を読むと `want` が反転し、頼んだ側と反対に
+/// 着地していた。側を読む前に一度掃除する（cmd_move_new_group と同じ手当て）。
+test "a flank drop lands on the side that was asked for" {
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n"))
+  let s = move_side_end([3], 1, true)
+  assert_eq(node_left(s, "b"), true)
 }
