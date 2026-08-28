@@ -194,8 +194,14 @@ html, body {
   &:hover, &.dragging { background: var(--accent); }
 }
 /* 片方だけのときは幅を動かせない。押せば分割へ戻るので、掴む形ではなく
-   押す形のカーソルにする */
-#panes.no-map #splitter, #panes.no-md #splitter { cursor: pointer; }
+   押す形のカーソルにする。**狭いときは対象外** — `:root:not(.narrow)` を
+   付けないと `#panes.no-map`/`#panes.no-md`（詳細度 (2,1,0)）が
+   `.narrow #splitter`（詳細度 (1,1,0)）に必ず勝ってしまい、狭いときの
+   `cursor: default` が一度も効かない死んだ規則になる。狭いときは押しても
+   分割へは戻らない（`pointerdown` が早期リターンする）ので、この
+   「押せば戻る」形のカーソルを見せるべきでもない */
+:root:not(.narrow) #panes.no-map #splitter,
+:root:not(.narrow) #panes.no-md #splitter { cursor: pointer; }
 
 /* ========== md のペイン ========== */
 
@@ -258,6 +264,13 @@ html, body {
   }
 }
 
+/* **指にホバーは無い。** 沈めたままだと、起こす手段が無いまま半透明で
+   居続ける（ペイン切り替えの矢印・書き方ピッカー・視点を寄せるボタン、
+   3 つとも）。触って起こせないなら、最初から起きている */
+@media (hover: none) {
+  .pane-tool { opacity: 1; }
+}
+
 /* md の道具は**スクロールバーの内側**へ寄せる。CodeMirror のスクローラは
    環境により 15〜17px を取り、その帯はブラウザが押下を横取りするので
    （z-index では前に出せない）、幅を避けた位置から置く。
@@ -310,8 +323,37 @@ html, body {
   & button:disabled { display: none; }
 }
 /* 片方だけの時は、境目が窓の縁に来る。はみ出さないよう縁の内側へ留める */
-#panes.no-map #pane-switch { left: auto; right: 8px; transform: none; }
 #panes.no-md #pane-switch { left: 8px; transform: none; }
+/* md を出しているときの右端は CodeMirror のスクローラの帯（15〜17px）で、
+   ブラウザが押下を横取りする（z-index では前に出せない）。
+   `#md-pane .pane-tool` と同じだけ避ける */
+#panes.no-map #pane-switch { left: auto; right: 28px; transform: none; }
+
+/* 狭いときは、居場所が 2 つしか無い（`app/panes.ts` の `spotsFor`）。
+   **分割線は線としての性質だけを落とす** — 動かせない境目を「掴めます」と
+   いう顔で見せない。要素は 0 幅で残す: flex がそれを縁まで押し出すので、
+   `#pane-switch` は今までどおり同じ 1 か所に居られる（角と角に分けると、
+   片方だけスクロールバー避けの分ずれて見える）。
+   居場所が 2 つなら `button:disabled { display: none }` により、
+   **画面に出る矢印は常に 1 本**になる */
+.narrow #splitter {
+  width: 0;
+  background: none;
+  cursor: default;
+}
+
+/* 指の的。**幅ではなく入力の質で決まる話**なので `.narrow` ではなく
+   メディアクエリで見る（狭くしただけのデスクトップの窓を太らせない）。
+   狭いところでは、切り替えの矢印がペインを行き来する唯一の手段になる */
+@media (pointer: coarse) {
+  /* **縦だけ太らせても的にはならない。** 26px 幅のままだと、隙間なく 3 つ
+     並ぶ書き方ピッカー（H / n+ / L）は隣を押しやすく、外すと文書ぜんぶの
+     木の書き方が入れ替わる — マップ側のどのボタンより取り返しが遠い。
+     幅も 44px にする（3 つで 132px。いちばん狭い窓でも収まる） */
+  .pane-tool button { min-height: 44px; min-width: 44px; }
+  #pane-switch button { width: 44px; height: 44px; }
+  #pane-switch button .icon { width: 16px; height: 16px; }
+}
 
 /* ========== マップのペイン ========== */
 
@@ -323,6 +365,10 @@ html, body {
   outline: none;
   background-color: var(--bg);
   background-image: radial-gradient(circle, var(--dot) 1px, transparent 1px);
+  /* 指やペンでも動かせるように、ブラウザのスクロール/ズームへ渡さない
+     （`.popup-canvas` と同じ理由）。**md ペインには敷かない** —
+     CodeMirror のネイティブなスクロールを奪わない */
+  touch-action: none;
 
   &.pane-focused { box-shadow: inset 0 0 0 2px var(--accent-soft); }
 }
@@ -543,14 +589,19 @@ html, body {
   }
 }
 
-/* ========== 落とし先の示し ========== */
-
-.plus-btn {
+/* 選んでいるノードの上下左右に出る `+`。**的は見た目より広い** —
+   指は 9px の丸の縁を正確には狙えないので、透明な当たり判定を被せる
+   （見えている丸まで指の的の大きさにすると、ノードより目立つ） */
+.add-btn {
   cursor: pointer;
 
-  & circle { fill: var(--accent); }
-  & line { stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+  & .hit { fill: transparent; }
+  & .face { fill: var(--accent); }
+  & line { stroke: #fff; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+  &:hover .face { filter: brightness(1.25); }
 }
+
+/* ========== 落とし先の示し ========== */
 
 #drop-line {
   stroke: var(--accent);
@@ -875,16 +926,20 @@ html, body {
 }
 
 /* ========== 狭いとき ==========
-   片方だけを出す。**どちらを出すかは JS で持たない** — マップが on なら
-   マップ、off なら md。切り替えは Alt+1 / Alt+2 がそのまま担う。 */
+   **どちらのペインを出すかは、ここでは決めない。** 居場所（狭ければ
+   「md だけ / マップだけ」の 2 つ）を持つのは `app/panes.ts` の
+   `spotsFor` / `project` / `toggled` で、結果は `.pane-off` として降りてくる
+   — 隠す規則は幅に関わらず 1 つきり（上の `.pane-off`）。
+   ここに残るのは、狭さそのものから決まる詰め方だけ。
+
+   幅で振る舞いを変えるものは `<html class="narrow">` を見る（`720px` の
+   唯一の源は `app/panes.ts` の `matchMedia`）。この照会が持つのは、
+   クラスを要さない純粋な見た目だけ。 */
 
 @media (max-width: 720px) {
   #topbar { gap: 6px; padding: 6px 8px; }
   /* 名前はタブが言っている。狭いところで二重に場所を取らない */
   #filename, #dirty { display: none; }
 
-  /* 並べないので、掴んで動かす境目も意味を失う */
-  #splitter { display: none; }
-  #panes:not(.no-map) #md-pane { display: none; }
   #md-pane, #map-pane { flex: 1; min-width: 0; }
 }

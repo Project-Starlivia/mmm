@@ -20,7 +20,7 @@ import { exportWays, initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
 import { deriveName } from "./app/name.ts";
 import { initTheme } from "./app/theme.ts";
-import { sweep } from "./app/persist.ts";
+import { LS_ADDS, load, store, sweep } from "./app/persist.ts";
 import { decidePaste } from "./app/paste.ts";
 import { initDrop } from "./app/dnd.ts";
 import { initForm } from "./app/form.ts";
@@ -28,7 +28,7 @@ import { showDrawing } from "./app/draw.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { onLanguageReady } from "./map/highlight.ts";
-import { openOnClick } from "./map/menu.ts";
+import { type MenuEntry, openOnClick } from "./map/menu.ts";
 import { RadialMenu } from "./map/radialMenu.ts";
 import {
   type CardRef,
@@ -55,6 +55,10 @@ function el<T extends Element>(id: string, kind: abstract new () => T): T {
 
 /** リポジトリの行き先。ここ 1 か所 */
 const REPO = "https://github.com/Project-Starlivia/mmm";
+
+/** File System Access API が無いブラウザで、Files のできない行と
+ *  ショートカットの両方がこの理由を言う。英語の文言はここ 1 か所だけ */
+const NO_FILE_ACCESS = "This browser cannot open or save files";
 
 /** 新しいタブで開く。`⋯` の外部リンクが通る唯一の道 */
 function openExternal(url: string): void {
@@ -689,6 +693,13 @@ function applyDoc(doc: Doc): void {
 }
 
 async function openFile(): Promise<void> {
+  // Files のメニューを経ずショートカットから来ることもある。無効な行は
+  // 押せないだけで理由を言うが、ショートカットは黙って何も起きない
+  // だけになってしまう — 同じ理由をここでも言う
+  if (!io.canOpen()) {
+    flashFilename(NO_FILE_ACCESS);
+    return;
+  }
   try {
     if (!(await confirmDiscard())) return;
     const doc = await io.openDialog();
@@ -733,6 +744,12 @@ async function saveFile(asNew = false): Promise<void> {
   const text = core.getText();
   try {
     if (asNew || savedName === null) {
+      // ここだけがピッカーを要る道。既存のハンドルへ書くだけの下の枝は
+      // API が無くても困らないので、ここでしか確かめない
+      if (!io.canSaveAs()) {
+        flashFilename(NO_FILE_ACCESS);
+        return;
+      }
       const doc = await io.saveAs(docName(), text);
       if (!doc) return; // キャンセル
       savedName = doc.name; // ここで初めて名前が決まる
@@ -877,16 +894,31 @@ function folderCaption(): string {
 //
 // 見出し（caption）は「続く行たちが何に効くか」を言う。保存していない文書に
 // 名前を変える相手は無いので、そのときは見出しがそう言い、行は無効になる。
-openOnClick(btnFile, () => [
-  { label: "New", key: "Mod+Alt+N", run: () => void newFile() },
-  { label: "Open", key: "Mod+O", run: () => void openFile() },
-  { caption: savedName ?? "not saved yet" },
-  { label: "Rename", run: () => void renameFile(), disabled: savedName === null },
-  { label: "Save", key: "Mod+S", run: () => void saveFile() },
-  { label: "Save as", key: "Mod+Shift+S", run: () => void saveFile(true) },
-  { caption: folderCaption() },
-  { label: "Images Folder", run: () => void assets.chooseFolder() },
-]);
+openOnClick(btnFile, () => {
+  // **無いものを黙って落とさない。** ファイルピッカーを持たないブラウザが
+  // あり、`docs/browsers.md` のとおり 2 本目の道は作らない。
+  // 押せない理由だけは言う
+  const canOpen = io.canOpen();
+  const canSave = io.canSaveAs();
+  const entries: MenuEntry[] = [
+    { label: "New", key: "Mod+Alt+N", run: () => void newFile() },
+    { label: "Open", key: "Mod+O", run: () => void openFile(), disabled: !canOpen },
+    ...(canOpen && canSave
+      ? []
+      : [{ caption: NO_FILE_ACCESS }]),
+    { caption: savedName ?? "not saved yet" },
+    { label: "Rename", run: () => void renameFile(), disabled: savedName === null },
+    { label: "Save", key: "Mod+S", run: () => void saveFile(), disabled: !canSave },
+    { label: "Save as", key: "Mod+Shift+S", run: () => void saveFile(true), disabled: !canSave },
+    { caption: folderCaption() },
+    {
+      label: "Images Folder",
+      run: () => void assets.chooseFolder(),
+      disabled: !assets.canChooseFolder(),
+    },
+  ];
+  return entries;
+});
 
 // 低頻度だが消したくないものの受け皿。Undo/Redo にボタンは無く（キーが
 // 本道）、ここが押せる保険になる。3 つの塊 — 戻す / 見た目 / 外に開く
@@ -896,6 +928,8 @@ openOnClick(btnMore, () => [
   "sep",
   { label: "Brand color", run: () => theme.pickColor() },
   { label: theme.isLight() ? "Dark theme" : "Light theme", run: () => theme.toggle() },
+  // 見た目の好み同士なのでテーマの隣。**押せばどうなるか**を名乗る（テーマと同じ流儀）
+  { label: addsOn ? "Hide add buttons" : "Show add buttons", run: () => setAdds(!addsOn) },
   "sep",
   { label: "Copy link", run: () => void copyLink() },
   "sep",
@@ -955,6 +989,32 @@ const theme = initTheme({
   logo: elLogo,
   setEditorTheme: (dark) => editor.setTheme(dark),
 });
+
+// **物理キーボードの有無は Web からは分からない。**代わりに「主たるポインタが
+// 指か」を見る。Surface はキーボードを外すと OS が主ポインタを指へ切り替える
+// ので、この 1 本で狙いどおりに振れる。近似であることは承知の上で、外れても
+// 人が押して直せる形にしてある（`⋯` の 1 行）。
+//
+// `any-pointer` ではなく `pointer` を使う: マウスも刺さっている機械で
+// 「指もある」だけを理由に出しっぱなしにはしない。
+const TOUCH_FIRST = "(pointer: coarse) and (hover: none)";
+
+// localStorage の中身は何でもありうる。名乗らせずに確かめる
+const savedAdds = load(LS_ADDS);
+let addsOn =
+  savedAdds === "on"
+    ? true
+    : savedAdds === "off"
+      ? false
+      : (window.matchMedia?.(TOUCH_FIRST).matches ?? false);
+
+const setAdds = (on: boolean): void => {
+  addsOn = on;
+  store(LS_ADDS, on ? "on" : "off");
+  map.setAddButtons(on);
+};
+map.setAddButtons(addsOn);
+
 initShortcuts({
   save: (asNew) => void saveFile(asNew),
   open: () => void openFile(),

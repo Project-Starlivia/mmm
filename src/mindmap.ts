@@ -45,13 +45,16 @@ import {
   fitToPane,
   panBy,
   panToShow,
+  pinch,
   toWorld,
   zoomAt,
 } from "./map/view.ts";
+import { Fingers } from "./map/gesture.ts";
 import { indicatorFor, isVisible } from "./map/indicator.ts";
 import { ContextMenu, type MenuEntry } from "./map/menu.ts";
 import { MapRenderer } from "./map/render.ts";
 import { CardPick } from "./map/pick.ts";
+import { AddButtons } from "./map/addButtons.ts";
 import { mapToSvg } from "./map/toSvg.ts";
 import { svgEl } from "./map/svg.ts";
 import { icon } from "./icons.ts";
@@ -162,6 +165,16 @@ const NO_IDS: ReadonlySet<number> = new Set<number>();
  *  わずかに動いてもドラッグに化けないよう、ノードにもカードにも同じ値を使う */
 const DRAG_SLOP2 = 64;
 
+/** 指のときの閾値。マウスより揺れるので、タップが勝手にドラッグへ化ける */
+const TOUCH_SLOP2 = 256;
+
+/** その出来事に効く閾値（px の 2 乗） */
+const slopOf = (e: PointerEvent): number =>
+  e.pointerType === "touch" ? TOUCH_SLOP2 : DRAG_SLOP2;
+
+/** 長押しと見なす時間（ms）。Chromium のネイティブと同じ体感に合わせる */
+const HOLD_MS = 500;
+
 export class MindMap {
   private pane: HTMLElement;
   private host: MapHost;
@@ -170,9 +183,11 @@ export class MindMap {
   private renderer = new MapRenderer();
   private dropLine: SVGLineElement;
   private dropHint: SVGPathElement; // どの親につくかを示す予告の曲線
-  private plusBtn: SVGGElement;
   /** 選んでいるカードに被せる枠と ×（常に高々 1 枚なので 1 個だけ持つ） */
   private pick = new CardPick();
+  /** 選んでいるノードの上下左右に出る `+`（出すかどうかは人が決める） */
+  private adds = new AddButtons();
+  private addsOn = false;
   private rubber: HTMLDivElement;
   private editor: HTMLInputElement;
   private editBox: HTMLDivElement;
@@ -196,6 +211,8 @@ export class MindMap {
 
   // interaction state
   private spaceDown = false;
+  /** 2 本目の指。1 本のあいだは何も言わないので、既存の状態は増えない */
+  private fingers = new Fingers();
   // ドラッグ中の最後のポインタ位置。Shift の押し外しだけで判定を
   // 出し直したいので覚えておく
   private lastPointer: { x: number; y: number } | null = null;
@@ -215,13 +232,21 @@ export class MindMap {
   // ドラッグでカードを動かした直後、pointerup に続いて発火するネイティブの
   // click が、落とし先の座標にあるカードをふらっと選び直すのを止める印
   private suppressClick = false;
+  /** 長押しの見張り。指が動くか離れたら取り消す */
+  private hold: ReturnType<typeof setTimeout> | null = null;
+  /** 見張りを始めた位置。閾値を越えて動いたら取り消す */
+  private holdAt: { x: number; y: number } | null = null;
+  // 長押しでメニューを開いた直後の印。ネイティブの contextmenu が追いかけて
+  // 来ても、同じメニューを開き直して瞬く/ずれるのを防ぐ。次の pointerdown で
+  // 必ず下ろす — マウスの右クリックは pointerdown → contextmenu の順で来る
+  // ので、この印が立ったままマウス操作に効くことはない
+  private suppressContextMenu = false;
   private drop: Drop | null = null;
   // ドロップ中の一時的なノード印。**どれに付けたかを覚えておくのは、
   // 外すときに全ノードを舐めないため**（マウス移動のたびに外して付け直す）。
   // 描き直しで要素が作り直されても paintState が同じ印を戻す
   private dropMarks = new Map<number, "drop-child" | "drop-parent">();
   private dropEdgeId: number | null = null;
-  private hoverId = -1;
   /** その場で直しているカード（位置は毎回引き直す） */
   private editingCard: CardRef | null = null;
 
@@ -239,25 +264,14 @@ export class MindMap {
     this.viewport = svgEl("g");
     this.dropLine = svgEl("line", { id: "drop-line", visibility: "hidden" });
     this.dropHint = svgEl("path", { id: "drop-hint", visibility: "hidden" });
-    // crosshair drawn with lines so the glyph is perfectly centered
-    const makePlus = (): SVGGElement => {
-      const btn = svgEl("g", { class: "plus-btn", visibility: "hidden" });
-      btn.append(
-        svgEl("circle", { r: "9" }),
-        svgEl("line", { x1: "-4", y1: "0", x2: "4", y2: "0" }),
-        svgEl("line", { x1: "0", y1: "-4", x2: "0", y2: "4" }),
-      );
-      return btn;
-    };
-    this.plusBtn = makePlus();
     this.viewport.append(
       this.renderer.edgeLayer,
       this.renderer.seamLayer,
       this.renderer.nodeLayer,
       this.pick.el,
+      this.adds.el,
       this.dropHint,
       this.dropLine,
-      this.plusBtn,
     );
     this.svg.append(this.viewport);
     pane.append(this.svg);
@@ -321,6 +335,12 @@ export class MindMap {
     return toWorld(this.view(), clientX - r.left, clientY - r.top);
   }
 
+  /** ペインの左上から測った画面 px（`map/view.ts` が使う座標系） */
+  private local(clientX: number, clientY: number): { x: number; y: number } {
+    const r = this.pane.getBoundingClientRect();
+    return { x: clientX - r.left, y: clientY - r.top };
+  }
+
   /** 新しい見え方を受け取って画面へ反映する */
   private setView(v: View): void {
     this.k = v.k;
@@ -328,6 +348,7 @@ export class MindMap {
     this.ty = v.ty;
     this.applyTransform();
     this.updateIndicator();
+    this.updateAdds();
   }
 
   /** ペインの大きさ（画面 px） */
@@ -390,7 +411,6 @@ export class MindMap {
     });
     this.paintState();
 
-    this.updatePlus();
     this.positionEditor();
     this.updateIndicator();
   }
@@ -445,6 +465,7 @@ export class MindMap {
       this.renderer.edgeEl(this.dropEdgeId)?.classList.add("drop-edge");
     }
     this.showPick();
+    this.updateAdds();
   }
 
   /** 選んでいるカードの上に印を置き直す（レイアウトか選択が動いたら呼ぶ） */
@@ -520,6 +541,7 @@ export class MindMap {
     this.cardEditor.focus();
     const end = this.cardEditor.value.length;
     this.cardEditor.setSelectionRange(from ?? end, to ?? from ?? end);
+    this.updateAdds();
   }
 
   /** 色付き層を今の中身で塗り直す（打つたびに呼ぶ） */
@@ -579,6 +601,7 @@ export class MindMap {
   private endCardEdit(): void {
     this.editingCard = null;
     this.editBox.style.display = "none";
+    this.updateAdds();
   }
 
   /** Center the whole tree in the pane (file open / initial view). If the
@@ -750,6 +773,7 @@ export class MindMap {
     // never select-all; caret at the end
     const pos = this.editor.value.length;
     this.editor.setSelectionRange(pos, pos);
+    this.updateAdds();
   }
 
   /** 入力欄の現在値を文書へ反映する（変換確定後にだけ呼ぶ）。 */
@@ -769,6 +793,7 @@ export class MindMap {
     this.editingTag = "";
     this.editor.style.display = "none";
     this.pane.focus();
+    this.updateAdds();
   }
 
   /** ラベルの入力欄が開いているか（確定は host.commitEdit が持つ）。 */
@@ -805,18 +830,44 @@ export class MindMap {
     st.paddingRight = `${p.padding}px`;
   }
 
-  // ---------- hover plus button ----------
+  // ---------- 選択ノードの `+` ----------
 
-  private updatePlus(): void {
-    const b = this.hoverId !== -1 ? this.boxes.get(this.hoverId) : undefined;
-    if (!b || this.dragging || this.isEditing()) {
-      this.plusBtn.setAttribute("visibility", "hidden");
+  /**
+   * 出すかどうかを切り替える。**保存も既定の判定もここは知らない** —
+   * 「いま出すか」だけを受け取る（main.ts が持ち主）。
+   */
+  setAddButtons(on: boolean): void {
+    this.addsOn = on;
+    this.updateAdds();
+  }
+
+  /**
+   * 出す条件は「迷いようが無いとき」だけ — 選択がちょうど 1 つ、カードを
+   * 選んでいない、編集中でない、ドラッグ中でない。
+   */
+  private updateAdds(): void {
+    const id = this.host.anchor();
+    const b = this.boxes.get(id);
+    if (
+      !this.addsOn ||
+      !b ||
+      this.host.selection().size !== 1 ||
+      this.host.pickedCard() !== null ||
+      this.dragging ||
+      this.isEditing()
+    ) {
+      this.adds.hide();
       return;
     }
-    this.plusBtn.setAttribute("visibility", "visible");
-    const dir = dirOf(b.n);
-    const p = growthEdgeOf(b, dir);
-    this.plusBtn.setAttribute("transform", `translate(${p.x + 14 * dir} ${p.y})`);
+    // ルートは親で包めない（core の cmd_add_parent が深さ 1 を弾く）
+    this.adds.show(b, this.k, b.n.depth > 1, dirOf(b.n));
+  }
+
+  /** 長押しの見張りを解く。指が動いた・離れた・攫われた、のどれでも */
+  private dropHold(): void {
+    if (this.hold !== null) clearTimeout(this.hold);
+    this.hold = null;
+    this.holdAt = null;
   }
 
   // ---------- events ----------
@@ -906,13 +957,67 @@ export class MindMap {
    */
   private bindPointer(): void {
     const pane = this.pane;
-    // `+` ボタンとリンクの ↗ は pointerdown を止めるので、ここへ来るのは
-    // ペイン / ノード / 入力欄の上での押下だけ
+
+    // **生きている指は、1 本残らずここに載る。** 台帳がこの不変を失うと、
+    // 載らなかった指の pointermove が下の「1 本ぶん」の流れへ落ち、**別の指の
+    // 始点**との差でパンやドラッグが進む（2 本目のタップで地図が指の間隔ぶん
+    // 跳ぶ、頼んでいない `host.move()` が走る）。
+    //
+    // だから **capture で取る。** ペインの上には pointerdown を止めるものが
+    // 2 つある（リンクの ↗ / `.pane-tool`）ので、下の pointerdown には
+    // 届かない指がある。どれにも止められない場所はここしかない。
+    pane.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (e.pointerType !== "touch") return;
+        const p = this.local(e.clientX, e.clientY);
+        this.fingers.down(e.pointerId, p.x, p.y);
+        if (!this.fingers.pinching) return;
+        // 2 本目が乗ったら長押しも畳む — 2 本を静止で構えたまま待たれても、
+        // 頼んでいないメニューは開かない
+        this.dropHold();
+        // 2 本目が乗った時点で、1 本ぶんの操作はすべて畳む。**指を足しただけで
+        // ノードが動いたり範囲が選ばれたりしない**
+        this.cancelPointerOp();
+      },
+      true,
+    );
+
+    // ここへ来るのは、上の 2 つに止められなかった押下だけ（ペイン / ノード /
+    // 入力欄の上）。**台帳は capture 側で済んでいる**ので、ここが見るのは
+    // 「いま何本目か」の答えだけ
     pane.addEventListener("pointerdown", (e) => {
       // 新しい操作の始まり。前の操作が立てた「次の click は捨てる」印が
       // 使われないまま残っていたら、ここで落とす（残すとユーザーの
       // 次の 1 クリックを食う）
       this.suppressClick = false;
+      // 長押しメニューの「開き直させない」印も、次の押下でかならず下ろす
+      this.suppressContextMenu = false;
+      // `+` の上での押下は、そのボタンのもの。**折り返すだけにする** —
+      // このリスナ自身がペインの担当なので、下の選択やパンの仕込みを止めるのは
+      // この `return`。`stopPropagation` を足しても下へは効かず、上の document で
+      // 待っている「外を押されたら閉じる」（map/menu.ts と map/radialMenu.ts）を
+      // 殺すだけになる（長押しで開いたメニューを残したまま `+` が効いていた）
+      if (targetIn(e, "[data-add]")) return;
+      if (e.pointerType === "touch") {
+        // 2 本乗っているあいだは、1 本ぶんの操作を新しく始めない
+        if (this.fingers.pinching) return;
+        this.holdAt = { x: e.clientX, y: e.clientY };
+        this.hold = setTimeout(() => {
+          const at = this.holdAt;
+          this.dropHold();
+          if (!at) return;
+          const id = this.nodeAt(at.x, at.y);
+          if (id === -1) return;
+          // メニューを開いた時点でこのジェスチャーは使い切った。指を離した
+          // ときの pointerup が素のタップ選択として同じノードをもう一度
+          // 選び直す（reveal も二重に走る）のを止める
+          this.dragCand = null;
+          if (!this.host.selection().has(id)) this.host.setSelection([id], id);
+          this.suppressContextMenu = true;
+          this.menu.show(at.x, at.y, this.menuItems());
+        }, HOLD_MS);
+      }
       // 入力欄の中のクリックはカーソルを置くためのもので、確定ではない。
       // ここで pane.focus() まで進むと、押した瞬間に blur して閉じてしまう
       if (e.target === this.editor) return;
@@ -921,10 +1026,15 @@ export class MindMap {
       if (this.isEditingLabel()) this.host.commitEdit();
       pane.focus();
 
-      // パンは 2 つ入り口を持つ: 中クリックはマウスだけで完結し、
-      // Space+ドラッグはキーボードに手がある時に届く。担当する手が
-      // 違うので、片方だけでは塞がる場面がある
-      if (e.button === 1 || (e.button === 0 && this.spaceDown)) {
+      // パンは 3 つ入り口を持つ: 中クリックはマウスだけで完結し、Space+ドラッグは
+      // キーボードに手がある時に届き、**指は背景をなぞる**。担当する手が違うので、
+      // どれか 1 つでは塞がる場面がある（指には中ボタンも Space も無く、背景の
+      // ドラッグを矩形選択に取られると、地図が 1mm も動かせない）
+      const touchPan =
+        e.pointerType === "touch" &&
+        this.nodeAt(e.clientX, e.clientY) === -1 &&
+        this.cardAt(e.clientX, e.clientY, "data-card") === null;
+      if (e.button === 1 || (e.button === 0 && this.spaceDown) || touchPan) {
         this.panning = {
           px: e.clientX,
           py: e.clientY,
@@ -970,11 +1080,28 @@ export class MindMap {
     });
 
     pane.addEventListener("pointermove", (e) => {
+      if (e.pointerType === "touch") {
+        const p = this.local(e.clientX, e.clientY);
+        const g = this.fingers.move(e.pointerId, p.x, p.y);
+        if (g) {
+          this.setView(pinch(this.view(), g.from, g.to));
+          return;
+        }
+        // 2 本乗っているあいだは、1 本ぶんの続きを進めない
+        if (this.fingers.pinching) return;
+      }
+      // 閾値を越えたときだけ解く — 指はじっとしていても揺れるので、
+      // 微小な揺れで長押しが取り消されては困る
+      if (this.holdAt) {
+        const dx = e.clientX - this.holdAt.x;
+        const dy = e.clientY - this.holdAt.y;
+        if (dx * dx + dy * dy > slopOf(e)) this.dropHold();
+      }
       if (this.cardDrag) {
         const dx = e.clientX - this.cardDrag.px;
         const dy = e.clientY - this.cardDrag.py;
         // 一度でも越えたらドラッグ。戻ってきても掴んだままにする
-        if (!this.cardDrag.moved && dx * dx + dy * dy <= DRAG_SLOP2) return;
+        if (!this.cardDrag.moved && dx * dx + dy * dy <= slopOf(e)) return;
         this.cardDrag.moved = true;
         this.cardDrop = this.cardSlotAt(e.clientX, e.clientY);
         this.showCardDrop();
@@ -1035,7 +1162,7 @@ export class MindMap {
       if (this.dragCand && !this.dragging) {
         const dx = e.clientX - this.dragCand.px;
         const dy = e.clientY - this.dragCand.py;
-        if (dx * dx + dy * dy > DRAG_SLOP2) this.startDrag();
+        if (dx * dx + dy * dy > slopOf(e)) this.startDrag();
       }
       if (this.dragging) {
         this.lastPointer = { x: e.clientX, y: e.clientY };
@@ -1044,6 +1171,11 @@ export class MindMap {
     });
 
     pane.addEventListener("pointerup", (e) => {
+      // タッチのブロックより先に解く — ピンチ中の pointerup は下で早期
+      // return するので、後ろに置くと長押しの見張りが残ったまま生き残り、
+      // 何も無いところで後からメニューが開いてしまう
+      this.dropHold();
+      if (e.pointerType === "touch" && this.liftFinger(e.pointerId)) return;
       if (this.cardDrag) {
         const from = this.cardDrag.ref;
         const to = this.cardDrop;
@@ -1132,23 +1264,69 @@ export class MindMap {
       }
     });
 
-    pane.addEventListener("pointercancel", () => {
-      // pen/touch cancellation must not leave a drag/pan/rubber stuck
-      this.panning = null;
-      this.rubberStart = null;
-      this.rubber.style.display = "none";
-      this.dragCand = null;
-      if (this.dragging) this.stopDragVisuals();
-      this.cardDrag = null;
-      this.cardDrop = null;
-      this.dropLine.setAttribute("visibility", "hidden");
-      pane.style.cursor = "";
+    // 攫われたポインタが、ドラッグ / パン / 矩形選択を掴んだままにしない。
+    // **攫われるのも 1 本ずつ**（Chromium は pointercancel をポインタごとに
+    // 投げる）なので、台帳から抜くのはその 1 本だけ — 台帳ごと捨てると、
+    // ピンチの片方が攫われただけで**まだ触れている指まで台帳から消え**、
+    // その指の move が 1 本ぶんの流れへ落ちて地図が固まっていた
+    pane.addEventListener("pointercancel", (e) => {
+      this.dropHold();
+      if (e.pointerType === "touch" && this.liftFinger(e.pointerId)) return;
+      this.cancelPointerOp();
     });
   }
 
   /**
-   * 押して離す以外のマウス操作 — ダブルクリック、ホバーと `+` ボタン、
-   * リンクとカードのクリック。
+   * 台帳から 1 本抜く。**組が壊れて 1 本だけ残ったら、その指から 1 本パンを
+   * 立て直す** — 実機では残った指の pointerdown は来ない（触れたままなので）
+   * ので、ここで自分から `panning` を立てないと、指が動いても地図が固まる。
+   * 残った指は capture を持っていないが、ペインの上に指があるあいだは
+   * pointermove がそのまま届くので実害は無い。
+   *
+   * 2 本目だった指なら true。**呼び出し側は 1 本ぶんの後始末を走らせない** —
+   * 抜けたのは組の片割れで、選択もドロップもその指のものではない。
+   */
+  private liftFinger(id: number): boolean {
+    const wasPinching = this.fingers.pinching;
+    this.fingers.up(id);
+    if (!wasPinching) return false;
+    const solo = this.fingers.only();
+    if (solo && !this.fingers.pinching) {
+      const r = this.pane.getBoundingClientRect();
+      this.panning = {
+        px: solo.x + r.left,
+        py: solo.y + r.top,
+        ox: this.tx,
+        oy: this.ty,
+      };
+    }
+    return true;
+  }
+
+  /**
+   * いま進んでいる 1 本ぶんの操作を、**何も起こさずに**畳む。パン / 矩形選択 /
+   * ノードのドラッグ / カードのドラッグは同時に高々 1 つなので、まとめて 1 か所。
+   *
+   * 呼ぶのは 2 つ — 2 本目の指が乗ったとき（指を足しただけで文書が動かない）と、
+   * ポインタが攫われたとき。どちらも「この操作は無かったことにする」で、
+   * 落とし先も選択も確定しない。**1 つでも取りこぼすと、押している指が無いのに
+   * 状態だけが生き残る**（cardDrag を残していた頃は、ピンチのあと `panning` が
+   * 古い差分を抱えたままになり、次のタップで地図が跳んだ）。
+   */
+  private cancelPointerOp(): void {
+    this.panning = null;
+    this.rubberStart = null;
+    this.rubber.style.display = "none";
+    this.dragCand = null;
+    if (this.dragging) this.stopDragVisuals();
+    this.cardDrag = null;
+    this.cardDrop = null;
+    this.dropLine.setAttribute("visibility", "hidden");
+    this.pane.style.cursor = "";
+  }
+
+  /**
+   * 押して離す以外のマウス操作 — ダブルクリック、リンクとカードのクリック。
    */
   private bindClick(): void {
     const pane = this.pane;
@@ -1173,38 +1351,24 @@ export class MindMap {
       this.host.editRequested(id);
     });
 
-    pane.addEventListener("pointerover", (e) => {
-      const hit = targetIn(e, "g.node");
-      const next =
-        hit instanceof SVGGElement
-          ? Number(hit.dataset.id)
-          : this.overPlus(e)
-            ? this.hoverId
-            : -1;
-      if (next !== this.hoverId) {
-        this.hoverId = next;
-        this.updatePlus();
-      }
-    });
-
-    this.plusBtn.addEventListener("pointerdown", (e) => {
-      e.stopPropagation();
-    });
-    this.plusBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (this.hoverId === -1) return;
-      // 箱の脇なので、右クリックの `Add ▸` と同じ並びをその場で開く。
-      // 子 1 つだけなら `Tab` のほうが速い
-      const r = this.plusBtn.getBoundingClientRect();
-      this.menu.show(r.right + 4, r.top, this.addItems(this.hoverId));
-    });
-
     // open link cards
     // ペインに付ける。ノード層だと、ポインタキャプチャで
     // イベントがペインへ付け替わったとき伝播経路から外れて届かない
     pane.addEventListener("click", (e) => {
       if (this.suppressClick) {
         this.suppressClick = false;
+        return;
+      }
+      // `+` は選んでいるノードにだけ出ている。押されたらその向きに 1 つ足す
+      const add = targetIn(e, "[data-add]")?.getAttribute("data-add");
+      if (add === "child" || add === "below" || add === "above" || add === "parent") {
+        const id = this.host.anchor();
+        if (id !== -1) {
+          if (add === "child") this.host.addChild(id);
+          else if (add === "below") this.host.addSibling(id);
+          else if (add === "above") this.host.addSiblingBefore(id);
+          else this.host.addParent(id);
+        }
         return;
       }
       // × は選ばれているカードにだけ出ている。押されたらその行ごと消す
@@ -1239,11 +1403,25 @@ export class MindMap {
     const pane = this.pane;
     pane.addEventListener("contextmenu", (e) => {
       e.preventDefault();
+      // 長押しでもう開いている — ネイティブの contextmenu が追いかけて
+      // 来ても、同じメニューを開き直して瞬く/ずれることはさせない
+      if (this.suppressContextMenu) return;
+      // 逆向きの対称: ネイティブの contextmenu が長押しタイマーより先に
+      // 届いた場合、このジェスチャーはもう届いたので、後からタイマーが
+      // 追い打ちで同じメニューを開き直さないよう見張りを解く
+      this.dropHold();
       const id = this.nodeAt(e.clientX, e.clientY);
       if (id === -1) {
         this.hideMenu();
         return;
       }
+      // タッチの長押しでも contextmenu は届きうる（ネイティブがタイマーより
+      // 先に届いた場合）。そのときは pointerdown が仕込んだ dragCand が
+      // まだ残っているので、消しておかないと指を離した pointerup が素の
+      // タップ選択として同じノードをもう一度選び直してしまう
+      // （マウスの右クリックは button !== 0 で dragCand をそもそも
+      // 仕込まないので、ここは無害）
+      this.dragCand = null;
       if (!this.host.selection().has(id)) this.host.setSelection([id], id);
       this.menu.show(e.clientX, e.clientY, this.menuItems());
     });
@@ -1327,10 +1505,6 @@ export class MindMap {
     const pane = this.pane;
     pane.addEventListener("keydown", (e) => this.onKeydown(e));
 
-  }
-
-  private overPlus(e: Event): boolean {
-    return targetIn(e, ".plus-btn") !== null;
   }
 
   /** Node whose box contains the given client position, or -1. Iterates in
@@ -1585,7 +1759,7 @@ export class MindMap {
     }
     this.dragging = { ids, subtree };
     for (const id of subtree) this.markNode(id, "dragging");
-    this.updatePlus();
+    this.updateAdds();
   }
 
   /**
@@ -1743,12 +1917,12 @@ export class MindMap {
     this.dropLine.setAttribute("visibility", "hidden");
     this.dropLine.classList.remove("slot");
     this.dropHint.setAttribute("visibility", "hidden");
+    this.updateAdds();
   }
 
   // ---------- context menu ----------
 
-  /** そのノードに対して、いま何ができるか。並べ方はメニュー側が持つ */
-  /** ノードの足し方。右クリックの入れ子も、箱の脇の `+` も、同じ並びを開く */
+  /** ノードの足し方。右クリックの入れ子 `Add ▸` が開く並び。並べ方はメニュー側が持つ */
   private addItems(id: number): MenuEntry[] {
     return [
       { label: "Child", key: "Tab", run: () => this.host.addChild(id) },
@@ -1826,5 +2000,6 @@ export class MindMap {
     this.renderer.refreshSelection(this.host.selection());
     this.showPick();
     this.updateIndicator();
+    this.updateAdds();
   }
 }

@@ -12,8 +12,11 @@ import {
   fitToPane,
   panBy,
   panToShow,
+  pinch,
+  type Span,
   toWorld,
   zoomAt,
+  zoomTo,
 } from "../src/map/view.ts";
 
 const PANE = { width: 800, height: 600 };
@@ -120,4 +123,52 @@ test("寄せる先は箱の中心を画面の中心に置く。倍率は変え�
   const cy = BOX.y + BOX.h / 2;
   assert.ok(Math.abs(cx * v.k + v.tx - PANE.width / 2) < 1e-9);
   assert.ok(Math.abs(cy * v.k + v.ty - PANE.height / 2) < 1e-9);
+});
+
+const span = (ax: number, ay: number, bx: number, by: number): Span => ({
+  a: { x: ax, y: ay },
+  b: { x: bx, y: by },
+});
+
+test("zoomTo は、その点の下の world を動かさない", () => {
+  for (const start of [{ k: 1, tx: 60, ty: 60 }, { k: 0.3, tx: -200, ty: 90 }]) {
+    for (const k of [0.2, 0.5, 1, 2.5]) {
+      const before = toWorld(start, 512, 331);
+      const after = toWorld(zoomTo(start, 512, 331, k), 512, 331);
+      assert.ok(Math.abs(before.x - after.x) < 1e-9);
+      assert.ok(Math.abs(before.y - after.y) < 1e-9);
+    }
+  }
+});
+
+test("zoomTo も上下の限界で止まる", () => {
+  assert.equal(zoomTo(V, 0, 0, 99).k, MAX_ZOOM);
+  assert.equal(zoomTo(V, 0, 0, 0.001).k, MIN_ZOOM);
+});
+
+test("2 本指を離すと拡大、近づけると縮小", () => {
+  const from = span(100, 100, 200, 100);
+  assert.ok(pinch(V, from, span(50, 100, 250, 100)).k > V.k);
+  assert.ok(pinch(V, from, span(140, 100, 160, 100)).k < V.k);
+});
+
+test("pinch は、2 点の中点の下の world を中点へ運ぶ", () => {
+  // 拡大しながら指をずらしても、掴んでいた場所が指の下に留まる
+  const from = span(100, 200, 300, 200); // 中点 (200, 200)
+  const to = span(140, 260, 460, 260); // 中点 (300, 260)、距離は 1.6 倍
+  const w = toWorld(V, 200, 200);
+  const after = pinch(V, from, to);
+  assert.ok(Math.abs(w.x * after.k + after.tx - 300) < 1e-9);
+  assert.ok(Math.abs(w.y * after.k + after.ty - 260) < 1e-9);
+});
+
+test("距離が変わらない 2 本指は、ただのパン", () => {
+  const after = pinch(V, span(0, 0, 100, 0), span(30, -20, 130, -20));
+  assert.deepEqual(after, { k: 1, tx: 90, ty: 40 });
+});
+
+test("2 本の指が重なっても倍率は壊れない", () => {
+  // 距離 0 で割ると Infinity/NaN が k に流れ込み、以降すべての描画が消える
+  const after = pinch(V, span(50, 50, 50, 50), span(60, 60, 80, 80));
+  assert.equal(after.k, V.k);
 });
