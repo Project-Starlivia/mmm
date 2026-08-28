@@ -3,13 +3,15 @@
 // **選択の anchor は常に高々 1 つ**なので、置き場所も 1 つでよい
 // （map/pick.ts の「選んだカードの枠と ×」と同じ立場）。
 //
-// **向きと木の意味を一致させる。** マップは左から右へ伸びるので、右が子・
-// 左が親・上下が兄弟。4 つ揃って初めて、覚えるものが「向き」1 つで済む。
+// **向きと木の意味を一致させる。** 子はその枝が育つ辺に、親はその枝が
+// 入ってくる辺に、上下が兄弟。左右どちらが子でどちらが親かは枝ごとの
+// 向き（`dirOf`）で決まる — **鏡映は geometry.ts の `growthEdgeOf` /
+// `entryEdgeOf` だけが知っていて、ここでは `dir === 1` を書かない**。
 //
 // 以前はホバーで 1 つだけ出て、押すと 4 項目のメニューが開いていた。押しに
 // 行くとホバーが外れて押せず、そもそも指にホバーは無い。
 
-import { type Rect, leftOf, rightOf } from "./geometry.ts";
+import { type Rect, entryEdgeOf, growthEdgeOf } from "./geometry.ts";
 import { svgEl } from "./svg.ts";
 
 export type AddDir = "child" | "below" | "above" | "parent";
@@ -26,27 +28,29 @@ export interface AddSpot {
  * `x` が左右（子・親）、`y` が上下（兄弟）— **左右と上下で値が違う**ので
  * 1 つの数では言えない（下記 `GAP_X` / `GAP_Y`）。**画面 px を `k` で
  * 割ったものを渡す** — ボタンの大きさは倍率に引きずられないため。
- * `canParent` が false なら親の口を出さない。
+ * `canParent` が false なら親の口を出さない。`dir` はその枝の育つ向き
+ * （右 = 1 / 左 = -1、`layout.ts` の `dirOf`）。
  *
- * 子への線が出る場所・親からの線が入る場所は geometry.ts の `rightOf`/
- * `leftOf` が唯一の出所（`rightOf` のコメントが、まさにこの呼び出しを
- * 見越している）。ここで座標を計算し直さない。
+ * 子への線が出る場所・親からの線が入る場所は geometry.ts の
+ * `growthEdgeOf` / `entryEdgeOf` が唯一の出所。左右の入れ替え（鏡映）は
+ * そちらに任せ、ここでは `dir` を渡して結果をそのまま使うだけ。
  */
 export function addSpots(
   b: Rect,
   gap: { x: number; y: number },
   canParent: boolean,
+  dir: 1 | -1,
 ): AddSpot[] {
   const cx = b.x + b.w / 2;
-  const r = rightOf(b);
+  const growth = growthEdgeOf(b, dir);
   const spots: AddSpot[] = [
-    { dir: "child", x: r.x + gap.x, y: r.y },
+    { dir: "child", x: growth.x + gap.x * dir, y: growth.y },
     { dir: "above", x: cx, y: b.y - gap.y },
     { dir: "below", x: cx, y: b.y + b.h + gap.y },
   ];
   if (canParent) {
-    const l = leftOf(b);
-    spots.push({ dir: "parent", x: l.x - gap.x, y: l.y });
+    const entry = entryEdgeOf(b, dir);
+    spots.push({ dir: "parent", x: entry.x - gap.x * dir, y: entry.y });
   }
   return spots;
 }
@@ -135,11 +139,11 @@ export class AddButtons {
    * 値を見る）。子は「隠す/隠さない」の 2 値だけを持ち、「見せる」判断は
    * コンテナの 1 か所に集める。
    */
-  show(b: Rect, k: number, canParent: boolean): void {
+  show(b: Rect, k: number, canParent: boolean, dir: 1 | -1): void {
     this.el.setAttribute("visibility", "visible");
     // 置き場所の算術は canParent に関わらず 4 つとも引く。出す/隠すは
     // このあとの表示切り替えだけの仕事にする（算術と見た目を混ぜない）
-    for (const spot of addSpots(b, { x: GAP_X / k, y: GAP_Y / k }, true)) {
+    for (const spot of addSpots(b, { x: GAP_X / k, y: GAP_Y / k }, true, dir)) {
       const btn = this.groups[spot.dir];
       const on = spot.dir !== "parent" || canParent;
       btn.setAttribute("visibility", on ? "inherit" : "hidden");

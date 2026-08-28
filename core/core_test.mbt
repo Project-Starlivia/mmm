@@ -1,4 +1,24 @@
 ///|
+/// スナップショットの中で、ラベル `label` のノードが hidden か。
+///
+/// 生の JSON の**隣り合わせ**（`"hidden":true,"label":"a"`）で見ていたころ、
+/// スナップショットに鍵を 1 つ足しただけで 7 本のテストが黙って落ちた。
+/// ノード 1 つは 1 つの `{…}` に収まるので、その塊の中だけを見る。
+fn node_hidden(snap : String, label : String) -> Bool {
+  let needle = "\"label\":\"" + label + "\""
+  let at = match snap.find(needle) {
+    Some(i) => i
+    None => abort("node_hidden: label not found in snapshot: " + label)
+  }
+  let head = snap[0:at]
+  let brace = match head.rev_find("{") {
+    Some(i) => i
+    None => abort("node_hidden: no enclosing { before label: " + label)
+  }
+  snap[brace:at].contains("\"hidden\":true")
+}
+
+///|
 test "parse basic structure" {
   ignore(init_doc("# root\n\n## a\n\n### b\n\nbody of b\n\n## c\n"))
   // root(1) a(2) b(3) c(4) — verify via selection_text of the whole doc
@@ -156,9 +176,9 @@ test "typing coalesces into one undo entry by tag" {
 ///|
 test "reorder swaps sibling blocks" {
   ignore(init_doc("# r\n\n## a\n\nbody a\n\n## b\n"))
-  ignore(reorder_node(3, -1))
+  ignore(reorder_node(3, -1, false))
   assert_eq(get_text(), "# r\n\n## b\n\n## a\n\nbody a\n")
-  ignore(reorder_node(3, 1))
+  ignore(reorder_node(3, 1, false))
   // b moved back down past a
   assert_eq(get_text(), "# r\n\n## a\n\nbody a\n\n## b\n")
 }
@@ -207,9 +227,11 @@ test "deleting adjacent blocks incl. the last one does not overlap edits" {
 }
 
 ///|
-test "thematic breaks are ordinary node content" {
+/// 区切りが有効な境界になった（2026-08-27, core/seps.mbt）ので、テキストには
+/// 残るがノードの範囲には含まれない。
+test "thematic breaks split ranges but stay in the raw text" {
   ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n"))
-  assert_eq(selection_text([2]).contains("---"), true)
+  assert_eq(selection_text([2]).contains("---"), false)
   assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## b\n")
 }
 
@@ -400,7 +422,7 @@ test "folding a child keeps it under its parent" {
   ignore(init_doc("# r\n\n## a\n\n### a1\n"))
   ignore(toggle_hidden(3))
   let s = init_doc(get_text())
-  assert_eq(s.contains("\"hidden\":true,\"label\":\"a1\""), true)
+  assert_eq(node_hidden(s, "a1"), true)
   // deleting the parent must still take the folded child AND its markers
   ignore(delete_nodes([2]))
   assert_eq(get_text(), "# r\n")
@@ -434,7 +456,7 @@ test "outdenting a folded node keeps it hidden and leaves no orphan marker" {
 test "reordering a folded node keeps it hidden and leaves no orphan marker" {
   ignore(init_doc("# r\n\n## a\n\n## b\n"))
   ignore(toggle_hidden(2)) // a
-  ignore(reorder_node(2, 1)) // swap with next sibling (b)
+  ignore(reorder_node(2, 1, false)) // swap with next sibling (b)
   assert_eq(get_text(), "# r\n\n## b\n\n<!--\n## a\n-->\n")
 }
 
@@ -492,22 +514,22 @@ test "comment markers follow renderer behaviour, not exact strings" {
   // close one here too. Being stricter hid the rest of a real document.
   ignore(init_doc("# r\n\n<!--\n## a\n--->\n\n## b\n"))
   let s = init_doc("# r\n\n<!--\n## a\n--->\n\n## b\n")
-  assert_eq(s.contains("\"hidden\":true,\"label\":\"a\""), true)
-  assert_eq(s.contains("\"hidden\":false,\"label\":\"b\""), true)
+  assert_eq(node_hidden(s, "a"), true)
+  assert_eq(node_hidden(s, "b"), false)
 }
 
 ///|
 test "comment opener tolerates extra dashes" {
   let s = init_doc("# r\n\n<!---\n## a\n-->\n\n## b\n")
-  assert_eq(s.contains("\"hidden\":true,\"label\":\"a\""), true)
-  assert_eq(s.contains("\"hidden\":false,\"label\":\"b\""), true)
+  assert_eq(node_hidden(s, "a"), true)
+  assert_eq(node_hidden(s, "b"), false)
 }
 
 ///|
 test "unclosed comment hides everything after it" {
   let s = init_doc("# r\n\n<!--\n## a\n\n## b\n")
-  assert_eq(s.contains("\"hidden\":true,\"label\":\"a\""), true)
-  assert_eq(s.contains("\"hidden\":true,\"label\":\"b\""), true)
+  assert_eq(node_hidden(s, "a"), true)
+  assert_eq(node_hidden(s, "b"), true)
 }
 
 ///|
@@ -556,7 +578,7 @@ test "a hidden node carries its markers when moved" {
   ignore(move_nodes([3], 2, 0))
   assert_eq(get_text(), "# r\n\n## a\n\n<!--\n### b\n-->\n")
   let s = init_doc(get_text())
-  assert_eq(s.contains("\"hidden\":true,\"label\":\"b\""), true)
+  assert_eq(node_hidden(s, "b"), true)
 }
 
 ///|
@@ -601,8 +623,8 @@ test "unfold-then-add is one undo step" {
 /// フェンス行があっても、`-->` を食って以降を全部 hidden にしない。
 test "a stray fence inside a hide region does not eat the close marker" {
   let s = init_doc("# r\n\n<!--\n\n## a\n\n```\n\n-->\n\n## b\n")
-  assert_eq(s.contains("\"hidden\":true,\"label\":\"a\""), true)
-  assert_eq(s.contains("\"hidden\":false,\"label\":\"b\""), true)
+  assert_eq(node_hidden(s, "a"), true)
+  assert_eq(node_hidden(s, "b"), false)
 }
 
 ///|
@@ -668,7 +690,7 @@ test "a fence opened inside a hide region ends with the region" {
   let s = init_doc("# r\n\n<!--\n## a\n\n```\ncode\n-->\n\n## b\n")
   assert_eq(s.contains("\"from\":16,\"to\":24,\"bodyFrom\":20,\"bodyTo\":24"), true)
   // 領域が閉じているので b は隠れない
-  assert_eq(s.contains("\"hidden\":false,\"label\":\"b\""), true)
+  assert_eq(node_hidden(s, "b"), false)
 }
 
 ///|

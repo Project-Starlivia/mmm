@@ -111,8 +111,31 @@ pub fn move_as_parent(ids : Array[Int], target : Int) -> String {
 
 ///|
 #export_name("reorderNode")
-pub fn reorder_node(id : Int, dir : Int) -> String {
-  @core.reorder_node(id, dir)
+pub fn reorder_node(id : Int, dir : Int, cross : Bool) -> String {
+  @core.reorder_node(id, dir, cross)
+}
+
+///|
+#export_name("flipSide")
+pub fn flip_side(id : Int) -> String {
+  @core.flip_side(id)
+}
+
+///|
+#export_name("moveSideEnd")
+pub fn move_side_end(ids : Array[Int], root : Int, left : Bool) -> String {
+  @core.move_side_end(ids, root, left)
+}
+
+///|
+#export_name("moveNewGroup")
+pub fn move_new_group(
+  ids : Array[Int],
+  target : Int,
+  before : Bool,
+  left : Bool,
+) -> String {
+  @core.move_new_group(ids, target, before, left)
 }
 
 ///|

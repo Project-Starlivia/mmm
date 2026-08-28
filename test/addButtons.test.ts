@@ -10,7 +10,7 @@ import { type AddDir, type AddSpot, addSpots } from "../src/map/addButtons.ts";
 const BOX = { x: 100, y: 200, w: 60, h: 20 };
 
 const dirs = (canParent: boolean): AddDir[] =>
-  addSpots(BOX, { x: 10, y: 10 }, canParent).map((s) => s.dir);
+  addSpots(BOX, { x: 10, y: 10 }, canParent, 1).map((s) => s.dir);
 
 /** その向きの置き場所。無ければ試験の前提が崩れているので落とす */
 const spotOf = (list: AddSpot[], dir: AddDir): AddSpot => {
@@ -19,17 +19,26 @@ const spotOf = (list: AddSpot[], dir: AddDir): AddSpot => {
   return found;
 };
 
-const at = (dir: AddDir): { x: number; y: number } => {
-  const { x, y } = spotOf(addSpots(BOX, { x: 10, y: 10 }, true), dir);
+const at = (dir: AddDir, branchDir: 1 | -1 = 1): { x: number; y: number } => {
+  const { x, y } = spotOf(addSpots(BOX, { x: 10, y: 10 }, true, branchDir), dir);
   return { x, y };
 };
 
 test("マップが伸びる向きと木の意味が一致する", () => {
-  // 右が子、左が親。上下が兄弟 — 覚えるものを「向き」1 つで済ませる
+  // 右へ育つ枝なら、右が子、左が親。上下が兄弟 — 覚えるものを「向き」1 つで済ませる
   assert.deepEqual(at("child"), { x: 170, y: 210 });
   assert.deepEqual(at("parent"), { x: 90, y: 210 });
   assert.deepEqual(at("above"), { x: 130, y: 190 });
   assert.deepEqual(at("below"), { x: 130, y: 230 });
+});
+
+test("左へ育つ枝は、子と親が鏡映になる", () => {
+  // 主 dir=-1 の枝は growthEdgeOf/entryEdgeOf が左右を入れ替えるので、
+  // dir=1 のときと child/parent が左右反転する。above/below は不変
+  assert.deepEqual(at("child", -1), { x: 90, y: 210 });
+  assert.deepEqual(at("parent", -1), { x: 170, y: 210 });
+  assert.deepEqual(at("above", -1), { x: 130, y: 190 });
+  assert.deepEqual(at("below", -1), { x: 130, y: 230 });
 });
 
 test("ルートには親を足せないので、その置き場所も出さない", () => {
@@ -40,8 +49,8 @@ test("ルートには親を足せないので、その置き場所も出さな�
 });
 
 test("隙間は箱の外側へ開く", () => {
-  const wide = addSpots(BOX, { x: 40, y: 40 }, true);
-  const near = addSpots(BOX, { x: 10, y: 10 }, true);
+  const wide = addSpots(BOX, { x: 40, y: 40 }, true, 1);
+  const near = addSpots(BOX, { x: 10, y: 10 }, true, 1);
   assert.ok(spotOf(wide, "child").x > spotOf(near, "child").x);
   assert.ok(spotOf(wide, "parent").x < spotOf(near, "parent").x);
 });
@@ -52,7 +61,7 @@ test("左右と上下は、それぞれの隙間を読む", () => {
   //
   // **左右と上下を違えた隙間で見る。** 揃った隙間だけで試すと、左右が
   // うっかり `gap.y` を読んでいても誰も落ちない
-  const spots = addSpots(BOX, { x: 10, y: 0 }, true);
+  const spots = addSpots(BOX, { x: 10, y: 0 }, true, 1);
   assert.equal(spotOf(spots, "above").y, BOX.y);
   assert.equal(spotOf(spots, "below").y, BOX.y + BOX.h);
   assert.equal(spotOf(spots, "child").x, BOX.x + BOX.w + 10);

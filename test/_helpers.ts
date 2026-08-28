@@ -29,7 +29,12 @@ export const getText = () => core.getText();
 /** initDoc して、いまの文書をテキスト・ノード・フェンスの組で返す。 */
 export function loadDoc(md: string): DocView {
   const snap = core.initDoc(md);
-  return { text: core.getText(), nodes: snap.nodes, fences: snap.fences };
+  return {
+    text: core.getText(),
+    nodes: snap.nodes,
+    fences: snap.fences,
+    head: snap.head,
+  };
 }
 
 /** ラベルからノードを引く。無ければ分かりやすく失敗させる。
@@ -187,4 +192,29 @@ export const reason = (e: unknown): string =>
 export function brief(md: string, max = 220): string {
   const s = JSON.stringify(md);
   return s.length <= max ? s : s.slice(0, max) + `..." (全${md.length}文字)`;
+}
+
+/**
+ * `layoutMap` を DOM 無しで動かすための最小の身代わり。
+ *
+ * 寸法は `map/metrics.ts` が canvas の `measureText` で実測するので、
+ * ブラウザの外ではそこだけが動かない。**1 文字 = 7px の等幅**にしてしまえば
+ * 配置の関係（左右・積み順・余白）はそのまま確かめられる。
+ * 呼ぶのはテストの先頭で 1 度だけ。
+ */
+export function stubCanvas(): void {
+  // `globalThis` は型上 DOM を持たないので、`as` で名乗らず Reflect 経由で
+  // 出し入れする（無ければ素通しの `undefined`、あれば確かめずに信じない）。
+  if (Reflect.has(globalThis, "document")) return;
+  const ctx = {
+    font: "",
+    measureText: (s: string) => ({ width: s.length * 7 }),
+  };
+  Reflect.set(globalThis, "document", {
+    createElement: () => ({ getContext: () => ctx }),
+    documentElement: {},
+  });
+  Reflect.set(globalThis, "getComputedStyle", () => ({
+    getPropertyValue: () => "",
+  }));
 }

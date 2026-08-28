@@ -427,6 +427,13 @@ html, body {
   stroke-linecap: round;
 }
 
+/* グループの継ぎ目。同じ側の列の中で、どこからが別のまとまりかを言う */
+.group-seam {
+  stroke: var(--line);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
 /* ========== ノードとカード ==========
    形は map/render.ts と map/drawCard.ts が作る。ここが持つのは、
    状態で変わるだけの定数（角丸・色・破線）。 */
@@ -600,6 +607,12 @@ html, body {
   stroke: var(--accent);
   stroke-width: 3;
   stroke-linecap: round;
+}
+
+/* 新しいグループのスロット。ふつうの挿入線より太くして、
+   「隣に入る」ではなく「別のまとまりになる」ことを言う */
+#drop-line.slot {
+  stroke-width: 6;
 }
 
 /* 挿入線だけだと「上の親の末尾」か「下の親の先頭」かが読めないので、
@@ -785,6 +798,9 @@ html, body {
   z-index: 40;
 }
 
+/* 窓の中身は**すべてこの下**に置く。ボタンの下地（`& button`）を、
+   インクや太さの見た目が上書きする関係になるので、同じ入れ子の中に
+   居ないと勝ち負けが場所で決まってしまう */
 .popup {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -808,34 +824,106 @@ html, body {
     &:hover { background: var(--accent-soft); border-color: var(--accent); }
     &.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   }
-}
 
-.popup-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
-.popup-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  & .popup-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+
+  /* 道具立て。**塊は 3 つ** — インク / 太さ / やり直す。前の 2 つは
+     「描くために選ぶもの」なので寄せて置き、やり直すものだけを右へ離す */
+  & .draw-tools {
+    display: flex;
+    /* **高さは字のあるボタンが決める**（背を伸ばす、で揃える）。太さの点は
+       大きさが 3 通りあるので、点に高さを決めさせると背丈が揃わない */
+    align-items: stretch;
+    gap: 14px;
+    margin-bottom: 10px;
+  }
+  & .draw-inks,
+  & .draw-nibs {
+    display: inline-flex;
+    gap: 6px;
+  }
+  & .draw-inks { align-items: center; }
+  /* Undo と Clear だけは 1 つの塊。継ぎ目は帯の書き出しと同じ `.group` */
+  & .draw-actions { margin-left: auto; }
+
+  /* インクの丸。色は draw.ts が `--ink-swatch` で渡す（綴りは 1 か所） */
+  & .draw-ink {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--ink-swatch);
+    /* 暗い色でも器から浮くように、縁は薄く 1 本 */
+    border: 1px solid var(--line);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    /* 触っても**塗りは変えない** — 色そのものが中身なので、下地に
+       すり替えると何色か分からなくなる */
+    &:hover { background: var(--ink-swatch); border-color: var(--ink-dim); }
+    /* 選ばれている印も同じ理由で塗りを覆わず、外側に輪を回す。
+       **器の色で隙間を空けてから**輪を引く — ブランドカラーの筆は輪と
+       同じ色になりうるので、地続きだと選ばれているのか分からない */
+    &.on {
+      box-shadow:
+        0 0 0 2px var(--panel),
+        0 0 0 4px var(--accent);
+    }
+  }
+
+  /* 消しゴムだけは色を持てないので、丸の中に絵を入れる（紙の色で塗ると
+     明るいテーマで器と同じ色になって消える）。
+     **触ったとき・選ばれたときの変化は色の丸とまったく同じ**（縁と輪）で、
+     絵が濃くなるだけ — 同じ並びに居るものが、別の変わり方をしない */
+  & .draw-eraser {
+    background: var(--panel);
+    color: var(--ink-dim);
+
+    &:hover { background: var(--panel); color: var(--ink); }
+    &.on { color: var(--ink); }
+    & .icon { width: 13px; height: 13px; }
+  }
+
+  /* 太さ。字ではなく**その太さの点そのもの**を出す */
+  & .draw-nib {
+    width: 30px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    &::before {
+      content: "";
+      width: var(--nib);
+      height: var(--nib);
+      border-radius: 50%;
+      background: currentColor;
+    }
+    &.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  }
+
+  & .draw-paper {
+    display: block;
+    /* 窓が狭ければ縮む。出来上がる絵の大きさは変わらない（draw.ts が持つ） */
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: crosshair;
+    /* 指やペンでも描けるように、ブラウザのスクロール/ズームへ渡さない */
+    touch-action: none;
+  }
+
+  & .popup-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+  }
+  & .popup-hint { flex: 1; font-size: 11px; color: var(--ink-dim); }
 }
-.popup-canvas {
-  display: block;
-  /* 窓が狭ければ縮む。出来上がる絵の大きさは変わらない（draw.ts が持つ） */
-  max-width: 100%;
-  height: auto;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  cursor: crosshair;
-  /* 指やペンでも描けるように、ブラウザのスクロール/ズームへ渡さない */
-  touch-action: none;
-}
-.popup-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-.popup-hint { flex: 1; font-size: 11px; color: var(--ink-dim); }
 
 /* ========== 狭いとき ==========
    **どちらのペインを出すかは、ここでは決めない。** 居場所（狭ければ

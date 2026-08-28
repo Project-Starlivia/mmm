@@ -28,6 +28,7 @@ function layoutOf(nodes: NodeInfo[], hiddenAway: number[] = []): Layout {
     boxes: new Map(),
     buriedCount: new Map(),
     fanOf: new Map(),
+    seams: [],
   };
 }
 

@@ -198,38 +198,18 @@ fn indent_edit(
 }
 
 ///|
-/// そのノードの本文の末尾。次に構造行が来る手前（無ければ自分の末尾）。
-/// TS 側 map/cards.ts の contentEnd と同じ式 — 挿入位置の計算にだけ要る。
-fn content_end_of(i : Int) -> Int {
-  if i + 1 < st.nodes.length() && st.nodes[i + 1].from < st.nodes[i].to {
-    st.nodes[i + 1].from
-  } else {
-    st.nodes[i].to
-  }
-}
-
-///|
 /// ノード i の本文の末尾へ、1 行を追加する編集。前後の空行の出し分けは
-/// 見出しの挿入（insert_heading_edit）と同じ式。
+/// block_insert（heading.mbt）に任せる。着地点は Node.content_end
+/// （doc.mbt が has_content と同じ規則で計算し、snapshot にも同じ値を出す
+/// — ここで再導出しない）。
 ///
 /// **リストの形で書かれたノードなら、その項目の中身の列まで字下げする。**
 /// 字下げしないと、外の Markdown パーサはそこでリストを閉じ、続く兄弟が
 /// 迷子になる（貼り付け・ドロップ・お絵描き・リンクで実際に踏んだ）。
 fn append_content_edit(i : Int, line : String) -> Edit {
-  let at = content_end_of(i)
+  let at = st.nodes[i].content_end
   let col = content_col_for(st.nodes[i].depth)
   let body = if col > 0 { spaces(col) + line } else { line }
-  let sb = StringBuilder::new()
-  if at > 0 && code_at(st.text, at - 1) != 10 {
-    sb.write_string(eol)
-    sb.write_string(eol)
-  } else if !preceded_by_blank(at) {
-    sb.write_string(eol)
-  }
-  sb.write_string(body)
-  sb.write_string(eol)
-  if at != st.text.length() {
-    sb.write_string(eol)
-  }
-  Edit::{ from: at, to: at, insert: sb.to_string(), removed: "" }
+  let (insert, _) = block_insert(at, body + eol)
+  Edit::{ from: at, to: at, insert, removed: "" }
 }

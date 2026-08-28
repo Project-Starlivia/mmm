@@ -15,6 +15,7 @@ import { MdEditor } from "./editor.ts";
 import { MindMap, type MapHost } from "./mindmap.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
+import { imageFolder, normalizePath, retarget, setImageFolder } from "./app/head.ts";
 import { exportWays, initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
 import { deriveName } from "./app/name.ts";
@@ -24,6 +25,7 @@ import { decidePaste } from "./app/paste.ts";
 import { initDrop } from "./app/dnd.ts";
 import { initForm } from "./app/form.ts";
 import { showDrawing } from "./app/draw.ts";
+import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 import { type MenuEntry, openOnClick } from "./map/menu.ts";
@@ -32,6 +34,7 @@ import {
   type CardRef,
   cardRowsOf,
   contentEndOf,
+  imageDest,
   linkLine,
 } from "./map/cards.ts";
 import { insertBlock, moveLine, removeLine } from "./edits.ts";
@@ -50,12 +53,17 @@ function el<T extends Element>(id: string, kind: abstract new () => T): T {
   throw new Error(`#${id} が ${kind.name} ではない`);
 }
 
-/** ヘルプの行き先。ここ 1 か所 */
+/** リポジトリの行き先。ここ 1 か所 */
 const REPO = "https://github.com/Project-Starlivia/mmm";
 
 /** File System Access API が無いブラウザで、Files のできない行と
  *  ショートカットの両方がこの理由を言う。英語の文言はここ 1 か所だけ */
 const NO_FILE_ACCESS = "This browser cannot open or save files";
+
+/** 新しいタブで開く。`⋯` の外部リンクが通る唯一の道 */
+function openExternal(url: string): void {
+  window.open(url, "_blank", "noopener");
+}
 
 const mdPane = el("md-pane", HTMLElement);
 const mapPane = el("map-pane", HTMLElement);
@@ -68,7 +76,7 @@ const elLogo = el("logo", SVGSVGElement);
 // ---------- app state ----------
 
 /** いまの文書（テキスト・ノード・フェンスの組）。スナップショットごと差し替える */
-let doc: DocView = { text: "", nodes: [], fences: [] };
+let doc: DocView = { text: "", nodes: [], fences: [], head: null };
 let byId = new Map<number, NodeInfo>();
 let selection = new Set<number>();
 let anchorId = -1;
@@ -96,23 +104,76 @@ let savedName: string | null = null;
  */
 let drawingOpen = false;
 
+// ---------- 画像フォルダの宣言（文書の頭） ----------
+//
+// 宣言の持ち主は .md の頭（app/head.ts）。ここは「頭が何を言っているか」を
+// 一言で引ける場所。実際の読み書きは app/assets.ts が持つ。
+
+/** いま頭が言っている宣言。読めない綴り（絶対パス・URL）なら null */
+function declaredFolder(): string | null {
+  const raw = imageFolder(doc.text, doc.head);
+  return raw === null ? null : normalizePath(raw);
+}
+
+/** 本文がいま映している宣言。打鍵の最中だけ、頭の言い分より遅れる */
+let appliedFolder: string | null = null;
+
+/**
+ * 頭の宣言に本文の画像パスを追従させ、画像を読み直す。
+ *
+ * **打鍵のたびに走る。** 待たない代わりに、その打鍵が使った `tag` に
+ * 相乗りする — コアは同じ tag の編集を 1 エントリに併合するので、頭の
+ * 打鍵と本文の書き換えは同じ Undo に入り、打鍵が続くかぎり増えない。
+ *
+ * 書き換えは頭より後ろにしか起きないので、CM 側の挿入位置はずれない。
+ * だから origin は `follow` — 打鍵の連なりを切らせない（`applySnap`）。
+ */
+function followDeclaration(tag: string): void {
+  const next = declaredFolder();
+  if (next === null) return; // 読めない綴り（空・絶対パス・URL）では何もしない
+  const prev = appliedFolder;
+  appliedFolder = next;
+  // 行って戻っただけなら何も変わっていない。ここで止めないと、動いていない
+  // 画像を読み直すだけの往復になる
+  if (prev === next) return;
+  // 初めての宣言（prev が null）では、どこから動かすのか分からないので
+  // 本文には触らない。読み直しだけする
+  if (prev !== null) {
+    // 後ろから。前から当てると後続のオフセットが挿入ぶんだけずれる。
+    // 編集ごとに applySnap を呼ぶと画像の枚数だけ再描画が走るので、
+    // 各回の editSets を繋いで最後に 1 度だけ渡す（並びがそのまま適用順）
+    const edits = retarget(doc, prev, next);
+    let snap: Snapshot | null = null;
+    const sets: EditOp[][] = [];
+    for (let i = edits.length - 1; i >= 0; i--) {
+      const e = edits[i];
+      snap = core.replaceText(e.from, e.to, e.insert, tag);
+      sets.push(...snap.editSets);
+    }
+    if (snap) applySnap({ ...snap, editSets: sets }, "follow");
+  }
+  assets.clear(); // 宣言が変わった。画像を読み直す
+}
 
 // ---------- sync ----------
 
 /**
- * そのスナップショットを誰が起こしたか。振る舞いが変わるのは 3 通りだけ。
- * - `cm`   … MD ペインの打鍵。CodeMirror には既に入っているので送り返さない
- * - `load` … 文書まるごとの入れ替え。setText が済んでいる
- * - `core` … それ以外（マップの操作・undo/redo）。MD ペインへ差分を送る
+ * そのスナップショットを誰が起こしたか。振る舞いが変わるのは 4 通りだけ。
+ * - `cm`     … MD ペインの打鍵。CodeMirror には既に入っているので送り返さない
+ * - `load`   … 文書まるごとの入れ替え。setText が済んでいる
+ * - `follow` … 直前の打鍵に本文が追いついた分（頭の宣言の引っ越し）。
+ *              MD ペインへ差分は送るが、**打鍵の連なりは切らない** —
+ *              書き換えは頭より後ろにしか起きず、挿入位置がずれないため
+ * - `core`   … それ以外（マップの操作・undo/redo）。MD ペインへ差分を送る
  */
-type Origin = "cm" | "load" | "core";
+type Origin = "cm" | "load" | "follow" | "core";
 
 function applySnap(snap: Snapshot, origin: Origin): void {
   // 何も無いところに最初の 1 つが生まれた瞬間だけ、真ん中へ寄せる。
   // `ensureVisible` は「見えるところまで」しか動かさないので、まっさらな
   // 画面では端に置かれたように見える
   const wasEmpty = doc.nodes.length === 0;
-  doc = { text: core.getText(), nodes: snap.nodes, fences: snap.fences };
+  doc = { text: core.getText(), nodes: snap.nodes, fences: snap.fences, head: snap.head };
   byId = new Map(doc.nodes.map((n) => [n.id, n]));
   if (origin !== "cm" && origin !== "load") editor.applySets(snap.editSets);
   // prune selection to surviving nodes
@@ -134,8 +195,15 @@ function applySnap(snap: Snapshot, origin: Origin): void {
     picked = null;
     selChanged = true;
   }
-  // structural edits from elsewhere invalidate the typing-merge chain
-  if (origin !== "cm") editKind = "";
+  // 打鍵と、その打鍵に本文が追いついた分**以外**で文書が変わったなら、
+  // 打鍵の連なりは切れ（次の打鍵は新しい Undo エントリから）、本文はもう
+  // その宣言を映している（読み込み・undo/redo・フォルダ選択のどれでも）。
+  // 打鍵のときだけ据え置くのは、直後の followDeclaration に「どこから」を
+  // 渡すため
+  if (origin !== "cm" && origin !== "follow") {
+    editKind = "";
+    appliedFolder = declaredFolder();
+  }
   map.render();
   // render がクラスまで塗り終えているので、ここで塗り直さない
   if (selChanged) syncSelectionViews(false, true);
@@ -283,7 +351,13 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
       editTag = tag;
       editPos = e.from;
     } else {
+      // 選択の置き換えなど、前後の打鍵と連ねない 1 編集。**それでも名前は
+      // 要る** — 空の tag はコアで併合されない決まりなので（history.mbt）、
+      // 空のままだと直後の追従が別の Undo エントリになり、1 回戻したときに
+      // 頭と本文が食い違う。他と重ならない名前を配れば、連ならないまま
+      // 追従だけが同じエントリに入る
       editKind = "";
+      tag = nextTag();
     }
   } else {
     editKind = "";
@@ -296,6 +370,9 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
     delta += e.insert.length - (e.to - e.from);
   }
   if (snap) applySnap(snap, "cm");
+  // 頭を打ったなら、本文をその場で追いつかせる。**同じ tag を渡す** —
+  // 打鍵と書き換えが 1 つの Undo に収まる
+  followDeclaration(tag);
 }
 
 // ---------- mindmap host ----------
@@ -442,8 +519,17 @@ const host: MapHost = {
     applySnap(core.outdentNodes([...selection]), "core");
     syncSelectionViews(false);
   },
-  reorder(id, dir) {
-    runCmd(() => core.reorderNode(id, dir));
+  reorder(id, dir, cross) {
+    runCmd(() => core.reorderNode(id, dir, cross));
+  },
+  moveSideEnd(ids, root, left) {
+    runCmd(() => core.moveSideEnd(ids, root, left));
+  },
+  moveNewGroup(ids, target, before, left) {
+    runCmd(() => core.moveNewGroup(ids, target, before, left));
+  },
+  flipSide(id) {
+    runCmd(() => core.flipSide(id));
   },
   toggleHidden(id) {
     runCmd(() => core.toggleHidden(id));
@@ -714,6 +800,27 @@ async function newFile(): Promise<void> {
   }
 }
 
+/**
+ * いまの本文へのリンクをクリップボードへ。保存の有無を問わない —
+ * 見出しから導いた仮の名前しか無い文書でも、そのまま渡せる。
+ * 画像は付いてこない（`![](...)` は相対パスで、相手の環境には無い）ので、
+ * 貼ってある文書ではそう伝える。
+ */
+async function copyLink(): Promise<void> {
+  try {
+    const text = core.getText();
+    const link = `${location.origin}${location.pathname}${await toHash(text)}`;
+    await navigator.clipboard.writeText(link);
+    if (hasImages(text)) flashFilename("Link copied — images won't travel", false);
+    else if (link.length > LINK_WARN_LENGTH)
+      flashFilename("Link copied — some apps may cut this", false);
+    else flashFilename("Link copied", false);
+  } catch (err) {
+    console.error("copy link failed:", err);
+    flashFilename("Could not copy the link");
+  }
+}
+
 async function confirmDiscard(): Promise<boolean> {
   if (core.getText() === savedText) return true;
   return window.confirm("You have unsaved changes. Discard them and continue?");
@@ -726,6 +833,11 @@ const assets = initAssets({
   hasFile: () => savedName !== null,
   warn: (m) => flashFilename(m),
   refresh: () => map.render(),
+  declared: () => declaredFolder(),
+  declare: (value) => {
+    const e = setImageFolder(doc.text, doc.head, value);
+    applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
+  },
 });
 
 /** `body` を独立した段落として `at` へ挿し込む（式は src/edits.ts）。 */
@@ -755,7 +867,25 @@ async function attachImage(id: number, blob: Blob, tag = ""): Promise<void> {
   if (!byId.has(id)) return;
   const rel = await assets.saveToDisk(blob);
   // 置いているあいだに消えていることがある
-  if (rel !== null && byId.has(id)) insertContentLine(id, `![](${rel})`, tag);
+  if (rel !== null && byId.has(id)) insertContentLine(id, `![](${imageDest(rel)})`, tag);
+}
+
+/**
+ * Files メニューの画像フォルダの見出し。「宣言」（頭）と「許可」（フォルダ
+ * ハンドル）は別々に食い違いうるので、4 通りをそれぞれ言い分ける。
+ *
+ * **とくに「許可はあるが宣言が無い」を黙らせない。** `AssetBinding.path` が
+ * 落ちた設計上、頭を持たない既存文書は宣言が無いまま `declaredPath()` が
+ * `./` に倒れる（app/assets.ts）。以前 `img/` 相当で結んでいた人はここが
+ * 外れて画像が黙って空になるが、フォルダ名は出てしまうので「結び付いて
+ * いるのに映らない」といういちばん気付きにくい状態になる。ここで
+ * "not declared" と名乗らせて、頭に宣言が無いことを見えるようにする。
+ */
+function folderCaption(): string {
+  const name = assets.folderName();
+  const declared = declaredFolder() !== null;
+  if (name === null) return declared ? "folder not linked" : "none";
+  return declared ? name : `${name}, not declared`;
 }
 
 // 文書に何かする道は Files にまとめる。**画像フォルダもここ** —
@@ -765,8 +895,8 @@ async function attachImage(id: number, blob: Blob, tag = ""): Promise<void> {
 // 見出し（caption）は「続く行たちが何に効くか」を言う。保存していない文書に
 // 名前を変える相手は無いので、そのときは見出しがそう言い、行は無効になる。
 openOnClick(btnFile, () => {
-  // **無いものを黙って落とさない。** スマホのブラウザには File System
-  // Access API が無く、`docs/web.md` のとおり 2 本目の道は作らない。
+  // **無いものを黙って落とさない。** ファイルピッカーを持たないブラウザが
+  // あり、`docs/browsers.md` のとおり 2 本目の道は作らない。
   // 押せない理由だけは言う
   const canOpen = io.canOpen();
   const canSave = io.canSaveAs();
@@ -780,7 +910,7 @@ openOnClick(btnFile, () => {
     { label: "Rename", run: () => void renameFile(), disabled: savedName === null },
     { label: "Save", key: "Mod+S", run: () => void saveFile(), disabled: !canSave },
     { label: "Save as", key: "Mod+Shift+S", run: () => void saveFile(true), disabled: !canSave },
-    { caption: assets.folderName() ?? "none" },
+    { caption: folderCaption() },
     {
       label: "Images Folder",
       run: () => void assets.chooseFolder(),
@@ -791,16 +921,23 @@ openOnClick(btnFile, () => {
 });
 
 // 低頻度だが消したくないものの受け皿。Undo/Redo にボタンは無く（キーが
-// 本道）、ここが押せる保険になる
+// 本道）、ここが押せる保険になる。3 つの塊 — 戻す / 見た目 / 外に開く
 openOnClick(btnMore, () => [
   { label: "Undo", key: "Mod+Z", run: doUndo },
   { label: "Redo", key: "Mod+Shift+Z", run: doRedo },
   "sep",
+  { label: "Brand color", run: () => theme.pickColor() },
   { label: theme.isLight() ? "Dark theme" : "Light theme", run: () => theme.toggle() },
   // 見た目の好み同士なのでテーマの隣。**押せばどうなるか**を名乗る（テーマと同じ流儀）
   { label: addsOn ? "Hide add buttons" : "Show add buttons", run: () => setAdds(!addsOn) },
   "sep",
-  { label: "Help", run: () => window.open(REPO, "_blank", "noopener") },
+  { label: "Copy link", run: () => void copyLink() },
+  "sep",
+  {
+    label: "Shortcuts",
+    run: () => openExternal(`${REPO}/blob/main/docs/shortcuts.md`),
+  },
+  { label: "GitHub", run: () => openExternal(REPO) },
 ]);
 elFilename.addEventListener("click", () => {
   void (async () => {
@@ -898,18 +1035,28 @@ initShortcuts({
   sweep(); // 役目を終えた localStorage のキーを捨てる
   loadText("", null); // 空 = まだ何も無い。dirty も立たない
   const bootGen = docGen;
-  void io
-    .startupDoc()
-    .then((doc) => {
-      // 読み終わるまでに打ち始めていたら、それを消してまで開かない。
-      // 同じ理由で、その間に New/Open/Drop で別の文書を開いていた場合も
-      // （それが空文書でも）上書きしない — その操作は必ず loadText を通るので
-      // docGen が進んでいるはず
-      if (doc && docGen === bootGen && core.getText() === "") applyDoc(doc);
-    })
-    .catch(() => {
-      flashFilename("Could not reopen the last file");
-    });
+  void fromHash(location.hash).then((shared) => {
+    if (shared !== null) {
+      // リンクで開いた。ハッシュはその場で消す — 文書の身元はあくまで
+      // ファイルハンドル 1 つで、リンクは入口でしかない。前回ファイルの
+      // 復元もしない（リンクを踏んだのに別の文書が出てくるのは筋が通らない）
+      history.replaceState(null, "", location.pathname + location.search);
+      if (docGen === bootGen && core.getText() === "") loadText(shared, null);
+      return;
+    }
+    void io
+      .startupDoc()
+      .then((doc) => {
+        // 読み終わるまでに打ち始めていたら、それを消してまで開かない。
+        // 同じ理由で、その間に New/Open/Drop で別の文書を開いていた場合も
+        // （それが空文書でも）上書きしない — その操作は必ず loadText を通るので
+        // docGen が進んでいるはず
+        if (doc && docGen === bootGen && core.getText() === "") applyDoc(doc);
+      })
+      .catch(() => {
+        flashFilename("Could not reopen the last file");
+      });
+  });
 }
 // フェンスの言語は後から読み込まれる。届いたら色を載せ直す
 onLanguageReady(() => map.render());

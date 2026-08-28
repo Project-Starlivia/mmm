@@ -46,7 +46,7 @@ export function initTheme(args: {
   /** topbar の `<svg id="logo">`。中身は logo.ts が入れる */
   logo: SVGSVGElement;
   setEditorTheme: (dark: boolean) => void;
-}): { toggle: () => void; isLight: () => boolean } {
+}): { toggle: () => void; isLight: () => boolean; pickColor: () => void } {
   const { logo } = args;
 
   // ロゴの形の源は logo.ts ひとつ。topbar も favicon もここから作る
@@ -106,5 +106,5 @@ export function initTheme(args: {
   const osLight = window.matchMedia?.("(prefers-color-scheme: light)").matches;
   applyTheme(saved ?? (osLight ? "light" : "dark"));
   applyColor(load(LS_COLOR) ?? DEFAULT_COLOR);
-  return { toggle, isLight };
+  return { toggle, isLight, pickColor };
 }

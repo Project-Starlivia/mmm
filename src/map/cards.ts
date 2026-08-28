@@ -33,6 +33,13 @@ export interface CardRef {
   index: number;
 }
 
+/**
+ * 先頭の `./` を落とした形。`./x` と `x` は同じ場所を指すので、比べる前に
+ * 必ずこの形へ寄せる。**カードが持つのも、画像の鍵になるのもこの形**
+ * （md へ書き戻すときだけ `app/assets.ts` の `mdPath` が `./` を付け直す）。
+ */
+export const bare = (path: string): string => path.replace(/^\.\//, "");
+
 const LINK_ROW = 26; // height of one link-card row under the label
 const IMG_H = 64; // thumbnail height inside an image row
 const IMG_ROW = IMG_H + 12; // height of one image row under the label
@@ -110,25 +117,57 @@ export function linkLine(
   return { line: `[${title}](${link.url})`, from: 1, to: 1 + title.length };
 }
 
+/** 1 行から読み取った、ローカル画像の指し方。 */
+export interface ImageRef {
+  /** 先頭の `./` を落とした形。カードの鍵になる */
+  path: string;
+  /** 拡張子込みのファイル名 */
+  name: string;
+  /** md に書かれているままの綴り */
+  raw: string;
+  /** 行頭から見た `raw` の範囲。`line.slice(from, to)` が `raw` になる */
+  from: number;
+  to: number;
+  /** 既に `<…>` で囲まれているか。書き換え側が二重に囲まないために要る */
+  bracketed: boolean;
+}
+
+/**
+ * `![]()` に書く destination の綴り。空白を含むなら CommonMark の `<…>` で
+ * 囲む — 裸のままだと下の `IMG_LINE` が読めず、カードが消えて以後の
+ * `retarget`（app/head.ts）からも見えなくなる。
+ */
+export const imageDest = (path: string): string =>
+  /\s/.test(path) ? `<${path}>` : path;
+
+// `d` フラグは捕獲の位置を返させるため。宣言フォルダの引っ越しで
+// **destination だけ**を差し替えるのに要る（app/head.ts の retarget）
+const IMG_LINE = /^!\[[^\]]*\]\((?:<([^>]+)>|([^)\s]+))\)$/d;
+
 /** Content line of the form `![alt](path)` with a LOCAL (relative) path.
  * External images (http/data URLs) are ignored — no external traffic.
  * `<path with space>` is CommonMark's escape for a destination containing
  * whitespace, so only the unescaped form forbids spaces. */
-export function parseImage(line: string): { path: string; name: string } | null {
-  const m = /^!\[[^\]]*\]\((?:<([^>]+)>|([^)\s]+))\)$/.exec(line.trim());
+export function parseImage(line: string): ImageRef | null {
+  const lead = line.length - line.trimStart().length;
+  const m = IMG_LINE.exec(line.trim());
   if (!m) return null;
-  let path = m[1] ?? m[2];
+  const bracketed = m[1] !== undefined;
+  const raw = m[1] ?? m[2];
   // A real URI scheme (http:, data:, ...) is always 2+ letters before the
   // colon; a single letter is a Windows drive (`C:\...`), which is a local
   // path, not an external one.
-  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(path);
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(raw);
   if (scheme && scheme[1].length > 1) return null;
-  if (path.startsWith("./")) path = path.slice(2);
+  // 位置は捕獲した組の側にある。`<…>` で囲まれていれば 1、裸なら 2
+  const span = m.indices?.[1] ?? m.indices?.[2];
+  if (!span) return null;
+  const path = bare(raw);
   if (path === "") return null;
   // Windows のパスは `\` 区切りでも来る（ドライブレターや `..\..\x.png`）
   // split は必ず 1 つ以上返すが、型は言い切らないので素直に受ける
   const name = path.split(/[\\/]/).pop() ?? path;
-  return { path, name };
+  return { path, name, raw, from: lead + span[0], to: lead + span[1], bracketed };
 }
 
 /**
@@ -206,20 +245,6 @@ function rowsOfContent(
   return list;
 }
 
-/**
- * そのノード（nodes[i]）の本文の終わり: 次ノードの見出し行頭、無ければ
- * そのノードの部分木の終わり。カード行を切り出す境界（cardRows）と、
- * カードの移動先を「そのノードの末尾」に決める境界（main.ts の
- * moveCardTo/insertContentLine）は同じ場所を指す — この式をここ以外に
- * 書かない。
- */
-export function contentEnd(nodes: NodeInfo[], i: number): number {
-  const n = nodes[i];
-  return i + 1 < nodes.length && nodes[i + 1].from < n.to
-    ? nodes[i + 1].from
-    : n.to;
-}
-
 /** フェンスを「開きフェンス行の行頭」で引けるようにする */
 const fenceIndex = (doc: DocView): Map<number, FenceSpan> => {
   const m = new Map<number, FenceSpan>();
@@ -227,7 +252,9 @@ const fenceIndex = (doc: DocView): Map<number, FenceSpan> => {
   return m;
 };
 
-/** ノード 1 つぶんのカード行。折り畳んだノードはラベルだけで中身を出さない。 */
+/** ノード 1 つぶんのカード行。折り畳んだノードはラベルだけで中身を出さない。
+ *  本文の範囲（contentStart/contentEnd）はコアが確定させた値をそのまま
+ *  読む — 区切り行の境界を頭打ちにする規則はコアだけが知っている。 */
 function rowsOfNode(
   doc: DocView,
   i: number,
@@ -235,12 +262,7 @@ function rowsOfNode(
 ): CardRow[] {
   const n = doc.nodes[i];
   if (!n.hasContent || n.hidden) return [];
-  const brk = doc.text.indexOf("\n", n.headEnd);
-  const start = brk === -1 ? -1 : brk + 1;
-  const end = contentEnd(doc.nodes, i);
-  return start > 0 && start < end
-    ? rowsOfContent(doc.text, start, end, fenceAt)
-    : [];
+  return rowsOfContent(doc.text, n.contentStart, n.contentEnd, fenceAt);
 }
 
 /**
@@ -269,8 +291,7 @@ export function cardRowsOf(doc: DocView, id: number): CardRow[] {
   return i === -1 ? [] : rowsOfNode(doc, i, fenceIndex(doc));
 }
 
-/** そのノードの本文の終わり。id から引くときはこちら。 */
+/** そのノードの本文の終わり（コアが確定させた contentEnd）。id から引くときはこちら。 */
 export function contentEndOf(nodes: NodeInfo[], id: number): number | null {
-  const i = nodes.findIndex((n) => n.id === id);
-  return i === -1 ? null : contentEnd(nodes, i);
+  return nodes.find((n) => n.id === id)?.contentEnd ?? null;
 }

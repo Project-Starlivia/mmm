@@ -25,8 +25,19 @@ export interface NodeInfo {
   headEnd: number;
   /** 区間の終わり = 部分木の終わり */
   to: number;
+  /** 本文の始まり = 見出し行の改行の直後 */
+  contentStart: number;
+  /** 本文の終わり（次の見出し・部分木の終わり・区切り行の境界のうち
+   *  いちばん手前）。**この規則はコアだけが持つ**（core/doc.mbt）。
+   *  末尾へ追記する位置・カード行を切り出す境界は、ここを読むだけで
+   *  常に一致する — TS 側で再導出しない */
+  contentEnd: number;
   hasContent: boolean;
   hidden: boolean;
+  /** その枝が属するグループ（木ごとに 0 始まり。境界を 1 つ越えるたび +1） */
+  group: number;
+  /** ルートの反対側（左）へ伸びる枝か。**枝の中では一定**（core が導出済み） */
+  left: boolean;
   label: string;
 }
 
@@ -49,6 +60,23 @@ export interface FenceSpan {
   info: string;
 }
 
+/**
+ * 文書の頭（YAML frontmatter）の一区間。
+ * **どこからどこまでが頭かを決めるのはコアだけ**（core/parser.mbt）— この
+ * 境界の内側は走査されないので、`tags:` 配下の `- a` がノードになるか
+ * どうかがここで決まる。中身の綴りは解釈しない。
+ */
+export interface HeadSpan {
+  /** 開き `---` 行の行頭 */
+  from: number;
+  /** 閉じ `---` 行の行末（改行の手前） */
+  to: number;
+  /** 中身の最初の行頭 */
+  bodyFrom: number;
+  /** 中身の最後の行末。中身が無ければ bodyFrom より手前 */
+  bodyTo: number;
+}
+
 export interface Snapshot {
   rev: number;
   focus: number;
@@ -60,6 +88,8 @@ export interface Snapshot {
   editSets: EditOp[][];
   nodes: NodeInfo[];
   fences: FenceSpan[];
+  /** 文書の頭。無ければ null */
+  head: HeadSpan | null;
 }
 
 /**
@@ -70,6 +100,7 @@ export interface DocView {
   text: string;
   nodes: NodeInfo[];
   fences: FenceSpan[];
+  head: HeadSpan | null;
 }
 
 // The JSON contract (field names/shapes) is defined by core/api.mbt's
@@ -116,8 +147,21 @@ export const core = {
   /** A→B の線への割り込み: ids を B の直前へ動かしてから B を 1 段下げる */
   moveAsParent: (ids: number[], target: number): Snapshot =>
     snap(mbt.moveAsParent(ids, target)),
-  reorderNode: (id: number, dir: -1 | 1): Snapshot =>
-    snap(mbt.reorderNode(id, dir)),
+  /** cross ならグループの壁を越える（Mod+Alt+↑↓） */
+  reorderNode: (id: number, dir: -1 | 1, cross = false): Snapshot =>
+    snap(mbt.reorderNode(id, dir, cross)),
+  /** そのノードの属するグループを、丸ごとルートの反対側へ */
+  flipSide: (id: number): Snapshot => snap(mbt.flipSide(id)),
+  /** ルート脇へ落とした: その側の末尾へ（要るときだけ切り替えの `---` を書く） */
+  moveSideEnd: (ids: number[], root: number, left: boolean): Snapshot =>
+    snap(mbt.moveSideEnd(ids, root, left)),
+  /** Mod+ドロップ: 選んだ枝を target の直前/直後へ新しいグループとして置く */
+  moveNewGroup: (
+    ids: number[],
+    target: number,
+    before: boolean,
+    left: boolean,
+  ): Snapshot => snap(mbt.moveNewGroup(ids, target, before, left)),
   toggleHidden: (id: number): Snapshot => snap(mbt.toggleHidden(id)),
   undo: (): Snapshot => snap(mbt.undo()),
   redo: (): Snapshot => snap(mbt.redo()),
