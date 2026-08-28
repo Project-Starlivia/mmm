@@ -14,7 +14,15 @@
   --ink-dim: #828a96;
   --line: #2a2f38;
   --accent: #5932ff;
-  --accent-soft: rgba(89, 50, 255, 0.2);
+  /* 面を accent で薄く塗るときの濃さ。**この 1 行だけ**が決める — 下が
+     透ける面（`--accent-soft`）も、ノードの箱のように地の上へ不透明に塗る面も
+     同じ濃さになる。同じ選択を 2 つのペインで見せているのに、濃さが違う
+     理由が無い。
+     テーマでも変えない: ライト用に薄くした宣言を持っていたが、app/theme.ts が
+     置くインラインに必ず負けていて一度も効いていなかった（誰も見たことの
+     ない濃さだった）。ブランドカラーは `--accent` にだけ入る */
+  --accent-mix: 20%;
+  --accent-soft: color-mix(in srgb, var(--accent) var(--accent-mix), transparent);
   --node-bg: #232830;
   --node-border: #3b424d;
   --node-border-strong: #5d6673;
@@ -39,7 +47,6 @@
   --ink: #1f2328;
   --ink-dim: #6b7280;
   --line: #e2e5ea;
-  --accent-soft: rgba(89, 50, 255, 0.12);
   --node-bg: #ffffff;
   --node-border: #cfd5dd;
   --node-border-strong: #9aa4b1;
@@ -211,13 +218,20 @@ html, body {
   background: var(--panel);
   position: relative; /* 隅に浮く道具（.pane-tool）の座標系 */
 
+  /* CodeMirror の色は**ここが決める**（src/editor.ts は色を持たない）。
+     テーマの中で当てると、ダークでは後から当たる oneDarkTheme に負ける —
+     普通の詳細度で書けば勝てるので、置き場所を 1 つに寄せてある。
+     oneDark が引き続き受け持つのはコードの字の色だけ。 */
   & .cm-editor {
     height: 100%;
     font-size: 13.5px;
+    background: var(--panel);
 
     &.cm-focused { outline: none; }
   }
   & .cm-scroller { font-family: var(--mono); line-height: 1.55; }
+  /* 打っている場所の印は、マップのその場編集と同じブランドカラー */
+  & .cm-content { caret-color: var(--accent); }
   & .cm-gutters {
     background: var(--panel);
     border-right: 1px solid var(--line);
@@ -521,7 +535,9 @@ html, body {
   &.selected rect.box {
     stroke: var(--accent);
     stroke-width: 2;
-    fill: color-mix(in srgb, var(--accent) 16%, var(--node-bg));
+    /* md 側のハイライトと同じ濃さ（--accent-mix）。ただし箱は下が透けては
+       困る（地のドットが出る）ので、transparent ではなく node-bg に混ぜる */
+    fill: color-mix(in srgb, var(--accent) var(--accent-mix), var(--node-bg));
   }
   &.hidden-node {
     opacity: 0.45;
@@ -599,6 +615,28 @@ html, body {
   & .face { fill: var(--accent); }
   & line { stroke: #fff; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
   &:hover .face { filter: brightness(1.25); }
+}
+
+/* ========== md のカーソルが居るところ ========== */
+
+/* 箱の**内側**に重なるもう 1 本の輪（置き場所は mindmap.ts）。
+   内側なのは、選択が外の枠だから — 外から掴むのが選択、中に居るのが
+   カーソルで、形がそのまま意味になる。だから両方が成り立つときも、
+   外が選択・内がカーソルでそのまま両方読める。
+
+   **`--accent-soft` は借りない。** あれは面を塗るための薄さで（md 側の
+   ハイライトも矩形選択も面）、2px の線に使うと消える。内側に居る以上
+   選択と紛れようがないので、線として読める濃さを自分で持つ。 */
+.caret-ring {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke-width: 2;
+  rx: 5px;
+  /* 印は乗っているだけ。掴めると、下のノードを選べなくなる */
+  pointer-events: none;
+
+  /* 畳んだノードは角の丸みも小さく、薄い。輪もそれに合わせる */
+  &.hidden-node { rx: 2px; opacity: 0.45; }
 }
 
 /* ========== 落とし先の示し ========== */

@@ -26,39 +26,28 @@ import {
 } from "@codemirror/language";
 import { oneDarkHighlightStyle, oneDarkTheme } from "@codemirror/theme-one-dark";
 import type { EditOp } from "./coreApi.ts";
+import type { Span } from "./caret.ts";
 
-const darkTweaks = EditorView.theme(
-  {
-    "&": { backgroundColor: "var(--panel)" },
-    ".cm-content": { caretColor: "var(--accent)" },
-    ".cm-cursor": { borderLeftColor: "var(--accent)" },
-    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
-      backgroundColor: "color-mix(in srgb, var(--accent) 30%, transparent)",
-    },
-    ".cm-activeLine": { backgroundColor: "rgba(255, 255, 255, 0.03)" },
-  },
-  { dark: true },
-);
-
-const lightTweaks = EditorView.theme(
-  {
-    "&": { backgroundColor: "var(--panel)" },
-    ".cm-content": { caretColor: "var(--accent)" },
-    ".cm-cursor": { borderLeftColor: "var(--accent)" },
-    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
-      backgroundColor: "color-mix(in srgb, var(--accent) 22%, transparent)",
-    },
-    ".cm-activeLine": { backgroundColor: "rgba(0, 0, 0, 0.04)" },
-  },
-  { dark: false },
-);
+/**
+ * CodeMirror へは **`dark` かどうかだけ**を渡す（自身の既定のスタイルが
+ * それで振れる）。**色は 1 つも持たない** — 地もキャレットも style.css の
+ * `#md-pane` の並びが決める。
+ *
+ * ここに色を書いていた頃は、書いたとおりにならなかった。選択・カーソル・
+ * アクティブ行の色は `drawSelection()` も `highlightActiveLine()` も入れて
+ * いないため要素が 1 つも作られず、地とキャレットはダークで後から当たる
+ * `oneDarkTheme` に負けていた（md ペインだけ地が `#282c34` になり、
+ * ガターの `--panel` と割れていた）。CSS の側で当てれば普通の詳細度で
+ * 勝てるので、色の置き場所を 1 つに寄せた。
+ */
+const tweaks = (dark: boolean) => EditorView.theme({}, { dark });
 
 const DARK_EXT = [
   oneDarkTheme,
-  darkTweaks,
+  tweaks(true),
   syntaxHighlighting(oneDarkHighlightStyle),
 ];
-const LIGHT_EXT = [lightTweaks, syntaxHighlighting(defaultHighlightStyle)];
+const LIGHT_EXT = [tweaks(false), syntaxHighlighting(defaultHighlightStyle)];
 
 const fromCore = Annotation.define<boolean>();
 
@@ -95,6 +84,9 @@ export class MdEditor {
   constructor(
     parent: HTMLElement,
     onUserEdits: (edits: EditOp[], userEvent: string) => void,
+    /** カーソルか選択が動いた（値の意味は下の `caret()`）。よそへ移った
+     *  瞬間も呼ばれるので、受け手は印を消せる */
+    onCaret: (spans: Span[]) => void,
   ) {
     this.view = new EditorView({
       parent,
@@ -119,33 +111,39 @@ export class MdEditor {
             },
           }),
           EditorView.updateListener.of((u) => {
-            if (!u.docChanged) return;
-            for (const tr of u.transactions) {
-              if (!tr.docChanged || tr.annotation(fromCore)) continue;
-              let userEvent = "";
-              for (const kind of [
-                "input.type.compose", // must precede its prefix "input.type"
-                "input.type",
-                "delete.backward",
-                "delete",
-                "input.paste",
-                "move.drop",
-                "input",
-              ]) {
-                if (tr.isUserEvent(kind)) {
-                  userEvent = kind;
-                  break;
+            if (u.docChanged) {
+              for (const tr of u.transactions) {
+                if (!tr.docChanged || tr.annotation(fromCore)) continue;
+                let userEvent = "";
+                for (const kind of [
+                  "input.type.compose", // must precede its prefix "input.type"
+                  "input.type",
+                  "delete.backward",
+                  "delete",
+                  "input.paste",
+                  "move.drop",
+                  "input",
+                ]) {
+                  if (tr.isUserEvent(kind)) {
+                    userEvent = kind;
+                    break;
+                  }
                 }
-              }
-              const edits: EditOp[] = [];
-              tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
-                edits.push({
-                  from: fromA,
-                  to: toA,
-                  insert: inserted.toString(),
+                const edits: EditOp[] = [];
+                tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+                  edits.push({
+                    from: fromA,
+                    to: toA,
+                    insert: inserted.toString(),
+                  });
                 });
-              });
-              onUserEdits(edits, userEvent);
+                onUserEdits(edits, userEvent);
+              }
+            }
+            // カーソルの居場所。文書が変わったときは**送り終えた後で**言う —
+            // 受け手は新しいテキストのオフセットとして読むため
+            if (u.docChanged || u.selectionSet || u.focusChanged) {
+              onCaret(this.caret());
             }
           }),
         ],
@@ -175,6 +173,21 @@ export class MdEditor {
   /** マップで選ばれている範囲を、こちらの行にも映す。 */
   highlight(ranges: { from: number; to: number }[]): void {
     this.view.dispatch({ effects: setHighlights.of(ranges) });
+  }
+
+  /**
+   * いまのカーソルと選択の範囲（複数カーソルならその数だけ。ただの
+   * カーソルは `from === to` の点）。**このペインにフォーカスが無ければ空** —
+   * 「いまどこを書いているか」はここに居るあいだだけの事実で、窓ごと
+   * 裏に回っているときも同じ（`hasFocus` がそこまで見てくれる）。
+   *
+   * 普段は動くたびに `onCaret` が言うが、**文書を丸ごと入れ替えたときだけ**
+   * 呼ぶ側から聞き直す必要がある（`setText` が走る時点では、受け手の
+   * ノードがまだ前の文書のもの）。
+   */
+  caret(): Span[] {
+    if (!this.view.hasFocus) return [];
+    return this.view.state.selection.ranges.map((r) => ({ from: r.from, to: r.to }));
   }
 
   reveal(pos: number): void {
