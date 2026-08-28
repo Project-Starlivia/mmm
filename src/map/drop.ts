@@ -113,18 +113,39 @@ function nearestRoot(scene: DropScene): number {
   }
   if (!reachable) return -1;
 
-  let best = Infinity;
-  let hit = -1;
+  // どの木かも、**上の上限とまったく同じ尺度で測る** — 木のどの箱までが
+  // いちばん近いか。根の箱の中心だけで測っていたころは木の広がりが式に
+  // 入らず、枝の箱のど真ん中で Mod ドロップしても隣の木へ落ちた（素の
+  // ドラッグは正しく指した枝を選ぶので、同じ位置で答えが食い違っていた）。
+  const rootOf = new Map<number, number>();
+  const treeOf = (id: number): number => {
+    const seen = rootOf.get(id);
+    if (seen !== undefined) return seen;
+    const up = scene.parentOf.get(id);
+    const r = up === undefined ? id : treeOf(up);
+    rootOf.set(id, r);
+    return r;
+  };
+  const near = new Map<number, number>(); // 根 → その木のどれかの箱までの最短
   for (const id of scene.order) {
-    if (scene.dragging.has(id)) continue;
-    if (scene.parentOf.get(id) !== undefined) continue;
     const b = scene.boxes.get(id);
     if (!b) continue;
-    const c = centerOf(b);
-    const d = Math.hypot(scene.at.x - c.x, scene.at.y - c.y);
+    const r = treeOf(id);
+    if (scene.dragging.has(r)) continue; // 掴んでいる木そのものは候補外
+    // 箱までの距離（中に居れば 0）。中心までの距離だと、大きく広がった木ほど
+    // 遠く見えてしまう
+    const dx = Math.max(0, b.x - scene.at.x, scene.at.x - (b.x + b.w));
+    const dy = Math.max(0, b.y - scene.at.y, scene.at.y - (b.y + b.h));
+    const d = dx + dy;
+    const seen = near.get(r);
+    if (seen === undefined || d < seen) near.set(r, d);
+  }
+  let best = Infinity;
+  let hit = -1;
+  for (const [r, d] of near) {
     if (d < best) {
       best = d;
-      hit = id;
+      hit = r;
     }
   }
   return hit;

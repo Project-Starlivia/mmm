@@ -335,6 +335,30 @@ test("Mod でも、枝が 1 つも無い側は「その側の末尾」に落ち�
   assert.deepEqual(resolveDrop(s).drop, { kind: "side", root: 1, left: true });
 });
 
+test("Mod: 指した枝の箱の上なら、その枝の木に落ちる", () => {
+  // どの木かを「根の箱の中心までの距離」だけで決めていたころは、木の広がりが
+  // 式に入らず、枝の箱のど真ん中でも隣の木へ落ちた（同じ位置で素のドラッグは
+  // 正しく指した枝を選ぶので、答えが内部で食い違っていた）
+  const root = box(1, 1, 0, 0, 31);
+  const kids = [2, 3, 4, 5, 6, 7].map((id, i) => box(id, 2, 76, -100 + i * 40, 31));
+  const other = box(8, 1, 0, 200, 31);
+  const otherKid = box(9, 2, 76, 200, 31);
+  const boxes = [root, ...kids, other, otherKid];
+  const links: [number, number][] = [
+    ...kids.map((k): [number, number] => [k.n.id, 1]),
+    [9, 8],
+  ];
+  const last = kids[kids.length - 1];
+  const at = { x: last.x + last.w / 2, y: last.y + last.h / 2 };
+  const d = resolveDrop(scene(boxes, links, at, { newGroup: true }));
+  assert.deepEqual(d.drop, {
+    kind: "group",
+    target: last.n.id,
+    before: false,
+    left: false,
+  });
+});
+
 test("Mod を押していても、どの木からも遠い空所ではキャンセルできる", () => {
   // nearestRoot に上限が無いと、Mod を押したまま空振りしても必ずどこかの
   // 根への移動が成立してしまい、ドラッグを諦める手段が無くなる

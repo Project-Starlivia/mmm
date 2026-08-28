@@ -667,10 +667,22 @@ test "sweeping leaves no separator once every branch is on one side" {
 /// ただし中ほどの境界は、切り替えなしでも消さない — 継ぎ目の線を引き、
 /// グループの壁（Tab / Alt+↑↓ が止まる）になるので仕事をしている。
 test "a mid-document split survives the sweep even without a flip" {
-  let md = "# r\n\n## a\n\n---\n\n## b\n"
+  // c は既にその側の末尾で、残る末尾 b も同じグループ。何も動かないので
+  // 掃除だけが走る — a | b,c を分ける `---` は仕事をしているので残る
+  let md = "# r\n\n## a\n\n---\n\n## b\n\n## c\n"
   ignore(init_doc(md))
-  ignore(move_side_end([3], 1, false)) // b は既に右。掃除だけが走る
+  ignore(move_side_end([4], 1, false))
   assert_eq(get_text(), md)
+}
+
+///|
+/// 掴んだ枝は「その側の末尾」を探す走査から外す。数に入れていたころは、
+/// 選択にその側の末尾が含まれているだけで操作まるごとが黙って捨てられ、
+/// 「枝を全部選んで片側へ寄せる」が必ず不発だった。
+test "a multi-select flank drop is not swallowed by its own last branch" {
+  ignore(init_doc("# r\n\n## a\n\n---\n---\n\n## b\n"))
+  ignore(move_side_end([2, 3], 1, true))
+  assert_eq(get_text(), "# r\n\n---\n---\n\n## a\n\n## b\n")
 }
 
 ///|

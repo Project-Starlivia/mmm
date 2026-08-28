@@ -506,11 +506,23 @@ fn cmd_move_side_end(ids : Array[Int], root : Int, left : Bool) -> Unit {
   if ri < 0 {
     return
   }
-  // その側の最後の直下の枝
+  // その側の最後の直下の枝。**掴んでいる枝は数に入れない** — これから
+  // 居なくなるので、着地点は残るほうの末尾でなければならない。数に入れて
+  // いたころは、選択にその側の末尾が含まれているだけで `move_lands_outside`
+  // が必ず false になり、**操作まるごとが黙って捨てられて**いた（枝を全部
+  // 選んで片側へ寄せる、という最も素直な使い方が必ず踏む）。
+  // 除いた結果 `last < 0` になれば、既にある「その側は空」の枝がそのまま
+  // 正しい答えになる。UI 側の `lastKidOf` も同じ理由で掴んだ枝を除いている。
+  let moving : Array[Int] = []
+  for k in normalize_selection(ids) {
+    for m in subtree_of(k) {
+      moving.push(st.nodes[m].id)
+    }
+  }
   let mut last = -1
   for i = 0; i < st.nodes.length(); i = i + 1 {
     let nd = st.nodes[i]
-    if nd.parent == root && nd.left == left {
+    if nd.parent == root && nd.left == left && !moving.contains(nd.id) {
       last = nd.id
     }
   }
