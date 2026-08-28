@@ -962,3 +962,28 @@ test "removing hide markers takes their blank padding with them" {
   ignore(delete_nodes([2]))
   assert_eq(get_text(), "# r\n\n## b\n")
 }
+
+///|
+/// 木ごと別の木の中へ動かすとき、その木の境界は連れていかない。
+///
+/// 境界は「ルート直下の枝を分ける」ものなので、木が根でなくなれば意味を
+/// 失う。範囲としては根の中に居るので黙って運ばれ、行き先では
+/// valid_bounds を満たさず、掃除の目印も移動で切れる（map_offsets が
+/// 削除で -1 を返す）ため、誰も片付けられない死んだ `---` が枝の中に
+/// 残っていた。ドラッグを重ねるほど溜まる。
+test "moving a whole tree leaves its own boundaries behind" {
+  ignore(init_doc("# r\n\n## b0\n\n# s\n\n## z\n\n---\n\n## y\n"))
+  ignore(move_nodes([3], 2, 0))
+  assert_eq(get_text(), "# r\n\n## b0\n\n### s\n\n#### z\n\n#### y\n")
+  // 境界より後ろの見出しも id を保つ（落とした長さを先に数えないと飛ぶ）
+  ignore(rename_node(5, "Y", ""))
+  assert_eq(get_text(), "# r\n\n## b0\n\n### s\n\n#### z\n\n#### Y\n")
+}
+
+///|
+/// 根のまま動かすなら、その木の境界はそのまま連れていく。
+test "a tree that stays a root keeps its boundaries" {
+  ignore(init_doc("# r\n\n## a\n\n# s\n\n## z\n\n---\n\n## y\n"))
+  ignore(move_nodes([3], 1, 1))
+  assert_eq(get_text(), "# s\n\n## z\n\n---\n\n## y\n\n# r\n\n## a\n")
+}

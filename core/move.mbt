@@ -118,22 +118,77 @@ fn move_block(i : Int, at : Int, new_depth : Int) -> Unit {
   // shift every heading in the block by delta '#'; remember each heading's
   // id and its offset inside the rebuilt block so ids survive the move
   let heads = subtree_of(i)
+  // **木ごと動かすとき、その木の境界は連れていかない。**
+  //
+  // 境界は「ルート直下の枝を分ける」ものなので、木が別の木の中へ入って
+  // 根でなくなれば意味を失う。範囲としては根の中に居るので黙って運ばれ、
+  // 行き先では valid_bounds を満たさず、掃除の目印も移動で切れるため
+  // （`map_offsets` が削除で -1 を返す）誰も片付けられない死んだ `---` が
+  // 枝の中に残っていた。ドラッグを重ねるほど溜まる。
+  let drops : Array[(Int, Int)] = []
+  if nd.depth == 1 && new_depth > 1 {
+    let n_text = st.text.length()
+    for b in st.bounds {
+      if b.start < nd.from || b.end > nd.to {
+        continue
+      }
+      // 直後の空行 1 つも道連れ（remove_sep_edit と同じ）
+      let mut to = b.end
+      let mut p = to
+      while p < n_text && is_space(code_at(st.text, p)) {
+        p = p + 1
+      }
+      if p < n_text && code_at(st.text, p) == 13 {
+        p = p + 1
+      }
+      if p < n_text && code_at(st.text, p) == 10 {
+        to = p + 1
+      }
+      drops.push((b.start, to))
+    }
+  }
+  /// `[a, b)` を、連れていかない区間を飛ばして書き出す。落とした長さを返す
+  fn emit(sb : StringBuilder, a : Int, b : Int) -> Int {
+    let mut cut = 0
+    let mut p = a
+    for d in drops {
+      let (ds, de) = d
+      if ds >= b || de <= a {
+        continue
+      }
+      let s = if ds > p { ds } else { p }
+      if s > p {
+        sb.write_string(slice(st.text, p, s))
+      }
+      cut = cut + (if de < b { de } else { b }) - s
+      p = if de > p { de } else { p }
+    }
+    if p < b {
+      sb.write_string(slice(st.text, p, b))
+    }
+    cut
+  }
+
   let rels : Array[(Int, Int)] = []
   let sb = StringBuilder::new()
   let mut pos = nd.from
   let mut acc = 0
+  let mut cut = 0
   for m in heads {
     let h = st.nodes[m]
-    rels.push((h.id, h.from - nd.from + acc))
+    // **落とすぶんを先に数える。** この見出しの手前で削った区間は、この
+    // 見出しの新しい位置をそのぶん前へ寄せる（後で数えると、境界より後ろの
+    // 見出しの id が拾い直せず飛ぶ）
+    cut = cut + emit(sb, pos, h.from)
+    rels.push((h.id, h.from - nd.from + acc - cut))
     // 接頭辞を目的の深さの正規形に書き直す。長さの差を積んで、
     // 各構造行の新しい相対位置（rels）を出す
     let np = prefix_for(h.depth + delta)
     acc = acc + np.length() - (h.label_start - h.from)
-    sb.write_string(slice(st.text, pos, h.from))
     sb.write_string(np)
     pos = h.label_start
   }
-  sb.write_string(slice(st.text, pos, nd.to))
+  ignore(emit(sb, pos, nd.to))
   let mut moved = sb.to_string()
   // keep block boundaries tidy: blank-line separated, single newline at EOF
   let br = eol
