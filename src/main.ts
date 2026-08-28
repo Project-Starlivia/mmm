@@ -27,6 +27,7 @@ import { initForm } from "./app/form.ts";
 import { showDrawing } from "./app/draw.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
+import { caretNode } from "./caret.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 import { type MenuEntry, openOnClick } from "./map/menu.ts";
 import { RadialMenu } from "./map/radialMenu.ts";
@@ -375,6 +376,22 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
   followDeclaration(tag);
 }
 
+/**
+ * md のカーソルが居るノード。**選択とは別のもの**で、操作の対象は選択だけが
+ * 決める（カーソルが動いても Delete や Export の相手は入れ替わらない）。
+ * -1 は「md にカーソルが無い / どのノードでもない」。
+ */
+let caretId = -1;
+
+/** md のカーソルが動いた（`offset` が -1 なら、そのペインに居ない）。 */
+function onCaret(offset: number): void {
+  const id = offset === -1 ? -1 : caretNode(doc.nodes, offset);
+  // 打鍵のたびに呼ばれる。同じノードの中を動いているあいだは何もしない
+  if (id === caretId) return;
+  caretId = id;
+  map.setCaret(id);
+}
+
 // ---------- mindmap host ----------
 
 const host: MapHost = {
@@ -630,7 +647,7 @@ const host: MapHost = {
 
 // ---------- boot panes ----------
 
-const editor = new MdEditor(mdPane, onUserEdits);
+const editor = new MdEditor(mdPane, onUserEdits, onCaret);
 const map = new MindMap(mapPane, host);
 
 /**
@@ -670,6 +687,9 @@ function loadText(text: string, name: string | null): void {
   const snap = core.initDoc(text);
   editor.setText(text);
   applySnap(snap, "load"); // 名乗りもここで出る
+  // ここだけは打鍵と順番が逆で、`setText` が言ってきた位置は**前の文書の
+  // ノード**に当てられている。新しい木が入った後で聞き直す
+  onCaret(editor.caret());
   map.fitView();
 }
 

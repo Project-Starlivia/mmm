@@ -95,6 +95,9 @@ export class MdEditor {
   constructor(
     parent: HTMLElement,
     onUserEdits: (edits: EditOp[], userEvent: string) => void,
+    /** カーソルが動いた（値の意味は下の `caret()`）。よそへ移った瞬間も
+     *  呼ばれるので、受け手は印を消せる */
+    onCaret: (offset: number) => void,
   ) {
     this.view = new EditorView({
       parent,
@@ -119,33 +122,39 @@ export class MdEditor {
             },
           }),
           EditorView.updateListener.of((u) => {
-            if (!u.docChanged) return;
-            for (const tr of u.transactions) {
-              if (!tr.docChanged || tr.annotation(fromCore)) continue;
-              let userEvent = "";
-              for (const kind of [
-                "input.type.compose", // must precede its prefix "input.type"
-                "input.type",
-                "delete.backward",
-                "delete",
-                "input.paste",
-                "move.drop",
-                "input",
-              ]) {
-                if (tr.isUserEvent(kind)) {
-                  userEvent = kind;
-                  break;
+            if (u.docChanged) {
+              for (const tr of u.transactions) {
+                if (!tr.docChanged || tr.annotation(fromCore)) continue;
+                let userEvent = "";
+                for (const kind of [
+                  "input.type.compose", // must precede its prefix "input.type"
+                  "input.type",
+                  "delete.backward",
+                  "delete",
+                  "input.paste",
+                  "move.drop",
+                  "input",
+                ]) {
+                  if (tr.isUserEvent(kind)) {
+                    userEvent = kind;
+                    break;
+                  }
                 }
-              }
-              const edits: EditOp[] = [];
-              tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
-                edits.push({
-                  from: fromA,
-                  to: toA,
-                  insert: inserted.toString(),
+                const edits: EditOp[] = [];
+                tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+                  edits.push({
+                    from: fromA,
+                    to: toA,
+                    insert: inserted.toString(),
+                  });
                 });
-              });
-              onUserEdits(edits, userEvent);
+                onUserEdits(edits, userEvent);
+              }
+            }
+            // カーソルの居場所。文書が変わったときは**送り終えた後で**言う —
+            // 受け手は新しいテキストのオフセットとして読むため
+            if (u.docChanged || u.selectionSet || u.focusChanged) {
+              onCaret(this.caret());
             }
           }),
         ],
@@ -175,6 +184,19 @@ export class MdEditor {
   /** マップで選ばれている範囲を、こちらの行にも映す。 */
   highlight(ranges: { from: number; to: number }[]): void {
     this.view.dispatch({ effects: setHighlights.of(ranges) });
+  }
+
+  /**
+   * いまのカーソル位置。**このペインにフォーカスが無ければ -1** —
+   * 「いまどこを書いているか」はここに居るあいだだけの事実で、窓ごと
+   * 裏に回っているときも同じ（`hasFocus` がそこまで見てくれる）。
+   *
+   * 普段は動くたびに `onCaret` が言うが、**文書を丸ごと入れ替えたときだけ**
+   * 呼ぶ側から聞き直す必要がある（`setText` が走る時点では、受け手の
+   * ノードがまだ前の文書のもの）。
+   */
+  caret(): number {
+    return this.view.hasFocus ? this.view.state.selection.main.head : -1;
   }
 
   reveal(pos: number): void {

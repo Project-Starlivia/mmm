@@ -518,6 +518,13 @@ html, body {
 
   /* ---- いまの操作の状態（付けるのは mindmap.ts の paintState）----
      ここは順番が意味を持つ。同じ強さなので、後ろに書いたものが勝つ */
+  /* md のカーソルが居るノード。選択より**弱い**印で、太さは足さない —
+     操作の対象ではなく居場所を言うだけなので、選ばれたものと見紛わせない
+     （両方が当たるときは、後ろに書いた .selected が勝つ） */
+  &.caret rect.box {
+    stroke: color-mix(in srgb, var(--accent) 50%, var(--node-border));
+    fill: color-mix(in srgb, var(--accent) 9%, var(--node-bg));
+  }
   &.selected rect.box {
     stroke: var(--accent);
     stroke-width: 2;

@@ -249,6 +249,12 @@ export class MindMap {
   private dropEdgeId: number | null = null;
   /** その場で直しているカード（位置は毎回引き直す） */
   private editingCard: CardRef | null = null;
+  /**
+   * md のカーソルが居るノード（-1 = md にカーソルが無い / どのノードでもない）。
+   * **選択ではない** — 操作の対象は選択だけで、こちらは居場所を言うだけ。
+   * 描き直しで要素が作り直されても paintState が同じ印を戻す。
+   */
+  private caret = -1;
 
   // editing state
   editingId = -1;
@@ -455,6 +461,7 @@ export class MindMap {
    */
   private paintState(): void {
     this.renderer.refreshSelection(this.host.selection());
+    this.renderer.refreshCaret(this.caret);
     for (const id of this.dragging?.subtree ?? NO_IDS) {
       this.renderer.nodeEl(id)?.classList.add("dragging");
     }
@@ -1992,6 +1999,16 @@ export class MindMap {
 
   hideMenu(): void {
     this.menu.hide();
+  }
+
+  /**
+   * md のカーソルが居るノードを教える。**選択には触らない** — 印が 1 つ
+   * 増えるだけで、Delete も Alt+↑↓ も Export の範囲も動かない。
+   * 地図も動かさない（打鍵のたびに寄せると、書いている手元が揺れる）。
+   */
+  setCaret(id: number): void {
+    this.caret = id;
+    this.renderer.refreshCaret(id);
   }
 
   /** レイアウトを見直さない軽い塗り替え（矩形選択の途中で使う）。
