@@ -14,7 +14,10 @@
   --ink-dim: #828a96;
   --line: #2a2f38;
   --accent: #5932ff;
-  --accent-soft: rgba(89, 50, 255, 0.2);
+  /* 薄い版は色から作る。**濃さを決めるのはここだけ** — 実値を JS が置くと
+     それはインラインスタイルになり、テーマごとの宣言（下の `:root.light`）に
+     必ず勝ってしまう。ブランドカラーは app/theme.ts が `--accent` にだけ入れる */
+  --accent-soft: color-mix(in srgb, var(--accent) 20%, transparent);
   --node-bg: #232830;
   --node-border: #3b424d;
   --node-border-strong: #5d6673;
@@ -39,7 +42,7 @@
   --ink: #1f2328;
   --ink-dim: #6b7280;
   --line: #e2e5ea;
-  --accent-soft: rgba(89, 50, 255, 0.12);
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --node-bg: #ffffff;
   --node-border: #cfd5dd;
   --node-border-strong: #9aa4b1;
