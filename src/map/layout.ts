@@ -171,19 +171,59 @@ export function layoutMap(doc: DocView): Layout {
     return size;
   };
 
-  const heights = new Map<number, number>();
-  /** その部分木が縦にどれだけ要るか（自分の高さと、子を積んだ高さの大きい方） */
-  const heightOf = (n: NodeInfo): number => {
-    const hit = heights.get(n.id);
-    if (hit !== undefined) return hit;
+  /**
+   * その部分木が縦に占める帯の高さ `h` と、**その帯の上端から見た自分の箱の
+   * 中心** `anchor`。
+   *
+   * 親の中心は「第 1 子と最終子の中心の中点」で決める（子の重さが偏っても
+   * 外側の子のあいだに立つ、という見せ方）。この中点は帯の幾何学的な中心
+   * とは限らないので、**帯のほうを中心に合わせて広げる**。帯を
+   * 「max(自分の高さ, 子を積んだ高さ)」で見積もっていたころは、箱が帯から
+   * はみ出して隣の兄弟を覆い、木の下端も嘘になり、グループの継ぎ目が箱の
+   * 上を横切っていた（ずれ =（第 1 子の高さ − 最終子の高さ）/4 なので、
+   * 兄弟の隙間 `GAP.y` を超えると必ず重なる）。
+   */
+  const metrics = new Map<number, { h: number; anchor: number }>();
+  const metricsOf = (n: NodeInfo): { h: number; anchor: number } => {
+    const hit = metrics.get(n.id);
+    if (hit) return hit;
+    const size = sizeOf(n);
     const kids = kidsOf(n);
-    const height = Math.max(
-      sizeOf(n).h,
-      kids.length === 0 ? 0 : stackH(kids),
-    );
-    heights.set(n.id, height);
-    return height;
+    let m: { h: number; anchor: number };
+    if (kids.length === 0) {
+      m = { h: size.h, anchor: size.h / 2 };
+    } else {
+      const mid = stackCenter(kids);
+      // 箱の上端が帯からはみ出すぶんだけ、子の山を下へずらす
+      const slide = Math.max(0, size.h / 2 - mid);
+      const anchor = slide + mid;
+      m = {
+        h: Math.max(slide + stackH(kids), anchor + size.h / 2),
+        anchor,
+      };
+    }
+    metrics.set(n.id, m);
+    return m;
   };
+
+  /** その部分木が縦にどれだけ要るか */
+  const heightOf = (n: NodeInfo): number => metricsOf(n).h;
+
+  /** 子を 0 から積んだときの「第 1 子と最終子の中心の中点」 */
+  function stackCenter(kids: NodeInfo[]): number {
+    let y = 0;
+    const centers: number[] = [];
+    for (let i = 0; i < kids.length; i++) {
+      y += gapBefore(i);
+      centers.push(y + metricsOf(kids[i]).anchor);
+      y += metricsOf(kids[i]).h;
+    }
+    return (centers[0] + centers[centers.length - 1]) / 2;
+  }
+
+  /** 子の山を、その部分木の帯の上端から何 px 下に置くか */
+  const slideOf = (n: NodeInfo): number =>
+    metricsOf(n).anchor - stackCenter(kidsOf(n));
 
   /** 子を縦に積んだときの高さ（あいだの隙間込み） */
   function stackH(kids: NodeInfo[]): number {
@@ -209,7 +249,9 @@ export function layoutMap(doc: DocView): Layout {
     if (kids.length === 0) {
       centerY = top + size.h / 2;
     } else {
-      let y = top + Math.max(0, (size.h - stackH(kids)) / 2);
+      // 子の山の置き所は `metricsOf` が決めた `slide` から取る。同じ式を
+      // 2 か所で別々に持つと、帯と箱が静かに食い違う（それがこの層の元のバグ）
+      let y = top + slideOf(n);
       const childNear = dir === 1 ? x + size.w + GAP.x : x - GAP.x;
       const centers: number[] = [];
       for (let i = 0; i < kids.length; i++) {

@@ -189,6 +189,42 @@ test("どの側も、第 1 子と最終子の中心の中点が根の中心に�
   }
 });
 
+test("背の高い箱でも、箱は自分の帯からはみ出して兄弟を覆わない", () => {
+  // 親の中心は「第 1 子と最終子の中心の中点」なのに、帯は「max(自分の高さ,
+  // 子を積んだ高さ)」で見積もっていた。子の重さが偏るとこの 2 つがずれ、
+  // 箱が帯の外へ出て隣の兄弟を丸ごと覆っていた（ずれは兄弟の隙間より大きい）
+  const img = (n: number) =>
+    Array.from({ length: n }, (_, i) => `![](./${i}.png)`).join("\n\n");
+  const md = `# root\n\n## A\n\n## B\n\n${img(6)}\n\n### light\n\n### heavy\n\n${img(4)}\n`;
+  const L = layoutMap(loadDoc(md));
+  const bs = [...L.boxes.values()];
+  for (let i = 0; i < bs.length; i++) {
+    for (let k = i + 1; k < bs.length; k++) {
+      const a = bs[i];
+      const b = bs[k];
+      const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      assert.ok(
+        ox <= 0.5 || oy <= 0.5,
+        `${a.n.label} と ${b.n.label} の箱が ${ox}x${oy} 重なる`,
+      );
+    }
+  }
+});
+
+test("グループの継ぎ目は、箱の上を横切らない", () => {
+  const md =
+    "# r\n\n## a\n\n![](./x.png)\n\n![](./x.png)\n\n### h\n\n```\n0\n1\n2\n3\n4\n5\n```\n\n### l\n\n---\n\n## b\n";
+  const L = layoutMap(loadDoc(md));
+  for (const s of L.seams) {
+    for (const b of L.boxes.values()) {
+      const inside =
+        s.y > b.y && s.y < b.y + b.h && s.x < b.x + b.w && s.x + s.w > b.x;
+      assert.ok(!inside, `継ぎ目 y=${s.y} が ${b.n.label} の箱を横切る`);
+    }
+  }
+});
+
 test("別々の `#` ルートの木は、上下に食い込まない", () => {
   // 側を根の中心へ揃えると、木は渡された top より**上**へも伸びうる。
   // placeTree は上端も返すのに積む側が下端しか読んでおらず、前の木へ
