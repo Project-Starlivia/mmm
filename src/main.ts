@@ -27,7 +27,7 @@ import { initForm } from "./app/form.ts";
 import { showDrawing } from "./app/draw.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
-import { caretNode } from "./caret.ts";
+import { type Span, caretNodes } from "./caret.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 import { type MenuEntry, openOnClick } from "./map/menu.ts";
 import { RadialMenu } from "./map/radialMenu.ts";
@@ -377,19 +377,21 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
 }
 
 /**
- * md のカーソルが居るノード。**選択とは別のもの**で、操作の対象は選択だけが
- * 決める（カーソルが動いても Delete や Export の相手は入れ替わらない）。
- * -1 は「md にカーソルが無い / どのノードでもない」。
+ * md のカーソル・選択が掛かっているノード（文書順）。**マップの選択とは
+ * 別のもの**で、操作の対象は選択だけが決める（カーソルが動いても Delete や
+ * Export の相手は入れ替わらない）。空 = md にカーソルが無い。
  */
-let caretId = -1;
+let caretIds: number[] = [];
 
-/** md のカーソルが動いた（`offset` が -1 なら、そのペインに居ない）。 */
-function onCaret(offset: number): void {
-  const id = offset === -1 ? -1 : caretNode(doc.nodes, offset);
-  // 打鍵のたびに呼ばれる。同じノードの中を動いているあいだは何もしない
-  if (id === caretId) return;
-  caretId = id;
-  map.setCaret(id);
+/** md のカーソルか選択が動いた（範囲が空なら、そのペインに居ない）。 */
+function onCaret(spans: Span[]): void {
+  const ids = caretNodes(doc.nodes, spans);
+  // 打鍵のたびに呼ばれる。掛かっている先が変わらないあいだは何もしない
+  if (ids.length === caretIds.length && ids.every((id, i) => id === caretIds[i])) {
+    return;
+  }
+  caretIds = ids;
+  map.setCaret(ids);
 }
 
 // ---------- mindmap host ----------

@@ -26,6 +26,7 @@ import {
 } from "@codemirror/language";
 import { oneDarkHighlightStyle, oneDarkTheme } from "@codemirror/theme-one-dark";
 import type { EditOp } from "./coreApi.ts";
+import type { Span } from "./caret.ts";
 
 const darkTweaks = EditorView.theme(
   {
@@ -95,9 +96,9 @@ export class MdEditor {
   constructor(
     parent: HTMLElement,
     onUserEdits: (edits: EditOp[], userEvent: string) => void,
-    /** カーソルが動いた（値の意味は下の `caret()`）。よそへ移った瞬間も
-     *  呼ばれるので、受け手は印を消せる */
-    onCaret: (offset: number) => void,
+    /** カーソルか選択が動いた（値の意味は下の `caret()`）。よそへ移った
+     *  瞬間も呼ばれるので、受け手は印を消せる */
+    onCaret: (spans: Span[]) => void,
   ) {
     this.view = new EditorView({
       parent,
@@ -187,7 +188,8 @@ export class MdEditor {
   }
 
   /**
-   * いまのカーソル位置。**このペインにフォーカスが無ければ -1** —
+   * いまのカーソルと選択の範囲（複数カーソルならその数だけ。ただの
+   * カーソルは `from === to` の点）。**このペインにフォーカスが無ければ空** —
    * 「いまどこを書いているか」はここに居るあいだだけの事実で、窓ごと
    * 裏に回っているときも同じ（`hasFocus` がそこまで見てくれる）。
    *
@@ -195,8 +197,9 @@ export class MdEditor {
    * 呼ぶ側から聞き直す必要がある（`setText` が走る時点では、受け手の
    * ノードがまだ前の文書のもの）。
    */
-  caret(): number {
-    return this.view.hasFocus ? this.view.state.selection.main.head : -1;
+  caret(): Span[] {
+    if (!this.view.hasFocus) return [];
+    return this.view.state.selection.ranges.map((r) => ({ from: r.from, to: r.to }));
   }
 
   reveal(pos: number): void {

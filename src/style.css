@@ -614,7 +614,7 @@ html, body {
    綴りは**ペインのフォーカス**（`#map-pane.pane-focused`）と同じ
    accent-soft の 2px。「フォーカスはここ」という言葉は既にあるので、
    ノードの大きさで同じことを言うだけにする。 */
-#caret-ring {
+.caret-ring {
   fill: none;
   stroke: var(--accent-soft);
   stroke-width: 2;

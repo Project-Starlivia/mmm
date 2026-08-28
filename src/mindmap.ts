@@ -187,8 +187,10 @@ export class MindMap {
   private renderer = new MapRenderer();
   private dropLine: SVGLineElement;
   private dropHint: SVGPathElement; // どの親につくかを示す予告の曲線
-  /** md のカーソルが居るノードに重なる内側の輪（常に高々 1 つ） */
-  private caretRing: SVGRectElement;
+  /** md のカーソル・選択が掛かっているノードに重なる内側の輪。器は 1 つで、
+   *  中身は本数が変わったときだけ作り足す/捨てる（グループの継ぎ目と同じ） */
+  private caretLayer: SVGGElement;
+  private caretRings: SVGRectElement[] = [];
   /** 選んでいるカードに被せる枠と ×（常に高々 1 枚なので 1 個だけ持つ） */
   private pick = new CardPick();
   /** 選んでいるノードの上下左右に出る `+`（出すかどうかは人が決める） */
@@ -256,10 +258,11 @@ export class MindMap {
   /** その場で直しているカード（位置は毎回引き直す） */
   private editingCard: CardRef | null = null;
   /**
-   * md のカーソルが居るノード（-1 = md にカーソルが無い / どのノードでもない）。
-   * **選択ではない** — 操作の対象は選択だけで、こちらは居場所を言うだけ。
+   * md のカーソル・選択が掛かっているノード（空 = md にカーソルが無い）。
+   * **選択ではない** — 操作の対象はマップ側の選択だけで、こちらは居場所を
+   * 言うだけ。
    */
-  private caret = -1;
+  private caret: number[] = [];
 
   // editing state
   editingId = -1;
@@ -275,12 +278,12 @@ export class MindMap {
     this.viewport = svgEl("g");
     this.dropLine = svgEl("line", { id: "drop-line", visibility: "hidden" });
     this.dropHint = svgEl("path", { id: "drop-hint", visibility: "hidden" });
-    this.caretRing = svgEl("rect", { id: "caret-ring", visibility: "hidden" });
+    this.caretLayer = svgEl("g", { id: "caret-rings" });
     this.viewport.append(
       this.renderer.edgeLayer,
       this.renderer.seamLayer,
       this.renderer.nodeLayer,
-      this.caretRing,
+      this.caretLayer,
       this.pick.el,
       this.adds.el,
       this.dropHint,
@@ -2013,33 +2016,42 @@ export class MindMap {
    * 増えるだけで、Delete も Alt+↑↓ も Export の範囲も動かない。
    * 地図も動かさない（打鍵のたびに寄せると、書いている手元が揺れる）。
    */
-  setCaret(id: number): void {
-    this.caret = id;
+  setCaret(ids: number[]): void {
+    this.caret = ids;
     this.showCaret();
   }
 
   /**
-   * カーソルの輪を、そのノードの**内側**へ重ねる。内側に置くのは選択が
-   * 外の枠だから — 外から掴むのが選択、中に居るのがカーソルで、形がそのまま
-   * 意味になる。どちらを強くしても混ざらず、重なれば両方読める。
+   * カーソルの輪を、掛かっているノードの**内側**へ重ねる。内側に置くのは
+   * 選択が外の枠だから — 外から掴むのが選択、中に居るのがカーソルで、形が
+   * そのまま意味になる。どちらを強くしても混ざらず、重なれば両方読める。
    *
-   * ノードの子ではなく world に浮かぶ 1 個の印にする（`CardPick` と同じ）。
-   * 子にすると、カーソルが動くたびにそのノードの中身が丸ごと作り直される。
-   * 箱が無い（畳まれて描かれていない）なら出さない — 指す相手が画面に
-   * 居ないのに、印だけ置くことはしない。
+   * ノードの子ではなく world に浮かぶ印にする（`CardPick` と同じ）。子に
+   * すると、カーソルが動くたびにそのノードの中身が丸ごと作り直される。
+   * 箱が無い（畳まれて描かれていない）ノードには出さない — 指す相手が
+   * 画面に居ないのに、印だけ置くことはしない。
    */
   private showCaret(): void {
-    const b = this.boxes.get(this.caret);
-    if (!b) {
-      this.caretRing.setAttribute("visibility", "hidden");
-      return;
+    const boxes: Box[] = [];
+    for (const id of this.caret) {
+      const b = this.boxes.get(id);
+      if (b) boxes.push(b);
     }
-    this.caretRing.setAttribute("visibility", "visible");
-    this.caretRing.classList.toggle("hidden-node", b.n.hidden);
-    this.caretRing.setAttribute("x", String(b.x + CARET_INSET));
-    this.caretRing.setAttribute("y", String(b.y + CARET_INSET));
-    this.caretRing.setAttribute("width", String(b.w - CARET_INSET * 2));
-    this.caretRing.setAttribute("height", String(b.h - CARET_INSET * 2));
+    // 本数が変わったときだけ作り足す/捨てる（グループの継ぎ目と同じ）
+    while (this.caretRings.length > boxes.length) this.caretRings.pop()?.remove();
+    while (this.caretRings.length < boxes.length) {
+      const ring = svgEl("rect", { class: "caret-ring" });
+      this.caretLayer.append(ring);
+      this.caretRings.push(ring);
+    }
+    for (const [i, b] of boxes.entries()) {
+      const ring = this.caretRings[i];
+      ring.classList.toggle("hidden-node", b.n.hidden);
+      ring.setAttribute("x", String(b.x + CARET_INSET));
+      ring.setAttribute("y", String(b.y + CARET_INSET));
+      ring.setAttribute("width", String(b.w - CARET_INSET * 2));
+      ring.setAttribute("height", String(b.h - CARET_INSET * 2));
+    }
   }
 
   /** レイアウトを見直さない軽い塗り替え（矩形選択の途中で使う）。
