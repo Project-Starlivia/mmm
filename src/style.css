@@ -218,13 +218,20 @@ html, body {
   background: var(--panel);
   position: relative; /* 隅に浮く道具（.pane-tool）の座標系 */
 
+  /* CodeMirror の色は**ここが決める**（src/editor.ts は色を持たない）。
+     テーマの中で当てると、ダークでは後から当たる oneDarkTheme に負ける —
+     普通の詳細度で書けば勝てるので、置き場所を 1 つに寄せてある。
+     oneDark が引き続き受け持つのはコードの字の色だけ。 */
   & .cm-editor {
     height: 100%;
     font-size: 13.5px;
+    background: var(--panel);
 
     &.cm-focused { outline: none; }
   }
   & .cm-scroller { font-family: var(--mono); line-height: 1.55; }
+  /* 打っている場所の印は、マップのその場編集と同じブランドカラー */
+  & .cm-content { caret-color: var(--accent); }
   & .cm-gutters {
     background: var(--panel);
     border-right: 1px solid var(--line);

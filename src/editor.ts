@@ -29,31 +29,18 @@ import type { EditOp } from "./coreApi.ts";
 import type { Span } from "./caret.ts";
 
 /**
- * CodeMirror に渡す色。**色そのものは style.css が持つ**ので、ここは変数を
- * 指すだけの 2 つ — 地と、キャレット。
+ * CodeMirror へは **`dark` かどうかだけ**を渡す（自身の既定のスタイルが
+ * それで振れる）。**色は 1 つも持たない** — 地もキャレットも style.css の
+ * `#md-pane` の並びが決める。
  *
- * 以前は選択・カーソル・アクティブ行の色も書いていたが、`drawSelection()` も
- * `highlightActiveLine()` も入れていないため、それらの要素は 1 つも作られず
- * **一度も効いていなかった**（選択はブラウザのネイティブ描画、キャレットは
- * 下の `caret-color` が塗っている）。書いてあるのに効かない宣言は、次に読む
- * 人を確実に誤らせるので置かない。
- *
- * 中身はテーマで変わらない。違うのは `dark` の申告だけで、CodeMirror 自身の
- * 既定のスタイルがそれで振れる。
- *
- * **ダークではこの 2 つも効いていない** — 後から当たる `oneDarkTheme` が勝ち、
- * 地は `#282c34`、キャレットは oneDark の青のまま（効くのはライトのときだけ）。
- * `Prec.high()` で優先度を上げれば `--panel` / `--accent` が通ることは確かめて
- * あるが、**ダークの見た目が変わる**ので、別に判断することとして残してある。
+ * ここに色を書いていた頃は、書いたとおりにならなかった。選択・カーソル・
+ * アクティブ行の色は `drawSelection()` も `highlightActiveLine()` も入れて
+ * いないため要素が 1 つも作られず、地とキャレットはダークで後から当たる
+ * `oneDarkTheme` に負けていた（md ペインだけ地が `#282c34` になり、
+ * ガターの `--panel` と割れていた）。CSS の側で当てれば普通の詳細度で
+ * 勝てるので、色の置き場所を 1 つに寄せた。
  */
-const tweaks = (dark: boolean) =>
-  EditorView.theme(
-    {
-      "&": { backgroundColor: "var(--panel)" },
-      ".cm-content": { caretColor: "var(--accent)" },
-    },
-    { dark },
-  );
+const tweaks = (dark: boolean) => EditorView.theme({}, { dark });
 
 const DARK_EXT = [
   oneDarkTheme,
