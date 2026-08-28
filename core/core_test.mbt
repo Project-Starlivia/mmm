@@ -902,3 +902,17 @@ test "selecting a parent with its descendant is the same as the parent alone" {
   ignore(move_as_parent([2, 3], 4))
   assert_eq(get_text(), alone)
 }
+
+///|
+/// 本文に**対になっていない**閉じマーカーがある枝は、畳まない。
+///
+/// 入れ子の番人は `st.hide_regions`（対として認識済みの区間）しか見て
+/// いなかったので、開きの無い裸の `-->` は素通りしていた。包むと領域が
+/// 早すぎる位置で閉じ、後ろの兄弟がノードごと消え、開き直すときにユーザーの
+/// 本文行が削除されていた。対になっている `<!-- … -->` と同じく no-op にする。
+test "folding refuses a branch that holds an unpaired close marker" {
+  let md = "# r\n\n## a\n\n```\n-->\n```\n\n## b\n\n## c\n"
+  ignore(init_doc(md))
+  ignore(toggle_hidden(2))
+  assert_eq(get_text(), md)
+}

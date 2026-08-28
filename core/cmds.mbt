@@ -138,6 +138,34 @@ fn subtree_text(ids : Array[Int]) -> String {
 /// renderers skip the branch, but it stays in the structure as hidden
 /// nodes. Showing removes the markers of the region containing the node.
 /// Hiding a subtree that already contains markers (nested hide) is a no-op.
+/// `[from, to)` に、どの hide 領域にも属さない閉じマーカー行があるか。
+///
+/// 「対になっている `<!-- … -->`」は `st.hide_regions` に載るので上の走査で
+/// 拾えるが、**開きの無い裸の `-->`** はどこにも載らない。包むと領域が
+/// そこで閉じてしまうので、畳む前に見つけて断る。
+fn has_stray_close(from : Int, to : Int) -> Bool {
+  for l in scan_lines(st.text) {
+    if l.start < from || l.start >= to {
+      continue
+    }
+    if !is_comment_close(st.text, l) {
+      continue
+    }
+    let mut paired = false
+    for r in st.hide_regions {
+      if r.close_start == l.start {
+        paired = true
+        break
+      }
+    }
+    if !paired {
+      return true
+    }
+  }
+  false
+}
+
+///|
 fn cmd_toggle_hidden(id : Int) -> Unit {
   let i = find_node(id)
   if i < 0 {
@@ -195,6 +223,17 @@ fn cmd_toggle_hidden(id : Int) -> Unit {
       (r.close_start >= nd.from && r.close_start < nd.to) {
       return
     }
+  }
+  // **対になっていない閉じマーカーも番人に入れる。**
+  //
+  // 上の走査は `st.hide_regions`（＝対として認識済みの区間）しか見ないので、
+  // 開きの無い裸の `-->` はどこにも記録されず素通りしていた。そのまま新しい
+  // マーカーで包むと、`is_comment_close` はフェンスの中でも一致する仕様なので
+  // 領域が**早すぎる位置で閉じ**、後ろの兄弟がノードごと消え、開き直すときに
+  // ユーザーの本文行が削除されていた（`open=1 close=2` の不均衡が残る）。
+  // 対になっている `<!-- … -->` が入れ子禁止で no-op になるのと同じ扱いにする。
+  if has_stray_close(nd.from, nd.to) {
+    return
   }
   // 閉じマーカーは必ず行頭に置く。本文が改行で終わっていないときは前に改行を
   // 足すが、そのぶん後ろには足さない。こうすると「マーカーが改行で終わって
