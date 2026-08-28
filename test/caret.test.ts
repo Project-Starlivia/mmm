@@ -1,7 +1,9 @@
 // md のカーソル・選択が、どのノードに掛かっているか。
 //
-// 規則は 1 つ「区間が重なっていれば挙げる、端は両側とも閉じて見る」。
-// ノードの区間は子孫を含むので、点 1 つでもその枝の道筋が揃って挙がる。
+// 規則は 1 つ「**そのノード自身の文**に重なっていれば挙げる、端は両側とも
+// 閉じて見る」。自身の文 = `[from, contentEnd)` で、見出しの行と、子に
+// 取られていない本文。子孫の区間まで含む `to` で見ると、点 1 つでもルート
+// までの祖先が全部挙がってしまう（選ばれているように見える）。
 //
 // 実行: pnpm test
 
@@ -13,7 +15,7 @@ import { type Span, caretNodes } from "../src/caret.ts";
 /** 総当たりの答え（同じ規則を、素直に書き下したもの）。 */
 function naive(nodes: NodeInfo[], spans: Span[]): number[] {
   return nodes
-    .filter((n) => spans.some((s) => n.from <= s.to && n.to >= s.from))
+    .filter((n) => spans.some((s) => n.from <= s.to && n.contentEnd >= s.from))
     .map((n) => n.id);
 }
 
@@ -37,46 +39,47 @@ const MD = `# 根
 ## 枝 B
 `;
 
-test("点 1 つでも、その枝の道筋がまとめて挙がる", () => {
-  assert.deepEqual(
-    labelsAt(MD, (t) => at(t.indexOf("A の子"))),
-    ["根", "枝 A", "A の子"],
-  );
+test("点 1 つなら、そこに居るノードだけ（祖先は挙がらない）", () => {
+  assert.deepEqual(labelsAt(MD, (t) => at(t.indexOf("A の子"))), ["A の子"]);
 });
 
-test("本文の行は、その本文を持つノードまで（子は含まない）", () => {
-  assert.deepEqual(
-    labelsAt(MD, (t) => at(t.indexOf("本文の行"))),
-    ["根", "枝 A"],
-  );
+test("本文の行は、その本文を持つノード（子は含まない）", () => {
+  assert.deepEqual(labelsAt(MD, (t) => at(t.indexOf("本文の行"))), ["枝 A"]);
 });
 
-test("兄弟をまたぐ範囲は、両方とその中身まで挙がる", () => {
+test("見出しと見出しのあいだの空行も、手前のノードの文のうち", () => {
+  // 空行を境に印が消えると、書いている最中にいちばん多く踏む
+  const { text, nodes } = loadDoc(MD);
+  const blank = text.indexOf("本文の行") + "本文の行".length + 1; // 直後の空行
+  const ids = new Set(caretNodes(nodes, at(blank)));
+  assert.deepEqual(nodes.filter((n) => ids.has(n.id)).map((n) => n.label), ["枝 A"]);
+});
+
+test("兄弟をまたぐ範囲は、掛かったものだけ（ルートは入らない）", () => {
   assert.deepEqual(
-    labelsAt(MD, (t) => [{ from: t.indexOf("## 枝 A"), to: t.indexOf("## 枝 B") }]),
-    ["根", "枝 A", "A の子", "枝 B"],
+    labelsAt(MD, (t) => [{ from: t.indexOf("枝 A"), to: t.indexOf("枝 B") }]),
+    ["枝 A", "A の子", "枝 B"],
   );
 });
 
 test("離れた複数カーソルは、それぞれの分を合わせたものになる", () => {
   assert.deepEqual(
-    labelsAt(MD, (t) => [...at(t.indexOf("A の子")), ...at(t.indexOf("## 枝 B"))]),
-    ["根", "枝 A", "A の子", "枝 B"],
+    labelsAt(MD, (t) => [...at(t.indexOf("A の子")), ...at(t.indexOf("枝 B"))]),
+    ["A の子", "枝 B"],
   );
 });
 
-test("文書の末尾でも、掛かっているものが挙がり続ける", () => {
-  // ここが半開のままだと、全部の区間が閉じきっていて何も挙がらない。
+test("継ぎ目ちょうどでは、その両側が挙がる", () => {
+  // 端を両側とも閉じて見ることの裏返し。手前の文の終わりは、次の文の始まり
+  assert.deepEqual(labelsAt(MD, (t) => at(t.indexOf("### A の子"))), ["枝 A", "A の子"]);
+});
+
+test("文書の末尾でも、最後のノードが挙がり続ける", () => {
+  // ここが半開のままだと、末尾では文が閉じきっていて何も挙がらない。
   // 追記しているあいだじゅう印が出ない、といういちばん困る形になる
-  assert.deepEqual(
-    labelsAt(MD, (t) => at(t.length)),
-    ["根", "枝 B"],
-  );
+  assert.deepEqual(labelsAt(MD, (t) => at(t.length)), ["枝 B"]);
   // 末尾に改行が無い文書でも同じ
-  assert.deepEqual(
-    labelsAt("# 根\n\n## 枝", (t) => at(t.length)),
-    ["根", "枝"],
-  );
+  assert.deepEqual(labelsAt("# 根\n\n## 枝", (t) => at(t.length)), ["枝"]);
 });
 
 test("どのノードにも掛からない位置では空", () => {
@@ -96,8 +99,8 @@ test("範囲が 1 つも無ければ（md にカーソルが無い）空", () =>
 
 test("返す並びは常に文書順（範囲をどの順で渡しても）", () => {
   const { text, nodes } = loadDoc(MD);
-  const forward = caretNodes(nodes, [...at(text.indexOf("# 根")), ...at(text.indexOf("## 枝 B"))]);
-  const backward = caretNodes(nodes, [...at(text.indexOf("## 枝 B")), ...at(text.indexOf("# 根"))]);
+  const forward = caretNodes(nodes, [...at(text.indexOf("根")), ...at(text.indexOf("枝 B"))]);
+  const backward = caretNodes(nodes, [...at(text.indexOf("枝 B")), ...at(text.indexOf("根"))]);
   assert.deepEqual(forward, backward);
   assert.deepEqual(
     forward,
