@@ -14,10 +14,15 @@
   --ink-dim: #828a96;
   --line: #2a2f38;
   --accent: #5932ff;
-  /* 薄い版は色から作る。**濃さを決めるのはここだけ** — 実値を JS が置くと
-     それはインラインスタイルになり、テーマごとの宣言（下の `:root.light`）に
-     必ず勝ってしまう。ブランドカラーは app/theme.ts が `--accent` にだけ入れる */
-  --accent-soft: color-mix(in srgb, var(--accent) 20%, transparent);
+  /* 面を accent で薄く塗るときの濃さ。**この 1 行だけ**が決める — 下が
+     透ける面（`--accent-soft`）も、ノードの箱のように地の上へ不透明に塗る面も
+     同じ濃さになる。同じ選択を 2 つのペインで見せているのに、濃さが違う
+     理由が無い。
+     テーマでも変えない: ライト用に薄くした宣言を持っていたが、app/theme.ts が
+     置くインラインに必ず負けていて一度も効いていなかった（誰も見たことの
+     ない濃さだった）。ブランドカラーは `--accent` にだけ入る */
+  --accent-mix: 20%;
+  --accent-soft: color-mix(in srgb, var(--accent) var(--accent-mix), transparent);
   --node-bg: #232830;
   --node-border: #3b424d;
   --node-border-strong: #5d6673;
@@ -42,7 +47,6 @@
   --ink: #1f2328;
   --ink-dim: #6b7280;
   --line: #e2e5ea;
-  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --node-bg: #ffffff;
   --node-border: #cfd5dd;
   --node-border-strong: #9aa4b1;
@@ -524,7 +528,9 @@ html, body {
   &.selected rect.box {
     stroke: var(--accent);
     stroke-width: 2;
-    fill: color-mix(in srgb, var(--accent) 16%, var(--node-bg));
+    /* md 側のハイライトと同じ濃さ（--accent-mix）。ただし箱は下が透けては
+       困る（地のドットが出る）ので、transparent ではなく node-bg に混ぜる */
+    fill: color-mix(in srgb, var(--accent) var(--accent-mix), var(--node-bg));
   }
   &.hidden-node {
     opacity: 0.45;
