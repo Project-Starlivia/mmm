@@ -916,3 +916,33 @@ test "folding refuses a branch that holds an unpaired close marker" {
   ignore(toggle_hidden(2))
   assert_eq(get_text(), md)
 }
+
+///|
+/// 先頭グループが空になったら、その境界はもう何も分けていないので消える。
+/// 位置も本数も変わらないので目印の数では気づけず、書き直しのゲートの
+/// 内側に規則を置いていたころは素通りしていた。
+test "a boundary that became a no-op lead is swept" {
+  for op in [0, 1, 2] {
+    ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n## c\n"))
+    if op == 0 {
+      ignore(delete_nodes([2]))
+      assert_eq(get_text(), "# r\n\n## b\n\n## c\n")
+    } else if op == 1 {
+      ignore(move_nodes([2], 4, 2))
+      assert_eq(get_text(), "# r\n\n## b\n\n## c\n\n## a\n")
+    } else {
+      ignore(move_nodes([2], 3, 0))
+      assert_eq(get_text(), "# r\n\n## b\n\n### a\n\n## c\n")
+    }
+  }
+}
+
+///|
+/// ただし境界と次の枝のあいだに本文があるときは消さない。先頭の境界には
+/// 切り替えのほかに「ルートの本文をそこで切り詰める」効果があり
+/// （cap_at_first_bound）、消すと根のカードがその本文を飲み込む。
+test "a lead boundary that caps root content is kept" {
+  ignore(init_doc("# r\n\n---\n\n![](./x.png)\n\n## a\n\n## b\n"))
+  ignore(move_side_end([3], 1, true))
+  assert_eq(get_text().contains("# r\n\n---\n\n![](./x.png)"), true)
+}

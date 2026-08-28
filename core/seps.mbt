@@ -550,19 +550,23 @@ fn sweep_seps(marks : SepMarks, from_set : Int) -> Unit {
     let raw = slice(st.text, b.start, b.end)
     let normal = raw == sep_body(depth, true) || raw == sep_body(depth, false)
     let fused = !normal && hit[i] >= 1 && b.flip != flip[i]
-    if hit[i] >= 2 || folded[i] || fused {
-      // 畳んだ結果が「先頭 + 切り替え無し」なら、その境界はもう何もしていない。
-      // 書き直して残すのは、打ち消すためにもう 1 本足すのと同じ種類の誤り
-      // （before_sep_edit が先頭に対して持っているのと同じ規則）。
-      // 中ほどの境界は切り替えなしでも継ぎ目とグループの壁になるので残す。
-      // 境界と次の枝のあいだに本文があるときも消さない — 先頭の境界には
-      // 切り替えのほかに `cap_at_first_bound` がルートの本文をそこで
-      // 切り詰める効果があり、消すと根のカードがそれを飲み込む
-      if !flip[i] && leads_tree(b.start) && blank_to_next_node(b.end) {
-        set.push(remove_sep_edit(b))
-      } else {
-        set.push(set_sep_edit(b, depth, flip[i]))
-      }
+    let rewrite = hit[i] >= 2 || folded[i] || fused
+    // 書き直すならその後の flip、書き直さないなら**今そこにある**読み。
+    // 目印（＝編集前の値）で見ていたころは、コマンドが書いたばかりの
+    // 切り替えを「切り替え無し」と誤読して消していた。
+    let will_flip = if rewrite { flip[i] } else { b.flip }
+    // 「先頭 + 切り替え無し」の境界はもう何もしていないので消す。
+    // **数のゲートの外で見る** — 手前の枝が居なくなって先頭に成り下がった
+    // だけの境界は、位置も本数も変わらないので素通りしていた
+    // （before_sep_edit が先頭に対して持っているのと同じ規則）。
+    // 中ほどの境界は切り替えなしでも継ぎ目とグループの壁になるので残す。
+    // 境界と次の枝のあいだに本文があるときも消さない — 先頭の境界には
+    // 切り替えのほかに `cap_at_first_bound` がルートの本文をそこで
+    // 切り詰める効果があり、消すと根のカードがそれを飲み込む。
+    if !will_flip && leads_tree(b.start) && blank_to_next_node(b.end) {
+      set.push(remove_sep_edit(b))
+    } else if rewrite {
+      set.push(set_sep_edit(b, depth, flip[i]))
     }
   }
   // 複数の目印が「もう効いていない」側に落ちても、地続きの生ランは 1 つに
