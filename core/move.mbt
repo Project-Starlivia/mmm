@@ -238,9 +238,20 @@ fn cmd_move(ids : Array[Int], target : Int, pos : Int) -> Unit {
     if !move_lands_outside(order, target) {
       return
     }
+    let ti = find_node(target)
+    let target_folded = ti >= 0 && st.nodes[ti].hidden
     unfold_target(target)
     let rehide = unhide_for_move(order)
+    let before = st.text
     let first_focus = move_steps(ids, target, pos)
+    // **空振りなら、開いた落とし先は畳み直す。** 「もう其処に居る」かどうかは
+    // 開いたあとの位置でしか判定できない（畳んだままだと `to` が閉じマーカーの
+    // 手前を指す）ので、開くのが先になる。位置が 1 つも変わらなかったときに
+    // 畳みだけ解けて、埋もれていた子が湧いて見えるのを防ぐ。本文が元に戻れば
+    // `commit_tx` が「変わっていない」と見て undo にも積まない
+    if target_folded && st.text == before {
+      cmd_toggle_hidden(target)
+    }
     for id in rehide {
       cmd_toggle_hidden(id)
     }

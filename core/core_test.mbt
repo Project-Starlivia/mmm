@@ -807,3 +807,29 @@ test "a blank line after the open marker does not break the sole-region match" {
   ignore(move_nodes([2], 4, 2))
   assert_eq(get_text(), "# r\n\n## b\n\n<!--\n## a\n\n### a1\n-->\n")
 }
+
+///|
+/// 何も変わっていない操作は undo に積まない。積んだ編集の**本数**で見て
+/// いたころは、打ち消し合う 2 本（hide を外して空振りして畳み直す等）も
+/// 「変わった」と数え、Ctrl+Z が空振りし、redo まで捨てられていた。
+test "a command that changes nothing costs no undo and keeps redo" {
+  ignore(init_doc("# r\n\n## a\n\n## b\n"))
+  ignore(add_child(2, ""))
+  let done = get_text()
+  ignore(undo())
+  ignore(move_nodes([3], 3, 2)) // 自分の後ろへ = 空振り
+  ignore(redo())
+  assert_eq(get_text(), done) // 空振りが redo を捨てていない
+}
+
+///|
+/// 位置が 1 つも変わらないドロップでは、落とし先の畳みも解けない。
+/// 「もう其処に居る」は開いたあとでしか判定できないので一度開くが、
+/// 空振りと分かった時点で畳み直す。
+test "a no-op drop does not unfold the landing spot" {
+  ignore(init_doc("# r\n\n## a\n\n### a1\n\n## b\n"))
+  ignore(toggle_hidden(2))
+  let folded = get_text()
+  ignore(move_nodes([3], 2, 0)) // a1 は既に a の最後の子
+  assert_eq(get_text(), folded)
+}

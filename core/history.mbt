@@ -10,6 +10,7 @@ priv struct Entry {
   tag : String
   before : Array[(Int, Int)] // (from, id) per node before the entry applied
   mut after : Array[(Int, Int)] // same, after — ids survive undo/redo
+  text0 : String // 開いた時点の本文。**積むかどうかはこれとの差で決める**
 }
 
 ///|
@@ -52,6 +53,7 @@ fn refresh_entry_after() -> Unit {
 /// entry on the undo stack (merged into an open tx or a same-tag top entry).
 fn apply_sets(sets : Array[Array[Edit]], tag : String) -> Unit {
   let before = id_pairs()
+  let text0 = st.text // 直に積む経路（tx 無し）の Entry が持つ「前の本文」
   // carry old ids through the edits by position
   let mapped : Array[Int] = [] // mapped from per old node, -1 if destroyed
   for nd in st.nodes {
@@ -100,7 +102,9 @@ fn apply_sets(sets : Array[Array[Edit]], tag : String) -> Unit {
         false
       }
       if !merged {
-        st.undo.push(Entry::{ steps: sets, inv: inv_sets, tag, before, after })
+        st.undo.push(
+          Entry::{ steps: sets, inv: inv_sets, tag, before, after, text0 },
+        )
       }
     }
   }
@@ -108,15 +112,31 @@ fn apply_sets(sets : Array[Array[Edit]], tag : String) -> Unit {
 
 ///|
 fn begin_tx(tag : String) -> Unit {
-  st.tx = Some(Entry::{ steps: [], inv: [], tag, before: id_pairs(), after: [] })
+  st.tx = Some(
+    Entry::{
+      steps: [],
+      inv: [],
+      tag,
+      before: id_pairs(),
+      after: [],
+      text0: st.text,
+    },
+  )
 }
 
 ///|
+/// **積むかどうかは「本文が実際に変わったか」で決める。**
+///
+/// 積んだ編集集合の本数で見ていたころは、打ち消し合う 2 本（hide を外して
+/// 空振りして畳み直す、区切りを消してまた書く）も「2 本あるから変わった」と
+/// 数えていた。1 バイトも変わっていないのに undo が 1 つ積まれ、Ctrl+Z が
+/// 空振りし、しかも `st.redo.clear()` を通るので**何も起きていないのに
+/// redo が捨てられて**いた。
 fn commit_tx() -> Unit {
   match st.tx {
     Some(tx) => {
       st.tx = None
-      if tx.steps.length() > 0 {
+      if tx.steps.length() > 0 && st.text != tx.text0 {
         tx.after = id_pairs()
         st.redo.clear()
         st.undo.push(tx)
