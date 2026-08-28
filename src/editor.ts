@@ -28,38 +28,39 @@ import { oneDarkHighlightStyle, oneDarkTheme } from "@codemirror/theme-one-dark"
 import type { EditOp } from "./coreApi.ts";
 import type { Span } from "./caret.ts";
 
-const darkTweaks = EditorView.theme(
-  {
-    "&": { backgroundColor: "var(--panel)" },
-    ".cm-content": { caretColor: "var(--accent)" },
-    ".cm-cursor": { borderLeftColor: "var(--accent)" },
-    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
-      backgroundColor: "color-mix(in srgb, var(--accent) 30%, transparent)",
+/**
+ * CodeMirror に渡す色。**色そのものは style.css が持つ**ので、ここは変数を
+ * 指すだけの 2 つ — 地と、キャレット。
+ *
+ * 以前は選択・カーソル・アクティブ行の色も書いていたが、`drawSelection()` も
+ * `highlightActiveLine()` も入れていないため、それらの要素は 1 つも作られず
+ * **一度も効いていなかった**（選択はブラウザのネイティブ描画、キャレットは
+ * 下の `caret-color` が塗っている）。書いてあるのに効かない宣言は、次に読む
+ * 人を確実に誤らせるので置かない。
+ *
+ * 中身はテーマで変わらない。違うのは `dark` の申告だけで、CodeMirror 自身の
+ * 既定のスタイルがそれで振れる。
+ *
+ * **ダークではこの 2 つも効いていない** — 後から当たる `oneDarkTheme` が勝ち、
+ * 地は `#282c34`、キャレットは oneDark の青のまま（効くのはライトのときだけ）。
+ * `Prec.high()` で優先度を上げれば `--panel` / `--accent` が通ることは確かめて
+ * あるが、**ダークの見た目が変わる**ので、別に判断することとして残してある。
+ */
+const tweaks = (dark: boolean) =>
+  EditorView.theme(
+    {
+      "&": { backgroundColor: "var(--panel)" },
+      ".cm-content": { caretColor: "var(--accent)" },
     },
-    ".cm-activeLine": { backgroundColor: "rgba(255, 255, 255, 0.03)" },
-  },
-  { dark: true },
-);
-
-const lightTweaks = EditorView.theme(
-  {
-    "&": { backgroundColor: "var(--panel)" },
-    ".cm-content": { caretColor: "var(--accent)" },
-    ".cm-cursor": { borderLeftColor: "var(--accent)" },
-    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
-      backgroundColor: "color-mix(in srgb, var(--accent) 22%, transparent)",
-    },
-    ".cm-activeLine": { backgroundColor: "rgba(0, 0, 0, 0.04)" },
-  },
-  { dark: false },
-);
+    { dark },
+  );
 
 const DARK_EXT = [
   oneDarkTheme,
-  darkTweaks,
+  tweaks(true),
   syntaxHighlighting(oneDarkHighlightStyle),
 ];
-const LIGHT_EXT = [lightTweaks, syntaxHighlighting(defaultHighlightStyle)];
+const LIGHT_EXT = [tweaks(false), syntaxHighlighting(defaultHighlightStyle)];
 
 const fromCore = Annotation.define<boolean>();
 
