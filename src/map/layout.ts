@@ -267,7 +267,7 @@ export function layoutMap(doc: DocView): Layout {
   const placeTree = (
     root: NodeInfo,
     top: number,
-  ): { top: number; bottom: number } => {
+  ): { top: number; bottom: number; shift: (dy: number) => void } => {
     const size = sizeOf(root);
     const span = treeH(root);
     const sides = [
@@ -352,14 +352,21 @@ export function layoutMap(doc: DocView): Layout {
       rows: rowsOf.get(root.id) ?? [],
     });
     // 実際に占めた縦の範囲。**ずらしたぶん `treeH` の見積もりを超えうる**ので、
-    // 木を縦に積む側はこれを見る（見積もりで積むと次の木と重なる）
+    // 木を縦に積む側はこれを見る（見積もりで積むと次の木と重なる）。
+    // 上端も返すのは、側を根へ揃えると渡された `top` より**上**へ伸びうるため。
+    // `shift` は箱だけでなく継ぎ目も連れていく — 木ごと動かす唯一の入口。
     let lo = centerY - size.h / 2;
     let hi = centerY + size.h / 2;
     for (const p of placed) {
       lo = Math.min(lo, p.y0);
       hi = Math.max(hi, p.y0 + p.h);
     }
-    return { top: lo, bottom: hi };
+    const shift = (dy: number): void => {
+      if (dy === 0) return;
+      shiftSubtree(root, dy);
+      for (const p of placed) for (const sm of p.mySeams) sm.y += dy;
+    };
+    return { top: lo, bottom: hi, shift };
   };
 
   /** その枝と子孫すべての箱を縦にずらす。側を根の中心へ揃えるため */
@@ -375,8 +382,13 @@ export function layoutMap(doc: DocView): Layout {
   for (const tree of tops) {
     if (tree === root) continue;
     // 積む位置は**実測の下端**から。側を根へ揃えるとその側は `treeH` の
-    // 見積もりからはみ出しうるので、見積もりで積むと次の木と重なる
-    top = placeTree(tree, top).bottom + GAP.root;
+    // 見積もりからはみ出しうるので、見積もりで積むと次の木と重なる。
+    // 同じ理由で**上へ**もはみ出しうる。そのぶんは押し下げて、頼んだ位置から
+    // 始まるようにする（上端を捨てていたころは、前の木へ食い込んでいた）
+    const put = placeTree(tree, top);
+    const up = Math.max(0, top - put.top);
+    put.shift(up);
+    top = put.bottom + up + GAP.root;
   }
 
   const parentOf = new Map<number, number>();

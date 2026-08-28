@@ -189,6 +189,29 @@ test("どの側も、第 1 子と最終子の中心の中点が根の中心に�
   }
 });
 
+test("別々の `#` ルートの木は、上下に食い込まない", () => {
+  // 側を根の中心へ揃えると、木は渡された top より**上**へも伸びうる。
+  // placeTree は上端も返すのに積む側が下端しか読んでおらず、前の木へ
+  // 食い込んでいた（区切りのある文書でだけ起きる）
+  const md =
+    "# R1\n---\n---\n## z0\n### z6\n# R2\n## a\n---\n---\n## b0\n" +
+    "### b9\n### b10\n### b11\n### b12\n### b13\n### b14\n### b15\n### b16\n## c\n";
+  const L = layoutMap(loadDoc(md));
+  const bs = [...L.boxes.values()];
+  for (let i = 0; i < bs.length; i++) {
+    for (let k = i + 1; k < bs.length; k++) {
+      const a = bs[i];
+      const b = bs[k];
+      const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      assert.ok(
+        ox <= 0.5 || oy <= 0.5,
+        `${a.n.label} と ${b.n.label} の箱が ${ox}x${oy} 重なる`,
+      );
+    }
+  }
+});
+
 test("同じ側に 2 本あれば、これまでどおり付け根を散らす", () => {
   const doc = loadDoc("# r\n\n## a\n\n## b\n");
   const L = layoutMap(doc);
