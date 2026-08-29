@@ -81,23 +81,50 @@ fn cmd_delete(ids : Array[Int]) -> Unit {
       // open は範囲より前・close は範囲より後なので、この位置に挟めば
       // apply_edit_set が要求する昇順のまま保たれる
       let hr = if nd.hidden { sole_hide_region(nd) } else { -1 }
+      // マーカーと中身のあいだが空白だけなら、そこも一緒に消す。行だけ抜くと
+      // 空行が残り、消した跡に空行が 3 連で並ぶ（範囲の編集と地続きになるので
+      // 昇順・非重複のまま保たれる）
       if hr >= 0 {
         let r = st.hide_regions[hr]
+        let head_to = if is_blank_range(r.open_next, from) {
+          from
+        } else {
+          r.open_next
+        }
         set.push(Edit::{
           from: r.open_start,
-          to: r.open_next,
+          to: head_to,
           insert: "",
-          removed: slice(st.text, r.open_start, r.open_next),
+          removed: slice(st.text, r.open_start, head_to),
         })
       }
       set.push(Edit::{ from, to, insert: "", removed: slice(st.text, from, to) })
       if hr >= 0 {
         let r = st.hide_regions[hr]
+        let tail_from = if is_blank_range(to, r.close_start) {
+          to
+        } else {
+          r.close_start
+        }
+        // 閉じマーカーの直後の空行も 1 つ道連れ（remove_sep_edit と同じ）。
+        // 中身は改行で終わっているので、行だけ抜くと空行が 2 つ並ぶ
+        let n = st.text.length()
+        let mut tail_to = r.close_next
+        let mut p = tail_to
+        while p < n && is_space(code_at(st.text, p)) {
+          p = p + 1
+        }
+        if p < n && code_at(st.text, p) == 13 {
+          p = p + 1
+        }
+        if p < n && code_at(st.text, p) == 10 {
+          tail_to = p + 1
+        }
         set.push(Edit::{
-          from: r.close_start,
-          to: r.close_next,
+          from: tail_from,
+          to: tail_to,
           insert: "",
-          removed: slice(st.text, r.close_start, r.close_next),
+          removed: slice(st.text, tail_from, tail_to),
         })
       }
     }
@@ -138,6 +165,34 @@ fn subtree_text(ids : Array[Int]) -> String {
 /// renderers skip the branch, but it stays in the structure as hidden
 /// nodes. Showing removes the markers of the region containing the node.
 /// Hiding a subtree that already contains markers (nested hide) is a no-op.
+/// `[from, to)` に、どの hide 領域にも属さない閉じマーカー行があるか。
+///
+/// 「対になっている `<!-- … -->`」は `st.hide_regions` に載るので上の走査で
+/// 拾えるが、**開きの無い裸の `-->`** はどこにも載らない。包むと領域が
+/// そこで閉じてしまうので、畳む前に見つけて断る。
+fn has_stray_close(from : Int, to : Int) -> Bool {
+  for l in scan_lines(st.text) {
+    if l.start < from || l.start >= to {
+      continue
+    }
+    if !is_comment_close(st.text, l) {
+      continue
+    }
+    let mut paired = false
+    for r in st.hide_regions {
+      if r.close_start == l.start {
+        paired = true
+        break
+      }
+    }
+    if !paired {
+      return true
+    }
+  }
+  false
+}
+
+///|
 fn cmd_toggle_hidden(id : Int) -> Unit {
   let i = find_node(id)
   if i < 0 {
@@ -149,12 +204,20 @@ fn cmd_toggle_hidden(id : Int) -> Unit {
     for r in st.hide_regions {
       let body_end = if r.close_start == -1 { n } else { r.close_start }
       if nd.from >= r.open_next && nd.from < body_end {
+        // 開きマーカーと中身のあいだの空行も一緒に消す。畳むときは
+        // `<!--` の直後に中身が来る形しか書かないので、そこに空行があるのは
+        // 手書き（か古い形）の余りで、残すと開くたびに空行が積み上がる
+        let head_end = if is_blank_range(r.open_next, nd.from) {
+          nd.from
+        } else {
+          r.open_next
+        }
         let edits : Array[Edit] = [
           Edit::{
             from: r.open_start,
-            to: r.open_next,
+            to: head_end,
             insert: "",
-            removed: slice(st.text, r.open_start, r.open_next),
+            removed: slice(st.text, r.open_start, head_end),
           },
         ]
         if r.close_start != -1 {
@@ -168,11 +231,25 @@ fn cmd_toggle_hidden(id : Int) -> Unit {
               from = from - len
             }
           }
+          // 閉じマーカーの**直後の空行も 1 つ道連れにする**（区切りを消す
+          // ときと同じ理屈）。中身は改行で終わっているので、マーカーの行だけ
+          // 抜くと空行が 2 つ並び、畳み直すたびに 1 行ずつ増えていく
+          let mut to = r.close_next
+          let mut p = to
+          while p < n && is_space(code_at(st.text, p)) {
+            p = p + 1
+          }
+          if p < n && code_at(st.text, p) == 13 {
+            p = p + 1
+          }
+          if p < n && code_at(st.text, p) == 10 {
+            to = p + 1
+          }
           edits.push(Edit::{
             from,
-            to: r.close_next,
+            to,
             insert: "",
-            removed: slice(st.text, from, r.close_next),
+            removed: slice(st.text, from, to),
           })
         }
         apply_sets([edits], "")
@@ -187,6 +264,17 @@ fn cmd_toggle_hidden(id : Int) -> Unit {
       (r.close_start >= nd.from && r.close_start < nd.to) {
       return
     }
+  }
+  // **対になっていない閉じマーカーも番人に入れる。**
+  //
+  // 上の走査は `st.hide_regions`（＝対として認識済みの区間）しか見ないので、
+  // 開きの無い裸の `-->` はどこにも記録されず素通りしていた。そのまま新しい
+  // マーカーで包むと、`is_comment_close` はフェンスの中でも一致する仕様なので
+  // 領域が**早すぎる位置で閉じ**、後ろの兄弟がノードごと消え、開き直すときに
+  // ユーザーの本文行が削除されていた（`open=1 close=2` の不均衡が残る）。
+  // 対になっている `<!-- … -->` が入れ子禁止で no-op になるのと同じ扱いにする。
+  if has_stray_close(nd.from, nd.to) {
+    return
   }
   // 閉じマーカーは必ず行頭に置く。本文が改行で終わっていないときは前に改行を
   // 足すが、そのぶん後ろには足さない。こうすると「マーカーが改行で終わって

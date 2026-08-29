@@ -19,6 +19,23 @@ fn node_hidden(snap : String, label : String) -> Bool {
 }
 
 ///|
+/// スナップショットの中で、ラベル `label` のノードが左側か。
+/// 見方は `node_hidden` と同じ（ノード 1 つ = 1 つの `{…}` の中だけを見る）。
+fn node_left(snap : String, label : String) -> Bool {
+  let needle = "\"label\":\"" + label + "\""
+  let at = match snap.find(needle) {
+    Some(i) => i
+    None => abort("node_left: label not found in snapshot: " + label)
+  }
+  let head = snap[0:at]
+  let brace = match head.rev_find("{") {
+    Some(i) => i
+    None => abort("node_left: no enclosing { before label: " + label)
+  }
+  snap[brace:at].contains("\"left\":true")
+}
+
+///|
 test "parse basic structure" {
   ignore(init_doc("# root\n\n## a\n\n### b\n\nbody of b\n\n## c\n"))
   // root(1) a(2) b(3) c(4) — verify via selection_text of the whole doc
@@ -637,6 +654,55 @@ test "a move into its own subtree changes nothing" {
 }
 
 ///|
+/// 畳んだノードへドロップすると、そのまま呑まれてマップから消えていた
+/// （足す側の unfold_before_add と同じ手当てが move には無かった）。
+/// 先に開いてから子にする。
+test "moving onto a folded node unfolds it first" {
+  ignore(init_doc("# r\n\n## a\n\n## b\n"))
+  let s = toggle_hidden(2)
+  assert_eq(node_hidden(s, "a"), true)
+  let after = move_nodes([3], 2, 0)
+  assert_eq(node_hidden(after, "a"), false)
+  assert_eq(node_hidden(after, "b"), false)
+  assert_eq(get_text(), "# r\n\n## a\n\n### b\n")
+}
+
+///|
+/// 枝を全部同じ側へ寄せると、境界は 1 本も残らない。
+///
+/// 先頭の境界は効果が「切り替え」だけなので、切り替えないなら何もしていない。
+/// 掃除は隣り合った境界を xor で 1 つに畳むところまではやっていたが、畳んだ
+/// 結果が「先頭 + 切り替え無し」になっても消さず、効かない `---` が居残っていた。
+test "sweeping leaves no separator once every branch is on one side" {
+  ignore(init_doc("# r\n\n---\n---\n\n## a\n\n## b\n"))
+  ignore(move_side_end([3], 1, false)) // b を右へ
+  ignore(move_side_end([2], 1, false)) // a も右へ = 左が空
+  assert_eq(get_text(), "# r\n\n## b\n\n## a\n")
+}
+
+///|
+/// ただし中ほどの境界は、切り替えなしでも消さない — 継ぎ目の線を引き、
+/// グループの壁（Tab / Alt+↑↓ が止まる）になるので仕事をしている。
+test "a mid-document split survives the sweep even without a flip" {
+  // c は既にその側の末尾で、残る末尾 b も同じグループ。何も動かないので
+  // 掃除だけが走る — a | b,c を分ける `---` は仕事をしているので残る
+  let md = "# r\n\n## a\n\n---\n\n## b\n\n## c\n"
+  ignore(init_doc(md))
+  ignore(move_side_end([4], 1, false))
+  assert_eq(get_text(), md)
+}
+
+///|
+/// 掴んだ枝は「その側の末尾」を探す走査から外す。数に入れていたころは、
+/// 選択にその側の末尾が含まれているだけで操作まるごとが黙って捨てられ、
+/// 「枝を全部選んで片側へ寄せる」が必ず不発だった。
+test "a multi-select flank drop is not swallowed by its own last branch" {
+  ignore(init_doc("# r\n\n## a\n\n---\n---\n\n## b\n"))
+  ignore(move_side_end([2, 3], 1, true))
+  assert_eq(get_text(), "# r\n\n---\n---\n\n## a\n\n## b\n")
+}
+
+///|
 /// 畳んだノードへの追加も、続く rename と 1 つの undo になる（tag を保つ）。
 test "adding into a folded node stays one undo with the rename" {
   ignore(init_doc("# r\n\n## a\n\n### a1\n"))
@@ -710,4 +776,214 @@ test "relevel shifts real headings only" {
 test "relevel never goes above depth one" {
   assert_eq(relevel_text("### a\n\n#### b\n", 1), "# a\n\n## b\n")
   assert_eq(relevel_text("# a\n\n## b\n", 1), "# a\n\n## b\n")
+}
+
+///|
+/// 落とし先が畳んであれば先に開く、を**落とし方によらず**守る。
+/// `cmd_move` にしかガードが無かったころは、割り込み・ルート脇・新しい
+/// グループの 3 つで挿入点が hide 領域の中に入り、見えていた枝が消えていた。
+test "every drop unfolds a folded landing spot first" {
+  // 線への割り込み
+  ignore(init_doc("# r\n\n<!--\n## a\n\n### a1\n\n-->\n## c\n"))
+  ignore(move_as_parent([4], 2))
+  assert_eq(get_text(), "# r\n\n## c\n\n### a\n\n#### a1\n")
+  // ルートの脇（着地点は自分で導いた「その側の末尾」）
+  ignore(init_doc("# r\n\n## a\n\n### a1\n\n<!--\n## z\n-->\n"))
+  ignore(move_side_end([2], 1, false))
+  assert_eq(get_text(), "# r\n\n## z\n\n## a\n\n### a1\n")
+}
+
+///|
+/// 割り込みで親になった枝は畳み直さない。畳み直すと、割り込まれた相手が
+/// 領域に呑まれて消える（`unfold_before_add` が「足したら開いたままにする」
+/// のと同じ理由）。
+test "a branch that gained a child is not folded back" {
+  ignore(init_doc("# r\n\n<!--\n## a\n\n### a1\n\n-->\n## b\n"))
+  ignore(move_as_parent([2], 4))
+  assert_eq(get_text(), "# r\n\n## a\n\n### a1\n\n### b\n")
+}
+
+///|
+/// 区切りは構造の話なので、畳んであるかに関わらず hide 領域の**外**に書く。
+/// 内側に書かれると `sole_hide_region` が外れ、次の一手でマーカーだけが
+/// 取り残されて、保存した .md が未閉じの HTML コメントになっていた。
+test "a separator is never written inside a hide region" {
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n"))
+  ignore(toggle_hidden(2))
+  ignore(flip_side(2))
+  assert_eq(get_text(), "# r\n\n---\n---\n\n<!--\n## a\n\n-->\n---\n---\n\n## b\n")
+}
+
+///|
+/// 次の枝が畳んでいても、手前の枝の範囲は境界で切れる。切れていなかった
+/// ころは `before_sep_edit` が既存の境界を「手前の枝の中」と誤読し、押す
+/// たびに新しい `---` を書いてファイルだけが太った（側は変わらない）。
+test "flipping a folded branch rewrites the boundary instead of adding one" {
+  let start = "# x\n\n## a\n\n---\n\n<!--\n\n## b\n\n-->\n"
+  ignore(init_doc(start))
+  ignore(flip_side(3))
+  assert_eq(get_text(), "# x\n\n## a\n\n---\n---\n\n<!--\n\n## b\n\n-->\n")
+  ignore(flip_side(3))
+  assert_eq(get_text(), start) // 往復で元へ戻る = 溜まらない
+}
+
+///|
+/// マーカーと中身のあいだに空行があっても「中身はちょうどこのノードだけ」と
+/// 認める。厳密一致だったころは、空行 1 行でマーカーが置き去りになり、
+/// hidden が黙って落ち、足した子が領域の中に生まれていた。
+test "a blank line after the open marker does not break the sole-region match" {
+  ignore(init_doc("# r\n\n<!--\n\n## a\n\n### a1\n\n-->\n\n## b\n"))
+  ignore(move_nodes([2], 4, 2))
+  assert_eq(get_text(), "# r\n\n## b\n\n<!--\n## a\n\n### a1\n-->\n")
+}
+
+///|
+/// 何も変わっていない操作は undo に積まない。積んだ編集の**本数**で見て
+/// いたころは、打ち消し合う 2 本（hide を外して空振りして畳み直す等）も
+/// 「変わった」と数え、Ctrl+Z が空振りし、redo まで捨てられていた。
+test "a command that changes nothing costs no undo and keeps redo" {
+  ignore(init_doc("# r\n\n## a\n\n## b\n"))
+  ignore(add_child(2, ""))
+  let done = get_text()
+  ignore(undo())
+  ignore(move_nodes([3], 3, 2)) // 自分の後ろへ = 空振り
+  ignore(redo())
+  assert_eq(get_text(), done) // 空振りが redo を捨てていない
+}
+
+///|
+/// 位置が 1 つも変わらないドロップでは、落とし先の畳みも解けない。
+/// 「もう其処に居る」は開いたあとでしか判定できないので一度開くが、
+/// 空振りと分かった時点で畳み直す。
+test "a no-op drop does not unfold the landing spot" {
+  ignore(init_doc("# r\n\n## a\n\n### a1\n\n## b\n"))
+  ignore(toggle_hidden(2))
+  let folded = get_text()
+  ignore(move_nodes([3], 2, 0)) // a1 は既に a の最後の子
+  assert_eq(get_text(), folded)
+}
+
+///|
+/// 並べ替えただけで、無関係なグループが反対側へ飛ばない。
+///
+/// 生の区切り行が生きた境界と地続きになると、1 本 + 1 本が 2 行 = 切り替えと
+/// 読まれる。その run に入る目印は 1 つだけなので、書き直しを「目印の数」で
+/// ゲートしていたころは素通りしていた。`sep_body` は空行を挟んだ形を書かない
+/// ので、正規形でないことがそのまま「勝手にくっついた」の印になる。
+/// 掴んだのは a1 だけなので、b は右のままでなければならない。
+test "a fused separator run does not flip an untouched group" {
+  ignore(init_doc("# r\n\n## a\n\n### a1\n\n---\n\n### a2\n\n---\n\n## b\n"))
+  ignore(reorder_node(3, 1, false))
+  assert_eq(get_text(), "# r\n\n## a\n\n### a2\n\n### a1\n\n---\n\n## b\n")
+}
+
+///|
+/// ルートの空いている脇へ落としたら、頼んだ側に着く。
+///
+/// 動かす枝が両脇を素の `---` で挟まれた単独グループだと、抜けたあとに
+/// 両脇の境界が空行を挟んで地続きになり、生の行数がそのまま切り替えとして
+/// 読める。畳む前の側で手前の枝を読むと `want` が反転し、頼んだ側と反対に
+/// 着地していた。側を読む前に一度掃除する（cmd_move_new_group と同じ手当て）。
+test "a flank drop lands on the side that was asked for" {
+  ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n"))
+  let s = move_side_end([3], 1, true)
+  assert_eq(node_left(s, "b"), true)
+}
+
+///|
+/// 親とその子孫を一緒に選んでも、割り込みの結果は親だけを選んだときと同じ。
+/// UI が「複数だと誰が親になるか決まらない」で割り込みを止めていた根拠が
+/// 成立していないことの裏づけ（コアは normalize_selection で畳む）。
+test "selecting a parent with its descendant is the same as the parent alone" {
+  ignore(init_doc("# r\n\n## a\n\n### a1\n\n## b\n"))
+  ignore(move_as_parent([2], 4))
+  let alone = get_text()
+  ignore(init_doc("# r\n\n## a\n\n### a1\n\n## b\n"))
+  ignore(move_as_parent([2, 3], 4))
+  assert_eq(get_text(), alone)
+}
+
+///|
+/// 本文に**対になっていない**閉じマーカーがある枝は、畳まない。
+///
+/// 入れ子の番人は `st.hide_regions`（対として認識済みの区間）しか見て
+/// いなかったので、開きの無い裸の `-->` は素通りしていた。包むと領域が
+/// 早すぎる位置で閉じ、後ろの兄弟がノードごと消え、開き直すときにユーザーの
+/// 本文行が削除されていた。対になっている `<!-- … -->` と同じく no-op にする。
+test "folding refuses a branch that holds an unpaired close marker" {
+  let md = "# r\n\n## a\n\n```\n-->\n```\n\n## b\n\n## c\n"
+  ignore(init_doc(md))
+  ignore(toggle_hidden(2))
+  assert_eq(get_text(), md)
+}
+
+///|
+/// 先頭グループが空になったら、その境界はもう何も分けていないので消える。
+/// 位置も本数も変わらないので目印の数では気づけず、書き直しのゲートの
+/// 内側に規則を置いていたころは素通りしていた。
+test "a boundary that became a no-op lead is swept" {
+  for op in [0, 1, 2] {
+    ignore(init_doc("# r\n\n## a\n\n---\n\n## b\n\n## c\n"))
+    if op == 0 {
+      ignore(delete_nodes([2]))
+      assert_eq(get_text(), "# r\n\n## b\n\n## c\n")
+    } else if op == 1 {
+      ignore(move_nodes([2], 4, 2))
+      assert_eq(get_text(), "# r\n\n## b\n\n## c\n\n## a\n")
+    } else {
+      ignore(move_nodes([2], 3, 0))
+      assert_eq(get_text(), "# r\n\n## b\n\n### a\n\n## c\n")
+    }
+  }
+}
+
+///|
+/// ただし境界と次の枝のあいだに本文があるときは消さない。先頭の境界には
+/// 切り替えのほかに「ルートの本文をそこで切り詰める」効果があり
+/// （cap_at_first_bound）、消すと根のカードがその本文を飲み込む。
+test "a lead boundary that caps root content is kept" {
+  ignore(init_doc("# r\n\n---\n\n![](./x.png)\n\n## a\n\n## b\n"))
+  ignore(move_side_end([3], 1, true))
+  assert_eq(get_text().contains("# r\n\n---\n\n![](./x.png)"), true)
+}
+
+///|
+/// hide のマーカーを外すときは、マーカーと中身のあいだ・直後の空行も
+/// 一緒に片付ける。行だけ抜いていたころは空行が積み上がり、畳み直すたびに
+/// 1 行ずつ増えていた（絵は変わらないのでテキストだけが汚れる）。
+test "removing hide markers takes their blank padding with them" {
+  // 畳んで開いて畳む = 正規形に落ち着く（空行が増えない）
+  ignore(init_doc("# r\n\n<!--\n\n## a\n\n### a1\n\n-->\n\n## b\n"))
+  ignore(toggle_hidden(2))
+  ignore(toggle_hidden(2))
+  assert_eq(get_text(), "# r\n\n<!--\n## a\n\n### a1\n\n-->\n## b\n")
+  // 畳んだ枝を消すと、マーカーも空行も残らない
+  ignore(init_doc("# r\n\n<!--\n\n## a\n\n### a1\n\n-->\n\n## b\n"))
+  ignore(delete_nodes([2]))
+  assert_eq(get_text(), "# r\n\n## b\n")
+}
+
+///|
+/// 木ごと別の木の中へ動かすとき、その木の境界は連れていかない。
+///
+/// 境界は「ルート直下の枝を分ける」ものなので、木が根でなくなれば意味を
+/// 失う。範囲としては根の中に居るので黙って運ばれ、行き先では
+/// valid_bounds を満たさず、掃除の目印も移動で切れる（map_offsets が
+/// 削除で -1 を返す）ため、誰も片付けられない死んだ `---` が枝の中に
+/// 残っていた。ドラッグを重ねるほど溜まる。
+test "moving a whole tree leaves its own boundaries behind" {
+  ignore(init_doc("# r\n\n## b0\n\n# s\n\n## z\n\n---\n\n## y\n"))
+  ignore(move_nodes([3], 2, 0))
+  assert_eq(get_text(), "# r\n\n## b0\n\n### s\n\n#### z\n\n#### y\n")
+  // 境界より後ろの見出しも id を保つ（落とした長さを先に数えないと飛ぶ）
+  ignore(rename_node(5, "Y", ""))
+  assert_eq(get_text(), "# r\n\n## b0\n\n### s\n\n#### z\n\n#### Y\n")
+}
+
+///|
+/// 根のまま動かすなら、その木の境界はそのまま連れていく。
+test "a tree that stays a root keeps its boundaries" {
+  ignore(init_doc("# r\n\n## a\n\n# s\n\n## z\n\n---\n\n## y\n"))
+  ignore(move_nodes([3], 1, 1))
+  assert_eq(get_text(), "# s\n\n## z\n\n---\n\n## y\n\n# r\n\n## a\n")
 }

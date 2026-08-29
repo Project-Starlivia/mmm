@@ -10,17 +10,18 @@
 /// 戻り値は「開いたので、以降を同じトランザクションに積むべきか」。
 /// tag を受け取るのは undo の粒度のため: 続く rename が同じ tag で
 /// 1 つの undo に併合されるのは、エントリの tag が一致するときだけ。
+/// 「その領域の中身がちょうどこのノードだけか」の判定は `sole_hide_region`
+/// が唯一の持ち主（ここに同じ式を写していたころは、片方だけ空白に耐えるよう
+/// 直して、足す側だけが hide 領域の中に子を生む形になっていた）。
 fn unfold_before_add(i : Int, tag : String) -> Bool {
   let nd = st.nodes[i]
   if !nd.hidden {
     return false
   }
-  for r in st.hide_regions {
-    if r.open_next == nd.from && r.close_start == nd.to {
-      begin_tx(tag)
-      cmd_toggle_hidden(nd.id)
-      return true
-    }
+  if sole_hide_region(nd) >= 0 {
+    begin_tx(tag)
+    cmd_toggle_hidden(nd.id)
+    return true
   }
   false
 }

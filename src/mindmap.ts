@@ -9,6 +9,7 @@ import { tokenizeBlock, touchesFence } from "./map/highlight.ts";
 import {
   type Pt,
   type Rect,
+  entryEdgeOf,
   growthEdgeOf,
   leftOf,
   midOfPolyline,
@@ -228,7 +229,12 @@ export class MindMap {
     null;
   private rubberStart: { x: number; y: number } | null = null;
   private dragCand: { id: number; px: number; py: number } | null = null;
-  private dragging: { ids: number[]; subtree: Set<number> } | null = null;
+  private dragging: {
+    ids: number[];
+    /** ids のうち、祖先が一緒に選ばれていないもの（= コアが実際に動かす枝） */
+    roots: number[];
+    subtree: Set<number>;
+  } | null = null;
   /** カードのドラッグ。掴んだだけ（閾値を越えるまで）は drop を出さない */
   private cardDrag: {
     ref: CardRef;
@@ -253,7 +259,7 @@ export class MindMap {
   // ドロップ中の一時的なノード印。**どれに付けたかを覚えておくのは、
   // 外すときに全ノードを舐めないため**（マウス移動のたびに外して付け直す）。
   // 描き直しで要素が作り直されても paintState が同じ印を戻す
-  private dropMarks = new Map<number, "drop-child" | "drop-parent">();
+  private dropMarks = new Map<number, "drop-parent">();
   private dropEdgeId: number | null = null;
   /** その場で直しているカード（位置は毎回引き直す） */
   private editingCard: CardRef | null = null;
@@ -689,11 +695,9 @@ export class MindMap {
   }
 
   /** id を指定して一時的な class を付ける（DOM を舐めずに済む） */
-  private markNode(id: number, cls: "dragging" | "drop-child" | "drop-parent"): void {
+  private markNode(id: number, cls: "dragging" | "drop-parent"): void {
     this.renderer.nodeEl(id)?.classList.add(cls);
-    if (cls === "drop-child" || cls === "drop-parent") {
-      this.dropMarks.set(id, cls);
-    }
+    if (cls === "drop-parent") this.dropMarks.set(id, cls);
   }
 
   /**
@@ -1774,7 +1778,21 @@ export class MindMap {
         if (m.from >= nd.from && m.from < nd.to) subtree.add(m.id);
       }
     }
-    this.dragging = { ids, subtree };
+    // 祖先が一緒に選ばれている id は、コアの `normalize_selection` が落とす
+    // ので**別々の枝としては数えない**。「複数だと誰が親になるか決まらない」
+    // は本当に独立した枝が 2 つ以上あるときの話で、親＋子孫はコアから見れば
+    // 親 1 つと完全に同じ。数えていたころは、範囲選択で親と子を一緒に掴むと
+    // 線への割り込みだけが盤面から黙って消えていた。
+    const roots = ids.filter((nid) => {
+      const nd = byId.get(nid);
+      if (!nd) return false;
+      return !ids.some((other) => {
+        if (other === nid) return false;
+        const o = byId.get(other);
+        return o !== undefined && nd.from >= o.from && nd.from < o.to;
+      });
+    });
+    this.dragging = { ids, roots, subtree };
     for (const id of subtree) this.markNode(id, "dragging");
     this.updateAdds();
   }
@@ -1793,13 +1811,13 @@ export class MindMap {
     // 呼び出し側は全員 `if (this.dragging)` の中からしか呼ばない
     const dragging = this.dragging;
     if (!dragging) return;
-    const { drop, ambiguous } = resolveDrop({
+    const { drop } = resolveDrop({
       at: this.toWorld(clientX, clientY),
       order: this.order,
       boxes: this.boxes,
       parentOf: this.layout.parentOf,
       dragging: dragging.subtree,
-      single: dragging.ids.length === 1,
+      single: dragging.roots.length === 1,
       preferEdge,
       newGroup,
       polyline: (id) => this.edgePolyline(id),
@@ -1816,11 +1834,17 @@ export class MindMap {
     }
 
     if (drop.kind === "side") {
-      // ルートの脇。その側の辺のすぐ外に、末尾への挿入線を出す
+      // ルートの脇 = **その側の末尾へ**。子にする（pos 0）とまったく同じで、
+      // その側に枝があれば着地点はその列の下端なので、同じ言い方で描く。
       // （行き先は箱から選んでいるので必ず在るが、描き直しと競っていれば
       // 消えていることもある。そのときは印を出さない）
       const rb = this.boxes.get(drop.root);
       if (!rb) return;
+      const last = this.lastKidOf(drop.root, drop.left);
+      if (last) {
+        this.insertMark(last, true, drop.root);
+        return;
+      }
       const p = drop.left ? leftOf(rb) : rightOf(rb);
       const lx = p.x + (GAP.x / 2) * (drop.left ? -1 : 1);
       const half = 16;
@@ -1830,6 +1854,7 @@ export class MindMap {
       this.dropLine.setAttribute("y2", String(p.y + half));
       this.dropLine.setAttribute("visibility", "visible");
       this.dropHint.setAttribute("visibility", "hidden");
+      this.markNode(drop.root, "drop-parent");
       return;
     }
 
@@ -1849,6 +1874,9 @@ export class MindMap {
       this.dropLine.classList.add("slot");
       this.dropLine.setAttribute("visibility", "visible");
       this.dropHint.setAttribute("visibility", "hidden");
+      // 新しいグループでも、親になるのはその木の根
+      const gp = this.layout.parentOf.get(drop.target);
+      if (gp !== undefined) this.markNode(gp, "drop-parent");
       return;
     }
 
@@ -1858,27 +1886,10 @@ export class MindMap {
     const b = this.boxes.get(drop.id);
     if (!b) return;
 
-    // 挿入線だけだと「上の親の末尾」と「下の親の先頭」が同じ場所に出て
-    // 区別できない。どの親につくのかを、その親からの予告線と枠で示す。
-    const parentId =
-      drop.pos === 0 ? drop.id : (this.layout.parentOf.get(drop.id) ?? -1);
-    const showHint = (to: { x: number; y: number }): void => {
-      const p = ambiguous ? this.boxes.get(parentId) : undefined;
-      if (!p) {
-        this.dropHint.setAttribute("visibility", "hidden");
-        return;
-      }
-      // ルートは両側へ伸びるので、親自身の向き（left フラグ）では出口が
-      // 決まらない。**落とし先に近いほうの辺**から出す
-      const out = to.x < p.x + p.w / 2 ? leftOf(p) : rightOf(p);
-      this.dropHint.setAttribute("d", edgePath(out, to));
-      this.dropHint.setAttribute("visibility", "visible");
-      this.markNode(parentId, "drop-parent");
-    };
-
     if (drop.pos === 3) {
       // 線への割り込み。線そのものを光らせて、その真ん中に印を出す。
-      // 「この線の途中に入る」以外の読み方がないので、親の枠までは出さない。
+      // 割り込んだものの親になるのは**その線の上の親**なので、枠はそこに出す
+      // （落とした先が誰の子になるかは、どの落とし方でも同じ言い方で示す）。
       this.dropEdgeId = drop.id;
       this.renderer.edgeEl(drop.id)?.classList.add("drop-edge");
       const pts = this.edgePolyline(drop.id);
@@ -1896,34 +1907,98 @@ export class MindMap {
       this.dropLine.setAttribute("y2", String(m.y + (tx / tl) * half));
       this.dropLine.setAttribute("visibility", "visible");
       this.dropHint.setAttribute("visibility", "hidden");
+      const ep = this.layout.parentOf.get(drop.id);
+      if (ep !== undefined) this.markNode(ep, "drop-parent");
     } else if (drop.pos === 0) {
-      // ring on the target PLUS an insertion line on its outward side,
-      // where the new child will appear
-      this.markNode(drop.id, "drop-child");
-      const dir = dirOf(b.n);
-      const e = growthEdgeOf(b, dir);
-      const lx = e.x + (GAP.x / 2) * dir;
-      const ly = e.y;
-      const half = 16;
-      this.dropLine.setAttribute("x1", String(lx));
-      this.dropLine.setAttribute("y1", String(ly - half));
-      this.dropLine.setAttribute("x2", String(lx));
-      this.dropLine.setAttribute("y2", String(ly + half));
-      this.dropLine.setAttribute("visibility", "visible");
-      showHint({ x: lx, y: ly });
+      // 「その子にする」の着地点は**その親の子の列のいちばん下**。子がいれば
+      // 「最後の子の後ろに入れる」と同じ場所なので、同じ言い方で描く。
+      // 子がいないときだけ、頼る相手が無いので親の脇に縦線を出す
+      const kid = this.lastKidOf(drop.id);
+      if (kid) {
+        this.insertMark(kid, true, drop.id);
+      } else {
+        const dir = dirOf(b.n);
+        const e = growthEdgeOf(b, dir);
+        const lx = e.x + (GAP.x / 2) * dir;
+        const half = 16;
+        this.dropLine.setAttribute("x1", String(lx));
+        this.dropLine.setAttribute("y1", String(e.y - half));
+        this.dropLine.setAttribute("x2", String(lx));
+        this.dropLine.setAttribute("y2", String(e.y + half));
+        this.dropLine.setAttribute("visibility", "visible");
+        // 線が親の辺に接しているので、接続の曲線までは要らない。
+        // ただし「誰の子になるか」の枠は、他の落とし方と同じように出す
+        this.dropHint.setAttribute("visibility", "hidden");
+        this.markNode(drop.id, "drop-parent");
+      }
     } else {
-      // 兄弟軸の上に挿入線を引く（相手の手前 / 後ろ）
-      const cx = b.x + b.w / 2;
-      const cy = b.y + b.h / 2;
-      const off = (b.h / 2 + GAP.y / 2) * (drop.pos === 1 ? -1 : 1);
-      const half = Math.max(b.w / 2, 40);
-      this.dropLine.setAttribute("x1", String(cx - half));
-      this.dropLine.setAttribute("y1", String(cy + off));
-      this.dropLine.setAttribute("x2", String(cx + half));
-      this.dropLine.setAttribute("y2", String(cy + off));
-      this.dropLine.setAttribute("visibility", "visible");
-      showHint({ x: cx - (b.w / 2) * dirOf(b.n), y: cy + off });
+      this.insertMark(b, drop.pos === 2, this.layout.parentOf.get(drop.id) ?? -1);
     }
+  }
+
+  /**
+   * その親の子のうち、いちばん下の箱。子が無ければ null。
+   * 新しい子はそこに足されるので、印もそこへ出す。
+   * `left` を渡すと、その側の子だけを見る（ルートは両側へ伸びるため）。
+   *
+   * **掴んでいる部分木は数に入れない。** 掴んだ枝の箱は元の場所に描かれた
+   * ままなので、数に入れると「自分の下に入る」という印が出る — 掴んだ本人は
+   * これから居なくなるので、着地点は残るほうの末尾でなければならない。
+   */
+  private lastKidOf(parent: number, left?: boolean): Box | null {
+    let hit: Box | null = null;
+    for (const b of this.boxes.values()) {
+      if (this.dragging?.subtree.has(b.n.id)) continue;
+      if (this.layout.parentOf.get(b.n.id) !== parent) continue;
+      if (left !== undefined && b.n.left !== left) continue;
+      if (!hit || b.y + b.h > hit.y + hit.h) hit = b;
+    }
+    return hit;
+  }
+
+  /**
+   * 兄弟軸の上の挿入線と、その親への接続。
+   *
+   * 挿入線だけだと「上の親の末尾」と「下の親の先頭」が同じ場所に出て区別が
+   * つかないので、**どの親につくのかを必ず線で言う**。「子にする」も着地点は
+   * 同じ形（子の列の下端）なので、ここを通って同じ見た目になる。
+   *
+   * 線の横の伸びは**箱ではなく列**から取る。箱ごとに中心と幅で引いていたころは、
+   * 行き先が隣の兄弟へ移るたびに幅の差だけ線が伸び縮みして、数 px カクついた。
+   * 列は付け根の辺（`entryEdgeOf`）を共有し、幅も兄弟の最大で固定できる。
+   */
+  private insertMark(b: Box, below: boolean, parentId: number): void {
+    const dir = dirOf(b.n);
+    const near = entryEdgeOf(b, dir).x; // 親を向いた辺。列で共通
+    let span = 0;
+    for (const k of this.boxes.values()) {
+      if (this.dragging?.subtree.has(k.n.id)) continue;
+      if (this.layout.parentOf.get(k.n.id) !== parentId) continue;
+      if (k.n.left !== b.n.left) continue;
+      span = Math.max(span, k.w);
+    }
+    span = Math.max(span, 80);
+    const cy = b.y + b.h / 2;
+    const off = (b.h / 2 + GAP.y / 2) * (below ? 1 : -1);
+    const OVER = 8; // 付け根側へのはみ出し。線が列に載っているように見せる
+    this.dropLine.setAttribute("x1", String(near - OVER * dir));
+    this.dropLine.setAttribute("y1", String(cy + off));
+    this.dropLine.setAttribute("x2", String(near + span * dir));
+    this.dropLine.setAttribute("y2", String(cy + off));
+    this.dropLine.setAttribute("visibility", "visible");
+
+    const to = { x: near, y: cy + off };
+    const p = this.boxes.get(parentId);
+    if (!p) {
+      this.dropHint.setAttribute("visibility", "hidden");
+      return;
+    }
+    // ルートは両側へ伸びるので、親自身の向き（left フラグ）では出口が
+    // 決まらない。**落とし先に近いほうの辺**から出す
+    const out = to.x < p.x + p.w / 2 ? leftOf(p) : rightOf(p);
+    this.dropHint.setAttribute("d", edgePath(out, to));
+    this.dropHint.setAttribute("visibility", "visible");
+    this.markNode(parentId, "drop-parent");
   }
 
   private stopDragVisuals(): void {

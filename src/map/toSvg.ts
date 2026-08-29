@@ -55,7 +55,6 @@ export async function mapToSvg(args: {
   const stripped: Array<{ el: Element; cls: string }> = [];
   const TRANSIENT = [
     "selected",
-    "drop-child",
     "drop-parent",
     "drop-edge",
     "dragging",
