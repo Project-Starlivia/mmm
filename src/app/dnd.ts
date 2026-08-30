@@ -26,17 +26,44 @@ export function initDrop(deps: {
   openMarkdown: (file: FileSystemFileHandle) => Promise<void>;
   /** 画像がノードの上に落ちた（ノードの外なら呼ばれない） */
   addImages: (files: FileSystemFileHandle[], node: number) => Promise<void>;
-  /** その座標にあるノード（無ければ -1） */
-  nodeAt: (clientX: number, clientY: number) => number;
-  warn: (msg: string) => void;
+  /** 着地点を予告する。`null` で消す。落ちる先のノード（無ければ -1）を返す */
+  markDrop: (at: { x: number; y: number } | null) => number;
+  failed: (msg: string) => void;
 }): void {
+  // **ドラッグしている間ずっと答えが見えている。** 落ちる先が決まっていれば
+  // その行に線を引き、置けないところではブラウザのカーソルがそう言う。
+  // 落としてから「ノードの上へ」と言い直す必要がそもそも無くなる。
+  //
+  // ドラッグ中に読めるのは**種類（MIME）まで**で、名前も中身も `drop` まで
+  // 伏せられている。だが絵かどうかはそれで足りる — 絵だけを掴んでいるなら
+  // 行き先はノードの上に限られ、外では受けないと言い切れる。
+  // 1 つでも絵でないもの（`.md`）が混ざるなら、どこへ落としても開くので受ける。
   window.addEventListener("dragover", (event) => {
-    const items = [...(event.dataTransfer?.items ?? [])];
-    if (items.some((item) => item.kind === "file")) event.preventDefault();
+    const data = event.dataTransfer;
+    const items = [...(data?.items ?? [])].filter((item) => item.kind === "file");
+    if (items.length === 0) return;
+    const onNode = deps.markDrop({ x: event.clientX, y: event.clientY }) !== -1;
+    const onlyImages = items.every((item) => item.type.startsWith("image/"));
+    if (onlyImages && !onNode) {
+      // **受けないと言う。** `preventDefault` を呼ばなければブラウザが既定の
+      // 扱いに戻し、カーソルが拒否の形になって drop も来ない
+      if (data) data.dropEffect = "none";
+      return;
+    }
+    event.preventDefault(); // これを言わないと drop が来ない
+    if (data) data.dropEffect = "copy";
+  });
+
+  // 窓から出ていったら予告は消す（戻ってくれば dragover がまた点ける）
+  window.addEventListener("dragleave", (event) => {
+    if (event.relatedTarget === null) deps.markDrop(null);
   });
 
   window.addEventListener("drop", (event) => {
     event.preventDefault();
+    // 行き先はこの点で決まる。読んでから予告を畳む
+    const node = deps.markDrop({ x: event.clientX, y: event.clientY });
+    deps.markDrop(null);
     const data = event.dataTransfer;
     if (!data) return;
     void (async () => {
@@ -47,16 +74,13 @@ export function initDrop(deps: {
         return;
       }
       const images = files.filter((f) => IMAGE.test(f.name));
-      if (images.length === 0) return;
-      const node = deps.nodeAt(event.clientX, event.clientY);
-      if (node === -1) {
-        deps.warn("Drop images onto a node");
-        return;
-      }
+      // ノードの外へ落ちた絵は、そもそもここまで来ない（dragover が受けて
+      // いない）。来るのは `.md` に混ざって落ちた分だけなので、黙って置かない
+      if (images.length === 0 || node === -1) return;
       await deps.addImages(images, node);
     })().catch((error) => {
       console.error("drop failed:", error);
-      deps.warn("Could not open the dropped file");
+      deps.failed("Couldn't open the dropped file");
     });
   });
 }

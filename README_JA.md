@@ -1,9 +1,9 @@
 # mmm
 
-**markdown / mindmap / mirror** — 双方向に編集できる Markdown ⇄ マインド
-マップエディタ。
+**markdown / mindmap / mirror** — 双方向に編集できる Markdown ⇄ Mindmap
+エディタ。
 
-実体はただの `.md` ファイル。マインドマップは、その md を空間的に見るための
+実体はただの `.md` ファイル。Mindmap は、その md を空間的に見るための
 もう一つの窓でしかない。
 
 詳しい仕様は [docs/spec.md](docs/spec.md)([English README](README.md))。
@@ -28,3 +28,7 @@ mmm 自体は MIT([LICENSE](LICENSE))。
 
 mmm 自体も成果物も無保証で、動作や内容の正しさを保証しない。それによって
 生じたいかなるトラブル・損失・損害についても、誰も責任を負わない。
+
+## クレジット
+
+メニューや帯の絵は [Lucide](https://lucide.dev)（ISC License）からいただきました。

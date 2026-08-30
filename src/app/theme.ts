@@ -1,14 +1,19 @@
-// 見た目の好み: ブランドカラーと、ライト/ダーク（既定は OS 設定、
+// 見た目の好み: アクセントカラーと、ライト/ダーク（既定は OS 設定、
 // 分からなければダーク）。どちらも保存して、次のセッションでもそのまま。
 
 import { LS_COLOR, LS_THEME, load, store } from "./persist.ts";
 import { logoInner, logoSvg } from "./logo.ts";
 
-/** 既定のブランドカラー。style.css の `--accent` の初期値と同じ。 */
+/** 既定のアクセントカラー。style.css の `--accent` の初期値と同じ。 */
 const DEFAULT_COLOR = "#5932ff";
 
-/** favicon は data URL なので、色を実値で埋める必要がある。 */
-function applyFavicon(color: string): void {
+// favicon は**色と未保存の印**の 2 つで決まる。片方だけ変わっても描き直す
+// ので、両方をここが覚えておく（呼ぶ側に「前は何色だったか」を持たせない）
+let faviconColor = DEFAULT_COLOR;
+let faviconDirty = false;
+
+/** favicon は data URL なので、色も印も実値で埋める必要がある。 */
+function applyFavicon(): void {
   const found = document.querySelector('link[rel="icon"]');
   // 型は名乗らせず確かめる。`<link rel=icon>` でないものが居たら作り直す
   let link: HTMLLinkElement;
@@ -19,7 +24,8 @@ function applyFavicon(color: string): void {
     link.rel = "icon";
     document.head.append(link);
   }
-  link.href = `data:image/svg+xml,${encodeURIComponent(logoSvg(color))}`;
+  const svg = logoSvg(faviconColor, faviconDirty);
+  link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 function applyColor(hex: string): void {
@@ -32,7 +38,8 @@ function applyColor(hex: string): void {
   const rootStyle = document.documentElement.style;
   rootStyle.setProperty("--accent", c);
   rootStyle.setProperty("--accent-soft", `rgba(${r}, ${g}, ${b}, 0.2)`);
-  applyFavicon(c);
+  faviconColor = c;
+  applyFavicon();
   store(LS_COLOR, c);
 }
 
@@ -46,7 +53,13 @@ export function initTheme(args: {
   /** topbar の `<svg id="logo">`。中身は logo.ts が入れる */
   logo: SVGSVGElement;
   setEditorTheme: (dark: boolean) => void;
-}): { toggle: () => void; isLight: () => boolean; pickColor: () => void } {
+}): {
+  toggle: () => void;
+  isLight: () => boolean;
+  pickColor: () => void;
+  /** 未保存かどうかが変わった。タブの印を描き直す（帯の `●` と同じ話） */
+  setDirty: (dirty: boolean) => void;
+} {
   const { logo } = args;
 
   // ロゴの形の源は logo.ts ひとつ。topbar も favicon もここから作る
@@ -54,7 +67,7 @@ export function initTheme(args: {
   // 誰も気づけない）。色は currentColor = --accent。
   logo.insertAdjacentHTML("beforeend", logoInner());
 
-  // ---- ブランドカラー ----
+  // ---- アクセントカラー ----
   const colorInput = document.createElement("input");
   colorInput.type = "color";
   // ロゴの下に（見えない形で）置く。ネイティブのピッカーが画面外ではなく
@@ -106,5 +119,13 @@ export function initTheme(args: {
   const osLight = window.matchMedia?.("(prefers-color-scheme: light)").matches;
   applyTheme(saved ?? (osLight ? "light" : "dark"));
   applyColor(load(LS_COLOR) ?? DEFAULT_COLOR);
-  return { toggle, isLight, pickColor };
+
+  const setDirty = (dirty: boolean): void => {
+    // 変わっていないなら描き直さない。data URL の組み立てと favicon の
+    // 差し替えは打鍵のたびに起きうるので、同じ絵を作り直さない
+    if (dirty === faviconDirty) return;
+    faviconDirty = dirty;
+    applyFavicon();
+  };
+  return { toggle, isLight, pickColor, setDirty };
 }

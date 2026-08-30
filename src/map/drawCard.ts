@@ -91,10 +91,11 @@ function image(
   r: Extract<CardRow, { kind: "img" }>,
   at: CardSpot,
   imageUrl: (path: string) => string | null,
+  hint: string | null,
 ): SVGElement[] {
   const url = imageUrl(r.path);
   if (url !== null) return [picture(url, at)];
-  // まだ読めていない（許可待ち / ファイルが無い）。読めたときに配置が
+  // まだ読めていない（握っていない / ファイルが無い）。読めたときに配置が
   // 飛ばないよう、同じ大きさの場所取りを置く
   const { x, y, w, h } = at.rect;
   const box = svgEl("rect", {
@@ -105,15 +106,29 @@ function image(
     width: w,
     height: h,
   });
+  // **黙って空にしない。** 読めない理由は 4 通りあるのに症状は 1 つなので、
+  // 場所取りが自分で言う。握っていないだけなら、ここが入口も兼ねる
+  const mid = y + h / 2;
   const name = svgEl("text", {
     class: "img-name",
     "data-card": at.spot,
     x: x + w / 2,
-    y: y + h / 2,
+    y: hint === null ? mid : mid - 7,
     "text-anchor": "middle",
   });
   name.textContent = r.name;
-  return [box, name];
+  if (hint === null) return [box, name];
+  // 入口は**この字だけ**。場所取りそのものは選択のままにしておく
+  // （2 つの意味を 1 つの当たり判定に乗せない）
+  const link = svgEl("text", {
+    class: "img-connect",
+    "data-connect": "1",
+    x: x + w / 2,
+    y: mid + 8,
+    "text-anchor": "middle",
+  });
+  link.textContent = hint;
+  return [box, name, link];
 }
 
 function code(
@@ -161,6 +176,7 @@ export function drawCard(
   r: CardRow,
   at: CardSpot,
   imageUrl: (path: string) => string | null,
+  imageHint: string | null,
 ): SVGElement[] {
   const body =
     r.kind === "link"
@@ -168,7 +184,7 @@ export function drawCard(
       : r.kind === "svg"
         ? inlineSvg(r, at)
         : r.kind === "img"
-          ? image(r, at, imageUrl)
+          ? image(r, at, imageUrl, imageHint)
           : code(r, at);
   return [separator(at), ...body];
 }

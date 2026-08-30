@@ -26,9 +26,18 @@ export function initForm(deps: FormDeps): {
   // 住む場所だけが `#form-picker` の持ちもの
   const box = paneTool("form-picker");
   box.classList.add("group");
-  const bHead = button("H", "Write the tree as headings");
-  const bHybrid = button("2+", "Headings above, list items below — press again to move the boundary");
-  const bList = button("L", "Write the tree as a list");
+  // 顔は **.md に実際に書かれる字**（`#` と `-`）。`H` / `L` は Heading /
+  // List という英語の頭文字で、書かれるものを指していなかった。
+  //
+  // 真ん中だけ数字なのは、そこだけが**値を持つ**から — 境目の深さは
+  // 押すたびに巡回し、次にどこへ行くかはこのボタンにしか出ていない
+  // （`#/-` のような記号にすると、その値が消える）。
+  // 3 つは種類ではなく**同じ物差しの上の 3 点**: 全部 `#` → 途中から → 全部 `-`。
+  const bHead = button("#", "Write the tree as headings");
+  // 境目が**いまどこか**はボタンの顔（`2+`）が言っているので、hover は
+  // 2 つの領域と、押せば動くことだけを言う
+  const bHybrid = button("2+", "Headings above, a list below — press to move");
+  const bList = button("-", "Write the tree as a list");
   box.append(bHead, bHybrid, bList);
   deps.pane.append(box);
 

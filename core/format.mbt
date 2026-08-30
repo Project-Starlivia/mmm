@@ -209,7 +209,36 @@ fn indent_edit(
 fn append_content_edit(i : Int, line : String) -> Edit {
   let at = st.nodes[i].content_end
   let col = content_col_for(st.nodes[i].depth)
-  let body = if col > 0 { spaces(col) + line } else { line }
+  let body = if col > 0 { indent_body(line, col) } else { line }
   let (insert, _) = block_insert(at, body + eol)
   Edit::{ from: at, to: at, insert, removed: "" }
+}
+
+///|
+/// 中身を `col` 桁へ字下げする。**行が複数あっても全部**。
+///
+/// コードフェンス（` ``` ` の開きと閉じ）のように 2 行以上を一度に足すとき、
+/// 先頭だけ字下げすると 2 行目から列 0 に落ちる。リストの形で書かれた文書では
+/// そこで外の Markdown パーサがリストを閉じ、続く兄弟が迷子になる
+/// （`append_content_edit` の上のコメントにある事故が、複数行で再演する）。
+///
+/// **空行も字下げする。** 塊の中の空行は「余分な空白」ではなく、その塊の
+/// 基準列そのもの — コードフェンスの中なら、字下げを削った行は本文より浅く
+/// なり、外のパーサはそこで項目を閉じる。中身が空のまま置かれた本文行は、
+/// 打ち始める場所でもあるので、最初から正しい列に無いと打った字が列 0 に落ちる。
+fn indent_body(body : String, col : Int) -> String {
+  let pad = spaces(col)
+  let sb = StringBuilder::new()
+  let mut start = 0
+  for p = 0; p <= body.length(); p = p + 1 {
+    if p == body.length() || code_at(body, p) == 10 {
+      sb.write_string(pad)
+      sb.write_string(slice(body, start, p))
+      if p < body.length() {
+        sb.write_string("\n")
+      }
+      start = p + 1
+    }
+  }
+  sb.to_string()
 }

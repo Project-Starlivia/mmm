@@ -15,28 +15,29 @@
 import { icon } from "../icons.ts";
 import { paneTool } from "./paneTool.ts";
 
-/** 分割線の居場所。左端 = md が無い / 真ん中 = 両方 / 右端 = マップが無い */
+/**
+ * 分割線の居場所。左端 = md が無い / 真ん中 = 両方 / 右端 = マップが無い。
+ *
+ * **名前は「その姿」であって「その一手」ではない。** 矢印が言うべきなのは
+ * 押した先で何が見えているかで、何を出すのか隠すのかではない — 出す/隠すで
+ * 言うと、同じ 3 か所を行き来する話が 4 通りの動詞に散る。姿に名前を付ければ
+ * **数は 3 つ**で、居場所の定義と同じ行に住む。
+ *
+ * **画面に `pane` とは書かない。** 見えているものの名前は Markdown と
+ * Mindmap の 2 つで、`pane` は器の呼び名（＝こちらの都合）でしかない。
+ * 真ん中だけ両方を並べるのは、「両方」と言うために要る語が他に無いから
+ * — 器の名前を借りるくらいなら、中身の名前を 2 つ並べる。
+ */
 const SPOTS = [
-  { md: false, map: true },
-  { md: true, map: true },
-  { md: true, map: false },
+  { md: false, map: true, name: "Mindmap only" },
+  { md: true, map: true, name: "Markdown + Mindmap" },
+  { md: true, map: false, name: "Markdown only" },
 ] as const;
 
 type Vis = { md: boolean; map: boolean };
 
 const spotOf = (v: Vis): number =>
   SPOTS.findIndex((s) => s.md === v.md && s.map === v.map);
-
-/** その一手で何が起きるかを言う（矢印は向きを変えないので、言葉が担う） */
-function describe(from: number, to: number): string {
-  const a = SPOTS[from];
-  const b = SPOTS[to];
-  if (a === undefined || b === undefined) return "";
-  if (a.md !== b.md) {
-    return b.md ? "Show the Markdown pane" : "Hide the Markdown pane";
-  }
-  return b.map ? "Show the map" : "Hide the map";
-}
 
 export function initPanes(args: {
   mdPane: HTMLElement;
@@ -69,8 +70,12 @@ export function initPanes(args: {
     const spot = spotOf(v);
     goLeft.disabled = spot <= 0;
     goRight.disabled = spot >= SPOTS.length - 1;
-    goLeft.title = describe(spot, spot - 1);
-    goRight.title = describe(spot, spot + 1);
+    // 絵しか持たない矢印。名前は動くたび変わる — 押す前に何が起きるかを
+    // 言い切る文言が、そのままアクセシブルネームにもなる
+    goLeft.title = SPOTS[spot - 1]?.name ?? "";
+    goLeft.setAttribute("aria-label", goLeft.title);
+    goRight.title = SPOTS[spot + 1]?.name ?? "";
+    goRight.setAttribute("aria-label", goRight.title);
     // focus must not stay in a hidden pane
     if (!v.md && mdPane.contains(document.activeElement)) mapPane.focus();
     if (!v.map && mapPane.contains(document.activeElement)) args.focusEditor();
@@ -151,7 +156,7 @@ export function initPanes(args: {
 function arrowButton(dir: "left" | "right"): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  const svg = icon("chevron");
+  const svg = icon("chevron-down");
   svg.classList.add(dir === "left" ? "point-left" : "point-right");
   button.append(svg);
   return button;

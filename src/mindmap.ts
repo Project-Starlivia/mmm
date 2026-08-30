@@ -56,6 +56,7 @@ import { mapToSvg } from "./map/toSvg.ts";
 import { svgEl } from "./map/svg.ts";
 import { icon } from "./icons.ts";
 import { paneTool } from "./app/paneTool.ts";
+import { paneHint } from "./app/hint.ts";
 
 export interface MapHost {
   /** いまの文書（テキスト・ノード・フェンスの組）。必ず同じ rev のもの */
@@ -63,10 +64,20 @@ export interface MapHost {
   /** objectURL for a local image path (relative to the md); null while
    * loading / until folder permission is granted */
   imageUrl(path: string): string | null;
+  /** 読めていない場所取りに添える字。握っていないときだけ（他は null） */
+  imageHint(): string | null;
+  /** その字が押された。画像フォルダを繋ぎ直す */
+  connectAssets(): void;
   /** その場で描いて、画像としてこのノードに貼る */
   addDrawing(id: number): void;
+  /**
+   * いま画像を足せない理由。足せるなら null。
+   * **押す前に分かることは、押す前に言う**ための問い合わせ。
+   */
   /** クリップボードの URL を、名前を付けられる形でこのノードに貼る */
   addLink(id: number): void;
+  /** 空のコードフェンスをこのノードに足し、その場で打てる状態にする */
+  addCode(id: number): void;
   /** その範囲を書き換える（カードをその場で直したとき） */
   replaceText(from: number, to: number, text: string): void;
   selection(): Set<number>;
@@ -162,7 +173,7 @@ const NO_IDS: ReadonlySet<number> = new Set<number>();
  *  わずかに動いてもドラッグに化けないよう、ノードにもカードにも同じ値を使う */
 const DRAG_SLOP2 = 64;
 
-export class MindMap {
+export class Mindmap {
   private pane: HTMLElement;
   private host: MapHost;
   private svg: SVGSVGElement;
@@ -285,10 +296,10 @@ export class MindMap {
     this.editBox.append(this.editInk, this.cardEditor);
     pane.append(this.editBox);
 
-    this.hint = document.createElement("div");
-    this.hint.id = "map-hint";
-    this.hint.innerHTML =
-      "Press Enter to create the first node<br>(or write a # heading in the editor)";
+    // **マップからの始め方だけを言う。** md からの始め方は md ペイン自身が
+    // 同じ器で言う（app/hint.ts）ので、こちらから隣のペインを指さない
+    // — 片方を隠しているときは、見えているほうの入口だけが残る
+    this.hint = paneHint("Press ", "Enter", " to create the first node");
     this.hint.style.display = "none";
     pane.append(this.hint);
 
@@ -300,8 +311,11 @@ export class MindMap {
     const centerTool = paneTool("map-center");
     const centerBtn = document.createElement("button");
     centerBtn.type = "button";
-    centerBtn.title = "Center on the selection, or the root — Home";
-    centerBtn.append(icon("target"));
+    centerBtn.title = "Center the view — Home";
+    // 絵しか持たない。名前は title に頼らず言い切る（title はホバーの
+    // 保険としてそのまま残す）
+    centerBtn.setAttribute("aria-label", "Center the view");
+    centerBtn.append(icon("crosshair"));
     centerBtn.addEventListener("click", () => this.centerOnTarget());
     centerTool.append(centerBtn);
     pane.append(centerTool);
@@ -357,6 +371,9 @@ export class MindMap {
 
   render(): void {
     const doc = this.host.doc();
+    // **まだ 1 つもノードが無いときだけ。** md 側の同じ言い出しも
+    // まったく同じ判断で出入りする（決めるのは applySnap ひとつ）—
+    // 対で出るものが別々の理由で動くと、対に見えなくなる
     this.hint.style.display = doc.nodes.length === 0 ? "flex" : "none";
 
     const L = layoutMap(doc);
@@ -387,6 +404,7 @@ export class MindMap {
     this.renderer.draw({
       layout: L,
       imageUrl: (path) => this.host.imageUrl(path),
+      imageHint: this.host.imageHint(),
     });
     this.paintState();
 
@@ -1197,6 +1215,7 @@ export class MindMap {
       // 子 1 つだけなら `Tab` のほうが速い
       const r = this.plusBtn.getBoundingClientRect();
       this.menu.show(r.right + 4, r.top, this.addItems(this.hoverId));
+      this.menu.focusFirst();
     });
 
     // open link cards
@@ -1211,6 +1230,11 @@ export class MindMap {
       const kill = this.cardAt(e.clientX, e.clientY, "data-kill");
       if (kill) {
         this.host.deleteCard(kill);
+        return;
+      }
+      // 読めていない場所取りの「繋ぐ」の字。**場所取りそのものは選択のまま**
+      if (targetIn(e, ".img-connect")) {
+        this.host.connectAssets();
         return;
       }
       const pick = this.cardAt(e.clientX, e.clientY, "data-card");
@@ -1246,6 +1270,7 @@ export class MindMap {
       }
       if (!this.host.selection().has(id)) this.host.setSelection([id], id);
       this.menu.show(e.clientX, e.clientY, this.menuItems());
+      this.menu.focusFirst();
     });
 
     // ラベルの入力欄。Enter / Esc / Mod+Enter はどれも**確定**で、
@@ -1335,6 +1360,25 @@ export class MindMap {
 
   /** Node whose box contains the given client position, or -1. Iterates in
    * reverse document order so the topmost-drawn box wins when boxes touch. */
+  /**
+   * 落ちてくる絵の着地点を予告する。`null` を渡せば消す。返すのは落ちる先の
+   * ノード（無ければ -1）で、呼ぶ側はそれで受け取れるかを決められる。
+   *
+   * 着地は必ず**そのノードの本文の末尾**（`insertContent` がそこへ足す）。
+   * 予告するのは「どこに入るか」だけで、入った後の姿ではない — カードの
+   * ドラッグと同じ割り切りで、線は今ある行の隙間に引く。絵の実寸を先読み
+   * して箱を膨らませる投機的なレイアウトは持たない。
+   *
+   * 器は `#drop-line` を使い回す。カードのドラッグと同時には起きない。
+   */
+  markFileDrop(at: { x: number; y: number } | null): number {
+    const id = at === null ? -1 : this.nodeAt(at.x, at.y);
+    const b = id === -1 ? undefined : this.boxes.get(id);
+    this.cardDrop = b ? { node: id, index: b.rows.length } : null;
+    this.showCardDrop();
+    return id;
+  }
+
   /** その点にあるノード（無ければ -1）。落ちてきたものの宛先を決めるのに使う */
   nodeAt(clientX: number, clientY: number): number {
     const w = this.toWorld(clientX, clientY);
@@ -1418,6 +1462,9 @@ export class MindMap {
     const mod = e.ctrlKey || e.metaKey;
     const anchor = this.host.anchor();
     const sel = this.host.selection();
+    // **ちょうど 1 つのノードを指しているか。** 宛先が 1 つに決まらない操作
+    // （編集・描く・リンク・コード）はこれを見る。同じ概念はメニュー側も
+    // 使う（solo()）— 概念が 1 つなら綴りも 1 つ
     const nodes = this.host.doc().nodes;
 
     // 選択（無ければルート）を画面の中心へ。マップにしか効かないので、
@@ -1435,22 +1482,27 @@ export class MindMap {
     }
     // その場で描いて貼る。**空ノードの打ち始めより前**に置く — 後ろだと
     // 名前の無いノードで `D` が文字入力に化ける
-    if (key === "D" && !mod && !e.altKey && anchor !== -1 && sel.size <= 1) {
+    if (key === "D" && !mod && !e.altKey && this.solo() !== -1) {
       this.host.addDrawing(anchor);
       e.preventDefault();
       return;
     }
     // クリップボードの URL をリンクとして貼り、そのまま題を打てる状態にする。
     // `D` と同じく**空ノードの打ち始めより前**に置く
-    if (key === "L" && !mod && !e.altKey && anchor !== -1 && sel.size <= 1) {
+    if (key === "L" && !mod && !e.altKey && this.solo() !== -1) {
       this.host.addLink(anchor);
+      e.preventDefault();
+      return;
+    }
+    // 空のコードフェンスを足して、そのまま打てる状態にする（`D` / `L` と同じ）
+    if (key === "C" && !mod && !e.altKey && this.solo() !== -1) {
+      this.host.addCode(anchor);
       e.preventDefault();
       return;
     }
     // 名前がまだ無いノード。ここでは「足す」より「埋める」ほうが要る
     const blank =
-      anchor !== -1 &&
-      sel.size <= 1 &&
+      this.solo() !== -1 &&
       (nodes.find((n) => n.id === anchor)?.label ?? "").trim() === "";
 
     // 名前が無いなら、打ち始めればそのまま書ける（Enter を挟ませない）。
@@ -1472,7 +1524,7 @@ export class MindMap {
     // edit the label
     if (key === "Enter" && mod) {
       if (nodes.length === 0) this.host.addRoot();
-      else if (anchor !== -1 && sel.size <= 1) this.host.editRequested(anchor);
+      else if (this.solo() !== -1) this.host.editRequested(anchor);
       e.preventDefault();
       return;
     }
@@ -1758,9 +1810,19 @@ export class MindMap {
     ];
   }
 
+  /**
+   * ちょうど 1 つのノードを指しているなら、その id。指していない・複数
+   * 選んでいるなら -1。**宛先が 1 つに決まらない操作の、唯一の物差し** —
+   * キー（Shift+D/L/C・Mod+Enter）とメニューの行の沈み方が同じこれを見る。
+   */
+  private solo(): number {
+    return this.host.selection().size <= 1 ? this.host.anchor() : -1;
+  }
+
   private menuItems(): MenuEntry[] {
     const anchor = this.host.anchor();
     const multi = this.host.selection().size > 1;
+    const solo = this.solo() !== -1;
     const node = this.host.doc().nodes.find((n) => n.id === anchor);
     const folded = node?.hidden ?? false;
     // 根はどのグループにも属さない（コアでは group 0 に丸められる）ので、
@@ -1776,43 +1838,68 @@ export class MindMap {
         disabled: multi,
         items: this.addItems(anchor),
       },
-      { label: "Rename", key: "Mod+Enter", run: () => this.host.editRequested(anchor), disabled: multi },
+      {
+        label: "Rename",
+        key: "Mod+Enter",
+        mark: "pencil",
+        run: () => this.host.editRequested(anchor),
+        disabled: multi,
+      },
       "sep",
       {
-        // キーだけでなく、ここからも指定・解除できるように
+        // キーだけでなく、ここからも指定・解除できるように。
+        // 絵も字と同じ向きを言う（畳むなら内へ、開くなら外へ）
         label: folded ? "Show (unfold)" : "Hide (fold)",
         key: "Shift+H",
+        mark: folded ? "chevrons-up-down" : "chevrons-down-up",
         run: () => this.host.toggleHidden(anchor),
         disabled: anchor === -1,
       },
       {
         label: "Flip side",
+        mark: "flip-horizontal",
         run: () => this.host.flipSide(anchor),
         disabled: anchor === -1 || isRoot,
       },
       "sep",
-      { label: "Copy", key: "Mod+C", run: () => this.host.copySelection(false) },
-      { label: "Cut", key: "Mod+X", run: () => this.host.copySelection(true) },
-      { label: "Paste", key: "Mod+V", run: () => this.host.paste(), disabled: multi },
+      { label: "Copy", key: "Mod+C", mark: "copy", run: () => this.host.copySelection(false) },
+      { label: "Cut", key: "Mod+X", mark: "scissors", run: () => this.host.copySelection(true) },
+      {
+        label: "Paste",
+        key: "Mod+V",
+        mark: "clipboard-paste",
+        run: () => this.host.paste(),
+        disabled: multi,
+      },
       "sep",
       // この枝の出し方。ヘッダの書き出しと同じ並びで、対象だけが違う。
       // 平らに 4 行足すと右クリックが伸びるので、入れ子に畳む
-      { label: "Export", items: this.host.exportWays(), disabled: anchor === -1 },
+      { label: "Export", mark: "download", items: this.host.exportWays(), disabled: anchor === -1 },
       "sep",
       {
         label: "Draw",
         key: "Shift+D",
+        mark: "paintbrush",
         run: () => this.host.addDrawing(anchor),
-        disabled: anchor === -1 || multi,
+        disabled: !solo,
       },
       {
         label: "Link",
         key: "Shift+L",
+        mark: "link",
         run: () => this.host.addLink(anchor),
-        disabled: anchor === -1 || multi,
+        disabled: !solo,
+      },
+      {
+        // 置き場所を要らない（画像と違ってフェンスは .md の中で完結する）
+        label: "Code",
+        key: "Shift+C",
+        mark: "code",
+        run: () => this.host.addCode(anchor),
+        disabled: !solo,
       },
       "sep",
-      { label: "Delete", key: "Del", run: () => this.host.deleteSelection() },
+      { label: "Delete", key: "Del", mark: "trash-2", run: () => this.host.deleteSelection() },
     ];
   }
 
