@@ -26,6 +26,7 @@ import {
 } from "@codemirror/language";
 import { oneDarkHighlightStyle, oneDarkTheme } from "@codemirror/theme-one-dark";
 import type { EditOp } from "./coreApi.ts";
+import { paneHint } from "./app/hint.ts";
 import type { Span } from "./caret.ts";
 
 /**
@@ -80,6 +81,9 @@ const highlightField = StateField.define<DecorationSet>({
 export class MdEditor {
   readonly view: EditorView;
   private themeComp = new Compartment();
+  /** まだノードが 1 つも無いときに出る言い出し。出す／引っ込めるを決めるのは
+   *  applySnap（main.ts）で、マップ側の同じ言い出しと 1 つの判断を共有する */
+  private hint: HTMLDivElement;
 
   constructor(
     parent: HTMLElement,
@@ -88,12 +92,23 @@ export class MdEditor {
      *  瞬間も呼ばれるので、受け手は印を消せる */
     onCaret: (spans: Span[]) => void,
   ) {
+    // 空のときの言い出し。**マップと同じ器**（app/hint.ts）を、同じように
+    // ペインの真ん中へ浮かべる — CodeMirror の `placeholder` は 1 行目の
+    // 頭に出るので、対のもう片方（マップの中央）と上下も寄せも揃わない。
+    // 見えるのはこちらで、読み上げには下の `aria-placeholder` が答える
+    this.hint = paneHint("Write a ", "# heading", " to start");
+    parent.append(this.hint);
+
     this.view = new EditorView({
       parent,
       state: EditorState.create({
         doc: "",
         extensions: [
           lineNumbers(),
+          // 見た目は上の `.pane-hint` が持つので、ここは読み上げにだけ答える
+          EditorView.contentAttributes.of({
+            "aria-placeholder": "Write a # heading to start",
+          }),
           highlightField,
           // フェンスの中も言語で色を付ける。言語一覧はマップのコードカードと
           // 同じものを渡す — 同じフェンスが 2 つの窓で違う色になると、
@@ -149,6 +164,16 @@ export class MdEditor {
         ],
       }),
     });
+  }
+
+  /**
+   * 白紙の言い出しを出す／引っ込める。**判定はここが持たない** —
+   * 「まだ 1 つもノードが無いか」はコアのスナップショットが答えることで、
+   * md ペインからは見えない。呼ぶのは applySnap（main.ts）1 か所で、
+   * マップ側の同じ言い出しと**同じ 1 つの判断**から両方が動く。
+   */
+  showHint(on: boolean): void {
+    this.hint.style.display = on ? "flex" : "none";
   }
 
   /** Replace the entire document (file open / new). */

@@ -42,15 +42,15 @@ const MAX_DPR = 2;
 const PALETTE = ["#111111", "#d92d20", "#1570ef", "#0f9d58", "#e07000"] as const;
 
 /**
- * ブランドカラーも 1 本の筆にする。**綴りは持たない** — ロゴと同じ
+ * アクセントカラーも 1 本の筆にする。**綴りは持たない** — ロゴと同じ
  * `--accent` を引くので、色を変えれば筆も変わる。
  *
  * 引いた値は**名乗らせず確かめる**。6 桁の hex でなければ既定へ落とさず、
  * その筆を出さない（読めない色を黙って別の色にすり替えない）。
- * 並びの**末尾**に置くのは、既定にすると淡いブランドカラーのときに
+ * 並びの**末尾**に置くのは、既定にすると淡いアクセントカラーのときに
  * 紙の上で消えるため — 選べば使えるが、黙って選ばれてはいない。
  */
-function brandInk(): string | null {
+function accentInk(): string | null {
   const value = getComputedStyle(document.documentElement)
     .getPropertyValue("--accent")
     .trim();
@@ -119,6 +119,7 @@ function inkFace(value: Ink): HTMLButtonElement {
   if (value.kind === "eraser") {
     b.className = "draw-ink draw-eraser";
     b.title = "Eraser";
+    b.setAttribute("aria-label", "Eraser");
     b.append(icon("eraser"));
     return b;
   }
@@ -126,6 +127,7 @@ function inkFace(value: Ink): HTMLButtonElement {
   // 色そのものは道具の持ち物。CSS には形だけを置く
   b.style.setProperty("--ink-swatch", value.color);
   b.title = value.color;
+  b.setAttribute("aria-label", `Color ${value.color}`);
   return b;
 }
 
@@ -169,9 +171,9 @@ export function showDrawing(): Promise<Blob | null> {
     // 左に置き、**やり直すもの**（Undo / Clear）だけを右へ離す。描くために
     // 選ぶものと、描いたものを取り消すものは種類が違う。
     //
-    // 筆の並びは**窓を開くたびに組む** — ブランドカラーはその間に変わりうる。
-    const brand = brandInk();
-    const palette = brand === null ? PALETTE : [...PALETTE, brand];
+    // 筆の並びは**窓を開くたびに組む** — アクセントカラーはその間に変わりうる。
+    const accent = accentInk();
+    const palette = accent === null ? PALETTE : [...PALETTE, accent];
     const inkList: readonly Ink[] = [
       ...palette.map((color): Ink => ({ kind: "pen", color })),
       { kind: "eraser" },
@@ -192,6 +194,7 @@ export function showDrawing(): Promise<Blob | null> {
       nibButtons.forEach((b, i) => {
         b.style.setProperty("--nib", `${table[i]}px`);
         b.title = `${table[i]}px`;
+        b.setAttribute("aria-label", `${table[i]}px`);
       });
     };
 

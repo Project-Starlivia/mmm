@@ -8,10 +8,10 @@
 // 新規 / 開く / 保存 が文書ぜんぶを相手にするのと同じ高さにヘッダを置き、
 // 「これ」を相手にする操作は右クリックへ寄せる。
 
-import type { MindMap } from "../mindmap.ts";
+import type { Mindmap } from "../mindmap.ts";
 import { type MenuEntry, openOnClick } from "../map/menu.ts";
 import type { RadialEntry } from "../map/radialMenu.ts";
-import { type IconName, icon, label } from "../icons.ts";
+import { type IconName, icon, label, nod } from "../icons.ts";
 import { LS_WAY, load, store } from "./persist.ts";
 
 /**
@@ -22,11 +22,26 @@ import { LS_WAY, load, store } from "./persist.ts";
 const SCALE = 2;
 
 export interface ExportDeps {
-  map: MindMap;
+  map: Mindmap;
   /** ダウンロード名の元になる、いまのファイル名 */
   name: () => string;
-  notify: (msg: string, isError?: boolean) => void;
+  /** 果たせなかった */
+  failed: (msg: string) => void;
+  /** 出すものが無い。キーから来たときだけここへ落ちる */
+  blocked: (msg: string) => void;
+  /** マップに 1 つも枝が無いか。**押す前に分かるので、押す前に言う** */
+  empty: () => boolean;
 }
+
+/** 出すものが無い理由。ボタンの `title` にも行の hover にも同じ言葉を出す */
+const NOTHING = "Nothing to export yet";
+
+/** `▾` の名乗り。絵しか持たないので、名前は綴りで持つ */
+const CHOOSE = "Choose how to export";
+
+/** 出せたことをボタンが言っている長さ。読めるだけ在って、次に押すときには
+ *  もう「いまの出し方」に戻っている、の間 */
+const HOLD = 1500;
 
 function downloadBlob(blob: Blob, name: string): void {
   const a = document.createElement("a");
@@ -94,7 +109,6 @@ const WAYS: readonly {
   short: string;
   mark: IconName;
   label: string;
-  done: string;
   out: (svg: SVGSVGElement, base: string) => Promise<void>;
 }[] = [
   {
@@ -102,7 +116,6 @@ const WAYS: readonly {
     short: "SVG",
     mark: "download",
     label: "Download SVG",
-    done: "",
     out: async (svg: SVGSVGElement, base: string): Promise<void> => {
       downloadBlob(
         new Blob([serialize(svg)], { type: "image/svg+xml" }),
@@ -115,7 +128,6 @@ const WAYS: readonly {
     short: "WebP",
     mark: "download",
     label: "Download WebP",
-    done: "",
     out: async (svg: SVGSVGElement, base: string): Promise<void> => {
       downloadBlob(await rasterize(svg, "image/webp"), `${base}.webp`);
     },
@@ -125,7 +137,6 @@ const WAYS: readonly {
     short: "PNG",
     mark: "copy",
     label: "Copy PNG",
-    done: "Image copied",
     out: async (svg: SVGSVGElement): Promise<void> => {
       const png = await rasterize(svg, "image/png");
       await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
@@ -136,7 +147,6 @@ const WAYS: readonly {
     short: "SVG",
     mark: "copy",
     label: "Copy SVG",
-    done: "SVG copied",
     out: async (svg: SVGSVGElement): Promise<void> => {
       const text = serialize(svg);
       await navigator.clipboard.write([
@@ -155,32 +165,43 @@ type Way = (typeof WAYS)[number];
 const wayOf = (saved: string | null): Way =>
   WAYS.find((w) => w.id === saved) ?? WAYS[0];
 
-/** そのやり方で 1 回出す */
-function run(deps: ExportDeps, way: Way, whole: boolean): void {
-  void (async () => {
+/**
+ * そのやり方で 1 回出す。**出せたかを返す** — 済んだらヘッダーのボタンが
+ * チェックで答えるので、答えてよいかを呼ぶ側が知る必要がある。
+ * しくじりはここがしらせに出し、約束は拒まない（呼ぶ側に try を書かせない）。
+ */
+async function run(deps: ExportDeps, way: Way, whole: boolean): Promise<boolean> {
+  try {
     const svg = await deps.map.exportSvg(whole);
     if (!svg) {
-      deps.notify("The map is empty");
-      return;
+      // ボタンは沈めてあるので、ここへ来るのはキー（`Mod+E`）から。
+      // **触って読める言葉と同じものを出す** — 同じ壁に 2 つの綴りを持たない
+      deps.blocked(NOTHING);
+      return false;
     }
     const base = deps.name().replace(/\.(md|markdown|txt)$/i, "") || "mmm";
     await way.out(svg, base);
-    if (way.done !== "") deps.notify(way.done, false);
-  })().catch((error: unknown) => {
+    return true;
+  } catch (error: unknown) {
     console.error("export failed:", error);
-    deps.notify("Export failed", true);
-  });
+    deps.failed("Couldn't export");
+    return false;
+  }
 }
 
 /**
  * 出し方の並び。**ヘッダも右クリックも同じものを開く** — 違うのは対象だけで、
  * `whole` なら全体、そうでなければ選んでいる枝。
- * `chose` はヘッダ用（選んだものを次の既定にする）。
+ *
+ * `header` はヘッダから開いたときの走らせ方。**選ばれた出し方を渡すだけで、
+ * その先はヘッダが持つ**（次の既定にし、済んだらボタンの絵で答える） —
+ * 答える場所がボタンなので、答え方を知っているのもボタンを持つ側。
+ * 無ければここが走らせるだけ（右クリック側。押せば閉じて、それで終わる）。
  */
 export function exportWays(
   deps: ExportDeps,
   whole: boolean,
-  chose?: (way: Way) => void,
+  header?: (way: Way) => void,
 ): MenuEntry[] {
   const entries: MenuEntry[] = [];
   for (const [i, way] of WAYS.entries()) {
@@ -189,9 +210,12 @@ export function exportWays(
     entries.push({
       label: way.label,
       mark: way.mark,
+      // 対象が枝のときは、枝を選んでいること自体が呼び出し側で保証されている
+      // （右クリックの Export は `anchor === -1` で既に閉じている）
+      disabled: whole && deps.empty() && NOTHING,
       run: () => {
-        chose?.(way);
-        run(deps, way, whole);
+        if (header) header(way);
+        else void run(deps, way, whole);
       },
     });
   }
@@ -210,13 +234,23 @@ export function exportWays(
  */
 export function initExport(
   deps: ExportDeps & { button: HTMLButtonElement; wayButton: HTMLButtonElement },
-): { run: () => void; ways: () => RadialEntry[] } {
-  deps.wayButton.replaceChildren(icon("chevron"));
+): { run: () => void; ways: () => RadialEntry[]; refresh: () => void } {
+  deps.wayButton.replaceChildren(icon("chevron-down"));
   let way = wayOf(load(LS_WAY));
   const show = (): void => {
     // 形式が文字、行き先が絵。押す前に何が起きるかが見えている
     deps.button.replaceChildren(...label(way.short, way.mark, true));
-    deps.button.title = `Export the whole map — ${way.label}`;
+    // 出すものが無いなら押せない。**なぜ押せないかも同じ場所が言う** —
+    // ボタンは 1 つしか言えないので、言えるほうを言う
+    const empty = deps.empty();
+    deps.button.disabled = empty;
+    deps.button.title = empty ? NOTHING : `Export the whole Mindmap — ${way.label}`;
+    // **`▾` も一緒に沈む。** 選び直すことは出すことなので（選べばその場で
+    // 出る）、出せないなら選ぶ意味も無い。並びを開いて 4 行とも沈んでいる
+    // のを見せるより、開く前に同じ言葉で言うほうが早い
+    deps.wayButton.disabled = empty;
+    deps.wayButton.title = empty ? NOTHING : CHOOSE;
+    deps.wayButton.setAttribute("aria-label", deps.wayButton.title);
   };
   show();
 
@@ -226,20 +260,56 @@ export function initExport(
     show();
   };
 
-  deps.button.addEventListener("click", () => run(deps, way, true));
+  /**
+   * 出せたことを**ボタンの絵で**言う。しらせを出して残すほどの話ではなく、
+   * 手元には何も現れないので（クリップボードも、ブラウザ任せのダウンロードも）
+   * 押した場所が一度うなずくだけでいい。
+   *
+   * **戻すきっかけは 2 つ。ボタンから離れたときと、離れないまま HOLD が
+   * 経ったとき。** 離れたときだけにすると、`▾` の並びから選んだときや
+   * キーで出したときはポインタがボタンに乗っておらず、離れる瞬間が
+   * 来ないので戻らない。時間だけにすると、次に押したいときまで
+   * 「いまの出し方」が読めないままになる。早く来たほうを採る。
+   */
+  let back: ReturnType<typeof setTimeout> | undefined;
+  const undo = (): void => {
+    if (back === undefined) return;
+    clearTimeout(back);
+    back = undefined;
+    show();
+  };
+  deps.button.addEventListener("pointerleave", undo);
 
-  openOnClick(deps.wayButton, () => exportWays(deps, true, remember));
+  /**
+   * ヘッダから 1 回出す。走っているあいだボタンが回り、出せたらうなずく
+   * （`nod` が決める）。しくじったときは `show()` で戻す — 回していた
+   * かもしれないので、必ず通す
+   */
+  const fire = (chosen: Way): void => {
+    const put = (mark: IconName): void => {
+      deps.button.replaceChildren(...label(chosen.short, mark, true));
+    };
+    void nod(run(deps, chosen, true), put).then((ok) => {
+      if (!ok) return show();
+      clearTimeout(back);
+      back = setTimeout(undo, HOLD);
+    });
+  };
+  /** 選び直して出す。次からの既定にもなる（`▾` の並びと放射メニュー） */
+  const pick = (chosen: Way): void => {
+    remember(chosen);
+    fire(chosen);
+  };
+
+  deps.button.addEventListener("click", () => fire(way));
+
+  openOnClick(deps.wayButton, () => exportWays(deps, true, pick));
 
   return {
-    run: () => run(deps, way, true),
+    run: () => fire(way),
     ways: () =>
-      WAYS.map((w) => ({
-        mark: w.mark,
-        label: w.short,
-        run: () => {
-          remember(w);
-          run(deps, w, true);
-        },
-      })),
+      WAYS.map((w) => ({ mark: w.mark, label: w.short, run: () => pick(w) })),
+    /** 文書が変わった。押せるかどうかを見直す（applySnap から呼ばれる） */
+    refresh: show,
   };
 }

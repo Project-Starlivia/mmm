@@ -24,6 +24,8 @@ export interface Scene {
   layout: Layout;
   /** ローカル画像の objectURL（まだ読めていなければ null） */
   imageUrl: (path: string) => string | null;
+  /** 読めていない場所取りに添える字。握っていないときだけ（他は null） */
+  imageHint: string | null;
 }
 
 /**
@@ -40,6 +42,9 @@ interface NodeShape {
   rows: CardRow[];
   /** rows と同じ並びで、画像だけ解決済みの URL（他は null） */
   urls: (string | null)[];
+  /** 場所取りに添える字。**繋がった瞬間は URL がどれも null のままなので、
+   *  これを姿に載せていないと描き直されない** */
+  hint: string | null;
 }
 
 /** カード 1 枚が、描き直しを要するほど変わったか */
@@ -69,6 +74,7 @@ function sameShape(a: NodeShape | undefined, b: NodeShape): boolean {
     a.buried !== b.buried ||
     a.epoch !== b.epoch ||
     a.label !== b.label ||
+    a.hint !== b.hint ||
     a.rows.length !== b.rows.length
   ) {
     return false;
@@ -134,6 +140,7 @@ export class MapRenderer {
       rows: b.rows,
       // 画像は「まだ読めていない」から「読めた」へ後から変わる
       urls: b.rows.map((r) => (r.kind === "img" ? p.imageUrl(r.path) : null)),
+      hint: p.imageHint,
     };
   }
 
@@ -234,7 +241,7 @@ export class MapRenderer {
             rowY: rowTop(b.rows, i),
             boxW: b.w,
             spot: `${n.id},${i}`,
-          }, p.imageUrl),
+          }, p.imageUrl, p.imageHint),
         );
       }
     }

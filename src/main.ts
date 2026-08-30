@@ -12,7 +12,8 @@ import {
   type Snapshot,
 } from "./coreApi.ts";
 import { MdEditor } from "./editor.ts";
-import { MindMap, type MapHost } from "./mindmap.ts";
+import { Mindmap, type MapHost } from "./mindmap.ts";
+import { handles } from "./app/handles.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
 import { imageFolder, normalizePath, retarget, setImageFolder } from "./app/head.ts";
@@ -23,13 +24,15 @@ import { initTheme } from "./app/theme.ts";
 import { LS_ADDS, load, store, sweep } from "./app/persist.ts";
 import { decidePaste } from "./app/paste.ts";
 import { initDrop } from "./app/dnd.ts";
+import { ask, askText, askYesNo } from "./app/ask.ts";
+import { blocked, failed } from "./app/notice.ts";
 import { initForm } from "./app/form.ts";
 import { showDrawing } from "./app/draw.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { type Span, caretNodes } from "./caret.ts";
 import { onLanguageReady } from "./map/highlight.ts";
-import { type MenuEntry, openOnClick } from "./map/menu.ts";
+import { openOnClick } from "./map/menu.ts";
 import { RadialMenu } from "./map/radialMenu.ts";
 import {
   type CardRef,
@@ -56,6 +59,26 @@ function el<T extends Element>(id: string, kind: abstract new () => T): T {
 
 /** リポジトリの行き先。ここ 1 か所 */
 const REPO = "https://github.com/Project-Starlivia/mmm";
+
+/**
+ * 改名する相手そのものがディスクに無い。
+ *
+ * **画像側とは扱いが違う。** あちらは押せば保存まで案内する駅になった
+ * （`ensurePlace`）が、改名は「保存すれば済む」ではなく「保存するまで
+ * 相手が居ない」— 保存したらもう改名する必要が無いので、駅にならない。
+ */
+const NOTHING_TO_RENAME = "Save the .md first — nothing on disk to rename yet";
+
+/**
+ * その環境が改名を持たない。ファイル名の hover と Files の Rename の行が
+ * 同じものを見る。
+ *
+ * **どのブラウザが、とは言わない。** 持っているのは今のところ Chromium
+ * だけだが（`io.canRename` が実際に見ているのは `move()` があるかどうか）、
+ * 名指しは移り変わるうえ、読む人が確かめようのないことを言っている。
+ * 分かるのは「ここでは無理」までで、そこまでを言う。
+ */
+const NO_RENAME_HERE = "This browser can't rename files";
 
 /** File System Access API が無いブラウザで、Files のできない行と
  *  ショートカットの両方がこの理由を言う。英語の文言はここ 1 か所だけ */
@@ -87,9 +110,14 @@ let anchorId = -1;
  * Delete や Alt+↑↓ が何に効くのか決まらない。
  */
 let picked: CardRef | null = null;
-/** loadText を呼ぶたびに進む世代番号。起動時の前回ファイル読み込みが、
- * その間に New/Open/Drop で別の(空の)文書を開いていた場合まで
- * 上書きしてしまわないためのガード。 */
+/**
+ * loadText を呼ぶたびに進む世代番号。
+ *
+ * **文書を跨いだ非同期は、必ずこれを見てから物を言う。** 待っているあいだに
+ * New/Open/Drop で別の文書へ移っていることがあり、そのまま続けると
+ * **もう開いていない文書の話**をすることになる（リンクで開いたときの本文の
+ * 上書き、繋ぎ直しの誘い）。
+ */
 let docGen = 0;
 let savedText = "";
 /**
@@ -137,23 +165,36 @@ function followDeclaration(tag: string): void {
   // 行って戻っただけなら何も変わっていない。ここで止めないと、動いていない
   // 画像を読み直すだけの往復になる
   if (prev === next) return;
-  // 初めての宣言（prev が null）では、どこから動かすのか分からないので
-  // 本文には触らない。読み直しだけする
-  if (prev !== null) {
-    // 後ろから。前から当てると後続のオフセットが挿入ぶんだけずれる。
-    // 編集ごとに applySnap を呼ぶと画像の枚数だけ再描画が走るので、
-    // 各回の editSets を繋いで最後に 1 度だけ渡す（並びがそのまま適用順）
-    const edits = retarget(doc, prev, next);
-    let snap: Snapshot | null = null;
-    const sets: EditOp[][] = [];
-    for (let i = edits.length - 1; i >= 0; i--) {
-      const e = edits[i];
-      snap = core.replaceText(e.from, e.to, e.insert, tag);
-      sets.push(...snap.editSets);
-    }
-    if (snap) applySnap({ ...snap, editSets: sets }, "follow");
-  }
+  moveImages(prev, next, tag);
   assets.clear(); // 宣言が変わった。画像を読み直す
+}
+
+/**
+ * 宣言が `prev` から `next` へ動いた。**本文の画像パスも一緒に動かす。**
+ *
+ * 頭を書き替えただけでは、本文の `![](./pics/x.webp)` は古い場所を指したまま
+ * 宣言の外に落ちる（読めなくなる）。**宣言と本文は同じ 1 つの引っ越し**なので、
+ * 同じ tag で書いて 1 回の Undo に畳む。
+ *
+ * 初めての宣言（`prev` が null）では触らない — どこから動かすのか分からない。
+ *
+ * 呼ぶ場所は 2 つ。頭を手で打ったとき（`followDeclaration`）と、道具が
+ * 書き替えたとき（`declare`）。**どちらも同じここを通る**。
+ */
+function moveImages(prev: string | null, next: string, tag: string): void {
+  if (prev === null || prev === next) return;
+  // 後ろから。前から当てると後続のオフセットが挿入ぶんだけずれる。
+  // 編集ごとに applySnap を呼ぶと画像の枚数だけ再描画が走るので、
+  // 各回の editSets を繋いで最後に 1 度だけ渡す（並びがそのまま適用順）
+  const edits = retarget(doc, prev, next);
+  let snap: Snapshot | null = null;
+  const sets: EditOp[][] = [];
+  for (let i = edits.length - 1; i >= 0; i--) {
+    const e = edits[i];
+    snap = core.replaceText(e.from, e.to, e.insert, tag);
+    sets.push(...snap.editSets);
+  }
+  if (snap) applySnap({ ...snap, editSets: sets }, "follow");
 }
 
 // ---------- sync ----------
@@ -206,16 +247,28 @@ function applySnap(snap: Snapshot, origin: Origin): void {
     appliedFolder = declaredFolder();
   }
   map.render();
+  // 白紙の言い出し。**出る理由は 1 つ**（まだノードが無い）で、マップ側も
+  // render() の中で同じことを見ている。md ペインからはノードが見えないので、
+  // ここから渡す
+  editor.showHint(doc.nodes.length === 0);
   // render がクラスまで塗り終えているので、ここで塗り直さない
   if (selChanged) syncSelectionViews(false, true);
   updateDirty();
   showName();
+  // 出せるものが在るか無いかが変わりうる。ボタンはそれを佇まいで言う
+  exportApi.refresh();
   form.show(snap.listFrom);
   if (wasEmpty && doc.nodes.length > 0) map.fitView();
 }
 
+/**
+ * 未保存の印。**判定はここ 1 つ**で、帯の `●` とタブの favicon の両方が
+ * 同じ答えを見る（別々に数えると、片方だけ古い状態のまま残る）。
+ */
 function updateDirty(): void {
-  elDirty.hidden = doc.text === savedText;
+  const dirty = doc.text !== savedText;
+  elDirty.hidden = !dirty;
+  theme.setDirty(dirty);
 }
 
 /** いまの文書の名前。保存済みならそのファイル名、まだなら本文から導く */
@@ -233,10 +286,20 @@ function showName(): void {
   const title = name === null ? "mmm" : `${name} - mmm`;
   // 打鍵のたびに呼ばれるので、変わっていないなら DOM に触らない
   if (document.title !== title) document.title = title;
-  // ファイル名欄は flash 中だけ別のことを言っている。終わったら戻る
-  if (flashTimer !== -1) return;
   const shown = docName();
   if (elFilename.textContent !== shown) elFilename.textContent = shown;
+  // **押せるときだけ押せる顔をする。** 名前を押すと改名だが、保存して
+  // いない文書には変える相手がおらず、その環境が改名を持たないこともある。
+  // 理由は Files の Rename の行と同じものを使う（綴りを 2 つ持たない）
+  const why = !io.canRename()
+    ? NO_RENAME_HERE
+    : savedName === null
+      ? NOTHING_TO_RENAME
+      : "";
+  elFilename.classList.toggle("off", why !== "");
+  elFilename.title = why === "" ? "Rename — click" : why;
+  if (why === "") elFilename.setAttribute("tabindex", "0");
+  else elFilename.removeAttribute("tabindex");
 }
 
 /** CardRef からいまのカードを引く。範囲外なら null（選択は落とす）。 */
@@ -400,12 +463,15 @@ const host: MapHost = {
   doc: () => doc,
   addDrawing(id) {
     if (!byId.has(id) || drawingOpen) return;
+    // **窓は無条件に開く。** 置き場所の話は描き終えてから（`attachImage`）—
+    // 落とす・貼るは絵が先に在って置き場所の駅を後から通るのだから、
+    // 描くだけ先に事務を挟むのは形が逆。取りやめても絵は窓に残る
     drawingOpen = true;
     void showDrawing()
       .then((blob) => (blob === null ? undefined : attachImage(id, blob)))
       .catch((error: unknown) => {
         console.error("drawing failed:", error);
-        flashFilename("Could not add the drawing");
+        failed("Couldn't add the drawing");
       })
       .finally(() => {
         drawingOpen = false;
@@ -417,7 +483,7 @@ const host: MapHost = {
     void (async () => {
       const made = linkLine(await navigator.clipboard.readText());
       if (made === null) {
-        flashFilename("Copy a link first");
+        failed("Couldn't read that as a link");
         return;
       }
       insertContentLine(id, made.line, nextTag());
@@ -426,8 +492,29 @@ const host: MapHost = {
       if (index >= 0) map.editCard({ node: id, index }, made.from, made.to);
     })().catch((error: unknown) => {
       console.error("link failed:", error);
-      flashFilename("Could not read the clipboard");
+      failed("Couldn't read the clipboard");
     });
+  },
+  /**
+   * 空のコードフェンスを足して、その場で打てる状態にする。
+   *
+   * 字下げはコアが持つ（リストの形なら項目の中身の列へ、行ごとに）。
+   * カーソルは**本文行の末尾**に置く — 言語は後から開きの行へ足せるが、
+   * まず打ちたいのはコードそのもの。桁を数で決め打ちせず 2 つ目の改行から
+   * 数えるのは、その行の頭にある字下げの幅が形によって変わるため
+   * （末尾に置けば、字下げの後ろから打ち始められる）。
+   */
+  addCode(id) {
+    if (!byId.has(id)) return;
+    insertContentLine(id, "```\n\n```", nextTag());
+    const rows = cardRowsOf(doc, id);
+    const index = rows.length - 1;
+    const row = rows[index];
+    if (!row) return;
+    const text = doc.text.slice(row.from, row.to);
+    const first = text.indexOf("\n");
+    const second = first === -1 ? -1 : text.indexOf("\n", first + 1);
+    map.editCard({ node: id, index }, second === -1 ? text.length : second);
   },
   replaceText(from, to, text) {
     applySnap(core.replaceText(from, to, text, nextTag()), "core");
@@ -638,6 +725,12 @@ const host: MapHost = {
     })().catch(() => {});
   },
   imageUrl: (path) => assets.imageUrl(path),
+  // 握っていないあいだだけ、場所取りが理由と入口を言う
+  imageHint: () => (assets.readable() ? null : "click to connect"),
+  // 入口は Files の行と同じ駅を通る。保存していなければ、そこから案内する
+  connectAssets: () => void (async () => {
+    if (await ensurePlace()) await assets.connect();
+  })(),
   editRequested(id) {
     if (!byId.has(id)) return;
     setSelection([id], id);
@@ -650,10 +743,10 @@ const host: MapHost = {
 // ---------- boot panes ----------
 
 const editor = new MdEditor(mdPane, onUserEdits, onCaret);
-const map = new MindMap(mapPane, host);
+const map = new Mindmap(mapPane, host);
 
 /**
- * 木の書き方（H / n+ / L）。押すとモードを変えて文書ぜんぶを書き直す。
+ * 木の書き方（# / n+ / -）。押すとモードを変えて文書ぜんぶを書き直す。
  * 1 回の undo で戻る（モード自体は undo で戻らないが、読みはモードを
  * 知らないので、テキストが戻ればマップも戻る）。
  */
@@ -669,7 +762,9 @@ const form = initForm({
 const exportDeps = {
   map,
   name: () => docName(),
-  notify: (msg: string, isError = true) => flashFilename(msg, isError),
+  failed,
+  blocked,
+  empty: () => doc.nodes.length === 0,
 };
 
 // ---------- 改行の正規化 (F-010) ----------
@@ -693,6 +788,9 @@ function loadText(text: string, name: string | null): void {
   // ノード**に当てられている。新しい木が入った後で聞き直す
   onCaret(editor.caret());
   map.fitView();
+  // 文書が入れ替わった。**Recent の並びもここで引き直す** — 開く・保存する・
+  // 新規・リンクで開く、全部この 1 か所を通る
+  void refreshRecent();
 }
 
 // ---------- undo / redo ----------
@@ -712,6 +810,38 @@ function doRedo(): void {
 function applyDoc(doc: Doc): void {
   savedText = doc.text;
   loadText(doc.text, doc.name);
+  void offerConnect();
+}
+
+/**
+ * 開いた文書に画像が居るのに、そのフォルダを握っていない。**繋ぎ直しを誘う。**
+ *
+ * 握りはセッションの持ち物なので、別の .md を開いた・保存し直した・
+ * 立ち上げ直した、のどれでもここへ来る。宣言（`image-folder:`）は md に
+ * 残っているから、**どこかはもう分かっていて、指してもらうだけ**。
+ *
+ * 出るのは画像が居るときだけ — 繋ぐものが無い文書に聞く意味は無い。
+ * 断っても道は閉じない（Files の Choose folder が入口として残る）。
+ *
+ * ブラウザはクリックの直後にしかピッカーを開けないので、**箱のボタンが
+ * その 1 回**になる。自動で繋ぎに行くことはできない。
+ */
+async function offerConnect(): Promise<void> {
+  if (savedName === null || !hasImages(core.getText())) return;
+  // 許可を確かめるあいだに別の文書へ移っていたら、もうこの文書の話ではない
+  const gen = docGen;
+  if (await assets.connected()) return;
+  if (gen !== docGen) return;
+  const where = declaredFolder() ?? "./";
+  const go = await ask({
+    title: "Connect the image folder?",
+    note: `Images here point to ${where}.`,
+    ok: "Connect…",
+    cancel: "Not now",
+  });
+  // 箱を読んでいるあいだに移っていることもある。**繋ぐ直前にもう一度見る** —
+  // ここで繋ぐと、いま開いている文書に別の文書のフォルダを結ぶことになる
+  if (go !== null && gen === docGen) await assets.connect();
 }
 
 async function openFile(): Promise<void> {
@@ -719,7 +849,7 @@ async function openFile(): Promise<void> {
   // 押せないだけで理由を言うが、ショートカットは黙って何も起きない
   // だけになってしまう — 同じ理由をここでも言う
   if (!io.canOpen()) {
-    flashFilename(NO_FILE_ACCESS);
+    failed(NO_FILE_ACCESS);
     return;
   }
   try {
@@ -728,7 +858,7 @@ async function openFile(): Promise<void> {
     if (doc) applyDoc(doc);
   } catch (err) {
     console.error("open failed:", err);
-    flashFilename("Could not open the file");
+    failed("Couldn't open the file");
   }
 }
 
@@ -739,7 +869,7 @@ async function openFile(): Promise<void> {
  */
 async function renameFile(): Promise<void> {
   if (savedName === null) return;
-  const typed = window.prompt("New file name", savedName);
+  const typed = await askText("New file name", savedName, "Rename");
   if (typed === null) return;
   const name = typed.trim();
   if (name === "" || name === savedName) return;
@@ -748,12 +878,10 @@ async function renameFile(): Promise<void> {
     if (next === null) return;
     savedName = next;
     showName();
-  } catch (error) {
-    flashFilename(
-      error instanceof Error && error.message === "no-rename"
-        ? "Renaming needs a Chromium browser"
-        : "Could not rename the file",
-    );
+  } catch {
+    // 「この環境が改名を持たない」はもうここに来ない — `io.canRename()` が
+    // 押す前に答え、Files の行がその理由ごと沈んでいる
+    failed("Couldn't rename the file");
   }
 }
 
@@ -769,13 +897,21 @@ async function saveFile(asNew = false): Promise<void> {
       // ここだけがピッカーを要る道。既存のハンドルへ書くだけの下の枝は
       // API が無くても困らないので、ここでしか確かめない
       if (!io.canSaveAs()) {
-        flashFilename(NO_FILE_ACCESS);
+        failed(NO_FILE_ACCESS);
         return;
       }
       const doc = await io.saveAs(docName(), text);
       if (!doc) return; // キャンセル
       savedName = doc.name; // ここで初めて名前が決まる
       showName();
+      // **写しは別の文書。** 握りは「この md から見たあのフォルダ」という対
+      // でしか意味を持たないので、md が別の場所へ移った時点で対ごと無効
+      // （宣言は写しの中に残っているので、指し直せば戻る）。
+      // 捨てないと、新しい md の隣を指しているつもりで**古いフォルダへ
+      // 書き込む**ことになる
+      assets.clear();
+      void refreshRecent();
+      void offerConnect();
     } else {
       await io.save(text);
     }
@@ -789,20 +925,8 @@ async function saveFile(asNew = false): Promise<void> {
     }
     // 自分でキャンセルしたときは null が返るのでここには来ない。
     console.error("save failed:", err);
-    flashFilename(typeof err === "string" ? err : "Could not save");
+    failed("Couldn't save");
   }
-}
-
-let flashTimer = -1;
-function flashFilename(msg: string, isError = true): void {
-  elFilename.textContent = `${docName()} \u2014 ${msg}`;
-  elFilename.classList.toggle("error", isError);
-  if (flashTimer !== -1) window.clearTimeout(flashTimer);
-  flashTimer = window.setTimeout(() => {
-    flashTimer = -1;
-    elFilename.classList.remove("error");
-    showName();
-  }, 4000);
 }
 
 /**
@@ -818,49 +942,102 @@ async function newFile(): Promise<void> {
     mapPane.focus();
   } catch (err) {
     console.error("new file failed:", err);
-    flashFilename("Could not create a new file");
+    failed("Couldn't create a new file");
   }
+}
+
+/** 本文へのリンクの綴り。作るのも測るのもこの 1 か所 */
+const linkOf = async (text: string): Promise<string> =>
+  `${location.origin}${location.pathname}${await toHash(text)}`;
+
+/**
+ * リンクにまつわる**押す前の但し書き**。無ければ null。
+ *
+ * コピーは必ず成功するので、これはしくじりではなく「渡す前に知っておく
+ * こと」— 押した後に言っても、そのときにはもう貼れる状態になっている。
+ * だから Copy link の**行に出す**（写せたことは、その行の絵が言う）。
+ *
+ * 長さは gzip してからでないと分からない（生の字数では代用できない —
+ * 実測で、同じ 8000 字の URL になる本文が中身次第で 9 千字から 10 万字まで
+ * 開く）。1ms 弱なので開くたびに本当に測る。
+ */
+async function linkNote(): Promise<string[]> {
+  const text = core.getText();
+  const notes: string[] = [];
+  if (hasImages(text)) notes.push("Images won't travel");
+  if ((await linkOf(text)).length > LINK_WARN_LENGTH) {
+    notes.push("Long link — may be cut");
+  }
+  return notes;
 }
 
 /**
  * いまの本文へのリンクをクリップボードへ。保存の有無を問わない —
  * 見出しから導いた仮の名前しか無い文書でも、そのまま渡せる。
- * 画像は付いてこない（`![](...)` は相対パスで、相手の環境には無い）ので、
- * 貼ってある文書ではそう伝える。
+ *
+ * **写せたことは言わない** — 但し書きは押す前に行が言い、写せたことは
+ * 押した行の絵がチェックになって言う。しらせが出るのはしくじりだけ。
  */
-async function copyLink(): Promise<void> {
+async function copyLink(): Promise<boolean> {
   try {
-    const text = core.getText();
-    const link = `${location.origin}${location.pathname}${await toHash(text)}`;
-    await navigator.clipboard.writeText(link);
-    if (hasImages(text)) flashFilename("Link copied — images won't travel", false);
-    else if (link.length > LINK_WARN_LENGTH)
-      flashFilename("Link copied — some apps may cut this", false);
-    else flashFilename("Link copied", false);
+    await navigator.clipboard.writeText(await linkOf(core.getText()));
+    return true;
   } catch (err) {
     console.error("copy link failed:", err);
-    flashFilename("Could not copy the link");
+    failed("Couldn't copy the link");
+    return false;
   }
 }
 
 async function confirmDiscard(): Promise<boolean> {
   if (core.getText() === savedText) return true;
-  return window.confirm("You have unsaved changes. Discard them and continue?");
+  // 「状態 — 結果／指示」を em dash でつなぐのがこのアプリの文の形
+  // （NOTHING_TO_RENAME・しらせの文言と同じ）。ここだけ句点で 2 文に割れていた
+  return askYesNo("Discard unsaved changes?", "Discard");
 }
 
 // ---------- 画像（ローカルファースト） ----------
 // 実装は app/assets.ts。ここは「いまのファイル」と描き直しを繋ぐだけ
 
 const assets = initAssets({
-  hasFile: () => savedName !== null,
-  warn: (m) => flashFilename(m),
+  failed,
   refresh: () => map.render(),
   declared: () => declaredFolder(),
   declare: (value) => {
+    // 書く前の宣言。**本文をどこから動かすか**はこれでしか分からない
+    const prev = declaredFolder();
+    const tag = nextTag();
     const e = setImageFolder(doc.text, doc.head, value);
-    applySnap(core.replaceText(e.from, e.to, e.insert, nextTag()), "core");
+    applySnap(core.replaceText(e.from, e.to, e.insert, tag), "core");
+    const next = declaredFolder();
+    // 頭を書いただけでは本文は古い場所を指したまま。同じ tag で続けて
+    // 動かし、1 回の Undo に畳む
+    if (next !== null) moveImages(prev, next, tag);
+    appliedFolder = next;
   },
 });
+
+/**
+ * 画像を置く一手の**手前の駅**。保存されていなければ、その場で保存まで案内する。
+ *
+ * **壁ではなく駅。** 「保存が先」と言って突き放すのではなく、行程を先に見せて
+ * そのまま通す — 通れば画像はそのまま置かれ、断れば何も起きない。
+ * 箱を 1 枚挟むのは、**保存が画像の外の操作**だから（フォルダ選択は画像を
+ * 置く一手の内側なので、こちらは前置き無しで開く）。
+ *
+ * 行程を 1 枚で言っておくのは、ピッカーが 2 枚続くため — 予告しておけば
+ * 2 枚目が不意打ちにならない。
+ */
+async function ensurePlace(): Promise<boolean> {
+  if (savedName !== null) return true;
+  const go = await askYesNo(
+    "Images need a place on disk. Save the .md, then pick a folder.",
+    "Save the .md…",
+  );
+  if (!go) return false;
+  await saveFile(true);
+  return savedName !== null;
+}
 
 /** `body` を独立した段落として `at` へ挿し込む（式は src/edits.ts）。 */
 function insertParagraph(at: number, body: string, tag = ""): void {
@@ -886,6 +1063,7 @@ function insertContentLine(id: number, line: string, tag = ""): void {
  * 確認も画像フォルダの結び付けも、`assets.saveToDisk` が 1 か所で持つ。
  */
 async function attachImage(id: number, blob: Blob, tag = ""): Promise<void> {
+  if (!(await ensurePlace())) return;
   if (!byId.has(id)) return;
   const rel = await assets.saveToDisk(blob);
   // 置いているあいだに消えていることがある
@@ -896,77 +1074,199 @@ async function attachImage(id: number, blob: Blob, tag = ""): Promise<void> {
  * Files メニューの画像フォルダの見出し。「宣言」（頭）と「許可」（フォルダ
  * ハンドル）は別々に食い違いうるので、4 通りをそれぞれ言い分ける。
  *
- * **とくに「許可はあるが宣言が無い」を黙らせない。** `AssetBinding.path` が
- * 落ちた設計上、頭を持たない既存文書は宣言が無いまま `declaredPath()` が
- * `./` に倒れる（app/assets.ts）。以前 `img/` 相当で結んでいた人はここが
- * 外れて画像が黙って空になるが、フォルダ名は出てしまうので「結び付いて
- * いるのに映らない」といういちばん気付きにくい状態になる。ここで
- * "not declared" と名乗らせて、頭に宣言が無いことを見えるようにする。
+ * **とくに「許可はあるが宣言が無い」を黙らせない。** 頭を持たない文書では
+ * 宣言が無いまま `declaredPath()` が `./` に倒れる（app/assets.ts）。以前
+ * `img/` 相当で結んでいた人はここが外れて画像が黙って空になるが、フォルダ名は
+ * 出てしまうので「結び付いているのに映らない」といういちばん気付きにくい状態に
+ * なる。ここで "not declared" と名乗らせて、頭に宣言が無いことを見えるようにする。
  */
 function folderCaption(): string {
   const name = assets.folderName();
-  const declared = declaredFolder() !== null;
-  if (name === null) return declared ? "folder not linked" : "none";
-  return declared ? name : `${name}, not declared`;
+  const declared = declaredFolder();
+  // 主語（画像フォルダ）は見出しの絵が言うので、ここは**状態だけ**を言う。
+  //
+  // **言葉は宣言と許可の 2 つだけ**（app/assets.ts の冒頭が名付けたもの）。
+  // 以前の `linked` はそのどちらでもない第三の語で、だから「押せば linked に
+  // なる」と読める行がどこにも無かった。欠けているほうの名前をそのまま言う。
+  //
+  // 許可が無いときは**宣言のパスを出す** — どこを指していて届いていないのかが
+  // 見えないと、直しようがない（フォルダ名はハンドル越しにしか読めないので、
+  // 許可を失うと名前は消える。宣言は .md の中なので残っている）
+  if (name === null) return declared === null ? "no folder" : `${declared}, no access`;
+  return declared !== null ? name : `${name}, not declared`;
 }
 
 // 文書に何かする道は Files にまとめる。**画像フォルダもここ** —
 // 「この .md の画像がどこに居るか」は文書ぜんぶの設定で、新規 / 開く / 保存と
 // 同じ高さのもの。
 //
-// 見出し（caption）は「続く行たちが何に効くか」を言う。保存していない文書に
-// 名前を変える相手は無いので、そのときは見出しがそう言い、行は無効になる。
+// **塊は 2 つだけ**（.md と、その画像フォルダ）。どちらも「見出しが状態を
+// 言い、続く行がそれに対してできること」という同じ形で、見出しが先に立つ。
+//
+// **絵が付くのは、押せるものだけ。** 見出しは状態を言う淡い字で、押せない。
+// 一時は見出しにも主語の絵を付けていたが、そうすると隣り合う行の絵と輪郭が
+// 重なった（`file` と `file-plus`。`d` の前半がバイト単位で同一）。主語は
+// メニューを開くボタン（`Files`）と見出しの言葉が既に言っているので、
+// 見出しに絵は要らない。
+//
+// **同じメニューの中で、同じ絵を 2 つの違う意味に使わない。** Open（開く
+// 動作）と Choose folder（フォルダという物を選ぶ）は同じ `folder` にすると
+// 区別が付かないので、Open だけ `folder-open`（開いた入れ物）にする。
+//
+// 並びは**よく使う順・確実にできる順**。変種は主の直後（`Save as`）、
+// 稀で無効になりがちなもの（`Rename`）は後ろ — 見出しの直後は塊の顔なので、
+// そこに押せない行を置かない。
+//
+// **無いものを黙って落とさない。** ファイルピッカーを持たないブラウザが
+// あり（`docs/browsers.md`）、2 本目の道は作らない。押せない理由だけは言う。
 openOnClick(btnFile, () => {
-  // **無いものを黙って落とさない。** ファイルピッカーを持たないブラウザが
-  // あり、`docs/browsers.md` のとおり 2 本目の道は作らない。
-  // 押せない理由だけは言う
   const canOpen = io.canOpen();
   const canSave = io.canSaveAs();
-  const entries: MenuEntry[] = [
-    { label: "New", key: "Mod+Alt+N", run: () => void newFile() },
-    { label: "Open", key: "Mod+O", run: () => void openFile(), disabled: !canOpen },
-    ...(canOpen && canSave
-      ? []
-      : [{ caption: NO_FILE_ACCESS }]),
+  return [
     { caption: savedName ?? "not saved yet" },
-    { label: "Rename", run: () => void renameFile(), disabled: savedName === null },
-    { label: "Save", key: "Mod+S", run: () => void saveFile(), disabled: !canSave },
-    { label: "Save as", key: "Mod+Shift+S", run: () => void saveFile(true), disabled: !canSave },
+    { label: "New", key: "Mod+Alt+N", mark: "file-plus", run: () => void newFile() },
+    {
+      label: "Open",
+      key: "Mod+O",
+      mark: "folder-open",
+      run: () => void openFile(),
+      disabled: !canOpen && NO_FILE_ACCESS,
+    },
+    {
+      // 覚えている文書。**選ぶのは人**（起動時に勝手に開き直すのはやめた）。
+      // 平らに並べると Files が伸びるので畳む — 中身は開くたびに引き直して
+      // ある（`refreshRecent`）ので、ここでは待たない
+      label: "Recent",
+      mark: "clock",
+      items: recent.map((file) => ({
+        label: file.name,
+        run: () => openKnown(file),
+      })),
+      disabled: recent.length === 0 && "Nothing opened yet",
+    },
+    {
+      label: "Save",
+      key: "Mod+S",
+      mark: "save",
+      run: () => void saveFile(),
+      disabled: !canSave && NO_FILE_ACCESS,
+    },
+    // 「as」は Save と同じ操作の別名なので、絵は主の行にだけ付ける
+    {
+      label: "Save as",
+      key: "Mod+Shift+S",
+      run: () => void saveFile(true),
+      disabled: !canSave && NO_FILE_ACCESS,
+    },
+    {
+      label: "Rename",
+      mark: "pencil",
+      run: () => void renameFile(),
+      disabled: !io.canRename() ? NO_RENAME_HERE : savedName === null && NOTHING_TO_RENAME,
+    },
     { caption: folderCaption() },
     {
-      label: "Images Folder",
-      run: () => void assets.chooseFolder(),
-      disabled: !assets.canChooseFolder(),
+      // 「Images」は見出しが既に言っている。行に残る絵は動詞の道具（フォルダ
+      // という物を選ぶ）— **押した人がやることをそのまま言う**（宣言と許可の
+      // 帳尻は裏方の仕事で、ラベルに背負わせるものではない）
+      label: "Choose folder",
+      mark: "folder",
+      // **保存していないことでは沈めない。** 押した先で保存まで案内する
+      // （壁ではなく駅。`ensurePlace`）。沈むのは、この環境がフォルダを
+      // 選べないときだけ — そちらは通り道が本当に無い
+      run: () => void (async () => {
+        if (await ensurePlace()) await assets.chooseFolder();
+      })(),
+      disabled: !assets.canChooseFolder() && NO_FILE_ACCESS,
     },
   ];
-  return entries;
 });
 
 // 低頻度だが消したくないものの受け皿。Undo/Redo にボタンは無く（キーが
 // 本道）、ここが押せる保険になる。3 つの塊 — 戻す / 見た目 / 外に開く
 openOnClick(btnMore, () => [
-  { label: "Undo", key: "Mod+Z", run: doUndo },
-  { label: "Redo", key: "Mod+Shift+Z", run: doRedo },
+  { label: "Undo", key: "Mod+Z", mark: "undo-2", run: doUndo },
+  { label: "Redo", key: "Mod+Shift+Z", mark: "redo-2", run: doRedo },
   "sep",
-  { label: "Brand color", run: () => theme.pickColor() },
-  { label: theme.isLight() ? "Dark theme" : "Light theme", run: () => theme.toggle() },
-  // 見た目の好み同士なのでテーマの隣。**押せばどうなるか**を名乗る（テーマと同じ流儀）
-  { label: addsOn ? "Hide add buttons" : "Show add buttons", run: () => setAdds(!addsOn) },
+  // 隣の `Light theme` と同じく、**変えられるものの名前**を言う（この塊は
+  // 見た目の設定の並びで、どれも「変える」のは共通なので動詞は要らない）。
+  // ロゴ側は単独のボタンなので、そちらは動詞のまま（`Change accent color`）
+  { label: "Accent color", mark: "palette", run: () => theme.pickColor() },
+  {
+    // 絵は「押すと何になるか」（切り替えた先）を言う。字と同じ向き
+    label: theme.isLight() ? "Dark theme" : "Light theme",
+    mark: theme.isLight() ? "moon" : "sun",
+    run: () => theme.toggle(),
+  },
+  {
+    // 見た目の好み同士なのでテーマの隣。**押せばどうなるか**を名乗る
+    label: addsOn ? "Hide add buttons" : "Show add buttons",
+    mark: "circle-plus",
+    run: () => setAdds(!addsOn),
+  },
   "sep",
-  { label: "Copy link", run: () => void copyLink() },
+  // 但し書きは待たずに開いて、届いたら埋まる（測るのに gzip が要る）
+  { label: "Copy link", mark: "link", note: linkNote(), done: copyLink },
   "sep",
   {
     label: "Shortcuts",
+    mark: "keyboard",
     run: () => openExternal(`${REPO}/blob/main/docs/shortcuts.md`),
   },
-  { label: "GitHub", run: () => openExternal(REPO) },
+  { label: "GitHub", mark: "mark-github", run: () => openExternal(REPO) },
 ]);
-elFilename.addEventListener("click", () => {
+/**
+ * 覚えている文書。**Files の `Recent` に並ぶのがこれ**。
+ *
+ * メニューは同期で組まれるのに、覚えているものは IndexedDB の向こうに在る。
+ * だから**開く・保存するたびに引き直して手元に置く** — メニューを開いた
+ * ときに待たせない。
+ *
+ * いま開いているものは並びから外す。開き直しても同じものが出るだけで、
+ * 選ぶ意味が無い（札は `isSameEntry` でしか比べられないので、ここで
+ * 済ませておく — メニューを組む場所では待てない）。
+ */
+let recent: FileSystemFileHandle[] = [];
+
+async function refreshRecent(): Promise<void> {
+  const now = io.currentFile();
+  const rows = await handles.list();
+  const out: FileSystemFileHandle[] = [];
+  for (const row of rows) {
+    if (now && (await row.doc.isSameEntry(now))) continue;
+    out.push(row.doc);
+  }
+  recent = out;
+}
+
+/**
+ * 覚えている文書を開く。**許可はここで取り直す** — 押されたことがその資格。
+ * 断られたら何も言わない（ファイル選択を閉じたときと同じ取りやめ）。
+ */
+function openKnown(file: FileSystemFileHandle): void {
   void (async () => {
     if (!(await confirmDiscard())) return;
-    const doc = await io.restoreDoc();
+    const doc = await io.openKnown(file);
     if (doc) applyDoc(doc);
-  })().catch(() => flashFilename("Could not get permission for the file"));
+  })().catch((error: unknown) => {
+    console.error("open failed:", error);
+    failed("Couldn't open the file");
+  });
+}
+
+// **名前を押したら、名前を変える。** 以前はここが「前回のファイルを開き直す」
+// で、押して何が起きるか名前から読めなかった（しかも許可が生きていれば
+// 見た目に何も起きない）。開き直しは Files の行へ移した。
+// 押せなさは `renameFile` 自身が持つ（保存していなければ即戻る）ので、
+// ここは繋ぐだけ
+elFilename.addEventListener("click", () => void renameFile());
+// <span role="button"> と同じ理由（app/theme.ts のロゴ）。SVG と違って
+// キーボード操作を持たない要素に「ボタンだ」と名乗らせたぶん、
+// Enter / Space を自分で出す
+elFilename.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  e.preventDefault();
+  void renameFile();
 });
 
 window.addEventListener("beforeunload", (event) => {
@@ -978,8 +1278,8 @@ window.addEventListener("beforeunload", (event) => {
 // ---------- ドラッグ & ドロップ（振り分けは app/dnd.ts） ----------
 
 initDrop({
-  nodeAt: (x, y) => map.nodeAt(x, y),
-  warn: (msg) => flashFilename(msg),
+  markDrop: (at) => map.markFileDrop(at),
+  failed,
   async openMarkdown(file) {
     if (!(await confirmDiscard())) return;
     applyDoc(await io.openHandle(file));
@@ -1051,33 +1351,20 @@ initShortcuts({
 
 // ---------- boot ----------
 
-// 本文の控えは持たない。IndexedDB に置くのはファイルハンドルだけで、
-// 起動時もディスク上の実体を読み直す。
+// 本文の控えは持たない。IndexedDB に置くのはハンドルだけで、
+// **起動時に勝手に開き直すことはしない** — 立ち上げたら常に空から始まる。
+// 前のものを出すかどうかは人が決める（Files の Recent）。
 {
   sweep(); // 役目を終えた localStorage のキーを捨てる
   loadText("", null); // 空 = まだ何も無い。dirty も立たない
+  void refreshRecent();
   const bootGen = docGen;
   void fromHash(location.hash).then((shared) => {
-    if (shared !== null) {
-      // リンクで開いた。ハッシュはその場で消す — 文書の身元はあくまで
-      // ファイルハンドル 1 つで、リンクは入口でしかない。前回ファイルの
-      // 復元もしない（リンクを踏んだのに別の文書が出てくるのは筋が通らない）
-      history.replaceState(null, "", location.pathname + location.search);
-      if (docGen === bootGen && core.getText() === "") loadText(shared, null);
-      return;
-    }
-    void io
-      .startupDoc()
-      .then((doc) => {
-        // 読み終わるまでに打ち始めていたら、それを消してまで開かない。
-        // 同じ理由で、その間に New/Open/Drop で別の文書を開いていた場合も
-        // （それが空文書でも）上書きしない — その操作は必ず loadText を通るので
-        // docGen が進んでいるはず
-        if (doc && docGen === bootGen && core.getText() === "") applyDoc(doc);
-      })
-      .catch(() => {
-        flashFilename("Could not reopen the last file");
-      });
+    if (shared === null) return;
+    // リンクで開いた。ハッシュはその場で消す — 文書の身元はあくまで
+    // ファイルハンドル 1 つで、リンクは入口でしかない
+    history.replaceState(null, "", location.pathname + location.search);
+    if (docGen === bootGen && core.getText() === "") loadText(shared, null);
   });
 }
 // フェンスの言語は後から読み込まれる。届いたら色を載せ直す

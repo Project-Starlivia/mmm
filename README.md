@@ -1,9 +1,9 @@
 # mmm
 
-**markdown / mindmap / mirror** — a Markdown ⇄ mind map editor you can edit
+**markdown / mindmap / mirror** — a Markdown ⇄ Mindmap editor you can edit
 from either side.
 
-The file itself is just a `.md`. The mind map is only another window onto it.
+The file itself is just a `.md`. The Mindmap is only another window onto it.
 
 For the full spec, see [docs/spec.md](docs/spec.md).
 
@@ -30,3 +30,7 @@ no restriction on use, no attribution requirement, no obligation to notify.
 Neither mmm nor what it produces comes with a warranty of correctness. Neither
 mmm nor anyone behind it is liable for any trouble, loss, or damage that
 results.
+
+## Credits
+
+Menu and toolbar icons are from [Lucide](https://lucide.dev) (ISC License).

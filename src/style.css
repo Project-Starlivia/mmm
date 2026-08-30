@@ -20,9 +20,13 @@
      理由が無い。
      テーマでも変えない: ライト用に薄くした宣言を持っていたが、app/theme.ts が
      置くインラインに必ず負けていて一度も効いていなかった（誰も見たことの
-     ない濃さだった）。ブランドカラーは `--accent` にだけ入る */
+     ない濃さだった）。アクセントカラーは `--accent` にだけ入る */
   --accent-mix: 20%;
   --accent-soft: color-mix(in srgb, var(--accent) var(--accent-mix), transparent);
+  /* フォーカス枠だけの濃さ。--accent-soft と同じ色味だが、地が --bg へ
+     沈んだ分（旧 --panel より暗い）そのままだと枠が薄まって見えるので、
+     ここだけ底上げする */
+  --ring: rgba(89, 50, 255, 0.32);
   --node-bg: #232830;
   --node-border: #3b424d;
   --node-border-strong: #5d6673;
@@ -47,6 +51,7 @@
   --ink: #1f2328;
   --ink-dim: #6b7280;
   --line: #e2e5ea;
+  --ring: rgba(89, 50, 255, 0.12);
   --node-bg: #ffffff;
   --node-border: #cfd5dd;
   --node-border-strong: #9aa4b1;
@@ -63,6 +68,37 @@
 /* ========== 土台 ========== */
 
 * { box-sizing: border-box; }
+
+/* スクロールバー。**指定しないと OS の既定がそのまま出る** — 15〜17px を
+   取り、テーマと関係のない色で本文に被って見える。
+   摘みだけを枠線の色（--line）にし、溝は透明にして地に沈める。色は変数を
+   継ぐので、ライト / ダークの切り替えにそのまま追従する。
+   `thin` は Firefox で細く、Chromium では既定より細い幅になる */
+:root {
+  /* `scrollbar-width: thin` が実際に取る幅。**測って入れた値**で、
+     こちらから決められる数ではない — Chromium は標準プロパティが
+     指定されていると `::-webkit-scrollbar { width }` を無視するので、
+     太さは thin の実測（10px）に決まる。
+     隅に浮く道具がこの帯を避けるのに使う（#md-pane .pane-tool） */
+  --bar: 10px;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+/* Chromium 向けの見た目。幅は上のとおり効かないので**書かない**
+   （書くと「ここで太さを決めている」という嘘になる）。
+   色の綴りは持たない — どちらも --line を見る */
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 6px;
+  /* 溝の縁に触れさせない。地の色で縁取ると、細い棒が浮いて見える */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--node-border-strong); }
+::-webkit-scrollbar-corner { background: transparent; }
 
 html, body {
   margin: 0;
@@ -101,14 +137,14 @@ html, body {
   :where(&) button {
     font: inherit;
     font-size: 13px;
-    padding: 3px 8px;
+    padding: 4px 8px;
     /* 絵と字を並べる。絵が先か後かは、入れる側が決める。
-       間はわずかだけ — 絵と字は 1 つの塊（「SVG」という形式の名前に、
+       間は刻みの最小 — 絵と字は 1 つの塊（「SVG」という形式の名前に、
        それを表す絵が添えてあるだけ）で、離しすぎると 2 つの別物に見える。
-       0 だと絵と字が触れてかえって読みにくいので、詰めるが接しはしない */
+       接するほど詰めると読みにくいので、塊に見える範囲でいちばん狭く取る */
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
     border: 1px solid transparent;
     border-radius: 6px;
     background: none;
@@ -123,7 +159,7 @@ html, body {
 /* 並んだボタンを 1 つの塊に見せる。**言うのは継ぎ目の 1 本だけ** —
    枠が 2 本並ぶと「別のボタン」に見えるので、枠は重ねて 1 本にし、
    帯のように枠が透明なところでは、その継ぎ目だけに色を付ける。
-   帯の書き出し（SVG ⤓ │ ⌄）と、md の書き方（H │ n+ │ L）が使う */
+   帯の書き出し（SVG ⤓ │ ⌄）と、md の書き方（# │ n+ │ -）が使う */
 .group {
   display: inline-flex;
 
@@ -166,6 +202,43 @@ html, body {
   color: inherit;
 }
 
+/* 出来事を言う絵（いまはチェックだけ。`DRAWN` が決める）は、**その場で
+   引かれながら**出る。差し替えるだけだと、いつからそこに在ったのかが
+   読めず、押した手応えにならない。
+
+   `24` は枠の一辺で、チェックの線（約 22.6）より長い。長いぶんには引き
+   切ったところで線が全部出るので、**実際の長さを測って持たなくていい**。
+
+   起点が**負**なのは、`check` の綴りが長い腕の先から始まっているから
+   （`M20 6 9 17l-5-5`）。正のまま引くとその先から生えてきて、手で書く
+   向きと逆になる。負にすると綴りの**終わりの側**から現れる — 短い腕の
+   先 → 谷 → 長い腕、と、人が書く順になる。 */
+.icon.drawn path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: -24;
+  animation: draw 0.25s ease-out forwards;
+}
+@keyframes draw { to { stroke-dashoffset: 0; } }
+
+/* まだ走っていると言う絵。**回っていることだけが中身**なので、止めては
+   意味が無い（切れ目のある輪なのは、閉じた輪では回っても止まって見えるため）。
+
+   出すのは `icons.ts` の `nod` が決める — 押してすぐではなく、待たされて
+   いると分かってから。ほとんどの一手はその前に終わるので、普段は出ない */
+.icon.spun {
+  transform-origin: center;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(1turn); } }
+
+/* 動きで伝えるのをやめている人には、引き終えた姿でそのまま出す。
+   ぐるぐるだけは止めない — 止めた輪は「終わった」と嘘をつく。
+   目に障らない速さまで落として、回っていることだけを残す */
+@media (prefers-reduced-motion: reduce) {
+  .icon.drawn path { animation: none; stroke-dashoffset: 0; }
+  .icon.spun { animation-duration: 2.4s; }
+}
+
 #logo {
   width: 22px;
   height: 22px;
@@ -175,15 +248,27 @@ html, body {
 
   &:hover { filter: brightness(1.25); }
 }
+/* **名乗りは名乗りだけ。** しくじりは #notice が自分の器で言う */
+/* 名乗り。押すと改名（Files の Rename と同じ操作）。**押せるときだけ
+   押せる顔をする** — 保存していない文書には名前を変える相手がおらず、
+   その環境が改名を持たないこともある（理由は title に出る） */
 #filename {
   color: var(--ink-dim);
   font-size: 13px;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px 4px;
+  /* 名乗りは常にそこに在るので、触れるまで押せる素振りを見せない */
+  &:hover { background: var(--accent-soft); color: var(--ink); }
 
-  &.error { color: #e5534b; }
+  &.off {
+    cursor: default;
+
+    &:hover { background: none; color: var(--ink-dim); }
+  }
 }
-#dirty { color: var(--accent); font-size: 10px; }
+#dirty { color: var(--accent); font-size: 11px; }
 .spacer { flex: 1; }
-.sep { width: 1px; height: 18px; background: var(--line); }
 
 /* ========== ペインの割り付け ========== */
 
@@ -191,14 +276,29 @@ html, body {
 .pane-off { display: none !important; }
 
 #splitter {
+  /* 幅はここ 1 つ。#pane-switch が片方表示で寄せる先（次のルール）も
+     同じ数を見る — 太さを変えたのに寄せ先だけ古いままになる、を防ぐ */
+  --w: 5px;
   flex: none;
-  width: 5px;
+  width: var(--w);
   cursor: col-resize;
-  background: var(--line);
-  transition: background 0.15s;
   position: relative; /* 境目にくっつく開閉の矢印（#pane-switch）の座標系 */
 
-  &:hover, &.dragging { background: var(--accent); }
+  /* 見える線はここだけが持つ。**ボタン（.pane-tool、z-index:10）より
+     前に出す専用の層** — splitter 自身の地にすると、乗っているボタンが
+     子である以上必ず前に描かれ、境目のところだけ線が 1px 欠けて見えた。
+     この層は当たり判定を持たない（掴む・押すはどちらも下の #splitter 自身
+     が受ける） */
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 11;
+    background: var(--line);
+    transition: background 0.15s;
+    pointer-events: none;
+  }
+  &:hover::after, &.dragging::after { background: var(--accent); }
 }
 /* 片方だけのときは幅を動かせない。押せば分割へ戻るので、掴む形ではなく
    押す形のカーソルにする。**狭いときは対象外** — `:root:not(.narrow)` を
@@ -212,10 +312,14 @@ html, body {
 
 /* ========== md のペイン ========== */
 
+/* **ペインは地であって、浮くものではない**。--panel は帯・メニュー・カードの
+   ように地から浮くものの色で、md がそれを借りていたので板が 1 枚明るく載って
+   見え、分割線（--line）との差も詰まっていた。マップと同じ --bg を敷けば、
+   両ペインは同じ地になり、継ぎ目の線はどちらにも属さない */
 #md-pane {
   flex: 0 0 var(--md-width, 42%);
   min-width: 200px;
-  background: var(--panel);
+  background: var(--bg);
   position: relative; /* 隅に浮く道具（.pane-tool）の座標系 */
 
   /* CodeMirror の色は**ここが決める**（src/editor.ts は色を持たない）。
@@ -224,16 +328,19 @@ html, body {
      oneDark が引き続き受け持つのはコードの字の色だけ。 */
   & .cm-editor {
     height: 100%;
-    font-size: 13.5px;
-    background: var(--panel);
+    font-size: 13px;
+    /* 地はペインが敷く。**ここで書くのは id 込みで勝てるから** —
+       editor.ts の theme から同じことを言っても、oneDarkTheme の
+       `#282c34` に負けて効かなかった（色の宣言はこのファイルに 1 本） */
+    background: var(--bg);
 
     &.cm-focused { outline: none; }
   }
   & .cm-scroller { font-family: var(--mono); line-height: 1.55; }
-  /* 打っている場所の印は、マップのその場編集と同じブランドカラー */
+  /* 打っている場所の印は、マップのその場編集と同じアクセントカラー */
   & .cm-content { caret-color: var(--accent); }
   & .cm-gutters {
-    background: var(--panel);
+    background: var(--bg);
     border-right: 1px solid var(--line);
     color: var(--ink-dim);
   }
@@ -243,13 +350,21 @@ html, body {
 .cm-mmm-selected { background: var(--accent-soft); }
 /* フォーカスの輪。#md-pane 自身は CodeMirror の背景に隠れて見えないので
    .cm-editor に当てる(map 側の同じ印は #map-pane.pane-focused が持つ) */
-#md-pane.pane-focused .cm-editor { box-shadow: inset 0 0 0 2px var(--accent-soft); }
+#md-pane.pane-focused .cm-editor { box-shadow: inset 0 0 0 2px var(--ring); }
 
 /* ペインの隅に浮く小さな道具。**そのペインにだけ効くもの**はここに住む
    （帯に出るのは文書ぜんぶに効くものだけ）。低頻度なので沈ませて、
-   触れたら起きる — 消さずに優先度だけ下げる、いつもの手 */
+   触れたら起きる — 消さずに優先度だけ下げる、いつもの手。
+
+   **ここが持つのは「縁からどれだけ離すか」と「背丈」だけ。** どの隅に
+   住むかは道具ごとの話で、それぞれが自分で言う — 役の違うものを同じ高さに
+   並べると、無関係な 3 つが 1 つの帯（＝ひとまとまりの道具立て）に見える。
+   近さは「仲間である」と言ってしまうので、仲間でないものは近づけない。 */
 .pane-tool {
   position: absolute;
+  /* 縁から離す量は全部これ。8 / 12 / 18px と散らばっていたのを 1 つに */
+  --edge: 8px;
+  right: var(--edge);
   z-index: 10;
   display: flex;
   opacity: 0.5;
@@ -259,7 +374,13 @@ html, body {
     font: inherit;
     font-size: 11px;
     min-width: 26px;
-    padding: 2px 6px;
+    /* 高さは**ここだけが決める**。中身が字でも絵でも同じ背丈になる
+       （道具どうしが横に並んだとき、背が揃っていないと帯に見えない） */
+    height: 20px;
+    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: 1px solid var(--line);
     background: var(--panel);
     color: var(--ink-dim);
@@ -278,6 +399,13 @@ html, body {
   }
 }
 
+/* **縁からの距離は、どちらのペインでも「読み書きする面の縁」から測る。**
+   md にはスクロールバーの帯があり、その帯はブラウザが押下を横取りする
+   （z-index では前に出せない）ので、本文が終わるのはバーの左端。
+   そこから `--edge` 離せば、マップ側の道具が地図の縁から離れているのと
+   同じ距離になる — 数が違って見えるのは、あいだにバーが居るぶんだけ */
+#md-pane .pane-tool { right: calc(var(--bar) + var(--edge)); }
+
 /* **指にホバーは無い。** 沈めたままだと、起こす手段が無いまま半透明で
    居続ける（ペイン切り替えの矢印・書き方ピッカー・視点を寄せるボタン、
    3 つとも）。触って起こせないなら、最初から起きている */
@@ -285,15 +413,23 @@ html, body {
   .pane-tool { opacity: 1; }
 }
 
-/* md の道具は**スクロールバーの内側**へ寄せる。CodeMirror のスクローラは
-   環境により 15〜17px を取り、その帯はブラウザが押下を横取りするので
-   （z-index では前に出せない）、幅を避けた位置から置く。
-   以前は右 16px で、15px のスクロールバーとの隙間が **1px** しかなく、
-   17px の環境ではボタンの右端が食われて「押しても反応しない」になっていた */
-#md-pane .pane-tool { right: 28px; }
+/* 木の書き方（# / n+ / -）は**上**。これは本文の書かれ方そのものを変える
+   道具で、いま何で書かれているかを出しているもの — 本文の頭に居るのが
+   その役に合う。マップの視点移動（見え方を変えるだけ）とは別の話なので、
+   同じ高さに並べない */
+#form-picker {
+  top: var(--edge);
 
-/* 木の書き方（H / n+ / L）は md の右上 */
-#form-picker { top: 6px; }
+  /* **両端は .md に書かれる字そのもの**なので、本文と同じ字体で出す —
+     「これは記号やラベルではなく、ファイルに入る字だ」と佇まいが言う。
+     副産物として `-` が読みやすくなる（等幅のハイフンは本文用の書体より
+     太く長い）。真ん中だけ地の書体のままなのは、そこだけが**値**
+     （境目の深さ）で、.md に書かれる字ではないから */
+  & button:first-child, & button:last-child {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+}
 
 /* 分割線にくっつく開閉の矢印。**splitter を隠さない**からこそ、片方の
    ペインを消しても flex がその境目まで splitter を押し出し、矢印はいつも
@@ -307,41 +443,58 @@ html, body {
    右はいつでも「右へ」で、端に着いたら押せなくなるだけ。分割線（5px）より
    広いので左右へはみ出すが、浮いている道具なので構わない */
 #pane-switch {
-  bottom: 12px;
+  /* 丸みはここ 1 つ。**4 箇所（両方表示の外側 2 つ・独りぼっちの残り 2 つ）が
+     同じ数を見る** — 太さを変えるたび 4 箇所を揃えて直すのは、直し忘れの
+     たねになる */
+  --r: 5px;
+  bottom: var(--edge);
   left: 50%;
+  right: auto;
   transform: translateX(-50%);
   gap: 2px;
 
   & button {
-    width: 18px;
-    height: 18px;
+    /* 絵 1 つだけなので横も詰める。高さは `.pane-tool` が決めた 20px */
+    width: 20px;
     min-width: 0;
     padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
+    border-radius: 0;
+
+    /* 丸めるのは外側の角だけ。内側（分割線に接する側）は角のまま —
+       丸めると、分割線の細い線のすぐ脇に隙間が開いて見えていた */
+    &:first-child { border-start-start-radius: var(--r); border-end-start-radius: var(--r); }
+    &:last-child { border-start-end-radius: var(--r); border-end-end-radius: var(--r); }
 
     & .icon {
-      width: 10px;
-      height: 10px;
+      width: 11px;
+      height: 11px;
       /* 絵は下向き 1 つだけ。左右はここで回して作る（線を増やさない） */
       &.point-left { transform: rotate(90deg); }
       &.point-right { transform: rotate(-90deg); }
     }
   }
+  /* 端では相方が消え、独りになる（disabled は display:none）。それでも
+     内側（分割線に接する側）は角のまま — 独りでも分割線とは今も隣接して
+     いる（#pane-switch の寄せ先が分割線の幅ぶんだけ離すよう直っている）
+     ので、first-child / last-child の規則がそのまま正しい。特別扱いは
+     要らない（以前ここに「独りなら四隅とも丸める」があったのは、
+     分割線と重なっていた頃の名残） */
   /* **押せないなら出さない。** 端では、その先がもう無い — 沈んだまま
      残しても、押して何も起きない一手を誘うだけ。
      `.pane-tool` 側ではなくここに書く: 上の配置指定が id を含むので、
      クラスだけの指定では負けて `display` が通らない */
   & button:disabled { display: none; }
 }
-/* 片方だけの時は、境目が窓の縁に来る。はみ出さないよう縁の内側へ留める */
-#panes.no-md #pane-switch { left: 8px; transform: none; }
-/* md を出しているときの右端は CodeMirror のスクローラの帯（15〜17px）で、
-   ブラウザが押下を横取りする（z-index では前に出せない）。
-   `#md-pane .pane-tool` と同じだけ避ける */
-#panes.no-map #pane-switch { left: auto; right: 28px; transform: none; }
+/* 片方だけの時は、境目が窓の縁に来る。中央寄せ（transform）のままだと
+   相方の消えた 1 個ぶんしか無い横幅で計算が狂い、画面の外へはみ出す —
+   だから寄せ先を切り替える。
+
+   **md を出している側はスクロールバーを避ける**（`#md-pane .pane-tool` と
+   同じ数）。マップ側にはその帯が無いので、分割線の幅ぶんだけ離す
+   （0 だと重なり、分割線の見える層（#splitter::after、z-index:11）が
+   ボタンより前に出る分だけ見える面積を食う）*/
+#panes.no-map #pane-switch { left: auto; right: calc(var(--bar) + var(--edge)); transform: none; }
+#panes.no-md #pane-switch { left: var(--w); transform: none; }
 
 /* 狭いときは、居場所が 2 つしか無い（`app/panes.ts` の `spotsFor`）。
    **分割線は線としての性質だけを落とす** — 動かせない境目を「掴めます」と
@@ -384,12 +537,13 @@ html, body {
      CodeMirror のネイティブなスクロールを奪わない */
   touch-action: none;
 
-  &.pane-focused { box-shadow: inset 0 0 0 2px var(--accent-soft); }
+  &.pane-focused { box-shadow: inset 0 0 0 2px var(--ring); }
 }
 
-/* 視点を選択(無ければルート)へ寄せる。md 側の書き方(#form-picker)と
-   同じ形式(上端 6px・右寄せ)を、境目を挟んで反対側にも置く */
-#map-center { top: 6px; right: 8px; }
+/* 視点を選択(無ければルート)へ寄せる道具は**下**。見え方を変えるだけで
+   中身には触らないので、地図の上端（#map-indicator が縁を使う）を避けて
+   沈む位置に居る */
+#map-center { bottom: var(--edge); }
 
 #map-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
@@ -401,14 +555,16 @@ html, body {
   top: 0;
   left: 0;
   width: 22px;
-  height: 9px;
+  height: 11px;
   background: var(--accent);
-  clip-path: polygon(0 50%, 38% 15%, 100% 50%, 38% 85%);
+  clip-path: polygon(0 50%, 38% 8%, 100% 50%, 38% 92%);
   opacity: 0.5;
   pointer-events: none;
 }
 
-#map-hint {
+/* 空のときの言い出し。**2 つのペインで同じ器**（app/hint.ts が組む）。
+   出る条件も 1 つ（まだノードが無い）。押せないし、選べない */
+.pane-hint {
   position: absolute;
   inset: 0;
   display: flex;
@@ -417,8 +573,15 @@ html, body {
   color: var(--ink-dim);
   font-size: 13px;
   pointer-events: none;
+  user-select: none;
   text-align: center;
-  line-height: 2;
+  /* md ペインでは CodeMirror の上に重なる（z-index を持たないと、
+     行の下に隠れる） */
+  z-index: 1;
+
+  /* その一手だけが立つ。**太さではなく明るさ**で言う — このアプリが
+     hover でもフォーカスでも使っている、ただ 1 つの強調の軸 */
+  & .act { color: var(--ink); }
 }
 
 /* 矩形選択の帯 */
@@ -513,6 +676,14 @@ html, body {
   & text.img-name {
     font-size: 11px;
     fill: var(--ink-dim);
+  }
+  /* 読めない場所取りの入口。**押せると分かる姿にする** — 淡いままだと
+     ただの説明書きに見え、押されない */
+  & text.img-connect {
+    font-size: 10px;
+    fill: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
   }
 
   /* ---- コードのカード ---- */
@@ -681,7 +852,7 @@ html, body {
   box-sizing: border-box;
   font-family: var(--mono);
   border: 1px solid var(--accent);
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--bg);
   overflow: hidden;
   z-index: 10;
@@ -724,11 +895,163 @@ html, body {
   display: none;
   font-family: var(--font);
   border: 2px solid var(--accent);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--node-bg);
   color: var(--ink);
   outline: none;
   z-index: 10;
+}
+
+/* ========== しらせ / たずね ==========
+   どちらも「アプリが自分で答えを知っている問い」の器。ブラウザの持ち場
+   （ファイルのピッカー・権限・離脱の引き止め）には手を出さない。 */
+
+/* 答えを待たない。帯の下・中央に出て、勝手に消える。**押せない** —
+   触れるものだと思わせない（消し方を覚えさせるほどの中身は載らない） */
+#notice {
+  position: fixed;
+  /* 帯の実測高さ(42px) + 8px の隙間。以前の 44px は帯とのあいだが 2px
+     しか無く、詰まって見えていた */
+  top: 50px;
+  left: 50%;
+  z-index: 200;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  /* **字はメニューの行と同じ 13px。** 12px だった頃は、同じ 14px の絵の下で
+     字の見えている帯だけが小さく、絵が浮いて見えていた（絵の張り出しが
+     上に 3px・下に 1px と釣り合わない）。器も中身も浮いた 1 行なのだから、
+     大きさもそちらへ揃える — 絵の側を小さくして辻褄を合わせるのではなく */
+  font-size: 13px;
+  color: var(--ink);
+  pointer-events: none;
+  /* **2 つの塊。** 左が「こちらが言っていること」（印 + 詫び）、右が
+     「何が起きなかったか」。別のものなので、あいだは塊の中（4px）より
+     はっきり広く取る — 近さは「仲間である」と言ってしまう。
+
+     揃えるのは**まん中**。印と詫びが掛かっているのは文言 1 行目ではなく
+     **言っていること全体**なので、行に付けにいかない（折り返して 2 行に
+     なっても、器の高さのまん中に居る）。
+
+     `gap` は**塊の中の距離**（印と詫び）。文言はそこからさらに離すので、
+     自分で `margin-left` を持つ（下）*/
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  /* 出ていないときは畳んで置く。`display` ではなく透明度と位置で消すのは、
+     出入りを同じ 1 つの遷移で言えるから */
+  opacity: 0;
+  transform: translate(-50%, -8px);
+  transition: opacity 0.15s, transform 0.15s;
+
+  &.on { opacity: 1; transform: translate(-50%, 0); }
+
+  /* 中身は 3 つ。**入れ物は、意味を持つか CSS で言えない境目があるときだけ**
+     置いてある（app/notice.ts）。
+
+       .icon  印
+       .lead  詫び（`blocked` では出ない）
+       .msg   何が起きなかったか
+
+     印と詫びを束ねる器は持たない — 伸びるのは `.msg` だけなので、文言が
+     折り返しても 2 つは離れない。束ねる器はそのために要ったもので、
+     意味は持っていなかった */
+
+  /* 印。**まずいことだと言うのは形で、色は増やさない** — 危険色を 1 つ足せば
+     「その色＝まずいこと」を覚えてもらう話になる。濃さだけで前に出す */
+  & .icon { color: var(--ink); }
+  /* 詫び。淡くして、主役（何が起きなかったか）に譲る */
+  & .lead { color: var(--ink-dim); }
+  /* 文言は**別のもの**なので、塊（上の gap 4px）よりはっきり離す。
+     4 + 8 = 12px — 近さは「仲間である」と言ってしまうので、仲間でない
+     ものは近づけない */
+  & .msg { margin-left: 8px; }
+}
+
+/* 答えを待つ。焦点の閉じ込め・Escape・背景は `<dialog>` が持つ */
+.ask {
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  font-family: var(--font);
+
+  &::backdrop { background: rgba(0, 0, 0, 0.45); }
+
+  & form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    min-width: 300px;
+  }
+  & .title { margin: 0; font-size: 13px; }
+  /* 補足。**題で足りるなら書かない**ので、要るときだけ場所を取る */
+  & .note { margin: -8px 0 0; font-size: 11px; color: var(--ink-dim); }
+  /* 何の話をしているかを見せる絵。字より先に置く — 名前を聞かれている
+     相手が、読む前に分かる。**元の縦横比のまま**、高さだけで抑える */
+  & .shot {
+    align-self: center;
+    max-width: 100%;
+    max-height: 160px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+  }
+  /* 字と欄の並び。**書かれる行の形そのまま**なので、字は本文と同じ幅の
+     字体で置く（`![](` と `./pics/` が md の中と同じ姿になる）*/
+  & .parts {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-wrap: wrap;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-dim);
+
+    & input { font-family: var(--mono); font-size: 12px; padding: 4px 6px; }
+  }
+  & input {
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--ink);
+
+    &:focus { outline: none; border-color: var(--accent); }
+  }
+  /* 進めない理由。**直す字のすぐ下**に出す（離すと目が往復する）。
+     行そのものを出し入れするので、要らないうちは高さも取らない */
+  & .bad { margin: -4px 0 0; font-size: 11px; color: var(--ink-dim); }
+
+  /* 断りは左、進むは右。押し間違えたときに軽いほうへ落ちる並び */
+  & .row { display: flex; justify-content: flex-end; gap: 8px; }
+  & button {
+    font: inherit;
+    font-size: 13px;
+    padding: 4px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--ink-dim);
+    cursor: pointer;
+
+    &:hover { border-color: var(--accent); color: var(--ink); }
+    /* 進む側だけが色を持つ。どちらが本命かを佇まいで言う */
+    &.go { background: var(--accent); border-color: var(--accent); color: #fff; }
+    /* 進めないあいだは沈む。**Enter でも送られない** — 送信は無効な
+       ボタンからは起きないので、門はこの 1 つで足りる */
+    &:disabled { opacity: 0.4; cursor: default; }
+    &:disabled:hover { border-color: var(--line); }
+    &.go:disabled:hover { border-color: var(--accent); }
+  }
 }
 
 /* ========== メニュー（右クリック / 書き出しの形式） ========== */
@@ -739,7 +1062,7 @@ html, body {
   min-width: 180px;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   padding: 4px;
   display: none;
@@ -747,7 +1070,7 @@ html, body {
 
   & .item {
     padding: 6px 12px;
-    border-radius: 5px;
+    border-radius: 6px;
     font-size: 13px;
     cursor: pointer;
     display: flex;
@@ -755,14 +1078,76 @@ html, body {
     justify-content: space-between;
     gap: 16px;
 
-    /* 行の頭の絵。字より控えめに座らせる */
-    & > .icon { margin-right: -10px; color: var(--ink-dim); }
-    /* 字は伸びて、キーの表示を右端へ押しやる */
-    & > span:not(.key) { flex: 1; }
+    /* 行の頭の絵。字より控えめに座らせる（絵の無い行も、同じ大きさの
+       空欄（.icon だが中身が無い）を置くので頭出しが揃う） */
+    & > .icon { margin-right: -10px; color: var(--ink-dim); flex: none; }
+    /* 済んだ行。絵がチェックに差し替わる（menu.ts）。**色は増やさず**、
+       淡さをやめるだけで「いま起きた」と言う — 並びの中で 1 行だけ濃い */
+    & > .icon.drawn { color: var(--ink); }
+    /* 字は伸びて、キーの表示を右端へ押しやる。**折り返させない** —
+       折り返すと器の広さが縮む側に決着し（`flex:1` の子は自分の字幅を
+       器の広さの計算に持ち込まない）、器を広げる側に決着しない */
+    & > span:not(.key):not(.icon) { flex: 1; white-space: nowrap; }
 
-    & .key { color: var(--ink-dim); font-size: 11px; }
-    &:hover { background: var(--accent-soft); }
-    &.disabled { opacity: 0.4; pointer-events: none; }
+    & .key { color: var(--ink-dim); font-size: 11px; white-space: nowrap; }
+    /* 押す前の但し書き。**1 つにつき印 1 つ**を右端に並べる。
+       行の頭の絵より小さく、淡く — 主役は label で、これは添え物 */
+    & .note-box {
+      position: relative;
+      display: inline-flex;
+      flex: none;
+
+      & .icon.note {
+        width: 12px;
+        height: 12px;
+        margin-right: 0;
+        color: var(--ink-dim);
+      }
+      /* 吹き出しは**触れた瞬間に出る**。`title` はブラウザ任せで一拍
+         待たされ、その一拍のあいだ印は「何かある」としか言えていない。
+         器はメニューと同じ佇まい（浮くものの色・丸み・影） */
+      & .tip {
+        position: absolute;
+        bottom: calc(100% + 6px);
+        right: -4px;
+        z-index: 1;
+        display: none;
+        max-width: 220px;
+        width: max-content;
+        padding: 4px 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+        color: var(--ink);
+        font-size: 11px;
+        white-space: normal;
+        pointer-events: none;
+
+        /* 但し書きが 2 本以上あるときの間。1 本なら効かない */
+        & > div + div { margin-top: 4px; }
+      }
+      &:hover .tip { display: flex; flex-direction: column; }
+    }
+    /* 光るのは**いま指しているところ**だけ。矢印キーで動く焦点は、
+       ブラウザ既定の輪ではなくホバーと同じ塗りで出す（同じ「ここ」を
+       2 通りの見た目で言わない）。
+
+       `:focus` ではなく `:focus-visible` なのは、**押した行が光ったまま
+       残らないため** — 行は `tabindex` を持つので押すと焦点が乗り、
+       閉じない行（`done`）では手を離しても光り続けていた。押し終えた
+       ものは、もう指してはいない */
+    &:hover, &:focus-visible { background: var(--accent-soft); }
+    &:focus { outline: none; }
+    /* **触れるが、効かない。** 押せなさは menu.ts が持つ（`pointer-events` で
+       止めると hover まで死んで、`title` の理由が読めない）。
+       起きないことを佇まいで言うため、地は光らせずカーソルも変えない */
+    &.disabled {
+      opacity: 0.4;
+      cursor: default;
+
+      &:hover { background: none; }
+    }
   }
 
   /* 見出し。**続く行たちが何に効くか**を言うだけで、押せない。
@@ -773,11 +1158,17 @@ html, body {
     border-top: 1px solid var(--line);
     font-size: 11px;
     color: var(--ink-dim);
-    /* 長いファイル名で器を広げない */
+    /* 絵が主語を言い、字が値を言う。絵は縮まない */
+    display: flex;
+    align-items: center;
+    gap: 6px;
     max-width: 240px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+
+    /* 絵は字より小さく。見出しそのものが小さいので、行の頭の絵と同じ
+       大きさだと絵のほうが大きく見える */
+    & .icon { width: 11px; height: 11px; }
+    /* 長いファイル名で器を広げない。省略するのは字だけ */
+    & span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   }
   /* 先頭に来たときは、上の線も余白も要らない */
   & .caption:first-child { margin-top: 0; border-top: none; }
@@ -842,7 +1233,7 @@ html, body {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 14px 16px;
+  padding: 16px;
   max-width: calc(100vw - 48px);
   max-height: calc(100vh - 48px);
   overflow: auto;
@@ -871,8 +1262,8 @@ html, body {
     /* **高さは字のあるボタンが決める**（背を伸ばす、で揃える）。太さの点は
        大きさが 3 通りあるので、点に高さを決めさせると背丈が揃わない */
     align-items: stretch;
-    gap: 14px;
-    margin-bottom: 10px;
+    gap: 12px;
+    margin-bottom: 12px;
   }
   & .draw-inks,
   & .draw-nibs {
@@ -900,7 +1291,7 @@ html, body {
        すり替えると何色か分からなくなる */
     &:hover { background: var(--ink-swatch); border-color: var(--ink-dim); }
     /* 選ばれている印も同じ理由で塗りを覆わず、外側に輪を回す。
-       **器の色で隙間を空けてから**輪を引く — ブランドカラーの筆は輪と
+       **器の色で隙間を空けてから**輪を引く — アクセントカラーの筆は輪と
        同じ色になりうるので、地続きだと選ばれているのか分からない */
     &.on {
       box-shadow:
@@ -919,7 +1310,7 @@ html, body {
 
     &:hover { background: var(--panel); color: var(--ink); }
     &.on { color: var(--ink); }
-    & .icon { width: 13px; height: 13px; }
+    & .icon { width: 14px; height: 14px; }
   }
 
   /* 太さ。字ではなく**その太さの点そのもの**を出す */
