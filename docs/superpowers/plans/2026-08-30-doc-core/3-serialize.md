@@ -7,7 +7,7 @@
 **T3 が作らないもの**（正誤表 §B / 裁定 4。以前の草稿から削除した）:
 
 - `core/doc/spell.mbt` — **T1 Task 1 の所有物**。§A-6 の 11 定数の完全版を T1 が作る。T3 は読むだけで、1 バイトも書かない
-- `core/doc/ast.mbt` / `core/doc/moon.pkg` — **T1 Task 1 の所有物**。「まだ無ければ §2 を写して着手する」は**禁止**。T1 のコミットを待つ
+- `core/doc/tree.mbt` / `core/doc/moon.pkg` — **T1 Task 1 の所有物**。「まだ無ければ §2 を写して着手する」は**禁止**。T1 のコミットを待つ
 - `doc_of` / `chain` / `heading` / `item` / `slot` — **T1 Task 2 の `core/doc/fixture_wbtest.mbt`** にある。`*_wbtest.mbt` はパッケージ内で 1 つの名前空間を共有する（実測 2）ので、再定義は `Error: [4051] ... is declared twice` でパッケージのテストが 1 本も走らなくなる
 
 **T3 が新しく置くトップレベル名**（正誤表 §C-3 の T3 の行のとおり。この表に無い名前を新設しない）:
@@ -19,9 +19,9 @@
 
 **着手条件（依存。正誤表 §H-2）**
 
-- Task 20 — **T1 Task 1 のコミット `feat: ✨ 新 core のパッケージと文書の木の型を置く` を待って着手する**（`moon.pkg` / `ast.mbt` / `spell.mbt` が揃う）
+- Task 20 — **T1 Task 1 のコミット `feat: ✨ 新 core のパッケージと文書の木の型を置く` を待って着手する**（`moon.pkg` / `tree.mbt` / `spell.mbt` が揃う）
 - Task 21〜26 — 上に加えて **T1 Task 2 のコミット `feat: ✨ 木の指紋を、手で組んだ木で確かめる` を待つ**（`fixture_wbtest.mbt` が揃う）
-- T2（parse 側）は**待たない**。T3 は `ast.mbt` と `spell.mbt` にしか依存せず、Task 20 から Task 26 まで単独で完走できる
+- T2（parse 側）は**待たない**。T3 は `tree.mbt` と `spell.mbt` にしか依存せず、Task 20 から Task 26 まで単独で完走できる
 
 **着手順**: Task 20 → 21 → 22 → 23 → 24 → 25 → 26（1 本道。並列にしない）。
 
@@ -29,7 +29,7 @@
 
 ## 統合の前提（他タスクと共有する取り決め）
 
-1. **逐語の文字列（`Ast.head` / `Opaque` / `Code.text` / `Svg`）の改行は `"\n"` に畳んで保持し、末尾改行を含まない。`\r` を 1 つも含まない。** head も**行ごとに `\r` を落として `\n` で綴じる**（**履行者は T1 Task 7 の `scan_head`**。正誤表 §A-7 前提 1）。serialize は `ast.eol` の流儀で全行を書き戻すだけで、逐語の中身を 1 バイトも直さない。これが無いと CRLF 文書で `---\r\r\n` が出て、parse のたびに文字列が伸び、法則 2（R093）が破れる
+1. **逐語の文字列（`Tree.head` / `Opaque` / `Code.text` / `Svg`）の改行は `"\n"` に畳んで保持し、末尾改行を含まない。`\r` を 1 つも含まない。** head も**行ごとに `\r` を落として `\n` で綴じる**（**履行者は T1 Task 7 の `scan_head`**。正誤表 §A-7 前提 1）。serialize は `tree.eol` の流儀で全行を書き戻すだけで、逐語の中身を 1 バイトも直さない。これが無いと CRLF 文書で `---\r\r\n` が出て、parse のたびに文字列が伸び、法則 2（R093）が破れる
 2. **parse は `<summary>` 行を落とす**（R107）。落とすのは `<details>` の直後の 1 行だけ（裁定 7）。serialize は毎回 label から作り直す。法則 1 はこの取り決めの上に立つ
 3. **`spell.mbt` の 11 定数は T1 Task 1 の所有物**（`item_mark` / `heading_mark` / `nest_step` / `fence_mark` / `fence_min` / `rule_mark` / `toggle_mark` / `fold_open` / `fold_close` / `summary_open` / `summary_close`）。綴りのリテラルはそこにしか無い。T3 は**読むだけ**
 4. **`implied` は side を持たない**（不変条件 11。裁定 1）。よって serialize には「側を書く場所が無い implied」が到達せず、`write_children` の区切りの書き分けは「実在するスロットの側の列」だけを見ればよい（§A-7 規則 11）
@@ -49,8 +49,8 @@
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/serialize_wbtest.mbt`（Create）
 
 **Interfaces:**
-- Consumes: `pub struct Ast { head : String?, eol : Eol, doc : Node }` / `pub enum Eol { Lf; Crlf }` / `pub fn empty(id : Int, form : Form) -> Node` / `pub enum Form { Heading; Item }`（すべて `core/doc/ast.mbt`。T1 Task 1）
-- Produces: `pub fn serialize(ast : Ast) -> String` / `priv struct Out { lines : Array[String], mut gap : Bool }` / `fn repeat(s : String, n : Int) -> String` / `fn indent(n : Int) -> String` / `fn push_text(o : Out, pad : Int, text : String) -> Unit` / `fn join_lines(lines : Array[String], eol : Eol) -> String`
+- Consumes: `pub struct Tree { head : String?, eol : Eol, doc : Node }` / `pub enum Eol { Lf; Crlf }` / `pub fn empty(id : Int, form : Form) -> Node` / `pub enum Form { Heading; Item }`（すべて `core/doc/tree.mbt`。T1 Task 1）
+- Produces: `pub fn serialize(tree : Tree) -> String` / `priv struct Out { lines : Array[String], mut gap : Bool }` / `fn repeat(s : String, n : Int) -> String` / `fn indent(n : Int) -> String` / `fn push_text(o : Out, pad : Int, text : String) -> Unit` / `fn join_lines(lines : Array[String], eol : Eol) -> String`
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -65,39 +65,39 @@
 ///|
 test "封筒だけの文書は、封筒を逐語で書いて改行で終わる" {
   // R108 / C11 の書き。head は開き `---` から閉じ `---` まで（末尾改行を含まない）
-  let ast : Ast = {
+  let tree : Tree = {
     head: Some("---\nimage-folder: img\n---"),
     eol: Lf,
     doc: empty(1, Heading),
   }
-  assert_eq(serialize(ast), "---\nimage-folder: img\n---\n")
+  assert_eq(serialize(tree), "---\nimage-folder: img\n---\n")
 }
 
 ///|
 test "何も無い文書は 1 バイトも書かない" {
   // R208（無操作は無編集）の土台。空の木に空行や改行を生やさない
-  let ast : Ast = { head: None, eol: Lf, doc: empty(1, Heading) }
-  assert_eq(serialize(ast), "")
+  let tree : Tree = { head: None, eol: Lf, doc: empty(1, Heading) }
+  assert_eq(serialize(tree), "")
 }
 
 ///|
 test "改行は原文の流儀で全行に書かれる" {
   // R093 EOL は原文の流儀を保存するダイヤル。逐語の head は "\n" 区切りで持ち、
   // 書き出しで初めて eol の流儀になる
-  let ast : Ast = { head: Some("---\na: 1\n---"), eol: Crlf, doc: empty(1, Heading) }
-  assert_eq(serialize(ast), "---\r\na: 1\r\n---\r\n")
+  let tree : Tree = { head: Some("---\na: 1\n---"), eol: Crlf, doc: empty(1, Heading) }
+  assert_eq(serialize(tree), "---\r\na: 1\r\n---\r\n")
 }
 
 ///|
 test "CRLF で書いても改行が二重にならない" {
   // 統合の前提 1 の見張り。join_lines か push_text が行末に改行を持ち込むと
   // `\r\r\n` が出て、次の parse で head が伸び続ける（法則 2 が破れる）
-  let ast : Ast = {
+  let tree : Tree = {
     head: Some("---\nk: v\n\nx: 1\n---"),
     eol: Crlf,
     doc: empty(1, Heading),
   }
-  assert_eq(serialize(ast).contains("\r\r"), false)
+  assert_eq(serialize(tree).contains("\r\r"), false)
 }
 ```
 
@@ -107,7 +107,7 @@ Run:
 ```
 moon -C D:/1.atrium/mmm/.claude/worktrees/doc-model/core test -p mmm-app/core/doc
 ```
-Expected: `Error: [4021]` / `The value identifier serialize is unbound.`（`Ast` / `Eol` / `empty` / `Heading` は T1 Task 1 で定義済みなので、未定義なのは `serialize` だけ）。1 本も走らない（`Total tests:` の行が出ない・EXIT=1）。
+Expected: `Error: [4021]` / `The value identifier serialize is unbound.`（`Tree` / `Eol` / `empty` / `Heading` は T1 Task 1 で定義済みなので、未定義なのは `serialize` だけ）。1 本も走らない（`Total tests:` の行が出ない・EXIT=1）。
 
 - [ ] **Step 3: 最小の実装を書く**
 
@@ -176,16 +176,16 @@ fn join_lines(lines : Array[String], eol : Eol) -> String {
 
 ///|
 /// 木を正規形の md にする。
-pub fn serialize(ast : Ast) -> String {
+pub fn serialize(tree : Tree) -> String {
   let o : Out = { lines: [], gap: false }
-  match ast.head {
+  match tree.head {
     Some(h) => {
       push_text(o, 0, h)
       o.gap = true
     }
     None => ()
   }
-  join_lines(o.lines, ast.eol)
+  join_lines(o.lines, tree.eol)
 }
 ```
 
@@ -214,7 +214,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 封筒�
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/serialize_wbtest.mbt`（Modify）
 
 **Interfaces:**
-- Consumes: `Out` / `repeat` / `indent` / `push_text` / `join_lines`（Task 20）／ `pub struct Node { id, form, label, implied, folded, side, body, children }` / `pub fn is_implied(nd : Node) -> Bool` / `pub fn empty(id : Int, form : Form) -> Node`（`ast.mbt`。T1 Task 1）／ `item_mark` / `heading_mark` / `nest_step`（`spell.mbt`。T1 Task 1）／ `doc_of(kids : Array[Node]) -> Node` / `heading(id : Int, label : String, kids : Array[Node]) -> Node` / `item(id : Int, label : String, kids : Array[Node]) -> Node` / `chain(n : Int) -> Node`（`fixture_wbtest.mbt`。T1 Task 2）
+- Consumes: `Out` / `repeat` / `indent` / `push_text` / `join_lines`（Task 20）／ `pub struct Node { id, form, label, implied, folded, side, body, children }` / `pub fn is_implied(nd : Node) -> Bool` / `pub fn empty(id : Int, form : Form) -> Node`（`tree.mbt`。T1 Task 1）／ `item_mark` / `heading_mark` / `nest_step`（`spell.mbt`。T1 Task 1）／ `doc_of(kids : Array[Node]) -> Node` / `heading(id : Int, label : String, kids : Array[Node]) -> Node` / `item(id : Int, label : String, kids : Array[Node]) -> Node` / `chain(n : Int) -> Node`（`fixture_wbtest.mbt`。T1 Task 2）
 - Produces: `fn feed(o : Out, before : Bool) -> Unit` / `fn hashes(n : Int) -> String` / `fn inner_pad(nd : Node, pad : Int) -> Int` / `fn write_node(o : Out, nd : Node, depth : Int, pad : Int) -> Unit` / `fn write_children(o : Out, nd : Node, depth : Int, pad : Int) -> Unit` / `fn ser(doc : Node) -> String`（テスト側）
 
 - [ ] **Step 1: 失敗するテストを書く**
@@ -226,8 +226,8 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 封筒�
 /// 木 1 つを LF・封筒なしの文書にして綴る。
 /// 手で組む道具は fixture_wbtest.mbt のもの（doc_of / heading / item / slot / chain）を使う。
 fn ser(doc : Node) -> String {
-  let ast : Ast = { head: None, eol: Lf, doc, }
-  serialize(ast)
+  let tree : Tree = { head: None, eol: Lf, doc, }
+  serialize(tree)
 }
 
 ///|
@@ -350,17 +350,17 @@ fn write_children(o : Out, nd : Node, depth : Int, pad : Int) -> Unit {
 ```moonbit
 ///|
 /// 木を正規形の md にする。
-pub fn serialize(ast : Ast) -> String {
+pub fn serialize(tree : Tree) -> String {
   let o : Out = { lines: [], gap: false }
-  match ast.head {
+  match tree.head {
     Some(h) => {
       push_text(o, 0, h)
       o.gap = true
     }
     None => ()
   }
-  write_children(o, ast.doc, 0, 0)
-  join_lines(o.lines, ast.eol)
+  write_children(o, tree.doc, 0, 0)
+  join_lines(o.lines, tree.eol)
 }
 ```
 
@@ -389,7 +389,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 見出�
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/serialize_wbtest.mbt`（Modify）
 
 **Interfaces:**
-- Consumes: `feed` / `push_text` / `indent` / `inner_pad` / `write_node` / `write_children` / `repeat`（Task 20・21）／ `pub enum Block { Content(Content); Rule; Opaque(String) }` / `pub enum Content { Image(alt~, src~); Link(text~, href~); Code(info~, text~); Svg(String) }`（`ast.mbt`）／ `rule_mark` / `fence_mark` / `fence_min`（`spell.mbt`。T1 Task 1）
+- Consumes: `feed` / `push_text` / `indent` / `inner_pad` / `write_node` / `write_children` / `repeat`（Task 20・21）／ `pub enum Block { Content(Content); Rule; Opaque(String) }` / `pub enum Content { Image(alt~, src~); Link(text~, href~); Code(info~, text~); Svg(String) }`（`tree.mbt`）／ `rule_mark` / `fence_mark` / `fence_min`（`spell.mbt`。T1 Task 1）
 - Produces: `fn write_body(o : Out, body : Array[Block], pad : Int) -> Unit` / `fn write_block(o : Out, b : Block, pad : Int) -> Unit` / `fn fence_len(text : String) -> Int` / `fn write_code(o : Out, pad : Int, info : String, text : String) -> Unit`
 
 - [ ] **Step 1: 失敗するテストを書く**
@@ -443,8 +443,8 @@ test "svg は逐語のまま、行ごとに字下げされる" {
 test "逐語の中の改行も、書き出しで eol の流儀になる" {
   // R093 / 統合の前提 1。Opaque は "\n" で持ち、CRLF 文書では全行が \r\n で出る
   let d = { ..doc_of([]), body: [Opaque("one\ntwo")] }
-  let ast : Ast = { head: None, eol: Crlf, doc: d }
-  assert_eq(serialize(ast), "one\r\ntwo\r\n")
+  let tree : Tree = { head: None, eol: Crlf, doc: d }
+  assert_eq(serialize(tree), "one\r\ntwo\r\n")
 }
 
 ///|
@@ -461,7 +461,7 @@ Run:
 ```
 moon -C D:/1.atrium/mmm/.claude/worktrees/doc-model/core test -p mmm-app/core/doc
 ```
-Expected: コンパイルは通り（`Block` / `Content` は `ast.mbt` に在る）、**値の差で落ちる**。`write_node` はまだ `body` を 1 行も書かないので、新しい 6 本すべてが「骨格行だけの md」と期待の差を出す。最終行は `Total tests: N, passed: N-6, failed: 6.`（EXIT=2）。
+Expected: コンパイルは通り（`Block` / `Content` は `tree.mbt` に在る）、**値の差で落ちる**。`write_node` はまだ `body` を 1 行も書かないので、新しい 6 本すべてが「骨格行だけの md」と期待の差を出す。最終行は `Total tests: N, passed: N-6, failed: 6.`（EXIT=2）。
 
 - [ ] **Step 3: 最小の実装を書く**
 
@@ -581,18 +581,18 @@ fn write_node(o : Out, nd : Node, depth : Int, pad : Int) -> Unit {
 ```moonbit
 ///|
 /// 木を正規形の md にする。
-pub fn serialize(ast : Ast) -> String {
+pub fn serialize(tree : Tree) -> String {
   let o : Out = { lines: [], gap: false }
-  match ast.head {
+  match tree.head {
     Some(h) => {
       push_text(o, 0, h)
       o.gap = true
     }
     None => ()
   }
-  write_body(o, ast.doc.body, 0)
-  write_children(o, ast.doc, 0, 0)
-  join_lines(o.lines, ast.eol)
+  write_body(o, tree.doc.body, 0)
+  write_children(o, tree.doc, 0, 0)
+  join_lines(o.lines, tree.eol)
 }
 ```
 
@@ -750,7 +750,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "test: ✅ フェ�
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/serialize_wbtest.mbt`（Modify）
 
 **Interfaces:**
-- Consumes: `write_children` / `inner_pad` / `feed` / `indent`（Task 21）／ `pub enum Side { Right; Left }` / `pub fn is_implied(nd : Node) -> Bool`（`ast.mbt`）／ `toggle_mark`（`spell.mbt`。T1 Task 1）／ `slot(id : Int, label : String, left : Bool) -> Node`（`fixture_wbtest.mbt`。T1 Task 2）
+- Consumes: `write_children` / `inner_pad` / `feed` / `indent`（Task 21）／ `pub enum Side { Right; Left }` / `pub fn is_implied(nd : Node) -> Bool`（`tree.mbt`）／ `toggle_mark`（`spell.mbt`。T1 Task 1）／ `slot(id : Int, label : String, left : Bool) -> Node`（`fixture_wbtest.mbt`。T1 Task 2）
 - Produces: `fn is_left(s : Side) -> Bool` / `fn write_toggle(o : Out, pad : Int) -> Unit`、および側を見る `write_children`
 
 - [ ] **Step 1: 失敗するテストを書く**
@@ -1045,7 +1045,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 畳み�
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/serialize_wbtest.mbt`（Modify）
 
 **Interfaces:**
-- Consumes: `serialize`（Task 20〜25 の全規則）／ `hashes`（Task 21）／ `ser`（Task 21）／ `doc_of` / `heading` / `item` / `slot` / `chain` / `empty`（`fixture_wbtest.mbt` と `ast.mbt`）
+- Consumes: `serialize`（Task 20〜25 の全規則）／ `hashes`（Task 21）／ `ser`（Task 21）／ `doc_of` / `heading` / `item` / `slot` / `chain` / `empty`（`fixture_wbtest.mbt` と `tree.mbt`）
 - Produces: `fn nl_count(s : String) -> Int`（テスト側の物差し。§C-3 の T3 所有名）
 
 - [ ] **Step 1: テストを書く**
@@ -1076,12 +1076,12 @@ test "format は setext も閉じ # もインデントコードも正規形に�
 ///|
 test "封筒の後・木の前に先頭トグルが書かれる" {
   // C11 / R200。frontmatter の `---` と衝突しない（封筒の内側は隙間ではない）
-  let ast : Ast = {
+  let tree : Tree = {
     head: Some("---\nimage-folder: img\n---"),
     eol: Lf,
     doc: doc_of([heading(2, "r", [slot(3, "a", true)])]),
   }
-  assert_eq(serialize(ast), "---\nimage-folder: img\n---\n\n# r\n\n---\n\n## a\n")
+  assert_eq(serialize(tree), "---\nimage-folder: img\n---\n\n# r\n\n---\n\n## a\n")
 }
 
 ///|
@@ -1233,7 +1233,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "test: ✅ 正規�
 
 ## T3 完了時に他タスクへ渡るもの
 
-- **`pub fn serialize(ast : Ast) -> String`** — T4 の法則 1・2（`format_of` / `law_wbtest.mbt`）と T5 の `reflect` が土台にする、唯一の書き手
+- **`pub fn serialize(tree : Tree) -> String`** — T4 の法則 1・2（`format_of` / `law_wbtest.mbt`）と T5 の `reflect` が土台にする、唯一の書き手
 - `fence_len` / `hashes` / `indent` / `repeat` / `push_text` / `join_lines` — 同じパッケージ内の道具（T5 の `diff` が行を扱うときに再利用してよい。**再定義しないこと**）
 - **綴りの帰結として他タスクが守るもの**:
   - **parse は `<summary>` 行を落とす**（T1 Task 9 / T2）。落とさないと、serialize が毎回 label から書き直す `<summary>` が二重になって法則 1 が破れる

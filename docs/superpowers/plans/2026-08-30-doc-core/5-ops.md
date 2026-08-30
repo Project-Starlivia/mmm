@@ -6,8 +6,8 @@
 
 **前提（正誤表 A〜H に従う。逸脱しない）**
 
-1. `core/doc/moon.pkg` / `ast.mbt` / `spell.mbt` は **T1 Task 1 の所有物**。T5 は **T1 Task 1 のコミット `feat: ✨ 新 core のパッケージと文書の木の型を置く` を待って着手する**。写して先に置くことはしない
-2. 手で木を組む道具（`node` / `heading` / `item` / `slot` / `doc_of` / `ast_of` / `chain` / `chain_ast`）は **T1 Task 2 の `core/doc/fixture_wbtest.mbt`**。T5 は**自前で定義しない**。`tree_wbtest.mbt` は作らない
+1. `core/doc/moon.pkg` / `tree.mbt` / `spell.mbt` は **T1 Task 1 の所有物**。T5 は **T1 Task 1 のコミット `feat: ✨ 新 core のパッケージと文書の木の型を置く` を待って着手する**。写して先に置くことはしない
+2. 手で木を組む道具（`node` / `heading` / `item` / `slot` / `doc_of` / `tree_of` / `chain` / `chain_tree`）は **T1 Task 2 の `core/doc/fixture_wbtest.mbt`**。T5 は**自前で定義しない**（wbtest 用の共有ヘルパを置く新しいファイルも作らない — 置き場は fixture_wbtest.mbt ただ 1 つ）
 3. **T5 に許された唯一の他人のファイルへの書き込みは、Task 43 で `fixture_wbtest.mbt` の末尾に `done` / `rejected` の 2 関数を追記すること**だけ
 4. `test/_doc.ts` は **T4 の所有物**。T5 は import するだけで、自前の型も自前の `applyEdits` も定義しない（正誤表 D-3 の export 名だけが存在する）
 5. 綴りの規律: `pub type Path = Array[Int]`（`typealias` は無い）／否定は `!x`（`not(x)` は使わない）／ラベル付き引数の呼び出しは `=`／`derive(Show)` は使わない／`rev_in_place`・`to_owned`
@@ -31,7 +31,7 @@ T5 Task 45・46・47 ──> T4 Task 37(操作の受け口) ──> Task 48(TS �
 Task 48 ──> Task 49(回復と拒否の文書) ──> Task 50(殺す条件の判定と記録)
 ```
 
-Task 40・42・43・44・45・46・47 は **T2 / T3 / T4 を 1 つも待たない**（手で組んだ `Ast` だけで完結する）。待つのは Task 41（`serialize` が要る）と Task 48（JS 出力と `test/_doc.ts` が要る）の 2 つだけなので、**40 → 42 → 43 → 44 → 45 → 46 → 47 を先に走らせ、41 と 48 を最後に回して合流する**のが最短である。
+Task 40・42・43・44・45・46・47 は **T2 / T3 / T4 を 1 つも待たない**（手で組んだ `Tree` だけで完結する）。待つのは Task 41（`serialize` が要る）と Task 48（JS 出力と `test/_doc.ts` が要る）の 2 つだけなので、**40 → 42 → 43 → 44 → 45 → 46 → 47 を先に走らせ、41 と 48 を最後に回して合流する**のが最短である。
 
 **テスト本数の読み方**: `moon -C <REPO>/core test -p mmm-app/core/doc` はパッケージ内の全テストを走らせるので、`Total tests: N` の N は他群の進捗で動く。各 Step 4 では **`failed: 0.` であることと、T5 の累計本数がそこに含まれること**を見る（T5 単独の累計を各タスクに明記した）。**`Total tests: 0` が出たら緑ではない — `-p` の綴りを疑う**（正誤表 E-1-2。`-p` を書き損じると黙って EXIT=0 になる）。
 
@@ -45,7 +45,7 @@ Task 40・42・43・44・45・46・47 は **T2 / T3 / T4 を 1 つも待たな�
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/diff_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: なし（文字列だけを見る。`ast.mbt` にも依存しない）。パッケージが存在すること（T1 Task 1 のコミット）だけが前提
+- Consumes: なし（文字列だけを見る。`tree.mbt` にも依存しない）。パッケージが存在すること（T1 Task 1 のコミット）だけが前提
 - Produces:
   - `pub struct Edit { from : Int; to : Int; insert : String } derive(Eq, Debug)`
   - `pub fn apply(text : String, edits : Array[Edit]) -> String`
@@ -202,8 +202,8 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 反映�
 - Modify: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/diff_wbtest.mbt`（末尾に 3 本追記）
 
 **Interfaces:**
-- Consumes: `pub fn diff(old : String, new_ : String) -> Array[Edit]` / `pub fn apply(text : String, edits : Array[Edit]) -> String`（Task 40）、`pub fn serialize(ast : Ast) -> String`（T3 Task 26）、`Ast` / `Node` / `empty`（T1 Task 1）、`node` / `heading` / `ast_of`（T1 Task 2 の `fixture_wbtest.mbt`）
-- Produces: `pub fn reflect(old : String, ast : Ast) -> Array[Edit]`
+- Consumes: `pub fn diff(old : String, new_ : String) -> Array[Edit]` / `pub fn apply(text : String, edits : Array[Edit]) -> String`（Task 40）、`pub fn serialize(tree : Tree) -> String`（T3 Task 26）、`Tree` / `Node` / `empty`（T1 Task 1）、`node` / `heading` / `tree_of`（T1 Task 2 の `fixture_wbtest.mbt`）
+- Produces: `pub fn reflect(old : String, tree : Tree) -> Array[Edit]`
 
 **依存**: このタスクは T3 の `serialize` が居ないとリンクできない。**T3 Task 26 のコミットを待って着手する**（依存図どおり `T3 Task 26 → T5 Task 41`）。T3 が未着なら Task 42 へ進み、後でここへ戻る。
 
@@ -215,23 +215,23 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 反映�
 ///|
 /// 備考 R208 / C15 — 読みだけでは md が 1 バイトも変わらない。
 test "無操作は無編集" {
-  let ast = ast_of([heading(2, "r", [heading(3, "a", [])])])
-  assert_eq(reflect(serialize(ast), ast).length(), 0)
+  let tree = tree_of([heading(2, "r", [heading(3, "a", [])])])
+  assert_eq(reflect(serialize(tree), tree).length(), 0)
 }
 
 ///|
 /// 備考 R143 / R148 — 反映 v0 は「当てれば正規形になる」ことが全部。
 test "反映を当てると全文が正規形になる" {
-  let ast = ast_of([heading(2, "r", [heading(3, "a", [])])])
+  let tree = tree_of([heading(2, "r", [heading(3, "a", [])])])
   let old = "# r\n\n## z\n"
-  assert_eq(apply(old, reflect(old, ast)), serialize(ast))
+  assert_eq(apply(old, reflect(old, tree)), serialize(tree))
 }
 
 ///|
 /// 備考 R143 — 空文書からでも当たる。
 test "空の原文へも反映できる" {
-  let ast = ast_of([heading(2, "r", [])])
-  assert_eq(apply("", reflect("", ast)), serialize(ast))
+  let tree = tree_of([heading(2, "r", [])])
+  assert_eq(apply("", reflect("", tree)), serialize(tree))
 }
 ```
 
@@ -249,8 +249,8 @@ Expected: `Error: [4021]` / `The value identifier reflect is unbound.`。EXIT=1
 /// 反映 v0 = 全文正規形。旧全文と変異後の木から Edit の列を作る。
 /// 自己検査（仕様 §5 段階 6）: 当てて反映文にならなければ全文置換 1 ハンクへ落とす
 /// （正しさは保たれ、カーソルだけ跳ぶ）。すげ替え（v1）はこの上に足す。
-pub fn reflect(old : String, ast : Ast) -> Array[Edit] {
-  let want = serialize(ast)
+pub fn reflect(old : String, tree : Tree) -> Array[Edit] {
+  let want = serialize(tree)
   let edits = diff(old, want)
   if apply(old, edits) == want {
     edits
@@ -282,7 +282,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 反映 v
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/form_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Node` / `Form` / `pub fn promote(nd : Node, label : String) -> Node` / `pub fn sig(ast : Ast) -> String`（T1 Task 1）、`node` / `ast_of`（T1 Task 2）
+- Consumes: `Node` / `Form` / `pub fn promote(nd : Node, label : String) -> Node` / `pub fn sig(tree : Tree) -> String`（T1 Task 1）、`node` / `tree_of`（T1 Task 2）
 - Produces:
   - `pub fn to_item(nd : Node) -> Node`
   - `pub fn refit(nd : Node, parent : Form, siblings : Array[Node], at : Int) -> Node`
@@ -302,14 +302,14 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 反映 v
 /// 備考 R122 / C14 — 単調性は下向きに伝播する。
 test "Item のサブツリー化は下向きに伝播する" {
   let h = node(2, Heading, "a", [node(3, Heading, "b", [])])
-  assert_eq(sig(ast_of([to_item(h)])), "head:-\nlf\n[H[Ia[Ib]]]")
+  assert_eq(sig(tree_of([to_item(h)])), "head:-\nlf\n[H[Ia[Ib]]]")
 }
 
 ///|
 /// 備考 R044 — 親が Item なら問答無用で Item。
 test "Item 親の下では form はサブツリーごと Item になる" {
   let fit = refit(node(2, Heading, "a", [node(3, Heading, "b", [])]), Item, [], 0)
-  assert_eq(sig(ast_of([fit])), "head:-\nlf\n[H[Ia[Ib]]]")
+  assert_eq(sig(tree_of([fit])), "head:-\nlf\n[H[Ia[Ib]]]")
 }
 
 ///|
@@ -317,7 +317,7 @@ test "Item 親の下では form はサブツリーごと Item になる" {
 test "Heading 兄弟の後ろへ挿すとそのノードだけ Heading になる" {
   let sibs = [node(3, Heading, "x", [])]
   let fit = refit(node(2, Item, "a", [node(4, Item, "b", [])]), Heading, sibs, 1)
-  assert_eq(sig(ast_of([fit])), "head:-\nlf\n[H[Ha[Ib]]]")
+  assert_eq(sig(tree_of([fit])), "head:-\nlf\n[H[Ha[Ib]]]")
 }
 
 ///|
@@ -330,14 +330,14 @@ test "後ろに Item が居る位置へ挿すとサブツリーごと Item に�
     sibs,
     0,
   )
-  assert_eq(sig(ast_of([fit])), "head:-\nlf\n[H[Ia[Ib]]]")
+  assert_eq(sig(tree_of([fit])), "head:-\nlf\n[H[Ia[Ib]]]")
 }
 
 ///|
 /// 備考 R121 — 転形は最小限。どれでもなければ触らない。
 test "資格が無ければ form はそのまま" {
   let fit = refit(node(2, Item, "a", []), Heading, [], 0)
-  assert_eq(sig(ast_of([fit])), "head:-\nlf\n[H[Ia]]")
+  assert_eq(sig(tree_of([fit])), "head:-\nlf\n[H[Ia]]")
 }
 ```
 
@@ -414,15 +414,15 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ form が
 - Modify: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/fixture_wbtest.mbt`（**末尾に `done` / `rejected` の 2 関数だけを追記**。他は 1 バイトも触らない）
 
 **Interfaces:**
-- Consumes: `Ast` / `Node` / `sig`（T1 Task 1）、`node` / `heading` / `ast_of`（T1 Task 2）
+- Consumes: `Tree` / `Node` / `sig`（T1 Task 1）、`node` / `heading` / `tree_of`（T1 Task 2）
 - Produces:
-  - `pub enum Outcome { Done(Ast); Reject(Reject) }`
+  - `pub enum Outcome { Done(Tree); Reject(Reject) }`
   - `pub enum Reject { Missing; Cycle; Ineligible } derive(Eq, Debug)`
   - `pub type Path = Array[Int]`
-  - `pub fn path_of(ast : Ast, id : Int) -> Path?`
-  - `pub fn tops(ast : Ast, ids : Array[Int]) -> Array[Path]`
+  - `pub fn path_of(tree : Tree, id : Int) -> Path?`
+  - `pub fn tops(tree : Tree, ids : Array[Int]) -> Array[Path]`
   - （非公開・Task 44〜47 が使う）`seek` / `precedes` / `under` / `at_path` / `amend` / `pluck`
-  - （`fixture_wbtest.mbt`）`fn done(o : Outcome) -> Ast` / `fn rejected(o : Outcome) -> Reject`
+  - （`fixture_wbtest.mbt`）`fn done(o : Outcome) -> Tree` / `fn rejected(o : Outcome) -> Reject`
 
 **名前の注意**（正誤表 C-1）: `before` は T3 `serialize.mbt` の引数名と衝突するので **`precedes`** に改名済み。`spell` はファイル名 `spell.mbt` と衝突するので Task 44 で **`spellable`** として置く。
 
@@ -433,7 +433,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ form が
 ```moonbit
 ///|
 /// 通った結果を剥がす（拒否されたらテストを落とす）。
-fn done(o : Outcome) -> Ast {
+fn done(o : Outcome) -> Tree {
   match o {
     Done(a) => a
     Reject(_) => abort("拒否された")
@@ -458,43 +458,43 @@ fn rejected(o : Outcome) -> Reject {
 ///|
 /// 備考 R112 — 文書そのものは空の道。
 test "文書の道は空" {
-  let ast = ast_of([heading(2, "r", [])])
-  assert_eq(path_of(ast, 1), Some([]))
+  let tree = tree_of([heading(2, "r", [])])
+  assert_eq(path_of(tree, 1), Some([]))
 }
 
 ///|
 /// 備考 R112 — 道は children の添字の列。
 test "道は children の添字の列" {
-  let ast = ast_of([heading(2, "r", [heading(3, "a", []), heading(4, "b", [])])])
-  assert_eq(path_of(ast, 4), Some([0, 1]))
+  let tree = tree_of([heading(2, "r", [heading(3, "a", []), heading(4, "b", [])])])
+  assert_eq(path_of(tree, 4), Some([0, 1]))
 }
 
 ///|
 /// 備考 R112 — 居ないものは道を持たない（拒否 Missing の根拠）。
 test "居ない id は道を持たない" {
-  let ast = ast_of([heading(2, "r", [])])
-  assert_eq(path_of(ast, 99), None)
+  let tree = tree_of([heading(2, "r", [])])
+  assert_eq(path_of(tree, 99), None)
 }
 
 ///|
 /// 備考 R130 — 子孫の選択は祖先に吸収される。
 test "頂点集合は子孫を祖先に吸収する" {
-  let ast = ast_of([heading(2, "r", [heading(3, "a", [])])])
-  assert_eq(tops(ast, [3, 2]), [[0]])
+  let tree = tree_of([heading(2, "r", [heading(3, "a", [])])])
+  assert_eq(tops(tree, [3, 2]), [[0]])
 }
 
 ///|
 /// 備考 R131 — 頂点集合は文書順に並ぶ。
 test "頂点集合は文書順に並ぶ" {
-  let ast = ast_of([heading(2, "r", [heading(3, "a", []), heading(4, "b", [])])])
-  assert_eq(tops(ast, [4, 3]), [[0, 0], [0, 1]])
+  let tree = tree_of([heading(2, "r", [heading(3, "a", []), heading(4, "b", [])])])
+  assert_eq(tops(tree, [4, 3]), [[0, 0], [0, 1]])
 }
 
 ///|
 /// 備考 R130 — 同じものを 2 回選んでも 1 つ。
 test "同じ id を重ねても頂点は 1 つ" {
-  let ast = ast_of([heading(2, "r", [])])
-  assert_eq(tops(ast, [2, 2]), [[0]])
+  let tree = tree_of([heading(2, "r", [])])
+  assert_eq(tops(tree, [2, 2]), [[0]])
 }
 ```
 
@@ -512,7 +512,7 @@ Expected: `Error: [4032]` / `The type Outcome is undefined.` と `Error: [4021]`
 /// 操作の結果。拒否は例外ではなく値（Result も raise も使わない — 旧 core に前例が無く、
 /// 拒否は異常ではなく通常の答えだから）。
 pub enum Outcome {
-  Done(Ast)
+  Done(Tree)
   Reject(Reject)
 }
 
@@ -529,9 +529,9 @@ pub type Path = Array[Int]
 
 ///|
 /// id からの道。居なければ None。
-pub fn path_of(ast : Ast, id : Int) -> Path? {
+pub fn path_of(tree : Tree, id : Int) -> Path? {
   let acc : Array[Int] = []
-  if seek(ast.doc, id, acc) {
+  if seek(tree.doc, id, acc) {
     Some(acc)
   } else {
     None
@@ -556,10 +556,10 @@ fn seek(nd : Node, id : Int, acc : Array[Int]) -> Bool {
 
 ///|
 /// 頂点集合への正規化（子孫の選択は祖先に吸収され、文書順に並ぶ）。
-pub fn tops(ast : Ast, ids : Array[Int]) -> Array[Path] {
+pub fn tops(tree : Tree, ids : Array[Int]) -> Array[Path] {
   let paths : Array[Path] = []
   for id in ids {
-    match path_of(ast, id) {
+    match path_of(tree, id) {
       Some(p) => paths.push(p)
       None => ()
     }
@@ -673,8 +673,8 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 操作�
 - Modify: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/op_wbtest.mbt`（末尾に 10 本足す）
 
 **Interfaces:**
-- Consumes: `to_item`（Task 42）、`is_implied` / `promote` / `empty` / `sig` / `Side`（T1 Task 1）、`node` / `heading` / `item` / `ast_of`（T1 Task 2）
-- Produces: `pub fn normalize(ast : Ast) -> Ast`、（非公開）`fn fix(nd : Node, depth : Int) -> Node` / `fn spellable(nd : Node, heading_before : Bool, depth : Int, prev : Side) -> Node`
+- Consumes: `to_item`（Task 42）、`is_implied` / `promote` / `empty` / `sig` / `Side`（T1 Task 1）、`node` / `heading` / `item` / `tree_of`（T1 Task 2）
+- Produces: `pub fn normalize(tree : Tree) -> Tree`、（非公開）`fn fix(nd : Node, depth : Int) -> Node` / `fn spellable(nd : Node, heading_before : Bool, depth : Int, prev : Side) -> Node`
 
 これが T5 の心臓であり、**仕様 §9「殺す条件」の観測点**（Task 50）でもある。操作ごとの場合分けはここへ集める。
 
@@ -691,24 +691,24 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 操作�
 /// 備考 R024 / R025 — implied は子を持つ限りにおいて存在する。
 test "子の居ない implied は導出されなくなる" {
   let g = { ..empty(3, Heading), implied: true }
-  let ast = ast_of([heading(2, "r", [g])])
-  assert_eq(sig(normalize(ast)), "head:-\nlf\n[H[Hr]]")
+  let tree = tree_of([heading(2, "r", [g])])
+  assert_eq(sig(normalize(tree)), "head:-\nlf\n[H[Hr]]")
 }
 
 ///|
 /// 備考 R024 — 子が居る implied はそのまま（飛びが綴り）。
 test "子の居る implied は残る" {
   let g = { ..empty(3, Heading), implied: true, children: [heading(4, "x", [])] }
-  let ast = ast_of([heading(2, "r", [g])])
-  assert_eq(sig(normalize(ast)), "head:-\nlf\n[H[Hr[H~[Hx]]]]")
+  let tree = tree_of([heading(2, "r", [g])])
+  assert_eq(sig(normalize(tree)), "head:-\nlf\n[H[Hr[H~[Hx]]]]")
 }
 
 ///|
 /// 備考 R124 / 裁定 B — 前に見出しが居ると飛びが吸収されて綴れないので昇格する（不変条件 8）。
 test "見出しの後ろの implied は昇格する" {
   let g = { ..empty(4, Heading), implied: true, children: [heading(5, "x", [])] }
-  let ast = ast_of([heading(2, "r", [heading(3, "a", []), g])])
-  assert_eq(sig(normalize(ast)), "head:-\nlf\n[H[Hr[Ha][H[Hx]]]]")
+  let tree = tree_of([heading(2, "r", [heading(3, "a", []), g])])
+  assert_eq(sig(normalize(tree)), "head:-\nlf\n[H[Hr[Ha][H[Hx]]]]")
 }
 
 ///|
@@ -716,45 +716,45 @@ test "見出しの後ろの implied は昇格する" {
 /// 項目 root の後ろに立った implied は綴れる。昇格させない。
 test "項目 root のあとの implied は昇格しない" {
   let g = { ..empty(3, Heading), implied: true, children: [heading(4, "h", [])] }
-  let ast = ast_of([item(2, "a", []), g])
-  assert_eq(sig(normalize(ast)), "head:-\nlf\n[H[Ia][H~[Hh]]]")
+  let tree = tree_of([item(2, "a", []), g])
+  assert_eq(sig(normalize(tree)), "head:-\nlf\n[H[Ia][H~[Hh]]]")
 }
 
 ///|
 /// 備考 R039 — 単調性: Item の子孫はすべて Item。
 test "Item の下は全部 Item になる" {
-  let ast = ast_of([
+  let tree = tree_of([
     node(2, Item, "a", [node(3, Heading, "b", [node(4, Heading, "c", [])])]),
   ])
-  assert_eq(sig(normalize(ast)), "head:-\nlf\n[H[Ia[Ib[Ic]]]]")
+  assert_eq(sig(normalize(tree)), "head:-\nlf\n[H[Ia[Ib[Ic]]]]")
 }
 
 ///|
 /// 備考 R041 — 順序法則: 同じ親の子は Item が先、Heading が後。
 test "同じ親の子は Item が先、Heading が後に並ぶ" {
-  let ast = ast_of([
+  let tree = tree_of([
     heading(2, "r", [
       node(3, Heading, "a", []),
       node(4, Item, "x", []),
       node(5, Heading, "b", []),
     ]),
   ])
-  assert_eq(sig(normalize(ast)), "head:-\nlf\n[H[Hr[Ix][Ha][Hb]]]")
+  assert_eq(sig(normalize(tree)), "head:-\nlf\n[H[Hr[Ix][Ha][Hb]]]")
 }
 
 ///|
 /// 備考 R042 — 順序法則は doc（深さ 0）直下にも同じく効く。
 test "文書直下でも Item root が Heading root より前に並ぶ" {
-  let ast = ast_of([node(2, Heading, "r", []), node(3, Item, "c", [])])
-  assert_eq(sig(normalize(ast)), "head:-\nlf\n[H[Ic][Hr]]")
+  let tree = tree_of([node(2, Heading, "r", []), node(3, Item, "c", [])])
+  assert_eq(sig(normalize(tree)), "head:-\nlf\n[H[Ic][Hr]]")
 }
 
 ///|
 /// 備考 R055 — 側は深さ 2 のスロットだけが持つ（不変条件 10）。
 test "深さ 2 でない側は落とされる" {
   let x = { ..node(4, Heading, "x", []), side: Left }
-  let ast = ast_of([heading(2, "r", [heading(3, "a", [x])])])
-  assert_eq(sig(normalize(ast)), "head:-\nlf\n[H[Hr[Ha[Hx]]]]")
+  let tree = tree_of([heading(2, "r", [heading(3, "a", [x])])])
+  assert_eq(sig(normalize(tree)), "head:-\nlf\n[H[Hr[Ha[Hx]]]]")
 }
 
 ///|
@@ -774,16 +774,16 @@ test "側のトグルを要する implied スロットは昇格する" {
     side: Left,
     children: [inner],
   }
-  let ast = ast_of([heading(2, "r", [left_slot])])
-  assert_eq(sig(normalize(ast)), "head:-\nlf\n[H[Hr[H<[H~[Hb]]]]]")
+  let tree = tree_of([heading(2, "r", [left_slot])])
+  assert_eq(sig(normalize(tree)), "head:-\nlf\n[H[Hr[H<[H~[Hb]]]]]")
 }
 
 ///|
 /// 備考 R003 — 回復は決定的・冪等。
 test "不変条件の回復は冪等" {
   let g = { ..empty(3, Heading), implied: true, children: [node(4, Item, "x", [])] }
-  let ast = ast_of([heading(2, "r", [heading(5, "a", []), g])])
-  let once = normalize(ast)
+  let tree = tree_of([heading(2, "r", [heading(5, "a", []), g])])
+  let once = normalize(tree)
   assert_eq(sig(normalize(once)), sig(once))
 }
 ```
@@ -801,8 +801,8 @@ Expected: `Error: [4021]` / `The value identifier normalize is unbound.`。EXIT=
 ///|
 /// 不変条件の回復。**すべての操作の最後に必ず通す**。
 /// implied の消滅・昇格・単調性・順序法則・側の落とし込みを 1 度に行う。
-pub fn normalize(ast : Ast) -> Ast {
-  { ..ast, doc: fix(ast.doc, 0) }
+pub fn normalize(tree : Tree) -> Tree {
+  { ..tree, doc: fix(tree.doc, 0) }
 }
 
 ///|
@@ -904,8 +904,8 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 不変�
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/delete_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Outcome` / `Reject` / `Path` / `path_of` / `tops` / `normalize` と非公開の `pluck`（Task 43・44）、`empty` / `sig`（T1 Task 1）、`node` / `heading` / `ast_of` / `done` / `rejected`（`fixture_wbtest.mbt`）
-- Produces: `pub fn delete_nodes(ast : Ast, ids : Array[Int]) -> Outcome`
+- Consumes: `Outcome` / `Reject` / `Path` / `path_of` / `tops` / `normalize` と非公開の `pluck`（Task 43・44）、`empty` / `sig`（T1 Task 1）、`node` / `heading` / `tree_of` / `done` / `rejected`（`fixture_wbtest.mbt`）
+- Produces: `pub fn delete_nodes(tree : Tree, ids : Array[Int]) -> Outcome`
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -918,18 +918,18 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 不変�
 /// 備考 C3 / R183 — 側の列が (右, 右) になり、区切りは導出されなくなる。
 test "C3: 左の枝を消すと側の列が (右, 右) になる" {
   let b = { ..heading(3, "b", []), side: Left }
-  let ast = ast_of([
+  let tree = tree_of([
     heading(2, "r", [heading(4, "a", []), b, heading(5, "c", [])]),
   ])
-  let out = done(delete_nodes(ast, [3]))
+  let out = done(delete_nodes(tree, [3]))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr[Ha][Hc]]]")
 }
 
 ///|
 /// 備考 R133 — delete はサブツリー削除で統一（段差詰めはしない）。
 test "消すのはサブツリーごと" {
-  let ast = ast_of([heading(2, "r", [heading(3, "a", [heading(4, "x", [])])])])
-  let out = done(delete_nodes(ast, [3]))
+  let tree = tree_of([heading(2, "r", [heading(3, "a", [heading(4, "x", [])])])])
+  let out = done(delete_nodes(tree, [3]))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr]]")
 }
 
@@ -937,36 +937,36 @@ test "消すのはサブツリーごと" {
 /// 備考 R025 — 最後の子を失った implied は同時に居なくなる。
 test "子を失った implied は導出されなくなる" {
   let g = { ..empty(3, Heading), implied: true, children: [heading(4, "x", [])] }
-  let ast = ast_of([heading(2, "r", [g])])
-  let out = done(delete_nodes(ast, [4]))
+  let tree = tree_of([heading(2, "r", [g])])
+  let out = done(delete_nodes(tree, [4]))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr]]")
 }
 
 ///|
 /// 備考 R130 — 複数選択は頂点集合に正規化してから当てる。
 test "祖先と子孫を一緒に選んでも 1 回だけ消える" {
-  let ast = ast_of([
+  let tree = tree_of([
     heading(2, "r", [
       heading(3, "a", [heading(4, "x", [])]),
       heading(5, "b", []),
     ]),
   ])
-  let out = done(delete_nodes(ast, [4, 3]))
+  let out = done(delete_nodes(tree, [4, 3]))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr[Hb]]]")
 }
 
 ///|
 /// 備考 R112 — 居ない id は Missing。
 test "居ない id を指した delete は Missing" {
-  let ast = ast_of([heading(2, "r", [])])
-  assert_eq(rejected(delete_nodes(ast, [99])), Missing)
+  let tree = tree_of([heading(2, "r", [])])
+  assert_eq(rejected(delete_nodes(tree, [99])), Missing)
 }
 
 ///|
 /// 備考 不変条件 1 — 文書は消せない。
 test "文書そのものは消せない" {
-  let ast = ast_of([heading(2, "r", [])])
-  assert_eq(rejected(delete_nodes(ast, [1])), Ineligible)
+  let tree = tree_of([heading(2, "r", [])])
+  assert_eq(rejected(delete_nodes(tree, [1])), Ineligible)
 }
 ```
 
@@ -982,13 +982,13 @@ Expected: `Error: [4021]` / `The value identifier delete_nodes is unbound.`。EX
 ```moonbit
 ///|
 /// 選んだもののサブツリーを消す（段差詰めはしない）。
-pub fn delete_nodes(ast : Ast, ids : Array[Int]) -> Outcome {
+pub fn delete_nodes(tree : Tree, ids : Array[Int]) -> Outcome {
   for id in ids {
-    if path_of(ast, id) is None {
+    if path_of(tree, id) is None {
       return Reject(Missing)
     }
   }
-  let ps = tops(ast, ids)
+  let ps = tops(tree, ids)
   if ps.length() == 0 {
     return Reject(Ineligible)
   }
@@ -998,11 +998,11 @@ pub fn delete_nodes(ast : Ast, ids : Array[Int]) -> Outcome {
     }
   }
   // 後ろから抜く（前の道の添字がずれない）
-  let mut doc = ast.doc
+  let mut doc = tree.doc
   for i = ps.length() - 1; i >= 0; i = i - 1 {
     doc = pluck(doc, ps[i], 0)
   }
-  Done(normalize({ ..ast, doc, }))
+  Done(normalize({ ..tree, doc, }))
 }
 ```
 
@@ -1028,8 +1028,8 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 消す�
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/side_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Outcome` / `Reject` / `path_of` / `tops` / `normalize` と非公開の `amend`（Task 43・44）、`promote` / `empty` / `sig`（T1 Task 1）、`heading` / `ast_of` / `done` / `rejected`（`fixture_wbtest.mbt`）
-- Produces: `pub fn flip_side(ast : Ast, ids : Array[Int]) -> Outcome`、（非公開）`fn turn(nd : Node) -> Node` / `fn mirror(nd : Node) -> Node`
+- Consumes: `Outcome` / `Reject` / `path_of` / `tops` / `normalize` と非公開の `amend`（Task 43・44）、`promote` / `empty` / `sig`（T1 Task 1）、`heading` / `tree_of` / `done` / `rejected`（`fixture_wbtest.mbt`）
+- Produces: `pub fn flip_side(tree : Tree, ids : Array[Int]) -> Outcome`、（非公開）`fn turn(nd : Node) -> Node` / `fn mirror(nd : Node) -> Node`
 
 **裁定 1 の実装点**: `turn` は**骨格行を書いてから反転する**。`promote(nd, nd.label)` は骨格行を持つノードには無害（同じ label を書き直すだけ）なので、**分岐なしで無条件に呼ぶ**。これで side.mbt に `implied` / `is_implied` というリテラルが 1 つも現れず、Task 50 の判定 3（implied の専用分岐がゼロ）が守られる。
 
@@ -1043,8 +1043,8 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 消す�
 ///|
 /// 備考 C4 / R185 — 先頭の枝も反転できる（先頭トグルが左開始を綴る）。
 test "C4: 先頭の枝の flipSide は側の列を (左, 右) にする" {
-  let ast = ast_of([heading(2, "r", [heading(3, "a", []), heading(4, "b", [])])])
-  let out = done(flip_side(ast, [3]))
+  let tree = tree_of([heading(2, "r", [heading(3, "a", []), heading(4, "b", [])])])
+  let out = done(flip_side(tree, [3]))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr[H<a][Hb]]]")
 }
 
@@ -1052,24 +1052,24 @@ test "C4: 先頭の枝の flipSide は側の列を (左, 右) にする" {
 /// 備考 R127 — root は鏡像（全スロット一括反転）。木全体 = root のサブツリーなので比例的。
 test "root の flipSide は鏡像になる" {
   let a = { ..heading(3, "a", []), side: Left }
-  let ast = ast_of([heading(2, "r", [a, heading(4, "b", [])])])
-  let out = done(flip_side(ast, [2]))
+  let tree = tree_of([heading(2, "r", [a, heading(4, "b", [])])])
+  let out = done(flip_side(tree, [2]))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr[Ha][H<b]]]")
 }
 
 ///|
 /// 備考 R118 / R128 — 深いノードには資格が無い（委譲は却下）。
 test "深いノードの flipSide は資格が無い" {
-  let ast = ast_of([heading(2, "r", [heading(3, "a", [heading(4, "x", [])])])])
-  assert_eq(rejected(flip_side(ast, [4])), Ineligible)
+  let tree = tree_of([heading(2, "r", [heading(3, "a", [heading(4, "x", [])])])])
+  assert_eq(rejected(flip_side(tree, [4])), Ineligible)
 }
 
 ///|
 /// 備考 R129 — 複数選択では資格のあるものだけに効き、他はスキップする。
 test "資格のあるものだけに効く" {
   let a = heading(3, "a", [heading(4, "x", [])])
-  let ast = ast_of([heading(2, "r", [a, heading(5, "b", [])])])
-  let out = done(flip_side(ast, [4, 5]))
+  let tree = tree_of([heading(2, "r", [a, heading(5, "b", [])])])
+  let out = done(flip_side(tree, [4, 5]))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr[Ha[Hx]][H<b]]]")
 }
 
@@ -1084,16 +1084,16 @@ test "C16: implied スロットの flipSide は昇格してから反転する" {
   }
   // 名前は `slot` を避ける（fixture_wbtest.mbt の `fn slot` を影にしないため）
   let implied_slot = { ..empty(3, Heading), implied: true, children: [inner] }
-  let ast = ast_of([heading(2, "r", [implied_slot])])
-  let out = done(flip_side(ast, [3]))
+  let tree = tree_of([heading(2, "r", [implied_slot])])
+  let out = done(flip_side(tree, [3]))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr[H<[H~[Hb]]]]]")
 }
 
 ///|
 /// 備考 R112 — 居ない id は Missing。
 test "居ない id を指した flipSide は Missing" {
-  let ast = ast_of([heading(2, "r", [])])
-  assert_eq(rejected(flip_side(ast, [99])), Missing)
+  let tree = tree_of([heading(2, "r", [])])
+  assert_eq(rejected(flip_side(tree, [99])), Missing)
 }
 ```
 
@@ -1131,15 +1131,15 @@ fn mirror(nd : Node) -> Node {
 /// 側を返す。root（深さ 1）なら鏡像（配下の全スロット一括反転）、
 /// 深さ 2 のスロットならそれ 1 つ。他は資格が無い。
 /// 複数選択では資格のあるものだけに効き、資格が 1 つも無ければ Reject(Ineligible)。
-pub fn flip_side(ast : Ast, ids : Array[Int]) -> Outcome {
+pub fn flip_side(tree : Tree, ids : Array[Int]) -> Outcome {
   for id in ids {
-    if path_of(ast, id) is None {
+    if path_of(tree, id) is None {
       return Reject(Missing)
     }
   }
-  let mut doc = ast.doc
+  let mut doc = tree.doc
   let mut hit = false
-  for p in tops(ast, ids) {
+  for p in tops(tree, ids) {
     if p.length() == 1 {
       doc = amend(doc, p, 0, mirror)
       hit = true
@@ -1149,7 +1149,7 @@ pub fn flip_side(ast : Ast, ids : Array[Int]) -> Outcome {
     }
   }
   if hit {
-    Done(normalize({ ..ast, doc, }))
+    Done(normalize({ ..tree, doc, }))
   } else {
     Reject(Ineligible)
   }
@@ -1178,8 +1178,8 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 側を�
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/move_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `refit` / `to_item`（Task 42）、`Outcome` / `Reject` / `Path` / `path_of` / `tops` / `normalize` と非公開の `at_path` / `amend` / `pluck` / `under`（Task 43・44）、`empty` / `sig` / `Block`（T1 Task 1）、`node` / `heading` / `ast_of` / `done` / `rejected`（`fixture_wbtest.mbt`）
-- Produces: `pub fn move_nodes(ast : Ast, ids : Array[Int], parent : Int, at : Int) -> Outcome`、（非公開）`fn moving(picked : Array[Node], id : Int) -> Bool` / `fn seat_in(host : Node, picked : Array[Node], slot : Int) -> Node`
+- Consumes: `refit` / `to_item`（Task 42）、`Outcome` / `Reject` / `Path` / `path_of` / `tops` / `normalize` と非公開の `at_path` / `amend` / `pluck` / `under`（Task 43・44）、`empty` / `sig` / `Block`（T1 Task 1）、`node` / `heading` / `tree_of` / `done` / `rejected`（`fixture_wbtest.mbt`）
+- Produces: `pub fn move_nodes(tree : Tree, ids : Array[Int], parent : Int, at : Int) -> Outcome`、（非公開）`fn moving(picked : Array[Node], id : Int) -> Bool` / `fn seat_in(host : Node, picked : Array[Node], slot : Int) -> Node`
 
 **文書を親とする move**（R059 / R060）: root 専用の操作語彙は存在しない。root 化も root の並べ替えも「parent = doc の id（1）」の move で表現する。テストを 2 本置いて固定する。
 
@@ -1194,8 +1194,8 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 側を�
 /// 備考 C5 / R187 / R188 — 中身は運ばれ、深さは移動先で付け直される（level は木の深さそのもの）。
 test "C5: 中身は運ばれ、深さは付け直される" {
   let head = { ..heading(3, "head", []), body: [Opaque("content01"), Rule] }
-  let ast = ast_of([heading(2, "r", [head, heading(4, "head2", [])])])
-  let out = done(move_nodes(ast, [3], 4, 0))
+  let tree = tree_of([heading(2, "r", [head, heading(4, "head2", [])])])
+  let out = done(move_nodes(tree, [3], 4, 0))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr[Hhead2[Hhead|o:content01|rule]]]]")
 }
 
@@ -1203,8 +1203,8 @@ test "C5: 中身は運ばれ、深さは付け直される" {
 /// 備考 C14 / R123 — Heading 兄弟の間へ落ちた Item はそのノードだけ Heading 化（子は Item のまま）。
 test "C14: Heading 兄弟の間へ落ちた Item はそのノードだけ Heading になる" {
   let a = heading(3, "a", [node(5, Item, "x", [node(6, Item, "y", [])])])
-  let ast = ast_of([heading(2, "r", [a, heading(4, "b", [])])])
-  let out = done(move_nodes(ast, [5], 2, 1))
+  let tree = tree_of([heading(2, "r", [a, heading(4, "b", [])])])
+  let out = done(move_nodes(tree, [5], 2, 1))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr[Ha][Hx[Iy]][Hb]]]")
 }
 
@@ -1213,47 +1213,47 @@ test "C14: Heading 兄弟の間へ落ちた Item はそのノードだけ Headin
 test "Item 親の下へ来た Heading はサブツリーごと Item になる" {
   let a = node(3, Item, "a", [])
   let b = heading(4, "b", [heading(5, "c", [])])
-  let ast = ast_of([heading(2, "r", [a, b])])
-  let out = done(move_nodes(ast, [4], 3, 0))
+  let tree = tree_of([heading(2, "r", [a, b])])
+  let out = done(move_nodes(tree, [4], 3, 0))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr[Ia[Ib[Ic]]]]]")
 }
 
 ///|
 /// 備考 R116 — 子孫への move は循環。
 test "自分の中へは動かせない" {
-  let ast = ast_of([heading(2, "r", [heading(3, "a", [heading(4, "x", [])])])])
-  assert_eq(rejected(move_nodes(ast, [3], 4, 0)), Cycle)
+  let tree = tree_of([heading(2, "r", [heading(3, "a", [heading(4, "x", [])])])])
+  assert_eq(rejected(move_nodes(tree, [3], 4, 0)), Cycle)
 }
 
 ///|
 /// 備考 R120 — 同位置への move は許可し、編集ゼロ。
 test "同じ位置への move は木を変えない" {
-  let ast = ast_of([heading(2, "r", [heading(3, "a", []), heading(4, "b", [])])])
-  let out = done(move_nodes(ast, [3], 2, 0))
-  assert_eq(sig(out), sig(ast))
+  let tree = tree_of([heading(2, "r", [heading(3, "a", []), heading(4, "b", [])])])
+  let out = done(move_nodes(tree, [3], 2, 0))
+  assert_eq(sig(out), sig(tree))
 }
 
 ///|
 /// 備考 R131 — 複数選択は文書順を保って連続挿入する。
 test "複数選択は文書順を保って連続挿入される" {
-  let ast = ast_of([
+  let tree = tree_of([
     heading(2, "r", [
       heading(3, "a", []),
       heading(4, "b", []),
       heading(5, "c", []),
     ]),
   ])
-  let out = done(move_nodes(ast, [5, 3], 4, 0))
+  let out = done(move_nodes(tree, [5, 3], 4, 0))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr[Hb[Ha][Hc]]]]")
 }
 
 ///|
 /// 備考 R120 — at は操作前の children の添字。末尾なら最後の子。
 test "末尾への move は最後の子になる" {
-  let ast = ast_of([
+  let tree = tree_of([
     heading(2, "r", [heading(3, "a", [heading(5, "x", [])]), heading(4, "b", [])]),
   ])
-  let out = done(move_nodes(ast, [4], 3, 1))
+  let out = done(move_nodes(tree, [4], 3, 1))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr[Ha[Hx][Hb]]]]")
 }
 
@@ -1261,8 +1261,8 @@ test "末尾への move は最後の子になる" {
 /// 備考 R124 / 裁定 B — 綴りは行き先に従う。前に見出しが来た implied は飛びで綴れないので昇格する。
 test "見出しの後ろへ回った implied は昇格する" {
   let g = { ..empty(4, Heading), implied: true, children: [heading(5, "x", [])] }
-  let ast = ast_of([heading(2, "r", [g, heading(3, "a", [])])])
-  let out = done(move_nodes(ast, [3], 2, 0))
+  let tree = tree_of([heading(2, "r", [g, heading(3, "a", [])])])
+  let out = done(move_nodes(tree, [3], 2, 0))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr[Ha][H[Hx]]]]")
 }
 
@@ -1271,24 +1271,24 @@ test "見出しの後ろへ回った implied は昇格する" {
 /// 深さが 1 に付け直され、側も Right へ落ちる（不変条件 10）。
 test "枝を文書の子へ move すると root になる" {
   let a = { ..heading(3, "a", []), side: Left }
-  let ast = ast_of([heading(2, "r", [a])])
-  let out = done(move_nodes(ast, [3], 1, 1))
+  let tree = tree_of([heading(2, "r", [a])])
+  let out = done(move_nodes(tree, [3], 1, 1))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr][Ha]]")
 }
 
 ///|
 /// 備考 R060 — root の並べ替えも「文書を親とする move」で表す。
 test "root は文書を親とする move で並べ替わる" {
-  let ast = ast_of([heading(2, "r1", []), heading(3, "r2", [])])
-  let out = done(move_nodes(ast, [3], 1, 0))
+  let tree = tree_of([heading(2, "r1", []), heading(3, "r2", [])])
+  let out = done(move_nodes(tree, [3], 1, 0))
   assert_eq(sig(out), "head:-\nlf\n[H[Hr2][Hr1]]")
 }
 
 ///|
 /// 備考 R112 — 居ない id は Missing。
 test "居ない親を指した move は Missing" {
-  let ast = ast_of([heading(2, "r", [heading(3, "a", [])])])
-  assert_eq(rejected(move_nodes(ast, [3], 99, 0)), Missing)
+  let tree = tree_of([heading(2, "r", [heading(3, "a", [])])])
+  assert_eq(rejected(move_nodes(tree, [3], 99, 0)), Missing)
 }
 ```
 
@@ -1342,21 +1342,21 @@ fn seat_in(host : Node, picked : Array[Node], slot : Int) -> Node {
 /// children.length() なら末尾）。文書順を保って連続挿入する。
 /// 同じ位置への move は Done（編集ゼロ）。
 pub fn move_nodes(
-  ast : Ast,
+  tree : Tree,
   ids : Array[Int],
   parent : Int,
   at : Int,
 ) -> Outcome {
   for id in ids {
-    if path_of(ast, id) is None {
+    if path_of(tree, id) is None {
       return Reject(Missing)
     }
   }
-  let pp : Path = match path_of(ast, parent) {
+  let pp : Path = match path_of(tree, parent) {
     Some(p) => p
     None => return Reject(Missing)
   }
-  let ps = tops(ast, ids)
+  let ps = tops(tree, ids)
   if ps.length() == 0 {
     return Reject(Ineligible)
   }
@@ -1371,9 +1371,9 @@ pub fn move_nodes(
   // 抜くと添字がずれるので、挿し先は「錨」のノードの id で覚える
   let picked : Array[Node] = []
   for p in ps {
-    picked.push(at_path(ast.doc, p, 0))
+    picked.push(at_path(tree.doc, p, 0))
   }
-  let host = at_path(ast.doc, pp, 0)
+  let host = at_path(tree.doc, pp, 0)
   let mut want = at
   if want < 0 {
     want = 0
@@ -1387,11 +1387,11 @@ pub fn move_nodes(
       anchor = host.children[i].id
     }
   }
-  let mut doc = ast.doc
+  let mut doc = tree.doc
   for i = ps.length() - 1; i >= 0; i = i - 1 {
     doc = pluck(doc, ps[i], 0)
   }
-  let seat : Path = match path_of({ ..ast, doc, }, parent) {
+  let seat : Path = match path_of({ ..tree, doc, }, parent) {
     Some(p) => p
     None => return Reject(Missing)
   }
@@ -1403,7 +1403,7 @@ pub fn move_nodes(
     }
   }
   doc = amend(doc, seat, 0, fn(h) { seat_in(h, picked, slot) })
-  Done(normalize({ ..ast, doc, }))
+  Done(normalize({ ..tree, doc, }))
 }
 ```
 
@@ -1683,8 +1683,8 @@ fn pluck(nd : Node, p : Path, k : Int) -> Node {
 **(c) 自己検査が落ちた（`applyEdits(md, r.edits) !== r.text`）** — `reflect` のフォールバックが働いていない。`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/reflect.mbt` が次のとおりであることを確かめる（`diff` の刈り込みが間違っても、この 1 本で正しさは保たれる）:
 
 ```moonbit
-pub fn reflect(old : String, ast : Ast) -> Array[Edit] {
-  let want = serialize(ast)
+pub fn reflect(old : String, tree : Tree) -> Array[Edit] {
+  let want = serialize(tree)
   let edits = diff(old, want)
   if apply(old, edits) == want {
     edits

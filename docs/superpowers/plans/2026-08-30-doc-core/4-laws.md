@@ -12,7 +12,7 @@
 |---|---|
 | `<REPO>/core/doc/wire.mbt` | 外と**文字列だけ**でやり取りする面。木は JSON 文字列にする（裁定 3） |
 | `<REPO>/core/doc/js/moon.pkg` / `js/exports.mbt` | `#export_name` の薄い層。**5 本だけ**。String / Int / Bool / Array[Int] しか触らない |
-| `<REPO>/core/doc/law_wbtest.mbt` | 木の生成器 `gen_ast` と法則 1 のファズ |
+| `<REPO>/core/doc/law_wbtest.mbt` | 木の生成器 `gen_tree` と法則 1 のファズ |
 | `<REPO>/test/_doc.ts` | TS 側の受け口。**T5 はこれを import する**（自前の型を定義しない） |
 | `<REPO>/test/doc-law.test.ts` / `doc-dialect.test.ts` | 法則 2・法則 4 |
 | `<REPO>/test/_helpers.ts:171` の除外名 1 行 / `package.json` の `"test:doc"` 1 行 | 既存ファイルへの**1 行だけ**の変更 |
@@ -23,7 +23,7 @@
 
 1. **Task 30 は誰も待たない。**最初に踏む（`pnpm install` / `pnpm run core` / コーパスの除外名）
 2. Task 31・32 は **T2 Task 17（`parse`）と T3 Task 26（`serialize`）のコミット後**
-3. Task 33 は Task 32 の後（`fixture_wbtest.mbt` の `chain_ast` を使うので T1 Task 2 も要る）
+3. Task 33 は Task 32 の後（`fixture_wbtest.mbt` の `chain_tree` を使うので T1 Task 2 も要る）
 4. Task 34 → 35 → 36 はこの順（34 が表、35 が生成器、36 が審判）
 5. Task 37 は **T5 Task 45・46・47（delete / side / move）と Task 40・41（edit / diff / reflect）の後**。前半（`shrink`）だけは先行できる
 
@@ -36,17 +36,17 @@ Task 30 ──> （T1・T2・T3 の完了）──> Task 31 ──> Task 32 ─�
 
 **この群が守る規律**
 
-- `core/doc/js/exports.mbt` は **`@doc.Node` / `@doc.Block` / `@doc.Ast` / `@doc.Reject` を一切触らない**（裁定 3）。JSON の組み立ては `core/doc/wire.mbt`（パッケージの内側）で完結する
+- `core/doc/js/exports.mbt` は **`@doc.Node` / `@doc.Block` / `@doc.Tree` / `@doc.Reject` を一切触らない**（裁定 3）。JSON の組み立ては `core/doc/wire.mbt`（パッケージの内側）で完結する
 - ラベル付き enum ペイロードの呼び出しは **`Image(alt="図", src="./a.png")`**（`alt~=` は `Error: [3016]`。実測 4）
-- **`chain` を自前定義しない**。`fixture_wbtest.mbt`（T1 Task 2）の `chain_ast(n)` を使う
+- **`chain` を自前定義しない**。`fixture_wbtest.mbt`（T1 Task 2）の `chain_tree(n)` を使う
 - **環境変数の前置き（`VAR=値 コマンド`）を書かない**（裁定 6）。**TS 側のファズの回数も定数**（`RANDOM_CASES` / `DIALECT_CASES`）で切り替える。`fuzzCases`（`process.env.MMM_FUZZ` を読む既存ヘルパ）は import しない
-- `gen_ast` は **implied に Left を割り当てない**（裁定 1・不変条件 11）
+- `gen_tree` は **implied に Left を割り当てない**（裁定 1・不変条件 11）
 - `gen_children` の implied は **children の先頭**に置く。不変条件 8 は裁定 B により「**implied の前に見出しの兄弟が居ない**」へ一般化されたので、先頭に置けば必ず満たす（違反メッセージは `implied の前に見出しが居る: <id>`）
 - **単調性は parse の attach が強制する**（裁定 A）。`- a` + `## h` は「項目 a」と「implied root の下の h」の**木 2 本**になる。カタログ C17 がこれを 1 行で固定する
 - テスト総数の Expected は逐語で書く。**`Total tests: 0` は緑ではない**（`-p` の綴りを疑う）
-- **文書頭の `---` の裁定（裁定 E）を持つのは T1 の `scan_head`**（封筒なのは「閉じの `---` があり、かつ開きの直後が空行でない」とき）。T4 はそれを 2 か所で見張るだけ — 方言表の 1 行（Task 36）と、法則 1 ファズの **seed 199**（Task 33 の `gen_ast` が先頭トグル + トグルもう 1 本の木を吐く）。**落ちても直す先は T4 ではない**
+- **文書頭の `---` の裁定（裁定 E）を持つのは T1 の `scan_head`**（封筒なのは「閉じの `---` があり、かつ開きの直後が空行でない」とき）。T4 はそれを 2 か所で見張るだけ — 方言表の 1 行（Task 36）と、法則 1 ファズの **seed 199**（Task 33 の `gen_tree` が先頭トグル + トグルもう 1 本の木を吐く）。**落ちても直す先は T4 ではない**
 
-**`law_wbtest.mbt` が置くトップレベル名は 12 個**: `fuzz_seeds`（ファズの回数）／`Rand`・`Rand::new`・`Rand::pick`（決定的な擬似乱数）／`Gen`（生成の状態）／`labels`（ラベルの見本）／`sample_block`・`side_for`・`gen_implied`・`gen_children`・`gen_node`・`gen_ast`（木の生成器）。
+**`law_wbtest.mbt` が置くトップレベル名は 12 個**: `fuzz_seeds`（ファズの回数）／`Rand`・`Rand::new`・`Rand::pick`（決定的な擬似乱数）／`Gen`（生成の状態）／`labels`（ラベルの見本）／`sample_block`・`side_for`・`gen_implied`・`gen_children`・`gen_node`・`gen_tree`（木の生成器）。
 うち**正誤表 §C-3 の表に無いのは `fuzz_seeds` / `Rand::new` / `Rand::pick` の 3 個**なので、着手前に T4 の行へ足すこと（残り 9 個は既に表にある）。**とくに `labels` は総称的なので、他群は同名を置かないこと**（`*_wbtest.mbt` は名前空間を共有し、二重定義は `Error: [4051]` でパッケージのテストが 1 本も走らなくなる）。
 
 TS 側で表に無い export を 1 つ増やす: `test/_doc.ts` の **`atxWritable`**（Task 35）。Task 36 の番人が同じ規則で審判への入力を絞るので、`export` を付けて import させる（規則の写しを MoonBit の `atx_writable` とこの 1 つより増やさない）。**着手前に §D-3 の表へ 1 行足すこと。**`LABELS` / `SETEXT_LABELS` / `BLOCKS` は生成器の内側のままで export しない。
@@ -189,7 +189,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "test: 🧪 コー�
 - Test: なし（このタスクの赤は node の疎通で取る。TS 側のテストは Task 32）
 
 **Interfaces:**
-- Consumes: `parse(md : String) -> Ast`（T2 Task 17）／`serialize(ast : Ast) -> String`（T3 Task 26）／`sig(ast : Ast) -> String`・`check(ast : Ast) -> Array[String]`（T1 Task 2・3）／型 `Form` / `Side` / `Eol`（T1 Task 1）
+- Consumes: `parse(md : String) -> Tree`（T2 Task 17）／`serialize(tree : Tree) -> String`（T3 Task 26）／`sig(tree : Tree) -> String`・`check(tree : Tree) -> Array[String]`（T1 Task 2・3）／型 `Form` / `Side` / `Eol`（T1 Task 1）
 - Produces:
   - MoonBit: `pub fn sig_of(md : String) -> String` / `pub fn format_of(md : String) -> String` / `pub fn check_of(md : String) -> String`（`core/doc/wire.mbt`）と private の `json_str` / `form_tag` / `side_tag` / `eol_tag` / `bool_lit`
   - JS: `docSig(md: string): string` / `docFormat(md: string): string` / `docCheck(md: string): string`（`core/_build/js/release/build/doc/js/js.js`）
@@ -388,7 +388,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 新 core
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/test/doc-law.test.ts`
 
 **Interfaces:**
-- Consumes: `docSig` / `docFormat` / `docCheck`（Task 31）／`Ast` / `Node` / `Block` / `Content`（T1）／`is_implied(nd : Node) -> Bool`（T1）
+- Consumes: `docSig` / `docFormat` / `docCheck`（Task 31）／`Tree` / `Node` / `Block` / `Content`（T1）／`is_implied(nd : Node) -> Bool`（T1）
 - Produces:
   - JS: `docTree(md: string): string`（§D-1 の鍵で固定した JSON）
   - TS（`test/_doc.ts`。**T5 はこれを import する。自前の型を定義しない**）: 型 `DocBlock` / `DocNode` / `DocTree`、関数 `sig` / `format` / `check` / `tree` / `flatten` / `skeleton` / `blockSig` / `blocksOf`
@@ -522,17 +522,17 @@ fn json_node(nd : Node, depth : Int) -> String {
 ///|
 /// 木そのものの JSON（id 付き）。
 pub fn tree_of(md : String) -> String {
-  let ast = parse(md)
-  let head = match ast.head {
+  let tree = parse(md)
+  let head = match tree.head {
     Some(h) => json_str(h)
     None => "null"
   }
   "{\"eol\":" +
-  json_str(eol_tag(ast.eol)) +
+  json_str(eol_tag(tree.eol)) +
   ",\"head\":" +
   head +
   ",\"doc\":" +
-  json_node(ast.doc, 0) +
+  json_node(tree.doc, 0) +
   "}"
 }
 ```
@@ -721,8 +721,8 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "test: 🧪 新 cor
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/law_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Ast` / `Node` / `Block` / `Content` / `Form` / `Side` / `Eol`（T1 Task 1）、`sig(ast) -> String`・`check(ast) -> Array[String]`（T1 Task 2・3）、**`chain_ast(n : Int) -> Ast`（T1 Task 2 の `fixture_wbtest.mbt`）**、`parse(md) -> Ast`（T2 Task 17）、`serialize(ast) -> String`（T3 Task 26）
-- Produces: このファイルが新設するトップレベル名は 12 個 — `fuzz_seeds` / `Rand` / `Rand::new` / `Rand::pick` / `Gen` / `labels` / `sample_block` / `side_for` / `gen_implied` / `gen_children` / `gen_node` / `gen_ast(seed : Int) -> Ast`。**着手前に §C-3 の T4 の行へ全部足すこと**（`*_wbtest.mbt` は名前空間を共有し、二重定義は `Error: [4051]`）。加えて `pnpm run test:doc` の綴り
+- Consumes: `Tree` / `Node` / `Block` / `Content` / `Form` / `Side` / `Eol`（T1 Task 1）、`sig(tree) -> String`・`check(tree) -> Array[String]`（T1 Task 2・3）、**`chain_tree(n : Int) -> Tree`（T1 Task 2 の `fixture_wbtest.mbt`）**、`parse(md) -> Tree`（T2 Task 17）、`serialize(tree) -> String`（T3 Task 26）
+- Produces: このファイルが新設するトップレベル名は 12 個 — `fuzz_seeds` / `Rand` / `Rand::new` / `Rand::pick` / `Gen` / `labels` / `sample_block` / `side_for` / `gen_implied` / `gen_children` / `gen_node` / `gen_tree(seed : Int) -> Tree`。**着手前に §C-3 の T4 の行へ全部足すこと**（`*_wbtest.mbt` は名前空間を共有し、二重定義は `Error: [4051]`）。加えて `pnpm run test:doc` の綴り
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -740,8 +740,8 @@ Expected: `Total tests: B, passed: B, failed: 0.`（B = T1〜T3 の累計。**�
 // 木をランダムに組んで法則 1（parse(serialize(M)) = M）を殴る。
 // 生成器・sig・check はいずれも同パッケージの private なので whitebox テスト。
 //
-// 手で木を組む道具（node / heading / item / slot / doc_of / ast_of / chain /
-// chain_ast）は `fixture_wbtest.mbt`（T1 Task 2）が持つ。ここで作り直さない。
+// 手で木を組む道具（node / heading / item / slot / doc_of / tree_of / chain /
+// chain_tree）は `fixture_wbtest.mbt`（T1 Task 2）が持つ。ここで作り直さない。
 
 ///|
 /// ファズの回数。深掘りするときはこの数を上げる
@@ -753,7 +753,7 @@ test "生成した木は不変条件を満たす（生成器そのものの検�
   // 生成側で不変条件を満たすので、ここが落ちたら生成器のバグ。木の検査ではない。
   let mut bad = ""
   for seed = 1; seed <= fuzz_seeds; seed = seed + 1 {
-    let vs = check(gen_ast(seed))
+    let vs = check(gen_tree(seed))
     if vs.length() > 0 && bad == "" {
       bad = "seed=" + seed.to_string() + " " + vs[0]
     }
@@ -765,7 +765,7 @@ test "生成した木は不変条件を満たす（生成器そのものの検�
 test "生成した木は parse(serialize(M)) で戻る（法則 1）" {
   let mut bad = ""
   for seed = 1; seed <= fuzz_seeds; seed = seed + 1 {
-    let m = gen_ast(seed)
+    let m = gen_tree(seed)
     let md = serialize(m)
     let back = parse(md)
     if sig(back) != sig(m) && bad == "" {
@@ -786,7 +786,7 @@ test "生成した木は parse(serialize(M)) で戻る（法則 1）" {
 test "書き戻した md はもう一度書いても動かない（法則 2 の生成側）" {
   let mut bad = ""
   for seed = 1; seed <= fuzz_seeds; seed = seed + 1 {
-    let once = serialize(gen_ast(seed))
+    let once = serialize(gen_tree(seed))
     let twice = serialize(parse(once))
     if once != twice && bad == "" {
       bad = "seed=" +
@@ -803,7 +803,7 @@ test "書き戻した md はもう一度書いても動かない（法則 2 の�
 ///|
 test "深さ 200 の一本鎖でも法則 1 が立つ" {
   // 木を再帰で書いた判断（§A-8 の ⑧）の見張り。`test/fixtures/deep.md` と同じ深さ。
-  let m = chain_ast(200)
+  let m = chain_tree(200)
   assert_eq(sig(parse(serialize(m))), sig(m))
 }
 ```
@@ -814,7 +814,7 @@ Run:
 ```
 moon -C D:/1.atrium/mmm/.claude/worktrees/doc-model/core test -p mmm-app/core/doc
 ```
-Expected: `Error: [4021]` / `The value identifier gen_ast is unbound.`（`law_wbtest.mbt` の 3 か所）。EXIT=1。
+Expected: `Error: [4021]` / `The value identifier gen_tree is unbound.`（`law_wbtest.mbt` の 3 か所）。EXIT=1。
 
 - [ ] **Step 3: 最小の実装を書く**
 
@@ -1007,7 +1007,7 @@ fn gen_node(g : Gen, depth : Int, form : Form, budget : Int) -> Node {
 /// `sig(parse(serialize(m))) != sig(m)` になって法則 1 が落ちる。
 /// **この覆いを痩せさせないこと** — 先頭 implied の枝と `side_for` の左を消すと、
 /// 裁定 E の見張りが黙って消える。
-fn gen_ast(seed : Int) -> Ast {
+fn gen_tree(seed : Int) -> Tree {
   let g = { r: Rand::new(seed), next_id: 2 }
   let blocks : Array[Block] = []
   if g.r.pick(3) == 0 {
@@ -1051,7 +1051,7 @@ pnpm -C D:/1.atrium/mmm/.claude/worktrees/doc-model run test:doc
 Expected: `Total tests: B+4, passed: B+4, failed: 0.`（B = Step 1 で控えた本数）／EXIT=0。
 落ちた場合（EXIT=2）は `bad` に seed・md・両側の指紋が丸ごと出るので、その逐語を担当へ渡す — 指紋が違えば T2（`build.mbt`）か T3（`serialize.mbt`）、`check` の違反なら生成器（このファイル）のバグ。
 とくに `Item の下に Heading: <id>` が出たら、**疑うのは生成器ではなく T2 の `push_skel`** である（裁定 A。見出しを積む前に開いている項目を全部閉じているか）。生成器は Item の下に Heading を作らないので、この違反は必ず読み側から来る。
-**`md=` が `---` で始まっていて、`戻=` の側だけ木が丸ごと消えている**（`head` に本文が飲まれ、指紋の木が痩せる）ときは、疑うのは生成器ではなく **T1 の `scan_head`** である（裁定 E。封筒の「中身の形」= **開き `---` の直後が空行なら封筒ではない**、の条件が抜けている）。seed 1〜300 でこの形を吐くのは **seed 199** だけなので、落ちるのも 1 件だけになる（`gen_ast` の doc コメントに実測を残してある）。
+**`md=` が `---` で始まっていて、`戻=` の側だけ木が丸ごと消えている**（`head` に本文が飲まれ、指紋の木が痩せる）ときは、疑うのは生成器ではなく **T1 の `scan_head`** である（裁定 E。封筒の「中身の形」= **開き `---` の直後が空行なら封筒ではない**、の条件が抜けている）。seed 1〜300 でこの形を吐くのは **seed 199** だけなので、落ちるのも 1 件だけになる（`gen_tree` の doc コメントに実測を残してある）。
 深掘りするときは `fuzz_seeds` の値（`let fuzz_seeds : Int = 300`）を 5000 などに書き換えて同じコマンドを回し、**終わったら 300 に戻す**。
 
 - [ ] **Step 5: コミット**
@@ -1462,7 +1462,7 @@ import {
 // ランダム生成の md（text-first）。既存 randomDoc は見出しと `---` に偏り、
 // 新モデルの語彙（リスト・字下げ・details・setext・飛び）をほとんど踏まない。
 // 木を組んでから serialize する model-first の生成は MoonBit 側
-// （`core/doc/law_wbtest.mbt` の `gen_ast`）が持つ。あちらが法則 1、こちらが法則 2。
+// （`core/doc/law_wbtest.mbt` の `gen_tree`）が持つ。あちらが法則 1、こちらが法則 2。
 // ---------------------------------------------------------------
 
 // 深掘りするときはこの数を上げ、終わったら 600 に戻す（裁定 6 —
@@ -1631,7 +1631,7 @@ const BLOCKS = [
  * `- - -` は **飾りの水平線**として撒く（裁定 2。旧 core の箇条書き方言は捨てた）。
  *
  * 木を組んでから serialize する model-first の生成は MoonBit 側
- * （`core/doc/law_wbtest.mbt` の `gen_ast`）が持つ。あちらが法則 1、こちらが法則 2。
+ * （`core/doc/law_wbtest.mbt` の `gen_tree`）が持つ。あちらが法則 1、こちらが法則 2。
  */
 export function randomMd(seed: number): string {
   const rand = rng(seed);
@@ -2289,7 +2289,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "test: 🧪 外の�
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/test/doc-law.test.ts`
 
 **Interfaces:**
-- Consumes: `move_nodes(ast, ids, parent, at) -> Outcome` / `flip_side(ast, ids) -> Outcome` / `delete_nodes(ast, ids) -> Outcome` / `reflect(old, ast) -> Array[Edit]` / `apply(text, edits) -> String` / `Outcome` / `Reject` / `Edit`（すべて T5）
+- Consumes: `move_nodes(tree, ids, parent, at) -> Outcome` / `flip_side(tree, ids) -> Outcome` / `delete_nodes(tree, ids) -> Outcome` / `reflect(old, tree) -> Array[Edit]` / `apply(text, edits) -> String` / `Outcome` / `Reject` / `Edit`（すべて T5）
 - Produces:
   - JS: `docApply(md, op, ids, parent, at): string`（§D-1 の形の JSON）
   - TS: `shrink(md, fails, rounds?)` / `applyOp(md, op, ids, parent, at): OpResult` / `applyEdits(text, edits): string` と型 `OpEdit` / `OpResult`（**判別可能ユニオン**）
@@ -2414,13 +2414,13 @@ pub fn apply_op(
   if op != "move" && op != "flip" && op != "delete" {
     return "{\"ok\":false,\"reject\":\"unknown-op\"}"
   }
-  let ast = parse(md)
+  let tree = parse(md)
   let outcome = if op == "move" {
-    move_nodes(ast, ids, parent, at)
+    move_nodes(tree, ids, parent, at)
   } else if op == "flip" {
-    flip_side(ast, ids)
+    flip_side(tree, ids)
   } else {
-    delete_nodes(ast, ids)
+    delete_nodes(tree, ids)
   }
   match outcome {
     Reject(r) => "{\"ok\":false,\"reject\":" + json_str(reject_tag(r)) + "}"
@@ -2659,7 +2659,7 @@ T5(40・41・45・46・47) ─────────────────�
 
 - **T1 へ**: `sig` の綴りは `doc-law.test.ts` の受け口テストが `"head:-\nlf\n[H[Hr[Ha]]]"` で逐語固定する（§A-4 の固定の例と一致させること）。`- - -` は **`Break(false)` = 飾りの水平線**（裁定 2）で、方言表にも「捨てた方言」として明記した（T1 Task 6 で実装済み）
 - **T1 へ**: `atx_writable`（Task 9）は T4 の生成器にも写してある（`test/_doc.ts` の `atxWritable`。Task 36 の番人はそれを import して使うので、写しは 2 つのまま）。**規則を変えるときは 2 か所を同時に直す** — 前後空白・末尾 `#` の行に setext の下線を付けるのをやめる、という同じ判断を、読み側と生成側の両方で守っている。方言表にも「ATX で書き戻せない行は setext にしない」の行を置いた（`verdict: "diff"`。lezer は `  a  ` + `---` を setext 見出しと読む）
-- **T1 へ**: **裁定 E（封筒の「中身の形」）が `scan_head` に入っていないと、Task 33 が seed 199 で落ちる。**先頭スロットが左の implied root を先頭に持つ木は文書の 1 行目に `---` が出るので、トグルがもう 1 本あると 1 本目〜2 本目が丸ごと head に飲まれる。`gen_ast` は種 1〜300 で先頭 `---` の木を 6 本（48・60・123・199・256・268）、うちトグル 2 本以上を 1 本（**seed 199**）吐く（5000 まで広げると 114 本 / 34 本）。方言表にも「開き `---` の直後が空行なら封筒ではなく先頭トグル」の行を置いた。**直す場所は `scan.mbt` の `scan_head`**（開き `---` の直後が空行なら封筒ではない）であって、生成器ではない
+- **T1 へ**: **裁定 E（封筒の「中身の形」）が `scan_head` に入っていないと、Task 33 が seed 199 で落ちる。**先頭スロットが左の implied root を先頭に持つ木は文書の 1 行目に `---` が出るので、トグルがもう 1 本あると 1 本目〜2 本目が丸ごと head に飲まれる。`gen_tree` は種 1〜300 で先頭 `---` の木を 6 本（48・60・123・199・256・268）、うちトグル 2 本以上を 1 本（**seed 199**）吐く（5000 まで広げると 114 本 / 34 本）。方言表にも「開き `---` の直後が空行なら封筒ではなく先頭トグル」の行を置いた。**直す場所は `scan.mbt` の `scan_head`**（開き `---` の直後が空行なら封筒ではない）であって、生成器ではない
 - **T1 へ**: `head` / `Opaque` / `Code.text` / `Svg` の改行が `"\n"` で `\r` を含まないこと（§A-7 前提 1）は、Task 34 の「法則 2: リポジトリ内の実 .md すべてで format が冪等」が `test/fixtures/gnarly-crlf.md` で毎回検算する
 - **T2 へ**: 方言表（`test/doc-dialect.test.ts` の `DIALECT` 18 行）が `block.mbt` / `build.mbt` の読みを 1 行ずつ固定する。落ちたら行 id と `期待=` / `実際=` が逐語で出る
 - **T2 へ**: **裁定 A（`push_skel` が見出しを積む前に開いている項目を全部閉じる）が入っていないと、Task 35 が着手した瞬間に赤になる。**Task 35 の 600 seed のうち 14 seed（最小は seed 85 の `1. a` + `## a`）がこの形を吐き、`check` が `Item の下に Heading: <id>` を返す。**実 .md コーパスにはこの形が無いので Task 34 は緑のまま通る** — 原因が T4 に見えるが、直す場所は `build.mbt` の `push_skel` である。カタログ C17（`- a` + `## h` → `[H[Ia][H~[Hh]]]`）がこの形を 1 行で固定する
@@ -2668,5 +2668,5 @@ T5(40・41・45・46・47) ─────────────────�
 - **T5 へ**: `test/_doc.ts` に存在する名前は §D-3 の 17 個 + Task 35 で足す `atxWritable` の **18 個**だけ（§D-3 の表へ 1 行足すこと）。`doc` 名前空間・`randomDoc`・`ApplyResult` は**存在しない**。`LABELS` / `SETEXT_LABELS` / `BLOCKS` は export しない（生成器の内側）
 - **T5 へ**: MoonBit 側の `labels`（Task 33）は**綴りを素通しする 10 個だけ**で、前後空白・末尾 `#` のような「往復で変わるラベル」を持たない。これは網の穴ではなく**入口が無いことの写し**である — parse は `atx_writable` でそういう行を見出しにせず、`normalize` はラベルを一切触らないので、操作からモデルへ不正なラベルは入らない。**`normalize` にラベルを触らせないこと**が前提で、rename（範囲外）を足す日には「逃がし方（`spell.mbt` の綴り）を決める → `labels` を広げる」の順で進める
 - **T5 へ**: 不変条件 8 は裁定 B により「**implied の前に見出しの兄弟が居ない**」へ一般化された（違反メッセージは `implied の前に見出しが居る: <id>`）。`spellable` の判定も同じ言葉に揃えること — 項目 root の後ろの implied（カタログ C17 の形）は綴れるので昇格させない
-- **全員へ**: `core/doc/law_wbtest.mbt` が新設するトップレベル名は 12 個（`fuzz_seeds` / `Rand` / `Rand::new` / `Rand::pick` / `Gen` / `labels` / `sample_block` / `side_for` / `gen_implied` / `gen_children` / `gen_node` / `gen_ast`）。§C-3 の T4 の行に全部足すこと。**`labels` は総称的なので他群は同名を置かない**（`*_wbtest.mbt` は名前空間を共有し、二重定義は `Error: [4051]` でパッケージのテストが 1 本も走らなくなる）
+- **全員へ**: `core/doc/law_wbtest.mbt` が新設するトップレベル名は 12 個（`fuzz_seeds` / `Rand` / `Rand::new` / `Rand::pick` / `Gen` / `labels` / `sample_block` / `side_for` / `gen_implied` / `gen_children` / `gen_node` / `gen_tree`）。§C-3 の T4 の行に全部足すこと。**`labels` は総称的なので他群は同名を置かない**（`*_wbtest.mbt` は名前空間を共有し、二重定義は `Error: [4051]` でパッケージのテストが 1 本も走らなくなる）
 - **全員へ**: ファズの回数は**定数**で切り替える（裁定 6）。MoonBit は `fuzz_seeds`、TS は `RANDOM_CASES`（`doc-law.test.ts`）と `DIALECT_CASES`（`doc-dialect.test.ts`）。**環境変数の前置きは書かない。`fuzzCases` も import しない**

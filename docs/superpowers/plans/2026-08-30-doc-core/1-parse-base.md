@@ -5,7 +5,7 @@
 **担当**: T1 — 型・綴りの定数・行の走査・行 → かたまり（`scan`）まで。**木は作らない**（`build` / `parse` は T2、`serialize` は T3）。
 
 **所有ファイル**（正誤表 §B-1 / §B-2）:
-`core/doc/moon.pkg` / `ast.mbt` / `spell.mbt` / `line.mbt` / `scan.mbt` / `block.mbt`（仮置き `classify` の Create のみ。本実装は T2 が Modify）／ `fixture_wbtest.mbt` / `ast_wbtest.mbt` / `line_wbtest.mbt` / `scan_wbtest.mbt`。
+`core/doc/moon.pkg` / `tree.mbt` / `spell.mbt` / `line.mbt` / `scan.mbt` / `block.mbt`（仮置き `classify` の Create のみ。本実装は T2 が Modify）／ `fixture_wbtest.mbt` / `tree_wbtest.mbt` / `line_wbtest.mbt` / `scan_wbtest.mbt`。
 
 **この群が新設する、正誤表 §C-3 の表に無い名前**: `atx_writable`（Task 9）の 1 つだけ。**着手前に §C-3 の T1 `scan.mbt` の行へ足して全員へ共有する** — §C はパッケージ内でトップレベルの名前が一意であることを執行する唯一の根拠であり、二重定義は `Error: [4051]` でテストが 1 本も走らなくなる。
 
@@ -45,14 +45,14 @@
 
 **Files:**
 - Create: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/moon.pkg`
-- Create: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/ast.mbt`
+- Create: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/tree.mbt`
 - Create: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/spell.mbt`
-- Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/ast_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/tree_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: なし（起点）
 - Produces:
-  - 型 `Ast` / `Node` / `Form` / `Side` / `Block` / `Content` / `Eol`（正誤表 §A-2 の全文。**5 人の共有物**）
+  - 型 `Tree` / `Node` / `Form` / `Side` / `Block` / `Content` / `Eol`（正誤表 §A-2 の全文。**5 人の共有物**）
   - `pub fn is_implied(nd : Node) -> Bool` / `pub fn empty(id : Int, form : Form) -> Node` / `pub fn promote(nd : Node, label : String) -> Node`
   - `spell.mbt` の 11 定数 `item_mark` / `heading_mark` / `nest_step` / `fence_mark` / `fence_min` / `rule_mark` / `toggle_mark` / `fold_open` / `fold_close` / `summary_open` / `summary_close`（正誤表 §A-6。**T2・T3 は読むだけ。作らない**）
 
@@ -66,7 +66,7 @@
 pkgtype(kind: "library")
 ```
 
-`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/ast_wbtest.mbt`:
+`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/tree_wbtest.mbt`:
 
 ```moonbit
 // 型は木の中を直接組んで確かめるので whitebox テスト。
@@ -85,11 +85,11 @@ Run:
 ```
 moon -C D:/1.atrium/mmm/.claude/worktrees/doc-model/core test -p mmm-app/core/doc
 ```
-Expected: `ast.mbt` がまだ無いのでコンパイルエラー。1 行目 `Error: [4021]`、本文 `The value identifier empty is unbound.`（`Heading` / `Right` も同じく未定義として続く）。**`Total tests:` の行は出ない**（EXIT=1）。
+Expected: `tree.mbt` がまだ無いのでコンパイルエラー。1 行目 `Error: [4021]`、本文 `The value identifier empty is unbound.`（`Heading` / `Right` も同じく未定義として続く）。**`Total tests:` の行は出ない**（EXIT=1）。
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/ast.mbt`（正誤表 §A-2 の全文）:
+`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/tree.mbt`（正誤表 §A-2 の全文）:
 
 ```moonbit
 // 文書の木。綴りは持たない — 綴りは serialize が所有する。
@@ -99,7 +99,7 @@ Expected: `ast.mbt` がまだ無いのでコンパイルエラー。1 行目 `Er
 
 ///|
 /// 文書ひとつ。head は封筒（中は解釈しない）、doc は木そのもの（深さ 0）。
-pub struct Ast {
+pub struct Tree {
   head : String? // frontmatter の逐語。開き `---` 行頭から閉じ `---` 行末まで（末尾改行を含まない・改行は "\n" に畳む）
   eol : Eol // 原文の流儀。serialize が全行をこれで書く
   doc : Node // 深さ 0 のノード。body = 最初の骨格行より前、children = 木の列
@@ -239,7 +239,7 @@ Expected: 最終行 `Total tests: N, passed: N, failed: 0.`（EXIT=0）。**T1 �
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.claude/worktrees/doc-model add core/doc/moon.pkg core/doc/ast.mbt core/doc/spell.mbt core/doc/ast_wbtest.mbt
+git -C D:/1.atrium/mmm/.claude/worktrees/doc-model add core/doc/moon.pkg core/doc/tree.mbt core/doc/spell.mbt core/doc/tree_wbtest.mbt
 git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 新 core のパッケージと文書の木の型を置く"
 ```
 
@@ -251,15 +251,15 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 新 core
 
 **Files:**
 - Create: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/fixture_wbtest.mbt`
-- Modify: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/ast.mbt`（`promote` の後ろへ `esc` / `block_sig` / `node_sig` / `sig` を追記）
-- Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/ast_wbtest.mbt`（末尾へ追記）
+- Modify: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/tree.mbt`（`promote` の後ろへ `esc` / `block_sig` / `node_sig` / `sig` を追記）
+- Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/tree_wbtest.mbt`（末尾へ追記）
 
 **Interfaces:**
-- Consumes: `Ast` / `Node` / `Form` / `Side` / `Block` / `Content` / `Eol`、`empty` / `promote` / `is_implied`（Task 1）
+- Consumes: `Tree` / `Node` / `Form` / `Side` / `Block` / `Content` / `Eol`、`empty` / `promote` / `is_implied`（Task 1）
 - Produces:
-  - `pub fn sig(ast : Ast) -> String` — **id を含まない**木の指紋。法則 1・2 の比較子はこれ 1 本（T4 の `sig_of`・T5 の操作テストが使う）
+  - `pub fn sig(tree : Tree) -> String` — **id を含まない**木の指紋。法則 1・2 の比較子はこれ 1 本（T4 の `sig_of`・T5 の操作テストが使う）
   - `fn esc(s : String) -> String` / `fn block_sig(b : Block, sb : StringBuilder) -> Unit` / `fn node_sig(nd : Node, sb : StringBuilder) -> Unit` — パッケージ内の部品（T1 自身が `scan_wbtest.mbt` で `esc` を再利用する）
-  - **`fixture_wbtest.mbt` の 8 関数** `node(id, form, label, kids) -> Node` / `heading(id, label, kids) -> Node` / `item(id, label, kids) -> Node` / `slot(id, label, left) -> Node` / `doc_of(kids) -> Node` / `ast_of(kids) -> Ast` / `chain(n) -> Node` / `chain_ast(n) -> Ast`
+  - **`fixture_wbtest.mbt` の 8 関数** `node(id, form, label, kids) -> Node` / `heading(id, label, kids) -> Node` / `item(id, label, kids) -> Node` / `slot(id, label, left) -> Node` / `doc_of(kids) -> Node` / `tree_of(kids) -> Tree` / `chain(n) -> Node` / `chain_tree(n) -> Tree`
     （**T3・T4・T5 はこれを使う。自前で定義しない**。`*_wbtest.mbt` はパッケージ内でトップレベルの名前空間を共有し、同名定義は `Error: [4051]` でテストが 1 本も走らなくなる）
 
 **カバーする要件:** R062・R063（法則 1・2 の比較子）、R020（id はモデルの同一性に入らない）。カタログ C16（裁定 1 の昇格した結果の指紋）。
@@ -307,7 +307,7 @@ fn doc_of(kids : Array[Node]) -> Node {
 
 ///|
 /// 文書ひとつ（head 無し・LF）。
-fn ast_of(kids : Array[Node]) -> Ast {
+fn tree_of(kids : Array[Node]) -> Tree {
   { head: None, eol: Lf, doc: doc_of(kids) }
 }
 
@@ -324,40 +324,40 @@ fn chain(n : Int) -> Node {
 
 ///|
 /// 深さ n の一本鎖を吊るした文書。
-fn chain_ast(n : Int) -> Ast {
-  ast_of([chain(n)])
+fn chain_tree(n : Int) -> Tree {
+  tree_of([chain(n)])
 }
 ```
 
-`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/ast_wbtest.mbt` の末尾へ追記:
+`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/tree_wbtest.mbt` の末尾へ追記:
 
 ```moonbit
 ///|
 /// 正誤表 §A-4 の固定の例その 5: `# r` + `- x`（左・画像 1 枚）。
-fn sample() -> Ast {
+fn sample() -> Tree {
   let x = {
     ..empty(3, Item),
     label: "x",
     side: Left,
     body: [Content(Image(alt="a", src="b.png"))],
   }
-  ast_of([heading(2, "r", [x])])
+  tree_of([heading(2, "r", [x])])
 }
 
 ///|
 test "空文書の指紋は doc ひとつ" {
-  assert_eq(sig(ast_of([])), "head:-\nlf\n[H]")
+  assert_eq(sig(tree_of([])), "head:-\nlf\n[H]")
 }
 
 ///|
 test "見出し 1 つの指紋" {
-  assert_eq(sig(ast_of([heading(2, "r", [])])), "head:-\nlf\n[H[Hr]]")
+  assert_eq(sig(tree_of([heading(2, "r", [])])), "head:-\nlf\n[H[Hr]]")
 }
 
 ///|
 test "親子の指紋は入れ子になる" {
   let r = heading(2, "r", [heading(3, "a", [])])
-  assert_eq(sig(ast_of([r])), "head:-\nlf\n[H[Hr[Ha]]]")
+  assert_eq(sig(tree_of([r])), "head:-\nlf\n[H[Hr[Ha]]]")
 }
 
 ///|
@@ -366,7 +366,7 @@ test "implied の 2 段は ~ が 2 つ並ぶ" {
   let b = heading(5, "b", [])
   let g2 = { ..empty(4, Heading), implied: true, children: [b] }
   let g1 = { ..empty(3, Heading), implied: true, children: [g2] }
-  assert_eq(sig(ast_of([heading(2, "r", [g1])])), "head:-\nlf\n[H[Hr[H~[H~[Hb]]]]]")
+  assert_eq(sig(tree_of([heading(2, "r", [g1])])), "head:-\nlf\n[H[Hr[H~[H~[Hb]]]]]")
 }
 
 ///|
@@ -380,7 +380,7 @@ test "C16 昇格したスロットは側を持ち、その下に implied が並�
   let b = heading(5, "b", [])
   let g = { ..empty(4, Heading), implied: true, children: [b] }
   let s = { ..slot(3, "", true), children: [g] }
-  assert_eq(sig(ast_of([heading(2, "r", [s])])), "head:-\nlf\n[H[Hr[H<[H~[Hb]]]]]")
+  assert_eq(sig(tree_of([heading(2, "r", [s])])), "head:-\nlf\n[H[Hr[H<[H~[Hb]]]]]")
 }
 
 ///|
@@ -395,25 +395,25 @@ test "指紋は id を含まない" {
 test "指紋は ^ を逃がす（畳みのフラグと取り違えない）" {
   // 逃がさないと label が "^x" の畳んでいないノードと
   // label が "x" の畳んだノードが同じ指紋になる（法則 1 の比較子の穴）
-  assert_eq(sig(ast_of([heading(2, "^x", [])])), "head:-\nlf\n[H[H\\^x]]")
+  assert_eq(sig(tree_of([heading(2, "^x", [])])), "head:-\nlf\n[H[H\\^x]]")
 }
 
 ///|
 test "指紋は ~ と < も逃がす" {
   // "~" は implied のフラグ、"<" は左のフラグと衝突する
-  assert_eq(sig(ast_of([heading(2, "~<", [])])), "head:-\nlf\n[H[H\\~\\<]]")
+  assert_eq(sig(tree_of([heading(2, "~<", [])])), "head:-\nlf\n[H[H\\~\\<]]")
 }
 
 ///|
 test "指紋は区切り文字と改行を逃がし、封筒と流儀を頭に置く" {
   let a = heading(2, "a|b[c]d\\e\nf", [])
-  let ast = {
+  let tree = {
     head: Some("---\nk: v\n---"),
     eol: Crlf,
     doc: doc_of([a]),
   }
   assert_eq(
-    sig(ast),
+    sig(tree),
     "head:---\\nk: v\\n---\ncrlf\n[H[Ha\\|b\\[c\\]d\\\\e\\nf]]",
   )
 }
@@ -429,7 +429,7 @@ Expected: 1 行目 `Error: [4021]`、本文 `The value identifier sig is unbound
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/ast.mbt` の末尾（`promote` の後ろ）へ追記:
+`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/tree.mbt` の末尾（`promote` の後ろ）へ追記:
 
 ```moonbit
 ///|
@@ -516,17 +516,17 @@ fn node_sig(nd : Node, sb : StringBuilder) -> Unit {
 ///|
 /// 木の指紋。**id を含まない** — 法則 1・2 の比較子はこれ 1 本。
 /// id は parse が振り直すので、モデルの同一性に id は入らない。
-pub fn sig(ast : Ast) -> String {
+pub fn sig(tree : Tree) -> String {
   let sb = StringBuilder::new()
   sb.write_string("head:")
-  match ast.head {
+  match tree.head {
     Some(h) => sb.write_string(esc(h))
     None => sb.write_string("-")
   }
   sb.write_string("\n")
-  sb.write_string(if ast.eol == Lf { "lf" } else { "crlf" })
+  sb.write_string(if tree.eol == Lf { "lf" } else { "crlf" })
   sb.write_string("\n")
-  node_sig(ast.doc, sb)
+  node_sig(tree.doc, sb)
   sb.to_string()
 }
 ```
@@ -544,7 +544,7 @@ Expected: 最終行 `Total tests: N, passed: N, failed: 0.`（EXIT=0）。**T1 �
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.claude/worktrees/doc-model add core/doc/ast.mbt core/doc/ast_wbtest.mbt core/doc/fixture_wbtest.mbt
+git -C D:/1.atrium/mmm/.claude/worktrees/doc-model add core/doc/tree.mbt core/doc/tree_wbtest.mbt core/doc/fixture_wbtest.mbt
 git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 木の指紋を、手で組んだ木で確かめる"
 ```
 
@@ -555,18 +555,18 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 木の�
 ## Task 3: 不変条件の検査（11 個）
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/ast.mbt`（`sig` の後ろへ `visit` / `check` を追記）
-- Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/ast_wbtest.mbt`（末尾へ追記）
+- Modify: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/tree.mbt`（`sig` の後ろへ `visit` / `check` を追記）
+- Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/tree_wbtest.mbt`（末尾へ追記）
 
 **Interfaces:**
 - Consumes: Task 1 の型と `empty` / `promote` / `is_implied`、Task 2 の `sig` と `fixture_wbtest.mbt` の 8 関数
-- Produces: `pub fn check(ast : Ast) -> Array[String]` — 不変条件の違反。空なら健全（T4 の `check_of` が `"\n"` 区切りで JS へ出し、T5 の `normalize` がこれを満たす木しか返さない）
+- Produces: `pub fn check(tree : Tree) -> Array[String]` — 不変条件の違反。空なら健全（T4 の `check_of` が `"\n"` 区切りで JS へ出し、T5 の `normalize` がこれを満たす木しか返さない）
 
 **カバーする要件:** R011（doc は深さ 0 の錨）、R039（単調性）、R041（順序法則）、**R042（順序法則は doc 直下にも効く）**、R024（implied の存在条件）、R014（side は深さ 2 だけ）、R020（id の一意）。**裁定 1 の不変条件 11**（仕様 §2 の改訂・カタログ C16）。**裁定 B の不変条件 8**（「先頭」ではなく「前に見出しが居ない」）。
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/ast_wbtest.mbt` の末尾へ追記:
+`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/tree_wbtest.mbt` の末尾へ追記:
 
 ```moonbit
 ///|
@@ -577,63 +577,63 @@ test "健全な木の検査は空を返す" {
 ///|
 test "条件 1: 汚れた doc は違反として挙がる" {
   // R011
-  let ast = { head: None, eol: Lf, doc: { ..empty(1, Heading), label: "x" } }
-  assert_eq(check(ast)[0], "doc が汚れている")
+  let tree = { head: None, eol: Lf, doc: { ..empty(1, Heading), label: "x" } }
+  assert_eq(check(tree)[0], "doc が汚れている")
 }
 
 ///|
 test "条件 2: id の重複は違反として挙がる" {
   // R020
-  let ast = ast_of([heading(2, "a", []), heading(2, "b", [])])
-  assert_eq(check(ast)[0], "id が重複: 2")
+  let tree = tree_of([heading(2, "a", []), heading(2, "b", [])])
+  assert_eq(check(tree)[0], "id が重複: 2")
 }
 
 ///|
 test "条件 3: Item の下の Heading は単調性の違反になる" {
   // R039
-  let ast = ast_of([item(2, "i", [heading(3, "h", [])])])
-  assert_eq(check(ast)[0], "Item の下に Heading: 3")
+  let tree = tree_of([item(2, "i", [heading(3, "h", [])])])
+  assert_eq(check(tree)[0], "Item の下に Heading: 3")
 }
 
 ///|
 test "条件 4: Heading の後ろの Item は順序法則の違反になる" {
   // R041
   let r = heading(2, "r", [heading(3, "h", []), item(4, "i", [])])
-  assert_eq(check(ast_of([r]))[0], "順序法則の違反: 4")
+  assert_eq(check(tree_of([r]))[0], "順序法則の違反: 4")
 }
 
 ///|
 test "条件 4 は doc 直下にも効く" {
   // R042。doc も「同じ親」の 1 つである
-  let ast = ast_of([heading(2, "h", []), item(3, "i", [])])
-  assert_eq(check(ast)[0], "順序法則の違反: 3")
+  let tree = tree_of([heading(2, "h", []), item(3, "i", [])])
+  assert_eq(check(tree)[0], "順序法則の違反: 3")
 }
 
 ///|
 test "条件 5: implied が Item なら違反になる" {
   let g = { ..empty(2, Item), implied: true, children: [item(3, "b", [])] }
-  assert_eq(check(ast_of([g]))[0], "implied が Item: 2")
+  assert_eq(check(tree_of([g]))[0], "implied が Item: 2")
 }
 
 ///|
 test "条件 6: 中身を持った implied は違反になる" {
   let g = { ..empty(2, Heading), implied: true, label: "x", children: [heading(3, "b", [])] }
-  assert_eq(check(ast_of([g]))[0], "implied が中身を持つ: 2")
+  assert_eq(check(tree_of([g]))[0], "implied が中身を持つ: 2")
 }
 
 ///|
 test "条件 7: 子の居ない implied は存在条件の違反になる" {
   // R024
   let g = { ..empty(2, Heading), implied: true }
-  assert_eq(check(ast_of([g]))[0], "implied に子が居ない: 2")
+  assert_eq(check(tree_of([g]))[0], "implied に子が居ない: 2")
 }
 
 ///|
 test "条件 8: 見出しの後ろの implied は綴れないので違反になる" {
   // 裁定 B。前に見出しが居ると、その見出しが飛びを飲み込んでしまう
   let g = { ..empty(3, Heading), implied: true, children: [heading(4, "b", [])] }
-  let ast = ast_of([heading(2, "a", []), g])
-  assert_eq(check(ast)[0], "implied の前に見出しが居る: 3")
+  let tree = tree_of([heading(2, "a", []), g])
+  assert_eq(check(tree)[0], "implied の前に見出しが居る: 3")
 }
 
 ///|
@@ -641,13 +641,13 @@ test "条件 8: 項目 root のあとの implied は綴れるので違反にな�
   // 裁定 B。直前の兄弟が Item なら飛びは吸収されない（Item は Heading の子を持てない）。
   // 裁定 A で `- a` + `## h` が生む木がこれである
   let g = { ..empty(3, Heading), implied: true, children: [heading(4, "h", [])] }
-  assert_eq(check(ast_of([item(2, "a", []), g])).length(), 0)
+  assert_eq(check(tree_of([item(2, "a", []), g])).length(), 0)
 }
 
 ///|
 test "条件 9: implied が Item の子を持てば飛びで綴れないので違反になる" {
   let g = { ..empty(2, Heading), implied: true, children: [item(3, "b", [])] }
-  assert_eq(check(ast_of([g]))[0], "implied が Item の子を持つ: 2")
+  assert_eq(check(tree_of([g]))[0], "implied が Item の子を持つ: 2")
 }
 
 ///|
@@ -655,7 +655,7 @@ test "条件 10: 深さ 2 でない側は違反として挙がる" {
   // R014
   let deep = { ..empty(4, Heading), label: "d", side: Left }
   let r = heading(2, "r", [heading(3, "x", [deep])])
-  assert_eq(check(ast_of([r]))[0], "深さ 2 でない側: 4")
+  assert_eq(check(tree_of([r]))[0], "深さ 2 でない側: 4")
 }
 
 ///|
@@ -663,7 +663,7 @@ test "条件 11: 側を持たされた implied は違反になる" {
   // 裁定 1。深さ 2 なので条件 10 は通り、ここで落ちる。
   // この穴が塞がるまで、飛びでは綴れない状態が木に書けてしまっていた
   let g = { ..empty(3, Heading), implied: true, side: Left, children: [heading(4, "b", [])] }
-  assert_eq(check(ast_of([heading(2, "r", [g])]))[0], "implied が側を持つ: 3")
+  assert_eq(check(tree_of([heading(2, "r", [g])]))[0], "implied が側を持つ: 3")
 }
 
 ///|
@@ -684,7 +684,7 @@ Expected: 1 行目 `Error: [4021]`、本文 `The value identifier check is unbou
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/ast.mbt` の末尾（`sig` の後ろ）へ追記:
+`D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/tree.mbt` の末尾（`sig` の後ろ）へ追記:
 
 ```moonbit
 ///|
@@ -756,9 +756,9 @@ fn visit(
 ///|
 /// 不変条件の違反。空なら健全。テストと debug の assert がこれを見る。
 /// **メッセージは改行を含まない**（wire.mbt が "\n" で綴じ、TS が split で戻す）。
-pub fn check(ast : Ast) -> Array[String] {
+pub fn check(tree : Tree) -> Array[String] {
   let out : Array[String] = []
-  let d = ast.doc
+  let d = tree.doc
   if d.form != Heading || d.label != "" || d.implied || d.folded {
     out.push("doc が汚れている")
   }
@@ -781,7 +781,7 @@ Expected: 最終行 `Total tests: N, passed: N, failed: 0.`（EXIT=0）。**T1 �
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.claude/worktrees/doc-model add core/doc/ast.mbt core/doc/ast_wbtest.mbt
+git -C D:/1.atrium/mmm/.claude/worktrees/doc-model add core/doc/tree.mbt core/doc/tree_wbtest.mbt
 git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 木の不変条件を 11 個ぶん見張る"
 ```
 
@@ -2515,11 +2515,11 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 項目�
 
 | 渡すもの | 受け取る側 |
 |---|---|
-| `Ast` / `Node` / `Form` / `Side` / `Block` / `Content` / `Eol`、`is_implied` / `empty` / `promote`（Task 1） | **全員。型を変えたくなったら、書き換える前に全員へ共有すること** |
+| `Tree` / `Node` / `Form` / `Side` / `Block` / `Content` / `Eol`、`is_implied` / `empty` / `promote`（Task 1） | **全員。型を変えたくなったら、書き換える前に全員へ共有すること** |
 | `spell.mbt` の 11 定数（Task 1） | T2 Task 16（`fold_open` / `fold_close`）、T3 Task 20〜26（全部）。**読むだけ。作らない** |
-| `sig(ast) -> String`（Task 2） | T4（法則 1 のファズ・`sig_of`）、T5（操作テスト）。綴りは正誤表 §A-4。`doc-law.test.ts` の受け口が `"head:-\nlf\n[H[Hr[Ha]]]"` で固定する |
-| `check(ast) -> Array[String]`（Task 3。**11 条件**。条件 8 は裁定 B の「implied の前に見出しが居る」） | T4（`check_of`）、T5（`normalize` はこれを満たす木しか返さない。`spellable` の第 2 引数も `heading_before : Bool`） |
-| `fixture_wbtest.mbt` の `node` / `heading` / `item` / `slot` / `doc_of` / `ast_of` / `chain` / `chain_ast`（Task 2） | T3（`ser(doc_of([...]))` / `chain(7)` / `chain(200)`）、T4（`chain_ast(200)`）、T5（`ast_of(...)` / `node(...)`）。**自前で定義しない**（`Error: [4051]`）。T5 Task 43 だけが `done` / `rejected` の 2 本を末尾に追記してよい |
+| `sig(tree) -> String`（Task 2） | T4（法則 1 のファズ・`sig_of`）、T5（操作テスト）。綴りは正誤表 §A-4。`doc-law.test.ts` の受け口が `"head:-\nlf\n[H[Hr[Ha]]]"` で固定する |
+| `check(tree) -> Array[String]`（Task 3。**11 条件**。条件 8 は裁定 B の「implied の前に見出しが居る」） | T4（`check_of`）、T5（`normalize` はこれを満たす木しか返さない。`spellable` の第 2 引数も `heading_before : Bool`） |
+| `fixture_wbtest.mbt` の `node` / `heading` / `item` / `slot` / `doc_of` / `tree_of` / `chain` / `chain_tree`（Task 2） | T3（`ser(doc_of([...]))` / `chain(7)` / `chain(200)`）、T4（`chain_tree(200)`）、T5（`tree_of(...)` / `node(...)`）。**自前で定義しない**（`Error: [4051]`）。T5 Task 43 だけが `done` / `rejected` の 2 本を末尾に追記してよい |
 | `lead_spaces(s : String) -> Int` / `blank_line(s : String) -> Bool`（Task 4） | T2 の `block.mbt`。**`indent_of(line : String)` / `is_blank(line : String)` を再定義しない** |
 | `scan(md) -> Scan`、`Scan` / `Chunk` / `Kind`（Task 8・9） | T2 の `build` の唯一の入口 |
 | `block.mbt` の仮置き `classify`（Task 8） | T2 Task 10 が**同じファイルを Modify** で本実装に差し替える（Create しない） |
@@ -2533,7 +2533,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 項目�
 5. **`Chunk.depth` は「その行の字下げを飲み込んでいる、いちばん内側のコンテナの深さ」**（骨格行だけは自分の深さ）。`build` はこれを木の深さにそのまま使ってよい
 6. **setext は「ATX で書き戻せる行」だけが見出しになる**（`atx_writable`）。前後に空白がある行・末尾が空白 + `#` の行は段落のまま残る。多行の段落は**最終行だけ**が見出しになり、残りは `Body` に落ちる（R065。CommonMark との差分は T4 Task 36 の方言表が持つ）
 7. **`body_text` は散文にしか使わない**。インデントコード／フェンス／画像の中身は T2 Task 10・11 の `block_wbtest.mbt` が固定する（`chunks_sig` は Body を `body` としか出さないので、T2 が `classify` を本実装しても T1 のテストは 1 本も落ちない）
-8. **文書頭の `---` が封筒なのは「直後が空行でなく、かつ閉じの `---` がある」ときだけ**（裁定 E。仕様 §4 の frontmatter の行）。該当しなければ先頭トグル（左開始）として `Break(true)` に落ちる — mmm が書く先頭トグルの直後には空行規律で必ず空行が入るので、封筒と先頭トグルは綴りで一意に分かれる。**往復の固定は T4 Task 33 の法則 1 ファズ（`gen_ast` の seed 199 がこの形を吐く）、CommonMark との差分の記録は T4 Task 36 の方言表 18 行目が持つ**（T2 Task 17 の期待値はこの裁定で 1 つも動かないので、T2 に見張りは置かない）
+8. **文書頭の `---` が封筒なのは「直後が空行でなく、かつ閉じの `---` がある」ときだけ**（裁定 E。仕様 §4 の frontmatter の行）。該当しなければ先頭トグル（左開始）として `Break(true)` に落ちる — mmm が書く先頭トグルの直後には空行規律で必ず空行が入るので、封筒と先頭トグルは綴りで一意に分かれる。**往復の固定は T4 Task 33 の法則 1 ファズ（`gen_tree` の seed 199 がこの形を吐く）、CommonMark との差分の記録は T4 Task 36 の方言表 18 行目が持つ**（T2 Task 17 の期待値はこの裁定で 1 つも動かないので、T2 に見張りは置かない）
 9. **この時点で `parse` はまだ無い**（T2 の持ち物）。`scan` は木を知らないので、implied の導出・側の割り当て・区切りの帰属・畳みの対応付けはすべて T2 の `build` が行う
 
 **実施者向けの注意（実測）**

@@ -1,14 +1,14 @@
-# 新 core（mmmAst）実装計画
+# 新 core（MmmTree）実装計画
 
 > **エージェント実行者へ:** 必須サブスキル — `superpowers:subagent-driven-development`（推奨）
 > または `superpowers:executing-plans` を使い、タスクごとに実装すること。
 > ステップは `- [ ]` のチェックボックス形式で進捗を追う。
 
-**Goal:** md と同型の文書モデル（mmmAst）を MoonBit に新設し、
+**Goal:** md と同型の文書モデル（MmmTree）を MoonBit に新設し、
 parse / serialize / 操作 3 種 / 反映 v0 までを、法則のファズで検証しながら作る。
 
-**Architecture:** テキストが真実。`parse` が md を mmmAst（意味と中身。綴りは持たない）に読み、
-`serialize` が正規形の md を吐く。操作は mmmAst を直接変異させ、
+**Architecture:** テキストが真実。`parse` が md を MmmTree（意味と中身。綴りは持たない）に読み、
+`serialize` が正規形の md を吐く。操作は MmmTree を直接変異させ、
 差分を editSets として返す純関数として境界を渡る。正しさは 4 つの法則が持ち、
 実在コーパスとランダム生成の両方で機械検証する。
 
@@ -45,7 +45,7 @@ TypeScript（vitest。`@lezer/markdown` は法則 4 の外部審判）/ 旧 core
 
 ## スコープ
 
-**作る**: mmmAst の型 / parse / serialize / 法則 1・2・4 の検証基盤 /
+**作る**: MmmTree の型 / parse / serialize / 法則 1・2・4 の検証基盤 /
 操作 3 種（move・flipSide・delete）/ 反映 v0（全文正規形 → diff → editSets）。
 
 **作らない**（殺す条件の判定後に別計画）: UI 接続 / TS の書き換え / すげ替え v1 /

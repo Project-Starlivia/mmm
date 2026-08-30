@@ -18,7 +18,7 @@
 | 3 | 不変条件に **11 番「implied ⇒ side = Right」**を追加。`flip_side` は implied を**昇格させてから**反転する | 裁定 1（仕様 §2 と カタログ C16 は統括が改訂済み） |
 | 4 | `- - -` は **飾りの水平線（Rule）**。旧 core の「前から箇条書き」方言は**捨てる** | 裁定 2 |
 | 5 | `spell.mbt` の所有者は **T1**（11 定数の完全版）。`block.mbt` は **T1 が仮置きを Create、T2 が Modify で本実装** | 裁定 4 |
-| 6 | `tree_wbtest.mbt` を**廃し**、`fixture_wbtest.mbt`（T1 所有）に wbtest の共有ヘルパを全部集約する | 裁定 4 |
+| 6 | T5 が置こうとしていた wbtest ヘルパ用のファイルを**廃し**、`fixture_wbtest.mbt`（T1 所有）に wbtest の共有ヘルパを全部集約する | 裁定 4 |
 | 7 | 指紋 `sig` の `esc` に **`~` `^` `<` `\r` を追加**（フラグと label の取り違えで別の木が同じ指紋になる穴を塞ぐ） | 本正誤表 §A-4 |
 | 8 | `pub(all)` は**一切使わない**。`not(x)` は**使わない**（`!x`）。`rev_inplace` / ArrayView の `to_array` は**使わない**（`rev_in_place` / `to_owned`） | 実測 3・6・11 |
 | 9 | `check` は 10 → **11 条件**。`spell.mbt` は 8 → **11 定数** | 裁定 1・4 |
@@ -30,7 +30,7 @@
 ```
 core/doc/
   moon.pkg              pkgtype(kind: "library")
-  ast.mbt               木の型・指紋・不変条件の検査
+  tree.mbt               木の型・指紋・不変条件の検査
   spell.mbt             正規形の綴りの定数（11 個。綴りのリテラルはここにしか置かない）
   line.mbt              行の走査。文字と空白の道具
   scan.mbt              行 → かたまり（Chunk）の並び
@@ -78,7 +78,7 @@ pkgtype(kind: "library")
 
 **表に無いファイルを作ってはならない。** 必要になったら、作る前に §B の表に足すことを全員へ共有する。
 
-## A-2. 型の全文（`core/doc/ast.mbt`）
+## A-2. 型の全文（`core/doc/tree.mbt`）
 
 **そのまま写して着手してよい。T1 Task 1 の成果物。**
 
@@ -90,7 +90,7 @@ pkgtype(kind: "library")
 
 ///|
 /// 文書ひとつ。head は封筒（中は解釈しない）、doc は木そのもの（深さ 0）。
-pub struct Ast {
+pub struct Tree {
   head : String? // frontmatter の逐語。開き `---` 行頭から閉じ `---` 行末まで（末尾改行を含まない・改行は "\n" に畳む）
   eol : Eol // 原文の流儀。serialize が全行をこれで書く
   doc : Node // 深さ 0 のノード。body = 最初の骨格行より前、children = 木の列
@@ -196,7 +196,7 @@ pub fn promote(nd : Node, label : String) -> Node {
 ```moonbit
 ///|
 /// 不変条件の違反。空なら健全。テストと debug の assert がこれを見る。
-pub fn check(ast : Ast) -> Array[String]
+pub fn check(tree : Tree) -> Array[String]
 ```
 
 | # | 条件 | 違反時のメッセージ（逐語） |
@@ -221,7 +221,7 @@ pub fn check(ast : Ast) -> Array[String]
 **11 の帰結（裁定 1、全員が守る）**
 - `flip_side` は、対象が implied なら `promote(nd, nd.label)` してから反転する（`side.mbt`。T5 Task 46）
 - `normalize` の `spellable` は「飛びで綴れない位置の implied を昇格させる」の一般化としてこれを含む（`op.mbt`。T5 Task 44）
-- 木の生成器 `gen_ast` は **implied に Left を割り当てない**（`law_wbtest.mbt`。T4 Task 33）
+- 木の生成器 `gen_tree` は **implied に Left を割り当てない**（`law_wbtest.mbt`。T4 Task 33）
 - serialize / parse の区切りの帰属規則は**現状のまま**でよい（穴が閉じるので変更不要）
 - カタログのケース **C16 は統括が追加済み**（`2026-08-29-op-cases.md:701`）。**5 人は仕様とカタログを書き換えない**
 
@@ -230,10 +230,10 @@ pub fn check(ast : Ast) -> Array[String]
 ```moonbit
 ///|
 /// 木の指紋。**id を含まない** — 法則 1・2 の比較子はこれ 1 本。
-pub fn sig(ast : Ast) -> String
+pub fn sig(tree : Tree) -> String
 ```
 
-**逃がし（`esc`。`ast.mbt` の private 関数。T1 所有）**
+**逃がし（`esc`。`tree.mbt` の private 関数。T1 所有）**
 
 `s.iter()`（コードポイント）で回し、次だけを置き換える。それ以外はそのまま書く。
 
@@ -255,10 +255,10 @@ pub fn sig(ast : Ast) -> String
 **全体の形**
 
 ```
-sig(ast) = "head:" + H + "\n" + E + "\n" + node_sig(ast.doc)
-  H = ast.head が None なら "-"、Some(h) なら esc(h)
+sig(tree) = "head:" + H + "\n" + E + "\n" + node_sig(tree.doc)
+  H = tree.head が None なら "-"、Some(h) なら esc(h)
       （head は必ず `---` で始まり 7 文字以上なので、"-" と衝突しない）
-  E = ast.eol が Lf なら "lf"、Crlf なら "crlf"
+  E = tree.eol が Lf なら "lf"、Crlf なら "crlf"
 
 node_sig(nd) = "[" + F + G + esc(nd.label) + B + C + "]"
   F = nd.form が Heading なら "H"、Item なら "I"
@@ -297,7 +297,7 @@ block_sig(b) =
 // core/doc/parse.mbt
 ///|
 /// md を木にする。**この関数は決して書かない**。id は文書順に 1 から振る（doc が 1）。
-pub fn parse(md : String) -> Ast
+pub fn parse(md : String) -> Tree
 
 // core/doc/scan.mbt
 ///|
@@ -330,7 +330,7 @@ pub fn scan(md : String) -> Scan
 // core/doc/build.mbt
 ///|
 /// かたまりの並びを木にする。implied の導出・側の割り当て・畳みの対応付けはここ。
-pub fn build(sc : Scan) -> Ast
+pub fn build(sc : Scan) -> Tree
 
 // core/doc/block.mbt
 ///|
@@ -340,11 +340,11 @@ pub fn classify(text : String) -> Block
 // core/doc/serialize.mbt
 ///|
 /// 木を正規形の md にする。**mmm のフォーマッタそのもの**。決定的・冪等。
-pub fn serialize(ast : Ast) -> String
+pub fn serialize(tree : Tree) -> String
 
-// core/doc/ast.mbt
-pub fn sig(ast : Ast) -> String
-pub fn check(ast : Ast) -> Array[String]
+// core/doc/tree.mbt
+pub fn sig(tree : Tree) -> String
+pub fn check(tree : Tree) -> Array[String]
 pub fn is_implied(nd : Node) -> Bool
 pub fn empty(id : Int, form : Form) -> Node
 pub fn promote(nd : Node, label : String) -> Node
@@ -357,7 +357,7 @@ pub fn promote(nd : Node, label : String) -> Node
 ///|
 /// 操作の結果。拒否は例外ではなく値。
 pub enum Outcome {
-  Done(Ast)
+  Done(Tree)
   Reject(Reject)
 }
 
@@ -373,24 +373,24 @@ pub enum Reject {
 /// **`pub type`。`pub typealias` は存在しない**（実測 1）。
 pub type Path = Array[Int]
 
-pub fn path_of(ast : Ast, id : Int) -> Path?
-pub fn tops(ast : Ast, ids : Array[Int]) -> Array[Path]
+pub fn path_of(tree : Tree, id : Int) -> Path?
+pub fn tops(tree : Tree, ids : Array[Int]) -> Array[Path]
 
 ///|
 /// 不変条件の回復。**すべての操作の最後に必ず通す**。
-pub fn normalize(ast : Ast) -> Ast
+pub fn normalize(tree : Tree) -> Tree
 
 // core/doc/move.mbt
-pub fn move_nodes(ast : Ast, ids : Array[Int], parent : Int, at : Int) -> Outcome
+pub fn move_nodes(tree : Tree, ids : Array[Int], parent : Int, at : Int) -> Outcome
 
 // core/doc/side.mbt
 ///|
 /// 側を返す。root（深さ 1）なら鏡像、深さ 2 のスロットならそれ 1 つ。他は資格が無い。
 /// **対象が implied なら promote してから反転する**（裁定 1）。
-pub fn flip_side(ast : Ast, ids : Array[Int]) -> Outcome
+pub fn flip_side(tree : Tree, ids : Array[Int]) -> Outcome
 
 // core/doc/delete.mbt
-pub fn delete_nodes(ast : Ast, ids : Array[Int]) -> Outcome
+pub fn delete_nodes(tree : Tree, ids : Array[Int]) -> Outcome
 
 // core/doc/form.mbt
 pub fn to_item(nd : Node) -> Node
@@ -417,7 +417,7 @@ pub fn apply(text : String, edits : Array[Edit]) -> String
 pub fn diff(old : String, new_ : String) -> Array[Edit]
 
 // core/doc/reflect.mbt
-pub fn reflect(old : String, ast : Ast) -> Array[Edit]
+pub fn reflect(old : String, tree : Tree) -> Array[Edit]
 ```
 
 ### 外との面（`core/doc/wire.mbt`。**裁定 3**）
@@ -536,13 +536,13 @@ Task 1 の時点ではどれも未使用なので `Warning (unused_value)` が�
 
 **統合の前提（全員で共有する取り決め）**
 
-1. **逐語の文字列（`Ast.head` / `Opaque` / `Code.text` / `Svg`）の改行は `"\n"` に畳んで保持し、末尾改行を含まない。** CRLF 文書でも `\r` を残さない（**T1 の責務**。`scan_head` と `dedent` が行ごとに `\r` を落として `"\n"` で綴じる）。serialize が `ast.eol` の流儀で書き戻す
+1. **逐語の文字列（`Tree.head` / `Opaque` / `Code.text` / `Svg`）の改行は `"\n"` に畳んで保持し、末尾改行を含まない。** CRLF 文書でも `\r` を残さない（**T1 の責務**。`scan_head` と `dedent` が行ごとに `\r` を落として `"\n"` で綴じる）。serialize が `tree.eol` の流儀で書き戻す
 2. **parse は `<summary>` 行を落とす**（R107）。ただし**落とすのは `<details>` の直後に置かれた 1 行だけ**（裁定 7。本文の `<summary>…</summary>` は消さない）。serialize は毎回 label から作り直す
 
 **規則**
 
 1. head があれば逐語で書き、空行 1 本を挟む
-2. 改行は `ast.eol` の流儀で全行。文書は必ず改行で終わる（空文書は `""`）
+2. 改行は `tree.eol` の流儀で全行。文書は必ず改行で終わる（空文書は `""`）
 3. 見出し: `heading_mark` × 深さ + 半角空白 + label。**空ラベルでも空白 1 つを書く**（`### `）
 4. 項目: 字下げ + `item_mark` + 半角空白 + label。字下げ = 祖先の連続する Item の数 × `nest_step`（親が Item でなければ 0）
 5. 見出しの継ぎ目は空行 1 本。リストは**常に tight**。例外は「リスト形ノードの body に段落系（Image / Link / Opaque）がある」ときだけ（Code はフェンスが段落を中断できるので tight のまま）
@@ -579,7 +579,7 @@ Task 1 の時点ではどれも未使用なので `Warning (unused_value)` が�
 | ファイル | 所有 | Create | 他タスクの権限 |
 |---|---|---|---|
 | `moon.pkg` | T1 | T1 Task 1 | 読むだけ |
-| `ast.mbt` | T1 | T1 Task 1 | 読むだけ（型は 5 人の共有物。変えるなら**書き換える前に全員へ共有**） |
+| `tree.mbt` | T1 | T1 Task 1 | 読むだけ（型は 5 人の共有物。変えるなら**書き換える前に全員へ共有**） |
 | `spell.mbt` | **T1** | T1 Task 1 | 読むだけ。**T2・T3 は作らない**（裁定 4） |
 | `line.mbt` | T1 | T1 Task 4 | 読むだけ。`indent_of` / `is_blank` / `lead_spaces` / `blank_line` は T1 の所有名 |
 | `scan.mbt` | T1 | T1 Task 5 | 読むだけ |
@@ -604,7 +604,7 @@ Task 1 の時点ではどれも未使用なので `Warning (unused_value)` が�
 | ファイル | 所有 | Create | 他タスクの権限 |
 |---|---|---|---|
 | `fixture_wbtest.mbt` | **T1** | T1 Task 2 | **T5 Task 43 だけが、`done` / `rejected` の 2 関数を末尾に追記してよい**（`Outcome` は T5 Task 43 で初めて存在するため）。それ以外は読むだけ |
-| `ast_wbtest.mbt` | T1 | T1 Task 1 | 読むだけ |
+| `tree_wbtest.mbt` | T1 | T1 Task 1 | 読むだけ |
 | `line_wbtest.mbt` | T1 | T1 Task 4 | 読むだけ |
 | `scan_wbtest.mbt` | T1 | T1 Task 5 | 読むだけ。**T2 は触らない**（裁定 5 により T1 の期待値は classify に依存しなくなった） |
 | `block_wbtest.mbt` | T2 | T2 Task 10 | 読むだけ |
@@ -618,7 +618,8 @@ Task 1 の時点ではどれも未使用なので `Warning (unused_value)` が�
 | `move_wbtest.mbt` | T5 | T5 Task 47 | 読むだけ |
 | `diff_wbtest.mbt` | T5 | T5 Task 40 | 読むだけ |
 
-**`tree_wbtest.mbt` は作らない**（`fixture_wbtest.mbt` に統合。裁定 4）。
+**wbtest の共有ヘルパの置き場は `fixture_wbtest.mbt` ただ 1 つ**（裁定 4）。
+T5 はヘルパ用のファイルを新設しない — 上の表に無い `*_wbtest.mbt` は作らない。
 ブラックボックス（`*_test.mbt`）は 1 本も書かない。
 
 ## B-3. TS 側とその他
@@ -649,10 +650,10 @@ Task 1 の時点ではどれも未使用なので `Warning (unused_value)` が�
 |---|---|---|---|
 | `indent_of` | T1 `line.mbt` `(text, l) -> (Int, Int)` ／ T2 `block.mbt` `(line) -> Int` | **T1 の綴りを正**とし、T1 が String 版も所有する（裁定 4「T2 は再定義せず使う」） | **T2**: `block.mbt` の定義を削除し、`line.mbt` の `lead_spaces(s : String) -> Int` を呼ぶ。呼び出し 3 か所（`is_rule_text` の `let mut i = indent_of(text)` ／ `is_fence_close` の `let mut i = indent_of(line)` ／ `indented_code` の `indent_of(l) >= 4`）を `lead_spaces(...)` に置換 |
 | `is_blank` | T1 `line.mbt` `(text, l) -> Bool` ／ T2 `block.mbt` `(line) -> Bool` | 同上 | **T2**: 定義を削除し `blank_line(s : String) -> Bool` を呼ぶ。`indented_code` の 3 か所（`is_blank(ls[0])` ／ `is_blank(ls[ls.length() - 1])` ／ `if is_blank(l)`）を `blank_line(...)` に置換 |
-| `doc_of` | T3 `serialize_wbtest` `-> Node` ／ T5 `tree_wbtest` `-> Ast` | **両方を `fixture_wbtest.mbt` に別名で置く**（T1 所有） | `doc_of(kids) -> Node` と `ast_of(kids) -> Ast` の 2 本にする。**T5 は `doc_of(...)` → `ast_of(...)` に一括置換**（Task 41〜48 の全テスト本文） |
-| `chain` | T3 `serialize_wbtest` `-> Node` ／ T4 `law_wbtest` `-> Ast` | 同上 | `chain(n) -> Node` と `chain_ast(n) -> Ast` の 2 本。**T4 は `chain(200)` → `chain_ast(200)`** |
+| `doc_of` | T3 `serialize_wbtest` `-> Node` ／ T5 `tree_wbtest` `-> Tree` | **両方を `fixture_wbtest.mbt` に別名で置く**（T1 所有） | `doc_of(kids) -> Node` と `tree_of(kids) -> Tree` の 2 本にする。**T5 は `doc_of(...)` → `tree_of(...)` に一括置換**（Task 41〜48 の全テスト本文） |
+| `chain` | T3 `serialize_wbtest` `-> Node` ／ T4 `law_wbtest` `-> Tree` | 同上 | `chain(n) -> Node` と `chain_tree(n) -> Tree` の 2 本。**T4 は `chain(200)` → `chain_tree(200)`** |
 | `sig_of` | T2 `build_wbtest` `(chunks) -> String` ／ `wire.mbt` `(md) -> String` | `wire.mbt` の `sig_of(md)` を正とする | **T2**: `build_wbtest.mbt` の `sig_of(chunks)` を **`built_sig(chunks : Array[Chunk]) -> String`** に改名し、Task 12〜17 の全テスト本文を置換 |
-| `nd` | T5 `tree_wbtest` の `fn nd(...)` ／ `ast.mbt` の全関数の**引数名** | 引数名を正とする | **T5**: 関数を **`node(id, form, label, kids) -> Node`** に改名（`fixture_wbtest.mbt` へ移動）。Task 41〜48 の全テスト本文を置換 |
+| `nd` | T5 `tree_wbtest` の `fn nd(...)` ／ `tree.mbt` の全関数の**引数名** | 引数名を正とする | **T5**: 関数を **`node(id, form, label, kids) -> Node`** に改名（`fixture_wbtest.mbt` へ移動）。Task 41〜48 の全テスト本文を置換 |
 | `spell` | T5 `op.mbt` の `fn spell(nd, at)` ／ ファイル `spell.mbt`（綴り定数の置き場） | ファイル名を正とする | **T5**: 関数を **`spellable(nd : Node, at : Int) -> Node`** に改名 |
 | `before` | T5 `op.mbt` の `fn before(a, b)` ／ T3 `serialize.mbt` の `feed(o, before : Bool)` の引数名 | 引数名を正とする | **T5**: 関数を **`precedes(a : Path, b : Path) -> Bool`** に改名 |
 | `spell.mbt` の 8 定数 | T2 Task 16 が「まだ無ければ作る」／ T3 Task 20 が Create | **T1 が Task 1 で 11 定数版を作る**（裁定 4） | **T2・T3 とも Files から `spell.mbt` を外す**。Consumes に「`spell.mbt` の定数（T1 Task 1）」と書く |
@@ -697,7 +698,7 @@ fn doc_of(kids : Array[Node]) -> Node {
 
 ///|
 /// 文書ひとつ（head 無し・LF）。
-fn ast_of(kids : Array[Node]) -> Ast {
+fn tree_of(kids : Array[Node]) -> Tree {
   { head: None, eol: Lf, doc: doc_of(kids) }
 }
 
@@ -706,16 +707,16 @@ fn ast_of(kids : Array[Node]) -> Ast {
 fn chain(n : Int) -> Node
 
 ///|
-/// 深さ n の一本鎖を吊るした文書。`ast_of([chain(n)])`。
-fn chain_ast(n : Int) -> Ast {
-  ast_of([chain(n)])
+/// 深さ n の一本鎖を吊るした文書。`tree_of([chain(n)])`。
+fn chain_tree(n : Int) -> Tree {
+  tree_of([chain(n)])
 }
 
 // ↓ ここから下は T5 Task 43 が追記する（`Outcome` はそのとき初めて存在する）
 
 ///|
 /// 通った結果を剥がす（拒否されたらテストを落とす）。
-fn done(o : Outcome) -> Ast {
+fn done(o : Outcome) -> Tree {
   match o {
     Done(a) => a
     Reject(_) => abort("拒否された")
@@ -741,13 +742,13 @@ T3 の `ser(doc : Node) -> String`（`serialize_wbtest.mbt`）は T3 のまま�
 
 | ファイル | 名前とシグネチャ |
 |---|---|
-| `ast.mbt` | `pub struct Ast` / `pub struct Node` / `pub enum Eol` / `pub enum Form` / `pub enum Side` / `pub enum Block` / `pub enum Content` / `pub fn is_implied(nd : Node) -> Bool` / `pub fn empty(id : Int, form : Form) -> Node` / `pub fn promote(nd : Node, label : String) -> Node` / `pub fn sig(ast : Ast) -> String` / `pub fn check(ast : Ast) -> Array[String]` / `fn esc(s : String) -> String` / `fn block_sig(b : Block, sb : StringBuilder) -> Unit` / `fn node_sig(nd : Node, sb : StringBuilder) -> Unit` / `fn visit(...)` |
+| `tree.mbt` | `pub struct Tree` / `pub struct Node` / `pub enum Eol` / `pub enum Form` / `pub enum Side` / `pub enum Block` / `pub enum Content` / `pub fn is_implied(nd : Node) -> Bool` / `pub fn empty(id : Int, form : Form) -> Node` / `pub fn promote(nd : Node, label : String) -> Node` / `pub fn sig(tree : Tree) -> String` / `pub fn check(tree : Tree) -> Array[String]` / `fn esc(s : String) -> String` / `fn block_sig(b : Block, sb : StringBuilder) -> Unit` / `fn node_sig(nd : Node, sb : StringBuilder) -> Unit` / `fn visit(...)` |
 | `spell.mbt` | `item_mark` / `heading_mark` / `nest_step` / `fence_mark` / `fence_min` / `rule_mark` / `toggle_mark` / `fold_open` / `fold_close` / `summary_open` / `summary_close` |
 | `line.mbt` | `priv struct Line` / `fn scan_lines(text : String) -> Array[Line]` / `fn code_at(s : String, i : Int) -> Int` / `fn slice(s : String, a : Int, b : Int) -> String` / `fn is_space(c : Int) -> Bool` / `fn trim_range(text : String, a : Int, b : Int) -> (Int, Int)` / `fn trimmed_span(text : String, l : Line) -> (Int, Int)` / `fn is_blank(text : String, l : Line) -> Bool` / `fn indent_of(text : String, l : Line) -> (Int, Int)` / `fn eol_of(text : String) -> Eol` / `fn dedent(text : String, l : Line, drop : Int) -> String` / **`fn lead_spaces(s : String) -> Int`** / **`fn blank_line(s : String) -> Bool`** |
 | `scan.mbt` | `pub struct Scan` / `pub struct Chunk` / `pub enum Kind` / `pub fn scan(md : String) -> Scan` / `fn is_head_marker(...)` / `fn scan_head(text : String, lines : Array[Line]) -> (String, Int)?` / `fn atx_at(text : String, l : Line) -> (Int, String)?` / `fn bullet_at(text : String, l : Line) -> (Int, Int, String)?` / `fn break_at(text : String, l : Line, base : Int) -> Int` / `fn setext_at(text : String, l : Line, base : Int) -> Int` / `fn is_tag(text : String, l : Line, tag : String) -> Bool` / `fn is_summary(text : String, l : Line) -> Bool` / `fn fence_open(text : String, l : Line, base : Int) -> (Int, Int)?` / `fn fence_close_len(text : String, l : Line, ch : Int, base : Int) -> Int` / `priv struct Sc` / `fn flush(sc : Sc) -> Unit` / `fn keep(...)` / `fn settle(sc : Sc, col : Int) -> Int` / `fn owner_depth(sc : Sc) -> Int` |
 | `block.mbt`（仮置きのみ） | `pub fn classify(text : String) -> Block` |
-| `fixture_wbtest.mbt` | `node` / `heading` / `item` / `slot` / `doc_of` / `ast_of` / `chain` / `chain_ast`（+ T5 が `done` / `rejected`） |
-| `ast_wbtest.mbt` | `fn sample() -> Ast` |
+| `fixture_wbtest.mbt` | `node` / `heading` / `item` / `slot` / `doc_of` / `tree_of` / `chain` / `chain_tree`（+ T5 が `done` / `rejected`） |
+| `tree_wbtest.mbt` | `fn sample() -> Tree` |
 | `line_wbtest.mbt` | `fn lines_sig(text : String) -> String` |
 | `scan_wbtest.mbt` | `fn first_line(md : String) -> Line` / `fn chunks_sig(md : String) -> String` / `fn body_text(md : String, at : Int) -> String` |
 
@@ -756,8 +757,8 @@ T3 の `ser(doc : Node) -> String`（`serialize_wbtest.mbt`）は T3 のまま�
 | ファイル | 名前 |
 |---|---|
 | `block.mbt` | `pub fn classify`（Modify で本実装） / `fn content_of` / `fn is_rule_text` / `fn image_of` / `fn link_of` / `fn link_parts` / `fn starts` / `fn ends` / `fn code_of` / `fn fence_head` / `fn is_fence_close` / `fn indented_code` / `fn lines_of` / `fn join` / `fn trim` / `fn svg_of` ／ **`indent_of` と `is_blank` は定義しない**（`lead_spaces` / `blank_line` を呼ぶ） |
-| `build.mbt` | `pub fn build(sc : Scan) -> Ast` / `priv struct Frame` / `priv struct Ctx` / `fn close_frame` / `fn top` / `fn close_to` / `fn push_skel` / `fn push_frame` / `fn owner` / `fn next_is_slot` / `fn in_deep_item` / `fn fold_at` |
-| `parse.mbt` | `pub fn parse(md : String) -> Ast` |
+| `build.mbt` | `pub fn build(sc : Scan) -> Tree` / `priv struct Frame` / `priv struct Ctx` / `fn close_frame` / `fn top` / `fn close_to` / `fn push_skel` / `fn push_frame` / `fn owner` / `fn next_is_slot` / `fn in_deep_item` / `fn fold_at` |
+| `parse.mbt` | `pub fn parse(md : String) -> Tree` |
 | `block_wbtest.mbt` | （ヘルパ無し） |
 | `build_wbtest.mbt` | `fn skel(d, f, label) -> Chunk` / `fn body(d, b) -> Chunk` / `fn brk(d, hard) -> Chunk` / `fn fold(d, open) -> Chunk` / **`fn built_sig(chunks : Array[Chunk]) -> String`** / `fn md_sig(md : String) -> String` |
 
@@ -765,7 +766,7 @@ T3 の `ser(doc : Node) -> String`（`serialize_wbtest.mbt`）は T3 のまま�
 
 | ファイル | 名前 |
 |---|---|
-| `serialize.mbt` | `pub fn serialize(ast : Ast) -> String` / `priv struct Out` / `fn repeat` / `fn indent` / `fn push_text` / `fn join_lines` / `fn feed` / `fn hashes` / `fn inner_pad` / `fn write_node` / `fn write_children` / `fn write_body` / `fn write_block` / `fn fence_len` / `fn write_code` / `fn is_left` / `fn write_toggle` / `fn open_fold` / `fn close_fold` / `fn nl_count` |
+| `serialize.mbt` | `pub fn serialize(tree : Tree) -> String` / `priv struct Out` / `fn repeat` / `fn indent` / `fn push_text` / `fn join_lines` / `fn feed` / `fn hashes` / `fn inner_pad` / `fn write_node` / `fn write_children` / `fn write_body` / `fn write_block` / `fn fence_len` / `fn write_code` / `fn is_left` / `fn write_toggle` / `fn open_fold` / `fn close_fold` / `fn nl_count` |
 | `serialize_wbtest.mbt` | `fn ser(doc : Node) -> String` ／ **`doc_of` / `chain` / `heading` / `item` / `slot` は定義しない**（`fixture_wbtest.mbt` のものを使う） |
 
 ### T4 所有
@@ -774,7 +775,7 @@ T3 の `ser(doc : Node) -> String`（`serialize_wbtest.mbt`）は T3 のまま�
 |---|---|
 | `wire.mbt` | `pub fn sig_of` / `pub fn format_of` / `pub fn check_of` / `pub fn tree_of` / `pub fn apply_op` / `fn json_str` / `fn json_block` / `fn json_node` / `fn form_tag` / `fn side_tag` / `fn eol_tag` / `fn bool_lit` / `fn reject_tag` |
 | `js/exports.mbt` | `pub fn doc_sig` / `doc_format` / `doc_check` / `doc_tree` / `doc_apply`（**別パッケージ**。`mmm-app/core/doc` の名前とは衝突しない） |
-| `law_wbtest.mbt` | `priv struct Rand` / `priv struct Gen` / `let labels : Array[String]` / `fn sample_block` / `fn side_for` / `fn gen_implied` / `fn gen_children` / `fn gen_node` / `fn gen_ast(seed : Int) -> Ast` ／ **`chain` は定義しない**（`chain_ast` を使う） |
+| `law_wbtest.mbt` | `priv struct Rand` / `priv struct Gen` / `let labels : Array[String]` / `fn sample_block` / `fn side_for` / `fn gen_implied` / `fn gen_children` / `fn gen_node` / `fn gen_tree(seed : Int) -> Tree` ／ **`chain` は定義しない**（`chain_tree` を使う） |
 
 ### T5 所有
 
@@ -782,7 +783,7 @@ T3 の `ser(doc : Node) -> String`（`serialize_wbtest.mbt`）は T3 のまま�
 |---|---|
 | `edit.mbt` | `pub struct Edit` / `pub fn apply(text : String, edits : Array[Edit]) -> String` |
 | `diff.mbt` | `pub fn diff(old : String, new_ : String) -> Array[Edit]` / `fn at_line_start` |
-| `reflect.mbt` | `pub fn reflect(old : String, ast : Ast) -> Array[Edit]` |
+| `reflect.mbt` | `pub fn reflect(old : String, tree : Tree) -> Array[Edit]` |
 | `form.mbt` | `pub fn to_item` / `pub fn refit` |
 | `op.mbt` | `pub enum Outcome` / `pub enum Reject` / `pub type Path = Array[Int]` / `pub fn path_of` / `pub fn tops` / `pub fn normalize` / `fn seek` / **`fn precedes(a : Path, b : Path) -> Bool`** / `fn under` / `fn at_path` / `fn amend` / `fn pluck` / `fn fix(nd : Node, depth : Int) -> Node` / **`fn spellable(nd : Node, at : Int) -> Node`** |
 | `delete.mbt` | `pub fn delete_nodes` |
@@ -1025,7 +1026,7 @@ const BLOCKS = [
 /**
  * 病的な markdown を種 1 つから決定的に生成する（text-first）。
  * 木を組んでから serialize する model-first の生成は MoonBit 側
- * （`core/doc/law_wbtest.mbt` の `gen_ast`）が持つ。あちらが法則 1、こちらが法則 2。
+ * （`core/doc/law_wbtest.mbt` の `gen_tree`）が持つ。あちらが法則 1、こちらが法則 2。
  */
 export function randomMd(seed: number): string {
   // 本文は T4 Task 35 の草稿のまま（LABELS / BLOCKS を使う）。
@@ -1254,7 +1255,7 @@ export function shrink(
 
 ### Task 1: パッケージ・木の型・綴りの定数
 
-- Files: Create `core/doc/moon.pkg` / `core/doc/ast.mbt`（§A-2 の全文）/ **`core/doc/spell.mbt`（§A-6 の 11 定数）** / Test `core/doc/ast_wbtest.mbt`（1 本）
+- Files: Create `core/doc/moon.pkg` / `core/doc/tree.mbt`（§A-2 の全文）/ **`core/doc/spell.mbt`（§A-6 の 11 定数）** / Test `core/doc/tree_wbtest.mbt`（1 本）
 - **`spell.mbt` の所有者は T1。** T2・T3 は作らない 〔致命 ×2〕
 - `moon.pkg` は `pkgtype(kind: "library")` の 1 行だけ
 - **Step 4 に「`pub struct` のクロスパッケージ読みを試す」プローブは要らない**（裁定 3 により境界を struct が跨がなくなったため）。査読 3 が求めたプローブは**不要になった** 〔重大〕
@@ -1263,15 +1264,15 @@ export function shrink(
 
 ### Task 2: 手で木を組む道具と、指紋
 
-- Files: Create **`core/doc/fixture_wbtest.mbt`**（§C-2 の全文。`done` / `rejected` は**書かない**）/ Modify `core/doc/ast.mbt`（`esc` / `block_sig` / `node_sig` / `sig` を追記）/ Modify `core/doc/ast_wbtest.mbt`
+- Files: Create **`core/doc/fixture_wbtest.mbt`**（§C-2 の全文。`done` / `rejected` は**書かない**）/ Modify `core/doc/tree.mbt`（`esc` / `block_sig` / `node_sig` / `sig` を追記）/ Modify `core/doc/tree_wbtest.mbt`
 - **`esc` は `~` `^` `<` `\r` も逃がす**（§A-4）。テストを 1 本足す:
-  `assert_eq(sig(ast_of([heading(2, "^x", [])])), "head:-\nlf\n[H[H\\^x]]")` — 逃がさないと、畳んだ `x` と label `^x` が同じ指紋になる
+  `assert_eq(sig(tree_of([heading(2, "^x", [])])), "head:-\nlf\n[H[H\\^x]]")` — 逃がさないと、畳んだ `x` と label `^x` が同じ指紋になる
 - 指紋は §A-4 の形で 1 文字も違わないこと。固定の例 6 つを全部テストにする
 - コミット: `feat: ✨ 木の指紋を、手で組んだ木で確かめる`
 
 ### Task 3: 不変条件の検査
 
-- Modify `core/doc/ast.mbt`（`check` / `visit`）、Modify `core/doc/ast_wbtest.mbt`
+- Modify `core/doc/tree.mbt`（`check` / `visit`）、Modify `core/doc/tree_wbtest.mbt`
 - **条件は 11 個。** §A-3 の表のメッセージを逐語で固定する。**11 番「implied が側を持つ: `<id>`」が裁定 1 の本体**である 〔致命 — 法則 1 の穴〕
 - 4 番（順序法則）は **doc 直下でも効く**ことをテスト 1 本で押さえる 〔軽微 R042〕
 - コミット: `feat: ✨ 木の不変条件を 11 個ぶん見張る`
@@ -1414,7 +1415,7 @@ export function shrink(
 
 ### 全体
 
-1. **裁定 3 に従い、JSON の組み立てを `core/doc/wire.mbt`（新設・T4 所有）へ移す。** `core/doc/js/exports.mbt` は §A-5 の 5 本の 1 行ラッパだけにする。**`@doc.Node` / `@doc.Block` / `@doc.Ast` / `@doc.Reject` を別パッケージから触らない** 〔重大 — `pub struct` のクロスパッケージ読みが未検証だった問題への回答〕
+1. **裁定 3 に従い、JSON の組み立てを `core/doc/wire.mbt`（新設・T4 所有）へ移す。** `core/doc/js/exports.mbt` は §A-5 の 5 本の 1 行ラッパだけにする。**`@doc.Node` / `@doc.Block` / `@doc.Tree` / `@doc.Reject` を別パッケージから触らない** 〔重大 — `pub struct` のクロスパッケージ読みが未検証だった問題への回答〕
 2. `core/doc/js/moon.pkg` は `import { "mmm-app/core/doc", }`（**別名を書かない**。`moon fmt` が剥がす）
 3. 全 `MMM_FUZZ=…` を PowerShell / Bash の両方併記に直す（§E-1-5） 〔軽微〕
 
@@ -1453,7 +1454,7 @@ export function shrink(
     6 => Content(Link(text="題", href="https://example.com/t"))
     _ => Content(Code(info="ts", text="const x = `1`;"))
   ```
-- **`chain(n) -> Ast` を定義しない。** `fixture_wbtest.mbt` の **`chain_ast(n)`** を使い、「深さ 200 の一本鎖でも法則 1 が立つ」の `let m = chain(200)` を `let m = chain_ast(200)` に置換 〔致命 ×2〕
+- **`chain(n) -> Tree` を定義しない。** `fixture_wbtest.mbt` の **`chain_tree(n)`** を使い、「深さ 200 の一本鎖でも法則 1 が立つ」の `let m = chain(200)` を `let m = chain_tree(200)` に置換 〔致命 ×2〕
 - **`side_for` が implied に Left を割り当てないようにする**（裁定 1）。`gen_implied` は必ず `side: Right` で作る。実装コメントに「implied は側を持てない（不変条件 11）」と書く 〔致命〕
 - `"test:doc": "moon -C core test -p mmm-app/core/doc"`。**`"test:core"` は触らない**
 - コミット: `test: 🧪 木をばら撒いて、読み書きの往復を殴る`
@@ -1507,11 +1508,11 @@ export function shrink(
 ### 全体
 
 1. **Task 番号を振り直す**（§H）。旧 Task 45（delete と flipSide の同居・Step 9 個）を **45（消す）と 46（側を返す）**に割り、旧 46 → 47、旧 47 → 48、旧 48 → 50 とし、**49 に文書タスク**を新設する 〔重大 ×2 + 重大 1〕
-2. **`tree_wbtest.mbt` を作らない。** `fixture_wbtest.mbt`（T1 Task 2）を使う。`doc_of(...)`（Ast を返していたもの）を **`ast_of(...)`** に、`nd(...)` を **`node(...)`** に、Task 41〜48 の全テスト本文で一括置換する 〔致命 ×3〕
+2. **`tree_wbtest.mbt` を作らない。** `fixture_wbtest.mbt`（T1 Task 2）を使う。`doc_of(...)`（Tree を返していたもの）を **`tree_of(...)`** に、`nd(...)` を **`node(...)`** に、Task 41〜48 の全テスト本文で一括置換する 〔致命 ×3〕
 3. **`done` / `rejected` は Task 43 で `fixture_wbtest.mbt` の末尾に追記する**（`Outcome` がそこで初めて存在する）。これが T5 に許された唯一の他人のファイルへの書き込みである
 4. **`spell(nd, at)` → `spellable(nd, at)`、`before(a, b)` → `precedes(a, b)`** に改名 〔軽微〕
 5. **契約への申し送りの誤りを直す** 〔軽微〕: `Error [4014] The value X is undefined.` は誤り。§F-1 の `Error: [4021] / The value identifier X is unbound.` に統一する。`pub type Path = Array[Int]` の指摘は**正しく、契約に取り込み済み**（§A-5） 〔重大〕
-6. 前提の「`core/doc/ast.mbt` と `moon.pkg` はまだ無ければ §2 を写す」を削除し、「**T1 Task 1 のコミットを待って着手する**」に置き換える 〔軽微〕
+6. 前提の「`core/doc/tree.mbt` と `moon.pkg` はまだ無ければ §2 を写す」を削除し、「**T1 Task 1 のコミットを待って着手する**」に置き換える 〔軽微〕
 7. 全 git を `git -C <REPO> …`、全 moon を `moon -C <REPO>/core …` に統一 〔軽微〕
 
 ### Task 43: 操作の共通の道具
@@ -1528,7 +1529,7 @@ export function shrink(
   **`depth + 1 == 2 && (nd.side is Left || 直前の兄弟と側が違う)` なら `promote(nd, nd.label)`** する
 - テストを 1 本足す:「側のトグルを要する implied スロットは昇格する」期待 `head:-\nlf\n[H[Hr[H<[H~[Hb]]]]]`
 - **doc 直下の順序法則のテストを 1 本足す** 〔軽微 R042〕:
-  `ast_of([node(2, Heading, "r", []), node(3, Item, "c", [])])` を normalize して `head:-\nlf\n[H[Ic][Hr]]` を期待する
+  `tree_of([node(2, Heading, "r", []), node(3, Item, "c", [])])` を normalize して `head:-\nlf\n[H[Ic][Hr]]` を期待する
 
 ### Task 45: 消す
 
@@ -1545,7 +1546,7 @@ export function shrink(
 
 - Create `core/doc/move.mbt` / `core/doc/move_wbtest.mbt`
 - **文書を親とする move のテストを 2 本足す** 〔重大 R059 / R060〕:
-  - ①「枝を文書の子へ move すると root になる」— `# r` 下の `a` を `move_nodes(ast, [3], 1, 1)` して `head:-\nlf\n[H[Hr][Ha]]` を期待（深さが 1 に付け直され、side が Right へ落ちることも同時に押さえる）
+  - ①「枝を文書の子へ move すると root になる」— `# r` 下の `a` を `move_nodes(tree, [3], 1, 1)` して `head:-\nlf\n[H[Hr][Ha]]` を期待（深さが 1 に付け直され、side が Right へ落ちることも同時に押さえる）
   - ②「root は文書を親とする move で並べ替わる」— 2 本の root を入れ替えて順序が変わること
 
 ### Task 48: 操作の性質のファズ（TS 側）
@@ -1612,9 +1613,9 @@ T5 だけ帯を 50 まで広げた（隣が居ないので衝突しない。裁�
 
 | # | 主題 | 主な成果物 |
 |---|---|---|
-| **1** | パッケージ・木の型・綴りの定数 | `moon.pkg` / `ast.mbt` / `spell.mbt` / `ast_wbtest.mbt` |
-| **2** | 手で木を組む道具と、指紋 | `fixture_wbtest.mbt` / `ast.mbt`(`esc`,`sig`) |
-| **3** | 不変条件の検査（11 個） | `ast.mbt`(`check`) |
+| **1** | パッケージ・木の型・綴りの定数 | `moon.pkg` / `tree.mbt` / `spell.mbt` / `tree_wbtest.mbt` |
+| **2** | 手で木を組む道具と、指紋 | `fixture_wbtest.mbt` / `tree.mbt`(`esc`,`sig`) |
+| **3** | 不変条件の検査（11 個） | `tree.mbt`(`check`) |
 | **4** | 行の走査と、文字・空白の道具 | `line.mbt` / `line_wbtest.mbt` |
 | **5** | 見出しと項目の行 | `scan.mbt`(型,`atx_at`,`bullet_at`) / `scan_wbtest.mbt` |
 | **6** | 水平線と setext の行、`- - -` の裁定 | `scan.mbt`(`break_at`,`setext_at`,`bullet_at` の guard) |
@@ -1662,7 +1663,7 @@ T5 だけ帯を 50 まで広げた（隣が居ないので衝突しない。裁�
 T1 Task 1 ──┬─> T1 Task 2〜9
             ├─> T2 Task 10（block.mbt は T1 Task 8 の仮置きを待つ）
             ├─> T3 Task 20〜26（spell.mbt を読むだけ）
-            └─> T5 Task 40・42・43・44・45・46・47（手で組んだ Ast で完結）
+            └─> T5 Task 40・42・43・44・45・46・47（手で組んだ Tree で完結）
 
 T1 Task 2（fixture_wbtest） ──> T3 Task 21〜26 ／ T4 Task 33 ／ T5 Task 41〜48
 T1 Task 8（scan の駆動）    ──> T2 Task 12〜17
@@ -1682,7 +1683,7 @@ T4 Task 30 ──────────────────> 単独で先�
 ## 最後に — 全員が守る 5 行
 
 1. **表に無いファイルを作らない。**他人のファイルを書き換えない（例外は T5 Task 43 の `fixture_wbtest.mbt` への 2 関数の追記だけ）
-2. **`ast.mbt` の型を変えたくなったら、書き換える前に全員へ共有する。**5 人の共有物である
+2. **`tree.mbt` の型を変えたくなったら、書き換える前に全員へ共有する。**5 人の共有物である
 3. **旧 core（`core/*.mbt`・`core/js/`）・`src/`・既存 `test/*.test.ts` 26 本・仕様・カタログは 1 バイトも触らない**
 4. **Step 2 の Expected は §F の逐語で書く。**「たぶんこう落ちる」を書かない
 5. **`Total tests: 0` を見たら緑ではない。**`-p` の綴りを疑う

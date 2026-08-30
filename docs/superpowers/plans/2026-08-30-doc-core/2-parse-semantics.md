@@ -2,7 +2,7 @@
 
 ## この群の概要
 
-**担当範囲（Task 10〜17）** — かたまりの並び（`Scan`）を木（`Ast`）にする層。`block.mbt`（かたまり 1 つの認定）・`build.mbt`（並び → 木）・`parse.mbt`（読みの入口）の 3 ファイルと、その白箱テスト 2 本を持つ。
+**担当範囲（Task 10〜17）** — かたまりの並び（`Scan`）を木（`Tree`）にする層。`block.mbt`（かたまり 1 つの認定）・`build.mbt`（並び → 木）・`parse.mbt`（読みの入口）の 3 ファイルと、その白箱テスト 2 本を持つ。
 
 **所有ファイル（正誤表 §B-1・§B-2）**
 
@@ -14,7 +14,7 @@
 | `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/block_wbtest.mbt` | Create（Task 10） |
 | `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/build_wbtest.mbt` | Create（Task 12） |
 
-**1 バイトも触らないもの**: `ast.mbt` / `spell.mbt` / `line.mbt` / `scan.mbt` / `scan_wbtest.mbt` / `fixture_wbtest.mbt`（すべて T1 所有）、旧 core（`core/*.mbt`・`core/js/`）、`src/`、既存 `test/*.test.ts` 26 本、仕様とカタログ。
+**1 バイトも触らないもの**: `tree.mbt` / `spell.mbt` / `line.mbt` / `scan.mbt` / `scan_wbtest.mbt` / `fixture_wbtest.mbt`（すべて T1 所有）、旧 core（`core/*.mbt`・`core/js/`）、`src/`、既存 `test/*.test.ts` 26 本、仕様とカタログ。
 
 **着手の前提（正誤表 §H-2 の依存図）**
 
@@ -28,7 +28,7 @@
 - **`indent_of` と `is_blank` を定義しない。** T1 `line.mbt` の **`lead_spaces(s : String) -> Int`**（先頭の半角空白を数える）と **`blank_line(s : String) -> Bool`**（空白とタブだけなら true）を呼ぶ
 - **`spell.mbt` を作らない。** 11 定数の所有者は T1 Task 1。T2 は `fold_open` / `fold_close` を読むだけ
 - `build_wbtest.mbt` の指紋ヘルパは **`built_sig(chunks : Array[Chunk]) -> String`**（`wire.mbt` の `pub fn sig_of(md)` と衝突するため）
-- 手で木を組むヘルパ（`node` / `heading` / `item` / `doc_of` / `ast_of` / `chain`）は `fixture_wbtest.mbt`（T1 Task 2）にある。T2 は木を手で組まない（かたまりを組む）ので使わない
+- 手で木を組むヘルパ（`node` / `heading` / `item` / `doc_of` / `tree_of` / `chain`）は `fixture_wbtest.mbt`（T1 Task 2）にある。T2 は木を手で組まない（かたまりを組む）ので使わない
 
 **整形の綴り**
 
@@ -70,7 +70,7 @@
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/block_wbtest.mbt`（Create）
 
 **Interfaces:**
-- Consumes: `fn code_at(s : String, i : Int) -> Int` / `fn slice(s : String, a : Int, b : Int) -> String` / **`fn lead_spaces(s : String) -> Int`**（T1 `line.mbt`）、`enum Block` / `enum Content`（T1 `ast.mbt`）
+- Consumes: `fn code_at(s : String, i : Int) -> Int` / `fn slice(s : String, a : Int, b : Int) -> String` / **`fn lead_spaces(s : String) -> Int`**（T1 `line.mbt`）、`enum Block` / `enum Content`（T1 `tree.mbt`）
 - Produces: `pub fn classify(text : String) -> Block`（T1 の `scan` の `flush` が呼ぶ。Task 12〜17 の通しがこれを通る）、`fn content_of(text : String) -> Content?` / `fn is_rule_text(text : String) -> Bool` / `fn image_of(text : String) -> Content?` / `fn link_of(text : String) -> Content?` / `fn link_parts(text : String, start : Int) -> (String, String)?` / `fn starts(s : String, p : String) -> Bool` / `fn ends(s : String, p : String) -> Bool`
 
 **カバーする要件:** R016・R017（Content の割り）、R018（疑わしきは Opaque）、R081（水平線の綴り。裁定 2）、R110（散文は逐語）。正誤表 §A-8-⑤・⑥。
@@ -548,8 +548,8 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ コー�
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/build_wbtest.mbt`（Create）
 
 **Interfaces:**
-- Consumes: `pub struct Scan` / `pub struct Chunk` / `pub enum Kind`（T1 `scan.mbt`）、`struct Ast` / `struct Node` / `enum Form` / `enum Side` / `enum Block` / `enum Eol` / `pub fn sig(ast : Ast) -> String`（T1 `ast.mbt`）
-- Produces: `pub fn build(sc : Scan) -> Ast`、`priv struct Frame` / `priv struct Ctx`、`fn close_frame(fr : Frame) -> Node` / `fn top(cx : Ctx) -> Frame` / `fn close_to(cx : Ctx, d : Int) -> Unit` / `fn push_skel(cx : Ctx, want : Int, form : Form, label : String) -> Unit` / `fn push_frame(cx : Ctx, form : Form, label : String, implied : Bool) -> Unit`、テストの道具 `fn skel(d : Int, f : Form, label : String) -> Chunk` / `fn built_sig(chunks : Array[Chunk]) -> String`
+- Consumes: `pub struct Scan` / `pub struct Chunk` / `pub enum Kind`（T1 `scan.mbt`）、`struct Tree` / `struct Node` / `enum Form` / `enum Side` / `enum Block` / `enum Eol` / `pub fn sig(tree : Tree) -> String`（T1 `tree.mbt`）
+- Produces: `pub fn build(sc : Scan) -> Tree`、`priv struct Frame` / `priv struct Ctx`、`fn close_frame(fr : Frame) -> Node` / `fn top(cx : Ctx) -> Frame` / `fn close_to(cx : Ctx, d : Int) -> Unit` / `fn push_skel(cx : Ctx, want : Int, form : Form, label : String) -> Unit` / `fn push_frame(cx : Ctx, form : Form, label : String, implied : Bool) -> Unit`、テストの道具 `fn skel(d : Int, f : Form, label : String) -> Chunk` / `fn built_sig(chunks : Array[Chunk]) -> String`
 
 **カバーする要件:** R020（id は文書順に 1 から。doc が 1）、R038（リストは相対記法）、R052・R053（深さ = level の全域一致）。
 
@@ -599,14 +599,14 @@ test "項目は飛べないので、いま開いている枝の子になる" {
 ///|
 test "id は文書順に 1 から振られる" {
   // R020 正誤表 §A-2（doc が 1）
-  let ast = build({
+  let tree = build({
     head: None,
     eol: Lf,
     chunks: [skel(1, Heading, "r"), skel(2, Heading, "a")],
   })
-  assert_eq(ast.doc.id, 1)
-  assert_eq(ast.doc.children[0].id, 2)
-  assert_eq(ast.doc.children[0].children[0].id, 3)
+  assert_eq(tree.doc.id, 1)
+  assert_eq(tree.doc.children[0].id, 2)
+  assert_eq(tree.doc.children[0].children[0].id, 3)
 }
 ```
 
@@ -653,7 +653,7 @@ priv struct Ctx {
 
 ///|
 /// かたまりの並びを木にする。
-pub fn build(sc : Scan) -> Ast {
+pub fn build(sc : Scan) -> Tree {
   let cx = {
     stack: [
       {
@@ -770,7 +770,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ かた�
 
 **Interfaces:**
 - Consumes: `push_skel` / `push_frame` / `close_to` / `top`（Task 12）
-- Produces: 正誤表 §A-3 の不変条件 3（Item の下に Heading は無い）・5〜9 を満たす implied を含む `Ast`（T1 の `check` と T5 の `normalize` が前提にする）
+- Produces: 正誤表 §A-3 の不変条件 3（Item の下に Heading は無い）・5〜9 を満たす implied を含む `Tree`（T1 の `check` と T5 の `normalize` が前提にする）
 
 **カバーする要件:** R022・R023（implied は id を持つ普通のノード）、R029・R030（最初の `#` より前の深い見出し）、R039（単調性）、R041・R042、R052（深さ = level）、R057（項目 root）。カタログ C6・**C17**。仕様 §2 の改訂（裁定 A）。
 
@@ -818,13 +818,13 @@ test "implied の前に見出しの兄弟は居ない" {
 ///|
 test "implied は id を持つ普通のノードである" {
   // R023 R020
-  let ast = build({
+  let tree = build({
     head: None,
     eol: Lf,
     chunks: [skel(1, Heading, "r"), skel(3, Heading, "b")],
   })
-  assert_eq(ast.doc.children[0].children[0].id, 3)
-  assert_eq(ast.doc.children[0].children[0].children[0].id, 4)
+  assert_eq(tree.doc.children[0].children[0].id, 3)
+  assert_eq(tree.doc.children[0].children[0].children[0].id, 4)
 }
 
 ///|
@@ -862,7 +862,7 @@ Expected（正誤表 §F-3 — コンパイルは通り、**値の差で落ち�
 > - 「深さの飛びは implied が埋める」→ `"head:-\nlf\n[H[Hr[Ha[Hb]]]]"`（`~` が無い）
 > - 「最初の # より前の深い見出しは implied root の下に入る」→ `"head:-\nlf\n[H[Ha[Hb]]]"`（飛びを埋めないので a が深さ 1 に落ち、b がその子になる）
 > - 「implied の前に見出しの兄弟は居ない」→ `"head:-\nlf\n[H[Hp[Hx][Hy]]]"`
-> - 「implied は id を持つ普通のノードである」→ `ast.doc.children[0].children[0].children[0]` が存在せず添字が範囲外で落ちる
+> - 「implied は id を持つ普通のノードである」→ `tree.doc.children[0].children[0].children[0]` が存在せず添字が範囲外で落ちる
 > - 「項目 root のあとの深い見出しは implied root の下に入る」→ `"head:-\nlf\n[H[Ia[Hh]]]"`（見出しが項目の子になっている。**これが再査読 3 の致命 R039**）
 >
 > **「項目 root のあとの `#` は素直に root になる」だけは PASS する**（深さ 1 の見出しは `close_to(1)` が項目を閉じるので、この時点でも期待どおりになる） — Step 3 で足す「項目を閉じるループ」がこの素直な形を壊さないことを見張る回帰の網である。
@@ -1154,7 +1154,7 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ 中身�
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/build_wbtest.mbt`（末尾へ追記）
 
 **Interfaces:**
-- Consumes: `Ctx.pending`（Task 14）、`push_frame`（Task 12）、`pub fn check(ast : Ast) -> Array[String]`（T1 `ast.mbt`）
+- Consumes: `Ctx.pending`（Task 14）、`push_frame`（Task 12）、`pub fn check(tree : Tree) -> Array[String]`（T1 `tree.mbt`）
 - Produces: 深さ 2 のノード**で、かつ骨格行を持つもの**だけが意味を持つ `Node.side`（正誤表 §A-3 不変条件 10・**11**。T3 の serialize が側の列から区切りを導出する入力）
 
 **カバーする要件:** R032（implied root のスロット）、R057・R058（項目 root の中身の列のトグル）、R080（変わり目にちょうど 1 本）、R082・R185（側の列）、R207。正誤表 §A-3 不変条件 10・11（裁定 1）。カタログ C4・C15。
@@ -1517,8 +1517,8 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ details 
 - Test: `D:/1.atrium/mmm/.claude/worktrees/doc-model/core/doc/build_wbtest.mbt`（先頭の道具と末尾へ追記）
 
 **Interfaces:**
-- Consumes: `pub fn scan(md : String) -> Scan`（T1 `scan.mbt`）、`pub fn build(sc : Scan) -> Ast`（Task 12〜16）、`pub fn check(ast : Ast) -> Array[String]` / `pub fn sig(ast : Ast) -> String`（T1 `ast.mbt`）
-- Produces: `pub fn parse(md : String) -> Ast` — **T3 の法則テスト・T4 の `wire.mbt`（`sig_of` / `format_of` / `check_of` / `tree_of` / `apply_op`）・T5 の `reflect` がこれ 1 本を通る**。テストの道具 `fn md_sig(md : String) -> String`
+- Consumes: `pub fn scan(md : String) -> Scan`（T1 `scan.mbt`）、`pub fn build(sc : Scan) -> Tree`（Task 12〜16）、`pub fn check(tree : Tree) -> Array[String]` / `pub fn sig(tree : Tree) -> String`（T1 `tree.mbt`）
+- Produces: `pub fn parse(md : String) -> Tree` — **T3 の法則テスト・T4 の `wire.mbt`（`sig_of` / `format_of` / `check_of` / `tree_of` / `apply_op`）・T5 の `reflect` がこれ 1 本を通る**。テストの道具 `fn md_sig(md : String) -> String`
 
 **カバーする要件:** R010・R093・R105・R108・R109・R189・R200、R039・R042・R057・R058・R206・R207、R084・R087。正誤表 §A-3 不変条件 1〜11（`build` は `check` を満たす木しか作らない）。カタログ C6・C8・C9・C11・C15・C4・**C17**。
 
@@ -1634,7 +1634,7 @@ The value identifier parse is unbound.
 ///|
 /// md を木にする。**この関数は決して書かない**（読みのサイクルは書き戻さない）。
 /// id は文書順に 1 から振る（doc が 1）。
-pub fn parse(md : String) -> Ast {
+pub fn parse(md : String) -> Tree {
   build(scan(md))
 }
 ```
@@ -1665,12 +1665,12 @@ git -C D:/1.atrium/mmm/.claude/worktrees/doc-model commit -m "feat: ✨ md を�
 | 渡すもの | 受け取る側 |
 |---|---|
 | `pub fn classify(text : String) -> Block`（本実装。`- - -` を含む水平線は `Rule`） | T1 の `scan` の `flush`（呼び出し側は無変更） |
-| `pub fn build(sc : Scan) -> Ast` | T2 内部（`parse`）。他は `parse` を通る |
-| `pub fn parse(md : String) -> Ast` | T3（法則テスト）／T4（`wire.mbt` の 5 本すべて）／T5（`reflect`） |
+| `pub fn build(sc : Scan) -> Tree` | T2 内部（`parse`）。他は `parse` を通る |
+| `pub fn parse(md : String) -> Tree` | T3（法則テスト）／T4（`wire.mbt` の 5 本すべて）／T5（`reflect`） |
 | `fn lines_of` / `fn join` / `fn trim` / `fn starts` / `fn ends`（`block.mbt` の道具） | T3 の `serialize` が再利用してよい（同じパッケージ内。**再定義しないこと**） |
 
 - **`parse` が返す木は必ず `check` を満たす**（Task 17 の 2 本が見張る）。特に **implied は深さによらず `side = Right`**（裁定 1・不変条件 11）。T5 の `normalize` は「parse 直後の木は健全」を前提にしてよい
-- **項目 root のあとの列 0 の見出しは、項目の子にならない**（裁定 A・仕様 §2・C17）。`push_skel` が見出しを積む前に開いている項目を全部閉じるので、`- a` + `## h` は `doc.children = [a(Item), implied(1)[h]]` になる。**T3 の serialize はこの木から `- a` / 空行 / `## h` を書き戻すこと**（implied は骨格行を書かないので、`h` は `##` で出る）。T4 のファズ（`gen_ast` が項目 root の後ろに見出し root を並べる形）もこの木を前提にしてよい
+- **項目 root のあとの列 0 の見出しは、項目の子にならない**（裁定 A・仕様 §2・C17）。`push_skel` が見出しを積む前に開いている項目を全部閉じるので、`- a` + `## h` は `doc.children = [a(Item), implied(1)[h]]` になる。**T3 の serialize はこの木から `- a` / 空行 / `## h` を書き戻すこと**（implied は骨格行を書かないので、`h` は `##` で出る）。T4 のファズ（`gen_tree` が項目 root の後ろに見出し root を並べる形）もこの木を前提にしてよい
 - **不変条件 8 は「implied ⇒ その前に見出しの兄弟が居ない」**（裁定 B）。違反メッセージは `implied の前に見出しが居る: <id>`。`build` はこの一般化された条件に依存している（`[a(Item), implied[h]]` を作る）ので、T1 の `check` と T5 の `spellable` が旧文言（「親の children の先頭」）のままだと Task 15・17 の `check(...).length() == 0` が落ちる
 - **封筒の裁定には「開きの `---` の直後が空行でないこと」が要る**（裁定 E・仕様 §4）。T1 の `scan_head` がこの 1 条件を持つ前提だが、**T2 の期待値は 1 つも動かない** — Task 17 の「頭でない先頭の `---` は先頭トグルとして読まれる」（`---\n\n## a\n`）は閉じの `---` が無いので元から封筒ではなく、「C11: frontmatter は封筒として頭に載る」と Task 17 の `check(parse("---\nk: v\n---\n…"))` は 2 行目が空行でないので封筒のまま。条件が T1 側に無いと、serialize が書く「先頭トグル + もう 1 本のトグル」の文書（`---` / 空行 / `## a` / 空行 / `---` / 空行 / `## b`）で木が丸ごと head に飲まれる — **その形で落ちたら疑うのは `build` ではなく T1 の `scan_head`**
 - **`- - -` は飾りの水平線**（裁定 2）。`scan` は `Break(false)`、`classify` は `Rule` を返す。旧 core の「前から箇条書き」方言は捨てた

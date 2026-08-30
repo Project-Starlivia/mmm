@@ -33,7 +33,7 @@
 ## 2. 構造
 
 ```
-mmmAst {                          // 意味と中身。綴りは持たない
+MmmTree {                          // 意味と中身。綴りは持たない
   head: String?                   // frontmatter 区間まるごと（中は解釈しない）
   doc:  Node(level 0)             // 文書そのもの。body = 最初の見出しより前の散文、
 }                                 // children = 最上位ノードの列（level はそのまま保持）
@@ -42,8 +42,15 @@ Node { id, level, form, label, folded, body: [Block], children: [Node] }
 Block = Content(Image | Code | Svg | Link)   // 認定ブロック（ブロックレベルのみ）
       | Opaque(text)                         // 散文・table・引用・HTML・謎。中身は逐語
 
-Map構造木 = project(mmmAst)       // side/folded の絵・Opaque の気配化
+MindmapTree = project(MmmTree)       // side/folded の絵・Opaque の気配化
 ```
+
+**Tree と呼ぶ理由**: これは構文木でも純粋な構造木でもなく、
+**md が表現できる構造だけを、md の語彙で持つ木**。綴り（空行の数・マーカーの銘柄）は
+持たないので AST ではなく、level も form も details も md の記法が決めた形なので
+記法から独立してもいない。`Ast` は主張しすぎ、`Model` / `Doc` は範囲が広い —
+`Tree` は主張が最小で、この中間物を誤解させない。
+外の世界の木（CommonMark のブロック木）は `MarkdownAst` のまま — **Ast は外の言葉、Tree は mmm の言葉**。
 
 - **文書は level 0 のノード**。`#`（level 1）の子がそれぞれ独立の木。
   最初の `#` より前に level 2+ の見出しがあれば、level 0 との段差から implied(1) が
@@ -56,7 +63,7 @@ Map構造木 = project(mmmAst)       // side/folded の絵・Opaque の気配化
   綴りは**何も書かない**（level 飛びそのものが implied の綴り）。
   rename や body 追加で骨格行が書かれてスパンが付いた瞬間、普通のノードに**昇格**し、
   以後は子と無関係に存在する（手書きの空見出し `## ` は最初からこちら側）
-- **id はセッション限り**。操作中は mmmAst が運ぶので、操作の道に照合は存在しない
+- **id はセッション限り**。操作中は MmmTree が運ぶので、操作の道に照合は存在しない
 - **form は意味** — 見出しか項目かは書かれたとおりに読み、format は変えない
   （変えるのは setForm と convert だけ）。見出しは**絶対記法**（level を自分で宣言し、
   飛びは implied を導出する）、リストは**相対記法**（置かれた場所から埋まり、implied を作らない）
@@ -87,7 +94,7 @@ Map構造木 = project(mmmAst)       // side/folded の絵・Opaque の気配化
 ## 3. 変換と法則
 
 ```
-md ─ parse → mmmAst ─ project → Map構造木 ─ render → map
+md ─ parse → MmmTree ─ project → MindmapTree ─ render → map
 md ← serialize ┘
 
 法則 1: parse(serialize(M)) = M     … モデルの完全往復。ファズの本丸
@@ -156,9 +163,9 @@ blockquote/table/一般 HTML/項目内の見出しは Opaque。
 ## 5. 操作の流れ
 
 ```
-1. UI (ts)   ポインタ解釈 → Map構造木の言葉で命令を発話
+1. UI (ts)   ポインタ解釈 → MindmapTree の言葉で命令を発話
 2. 翻訳      id 素通し / index 読み替え（Opaque を飛ばした分）
-3. core      mmmAst を意味で変異（reshape / reject の判定込み）
+3. core      MmmTree を意味で変異（reshape / reject の判定込み）
 4. serialize 正規形の md 全文 → 旧 md と diff → editSets をペインへ
 5. project → render で map 更新
 ```
@@ -167,13 +174,13 @@ blockquote/table/一般 HTML/項目内の見出しは Opaque。
   回す。無限ループしないのは「**書くのは操作だけ。読みのサイクルは決して書かない**」から —
   serialize は操作ハンドラの中にしか居らず、変更イベントの先に書き戻す経路が無い
 - 操作の道の id は reparse でも死なない: 操作後の parse 結果は法則 2 により変異後の
-  mmmAst と構造同一なので、**文書順に並走して id を写すだけ**（推測ゼロの機械的コピー +
+  MmmTree と構造同一なので、**文書順に並走して id を写すだけ**（推測ゼロの機械的コピー +
   構造一致 assert = 法則 2 の実地検証が毎操作タダで走る）。推測が要るのは打鍵だけ
   （CM トランザクションの出自注釈で写し方を切り替える）
-- **Map構造木は絶対に変異させない**（React と同じ一方向ループ。投影の逆写像を作らない）
-- **再パースなし**（法則 1 が保証。debug で assert は自由）、**照合なし**（id は mmmAst が運ぶ）
+- **MindmapTree は絶対に変異させない**（React と同じ一方向ループ。投影の逆写像を作らない）
+- **再パースなし**（法則 1 が保証。debug で assert は自由）、**照合なし**（id は MmmTree が運ぶ）
 - diff は「間違えても壊れない」部品（正しさは serialize が保証。最悪カーソルが跳ぶ）
-- 読みの道（打鍵・rename・カード編集・貼り付け）だけ逆向き: テキスト → parse → 新 mmmAst。
+- 読みの道（打鍵・rename・カード編集・貼り付け）だけ逆向き: テキスト → parse → 新 MmmTree。
   **id の継ぎ目は世界でここ 1 か所**、被害は選択ズレ止まり
 
 ### 入力の裁定 — 二本の道
@@ -181,7 +188,7 @@ blockquote/table/一般 HTML/項目内の見出しは Opaque。
 > **構造を変える者は文字列に触れず、文字列に触れる者は必ず解釈を受ける。**
 
 - **木の道**: move / indent / outdent / delete / flipSide / fold / setForm — 木の語彙で
-  mmmAst を直接変異。parse を通らず、id は mmmAst が運ぶ
+  MmmTree を直接変異。parse を通らず、id は MmmTree が運ぶ
 - **読みの道**: 打鍵・rename・カード編集・貼り付け — 文字列を運ぶものは例外なく
   テキストに書かれて parse を通る。**一言語原則**: カード入力も md を話す。
   エスケープ・trim・改行拒否といったラベル専用の裁定は存在せず、md 文法が唯一の裁定者。
@@ -218,9 +225,9 @@ blockquote/table/一般 HTML/項目内の見出しは Opaque。
 ### 反映の機構（正しさは全体で、書き込みは触った所だけ）
 
 ```
-1. serialize(mmmAst) で全文の正規形を生成（正しさの基準は常に全体で持つ）
+1. serialize(MmmTree) で全文の正規形を生成（正しさの基準は常に全体で持つ）
 2. すげ替え: 意味の変わっていないノードは旧原文の範囲を再利用して反映文 R を組む
-3. 検証: parse(R) == 変異後の mmmAst。通らなければ再利用を諦めて正規形へ
+3. 検証: parse(R) == 変異後の MmmTree。通らなければ再利用を諦めて正規形へ
    段階フォールバック（終点 = 全文正規形。常に正しい）
 4. R と旧全文の diff（共通接頭辞・接尾辞を刈って行単位 Myers）
    → editSets = [{from, to, insert}]（旧文書上の UTF-16 オフセット）だけが境界を渡る
@@ -260,16 +267,16 @@ N51 勝手整形（正規形の再 serialize は無変化 = 法則 2）/ N33 形
 
 | 層 | 持ち物 | 責務 |
 |---|---|---|
-| **MoonBit core** | mmmAst / parse / serialize / 操作 / diff | 意味の全て。純関数で、editSets（値）だけを返す。ヘッドレスで網羅検証 |
+| **MoonBit core** | MmmTree / parse / serialize / 操作 / diff | 意味の全て。純関数で、editSets（値）だけを返す。ヘッドレスで網羅検証 |
 | **CodeMirror** (ts) | バッファ・undo 履歴・選択・位置写像 | `ChangeSet` / `history` / `mapPos` を使う。自作しない。
   旧 `core/edit.mbt`・`core/history.mbt`・tag 機械は引き継がない |
-| **map** (ts) | render・寸法実測・ポインタ解釈 | Map構造木の毎回全量導出。DOM 差分は速度の都合 |
+| **map** (ts) | render・寸法実測・ポインタ解釈 | MindmapTree の毎回全量導出。DOM 差分は速度の都合 |
 | **@lezer/markdown** | — | パイプラインの段ではなく法則 4 の外部審判（CM が既に毎打鍵パースしている） |
 
 - 「ts はバイトを選ばない」— editSets を作るのは mbt、運ぶのが ts
 - **undo は CM history 1 本**。操作の editSets も打鍵も同じバッファに
   トランザクションとして流れるので、履歴が自然に統一される（操作 1 回 = undo 1 段、
-  打鍵の連結は `newGroupDelay`）。undo 後は読みの道と同じく parse で mmmAst を再導出 —
+  打鍵の連結は `newGroupDelay`）。undo 後は読みの道と同じく parse で MmmTree を再導出 —
   モデル用の履歴は持たない
 - 整形の告知 UX は不要（すげ替え既定により「頼んでいない全文整形」が存在しない。
   format は明示操作なので言うまでもない）
