@@ -21,7 +21,7 @@ import { exportWays, initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
 import { deriveName } from "./app/name.ts";
 import { initTheme } from "./app/theme.ts";
-import { sweep } from "./app/persist.ts";
+import { LS_ADDS, load, store, sweep } from "./app/persist.ts";
 import { decidePaste } from "./app/paste.ts";
 import { initDrop } from "./app/dnd.ts";
 import { ask, askText, askYesNo } from "./app/ask.ts";
@@ -30,6 +30,7 @@ import { initForm } from "./app/form.ts";
 import { showDrawing } from "./app/draw.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
+import { type Span, caretNodes } from "./caret.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 import { openOnClick } from "./map/menu.ts";
 import { RadialMenu } from "./map/radialMenu.ts";
@@ -78,6 +79,10 @@ const NOTHING_TO_RENAME = "Save the .md first — nothing on disk to rename yet"
  * 分かるのは「ここでは無理」までで、そこまでを言う。
  */
 const NO_RENAME_HERE = "This browser can't rename files";
+
+/** File System Access API が無いブラウザで、Files のできない行と
+ *  ショートカットの両方がこの理由を言う。英語の文言はここ 1 か所だけ */
+const NO_FILE_ACCESS = "This browser cannot open or save files";
 
 /** 新しいタブで開く。`⋯` の外部リンクが通る唯一の道 */
 function openExternal(url: string): void {
@@ -434,6 +439,24 @@ function onUserEdits(edits: EditOp[], userEvent: string): void {
   followDeclaration(tag);
 }
 
+/**
+ * md のカーソル・選択が掛かっているノード（文書順）。**マップの選択とは
+ * 別のもの**で、操作の対象は選択だけが決める（カーソルが動いても Delete や
+ * Export の相手は入れ替わらない）。空 = md にカーソルが無い。
+ */
+let caretIds: number[] = [];
+
+/** md のカーソルか選択が動いた（範囲が空なら、そのペインに居ない）。 */
+function onCaret(spans: Span[]): void {
+  const ids = caretNodes(doc.nodes, spans);
+  // 打鍵のたびに呼ばれる。掛かっている先が変わらないあいだは何もしない
+  if (ids.length === caretIds.length && ids.every((id, i) => id === caretIds[i])) {
+    return;
+  }
+  caretIds = ids;
+  map.setCaret(ids);
+}
+
 // ---------- mindmap host ----------
 
 const host: MapHost = {
@@ -719,7 +742,7 @@ const host: MapHost = {
 
 // ---------- boot panes ----------
 
-const editor = new MdEditor(mdPane, onUserEdits);
+const editor = new MdEditor(mdPane, onUserEdits, onCaret);
 const map = new Mindmap(mapPane, host);
 
 /**
@@ -761,6 +784,9 @@ function loadText(text: string, name: string | null): void {
   const snap = core.initDoc(text);
   editor.setText(text);
   applySnap(snap, "load"); // 名乗りもここで出る
+  // ここだけは打鍵と順番が逆で、`setText` が言ってきた位置は**前の文書の
+  // ノード**に当てられている。新しい木が入った後で聞き直す
+  onCaret(editor.caret());
   map.fitView();
   // 文書が入れ替わった。**Recent の並びもここで引き直す** — 開く・保存する・
   // 新規・リンクで開く、全部この 1 か所を通る
@@ -819,6 +845,13 @@ async function offerConnect(): Promise<void> {
 }
 
 async function openFile(): Promise<void> {
+  // Files のメニューを経ずショートカットから来ることもある。無効な行は
+  // 押せないだけで理由を言うが、ショートカットは黙って何も起きない
+  // だけになってしまう — 同じ理由をここでも言う
+  if (!io.canOpen()) {
+    failed(NO_FILE_ACCESS);
+    return;
+  }
   try {
     if (!(await confirmDiscard())) return;
     const doc = await io.openDialog();
@@ -861,6 +894,12 @@ async function saveFile(asNew = false): Promise<void> {
   const text = core.getText();
   try {
     if (asNew || savedName === null) {
+      // ここだけがピッカーを要る道。既存のハンドルへ書くだけの下の枝は
+      // API が無くても困らないので、ここでしか確かめない
+      if (!io.canSaveAs()) {
+        failed(NO_FILE_ACCESS);
+        return;
+      }
       const doc = await io.saveAs(docName(), text);
       if (!doc) return; // キャンセル
       savedName = doc.name; // ここで初めて名前が決まる
@@ -1063,8 +1102,6 @@ function folderCaption(): string {
 //
 // **塊は 2 つだけ**（.md と、その画像フォルダ）。どちらも「見出しが状態を
 // 言い、続く行がそれに対してできること」という同じ形で、見出しが先に立つ。
-// 6 行しかないものを 3 つに割ると、New / Open だけが見出しを持たないまま
-// 宙に浮いた — 塊の数は中身の量に見合っている必要がある。
 //
 // **絵が付くのは、押せるものだけ。** 見出しは状態を言う淡い字で、押せない。
 // 一時は見出しにも主語の絵を付けていたが、そうすると隣り合う行の絵と輪郭が
@@ -1079,45 +1116,71 @@ function folderCaption(): string {
 // 並びは**よく使う順・確実にできる順**。変種は主の直後（`Save as`）、
 // 稀で無効になりがちなもの（`Rename`）は後ろ — 見出しの直後は塊の顔なので、
 // そこに押せない行を置かない。
-openOnClick(btnFile, () => [
-  { caption: savedName ?? "not saved yet" },
-  { label: "New", key: "Mod+Alt+N", mark: "file-plus", run: () => void newFile() },
-  { label: "Open", key: "Mod+O", mark: "folder-open", run: () => void openFile() },
-  {
-    // 覚えている文書。**選ぶのは人**（起動時に勝手に開き直すのはやめた）。
-    // 平らに並べると Files が伸びるので畳む — 中身は開くたびに引き直して
-    // ある（`refreshRecent`）ので、ここでは待たない
-    label: "Recent",
-    mark: "clock",
-    items: recent.map((file) => ({
-      label: file.name,
-      run: () => openKnown(file),
-    })),
-    disabled: recent.length === 0 && "Nothing opened yet",
-  },
-  { label: "Save", key: "Mod+S", mark: "save", run: () => void saveFile() },
-  // 「as」は Save と同じ操作の別名なので、絵は主の行にだけ付ける
-  { label: "Save as", key: "Mod+Shift+S", run: () => void saveFile(true) },
-  {
-    label: "Rename",
-    mark: "pencil",
-    run: () => void renameFile(),
-    disabled: !io.canRename() ? NO_RENAME_HERE : savedName === null && NOTHING_TO_RENAME,
-  },
-  { caption: folderCaption() },
-  {
-    // 「Images」は見出しが既に言っている。行に残る絵は動詞の道具（フォルダ
-    // という物を選ぶ）— **押した人がやることをそのまま言う**（宣言と許可の
-    // 帳尻は裏方の仕事で、ラベルに背負わせるものではない）
-    label: "Choose folder",
-    mark: "folder",
-    // **沈めない。** 保存していなければ、押した先で保存まで案内する
-    // （壁ではなく駅。`ensurePlace`）
-    run: () => void (async () => {
-      if (await ensurePlace()) await assets.chooseFolder();
-    })(),
-  },
-]);
+//
+// **無いものを黙って落とさない。** ファイルピッカーを持たないブラウザが
+// あり（`docs/browsers.md`）、2 本目の道は作らない。押せない理由だけは言う。
+openOnClick(btnFile, () => {
+  const canOpen = io.canOpen();
+  const canSave = io.canSaveAs();
+  return [
+    { caption: savedName ?? "not saved yet" },
+    { label: "New", key: "Mod+Alt+N", mark: "file-plus", run: () => void newFile() },
+    {
+      label: "Open",
+      key: "Mod+O",
+      mark: "folder-open",
+      run: () => void openFile(),
+      disabled: !canOpen && NO_FILE_ACCESS,
+    },
+    {
+      // 覚えている文書。**選ぶのは人**（起動時に勝手に開き直すのはやめた）。
+      // 平らに並べると Files が伸びるので畳む — 中身は開くたびに引き直して
+      // ある（`refreshRecent`）ので、ここでは待たない
+      label: "Recent",
+      mark: "clock",
+      items: recent.map((file) => ({
+        label: file.name,
+        run: () => openKnown(file),
+      })),
+      disabled: recent.length === 0 && "Nothing opened yet",
+    },
+    {
+      label: "Save",
+      key: "Mod+S",
+      mark: "save",
+      run: () => void saveFile(),
+      disabled: !canSave && NO_FILE_ACCESS,
+    },
+    // 「as」は Save と同じ操作の別名なので、絵は主の行にだけ付ける
+    {
+      label: "Save as",
+      key: "Mod+Shift+S",
+      run: () => void saveFile(true),
+      disabled: !canSave && NO_FILE_ACCESS,
+    },
+    {
+      label: "Rename",
+      mark: "pencil",
+      run: () => void renameFile(),
+      disabled: !io.canRename() ? NO_RENAME_HERE : savedName === null && NOTHING_TO_RENAME,
+    },
+    { caption: folderCaption() },
+    {
+      // 「Images」は見出しが既に言っている。行に残る絵は動詞の道具（フォルダ
+      // という物を選ぶ）— **押した人がやることをそのまま言う**（宣言と許可の
+      // 帳尻は裏方の仕事で、ラベルに背負わせるものではない）
+      label: "Choose folder",
+      mark: "folder",
+      // **保存していないことでは沈めない。** 押した先で保存まで案内する
+      // （壁ではなく駅。`ensurePlace`）。沈むのは、この環境がフォルダを
+      // 選べないときだけ — そちらは通り道が本当に無い
+      run: () => void (async () => {
+        if (await ensurePlace()) await assets.chooseFolder();
+      })(),
+      disabled: !assets.canChooseFolder() && NO_FILE_ACCESS,
+    },
+  ];
+});
 
 // 低頻度だが消したくないものの受け皿。Undo/Redo にボタンは無く（キーが
 // 本道）、ここが押せる保険になる。3 つの塊 — 戻す / 見た目 / 外に開く
@@ -1134,6 +1197,12 @@ openOnClick(btnMore, () => [
     label: theme.isLight() ? "Dark theme" : "Light theme",
     mark: theme.isLight() ? "moon" : "sun",
     run: () => theme.toggle(),
+  },
+  {
+    // 見た目の好み同士なのでテーマの隣。**押せばどうなるか**を名乗る
+    label: addsOn ? "Hide add buttons" : "Show add buttons",
+    mark: "circle-plus",
+    run: () => setAdds(!addsOn),
   },
   "sep",
   // 但し書きは待たずに開いて、届いたら埋まる（測るのに gzip が要る）
@@ -1242,6 +1311,32 @@ const theme = initTheme({
   logo: elLogo,
   setEditorTheme: (dark) => editor.setTheme(dark),
 });
+
+// **物理キーボードの有無は Web からは分からない。**代わりに「主たるポインタが
+// 指か」を見る。Surface はキーボードを外すと OS が主ポインタを指へ切り替える
+// ので、この 1 本で狙いどおりに振れる。近似であることは承知の上で、外れても
+// 人が押して直せる形にしてある（`⋯` の 1 行）。
+//
+// `any-pointer` ではなく `pointer` を使う: マウスも刺さっている機械で
+// 「指もある」だけを理由に出しっぱなしにはしない。
+const TOUCH_FIRST = "(pointer: coarse) and (hover: none)";
+
+// localStorage の中身は何でもありうる。名乗らせずに確かめる
+const savedAdds = load(LS_ADDS);
+let addsOn =
+  savedAdds === "on"
+    ? true
+    : savedAdds === "off"
+      ? false
+      : (window.matchMedia?.(TOUCH_FIRST).matches ?? false);
+
+const setAdds = (on: boolean): void => {
+  addsOn = on;
+  store(LS_ADDS, on ? "on" : "off");
+  map.setAddButtons(on);
+};
+map.setAddButtons(addsOn);
+
 initShortcuts({
   save: (asNew) => void saveFile(asNew),
   open: () => void openFile(),

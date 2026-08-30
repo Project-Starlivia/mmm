@@ -118,22 +118,77 @@ fn move_block(i : Int, at : Int, new_depth : Int) -> Unit {
   // shift every heading in the block by delta '#'; remember each heading's
   // id and its offset inside the rebuilt block so ids survive the move
   let heads = subtree_of(i)
+  // **木ごと動かすとき、その木の境界は連れていかない。**
+  //
+  // 境界は「ルート直下の枝を分ける」ものなので、木が別の木の中へ入って
+  // 根でなくなれば意味を失う。範囲としては根の中に居るので黙って運ばれ、
+  // 行き先では valid_bounds を満たさず、掃除の目印も移動で切れるため
+  // （`map_offsets` が削除で -1 を返す）誰も片付けられない死んだ `---` が
+  // 枝の中に残っていた。ドラッグを重ねるほど溜まる。
+  let drops : Array[(Int, Int)] = []
+  if nd.depth == 1 && new_depth > 1 {
+    let n_text = st.text.length()
+    for b in st.bounds {
+      if b.start < nd.from || b.end > nd.to {
+        continue
+      }
+      // 直後の空行 1 つも道連れ（remove_sep_edit と同じ）
+      let mut to = b.end
+      let mut p = to
+      while p < n_text && is_space(code_at(st.text, p)) {
+        p = p + 1
+      }
+      if p < n_text && code_at(st.text, p) == 13 {
+        p = p + 1
+      }
+      if p < n_text && code_at(st.text, p) == 10 {
+        to = p + 1
+      }
+      drops.push((b.start, to))
+    }
+  }
+  /// `[a, b)` を、連れていかない区間を飛ばして書き出す。落とした長さを返す
+  fn emit(sb : StringBuilder, a : Int, b : Int) -> Int {
+    let mut cut = 0
+    let mut p = a
+    for d in drops {
+      let (ds, de) = d
+      if ds >= b || de <= a {
+        continue
+      }
+      let s = if ds > p { ds } else { p }
+      if s > p {
+        sb.write_string(slice(st.text, p, s))
+      }
+      cut = cut + (if de < b { de } else { b }) - s
+      p = if de > p { de } else { p }
+    }
+    if p < b {
+      sb.write_string(slice(st.text, p, b))
+    }
+    cut
+  }
+
   let rels : Array[(Int, Int)] = []
   let sb = StringBuilder::new()
   let mut pos = nd.from
   let mut acc = 0
+  let mut cut = 0
   for m in heads {
     let h = st.nodes[m]
-    rels.push((h.id, h.from - nd.from + acc))
+    // **落とすぶんを先に数える。** この見出しの手前で削った区間は、この
+    // 見出しの新しい位置をそのぶん前へ寄せる（後で数えると、境界より後ろの
+    // 見出しの id が拾い直せず飛ぶ）
+    cut = cut + emit(sb, pos, h.from)
+    rels.push((h.id, h.from - nd.from + acc - cut))
     // 接頭辞を目的の深さの正規形に書き直す。長さの差を積んで、
     // 各構造行の新しい相対位置（rels）を出す
     let np = prefix_for(h.depth + delta)
     acc = acc + np.length() - (h.label_start - h.from)
-    sb.write_string(slice(st.text, pos, h.from))
     sb.write_string(np)
     pos = h.label_start
   }
-  sb.write_string(slice(st.text, pos, nd.to))
+  ignore(emit(sb, pos, nd.to))
   let mut moved = sb.to_string()
   // keep block boundaries tidy: blank-line separated, single newline at EOF
   let br = eol
@@ -210,6 +265,23 @@ fn move_lands_outside(order : Array[Int], target : Int) -> Bool {
 }
 
 ///|
+/// 落とし先が畳んであれば先に開く。**着地点を計算する前に呼ぶこと。**
+///
+/// hide のマーカーはノードの範囲の外にあるので、畳んだままの相手の `to`
+/// （= 閉じマーカーの手前）へ挿し込むと、動かした枝が領域の中に入り、
+/// マップから消えて `+N` バッジに呑まれる。予告線は普通の挿入に見えるので
+/// 「惜しい」の中でも最悪の類。`unfold_before_add` と同じ理由。
+///
+/// **落とし先を自分で導き出すコマンドは、導き出した相手に対して呼ぶ**
+/// （`cmd_move_side_end` の `last` のように、利用者が指した相手とは限らない）。
+fn unfold_target(id : Int) -> Unit {
+  let i = find_node(id)
+  if i >= 0 && st.nodes[i].hidden {
+    cmd_toggle_hidden(id)
+  }
+}
+
+///|
 /// pos: 0 = as last child of target, 1 = before target, 2 = after target.
 fn cmd_move(ids : Array[Int], target : Int, pos : Int) -> Unit {
   begin_tx("")
@@ -221,8 +293,20 @@ fn cmd_move(ids : Array[Int], target : Int, pos : Int) -> Unit {
     if !move_lands_outside(order, target) {
       return
     }
+    let ti = find_node(target)
+    let target_folded = ti >= 0 && st.nodes[ti].hidden
+    unfold_target(target)
     let rehide = unhide_for_move(order)
+    let before = st.text
     let first_focus = move_steps(ids, target, pos)
+    // **空振りなら、開いた落とし先は畳み直す。** 「もう其処に居る」かどうかは
+    // 開いたあとの位置でしか判定できない（畳んだままだと `to` が閉じマーカーの
+    // 手前を指す）ので、開くのが先になる。位置が 1 つも変わらなかったときに
+    // 畳みだけ解けて、埋もれていた子が湧いて見えるのを防ぐ。本文が元に戻れば
+    // `commit_tx` が「変わっていない」と見て undo にも積まない
+    if target_folded && st.text == before {
+      cmd_toggle_hidden(target)
+    }
     for id in rehide {
       cmd_toggle_hidden(id)
     }
@@ -247,6 +331,7 @@ fn cmd_move_as_parent(ids : Array[Int], target : Int) -> Unit {
     if !move_lands_outside(order, target) {
       return
     }
+    unfold_target(target)
     let rehide = unhide_for_move(order)
     let first_focus = move_steps(ids, target, 1)
     // 移動が一切起きなかったときに indent だけ走らせると、B が無関係な
@@ -255,7 +340,12 @@ fn cmd_move_as_parent(ids : Array[Int], target : Int) -> Unit {
       cmd_indent([target])
     }
     for id in rehide {
-      cmd_toggle_hidden(id)
+      // **子が増えた枝は畳み直さない。** 割り込みでは掴んだ枝が相手の親に
+      // なるので、畳み直すと相手（と其の子孫）まで領域に呑まれて消える。
+      // `unfold_before_add` が「足したら開いたままにする」のと同じ理由。
+      if first_focus == -1 || id != first_focus {
+        cmd_toggle_hidden(id)
+      }
     }
     if first_focus != -1 {
       st.focus = first_focus
@@ -269,11 +359,18 @@ fn cmd_move_as_parent(ids : Array[Int], target : Int) -> Unit {
 /// （兄弟ごと包んでいるのではなく nd 単独）があればそれを返す。無ければ -1。
 /// move / delete / outdent / reorder が「マーカーだけ外に取り残す」事故を
 /// 避けるための共通の判定はここに一本化する。
+/// **位置のバイト厳密一致では狭すぎる。** マーカーと見出しのあいだに空行が
+/// 1 行あるだけで外れ、マーカーが置き去りになって空の対がゴミとして残り、
+/// hidden も黙って落ちていた（`docs/spec.md` はマーカーの判定を
+/// 「エディタや GitHub と同じ」= 寛容と明言しており、読む側は実際に緩い。
+/// 動かす/消す/足す側だけが厳しかった）。あいだが空白だけなら同じとみなす。
 fn sole_hide_region(nd : Node) -> Int {
   let mut idx = -1
   for i = 0; i < st.hide_regions.length(); i = i + 1 {
     let r = st.hide_regions[i]
-    if r.open_next == nd.from && r.close_start == nd.to {
+    let head_ok = r.open_next <= nd.from && is_blank_range(r.open_next, nd.from)
+    let tail_ok = r.close_start >= nd.to && is_blank_range(nd.to, r.close_start)
+    if head_ok && tail_ok {
       idx = i
       break
     }
@@ -464,11 +561,23 @@ fn cmd_move_side_end(ids : Array[Int], root : Int, left : Bool) -> Unit {
   if ri < 0 {
     return
   }
-  // その側の最後の直下の枝
+  // その側の最後の直下の枝。**掴んでいる枝は数に入れない** — これから
+  // 居なくなるので、着地点は残るほうの末尾でなければならない。数に入れて
+  // いたころは、選択にその側の末尾が含まれているだけで `move_lands_outside`
+  // が必ず false になり、**操作まるごとが黙って捨てられて**いた（枝を全部
+  // 選んで片側へ寄せる、という最も素直な使い方が必ず踏む）。
+  // 除いた結果 `last < 0` になれば、既にある「その側は空」の枝がそのまま
+  // 正しい答えになる。UI 側の `lastKidOf` も同じ理由で掴んだ枝を除いている。
+  let moving : Array[Int] = []
+  for k in normalize_selection(ids) {
+    for m in subtree_of(k) {
+      moving.push(st.nodes[m].id)
+    }
+  }
   let mut last = -1
   for i = 0; i < st.nodes.length(); i = i + 1 {
     let nd = st.nodes[i]
-    if nd.parent == root && nd.left == left {
+    if nd.parent == root && nd.left == left && !moving.contains(nd.id) {
       last = nd.id
     }
   }
@@ -482,13 +591,27 @@ fn cmd_move_side_end(ids : Array[Int], root : Int, left : Bool) -> Unit {
     if !move_lands_outside(order, if last >= 0 { last } else { root }) {
       return
     }
+    // 着地点は**こちらで導いた** `last`。それが畳んでいれば、その閉じマーカーの
+    // 手前へ挿し込むことになるので、先に開く
+    if last >= 0 {
+      unfold_target(last)
+    }
     let rehide = unhide_for_move(order)
     if last >= 0 {
       // その側の最後のグループの末尾へ（区切りは書かない）
       ignore(move_steps(ids, last, 2))
     } else {
-      // その側は空。ルートの最後の子にしてから、手前の境界を整える
+      // その側は空。ルートの最後の子にしてから、手前の境界を整える。
+      //
+      // **側を読む前に一度掃除する。** 動かした枝が単独グループだったときは
+      // 両脇の境界が空行を挟んで地続きになり、生の行数がそのまま flip として
+      // 読めてしまう（1 本 + 1 本 = 2 行 = 切り替え）。畳む前の側で `prev` を
+      // 読むと `want` が反転し、**頼んだ側と反対に着地**していた。
+      // `cmd_move_new_group` は同じ理由で既にこの手当てを持っている。
+      let move_marks = sep_marks()
+      let move_base = st.last_sets.length()
       let first = move_steps(ids, root, 0)
+      sweep_seps(move_marks, move_base)
       if first >= 0 {
         // 塊の範囲は、動かしたものを id で引き直して出す（id は移動をまたいで生きる）
         let mut head_from = -1
@@ -557,6 +680,7 @@ fn cmd_move_new_group(
     if !move_lands_outside(order, target) {
       return
     }
+    unfold_target(target)
     let rehide = unhide_for_move(order)
     // 動かした枝がそのグループで唯一のメンバーだったときは、両脇の境界が
     // くっついて生の行数がそのまま flip として読めてしまう（xor 前の値）。

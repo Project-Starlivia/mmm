@@ -349,9 +349,11 @@ test "その側にグループがあれば、最後のグループの末尾へ�
   // c を右（既にある側）の末尾へ = 何も書かれない。既に末尾なので変化なし
   ignore(move_side_end([st.nodes[3].id], st.nodes[0].id, false))
   assert_eq(get_text(), "# r\n\n## a\n\n---\n\n## b\n\n## c\n")
-  // a を右の末尾へ = グループ 1 の末尾に移る
+  // a を右の末尾へ = グループ 1 の末尾に移る。
+  // a が抜けて先頭グループが空になるので、その境界は**何も分けなくなり**
+  // 掃除で消える（「先頭 + 切り替え無し」は仕事をしていない）
   ignore(move_side_end([st.nodes[1].id], st.nodes[0].id, false))
-  assert_eq(get_text(), "# r\n\n---\n\n## b\n\n## c\n\n## a\n")
+  assert_eq(get_text(), "# r\n\n## b\n\n## c\n\n## a\n")
 }
 
 ///|

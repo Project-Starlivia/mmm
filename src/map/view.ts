@@ -5,7 +5,7 @@
 // カーソル基点のズームや端寄せは符号を 1 つ間違えても動いてしまい、目でしか
 // 気づけないので、値として試験できる形が要る。
 
-import { type Rect, unionRect } from "./geometry.ts";
+import { type Pt, type Rect, unionRect } from "./geometry.ts";
 
 /** world → 画面: `screen = world * k + t` */
 export interface View {
@@ -33,23 +33,28 @@ export const toWorld = (view: View, x: number, y: number): { x: number; y: numbe
   y: (y - view.ty) / view.k,
 });
 
+/** 倍率だけを限界に収める */
+const clampZoom = (k: number): number =>
+  Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, k));
+
 /**
- * カーソルを基点にズームする。**その点の下にある world の位置が動かない**
- * ように平行移動を合わせる — 合わせないと、拡大するたびに見ていた場所が
- * 画面の外へ逃げる。
+ * その点を基点に、倍率を `k` にする。**その点の下にある world の位置が
+ * 動かない**ように平行移動を合わせる — 合わせないと、拡大するたびに
+ * 見ていた場所が画面の外へ逃げる。
  */
-export function zoomAt(view: View, x: number, y: number, deltaY: number): View {
-  const k = Math.min(
-    MAX_ZOOM,
-    Math.max(MIN_ZOOM, view.k * Math.exp(-deltaY * ZOOM_RATE)),
-  );
-  const ratio = k / view.k;
+export function zoomTo(view: View, x: number, y: number, k: number): View {
+  const next = clampZoom(k);
+  const ratio = next / view.k;
   return {
-    k,
+    k: next,
     tx: x - (x - view.tx) * ratio,
     ty: y - (y - view.ty) * ratio,
   };
 }
+
+/** ホイールの目盛りを倍率に読み替えて `zoomTo` に渡すだけ */
+export const zoomAt = (view: View, x: number, y: number, deltaY: number): View =>
+  zoomTo(view, x, y, view.k * Math.exp(-deltaY * ZOOM_RATE));
 
 /** 平行移動だけ（倍率は変えない） */
 export const panBy = (view: View, dx: number, dy: number): View => ({
@@ -106,4 +111,31 @@ export function centerOn(view: View, box: Rect, pane: Pane): View {
     tx: pane.width / 2 - cx * view.k,
     ty: pane.height / 2 - cy * view.k,
   };
+}
+
+/** 2 本指の位置（ペインの左上から測った画面 px） */
+export interface Span {
+  a: Pt;
+  b: Pt;
+}
+
+const dist = (p: Pt, q: Pt): number => Math.hypot(q.x - p.x, q.y - p.y);
+const mid = (p: Pt, q: Pt): Pt => ({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
+
+/**
+ * 2 本指の前後の位置から、見え方を 1 つ出す。
+ *
+ * **拡大とパンを別々の話にしない** — 指は同時に離れながら動くので、
+ * 「中点を基点に倍率を変える」→「中点のずれだけ平行移動する」の 2 つを
+ * 順に当てれば、掴んでいた場所は指の下に留まる。
+ *
+ * 2 本が重なると距離が 0 になる。割ると `Infinity` が倍率へ流れ込み、以降
+ * すべての描画が消えるので、そのときは倍率を据え置く。
+ */
+export function pinch(view: View, from: Span, to: Span): View {
+  const d0 = dist(from.a, from.b);
+  const m0 = mid(from.a, from.b);
+  const m1 = mid(to.a, to.b);
+  const k = d0 > 0 ? view.k * (dist(to.a, to.b) / d0) : view.k;
+  return panBy(zoomTo(view, m0.x, m0.y, k), m1.x - m0.x, m1.y - m0.y);
 }

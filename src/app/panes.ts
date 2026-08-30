@@ -1,8 +1,8 @@
 // ペインの表示/非表示 (コードとノードのビュー) とスプリッタ。
 //
 // **見え方は「分割線の居場所」ひとつで言い切れる。** 「両方消えた」は
-// 作らないので、辿り着ける形は 3 つしかなく、左から順に並べると
-// そのまま分割線を左右に動かす話になる（`SPOTS`）。
+// 作らないので、辿り着ける形はたかだか 3 つ（狭ければ 2 つ）で、左から
+// 順に並べるとそのまま分割線を左右に動かす話になる（`spotsFor`）。
 //
 // だから**矢印は向きを変えない**。`‹` はいつでも「分割線を左へ 1 つ」、
 // `›` はいつでも「右へ 1 つ」で、いま押せるかどうかだけが変わる
@@ -11,33 +11,86 @@
 // 広がって見え、どちらがどちらかも並び順を覚えるしかなかった。
 //
 // どちらを出しているかは覚えない — 毎回、両方から始まる。
+//
+// **狭いときは「両方」が居場所から消える。** 並べられない幅で「両方」を
+// 残すと、CSS が片方を隠して**状態が 2 つになり食い違う** — 矢印は行けない
+// 場所を指し、`disabled` は画面に無い世界を説明する。
 
 import { icon } from "../icons.ts";
 import { paneTool } from "./paneTool.ts";
 
+/** 見えているペイン。**「両方消えた」は作らない** */
+export interface Vis {
+  md: boolean;
+  map: boolean;
+}
+
 /**
  * 分割線の居場所。左端 = md が無い / 真ん中 = 両方 / 右端 = マップが無い。
+ * **狭いときは真ん中が消えて 2 つになる** — 左から右へ並ぶ順は変わらない
+ * ので、`‹` は狭くても「分割線を左へ 1 つ」のまま。
+ */
+export function spotsFor(narrow: boolean): readonly Vis[] {
+  const mapOnly: Vis = { md: false, map: true };
+  const mdOnly: Vis = { md: true, map: false };
+  return narrow ? [mapOnly, mdOnly] : [mapOnly, { md: true, map: true }, mdOnly];
+}
+
+/**
+ * 要求された見え方を、いまの居場所へ射影する。**居場所に無い形は 2 つだけ** —
+ * 「両方消えた」と、狭いときの「両方」。どちらも**マップを必ず残し、md は
+ * 残せるなら残す**（この道具がマップのために在るから）。
+ */
+export function project(v: Vis, list: readonly Vis[]): Vis {
+  const hit = list.find((s) => s.md === v.md && s.map === v.map);
+  if (hit) return hit;
+  return list.find((s) => s.md && s.map) ?? list[0];
+}
+
+const spotOf = (list: readonly Vis[], v: Vis): number =>
+  list.findIndex((s) => s.md === v.md && s.map === v.map);
+
+/**
+ * `which` を出す / 引っ込める一手の行き先。**`project` のフォールバックには
+ * 任せない** — あちらは「行き先を言っていない要求」（境目をまたいだ・
+ * 両方消えた）専用で、常にマップへ丸めてしまうので、「md を出したい」
+ * のような名指しの要求に使うと要求そのものが無視される。
  *
- * **名前は「その姿」であって「その一手」ではない。** 矢印が言うべきなのは
- * 押した先で何が見えているかで、何を出すのか隠すのかではない — 出す/隠すで
- * 言うと、同じ 3 か所を行き来する話が 4 通りの動詞に散る。姿に名前を付ければ
- * **数は 3 つ**で、居場所の定義と同じ行に住む。
+ * 決め方は 2 つだけ:
+ * - **引っ込める。** 最後の 1 枚（もう片方が既に消えている）なら
+ *   「両方消えた」は作らないので、「もう片方を出す」一手として読む —
+ *   幅に関係なく、消される側の逆が残る。もう片方も出ていれば、ただ
+ *   その 1 枚だけを消す。
+ * - **出す。** 居場所が 2 つ（狭い）なら「両方」という置き場が無いので、
+ *   そのペイン 1 枚だけになる。3 つ（広い）なら相方はそのまま、その
+ *   ペインを足すだけ。
+ */
+export function toggled(v: Vis, which: "md" | "map", list: readonly Vis[]): Vis {
+  const other = which === "md" ? "map" : "md";
+  if (v[which]) {
+    if (!v[other]) return { md: which === "map", map: which === "md" };
+    return { ...v, [which]: false };
+  }
+  return list.length === 3 ? { ...v, [which]: true } : { md: which === "md", map: which === "map" };
+}
+
+/**
+ * その姿の名前。**「その一手」ではなく「着く先」を言う。**
+ *
+ * 出す/隠すの動詞で言うと、同じ数か所を行き来する話が何通りにも散り、
+ * 呼び名まで揃わなくなる（`the Markdown pane` と `the map`）。姿に名前を
+ * 付ければ、居場所の数だけで足りる。
  *
  * **画面に `pane` とは書かない。** 見えているものの名前は Markdown と
  * Mindmap の 2 つで、`pane` は器の呼び名（＝こちらの都合）でしかない。
- * 真ん中だけ両方を並べるのは、「両方」と言うために要る語が他に無いから
+ * 両方のときだけ 2 つ並べるのは、「両方」と言うために要る語が他に無いから
  * — 器の名前を借りるくらいなら、中身の名前を 2 つ並べる。
  */
-const SPOTS = [
-  { md: false, map: true, name: "Mindmap only" },
-  { md: true, map: true, name: "Markdown + Mindmap" },
-  { md: true, map: false, name: "Markdown only" },
-] as const;
-
-type Vis = { md: boolean; map: boolean };
-
-const spotOf = (v: Vis): number =>
-  SPOTS.findIndex((s) => s.md === v.md && s.map === v.map);
+function nameOf(v: Vis | undefined): string {
+  if (!v) return "";
+  if (v.md && v.map) return "Markdown + Mindmap";
+  return v.md ? "Markdown only" : "Mindmap only";
+}
 
 export function initPanes(args: {
   mdPane: HTMLElement;
@@ -53,28 +106,36 @@ export function initPanes(args: {
   const { mdPane, mapPane, panesEl, splitter } = args;
   let paneVis: Vis = { md: true, map: true };
 
+  // **`720px` を 2 か所に置かない。** メディアクエリでは CSS 変数を使えないので、
+  // 唯一の源を JS に置き、CSS は `<html class="narrow">` を見る
+  const NARROW = "(max-width: 720px)";
+  const narrow = window.matchMedia(NARROW);
+  const spots = (): readonly Vis[] => spotsFor(narrow.matches);
+
   const arrows = paneTool("pane-switch");
   const goLeft = arrowButton("left");
   const goRight = arrowButton("right");
   arrows.append(goLeft, goRight);
   splitter.append(arrows);
 
-  const applyPaneVis = (v: Vis): void => {
-    if (!v.md && !v.map) v = { md: true, map: true };
+  const applyPaneVis = (want: Vis): void => {
+    const list = spots();
+    const v = project(want, list);
     paneVis = v;
+    document.documentElement.classList.toggle("narrow", narrow.matches);
     mdPane.classList.toggle("pane-off", !v.md);
     mapPane.classList.toggle("pane-off", !v.map);
     panesEl.classList.toggle("no-map", !v.map);
     panesEl.classList.toggle("no-md", !v.md);
     // 端では、その先が無いので押せない
-    const spot = spotOf(v);
+    const spot = spotOf(list, v);
     goLeft.disabled = spot <= 0;
-    goRight.disabled = spot >= SPOTS.length - 1;
-    // 絵しか持たない矢印。名前は動くたび変わる — 押す前に何が起きるかを
-    // 言い切る文言が、そのままアクセシブルネームにもなる
-    goLeft.title = SPOTS[spot - 1]?.name ?? "";
+    goRight.disabled = spot >= list.length - 1;
+    // 絵しか持たない矢印。名前は動くたび変わる — 押した先の姿を言い切る
+    // 文言が、そのままアクセシブルネームにもなる
+    goLeft.title = nameOf(list[spot - 1]);
     goLeft.setAttribute("aria-label", goLeft.title);
-    goRight.title = SPOTS[spot + 1]?.name ?? "";
+    goRight.title = nameOf(list[spot + 1]);
     goRight.setAttribute("aria-label", goRight.title);
     // focus must not stay in a hidden pane
     if (!v.md && mdPane.contains(document.activeElement)) mapPane.focus();
@@ -83,15 +144,13 @@ export function initPanes(args: {
 
   /** 分割線を 1 つ動かす。端は動かない */
   const slide = (step: -1 | 1): void => {
-    const next = SPOTS[spotOf(paneVis) + step];
+    const list = spots();
+    const next = list[spotOf(list, paneVis) + step];
     if (next) applyPaneVis({ ...next });
   };
 
   const togglePaneVis = (which: "md" | "map"): void => {
-    const next = { ...paneVis, [which]: !paneVis[which] };
-    // never end up with zero panes: hiding the last one shows the other
-    if (!next.md && !next.map) next[which === "md" ? "map" : "md"] = true;
-    applyPaneVis(next);
+    applyPaneVis(toggled(paneVis, which, spots()));
   };
 
   goLeft.addEventListener("click", () => slide(-1));
@@ -100,10 +159,10 @@ export function initPanes(args: {
   // Mod+/: jump to the other pane, revealing it if hidden
   const togglePane = (): void => {
     if (mdPane.contains(document.activeElement)) {
-      if (!paneVis.map) applyPaneVis({ ...paneVis, map: true });
+      if (!paneVis.map) applyPaneVis(toggled(paneVis, "map", spots()));
       mapPane.focus();
     } else {
-      if (!paneVis.md) applyPaneVis({ ...paneVis, md: true });
+      if (!paneVis.md) applyPaneVis(toggled(paneVis, "md", spots()));
       args.focusEditor();
     }
   };
@@ -121,6 +180,8 @@ export function initPanes(args: {
   // 何もできないが、縁に寄った分割線はそこに見えている — 戻すための
   // 取っ手として使えるほうが、細い矢印 1 つを狙わせるより易しい
   splitter.addEventListener("pointerdown", (e) => {
+    // 狭いときは分割そのものが無い。掴む先も、戻る先も無い
+    if (narrow.matches) return;
     if (!paneVis.md || !paneVis.map) {
       applyPaneVis({ md: true, map: true });
       return;
@@ -145,6 +206,9 @@ export function initPanes(args: {
     splitter.addEventListener("pointerup", onUp);
     splitter.addEventListener("pointercancel", onUp);
   });
+
+  // 幅が境目をまたいだら、いまの見え方を新しい居場所へ射影し直す
+  narrow.addEventListener("change", () => applyPaneVis(paneVis));
 
   // 押せる / 押せないを最初に一度そろえる（既定でも必ず通す）
   applyPaneVis(paneVis);

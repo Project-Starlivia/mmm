@@ -103,6 +103,9 @@ const MARKS = {
     '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
   "triangle-alert":
     '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  /** 丸の中の +。ノードの脇に出る**足すボタン**そのもの */
+  "circle-plus":
+    '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>',
   /** 時計。**最後に触れた順**に並ぶもの（Recent）を言う */
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   /** キーボード。Shortcuts が指すものそのもの */

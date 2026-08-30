@@ -28,16 +28,21 @@ function applyFavicon(): void {
   link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
+/**
+ * アクセントカラーを当てる。**置くのは色そのものだけ** — 薄い版
+ * （`--accent-soft`）は style.css が色から作る。
+ *
+ * ここで `rgba(...)` を組んで置くと、それは要素のインラインスタイルなので
+ * `:root.light` の宣言に**必ず**勝ってしまう。ライト用に薄くしてあった
+ * 宣言が一度も効かず、ライトでもダークの濃さのままになっていた。
+ */
 function applyColor(hex: string): void {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
   if (!m) return;
   const c = `#${m[1]}`;
-  const r = parseInt(m[1].slice(0, 2), 16);
-  const g = parseInt(m[1].slice(2, 4), 16);
-  const b = parseInt(m[1].slice(4, 6), 16);
-  const rootStyle = document.documentElement.style;
-  rootStyle.setProperty("--accent", c);
-  rootStyle.setProperty("--accent-soft", `rgba(${r}, ${g}, ${b}, 0.2)`);
+  // 置くのは `--accent` **だけ**。薄塗り（`--accent-soft`）は style.css が
+  // これを `color-mix` で導く — ここから両方置くと、濃さの決め手が 2 つになる
+  document.documentElement.style.setProperty("--accent", c);
   faviconColor = c;
   applyFavicon();
   store(LS_COLOR, c);

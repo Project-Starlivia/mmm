@@ -6,7 +6,9 @@
 実体はただの `.md` ファイル。Mindmap は、その md を空間的に見るための
 もう一つの窓でしかない。
 
-詳しい仕様は [docs/spec.md](docs/spec.md)([English README](README.md))。
+詳しい仕様は [docs/spec.md](docs/spec.md)。
+
+([English README](README.md))
 
 ## 実行方法
 

@@ -7,9 +7,12 @@ export const LS_THEME = "mmm.theme";
 export const LS_COLOR = "mmm.color";
 /** 最後に選んだ書き出しのやり方（app/export.ts が持ち主） */
 export const LS_WAY = "mmm.exportWay";
+/** 選択ノードの上下左右の `+` を出すか（main.ts が持ち主）。
+ *  無ければ「その機械に従う」 — 保存するのは**人が押したときだけ** */
+export const LS_ADDS = "mmm.addButtons";
 
 /** いま意味のあるキー。ここに無い `mmm.*` は過去の遺物として捨てる。 */
-const OWNED: readonly string[] = [LS_THEME, LS_COLOR, LS_WAY];
+const OWNED: readonly string[] = [LS_THEME, LS_COLOR, LS_WAY, LS_ADDS];
 
 /**
  * localStorage への読み書き。容量オーバーや無効化で例外が飛ぶので、

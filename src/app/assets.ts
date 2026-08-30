@@ -32,6 +32,8 @@ export interface Assets {
    * 引かれるので、待てない。`connected()` が確かめた結果をここが覚えている。
    */
   readable(): boolean;
+  /** このブラウザがフォルダを選べるか（触る道具では持たないことがある） */
+  canChooseFolder(): boolean;
   chooseFolder(): Promise<void>;
   saveToDisk(blob: Blob): Promise<string | null>;
 }
@@ -236,9 +238,11 @@ export function initAssets(deps: {
   async function pick(): Promise<Picked | null> {
     const file = io.currentFile();
     if (!file) return null;
+    const pick = window.showDirectoryPicker;
+    if (!pick) return null;
     let directory: FileSystemDirectoryHandle;
     try {
-      directory = await window.showDirectoryPicker({ startIn: file, mode: "readwrite" });
+      directory = await pick({ startIn: file, mode: "readwrite" });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return null;
       throw error;
@@ -407,6 +411,8 @@ export function initAssets(deps: {
     },
 
     folderName: () => (cachedBinding ? cachedBinding.directory.name : null),
+
+    canChooseFolder: (): boolean => typeof window.showDirectoryPicker === "function",
 
     readable: () => live,
 

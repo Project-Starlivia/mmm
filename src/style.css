@@ -14,7 +14,15 @@
   --ink-dim: #828a96;
   --line: #2a2f38;
   --accent: #5932ff;
-  --accent-soft: rgba(89, 50, 255, 0.2);
+  /* 面を accent で薄く塗るときの濃さ。**この 1 行だけ**が決める — 下が
+     透ける面（`--accent-soft`）も、ノードの箱のように地の上へ不透明に塗る面も
+     同じ濃さになる。同じ選択を 2 つのペインで見せているのに、濃さが違う
+     理由が無い。
+     テーマでも変えない: ライト用に薄くした宣言を持っていたが、app/theme.ts が
+     置くインラインに必ず負けていて一度も効いていなかった（誰も見たことの
+     ない濃さだった）。アクセントカラーは `--accent` にだけ入る */
+  --accent-mix: 20%;
+  --accent-soft: color-mix(in srgb, var(--accent) var(--accent-mix), transparent);
   /* フォーカス枠だけの濃さ。--accent-soft と同じ色味だが、地が --bg へ
      沈んだ分（旧 --panel より暗い）そのままだと枠が薄まって見えるので、
      ここだけ底上げする */
@@ -43,7 +51,6 @@
   --ink: #1f2328;
   --ink-dim: #6b7280;
   --line: #e2e5ea;
-  --accent-soft: rgba(89, 50, 255, 0.12);
   --ring: rgba(89, 50, 255, 0.12);
   --node-bg: #ffffff;
   --node-border: #cfd5dd;
@@ -294,8 +301,14 @@ html, body {
   &:hover::after, &.dragging::after { background: var(--accent); }
 }
 /* 片方だけのときは幅を動かせない。押せば分割へ戻るので、掴む形ではなく
-   押す形のカーソルにする */
-#panes.no-map #splitter, #panes.no-md #splitter { cursor: pointer; }
+   押す形のカーソルにする。**狭いときは対象外** — `:root:not(.narrow)` を
+   付けないと `#panes.no-map`/`#panes.no-md`（詳細度 (2,1,0)）が
+   `.narrow #splitter`（詳細度 (1,1,0)）に必ず勝ってしまい、狭いときの
+   `cursor: default` が一度も効かない死んだ規則になる。狭いときは押しても
+   分割へは戻らない（`pointerdown` が早期リターンする）ので、この
+   「押せば戻る」形のカーソルを見せるべきでもない */
+:root:not(.narrow) #panes.no-map #splitter,
+:root:not(.narrow) #panes.no-md #splitter { cursor: pointer; }
 
 /* ========== md のペイン ========== */
 
@@ -309,6 +322,10 @@ html, body {
   background: var(--bg);
   position: relative; /* 隅に浮く道具（.pane-tool）の座標系 */
 
+  /* CodeMirror の色は**ここが決める**（src/editor.ts は色を持たない）。
+     テーマの中で当てると、ダークでは後から当たる oneDarkTheme に負ける —
+     普通の詳細度で書けば勝てるので、置き場所を 1 つに寄せてある。
+     oneDark が引き続き受け持つのはコードの字の色だけ。 */
   & .cm-editor {
     height: 100%;
     font-size: 13px;
@@ -320,6 +337,8 @@ html, body {
     &.cm-focused { outline: none; }
   }
   & .cm-scroller { font-family: var(--mono); line-height: 1.55; }
+  /* 打っている場所の印は、マップのその場編集と同じアクセントカラー */
+  & .cm-content { caret-color: var(--accent); }
   & .cm-gutters {
     background: var(--bg);
     border-right: 1px solid var(--line);
@@ -386,6 +405,13 @@ html, body {
    そこから `--edge` 離せば、マップ側の道具が地図の縁から離れているのと
    同じ距離になる — 数が違って見えるのは、あいだにバーが居るぶんだけ */
 #md-pane .pane-tool { right: calc(var(--bar) + var(--edge)); }
+
+/* **指にホバーは無い。** 沈めたままだと、起こす手段が無いまま半透明で
+   居続ける（ペイン切り替えの矢印・書き方ピッカー・視点を寄せるボタン、
+   3 つとも）。触って起こせないなら、最初から起きている */
+@media (hover: none) {
+  .pane-tool { opacity: 1; }
+}
 
 /* 木の書き方（# / n+ / -）は**上**。これは本文の書かれ方そのものを変える
    道具で、いま何で書かれているかを出しているもの — 本文の頭に居るのが
@@ -461,13 +487,40 @@ html, body {
 }
 /* 片方だけの時は、境目が窓の縁に来る。中央寄せ（transform）のままだと
    相方の消えた 1 個ぶんしか無い横幅で計算が狂い、画面の外へはみ出す —
-   だから寄せ先を切り替える。**分割線の幅ぶんだけ離す**（0 だと重なり、
-   分割線の見える層（#splitter::after、z-index:11）がボタンより前に
-   出る分だけボタンの見える面積を食う — 20px のうち 5px、独りのときは
-   目立つ）。`--w` は #splitter が持つ 1 つを、子である #pane-switch が
-   そのまま継いで見る */
-#panes.no-map #pane-switch { left: auto; right: var(--w); transform: none; }
+   だから寄せ先を切り替える。
+
+   **md を出している側はスクロールバーを避ける**（`#md-pane .pane-tool` と
+   同じ数）。マップ側にはその帯が無いので、分割線の幅ぶんだけ離す
+   （0 だと重なり、分割線の見える層（#splitter::after、z-index:11）が
+   ボタンより前に出る分だけ見える面積を食う）*/
+#panes.no-map #pane-switch { left: auto; right: calc(var(--bar) + var(--edge)); transform: none; }
 #panes.no-md #pane-switch { left: var(--w); transform: none; }
+
+/* 狭いときは、居場所が 2 つしか無い（`app/panes.ts` の `spotsFor`）。
+   **分割線は線としての性質だけを落とす** — 動かせない境目を「掴めます」と
+   いう顔で見せない。要素は 0 幅で残す: flex がそれを縁まで押し出すので、
+   `#pane-switch` は今までどおり同じ 1 か所に居られる（角と角に分けると、
+   片方だけスクロールバー避けの分ずれて見える）。
+   居場所が 2 つなら `button:disabled { display: none }` により、
+   **画面に出る矢印は常に 1 本**になる */
+.narrow #splitter {
+  width: 0;
+  background: none;
+  cursor: default;
+}
+
+/* 指の的。**幅ではなく入力の質で決まる話**なので `.narrow` ではなく
+   メディアクエリで見る（狭くしただけのデスクトップの窓を太らせない）。
+   狭いところでは、切り替えの矢印がペインを行き来する唯一の手段になる */
+@media (pointer: coarse) {
+  /* **縦だけ太らせても的にはならない。** 26px 幅のままだと、隙間なく 3 つ
+     並ぶ書き方ピッカー（H / n+ / L）は隣を押しやすく、外すと文書ぜんぶの
+     木の書き方が入れ替わる — マップ側のどのボタンより取り返しが遠い。
+     幅も 44px にする（3 つで 132px。いちばん狭い窓でも収まる） */
+  .pane-tool button { min-height: 44px; min-width: 44px; }
+  #pane-switch button { width: 44px; height: 44px; }
+  #pane-switch button .icon { width: 16px; height: 16px; }
+}
 
 /* ========== マップのペイン ========== */
 
@@ -479,6 +532,10 @@ html, body {
   outline: none;
   background-color: var(--bg);
   background-image: radial-gradient(circle, var(--dot) 1px, transparent 1px);
+  /* 指やペンでも動かせるように、ブラウザのスクロール/ズームへ渡さない
+     （`.popup-canvas` と同じ理由）。**md ペインには敷かない** —
+     CodeMirror のネイティブなスクロールを奪わない */
+  touch-action: none;
 
   &.pane-focused { box-shadow: inset 0 0 0 2px var(--ring); }
 }
@@ -649,7 +706,9 @@ html, body {
   &.selected rect.box {
     stroke: var(--accent);
     stroke-width: 2;
-    fill: color-mix(in srgb, var(--accent) 16%, var(--node-bg));
+    /* md 側のハイライトと同じ濃さ（--accent-mix）。ただし箱は下が透けては
+       困る（地のドットが出る）ので、transparent ではなく node-bg に混ぜる */
+    fill: color-mix(in srgb, var(--accent) var(--accent-mix), var(--node-bg));
   }
   &.hidden-node {
     opacity: 0.45;
@@ -658,7 +717,6 @@ html, body {
     & rect.box { rx: 4px; stroke-dasharray: 4 3; }
     & text.label { fill: var(--ink-dim); }
   }
-  &.drop-child rect.box { stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 5 3; }
   &.dragging { opacity: 0.35; }
   &.drop-parent rect.box {
     stroke: var(--accent);
@@ -717,14 +775,41 @@ html, body {
   }
 }
 
-/* ========== 落とし先の示し ========== */
-
-.plus-btn {
+/* 選んでいるノードの上下左右に出る `+`。**的は見た目より広い** —
+   指は 9px の丸の縁を正確には狙えないので、透明な当たり判定を被せる
+   （見えている丸まで指の的の大きさにすると、ノードより目立つ） */
+.add-btn {
   cursor: pointer;
 
-  & circle { fill: var(--accent); }
-  & line { stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+  & .hit { fill: transparent; }
+  & .face { fill: var(--accent); }
+  & line { stroke: #fff; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+  &:hover .face { filter: brightness(1.25); }
 }
+
+/* ========== md のカーソルが居るところ ========== */
+
+/* 箱の**内側**に重なるもう 1 本の輪（置き場所は mindmap.ts）。
+   内側なのは、選択が外の枠だから — 外から掴むのが選択、中に居るのが
+   カーソルで、形がそのまま意味になる。だから両方が成り立つときも、
+   外が選択・内がカーソルでそのまま両方読める。
+
+   **`--accent-soft` は借りない。** あれは面を塗るための薄さで（md 側の
+   ハイライトも矩形選択も面）、2px の線に使うと消える。内側に居る以上
+   選択と紛れようがないので、線として読める濃さを自分で持つ。 */
+.caret-ring {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke-width: 2;
+  rx: 5px;
+  /* 印は乗っているだけ。掴めると、下のノードを選べなくなる */
+  pointer-events: none;
+
+  /* 畳んだノードは角の丸みも小さく、薄い。輪もそれに合わせる */
+  &.hidden-node { rx: 2px; opacity: 0.45; }
+}
+
+/* ========== 落とし先の示し ========== */
 
 #drop-line {
   stroke: var(--accent);
@@ -1269,16 +1354,20 @@ html, body {
 }
 
 /* ========== 狭いとき ==========
-   片方だけを出す。**どちらを出すかは JS で持たない** — マップが on なら
-   マップ、off なら md。切り替えは Alt+1 / Alt+2 がそのまま担う。 */
+   **どちらのペインを出すかは、ここでは決めない。** 居場所（狭ければ
+   「md だけ / マップだけ」の 2 つ）を持つのは `app/panes.ts` の
+   `spotsFor` / `project` / `toggled` で、結果は `.pane-off` として降りてくる
+   — 隠す規則は幅に関わらず 1 つきり（上の `.pane-off`）。
+   ここに残るのは、狭さそのものから決まる詰め方だけ。
+
+   幅で振る舞いを変えるものは `<html class="narrow">` を見る（`720px` の
+   唯一の源は `app/panes.ts` の `matchMedia`）。この照会が持つのは、
+   クラスを要さない純粋な見た目だけ。 */
 
 @media (max-width: 720px) {
   #topbar { gap: 6px; padding: 6px 8px; }
   /* 名前はタブが言っている。狭いところで二重に場所を取らない */
   #filename, #dirty { display: none; }
 
-  /* 並べないので、掴んで動かす境目も意味を失う */
-  #splitter { display: none; }
-  #panes:not(.no-map) #md-pane { display: none; }
   #md-pane, #map-pane { flex: 1; min-width: 0; }
 }

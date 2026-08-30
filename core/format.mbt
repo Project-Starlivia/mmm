@@ -101,8 +101,27 @@ fn format_edits(depth_of : (Int) -> Int) -> Array[Edit] {
       }
     }
   }
+  // 区切り行（生きている境界のもの）。**どのノードの中身でもない**ので、
+  // 直前のノードの中身として字下げしてはいけない。owner だけで見ていたころは
+  // 深い枝の下にある `---` がその枝の中身の列（深さ 6 なら 10 桁）まで
+  // 押し込まれ、しかも 1 つの境界の 2 行のあいだに空行が入っていた
+  // （`sep_body` が決して書かない形）。列はルートの中身の列に揃える —
+  // そこなら外の CommonMark パーサから見てもリストは閉じない。
+  let sep_line : Array[Bool] = Array::make(lines.length(), false)
+  let sep_first : Array[Bool] = Array::make(lines.length(), false)
+  for b in st.bounds {
+    let mut first = true
+    for li = 0; li < lines.length(); li = li + 1 {
+      if lines[li].start >= b.start && lines[li].start < b.end {
+        sep_line[li] = true
+        sep_first[li] = first
+        first = false
+      }
+    }
+  }
   // 直前に出した「中身のある行」が構造行だったか（空行の要否の判定用）
   let mut prev_struct = false
+  let mut prev_sep = false // 直前の「中身のある行」が区切り行だったか
   let mut prev_seen = false
   let mut pending_blank_from = -1 // 詰めるべき空行の始まり
   for li = 0; li < lines.length(); li = li + 1 {
@@ -129,7 +148,15 @@ fn format_edits(depth_of : (Int) -> Int) -> Array[Edit] {
     }
     // ---- 行の間の空行を揃える ----
     if prev_seen {
-      let want_blank = st.list_from == 0 || !prev_struct || !is_struct[li]
+      // 1 つの境界の中は空行なし（`sep_body` が書く形）。境界の手前と
+      // 後ろは、どちらの形でも空行 1 つで区切る
+      let want_blank = if sep_line[li] {
+        sep_first[li] // 境界の 2 行目以降は詰める
+      } else if prev_sep {
+        true // 境界の直後は空行 1 つ
+      } else {
+        st.list_from == 0 || !prev_struct || !is_struct[li]
+      }
       if want_blank {
         if pending_blank_from < 0 {
           // 足りない: この行の直前に 1 つ入れる
@@ -157,8 +184,19 @@ fn format_edits(depth_of : (Int) -> Int) -> Array[Edit] {
     pending_blank_from = -1
     prev_seen = true
     prev_struct = is_struct[li]
+    prev_sep = sep_line[li]
     // ---- 行そのもの ----
-    if is_struct[li] {
+    if sep_line[li] {
+      // 区切りはルート直下の話。**その木の根の中身の列**に揃える
+      // （`sep_body` が書くのと同じ列。深い枝の中身の列まで押し込むと、
+      // どの枝に属するのかを嘘で語ることになる）
+      let want = spaces(content_col_for(st.nodes[root_index_of(o)].depth))
+      let (_, text_at) = indent_of(l.start, l.end)
+      let old = slice(st.text, l.start, text_at)
+      if want != old {
+        set.push(Edit::{ from: l.start, to: text_at, insert: want, removed: old })
+      }
+    } else if is_struct[li] {
       let e = prefix_edit(o, depth_of(o))
       if e.insert != e.removed {
         set.push(e)
