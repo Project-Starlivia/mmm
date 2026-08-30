@@ -33,21 +33,27 @@
 
 ```
 mmmAst {                          // 意味と中身。綴りは持たない
-  head:  String?                  // frontmatter 区間まるごと（中は解釈しない）
-  roots: [Root]
-}
-Root { id, level, label, body, branches: [(side, Node)] }
+  head: String?                   // frontmatter 区間まるごと（中は解釈しない）
+  doc:  Node(level 0)             // 文書そのもの。body = 最初の見出しより前の散文、
+}                                 // children = 最上位ノードの列（level はそのまま保持）
 Node { id, level, label, folded, body: [Block], children: [Node] }
+      // root 直下のスロットだけが side を持つ（具体型は実装で確定）
 Block = Content(Image | Code | Svg | Link)   // 認定ブロック（ブロックレベルのみ）
       | Opaque(text)                         // 散文・table・引用・HTML・謎。中身は逐語
 
 Map構造木 = project(mmmAst)       // ghost 実体化・side/folded の絵・Opaque の気配化
 ```
 
+- **文書は level 0 のノード**。`#`（level 1）の子がそれぞれ独立の木。
+  最初の `#` より前に level 2+ の見出しがあれば、level 0 との段差から**通常の ghost 規則**で
+  ghost(1) が導出され、その配下として読まれる（= 共有 ghost root。特例ではなく帰結）。
+  ghost root の木は高々 1 個・文書頭にだけ現れ、rename / materialize すれば
+  文書タイトル `# ` が生えて普通の木になる
 - **id はセッション限り**。操作中は mmmAst が運ぶので、操作の道に照合は存在しない
-- **level は疑似階層** — `# root` 直下の `### head` は空スロット（ghost）を挟んだ
-  3 階層目。level は構造なので正規形でも保存される（階層飛びは消えない）
-- **side は Root のスロットの属性**（場所の属性。深い階層には書けない）
+- **level は疑似階層** — 親子の level 差 > 1 の空位は ghost。深さ = level で全域一致
+  （level 0 の文書に錨を打ったので、木ごとの原点ずれが存在しない）
+- **side は root 直下（level 1 → 2）のスロットの属性**。ghost root の木では
+  ghost(1) のスロットに当たる。木と木の間（doc 直下の隙間）の区切りは無意味のまま
 - **folded** は意味のフラグ。綴りは details（§4）
 - **Opaque の中身は逐語** — 例外は単独の水平線だけ（§4 のチャンネル分離）
 
@@ -144,7 +150,8 @@ md ← serialize ┘
     flipSide は node と同じ裁定: root 直下の ghost のみ発動（スロット反転 = 自分のサブツリー）、
     深い ghost は reject
   - 複数選択に含めてよい。一括操作は各要素に個別裁定を適用（node 先・ghost 後）
-  - root の上に ghost は無い（木の頂点は level がいくつでも root — Root が level を持つ理由）。
+  - ghost root（§2 — 文書頭の接頭部の上に立つ ghost(1)）にも同じ 4 型がそのまま効く:
+    rename / materialize = 文書タイトルが生える、flipSide = 鏡像（root 直下 ghost の規則）。
     id は Map構造木だけの合成 id。md ペインに対応先は無い（テキストに存在しない）
 
 ### 反映の機構（生成は全体、適用は差分）
