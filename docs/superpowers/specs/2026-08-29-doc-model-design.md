@@ -37,8 +37,8 @@ mmmAst {                          // 意味と中身。綴りは持たない
   head: String?                   // frontmatter 区間まるごと（中は解釈しない）
   doc:  Node(level 0)             // 文書そのもの。body = 最初の見出しより前の散文、
 }                                 // children = 最上位ノードの列（level はそのまま保持）
-Node { id, level, label, folded, body: [Block], children: [Node] }
-      // root 直下のスロットだけが side を持つ（具体型は実装で確定）
+Node { id, level, form, label, folded, body: [Block], children: [Node] }
+      // form: Heading | Item。root 直下のスロットだけが side を持つ（具体型は実装で確定）
 Block = Content(Image | Code | Svg | Link)   // 認定ブロック（ブロックレベルのみ）
       | Opaque(text)                         // 散文・table・引用・HTML・謎。中身は逐語
 
@@ -51,6 +51,15 @@ Map構造木 = project(mmmAst)       // ghost 実体化・side/folded の絵・O
   ghost root の木は高々 1 個・文書頭にだけ現れ、rename / materialize すれば
   文書タイトル `# ` が生えて普通の木になる
 - **id はセッション限り**。操作中は mmmAst が運ぶので、操作の道に照合は存在しない
+- **form は意味** — 見出しか項目かは書かれたとおりに読み、format は変えない
+  （変えるのは setForm と convert だけ）。見出しは**絶対記法**（level を自分で宣言し、
+  飛びは ghost になる）、リストは**相対記法**（置かれた場所から埋まり、ghost を作らない）
+- **単調性**: Item の子孫は Item。項目の領土（content indent）内の見出しは
+  Opaque として読む — 絶対記法を相対容器に入れると level が嘘になるため
+- **順序法則**: 同じ親の子は **Item が先、Heading が後**。見出し節が始まると以降の
+  リストは節に食われるという md の物理。doc(level 0) 直下にも同じ法則が効く
+- **top-level の Item は level 1 の root** — `- center` を中心に全リストで map が書ける。
+  その side トグルは root の content indent に置く `---`（子リストがそこで割れる。読み書き一意）
 - **level は疑似階層** — 親子の level 差 > 1 の空位は ghost。深さ = level で全域一致
   （level 0 の文書に錨を打ったので、木ごとの原点ずれが存在しない）
 - **side は root 直下（level 1 → 2）のスロットの属性**。ghost root の木では
@@ -78,10 +87,18 @@ md ← serialize ┘
 
 | 項目 | 正規形 |
 |---|---|
-| 見出し | 常に ATX。level をそのまま `#` の数に（階層飛びも保存） |
-| 深さ 7 以上 / リスト形 | `list_from` ダイヤル（文書単位）で深さ N からリスト形。
-  **検出 = 文書中で最も浅いリスト項目の深さ（下限 2）。リスト無しなら 7**。
-  同深度に見出しとリストが混在する手書き文書はリスト側に揃う。h6 上限なので N ≤ 7 |
+| 見出し | 常に ATX。level をそのまま `#` の数に（階層飛びも保存）。
+  **level は無制限** — `#######`（7 個以上）も書く。GitHub では段落として描画される方言の対価。
+  深い階層を外でも綺麗に見せたければ Item form を選べばよい |
+| form の決定 | 新しく form を決める瞬間（add・move 先・materialize）の優先順位:
+  ① 単調性（Item の下は問答無用で Item）→ ② 順序法則（Heading 兄弟の間は Heading）→
+  ③ 兄弟の真似 → ④ policy。**policy は保存されない — リアルタイム推定**:
+  文書中で最も浅い Item の深さを N として Hybrid(N)（深さ N 未満は親に従い、N 以上は Item。
+  Item が無ければ常に親に従う）。読み（parse）には一切影響しない |
+| convert | **head only / list only / hybrid の一括 form 変換コマンド**（全ノードの setForm、
+  undo 1 回）。head only は ghost（level 飛び）をそのまま保存。
+  **list only は ghost を空ラベルの Item として実体化**（リストは相対記法で飛びを書けない。
+  段差詰めせず深さを保存する）。綴りの format とは別コマンド |
 | リストの綴り | マーカーは `-`（`*` `+` は読みのみ）。ネスト 1 段 = 2 スペース。
   行頭の飾り字下げ（0〜3）は読み飛ばし、書かない。
   順序リスト（`1.` `1)`）は構造として読み、`-` に正規化 — 兄弟の順序は構造として
@@ -108,7 +125,8 @@ md ← serialize ┘
 | frontmatter | head 逐語。parse の前段で封筒として切り出す |
 
 方言表（read が CommonMark と異なる点）: setext は読む・`<!---`/`--->` 許容・
-`#######` は段落（読まない）・blockquote/table/一般 HTML は Opaque。
+**`#######`（7 個以上）も見出しとして読む**（lezer は段落と読むので法則 4 の期待差分）・
+blockquote/table/一般 HTML/項目内の見出しは Opaque。
 
 正規形の綴り定数（マーカー記号・字下げ幅・フェンス記号・空行数など）は、
 将来の lint 的な設定化の余地のため**コード上 1 か所に括り出す**（現状は固定値。設定 UI は作らない）。
@@ -133,14 +151,19 @@ md ← serialize ┘
 
 > **構造を変える者は文字列に触れず、文字列に触れる者は必ず解釈を受ける。**
 
-- **木の道**: move / indent / outdent / delete / flipSide / fold — 木の語彙で mmmAst を
-  直接変異。parse を通らず、id は mmmAst が運ぶ
+- **木の道**: move / indent / outdent / delete / flipSide / fold / setForm — 木の語彙で
+  mmmAst を直接変異。parse を通らず、id は mmmAst が運ぶ
 - **読みの道**: 打鍵・rename・カード編集・貼り付け — 文字列を運ぶものは例外なく
   テキストに書かれて parse を通る。**一言語原則**: カード入力も md を話す。
   エスケープ・trim・改行拒否といったラベル専用の裁定は存在せず、md 文法が唯一の裁定者。
   `1. x` と打てば入れ子が生え、`# foo` と打てば見出しになる — 文法に逆らわないことが正しい。
   md ペインで打っても カードで打っても、同じ入力は同じ結果になる
 - 構造系の拒否: 子孫への move（循環）/ root より浅い outdent。同位置への move は許可・編集ゼロ
+- **form は行き先に従う。転形は自動・最小限**:
+  Item 親の下へ move された Heading サブツリーはサブツリーごと Item 化（単調性・下向きで比例）/
+  Heading 兄弟の間へ置かれた Item は**そのノードだけ** Heading 化（子は Item のままで合法）。
+  reject は 1 つだけ — Item 配下のノードへの setForm(Heading)（祖先を変えるのは比例性違反）。
+  空ノードを ghost 風の中空で描くかは render の自由（仕様は縛らない）
 - **操作の効果は、選択したもののサブツリー内に収まるべき**（比例性の原則）
 - **flipSide は root 直下の枝と root にだけ発動**:
   枝 = そのスロットの反転 / root = **鏡像**（全スロット一括反転。木全体 = root のサブツリーなので比例）。
