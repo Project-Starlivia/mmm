@@ -42,28 +42,34 @@ Node { id, level, form, label, folded, body: [Block], children: [Node] }
 Block = Content(Image | Code | Svg | Link)   // 認定ブロック（ブロックレベルのみ）
       | Opaque(text)                         // 散文・table・引用・HTML・謎。中身は逐語
 
-Map構造木 = project(mmmAst)       // ghost 実体化・side/folded の絵・Opaque の気配化
+Map構造木 = project(mmmAst)       // side/folded の絵・Opaque の気配化
 ```
 
 - **文書は level 0 のノード**。`#`（level 1）の子がそれぞれ独立の木。
-  最初の `#` より前に level 2+ の見出しがあれば、level 0 との段差から**通常の ghost 規則**で
-  ghost(1) が導出され、その配下として読まれる（= 共有 ghost root。特例ではなく帰結）。
-  ghost root の木は高々 1 個・文書頭にだけ現れ、rename / materialize すれば
-  文書タイトル `# ` が生えて普通の木になる
+  最初の `#` より前に level 2+ の見出しがあれば、level 0 との段差から implied(1) が
+  導出され、その配下として読まれる（= 空ラベルの root。特例ではなく帰結。文書頭に高々 1 個。
+  rename すれば文書タイトル `# ` が生えて昇格する）
+- **implied（暗黙ノード）** — parse が level 飛びから導出する、骨格スパンを持たない空ノード。
+  本物のノード（実 id・普通に操作できる・map に中空などで描ける）だが、**存在条件**を持つ:
+  **「implied は子を持つ限りにおいて存在する」** — 操作が最後の子を取り除けば、
+  不変条件の維持として同時に居なくなる（削除という出来事ではない。導出されなくなるだけ）。
+  綴りは**何も書かない**（level 飛びそのものが implied の綴り）。
+  rename や body 追加で骨格行が書かれてスパンが付いた瞬間、普通のノードに**昇格**し、
+  以後は子と無関係に存在する（手書きの空見出し `## ` は最初からこちら側）
 - **id はセッション限り**。操作中は mmmAst が運ぶので、操作の道に照合は存在しない
 - **form は意味** — 見出しか項目かは書かれたとおりに読み、format は変えない
   （変えるのは setForm と convert だけ）。見出しは**絶対記法**（level を自分で宣言し、
-  飛びは ghost になる）、リストは**相対記法**（置かれた場所から埋まり、ghost を作らない）
+  飛びは implied を導出する）、リストは**相対記法**（置かれた場所から埋まり、implied を作らない）
 - **単調性**: Item の子孫は Item。項目の領土（content indent）内の見出しは
   Opaque として読む — 絶対記法を相対容器に入れると level が嘘になるため
 - **順序法則**: 同じ親の子は **Item が先、Heading が後**。見出し節が始まると以降の
   リストは節に食われるという md の物理。doc(level 0) 直下にも同じ法則が効く
 - **top-level の Item は level 1 の root** — `- center` を中心に全リストで map が書ける。
   その side トグルは root の content indent に置く `---`（子リストがそこで割れる。読み書き一意）
-- **level は疑似階層** — 親子の level 差 > 1 の空位は ghost。深さ = level で全域一致
-  （level 0 の文書に錨を打ったので、木ごとの原点ずれが存在しない）
-- **side は root 直下（level 1 → 2）のスロットの属性**。ghost root の木では
-  ghost(1) のスロットに当たる。木と木の間（doc 直下の隙間）の区切りは無意味のまま
+- **level は疑似階層** — 親子の level 差 > 1 の空位は implied が埋める。深さ = level で
+  全域一致（level 0 の文書に錨を打ったので、木ごとの原点ずれが存在しない）
+- **side は root 直下（level 1 → 2）のスロットの属性**。implied root の木では
+  implied(1) のスロットに当たる。木と木の間（doc 直下の隙間）の区切りは無意味のまま
 - **folded** は意味のフラグ。綴りは details（§4）
 - **Opaque の中身は逐語** — 例外は単独の水平線だけ（§4 のチャンネル分離）
 
@@ -96,9 +102,9 @@ md ← serialize ┘
   文書中で最も浅い Item の深さを N として Hybrid(N)（深さ N 未満は親に従い、N 以上は Item。
   Item が無ければ常に親に従う）。読み（parse）には一切影響しない |
 | convert | **head only / list only / hybrid の一括 form 変換コマンド**（全ノードの setForm、
-  undo 1 回）。head only は ghost（level 飛び）をそのまま保存。
-  **list only は ghost を空ラベルの Item として実体化**（リストは相対記法で飛びを書けない。
-  段差詰めせず深さを保存する）。綴りの format とは別コマンド |
+  undo 1 回）。head only は implied を飛びのまま保存。
+  **list only は implied を空ラベルの Item として書く**（リストは相対記法で飛びを書けない。
+  段差詰めせず深さを保存。書かれた瞬間スパンが付いて昇格）。綴りの format とは別コマンド |
 | リストの綴り | マーカーは `-`（`*` `+` は読みのみ）。ネスト 1 段 = 2 スペース。
   行頭の飾り字下げ（0〜3）は読み飛ばし、書かない。
   順序リスト（`1.` `1)`）は構造として読み、`-` に正規化 — 兄弟の順序は構造として
@@ -106,7 +112,7 @@ md ← serialize ┘
   **常に tight** — loose は「リスト形ノード上の段落系カード（Image/Link）」が
   md の規則上強制するときだけ発生する（段落は段落を中断できないため空行が必須。
   Code はフェンスが段落を中断できるので tight のまま）。
-  リストは**相対記法**なので ghost を作らない（絶対座標を持つ見出しだけが作る） |
+  リストは**相対記法**なので implied を作らない（絶対座標を持つ見出しだけが導出する） |
 | 区切り | **`---` はトグル専用**。スロットの side の変わり目にちょうど 1 本。
   飾りの水平線（body 内の Opaque）は **`***` に書き替える**（チャンネル分離 —
   綴りを所有したことで初めて合法になった手。位置による誤読が構造的に消える） |
@@ -135,7 +141,7 @@ blockquote/table/一般 HTML/項目内の見出しは Opaque。
 
 ```
 1. UI (ts)   ポインタ解釈 → Map構造木の言葉で命令を発話
-2. 翻訳      id 素通し / index 読み替え（Opaque を飛ばした分）/ ghost の裁定
+2. 翻訳      id 素通し / index 読み替え（Opaque を飛ばした分）
 3. core      mmmAst を意味で変異（reshape / reject の判定込み）
 4. serialize 正規形の md 全文 → 旧 md と diff → editSets をペインへ
 5. project → render で map 更新
@@ -163,7 +169,7 @@ blockquote/table/一般 HTML/項目内の見出しは Opaque。
   Item 親の下へ move された Heading サブツリーはサブツリーごと Item 化（単調性・下向きで比例）/
   Heading 兄弟の間へ置かれた Item は**そのノードだけ** Heading 化（子は Item のままで合法）。
   reject は 1 つだけ — Item 配下のノードへの setForm(Heading)（祖先を変えるのは比例性違反）。
-  空ノードを ghost 風の中空で描くかは render の自由（仕様は縛らない）
+  空ノード（implied 含む）を中空で描くかは render の自由（仕様は縛らない）
 - **操作の効果は、選択したもののサブツリー内に収まるべき**（比例性の原則）
 - **flipSide は root 直下の枝と root にだけ発動**:
   枝 = そのスロットの反転 / root = **鏡像**（全スロット一括反転。木全体 = root のサブツリーなので比例）。
@@ -174,22 +180,13 @@ blockquote/table/一般 HTML/項目内の見出しは Opaque。
   「文書を親とする move / add」で、root 専用の操作語彙は無い。
   add の新スロットの side は末尾スロットの側を継ぐ（居なければ右）
 - **複数選択は頂点集合に正規化**してから適用（子孫の選択は祖先に吸収される）。
-  move は文書順を保って連続挿入、delete は node 先・ghost 後、
-  rename / カード編集 / add は単独選択のみ
-- **ghost**（階層飛びの空位）の裁定は 4 型:
-  - **素通し**: add / drop 受け — ghost の子は「level+1 の住人」でしかなく、
-    1 行書くだけ。ghost は ghost のまま残る（特別な裁定自体が不要）
-  - **埋める（実体化）**: `materialize`（ghost 専用の明示操作。空ノードに置き換えて編集開始）/
-    rename（打った文字で埋める）/ カード追加（body は骨格行が所有するため）/
-    fold（実体化してから畳む — 子だけ畳みたいなら子に操作すべき）
-  - **閉じる**: delete — 段差詰め（空位の下の全住人が 1 段浅くなる。ghost 2 段なら 1 回で 1 段）
-  - **委譲**: move（配下の実サブツリーを掴む — 効果は下向きなので比例性を満たす）。
-    flipSide は node と同じ裁定: root 直下の ghost のみ発動（スロット反転 = 自分のサブツリー）、
-    深い ghost は reject
-  - 複数選択に含めてよい。一括操作は各要素に個別裁定を適用（node 先・ghost 後）
-  - ghost root（§2 — 文書頭の接頭部の上に立つ ghost(1)）にも同じ 4 型がそのまま効く:
-    rename / materialize = 文書タイトルが生える、flipSide = 鏡像（root 直下 ghost の規則）。
-    id は Map構造木だけの合成 id。md ペインに対応先は無い（テキストに存在しない）
+  move は文書順を保って連続挿入、rename / カード編集 / add は単独選択のみ
+- **implied は操作上も普通のノード** — 専用の裁定表は無い。add / drop / rename /
+  カード追加 / fold / move / flipSide、すべて node と同一の規則が効く。
+  delete もサブツリー削除で統一（旧「段差詰め」は廃止 — 子を残したければ outdent する。
+  子を昇格させる deleteOne は後日箱）。
+  唯一 implied 固有なのは §2 の存在条件（子を失えば同時に居なくなる）と、
+  綴り（書かれない）・md ペインに対応先が無いこと、の 2 点だけ
 
 ### 反映の機構（正しさは全体で、書き込みは触った所だけ）
 
@@ -253,8 +250,8 @@ N51 勝手整形（正規形の再 serialize は無変化 = 法則 2）/ N33 形
 
 ## 8. 未決の旗
 
-**無し。** すべて本文で確定済み（list_from は §4、反映戦略（すげ替え既定・format）と
-reject・ghost の裁定は §5、undo 統一は §7）。
+**無し。** すべて本文で確定済み（form と policy は §4、反映戦略（すげ替え既定・format）と
+reject・implied は §2/§5、undo 統一は §7）。
 
 後日（設計を揺らさない拡張）: task list `- [ ]` の done 属性化・順序リストの番号の
 見た目 — どちらも「綴りを意味に昇格させるか」の同型問題として、
