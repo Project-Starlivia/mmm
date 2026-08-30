@@ -5,7 +5,9 @@ from either side.
 
 The file itself is just a `.md`. The mind map is only another window onto it.
 
-For the full spec, see [docs/spec.md](docs/spec.md) ([日本語版はこちら](README_JA.md)).
+For the full spec, see [docs/spec.md](docs/spec.md).
+
+([日本語版はこちら](README_JA.md))
 
 ## Run it
 
