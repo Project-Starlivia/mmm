@@ -1,0 +1,102 @@
+// md がどう読まれるかを、指紋（ブロックの種類と原文の範囲）で固定する。
+// 読むのは mizchi/markdown。ここは mmm がその出力に何を期待しているかの記録で、
+// 期待が崩れたら気づけるようにしてある。
+//
+// span は原文を隙間なく敷き詰める（前の to = 次の from）。すげ替えがこれに乗る。
+
+///|
+/// ブロック 1 枚の指紋。`種類[from,to]`。入れ子は括弧の中に並べる。
+fn dump(b : @markdown.Block) -> String {
+  match b {
+    ThematicBreak(marker~, count~, span~, ..) =>
+      "Rule\{marker}\{count}\{at(span)}"
+    Heading(level~, style~, span~, ..) => "H\{level}\{style}\{at(span)}"
+    Paragraph(span~, ..) => "P\{at(span)}"
+    FencedCode(info~, span~, ..) => "Fence(\{info})\{at(span)}"
+    IndentedCode(span~, ..) => "Indent\{at(span)}"
+    HtmlBlock(span~, ..) => "Html\{at(span)}"
+    BlankLines(count~, span~) => "Blank\{count}\{at(span)}"
+    BulletList(marker~, tight~, items~, span~, ..) =>
+      "List\{marker}\{tight}\{at(span)}(\{items.length()})"
+    OrderedList(items~, span~, ..) => "Ord\{at(span)}(\{items.length()})"
+    Blockquote(span~, ..) => "Quote\{at(span)}"
+    Table(span~, ..) => "Table\{at(span)}"
+    _ => "?"
+  }
+}
+
+///|
+fn at(s : @markdown.Span) -> String {
+  "[\{s.from},\{s.to}]"
+}
+
+///|
+/// 文書ぜんぶの指紋。frontmatter が在れば頭に付く。
+fn sig(md : String) -> String {
+  let doc = @markdown.parse(md).document
+  let sb = StringBuilder::new()
+  match doc.frontmatter {
+    Some(f) => sb.write_string("Front\{at(f.span)} ")
+    None => ()
+  }
+  for i, b in doc.children {
+    if i > 0 {
+      sb.write_string(" ")
+    }
+    sb.write_string(dump(b))
+  }
+  sb.to_string()
+}
+
+///|
+test "字下げの見出しはコードとして読まれる（F5）" {
+  inspect(
+    sig("# a\n    # x\n"),
+    content=(
+      #|H1Atx[0,4] Indent[8,12]
+    ),
+  )
+}
+
+///|
+test "項目だけの文書" {
+  inspect(
+    sig("- x\n- y\n"),
+    content=(
+      #|ListDashtrue[0,8](2)
+    ),
+  )
+}
+
+///|
+test "翼のトグルと飾りの水平線" {
+  inspect(
+    sig("# r\n\n## a\n\n---\n\n### x\n\n***\n"),
+    content=(
+      #|H1Atx[0,4] Blank1[4,5] H2Atx[5,10] Blank1[10,11] Rule-3[11,15] Blank1[15,16] H3Atx[16,22] Blank1[22,23] Rule*3[23,27]
+    ),
+  )
+}
+
+///|
+/// 7 個以上は CommonMark どおり段落。見出しは深さ 6 まで。
+/// 深い階層は Item（リスト）で書く — 相対記法なので上限が無い。
+/// 無限階層を通すかは #19 で保留。
+test "7 個以上の # は段落になる（見出しは深さ 6 まで）" {
+  inspect(
+    sig("###### f\n\n####### g\n\n######## h\n"),
+    content=(
+      #|H6Atx[0,9] Blank1[9,10] P[10,20] Blank1[20,21] P[21,32]
+    ),
+  )
+}
+
+///|
+test "畳みと frontmatter" {
+  inspect(
+    sig("---\nk: v\n---\n\n# r\n\n<details>\n\n## a\n\n</details>\n"),
+    content=(
+      #|Front[0,13] Blank1[13,14] H1Atx[14,18] Blank1[18,19] Html[19,29] Blank1[29,30] H2Atx[30,35] Blank1[35,36] Html[36,47]
+    ),
+  )
+}
