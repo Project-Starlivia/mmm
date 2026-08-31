@@ -1,4 +1,4 @@
-// AST → 木。mmm の解釈はここにしか無い。
+// mdAst → mmmTree。mmm の解釈はここにしか無い。
 //
 // 骨格（いまは見出しだけ）を深さで積み上げる。深さが飛んだら、間を Implicit が
 // 埋める — 飛びは構造なので保存し、綴りが無いことだけを型で表す。
@@ -21,7 +21,7 @@ pub fn parse(md : String) -> Doc {
 }
 
 ///|
-/// AST を木にする。ラベルは原文から切り出す（mmm はインラインを解釈しない）。
+/// mdAst を mmmTree にする。ラベルは原文から切り出す（mmm はインラインを解釈しない）。
 pub fn build(md : String, ast : @markdown.Document) -> Doc {
   let forest : Array[Frame] = []
   let stack : Array[Frame] = []

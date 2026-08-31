@@ -21,7 +21,7 @@ function paint(parts: [string, string][]): DocumentFragment {
 }
 
 /**
- * 木の指紋。引用符の中はラベル（原文そのまま）なので、そこだけ地の色にして、
+ * mmmTree の指紋。引用符の中はラベル（原文そのまま）なので、そこだけ地の色にして、
  * 構造の記号（`[ ] > < · # -`）を立てる。
  */
 export function paintSig(s: string): DocumentFragment {
@@ -51,7 +51,7 @@ export function paintSig(s: string): DocumentFragment {
   return paint(parts);
 }
 
-/** AST の指紋。`種類[from,to]` の範囲だけ落とす。 */
+/** mdAst の指紋。`種類[from,to]` の範囲だけ落とす。 */
 export function paintAst(s: string): DocumentFragment {
   const parts: [string, string][] = [];
   for (const m of s.matchAll(/(\[[\d,]*\])|([^[]+)/g)) {

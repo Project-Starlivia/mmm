@@ -1,4 +1,4 @@
-// md を打つたびに、AST の指紋・木の指紋・木ぜんぶを出す。
+// md を打つたびに mdAst と mmmTree を出す。
 //
 // ここは**見るための道具**なので、解釈は 1 つも持たない。
 // 規則はすべて core にあり、この画面はその出力を並べるだけ。
@@ -41,9 +41,9 @@ const out = {
 };
 
 function show(text: string): void {
-  out.ast.replaceChildren(paintAst(mbt.astSig(text)));
-  out.sig.replaceChildren(paintSig(mbt.treeSig(text)));
-  out.json.replaceChildren(paintJson(pretty(mbt.treeJson(text))));
+  out.ast.replaceChildren(paintAst(mbt.mdAstSig(text)));
+  out.sig.replaceChildren(paintSig(mbt.mmmTreeSig(text)));
+  out.json.replaceChildren(paintJson(pretty(mbt.mmmTreeJson(text))));
   localStorage.setItem("mmm-lab", text);
 }
 

@@ -7,7 +7,7 @@
 ///|
 test "字下げの見出しはコードとして読まれる（F5）" {
   inspect(
-    ast_sig("# a\n    # x\n"),
+    md_ast_sig("# a\n    # x\n"),
     content=(
       #|H1Atx[0,4] Indent[8,12]
     ),
@@ -17,7 +17,7 @@ test "字下げの見出しはコードとして読まれる（F5）" {
 ///|
 test "項目だけの文書" {
   inspect(
-    ast_sig("- x\n- y\n"),
+    md_ast_sig("- x\n- y\n"),
     content=(
       #|ListDashtrue[0,8](2)
     ),
@@ -27,7 +27,7 @@ test "項目だけの文書" {
 ///|
 test "翼のトグルと飾りの水平線" {
   inspect(
-    ast_sig("# r\n\n## a\n\n---\n\n### x\n\n***\n"),
+    md_ast_sig("# r\n\n## a\n\n---\n\n### x\n\n***\n"),
     content=(
       #|H1Atx[0,4] Blank1[4,5] H2Atx[5,10] Blank1[10,11] Rule-3[11,15] Blank1[15,16] H3Atx[16,22] Blank1[22,23] Rule*3[23,27]
     ),
@@ -40,7 +40,7 @@ test "翼のトグルと飾りの水平線" {
 /// 無限階層を通すかは #19 で保留。
 test "7 個以上の # は段落になる（見出しは深さ 6 まで）" {
   inspect(
-    ast_sig("###### f\n\n####### g\n\n######## h\n"),
+    md_ast_sig("###### f\n\n####### g\n\n######## h\n"),
     content=(
       #|H6Atx[0,9] Blank1[9,10] P[10,20] Blank1[20,21] P[21,32]
     ),
@@ -50,7 +50,7 @@ test "7 個以上の # は段落になる（見出しは深さ 6 まで）" {
 ///|
 test "畳みと frontmatter" {
   inspect(
-    ast_sig("---\nk: v\n---\n\n# r\n\n<details>\n\n## a\n\n</details>\n"),
+    md_ast_sig("---\nk: v\n---\n\n# r\n\n<details>\n\n## a\n\n</details>\n"),
     content=(
       #|Front[0,13] Blank1[13,14] H1Atx[14,18] Blank1[18,19] Html[19,29] Blank1[29,30] H2Atx[30,35] Blank1[35,36] Html[36,47]
     ),

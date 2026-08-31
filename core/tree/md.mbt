@@ -9,7 +9,7 @@
 // 生の出力では +49KB だが、到達しないコードは rollup が落とす。
 
 ///|
-/// md の AST。ここを通すことで、パーサの差し替えがこの 1 ファイルに閉じる。
+/// mdAst。ここを通すことで、パーサの差し替えがこの 1 ファイルに閉じる。
 pub fn read(md : String) -> @markdown.Document {
   @markdown.parse(md).document
 }
@@ -41,8 +41,8 @@ fn at(s : @markdown.Span) -> String {
 }
 
 ///|
-/// 文書ぜんぶの指紋。frontmatter が在れば頭に付く。
-pub fn ast_sig(md : String) -> String {
+/// mdAst ぜんぶの指紋。frontmatter が在れば頭に付く。
+pub fn md_ast_sig(md : String) -> String {
   let doc = read(md)
   let sb = StringBuilder::new()
   match doc.frontmatter {
