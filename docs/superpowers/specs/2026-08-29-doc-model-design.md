@@ -33,19 +33,36 @@
 ## 2. 構造
 
 ```
-MmmTree {                          // 意味と中身。綴りは持たない
-  head: String?                   // frontmatter 区間まるごと（中は解釈しない）
-  doc:  Node(level 0)             // 文書そのもの。body = 最初の見出しより前の散文、
-}                                 // children = 最上位ノードの列（level はそのまま保持）
-Node { id, level, form, label, folded, body: [Block], children: [Node] }
-      // form: Heading | Item。root 直下のスロットだけが side を持つ（具体型は実装で確定）
-Block = Content(Image | Code | Svg | Link)   // 認定ブロック（ブロックレベルのみ）
-      | Opaque(text)                         // 散文・table・引用・HTML・謎。中身は逐語
+MmmTree（トップの型は Doc。2026-08-31 に役割型へ再設計）:
 
-MindmapTree = project(MmmTree)       // side/folded の絵・Opaque の気配化
-// 投影は right / left の 2 列（バケツ）で持つ — 側をまたぐ読み順は絵に出ないので、
-// バケツが投影の母語。side というフィールドは投影から消える（どっちの列に居るかが側）
+Doc      { frontmatter: String?, eol: Eol, body: [Block], roots: [Root] }
+Root     { id, skeleton: Skeleton, branches: [Branch] }
+Branch   { side: Side, node: Node }   // スロット = 場所。占有者を問わず側を持つ
+Node     { id, skeleton: Skeleton, children: [Node] }   // 深さ 3 以降は一様
+
+Skeleton = Implicit                   // 骨格行なし（飛びが綴り）。label も body も型ごと無い
+         | Explicit(form, label, folded, body: [Block])
+Form     = Heading | Item             // Implicit は Form に入れない（setForm の引数型なので）
+Side     = Right | Left
+Block    = Content(Image | Code | Svg | Link) | Rule | Opaque(text)
+
+MindmapTree = project(MmmTree)        // right / left のバケツ。境界は JSON で
+                                      // implied と label の事実を渡す（hollow は見せ方 = ts の自由）
 ```
+
+**この形が型で殺すもの**: doc の汚れ / 深いノードの side / 側つきで綴り無しの状態 /
+implicit×label / implicit×body / implicit×folded / implicit×Item / setForm(Implicit)。
+**check に残る関係的不変条件**: id 一意 / implicit の存在条件（子を持つ限り在る）と
+位置（前に見出しの兄弟が居ない）/ implicit の子は Heading / 順序法則 / 単調性。
+
+**操作の原理（抗うゲームの遊び方）**: 公開 API は id で語り、型の異種性は
+**道具 4 つ（resolve / pluck / graft / amend）に幽閉**する。運搬の通貨
+`Sub = Tree(Root) | Limb(Node)` は op.mbt の外に出ない。root 化・降格の変換は
+graft だけに住む（Tree は root 位置間では無変換 — sides が無傷で旅する）。
+Path は素の `Array[Int]`（[] = doc、[i] = root、[i,j] = スロット、以深 = children）。
+**殺す条件の観測点は道具の腕数 — 3 で止まらなくなったら負け**。
+枝の並べ替えで side は運ばれない（pluck で残置、graft が行き先で決める —
+「側は場所の属性」の帰結）。rename は読みの道（一言語原則）なので amend を通らない。
 
 **Tree と呼ぶ理由**: これは構文木でも純粋な構造木でもなく、
 **md が表現できる構造だけを、md の語彙で持つ木**。綴り（空行の数・マーカーの銘柄）は
@@ -54,7 +71,7 @@ MindmapTree = project(MmmTree)       // side/folded の絵・Opaque の気配化
 `Tree` は主張が最小で、この中間物を誤解させない。
 外の世界の木（CommonMark のブロック木）は `MarkdownAst` のまま — **Ast は外の言葉、Tree は mmm の言葉**。
 
-- **文書は level 0 のノード**。`#`（level 1）の子がそれぞれ独立の木。
+- **文書（Doc）は深さ 0 の器**。`#`（level 1）の Root がそれぞれ独立の木。
   最初の `#` より前に level 2+ の見出しがあれば、level 0 との段差から implied(1) が
   導出され、その配下として読まれる（= 空ラベルの root。特例ではなく帰結。文書頭に高々 1 個。
   rename すれば文書タイトル `# ` が生えて昇格する）
@@ -92,10 +109,10 @@ MindmapTree = project(MmmTree)       // side/folded の絵・Opaque の気配化
   （初出の裁定「implied は側を持てない・昇格して反転」は、帰属規則を
   「直後が書かれた深さ 2 の行」と不要に狭く敷いたことによる誤りだったので撤回。
   正しい帰属規則: **root 直下のスロットの前の隙間にある区切りが、そのスロットのトグル**）
-- **状態の定義と符号化の区別** — 意味論上、side は
-  「root 直下のスロット → 側」の**部分写像**（場所の属性）。`Node.side` フィールドは
-  その**埋め込み**（符号化）であり、定義域の外（深さ 2 以外）は無意味で常に Right とする
-  — これが符号化の忠実性条件。読み書きは必ずアクセサを通す
+- **side の定義と型の一致** — 意味論上、side は「root 直下のスロット → 側」の
+  **部分写像**（場所の属性）。役割型への再設計で `Branch { side, node }` が
+  スロットそのものになり、**部分写像がそのまま型になった** — 定義域の外に side を
+  書く場所が存在せず、埋め込みの余りと忠実性条件は消滅した
 - **folded** は意味のフラグ。綴りは details（§4）
 - **Opaque の中身は逐語** — 例外は単独の水平線だけ（§4 のチャンネル分離）
 
