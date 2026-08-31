@@ -30,6 +30,12 @@ jobs:
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
       - run: moon version
 
+      # 入れたてのランナーには mooncakes の索引が無い。無いまま解決に入ると
+      # 「module was not found in the registry」で止まる（moon install は
+      # moon build が勝手にやるが、索引の取得だけはやらない）
+      - name: Update the mooncakes index
+        run: moon update
+
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
