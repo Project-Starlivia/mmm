@@ -42,7 +42,7 @@ TS 側（md を種にする法則 1・2・3、外部審判による法則 4、�
   `G1 → (G2 / G3) → G5 → G4`）。**G4 は最後に走る検証群**で、
   自分の所有ファイルの中にだけ実装を書く
 - 作業場所は `D:/1.atrium/mmm/.worktrees/feat/tree-core`（ブランチ `feat/tree-core`）
-- ツールチェイン: `moon 0.1.20260803` / `moonc v0.10.6+80dc50f24` / Node `v24.16.0` /
+- ツールチェイン: `moon 0.1.20260803` / `moonc v0.10.6+80dc50f24` / Branch `v24.16.0` /
   pnpm `11.21.0` / TypeScript `^5.6.0` / `@lezer/markdown` `1.7.2`（devDependencies）
 - **Run 行は絶対パス**。`pnpm` を使う Step は cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`
 - **Step 2 / Step 4 の mbt テストはファイル指定**、群の締め（Task 71）だけ `-p`（契約 §17）
@@ -65,7 +65,7 @@ G5 が終わっていない状態では着手できない（契約 §3）。
 | `quote` / `strings` / `hex` / `reflect_json` | `core/tree/json.mbt` | JSON の綴り |
 | `project` / `map_bucket` / `map_branch` / `map_node` / `map_card` | `core/tree/project.mbt` | 投影 |
 | （新設なし） | — | 木の組み立ては G1 の `make_*` を呼ぶ（契約 §4） |
-| `Law` / `law_pick` / `law_id` / `law_head_label` / `law_item_label` / `law_block` / `law_side` / `law_skeleton` / `law_nodes` / `law_node` / `law_branches` / `law_implicit_center` / `law_doc` | `core/tree/laws_wbtest.mbt` | 木の生成器 |
+| `Law` / `law_pick` / `law_id` / `law_head_label` / `law_item_label` / `law_block` / `law_side` / `law_skeleton` / `law_branches` / `law_branch` / `law_slots` / `law_implicit_center` / `law_doc` | `core/tree/laws_wbtest.mbt` | 木の生成器 |
 | `sig` / `format` / `check` / `project` / `move_nodes` / `flip_side` / `delete_nodes` | `core/tree/js/exports.mbt` | 境界 7 本（別パッケージ） |
 | `Edit` / `Reflection` / `Card` / `MapNode` / `MapBranch` / `MapTree` / `Mindmap` / `doc` / `mbt` / `apply` / `cardText` / `rng` / `randomDoc` / `pathological` / `shrink` / `corpus` / `fuzzCases` / `brief` | `test/_tree.ts` | TS の窓口 |
 | `outerSkeletons` / `mmmSkeletons` / `DIALECT` / `READING` | `test/treeDialect.test.ts` | 外部審判 |
@@ -324,7 +324,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ JSON の�
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/project_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` / `Center` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol` /
+- Consumes: `Doc` / `Center` / `Slot` / `Branch` / `Skeleton` / `Form` / `Side` / `Eol` /
   `Block` / `Content`（G1・契約 §6）、`quote`（Task 60）、
   **`same_side`（G3 `serialize.mbt`）**
 - Produces: `pub fn project(doc : Doc) -> String`（契約 §14 の JSON）/
@@ -343,29 +343,29 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ JSON の�
 // 投影の固定。バケツ分け・buried・implied の 3 点だけを見る（描き方は render の自由）。
 // 接頭辞が proj_ なのは、project.mbt が既に map_node / map_branch を名乗っているから。
 
-// 葉と文書の組み立ては G1 の `make_wbtest.mbt`（`make_node` / `make_head` / `make_doc`）を使う。
+// 葉と文書の組み立ては G1 の `make_wbtest.mbt`（`make_branch` / `make_head` / `make_doc`）を使う。
 // 同じ木を組む道具を 2 セット持たない（契約 §4 の「`make_*` に統一」）。
 
 ///|
-test "バケツ分けは branches の filter — 側ごとに順序を保つ" {
+test "バケツ分けは slots の filter — 側ごとに順序を保つ" {
   let center : Center = {
     id: 2,
     skeleton: Explicit(form=Heading, label="r", folded=false, body=[]),
-    branches: [
-      { side: Right, node: make_node(3, make_head("a"), []) },
-      { side: Left, node: make_node(4, make_head("b"), []) },
-      { side: Right, node: make_node(5, make_head("c"), []) },
+    slots: [
+      { side: Right, branch: make_branch(3, make_head("a"), []) },
+      { side: Left, branch: make_branch(4, make_head("b"), []) },
+      { side: Right, branch: make_branch(5, make_head("c"), []) },
     ],
   }
   assert_eq(
     project(make_doc([center])),
-    "{\"trees\":[{\"node\":{\"id\":2,\"label\":\"r\",\"implied\":false," +
+    "{\"trees\":[{\"branch\":{\"id\":2,\"label\":\"r\",\"implied\":false," +
     "\"folded\":false,\"form\":\"heading\",\"cards\":[],\"buried\":0}," +
-    "\"right\":[{\"node\":{\"id\":3,\"label\":\"a\",\"implied\":false," +
+    "\"right\":[{\"branch\":{\"id\":3,\"label\":\"a\",\"implied\":false," +
     "\"folded\":false,\"form\":\"heading\",\"cards\":[],\"buried\":0}," +
-    "\"children\":[]},{\"node\":{\"id\":5,\"label\":\"c\",\"implied\":false," +
+    "\"children\":[]},{\"branch\":{\"id\":5,\"label\":\"c\",\"implied\":false," +
     "\"folded\":false,\"form\":\"heading\",\"cards\":[],\"buried\":0}," +
-    "\"children\":[]}],\"left\":[{\"node\":{\"id\":4,\"label\":\"b\"," +
+    "\"children\":[]}],\"left\":[{\"branch\":{\"id\":4,\"label\":\"b\"," +
     "\"implied\":false,\"folded\":false,\"form\":\"heading\",\"cards\":[]," +
     "\"buried\":0},\"children\":[]}]}],\"buried\":0}",
   )
@@ -381,11 +381,11 @@ test "buried は絵に出ない Block の数。cards は Content と 1 対 1" {
       Rule,
       Content(Code(info="js", text="1")),
     ]),
-    branches: [],
+    slots: [],
   }
   assert_eq(
     project(make_doc([center])),
-    "{\"trees\":[{\"node\":{\"id\":2,\"label\":\"r\",\"implied\":false," +
+    "{\"trees\":[{\"branch\":{\"id\":2,\"label\":\"r\",\"implied\":false," +
     "\"folded\":true,\"form\":\"item\",\"cards\":[{\"kind\":\"image\"," +
     "\"alt\":\"a\",\"src\":\"./x.png\"},{\"kind\":\"code\",\"info\":\"js\"," +
     "\"text\":\"1\"}],\"buried\":2},\"right\":[],\"left\":[]}],\"buried\":0}",
@@ -402,15 +402,15 @@ test "implied は空ラベルの見出しとして出る。文書の散文は tr
       {
         id: 2,
         skeleton: Implicit,
-        branches: [{ side: Right, node: make_node(3, "b") }],
+        slots: [{ side: Right, branch: make_branch(3, "b") }],
       },
     ],
   }
   assert_eq(
     project(doc),
-    "{\"trees\":[{\"node\":{\"id\":2,\"label\":\"\",\"implied\":true," +
+    "{\"trees\":[{\"branch\":{\"id\":2,\"label\":\"\",\"implied\":true," +
     "\"folded\":false,\"form\":\"heading\",\"cards\":[],\"buried\":0}," +
-    "\"right\":[{\"node\":{\"id\":3,\"label\":\"b\",\"implied\":false," +
+    "\"right\":[{\"branch\":{\"id\":3,\"label\":\"b\",\"implied\":false," +
     "\"folded\":false,\"form\":\"heading\",\"cards\":[],\"buried\":0}," +
     "\"children\":[]}],\"left\":[]}],\"buried\":2}",
   )
@@ -428,7 +428,7 @@ Expected: `Error: [4021]` / `The value identifier project is unbound.` EXIT=1
 
 ```moonbit
 // Doc → MindmapTree。map への矢印はこの 1 本だけ（法則 3）。
-// バケツ分けは branches の filter — 側をまたぐ読み順はここで意図的に落ちる。
+// バケツ分けは slots の filter — 側をまたぐ読み順はここで意図的に落ちる。
 // 側の等値は G3 の same_side を呼ぶ（Side に Eq は無い。判定を 2 か所に割らない）。
 
 ///|
@@ -439,12 +439,12 @@ pub fn project(doc : Doc) -> String {
     if k > 0 {
       sb.write_string(",")
     }
-    sb.write_string("{\"node\":")
+    sb.write_string("{\"branch\":")
     map_node(sb, r.id, r.skeleton)
     sb.write_string(",\"right\":")
-    map_bucket(sb, r.branches, Right)
+    map_bucket(sb, r.slots, Right)
     sb.write_string(",\"left\":")
-    map_bucket(sb, r.branches, Left)
+    map_bucket(sb, r.slots, Left)
     sb.write_string("}")
   }
   sb.write_string("],\"buried\":")
@@ -456,29 +456,29 @@ pub fn project(doc : Doc) -> String {
 ///|
 fn map_bucket(
   sb : StringBuilder,
-  branches : Array[Branch],
+  slots : Array[Slot],
   side : Side,
 ) -> Unit {
   sb.write_string("[")
   let mut first = true
-  for b in branches {
+  for b in slots {
     if same_side(b.side, side) {
       if !first {
         sb.write_string(",")
       }
       first = false
-      map_branch(sb, b.node)
+      map_branch(sb, b.branch)
     }
   }
   sb.write_string("]")
 }
 
 ///|
-fn map_branch(sb : StringBuilder, node : Node) -> Unit {
-  sb.write_string("{\"node\":")
-  map_node(sb, node.id, node.skeleton)
+fn map_branch(sb : StringBuilder, branch : Branch) -> Unit {
+  sb.write_string("{\"branch\":")
+  map_node(sb, branch.id, branch.skeleton)
   sb.write_string(",\"children\":[")
-  for k, c in node.children {
+  for k, c in branch.children {
     if k > 0 {
       sb.write_string(",")
     }
@@ -616,7 +616,7 @@ Run: `pnpm run core`
 （cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`。別のワークツリーから叩くと旧 core を測る）
 Expected: `Finished.` EXIT=0（`exports.mbt` がまだ無いので中身は空）
 
-Run: `node -e "import('./core/_build/js/release/build/tree/js/js.js').then(m=>console.log(Object.keys(m))).catch(e=>console.log('ERR', e.code))"`
+Run: `branch -e "import('./core/_build/js/release/build/tree/js/js.js').then(m=>console.log(Object.keys(m))).catch(e=>console.log('ERR', e.code))"`
 （**この 2 行の Expected は未実測**。空の foreign_library に対して `pnpm run core` が通るか、生成物が出るかは moon の版に依る。実際の出力を見てから Expected を確定させ、落ちる場合は `exports.mbt` を置く順を先に回すこと。合格条件は次の Step 4 の緑）
 （cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: `[]`
@@ -785,8 +785,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 新 core �
 // 法則 2: serialize(parse(md)) は 2 回目から不動 … これがフォーマットの定義。
 // 法則 3: map へ出る口は project 1 本 … 境界の輸出そのものを数えて固定する。
 
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { test } from "branch:test";
+import assert from "branch:assert/strict";
 import { apply, doc, mbt } from "./_tree.ts";
 
 test("境界: 反映は ok / reason / text / edits の 4 つを返し、edits は text へ届く", () => {
@@ -803,7 +803,7 @@ test("境界: check は破れの配列、project は trees と buried を返す"
   assert.deepEqual(doc.check("# r\n"), []);
   const m = doc.project("# r\n");
   assert.equal(m.trees.length, 1);
-  assert.equal(m.trees[0]!.node.label, "r");
+  assert.equal(m.trees[0]!.branch.label, "r");
   assert.equal(m.buried, 0);
 });
 
@@ -840,8 +840,8 @@ Expected: `ERR_MODULE_NOT_FOUND` / `Cannot find module` … `test/_tree.ts`。
 //
 // 出力が無いと ERR_MODULE_NOT_FOUND で落ちる。先に `pnpm run core` を実行すること。
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync, statSync } from "branch:fs";
+import { join } from "branch:path";
 import * as mbt from "../core/_build/js/release/build/tree/js/js.js";
 
 /** 法則 3（map への矢印は project 1 本）を数えるために名前空間ごと出す */
@@ -896,12 +896,12 @@ export interface MapNode {
 }
 
 export interface MapBranch {
-  readonly node: MapNode;
+  readonly branch: MapNode;
   readonly children: readonly MapBranch[];
 }
 
 export interface MapTree {
-  readonly node: MapNode;
+  readonly branch: MapNode;
   readonly right: readonly MapBranch[];
   readonly left: readonly MapBranch[];
 }
@@ -1603,7 +1603,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 法則 1 �
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/laws_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` / `Center` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol` /
+- Consumes: `Doc` / `Center` / `Slot` / `Branch` / `Skeleton` / `Form` / `Side` / `Eol` /
   `Block` / `Content` / `first_id` / `check` / `sig`（G1）、`parse`（G2）、
   `serialize`（G3）、`strings`（Task 60）
 - Produces: なし（法則の固定）
@@ -1713,44 +1713,44 @@ fn law_skeleton(r : Law, form : Form) -> Skeleton {
 /// 兄弟の列。項目が先・見出しが後（順序法則）で、Implicit は
 /// 項目の走りの直後に高々 1 つ（前の兄弟がすべて項目という位置の条件）。
 /// 項目の親の下は項目だけ（単調性）。
-fn law_nodes(r : Law, parent : Form, depth : Int) -> Array[Node] {
-  let out : Array[Node] = []
+fn law_branches(r : Law, parent : Form, depth : Int) -> Array[Branch] {
+  let out : Array[Branch] = []
   if depth <= 0 {
     return out
   }
   for _ in 0..<law_pick(r, 3) {
-    out.push(law_node(r, Item, depth - 1))
+    out.push(law_branch(r, Item, depth - 1))
   }
   if parent is Heading {
     if law_pick(r, 3) == 0 {
-      let kids : Array[Node] = []
+      let kids : Array[Branch] = []
       for _ in 0..<(1 + law_pick(r, 2)) {
-        kids.push(law_node(r, Heading, depth - 1))
+        kids.push(law_branch(r, Heading, depth - 1))
       }
       out.push({ id: law_id(r), skeleton: Implicit, children: kids })
     }
     for _ in 0..<law_pick(r, 3) {
-      out.push(law_node(r, Heading, depth - 1))
+      out.push(law_branch(r, Heading, depth - 1))
     }
   }
   out
 }
 
 ///|
-fn law_node(r : Law, form : Form, depth : Int) -> Node {
+fn law_branch(r : Law, form : Form, depth : Int) -> Branch {
   {
     id: law_id(r),
     skeleton: law_skeleton(r, form),
-    children: law_nodes(r, form, depth),
+    children: law_branches(r, form, depth),
   }
 }
 
 ///|
 /// スロットの列。側は場所の属性なので、ここで初めて付く。
-fn law_branches(r : Law, parent : Form, depth : Int) -> Array[Branch] {
-  let out : Array[Branch] = []
-  for n in law_nodes(r, parent, depth) {
-    out.push({ side: law_side(r), node: n })
+fn law_slots(r : Law, parent : Form, depth : Int) -> Array[Slot] {
+  let out : Array[Slot] = []
+  for n in law_branches(r, parent, depth) {
+    out.push({ side: law_side(r), branch: n })
   }
   out
 }
@@ -1758,11 +1758,11 @@ fn law_branches(r : Law, parent : Form, depth : Int) -> Array[Branch] {
 ///|
 /// Implicit の center は子を持つ限りにおいて存在し、その子はすべて見出し。
 fn law_implicit_center(r : Law, depth : Int) -> Center {
-  let branches : Array[Branch] = []
+  let slots : Array[Slot] = []
   for _ in 0..<(1 + law_pick(r, 2)) {
-    branches.push({ side: law_side(r), node: law_node(r, Heading, depth - 1) })
+    slots.push({ side: law_side(r), branch: law_branch(r, Heading, depth - 1) })
   }
-  { id: law_id(r), skeleton: Implicit, branches }
+  { id: law_id(r), skeleton: Implicit, slots }
 }
 
 ///|
@@ -1778,7 +1778,7 @@ fn law_doc(seed : Int, depth : Int) -> Doc {
     centers.push({
       id: law_id(r),
       skeleton: law_skeleton(r, Item),
-      branches: law_branches(r, Item, depth),
+      slots: law_slots(r, Item, depth),
     })
   }
   if law_pick(r, 3) == 0 {
@@ -1788,7 +1788,7 @@ fn law_doc(seed : Int, depth : Int) -> Doc {
     centers.push({
       id: law_id(r),
       skeleton: law_skeleton(r, Heading),
-      branches: law_branches(r, Heading, depth),
+      slots: law_slots(r, Heading, depth),
     })
   }
   {
@@ -1913,8 +1913,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 木を種�
 // READING の期待指紋は契約 §8 の文法と §15 の裁定から導いたもの。実装と食い違ったら、
 // どちらが正しいかを §8・§15 に照らして決める（テストを黙って書き換えない）。
 
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { test } from "branch:test";
+import assert from "branch:assert/strict";
 import { parser } from "@lezer/markdown";
 import { doc, type MapBranch } from "./_tree.ts";
 
@@ -1940,12 +1940,12 @@ function outerSkeletons(md: string): number {
 function mmmSkeletons(md: string): number {
   let n = 0;
   const walk = (b: MapBranch): void => {
-    if (!b.node.implied) n++;
+    if (!b.branch.implied) n++;
     for (const c of b.children) walk(c);
   };
   const m = doc.project(md);
   for (const t of m.trees) {
-    if (!t.node.implied) n++;
+    if (!t.branch.implied) n++;
     for (const b of t.right) walk(b);
     for (const b of t.left) walk(b);
   }
@@ -2173,8 +2173,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 方言の�
 // 指紋の逐語は契約 §8 の文法から導いたもの。実装と食い違ったら、
 // どちらが正しいかを §8 に照らして決めること（テストを黙って書き換えない）。
 
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { test } from "branch:test";
+import assert from "branch:assert/strict";
 import { cardText, doc } from "./_tree.ts";
 
 /** ラベルから id を引く。無ければ分かりやすく落とす */
@@ -2182,21 +2182,21 @@ function idOf(md: string, label: string): number {
   const m = doc.project(md);
   let found = -1;
   const walk = (n: {
-    node: { id: number; label: string };
+    branch: { id: number; label: string };
     children: readonly unknown[];
   }): void => {
-    if (n.node.label === label && found < 0) found = n.node.id;
+    if (n.branch.label === label && found < 0) found = n.branch.id;
     for (const c of n.children) {
       walk(
         c as {
-          node: { id: number; label: string };
+          branch: { id: number; label: string };
           children: readonly unknown[];
         },
       );
     }
   };
   for (const t of m.trees) {
-    if (t.node.label === label && found < 0) found = t.node.id;
+    if (t.branch.label === label && found < 0) found = t.branch.id;
     for (const b of t.right) walk(b);
     for (const b of t.left) walk(b);
   }
@@ -2260,7 +2260,7 @@ test("C6: 階層飛びは構造なので正規形でも残る（読みの固定�
   assert.equal(doc.format(md), md);
   // 飛びは implied として map に居る（md には何も書かれない）
   const m = doc.project(md);
-  assert.equal(m.trees[0]!.right[0]!.children[0]!.node.implied, true);
+  assert.equal(m.trees[0]!.right[0]!.children[0]!.branch.implied, true);
 });
 
 test("C7: 飾りの水平線 — v0 は全文正規形なので `***` へ寄る", () => {
@@ -2312,7 +2312,7 @@ test("C9: format — 明示の全文正規化。意味は 1 ビットも変わ�
   assert.equal(doc.format(out), out);
   // インデントコードは info 無しの Code カードとして箱に載る
   assert.equal(
-    cardText(doc.project(md).trees[0]!.right[1]!.node.cards[0]!),
+    cardText(doc.project(md).trees[0]!.right[1]!.branch.cards[0]!),
     "code",
   );
 });
@@ -2377,7 +2377,7 @@ test("C15: 全リストの map — Item center と content indent のトグル",
 test("C16: implied スロットへの flipSide — 昇格は不要", () => {
   const md = "# r\n\n#### b\n";
   assert.equal(doc.sig(md), "D-n()[Reh_1:r()[>Ni[Ni[Neh_1:b()[]]]]]");
-  const slot = doc.project(md).trees[0]!.right[0]!.node.id;
+  const slot = doc.project(md).trees[0]!.right[0]!.branch.id;
   const r = doc.flipSide(md, [slot]);
   assert.equal(r.ok, true, r.reason);
   assert.equal(r.text, "# r\n\n---\n\n#### b\n");
@@ -2390,8 +2390,8 @@ test("C17: 項目 center の後ろの見出し — Item の子にはならない
   assert.equal(doc.format(md), md);
   const m = doc.project(md);
   assert.equal(m.trees.length, 2);
-  assert.equal(m.trees[0]!.node.implied, false);
-  assert.equal(m.trees[1]!.node.implied, true);
+  assert.equal(m.trees[0]!.branch.implied, false);
+  assert.equal(m.trees[1]!.branch.implied, true);
 });
 ```
 
@@ -2569,8 +2569,8 @@ G5 は着手しない。見る性質は 5 つ:
 // 操作の性質。ランダムな文書に木の道を通し、法則が操作の後でも立つことを見る。
 // 期待出力は 1 つも手書きしない — 見るのは「操作と法則の関係」だけ。
 
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { test } from "branch:test";
+import assert from "branch:assert/strict";
 import {
   apply,
   brief,
@@ -2586,11 +2586,11 @@ import {
 function idsOf(map: Mindmap): number[] {
   const out: number[] = [];
   const walk = (b: MapBranch): void => {
-    out.push(b.node.id);
+    out.push(b.branch.id);
     for (const c of b.children) walk(c);
   };
   for (const t of map.trees) {
-    out.push(t.node.id);
+    out.push(t.branch.id);
     for (const b of t.right) walk(b);
     for (const b of t.left) walk(b);
   }
@@ -2655,7 +2655,7 @@ test("move — 文書を親にしても、ノードを親にしても法則が�
     if (ids.length < 2) continue;
     const from = ids[i % ids.length]!;
     const to = ids[(i + 1) % ids.length]!;
-    holds(md, doc.moveNodes(md, [from], to, 0, false), "move→node");
+    holds(md, doc.moveNodes(md, [from], to, 0, false), "move→branch");
     holds(md, doc.moveNodes(md, [from], 1, 0, true), "move→doc");
   }
 });
@@ -2686,9 +2686,9 @@ test("無操作は無編集 — 正規形の文書を同じ場所へ動かして
     if (map.trees.length === 0) continue;
     const center = map.trees[0]!;
     if (center.right.length === 0) continue;
-    if (center.left.length > 0) continue; // at は branches の index。バケツの index ではない
-    const first = center.right[0]!.node.id;
-    const r = doc.moveNodes(md, [first], center.node.id, 0, false);
+    if (center.left.length > 0) continue; // at は slots の index。バケツの index ではない
+    const first = center.right[0]!.branch.id;
+    const r = doc.moveNodes(md, [first], center.branch.id, 0, false);
     holds(md, r, "同位置への move");
     if (r.ok) {
       assert.equal(r.text, md, `同位置への move は無編集: ${brief(md)}`);

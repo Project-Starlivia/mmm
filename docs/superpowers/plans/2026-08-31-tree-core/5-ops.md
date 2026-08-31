@@ -24,9 +24,9 @@
 
 依存順は `G1 → (G2 / G3) → G5 → G4`。**G5 は G2・G3 の後、G4 の前**。
 
-- **G1 が終わっていること。** `Doc` / `Center` / `Branch` / `Node` / `Skeleton` / `Side` /
+- **G1 が終わっていること。** `Doc` / `Center` / `Slot` / `Branch` / `Skeleton` / `Side` /
   `Verdict` / `doc_id`（`core/tree/doc.mbt`）、`sig`（`sig.mbt`）、`check` と `is_item`
-  （`check.mbt`）、木を組む `make_doc` / `make_center` / `make_branch` / `make_node` /
+  （`check.mbt`）、木を組む `make_doc` / `make_center` / `make_slot` / `make_branch` /
   `make_head` / `make_item`（`make_wbtest.mbt`）を使う。`is_item` と `make_*` は private だが
   同一パッケージなので見える
 - **G2 の `parse` と G3 の `serialize` が置かれていること。** Task 92 の `reflect` が実際に呼ぶ。
@@ -60,17 +60,17 @@ T92 だけが G2・G3 を待つ。
 
 | 名前 | 何 | 容器の腕 |
 |---|---|---|
-| `Sub` | 運搬の通貨 `Whole(Center) \| Limb(Node)` | — |
+| `Sub` | 運搬の通貨 `Whole(Center) \| Part(Branch)` | — |
 | `resolve(doc, id) -> Array[Int]?` | id → 居場所 | 0 |
-| `find_in(node, id) -> Array[Int]?` | resolve の下請け | 0 |
-| `node_at(doc, path) -> Node` | 深さ 2 以降のノードそのもの | 1 |
+| `find_in(branch, id) -> Array[Int]?` | resolve の下請け | 0 |
+| `branch_at(doc, path) -> Branch` | 深さ 2 以降のノードそのもの | 1 |
 | `kin_at(doc, path) -> Array[Skeleton]` | path が居る列（自分を含む兄弟）の骨格 | 3 |
 | `parent_at(doc, path) -> Skeleton?` | 親の骨格（None = 文書）。`kin_at` の上に建つ | 0 |
 | `pluck(doc, path) -> Sub?` | 抜く | 3 |
 | `graft(doc, parent, at, sub, side)` | 挿す + 変換の唯一の住所 | 3 |
 | `amend(doc, path, f)` | 骨格を書き替える | 3 |
 | `set_side(doc, i, j, side)` | スロットの側を差し替える | 1 |
-| `as_center(sub) -> Center` / `as_node(sub) -> Node` | graft の変換 2 本 | — |
+| `as_center(sub) -> Center` / `as_branch(sub) -> Branch` | graft の変換 2 本 | — |
 
 **`core/tree/op.mbt`**
 
@@ -88,7 +88,7 @@ T92 だけが G2・G3 を待つ。
 
 - `tool_wbtest.mbt`: `tool_doc` / `tool_fold`
 - `op_wbtest.mbt`: `op_doc` / `op_implied` / `op_shape` / `op_limb` / `op_forms` /
-  `op_form_node` / `op_mark` / `op_said`
+  `op_form_branch` / `op_mark` / `op_said`
 - `diff_wbtest.mbt`: `diff_holds`
 
 **`op_head` / `op_item` は作らない。** G1 の `make_head` / `make_item` を呼ぶ
@@ -243,7 +243,7 @@ center の鏡像で 1 回、枝自身で もう 1 回反転して `>3` に戻る
 
 ---
 
-## Task 80: 道具の座標系 — Sub / resolve / node_at
+## Task 80: 道具の座標系 — Sub / resolve / branch_at
 
 **Files:**
 - Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool.mbt`
@@ -251,13 +251,13 @@ center の鏡像で 1 回、枝自身で もう 1 回反転して `>3` に戻る
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` / `Center` / `Branch` / `Node` / `Skeleton` / `Side`（G1 の `doc.mbt`）、
+- Consumes: `Doc` / `Center` / `Slot` / `Branch` / `Skeleton` / `Side`（G1 の `doc.mbt`）、
   `sig(doc) -> String`（G1 の `sig.mbt`）、
-  `make_doc` / `make_center` / `make_branch` / `make_node` / `make_head`（G1 の `make_wbtest.mbt`）
-- Produces: `priv enum Sub { Whole(Center); Limb(Node) }` /
+  `make_doc` / `make_center` / `make_slot` / `make_branch` / `make_head`（G1 の `make_wbtest.mbt`）
+- Produces: `priv enum Sub { Whole(Center); Part(Branch) }` /
   `fn resolve(doc : Doc, id : Int) -> Array[Int]?` /
-  `fn find_in(node : Node, id : Int) -> Array[Int]?` /
-  `fn node_at(doc : Doc, path : ArrayView[Int]) -> Node`
+  `fn find_in(branch : Branch, id : Int) -> Array[Int]?` /
+  `fn branch_at(doc : Doc, path : ArrayView[Int]) -> Branch`
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -271,11 +271,11 @@ center の鏡像で 1 回、枝自身で もう 1 回反転して `>3` に戻る
 fn tool_doc() -> Doc {
   make_doc([
     make_center(2, make_head("r"), [
-      make_branch(
+      make_slot(
         Right,
-        make_node(3, make_head("a"), [make_node(4, make_head("x"), [])]),
+        make_branch(3, make_head("a"), [make_branch(4, make_head("x"), [])]),
       ),
-      make_branch(Left, make_node(5, make_head("b"), [])),
+      make_slot(Left, make_branch(5, make_head("b"), [])),
     ]),
   ])
 }
@@ -316,10 +316,10 @@ The value identifier resolve is unbound.
 
 ///|
 /// 運搬の通貨。**一度しか graft してはならない**（struct は参照なので、
-/// 二度挿すと中の Node が物理共有される）。この型は op の外に出ない。
+/// 二度挿すと中の Branch が物理共有される）。この型は op の外に出ない。
 priv enum Sub {
   Whole(Center)
-  Limb(Node)
+  Part(Branch)
 }
 
 ///|
@@ -329,8 +329,8 @@ fn resolve(doc : Doc, id : Int) -> Array[Int]? {
     if r.id == id {
       return Some([i])
     }
-    for j, b in r.branches {
-      if find_in(b.node, id) is Some(tail) {
+    for j, b in r.slots {
+      if find_in(b.branch, id) is Some(tail) {
         let path = [i, j]
         path.append(tail)
         return Some(path)
@@ -341,11 +341,11 @@ fn resolve(doc : Doc, id : Int) -> Array[Int]? {
 }
 
 ///|
-fn find_in(node : Node, id : Int) -> Array[Int]? {
-  if node.id == id {
+fn find_in(branch : Branch, id : Int) -> Array[Int]? {
+  if branch.id == id {
     return Some([])
   }
-  for k, c in node.children {
+  for k, c in branch.children {
     if find_in(c, id) is Some(tail) {
       let path = [k]
       path.append(tail)
@@ -357,9 +357,9 @@ fn find_in(node : Node, id : Int) -> Array[Int]? {
 
 ///|
 /// 深さ 2 以降のノードそのもの。道具が共有する唯一の座標系。
-fn node_at(doc : Doc, path : ArrayView[Int]) -> Node {
+fn branch_at(doc : Doc, path : ArrayView[Int]) -> Branch {
   guard! path is [i, j, .. rest]
-  let mut n = doc.centers[i].branches[j].node
+  let mut n = doc.centers[i].slots[j].branch
   for k in rest {
     n = n.children[k]
   }
@@ -374,7 +374,7 @@ Run:
 moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/tool_wbtest.mbt
 ```
 Expected: `Total tests: 1, passed: 1, failed: 0.` EXIT=0（**G5 の累計 1 本**）。
-`Warning: [0001] Unused function 'node_at'` が 1 本出るが、Task 81 で消える。
+`Warning: [0001] Unused function 'branch_at'` が 1 本出るが、Task 81 で消える。
 
 - [ ] **Step 5: コミット**
 
@@ -394,7 +394,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 道具の�
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `node_at(doc : Doc, path : ArrayView[Int]) -> Node`
+- Consumes: `branch_at(doc : Doc, path : ArrayView[Int]) -> Branch`
 - Produces: `fn kin_at(doc : Doc, path : Array[Int]) -> Array[Skeleton]` /
   `fn parent_at(doc : Doc, path : Array[Int]) -> Skeleton?`
 
@@ -414,7 +414,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 道具の�
 test "kin_at は path が居る列を、parent_at はその親を返す" {
   let doc = tool_doc()
   assert_eq(kin_at(doc, [0]).length(), 1) // 文書直下 = centers
-  assert_eq(kin_at(doc, [0, 0]).length(), 2) // center 直下 = branches
+  assert_eq(kin_at(doc, [0, 0]).length(), 2) // center 直下 = slots
   assert_eq(kin_at(doc, [0, 0, 0]).length(), 1) // 以深 = children
   assert_eq(kin_at(doc, []).length(), 0)
   // 親が居ない（文書）ときだけ None
@@ -438,7 +438,7 @@ The value identifier kin_at is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/tree/tool.mbt` の `node_at` の直後に足す。
+`core/tree/tool.mbt` の `branch_at` の直後に足す。
 
 ```moonbit
 ///|
@@ -448,8 +448,8 @@ fn kin_at(doc : Doc, path : Array[Int]) -> Array[Skeleton] {
   match path {
     [] => []
     [_] => doc.centers.map(fn(r) { r.skeleton })
-    [i, _] => doc.centers[i].branches.map(fn(b) { b.node.skeleton })
-    [.. head, _] => node_at(doc, head).children.map(fn(c) { c.skeleton })
+    [i, _] => doc.centers[i].slots.map(fn(b) { b.branch.skeleton })
+    [.. head, _] => branch_at(doc, head).children.map(fn(c) { c.skeleton })
   }
 }
 
@@ -491,18 +491,18 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 行き先�
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Sub` / `node_at` / `sig(doc) -> String`
+- Consumes: `Sub` / `branch_at` / `sig(doc) -> String`
 - Produces: `fn pluck(doc : Doc, path : Array[Int]) -> Sub?` /
   `fn graft(doc : Doc, parent : Array[Int], at : Int, sub : Sub, side : Side) -> Unit` /
-  `fn as_center(sub : Sub) -> Center` / `fn as_node(sub : Sub) -> Node`
+  `fn as_center(sub : Sub) -> Center` / `fn as_branch(sub : Sub) -> Branch`
 
 変換表（契約 §11）:
 
-| 行き先 | `Whole(Center)` | `Limb(Node)` |
+| 行き先 | `Whole(Center)` | `Part(Branch)` |
 |---|---|---|
-| doc（`parent = []`） | 無変換。sides が無傷で旅する | **Center 化** — children を `Branch(Right)` で包む。`side` 引数は使わない |
-| center（`parent = [i]`） | **解体** — branches を捨てて children にする。新しい side は**引数**が決める | `Branch(side)` で包む |
-| node（2 段以上） | **解体**。`side` 引数は捨てられる | そのまま。`side` 引数は捨てられる |
+| doc（`parent = []`） | 無変換。sides が無傷で旅する | **Center 化** — children を `Slot(Right)` で包む。`side` 引数は使わない |
+| center（`parent = [i]`） | **解体** — slots を捨てて children にする。新しい side は**引数**が決める | `Slot(side)` で包む |
+| branch（2 段以上） | **解体**。`side` 引数は捨てられる | そのまま。`side` 引数は捨てられる |
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -520,8 +520,8 @@ test "pluck は抜いた瞬間 doc から消え、graft が行き先で側を決
 }
 
 ///|
-/// 変換の唯一の住所。Limb を文書へ挿すと Center 化し、children が Right の枝になる。
-test "graft は Limb を文書へ挿すとき Center 化する" {
+/// 変換の唯一の住所。Part を文書へ挿すと Center 化し、children が Right の枝になる。
+test "graft は Part を文書へ挿すとき Center 化する" {
   let doc = tool_doc()
   guard pluck(doc, [0, 0]) is Some(sub) else { abort("no sub") }
   graft(doc, [], 0, sub, Left)
@@ -544,18 +544,18 @@ The value identifier pluck is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/tree/tool.mbt` の `parent_at` の直後に足す（`as_center` / `as_node` はファイル末尾）。
+`core/tree/tool.mbt` の `parent_at` の直後に足す（`as_center` / `as_branch` はファイル末尾）。
 
 ```moonbit
 ///|
-/// 抜き取る。容器 3 腕（centers / branches / children）。
+/// 抜き取る。容器 3 腕（centers / slots / children）。
 /// **抜いた瞬間 doc から消える** — graft までの間に落とすと木が壊れる。
 fn pluck(doc : Doc, path : Array[Int]) -> Sub? {
   match path {
     [] => None
     [i] => Some(Whole(doc.centers.remove(i)))
-    [i, j] => Some(Limb(doc.centers[i].branches.remove(j).node))
-    [.. head, last] => Some(Limb(node_at(doc, head).children.remove(last)))
+    [i, j] => Some(Part(doc.centers[i].slots.remove(j).branch))
+    [.. head, last] => Some(Part(branch_at(doc, head).children.remove(last)))
   }
 }
 
@@ -571,8 +571,8 @@ fn graft(
 ) -> Unit {
   match parent {
     [] => doc.centers.insert(at, as_center(sub))
-    [i] => doc.centers[i].branches.insert(at, { side, node: as_node(sub) })
-    _ => node_at(doc, parent[:]).children.insert(at, as_node(sub))
+    [i] => doc.centers[i].slots.insert(at, { side, branch: as_branch(sub) })
+    _ => branch_at(doc, parent[:]).children.insert(at, as_branch(sub))
   }
 }
 ```
@@ -581,30 +581,30 @@ fn graft(
 
 ```moonbit
 ///|
-/// doc へ: Limb → Center 化（children を Branch(Right) で包む）/ Whole → 無変換
+/// doc へ: Part → Center 化（children を Slot(Right) で包む）/ Whole → 無変換
 fn as_center(sub : Sub) -> Center {
   match sub {
     Whole(r) => r
-    Limb(n) =>
+    Part(n) =>
       {
         id: n.id,
         skeleton: n.skeleton,
-        branches: n.children.map(fn(c) { { side: Right, node: c } }),
+        slots: n.children.map(fn(c) { { side: Right, branch: c } }),
       }
   }
 }
 
 ///|
-/// center / node へ: Whole → 解体（sides は深さの物理で消滅）/ Limb → そのまま
-fn as_node(sub : Sub) -> Node {
+/// center / branch へ: Whole → 解体（sides は深さの物理で消滅）/ Part → そのまま
+fn as_branch(sub : Sub) -> Branch {
   match sub {
     Whole(r) =>
       {
         id: r.id,
         skeleton: r.skeleton,
-        children: r.branches.map(fn(b) { b.node }),
+        children: r.slots.map(fn(b) { b.branch }),
       }
-    Limb(n) => n
+    Part(n) => n
   }
 }
 ```
@@ -635,7 +635,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 抜き挿�
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `node_at` / `Skeleton` / `Side`
+- Consumes: `branch_at` / `Skeleton` / `Side`
 - Produces: `fn amend(doc : Doc, path : Array[Int], f : (Skeleton) -> Skeleton) -> Unit` /
   `fn set_side(doc : Doc, i : Int, j : Int, side : Side) -> Unit`
 
@@ -654,7 +654,7 @@ fn tool_fold(skeleton : Skeleton) -> Skeleton {
 }
 
 ///|
-/// 3 つの容器のどこでも同じ 1 本で届く。`[i, j]` だけ Branch と Node の 2 段を包み直す。
+/// 3 つの容器のどこでも同じ 1 本で届く。`[i, j]` だけ Slot と Branch の 2 段を包み直す。
 test "amend は 3 つの容器のどこでも骨格を書き替える" {
   let doc = tool_doc()
   amend(doc, [0], tool_fold)
@@ -691,8 +691,8 @@ The value identifier amend is unbound.
 
 ```moonbit
 ///|
-/// 骨格を書き替える。容器 3 腕 — `[i, j]` だけは Branch と Node の 2 段を包み直す。
-/// （`Branch` に `mut node` を 1 つ足せば 2 段包みが消える。腕が 4 本目になったら検討する）
+/// 骨格を書き替える。容器 3 腕 — `[i, j]` だけは Slot と Branch の 2 段を包み直す。
+/// （`Slot` に `mut branch` を 1 つ足せば 2 段包みが消える。腕が 4 本目になったら検討する）
 fn amend(doc : Doc, path : Array[Int], f : (Skeleton) -> Skeleton) -> Unit {
   match path {
     [] => ()
@@ -701,14 +701,14 @@ fn amend(doc : Doc, path : Array[Int], f : (Skeleton) -> Skeleton) -> Unit {
       doc.centers[i] = { ..r, skeleton: f(r.skeleton) }
     }
     [i, j] => {
-      let b = doc.centers[i].branches[j]
-      doc.centers[i].branches[j] = {
+      let b = doc.centers[i].slots[j]
+      doc.centers[i].slots[j] = {
         ..b,
-        node: { ..b.node, skeleton: f(b.node.skeleton) },
+        branch: { ..b.branch, skeleton: f(b.branch.skeleton) },
       }
     }
     [.. head, last] => {
-      let owner = node_at(doc, head)
+      let owner = branch_at(doc, head)
       let n = owner.children[last]
       owner.children[last] = { ..n, skeleton: f(n.skeleton) }
     }
@@ -718,8 +718,8 @@ fn amend(doc : Doc, path : Array[Int], f : (Skeleton) -> Skeleton) -> Unit {
 ///|
 /// スロットの側を差し替える（side は場所の属性なので amend では届かない）。
 fn set_side(doc : Doc, i : Int, j : Int, side : Side) -> Unit {
-  let b = doc.centers[i].branches[j]
-  doc.centers[i].branches[j] = { ..b, side, }
+  let b = doc.centers[i].slots[j]
+  doc.centers[i].slots[j] = { ..b, side, }
 }
 ```
 
@@ -751,7 +751,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 骨格と�
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `resolve` / `node_at` / `doc_id`（G1）、`make_*`（G1 の `make_wbtest.mbt`）
+- Consumes: `resolve` / `branch_at` / `doc_id`（G1）、`make_*`（G1 の `make_wbtest.mbt`）
 - Produces: `fn crown(doc : Doc, ids : Array[Int]) -> Array[Int]` /
   `fn ahead(a : Array[Int], b : Array[Int]) -> Bool` /
   `fn under(path : Array[Int], anc : Array[Int]) -> Bool` /
@@ -781,15 +781,15 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 骨格と�
 fn op_doc() -> Doc {
   make_doc([
     make_center(2, make_head("r"), [
-      make_branch(
+      make_slot(
         Right,
-        make_node(3, make_head("a"), [
-          make_node(4, make_head("x"), [make_node(5, make_head("y"), [])]),
+        make_branch(3, make_head("a"), [
+          make_branch(4, make_head("x"), [make_branch(5, make_head("y"), [])]),
         ]),
       ),
     ]),
     make_center(6, make_head("s"), [
-      make_branch(Left, make_node(7, make_head("b"), [])),
+      make_slot(Left, make_branch(7, make_head("b"), [])),
     ]),
   ])
 }
@@ -799,10 +799,10 @@ fn op_doc() -> Doc {
 fn op_implied() -> Doc {
   make_doc([
     make_center(2, make_head("r"), [
-      make_branch(
+      make_slot(
         Left,
-        make_node(3, Implicit, [
-          make_node(4, Implicit, [make_node(5, make_head("b"), [])]),
+        make_branch(3, Implicit, [
+          make_branch(4, Implicit, [make_branch(5, make_head("b"), [])]),
         ]),
       ),
     ]),
@@ -821,7 +821,7 @@ fn op_shape(doc : Doc) -> String {
     sb.write_string("R")
     sb.write_string(r.id.to_string())
     sb.write_string("[")
-    for j, b in r.branches {
+    for j, b in r.slots {
       if j > 0 {
         sb.write_string(" ")
       }
@@ -831,7 +831,7 @@ fn op_shape(doc : Doc) -> String {
           Left => "<"
         },
       )
-      op_limb(sb, b.node)
+      op_limb(sb, b.branch)
     }
     sb.write_string("]")
   }
@@ -840,11 +840,11 @@ fn op_shape(doc : Doc) -> String {
 }
 
 ///|
-fn op_limb(sb : StringBuilder, node : Node) -> Unit {
-  sb.write_string(node.id.to_string())
-  if !node.children.is_empty() {
+fn op_limb(sb : StringBuilder, branch : Branch) -> Unit {
+  sb.write_string(branch.id.to_string())
+  if !branch.children.is_empty() {
     sb.write_string("(")
-    for k, c in node.children {
+    for k, c in branch.children {
       if k > 0 {
         sb.write_string(" ")
       }
@@ -860,18 +860,18 @@ fn op_forms(doc : Doc) -> String {
   let sb = StringBuilder::new()
   for r in doc.centers {
     sb.write_string(op_mark(r.skeleton))
-    for b in r.branches {
-      op_form_node(sb, b.node)
+    for b in r.slots {
+      op_form_branch(sb, b.branch)
     }
   }
   sb.to_string()
 }
 
 ///|
-fn op_form_node(sb : StringBuilder, node : Node) -> Unit {
-  sb.write_string(op_mark(node.skeleton))
-  for c in node.children {
-    op_form_node(sb, c)
+fn op_form_branch(sb : StringBuilder, branch : Branch) -> Unit {
+  sb.write_string(op_mark(branch.skeleton))
+  for c in branch.children {
+    op_form_branch(sb, c)
   }
 }
 
@@ -1012,8 +1012,8 @@ fn dest(doc : Doc, parent : Int) -> Array[Int]? {
 fn clamp(doc : Doc, parent : Array[Int], at : Int) -> Int {
   let len = match parent {
     [] => doc.centers.length()
-    [i] => doc.centers[i].branches.length()
-    _ => node_at(doc, parent[:]).children.length()
+    [i] => doc.centers[i].slots.length()
+    _ => branch_at(doc, parent[:]).children.length()
   }
   if at < 0 {
     0
@@ -1092,7 +1092,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 頂点集�
 **Interfaces:**
 - Consumes: `crown` / `resolve` / `pluck` / `pick` / `missing` / `check`（G1）
 - Produces: `pub fn delete_nodes(doc : Doc, ids : Array[Int]) -> Verdict` /
-  `fn prune(doc : Doc) -> Unit` / `fn alive(node : Node) -> Bool`
+  `fn prune(doc : Doc) -> Unit` / `fn alive(branch : Branch) -> Bool`
 
 > **回復の範囲（抜いた側）**: 木から要素を取り除いても、順序法則（条件 5）も
 > Implicit の位置（条件 3）も単調性（条件 6）も破れない — 並びは変わらないから。
@@ -1133,7 +1133,7 @@ test "子を失った Implicit は連鎖ごと導出されなくなる" {
 test "Implicit の center も子を失えば消える" {
   let doc = make_doc([
     make_center(2, Implicit, [
-      make_branch(Right, make_node(3, make_head("h"), [])),
+      make_slot(Right, make_branch(3, make_head("h"), [])),
     ]),
   ])
   assert_eq(op_said(delete_nodes(doc, [3])), "ok")
@@ -1182,16 +1182,16 @@ pub fn delete_nodes(doc : Doc, ids : Array[Int]) -> Verdict {
 /// 導出されなくなる（憲法 §2 の存在条件）。深いほうから掃くので連鎖が 1 回で消える。
 fn prune(doc : Doc) -> Unit {
   for r in doc.centers {
-    r.branches.retain(fn(b) { alive(b.node) })
+    r.slots.retain(fn(b) { alive(b.branch) })
   }
-  doc.centers.retain(fn(r) { !(r.skeleton is Implicit) || !r.branches.is_empty() })
+  doc.centers.retain(fn(r) { !(r.skeleton is Implicit) || !r.slots.is_empty() })
 }
 
 ///|
 /// 子を先に掃いてから自分を判定する（下から上へ）。
-fn alive(node : Node) -> Bool {
-  node.children.retain(alive)
-  !(node.skeleton is Implicit) || !node.children.is_empty()
+fn alive(branch : Branch) -> Bool {
+  branch.children.retain(alive)
+  !(branch.skeleton is Implicit) || !branch.children.is_empty()
 }
 ```
 
@@ -1321,13 +1321,13 @@ pub fn flip_side(doc : Doc, ids : Array[Int]) -> Verdict {
   for id in tops {
     match resolve(doc, id) {
       Some([i]) => {
-        for j, b in doc.centers[i].branches {
+        for j, b in doc.centers[i].slots {
           set_side(doc, i, j, flipped(b.side))
         }
         hit = true
       }
       Some([i, j]) => {
-        set_side(doc, i, j, flipped(doc.centers[i].branches[j].side))
+        set_side(doc, i, j, flipped(doc.centers[i].slots[j].side))
         hit = true
       }
       _ => ()
@@ -1406,17 +1406,17 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 側の反�
 test "conform は Item 親の下でサブツリーごと項目にする" {
   let doc = make_doc([
     make_center(2, make_item("c"), [
-      make_branch(Right, make_node(3, make_item("a"), [])),
+      make_slot(Right, make_branch(3, make_item("a"), [])),
     ]),
     make_center(6, make_head("s"), [
-      make_branch(
+      make_slot(
         Right,
-        make_node(7, make_head("b"), [make_node(8, make_head("d"), [])]),
+        make_branch(7, make_head("b"), [make_branch(8, make_head("d"), [])]),
       ),
     ]),
   ])
   assert_eq(op_forms(doc), "llhhh")
-  // node 3（Item）の子として 7 を置く
+  // branch 3（Item）の子として 7 を置く
   guard pluck(doc, [1, 0]) is Some(sub) else { abort("no sub") }
   graft(doc, [0, 0], 0, sub, Right)
   conform(doc, [0, 0, 0])
@@ -1429,11 +1429,11 @@ test "conform は Item 親の下でサブツリーごと項目にする" {
 test "conform は見出しの兄弟の後ろで頂点だけ見出しにする" {
   let doc = make_doc([
     make_center(2, make_head("r"), [
-      make_branch(
+      make_slot(
         Right,
-        make_node(3, make_head("a"), [make_node(4, make_item("x"), [])]),
+        make_branch(3, make_head("a"), [make_branch(4, make_item("x"), [])]),
       ),
-      make_branch(Right, make_node(5, make_head("b"), [])),
+      make_slot(Right, make_branch(5, make_head("b"), [])),
     ]),
   ])
   assert_eq(op_forms(doc), "hhlh")
@@ -1449,11 +1449,11 @@ test "conform は見出しの兄弟の後ろで頂点だけ見出しにする" {
 test "conform は後ろに項目が居る場所で項目にする" {
   let doc = make_doc([
     make_center(2, make_head("r"), [
-      make_branch(Right, make_node(3, make_item("x"), [])),
-      make_branch(Right, make_node(4, make_head("a"), [])),
+      make_slot(Right, make_branch(3, make_item("x"), [])),
+      make_slot(Right, make_branch(4, make_head("a"), [])),
     ]),
     make_center(5, make_head("s"), [
-      make_branch(Right, make_node(6, make_head("b"), [])),
+      make_slot(Right, make_branch(6, make_head("b"), [])),
     ]),
   ])
   assert_eq(op_forms(doc), "hlhhh")
@@ -1469,12 +1469,12 @@ test "conform は後ろに項目が居る場所で項目にする" {
 test "conform は飛びを書けない位置の Implicit を昇格させる" {
   let doc = make_doc([
     make_center(2, make_head("r"), [
-      make_branch(Right, make_node(3, make_head("a"), [])),
+      make_slot(Right, make_branch(3, make_head("a"), [])),
     ]),
     make_center(6, make_head("s"), [
-      make_branch(
+      make_slot(
         Right,
-        make_node(7, Implicit, [make_node(8, make_head("b"), [])]),
+        make_branch(7, Implicit, [make_branch(8, make_head("b"), [])]),
       ),
     ]),
   ])
@@ -1617,7 +1617,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 行き先�
 - Produces: `pub fn move_nodes(doc : Doc, ids : Array[Int], parent : Int, at : Int, side : Side) -> Verdict`
 
 > **契約 §10 の細目**: `parent` は id（文書は番兵 `doc_id` = 1）。`at` は
-> branches / children / centers の index（**バケツの index ではない**）。`side` は**行き先の側**で、
+> slots / children / centers の index（**バケツの index ではない**）。`side` は**行き先の側**で、
 > center 直下のスロットへ挿すときだけ効く。
 >
 > **抜くたびに測り直す**: 複数 id の move では、1 つ抜いた時点で行き先の index も
@@ -1776,13 +1776,13 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 付け替�
 |---|---|---|---|---|
 | 1 | center 2 | doc | Tree 無変換 | `doc(R6[<7] R2[>3(4(5))])` |
 | 2 | center 2 | center 6 | Tree 解体（側は引数） | `doc(R6[<2(3(4(5))) <7])` |
-| 3 | center 2 | node 7 | Tree 解体（側は捨てる） | `doc(R6[<7(2(3(4(5))))])` |
-| 4 | slot 3 | doc | Limb → Center 化 | `doc(R2[] R6[<7] R3[>4(5)])` |
-| 5 | slot 3 | center 6 | Branch(side) で包む | `doc(R2[] R6[<7 <3(4(5))])` |
-| 6 | slot 3 | node 7 | そのまま | `doc(R2[] R6[<7(3(4(5)))])` |
-| 7 | deep 4 | doc | Limb → Center 化 | `doc(R4[>5] R2[>3] R6[<7])` |
-| 8 | deep 4 | center 6 | Branch(side) で包む | `doc(R2[>3] R6[>4(5) <7])` |
-| 9 | deep 4 | node 7 | そのまま | `doc(R2[>3] R6[<7(4(5))])` |
+| 3 | center 2 | branch 7 | Tree 解体（側は捨てる） | `doc(R6[<7(2(3(4(5))))])` |
+| 4 | slot 3 | doc | Part → Center 化 | `doc(R2[] R6[<7] R3[>4(5)])` |
+| 5 | slot 3 | center 6 | Slot(side) で包む | `doc(R2[] R6[<7 <3(4(5))])` |
+| 6 | slot 3 | branch 7 | そのまま | `doc(R2[] R6[<7(3(4(5)))])` |
+| 7 | deep 4 | doc | Part → Center 化 | `doc(R4[>5] R2[>3] R6[<7])` |
+| 8 | deep 4 | center 6 | Slot(side) で包む | `doc(R2[>3] R6[>4(5) <7])` |
+| 9 | deep 4 | branch 7 | そのまま | `doc(R2[>3] R6[<7(4(5))])` |
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -1791,7 +1791,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 付け替�
 ```moonbit
 ///|
 /// 出どころ = center。Whole は doc 位置間で無変換、それ以外では解体される。
-test "move 9 組合せ: center から doc / center / node へ" {
+test "move 9 組合せ: center から doc / center / branch へ" {
   let a = op_doc()
   assert_eq(op_said(move_nodes(a, [2], 1, 1, Right)), "ok")
   assert_eq(op_shape(a), "doc(R6[<7] R2[>3(4(5))])")
@@ -1805,7 +1805,7 @@ test "move 9 組合せ: center から doc / center / node へ" {
 
 ///|
 /// 出どころ = center 直下のスロット。文書へ出ると Center 化し、children が右の枝になる。
-test "move 9 組合せ: スロットから doc / center / node へ" {
+test "move 9 組合せ: スロットから doc / center / branch へ" {
   let a = op_doc()
   assert_eq(op_said(move_nodes(a, [3], 1, 2, Right)), "ok")
   assert_eq(op_shape(a), "doc(R2[] R6[<7] R3[>4(5)])")
@@ -1818,8 +1818,8 @@ test "move 9 組合せ: スロットから doc / center / node へ" {
 }
 
 ///|
-/// 出どころ = 深いノード。どの行き先でも Limb のまま旅する。
-test "move 9 組合せ: 深いノードから doc / center / node へ" {
+/// 出どころ = 深いノード。どの行き先でも Part のまま旅する。
+test "move 9 組合せ: 深いノードから doc / center / branch へ" {
   let a = op_doc()
   assert_eq(op_said(move_nodes(a, [4], 1, 0, Right)), "ok")
   assert_eq(op_shape(a), "doc(R4[>5] R2[>3] R6[<7])")
@@ -1849,9 +1849,9 @@ doc/op_wbtest.mbt:NN:NN-NN:NN@tree FAILED: `"..." != "..."`
 
 - [ ] **Step 3: 最小の実装を書く**
 
-**実装は増えない。** Task 82 の `as_center` / `as_node` / `graft` が変換表そのもので、
+**実装は増えない。** Task 82 の `as_center` / `as_branch` / `graft` が変換表そのもので、
 このタスクはそれが 9 通り全部で正しいことの固定。Step 2 で落ちた場合だけ、
-落ちた行の期待値と上の表を突き合わせて `as_center` / `as_node` のどの腕が違うかを 1 つずつ直す。
+落ちた行の期待値と上の表を突き合わせて `as_center` / `as_branch` のどの腕が違うかを 1 つずつ直す。
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
@@ -2321,7 +2321,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 反映 v0�
 **定義も数字も契約 §11 が正**（裁定 5）。ここで別の物差しを立てない。契約 §11 の逐語:
 
 > **容器の腕** = その関数の `match path` の枝のうち、**3 つの容器（`doc.centers` /
-> `Center::branches` / `Node::children`）のどれかを読むか書くもの**の数。何もしない・
+> `Center::slots` / `Branch::children`）のどれかを読むか書くもの**の数。何もしない・
 > 拒否するだけの番兵枝（`[]`）は数えない。
 >
 > **意味の腕** = 仕様が定めた場合分けの数（flipSide の資格 3 段など）。容器の異種性とは
@@ -2331,7 +2331,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 反映 v0�
 
 - **合格** — 道具の容器の腕がすべて **3 以下** / 操作 3 本の容器の腕が **0** /
   回復 2 本の容器の腕が **0** / `Sub` を変換する場所が **1 か所** / 2 段包みが **1 本以下**
-- **警告** — どれかの道具が **4 腕**になった（`Branch` に `mut node` を足して 3 へ戻せるか
+- **警告** — どれかの道具が **4 腕**になった（`Slot` に `mut branch` を足して 3 へ戻せるか
   検討する）/ 道具が **6 本目**になった（増えたのが読む道具か書く道具かを見る）
 - **死** — どれかの道具が **5 腕**になった / 操作 3 本のどれかが `match path` を自前で
   持ち始めた / `Sub` を変換する場所が **2 か所以上**になった
@@ -2343,7 +2343,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 反映 v0�
 
 - 道具は **5 本**（`resolve` / `kin_at` / `pluck` / `graft` / `amend`）。
   増えた 1 本（`kin_at`）は**読む道具**で、変換の住所は `graft` のまま 1 か所
-- 容器の腕: `resolve` 0 / `find_in` 0 / `node_at` 1 / `kin_at` 3 / `parent_at` 0 /
+- 容器の腕: `resolve` 0 / `find_in` 0 / `branch_at` 1 / `kin_at` 3 / `parent_at` 0 /
   `pluck` 3 / `graft` 3 / `amend` 3 / `set_side` 1
 - 操作 3 本の容器の腕: **0**（`move_nodes` 0 / `flip_side` 0 / `delete_nodes` 0）
 - 回復 2 本の容器の腕: **0**（`conform` は `kin_at` + `parent_at` + `amend` の合成、
@@ -2355,7 +2355,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 反映 v0�
 
 Run:
 ```
-node --test D:/1.atrium/mmm/.worktrees/feat/tree-core/test/roundtrip.test.ts
+branch --test D:/1.atrium/mmm/.worktrees/feat/tree-core/test/roundtrip.test.ts
 ```
 （cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`。別のワークツリーから叩くと旧 core を測る。
 事前に `pnpm run core` が要る）
@@ -2380,7 +2380,7 @@ Expected: `ℹ fail 0`（この時点では `docs/ops.md` がまだ無いので�
 
 Run:
 ```
-node --test D:/1.atrium/mmm/.worktrees/feat/tree-core/test/roundtrip.test.ts
+branch --test D:/1.atrium/mmm/.worktrees/feat/tree-core/test/roundtrip.test.ts
 ```
 Expected: `ℹ fail 0`。ここで落ちたら、その綴りが旧 core の正規形と食い違っている
 （`P1: parse→serialize がバイト同一` が落ちる）。疑う順は
@@ -2496,7 +2496,7 @@ GitHub は見出しからアンカーを生成する。だから見出しのラ�
 
 Run:
 ```
-node --test D:/1.atrium/mmm/.worktrees/feat/tree-core/test/roundtrip.test.ts
+branch --test D:/1.atrium/mmm/.worktrees/feat/tree-core/test/roundtrip.test.ts
 ```
 Expected: `ℹ fail 0`（Step 1 の基準線と同じ）。
 落ちたら `docs/ops.md` の綴りが旧 core の正規形と食い違っている。

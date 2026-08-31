@@ -20,7 +20,7 @@
 
 ### 前提
 
-1. **G1 が終わっていること。** `Doc` / `Center` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol` /
+1. **G1 が終わっていること。** `Doc` / `Center` / `Slot` / `Branch` / `Skeleton` / `Form` / `Side` / `Eol` /
    `Block` / `Content` / `doc_id` / `first_id`（契約 §6）、`Token` / `Scan` / `scan`（契約 §10）、
    `check`（契約 §7）、`sig`（契約 §8）が揃っていること。
    **テストは `sig` と `check` を比較子に使う**ので、この 2 つが無いと 1 本も書けない。
@@ -56,7 +56,7 @@ Task 20 → 26 の一直線。各タスクは前のタスクの上に足す（�
 | `read` | fn | parse の本体（Token の列だけを食う） | 20 |
 | `top` / `item` | fn | 開いている一番深い段 / その段は項目か | 20 |
 | `bud` | fn | 段を 1 つ生やす（id はここで配る） | 20 |
-| `to_center` / `to_node` / `bone` | fn | Frame の木 → Doc の木 | 20 |
+| `to_center` / `to_branch` / `bone` | fn | Frame の木 → Doc の木 | 20 |
 | `grow` | fn | 足りない段を Implicit で埋めてから積む | 21 |
 | `hashes` | fn | 領土に落ちた見出しの逐語（`(level : Int, label : String) -> String`） | 22 |
 | `shed` / `knit` / `card` / `pair` | fn | 領土から出る / 散文を綴じる / 正体を見る / `[…](…)` を割る | 23 |
@@ -73,7 +73,7 @@ wbtest のヘルパ名は全部 `parse_` で始める（契約 §16 — 同一�
 
 ### 設計の要点（なぜこの形か）
 
-- **木は `Frame` で建て、最後に 1 回だけ Doc の型へ写す。** `Center` / `Branch` / `Node` は不変 struct なので、
+- **木は `Frame` で建て、最後に 1 回だけ Doc の型へ写す。** `Center` / `Slot` / `Branch` は不変 struct なので、
   育ちながら建てるには可変の足場が要る。struct は参照（契約 §6）なので、`bud` が親の `kids` に挿してから
   中身を足せる — 木を組み直す処理は 1 つも要らない。
 - **`stack` の添字 = 深さ。** 底に「文書の器」（level 0・`form: None`）を置いたので、道は常に空でなく、
@@ -163,8 +163,8 @@ moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/parse_wbtest.mb
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/parse_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `pub fn scan(text : String) -> Scan`（G1）/ `pub(all) enum Token`（G1）/ `pub(all) struct Scan { frontmatter : String?; eol : Eol; tokens : Array[Token] }`（G1）/ `pub(all) struct Doc / Center / Branch / Node`・`pub(all) enum Skeleton / Form / Side / Block`・`pub let doc_id : Int`・`pub let first_id : Int`（G1）/ `pub fn sig(doc : Doc) -> String`（G1）
-- Produces: `pub fn parse(text : String) -> Doc` / `fn read(scanned : Scan) -> Doc` / `fn top(b : Build) -> Frame` / `fn item(f : Frame) -> Bool` / `fn bud(b : Build, level : Int, form : Form?, label : String, hang : Int) -> Unit` / `fn to_center(f : Frame) -> Center` / `fn to_node(f : Frame) -> Node` / `fn bone(f : Frame) -> Skeleton` / `priv struct Frame` / `priv struct Build` / (test) `fn parse_sig(md : String) -> String` / `fn parse_ids(md : String) -> String` / `fn parse_walk(node : Node, out : Array[String]) -> Unit`
+- Consumes: `pub fn scan(text : String) -> Scan`（G1）/ `pub(all) enum Token`（G1）/ `pub(all) struct Scan { frontmatter : String?; eol : Eol; tokens : Array[Token] }`（G1）/ `pub(all) struct Doc / Center / Slot / Branch`・`pub(all) enum Skeleton / Form / Side / Block`・`pub let doc_id : Int`・`pub let first_id : Int`（G1）/ `pub fn sig(doc : Doc) -> String`（G1）
+- Produces: `pub fn parse(text : String) -> Doc` / `fn read(scanned : Scan) -> Doc` / `fn top(b : Build) -> Frame` / `fn item(f : Frame) -> Bool` / `fn bud(b : Build, level : Int, form : Form?, label : String, hang : Int) -> Unit` / `fn to_center(f : Frame) -> Center` / `fn to_branch(f : Frame) -> Branch` / `fn bone(f : Frame) -> Skeleton` / `priv struct Frame` / `priv struct Build` / (test) `fn parse_sig(md : String) -> String` / `fn parse_ids(md : String) -> String` / `fn parse_walk(branch : Branch, out : Array[String]) -> Unit`
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -186,8 +186,8 @@ fn parse_ids(md : String) -> String {
   let out : Array[String] = []
   for r in parse(md).centers {
     out.push(r.id.to_string())
-    for b in r.branches {
-      parse_walk(b.node, out)
+    for b in r.slots {
+      parse_walk(b.branch, out)
     }
   }
   let sb = StringBuilder::new()
@@ -201,9 +201,9 @@ fn parse_ids(md : String) -> String {
 }
 
 ///|
-fn parse_walk(node : Node, out : Array[String]) -> Unit {
-  out.push(node.id.to_string())
-  for c in node.children {
+fn parse_walk(branch : Branch, out : Array[String]) -> Unit {
+  out.push(branch.id.to_string())
+  for c in branch.children {
     parse_walk(c, out)
   }
 }
@@ -359,16 +359,16 @@ fn bud(
 
 ///|
 fn to_center(f : Frame) -> Center {
-  let branches : Array[Branch] = []
+  let slots : Array[Slot] = []
   for k in f.kids {
-    branches.push({ side: Right, node: to_node(k) })
+    slots.push({ side: Right, branch: to_branch(k) })
   }
-  { id: f.id, skeleton: bone(f), branches }
+  { id: f.id, skeleton: bone(f), slots }
 }
 
 ///|
-fn to_node(f : Frame) -> Node {
-  { id: f.id, skeleton: bone(f), children: f.kids.map(to_node) }
+fn to_branch(f : Frame) -> Branch {
+  { id: f.id, skeleton: bone(f), children: f.kids.map(to_branch) }
 }
 
 ///|
@@ -1086,7 +1086,7 @@ fn spill(b : Build) -> Unit {
 ///|
 /// スロットの側は、隙間のトグルの積み上げ。先頭のトグルが左開始を表す。
 fn to_center(f : Frame) -> Center {
-  let branches : Array[Branch] = []
+  let slots : Array[Slot] = []
   let mut side = Right
   for k in f.kids {
     for _ in 0..<k.toggles {
@@ -1095,9 +1095,9 @@ fn to_center(f : Frame) -> Center {
         Left => Right
       }
     }
-    branches.push({ side, node: to_node(k) })
+    slots.push({ side, branch: to_branch(k) })
   }
-  { id: f.id, skeleton: bone(f), branches }
+  { id: f.id, skeleton: bone(f), slots }
 }
 ```
 

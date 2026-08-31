@@ -36,9 +36,9 @@
 MmmTree（トップの型は Doc。2026-08-31 に役割型へ再設計）:
 
 Doc    { frontmatter: String?, eol: Eol, body: [Block], centers: [Center] }
-Center { id, skeleton: Skeleton, branches: [Branch] }   // 木 1 本の中心。側を持つ唯一の型
-Branch { side: Side, node: Node }                       // スロット = 場所。占有者を問わず側を持つ
-Node   { id, skeleton: Skeleton, children: [Node] }     // 深さ 3 以降は一様
+Center { id, skeleton: Skeleton, slots: [Slot] }        // 木 1 本の中心。側を持つ唯一の型
+Slot   { side: Side, branch: Branch }                   // 場所。側はここにしか無い
+Branch { id, skeleton: Skeleton, children: [Branch] }   // 中心から放射し、枝分かれする
 
 Skeleton = Implicit                   // 骨格行なし（飛びが綴り）。label も body も型ごと無い
          | Explicit(form, label, folded, body: [Block])
@@ -57,7 +57,7 @@ implicit×label / implicit×body / implicit×folded / implicit×Item / setForm(I
 
 **操作の原理（抗うゲームの遊び方）**: 公開 API は id で語り、型の異種性は
 **道具 4 つ（resolve / pluck / graft / amend）に幽閉**する。運搬の通貨
-`Sub = Whole(Center) | Limb(Node)` は op.mbt の外に出ない。center 化・降格の変換は
+`Sub = Whole(Center) | Part(Branch)` は op.mbt の外に出ない。center 化・降格の変換は
 graft だけに住む（Whole は center 位置間では無変換 — sides が無傷で旅する）。
 Path は素の `Array[Int]`（[] = doc、[i] = center、[i,j] = スロット、以深 = children）。
 **殺す条件の観測点は道具の腕数 — 3 で止まらなくなったら負け**。
@@ -71,10 +71,18 @@ Path は素の `Array[Int]`（[] = doc、[i] = center、[i,j] = スロット、�
 `Tree` は主張が最小で、この中間物を誤解させない。
 外の世界の木（CommonMark のブロック木）は `MarkdownAst` のまま — **Ast は外の言葉、Tree は mmm の言葉**。
 
-**`Center` と呼ぶ理由**: この型が Node と違うのは「**side を持つ**」ことだけ、つまり
-左右が放射する点であることで、根であることではない。`Root` は単数の含みが強く、
-`centers: [Center]` のように複数あるものの 1 つとして読めない。
-map で中央に描かれる当のものでもある。
+**`Center` / `Slot` / `Branch` と呼ぶ理由**:
+文書は中心を複数持ち、中心はスロットを持ち、スロットは側と枝を持ち、枝は枝を持つ。
+
+- **Center** — この型が Branch と違うのは「**side を持つ**」ことだけ、つまり左右が放射する
+  点であることで、根であることではない。`Root` は単数の含みが強く、`centers: [Center]` の
+  ように複数あるものの 1 つとして読めなかった
+- **Slot** — これは枝ではなく**位置**（配列の 1 席）。持ち物は側と占有者だけ。
+  機械的な名だが、正体が機械的なので嘘がない
+- **Branch** — 中心から放射して枝分かれするもの。`Node` は総称であって、
+  Center も Slot の中身も node なのだから、片方だけがその名を名乗るのは嘘だった。
+  **型から Node が消えたので、「node」は API と投影で総称として自由に使える**
+  （`move_nodes` / `MapNode` — 絵の世界では中心も枝も等しくノード）
 
 - **文書（Doc）は深さ 0 の器**。`#`（level 1）の Center がそれぞれ独立の木。
   最初の `#` より前に level 2+ の見出しがあれば、level 0 との段差から implied(1) が
@@ -115,7 +123,7 @@ map で中央に描かれる当のものでもある。
   「直後が書かれた深さ 2 の行」と不要に狭く敷いたことによる誤りだったので撤回。
   正しい帰属規則: **center 直下のスロットの前の隙間にある区切りが、そのスロットのトグル**）
 - **side の定義と型の一致** — 意味論上、side は「center 直下のスロット → 側」の
-  **部分写像**（場所の属性）。役割型への再設計で `Branch { side, node }` が
+  **部分写像**（場所の属性）。役割型への再設計で `Slot { side, branch }` が
   スロットそのものになり、**部分写像がそのまま型になった** — 定義域の外に side を
   書く場所が存在せず、埋め込みの余りと忠実性条件は消滅した
 - **folded** は意味のフラグ。綴りは details（§4）
@@ -250,7 +258,7 @@ blockquote/table/一般 HTML/項目内の見出しは Opaque。
 - **複数選択は頂点集合に正規化**してから適用（子孫の選択は祖先に吸収される）。
   move は文書順を保って連続挿入、rename / カード編集 / add は単独選択のみ
 - **implied は操作上も普通のノード** — 専用の裁定表は無い。add / drop / rename /
-  カード追加 / fold / move / flipSide、すべて node と同一の規則が効く。
+  カード追加 / fold / move / flipSide、すべて branch と同一の規則が効く。
   delete もサブツリー削除で統一（旧「段差詰め」は廃止 — 子を残したければ outdent する。
   子を昇格させる deleteOne は後日箱）。
   唯一 implied 固有なのは §2 の存在条件（子を失えば同時に居なくなる）と、

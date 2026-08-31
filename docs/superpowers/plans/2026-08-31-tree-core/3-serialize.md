@@ -12,9 +12,9 @@ Task 40〜45 の**各段階を順に組み立てて**通した。最終状態は
 doc-model リポジトリは 1 バイトも変更していない。
 
 **実測との差分は 1 つだけ** — 確定版の契約 §4 に従い、wbtest のヘルパ `write_of` / `write_slot` を
-削除して G1 の `make_doc` / `make_branch` を呼ぶ形に、`write_tree` / `write_head` / `write_item` /
+削除して G1 の `make_doc` / `make_slot` を呼ぶ形に、`write_tree` / `write_head` / `write_item` /
 `write_gap` を `make_*` の合成に書き替えた。**組み上がる木も、書き出される md も、テスト本数 21 も
-1 バイト・1 本も動かない**（`write_of` は `make_doc` と、`write_slot` は `make_branch` と定義が同一）。
+1 バイト・1 本も動かない**（`write_of` は `make_doc` と、`write_slot` は `make_slot` と定義が同一）。
 
 ---
 
@@ -40,7 +40,7 @@ convert・format コマンド / すげ替え v1。この群が主張できるの
 `G1 → G2 / G3（並行）→ G5 → G4`。G3 が待つのは **G1 だけ**。
 
 - **G1 の Task 1 が済んでいること** — `core/tree/make_wbtest.mbt` の
-  `make_doc` / `make_center` / `make_branch` / `make_node` / `make_head` / `make_item` を wbtest が呼ぶ
+  `make_doc` / `make_center` / `make_slot` / `make_branch` / `make_head` / `make_item` を wbtest が呼ぶ
 - **G1 の Task 10.5 が済んでいること** — `core/tree/spell.mbt`（`Spell` / `spell` / `eol_text`）。
   無いと Task 40 が `Error: [4021] The value identifier spell is unbound.` で止まる
 - **G1 の Task 2 が済んでいること** — `core/tree/moon.pkg` と `core/tree/doc.mbt`（契約 §6 の型）が
@@ -63,8 +63,8 @@ G1・G2・G4・G5 はこの一覧の名前を使わないこと。
 
 - 型（priv）: `Voice`（構築子 `Loud` / `Quiet`）/ `Pen`
 - 公開: `serialize`
-- 補助: `is_loud` `put` `split_nl` `repeat` `write_front` `write_center` `write_branches`
-  `turned` `same_side` `write_node` `inner_steps` `write_skeleton` `write_fold_open`
+- 補助: `is_loud` `put` `split_nl` `repeat` `write_front` `write_center` `write_slots`
+  `turned` `same_side` `write_branch` `inner_steps` `write_skeleton` `write_fold_open`
   `write_fold_close` `write_body` `write_blocks` `write_block` `write_content` `fence_for`
 - wbtest の組み立て: `write_tree` `write_head` `write_item` `write_gap`
 
@@ -136,7 +136,7 @@ center ごとに:
      1 回も呼ばれないので空文字列。これも正しい）
    - `gap(sb, nl)` — **不要かつ有害**。空行の判断は `put` の `match pen.last` 1 か所だけに住む
      というのがこの群の受け入れ条件で、2 か所目を作った時点で規律が死ぬ
-   - `spellable(kin, at)` — **不要**。`write_node` は兄弟の列も自分の index も受け取らないので
+   - `spellable(kin, at)` — **不要**。`write_branch` は兄弟の列も自分の index も受け取らないので
      呼ぶ術が構造的に無く、シグネチャを変えれば設計ごと変わる。そして「飛びが表現できない
      位置の implied」は G5 Task 87 の `conform`（`raised(s, true)`）が model の側で潰しており、
      check 条件 3（Implicit の前の兄弟はすべて項目）が健全な木でそれを保証している。
@@ -233,9 +233,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 正規形�
 - Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` / `Center` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol`（G1 `doc.mbt`）、
+- Consumes: `Doc` / `Center` / `Slot` / `Branch` / `Skeleton` / `Form` / `Side` / `Eol`（G1 `doc.mbt`）、
   `spell` / `eol_text`（G1 `spell.mbt`）、
-  `make_doc` / `make_center` / `make_branch` / `make_node` / `make_head` / `make_item`（G1 `make_wbtest.mbt`）
+  `make_doc` / `make_center` / `make_slot` / `make_branch` / `make_head` / `make_item`（G1 `make_wbtest.mbt`）
 - Produces:
   - `pub fn serialize(doc : Doc) -> String`
   - `priv enum Voice { Loud; Quiet }` / `priv struct Pen { sb : StringBuilder; eol : String; mut last : Voice? }`
@@ -243,7 +243,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 正規形�
   - `fn put(pen : Pen, voice : Voice, steps : Int, text : String) -> Unit`
   - `fn split_nl(text : String) -> Array[String]` / `fn repeat(unit : String, n : Int) -> String`
   - `fn write_center(pen : Pen, center : Center) -> Unit`
-  - `fn write_node(pen : Pen, node : Node, depth : Int, steps : Int) -> Unit`
+  - `fn write_branch(pen : Pen, branch : Branch, depth : Int, steps : Int) -> Unit`
   - `fn inner_steps(skeleton : Skeleton, steps : Int) -> Int`
   - `fn write_skeleton(pen : Pen, skeleton : Skeleton, depth : Int, steps : Int) -> Unit`
   - wbtest: `write_tree` / `write_head` / `write_item` / `write_gap`（**すべて `make_*` の合成**）
@@ -252,31 +252,31 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 正規形�
 
 `core/tree/serialize_wbtest.mbt` の末尾に足す（備考: 憲法 §4 / カタログ C1・C3・C6・C15）。
 ヘルパは 4 本だけで、どれも G1 の `make_*` を合成しただけの短縮形（生の struct リテラルは書かない）。
-文書そのものは `make_doc`、スロットは `make_branch` を直に呼ぶ。
+文書そのものは `make_doc`、スロットは `make_slot` を直に呼ぶ。
 
 ```moonbit
 ///|
 /// center ひとつ。見出し・畳まず・中身なし。
-fn write_tree(id : Int, label : String, branches : Array[Branch]) -> Center {
-  make_center(id, make_head(label), branches)
+fn write_tree(id : Int, label : String, slots : Array[Slot]) -> Center {
+  make_center(id, make_head(label), slots)
 }
 
 ///|
 /// 見出しのノード。畳まず・中身なし。
-fn write_head(id : Int, label : String, children : Array[Node]) -> Node {
-  make_node(id, make_head(label), children)
+fn write_head(id : Int, label : String, children : Array[Branch]) -> Branch {
+  make_branch(id, make_head(label), children)
 }
 
 ///|
 /// 項目のノード。畳まず・中身なし。
-fn write_item(id : Int, label : String, children : Array[Node]) -> Node {
-  make_node(id, make_item(label), children)
+fn write_item(id : Int, label : String, children : Array[Branch]) -> Branch {
+  make_branch(id, make_item(label), children)
 }
 
 ///|
 /// 飛び。骨格行を持たないので label も中身も型ごと無い。
-fn write_gap(id : Int, children : Array[Node]) -> Node {
-  make_node(id, Implicit, children)
+fn write_gap(id : Int, children : Array[Branch]) -> Branch {
+  make_branch(id, Implicit, children)
 }
 
 ///|
@@ -288,8 +288,8 @@ test "空の文書は 1 バイトも書かない" {
 test "C3: 見出しの兄弟は空行 1 本で継ぐ（右どうしなので区切りは 0 本）" {
   let doc = make_doc([
     write_tree(2, "r", [
-      make_branch(Right, write_head(3, "a", [])),
-      make_branch(Right, write_head(4, "c", [])),
+      make_slot(Right, write_head(3, "a", [])),
+      make_slot(Right, write_head(4, "c", [])),
     ]),
   ])
   assert_eq(serialize(doc), "# r\n\n## a\n\n## c\n")
@@ -302,14 +302,14 @@ test "C1: 項目どうしの継ぎ目は詰める。空ラベルでも印と空�
     write_item(5, "c", []),
     write_item(6, "", []),
   ])
-  let doc = make_doc([write_tree(2, "r", [make_branch(Right, a)])])
+  let doc = make_doc([write_tree(2, "r", [make_slot(Right, a)])])
   assert_eq(serialize(doc), "# r\n\n## a\n\n- b\n- c\n- \n")
 }
 
 ///|
 test "C6: 飛びは Implicit のまま何も書かず、level は深さそのもの" {
   let a = write_head(3, "a", [write_gap(4, [write_head(5, "b", [])])])
-  let doc = make_doc([write_tree(2, "r", [make_branch(Right, a)])])
+  let doc = make_doc([write_tree(2, "r", [make_slot(Right, a)])])
   assert_eq(serialize(doc), "# r\n\n## a\n\n#### b\n")
 }
 
@@ -321,7 +321,7 @@ test "level は無制限。7 個以上の見出しも書く" {
       write_head(6, "b", [write_head(7, "c", [write_head(8, "d", [deep])])]),
     ]),
   ])
-  let doc = make_doc([write_tree(2, "r", [make_branch(Right, mid)])])
+  let doc = make_doc([write_tree(2, "r", [make_slot(Right, mid)])])
   assert_eq(
     serialize(doc),
     "# r\n\n## y\n\n### a\n\n#### b\n\n##### c\n\n###### d\n\n####### z\n",
@@ -331,8 +331,8 @@ test "level は無制限。7 個以上の見出しも書く" {
 ///|
 test "C15: 項目 center の子は 1 段字下げ（入れ子は相対記法）" {
   let center = make_center(2, make_item("center"), [
-    make_branch(Right, write_item(3, "a", [write_item(4, "b", [])])),
-    make_branch(Right, write_item(5, "c", [])),
+    make_slot(Right, write_item(3, "a", [write_item(4, "b", [])])),
+    make_slot(Right, write_item(5, "c", [])),
   ])
   assert_eq(serialize(make_doc([center])), "- center\n  - a\n    - b\n  - c\n")
 }
@@ -468,17 +468,17 @@ pub fn serialize(doc : Doc) -> String {
 fn write_center(pen : Pen, center : Center) -> Unit {
   write_skeleton(pen, center.skeleton, 1, 0)
   let inner = inner_steps(center.skeleton, 0)
-  for branch in center.branches {
-    write_node(pen, branch.node, 2, inner)
+  for slot in center.slots {
+    write_branch(pen, slot.branch, 2, inner)
   }
 }
 
 ///|
-fn write_node(pen : Pen, node : Node, depth : Int, steps : Int) -> Unit {
-  write_skeleton(pen, node.skeleton, depth, steps)
-  let inner = inner_steps(node.skeleton, steps)
-  for child in node.children {
-    write_node(pen, child, depth + 1, inner)
+fn write_branch(pen : Pen, branch : Branch, depth : Int, steps : Int) -> Unit {
+  write_skeleton(pen, branch.skeleton, depth, steps)
+  let inner = inner_steps(branch.skeleton, steps)
+  for child in branch.children {
+    write_branch(pen, child, depth + 1, inner)
   }
 }
 
@@ -543,7 +543,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 骨格行�
 
 **Interfaces:**
 - Consumes: `Block`（`Content` / `Rule` / `Opaque`）/ `Content`（`Image` / `Link` / `Code` / `Svg`）（G1）、
-  `put` / `inner_steps` / `repeat`（Task 41）、`make_node` / `make_doc` / `make_branch`（G1）
+  `put` / `inner_steps` / `repeat`（Task 41）、`make_branch` / `make_doc` / `make_slot`（G1）
 - Produces:
   - `fn write_body(pen : Pen, skeleton : Skeleton, steps : Int) -> Unit`
   - `fn write_blocks(pen : Pen, blocks : Array[Block], steps : Int) -> Unit`
@@ -555,12 +555,12 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 骨格行�
 
 `core/tree/serialize_wbtest.mbt` の末尾に足す（備考: 憲法 §4 の「コード」「区切り」、カタログ C5・C9）。
 中身を持つ骨格は `make_head` / `make_item` の守備範囲外（あれは中身なし・畳まずの短縮形）なので、
-`make_node` に `Explicit(...)` を直に渡して組む。
+`make_branch` に `Explicit(...)` を直に渡して組む。
 
 ```moonbit
 ///|
 test "C5: 中身は骨格行の下へ。飾りの水平線は *** で書く" {
-  let head = make_node(
+  let head = make_branch(
     4,
     Explicit(form=Heading, label="head", folded=false, body=[
       Opaque("content01"),
@@ -570,7 +570,7 @@ test "C5: 中身は骨格行の下へ。飾りの水平線は *** で書く" {
     [],
   )
   let head2 = write_head(3, "head2", [head])
-  let doc = make_doc([write_tree(2, "r", [make_branch(Right, head2)])])
+  let doc = make_doc([write_tree(2, "r", [make_slot(Right, head2)])])
   assert_eq(
     serialize(doc),
     "# r\n\n## head2\n\n### head\n\ncontent01\n\n***\n\ncontent02\n",
@@ -579,7 +579,7 @@ test "C5: 中身は骨格行の下へ。飾りの水平線は *** で書く" {
 
 ///|
 test "C9: コードは常にフェンス。info が空でも囲いは 3 本" {
-  let b = make_node(
+  let b = make_branch(
     4,
     Explicit(form=Heading, label="b", folded=false, body=[
       Content(Code(info="", text="code")),
@@ -588,8 +588,8 @@ test "C9: コードは常にフェンス。info が空でも囲いは 3 本" {
   )
   let doc = make_doc([
     write_tree(2, "r", [
-      make_branch(Right, write_head(3, "a", [])),
-      make_branch(Right, b),
+      make_slot(Right, write_head(3, "a", [])),
+      make_slot(Right, b),
     ]),
   ])
   assert_eq(serialize(doc), "# r\n\n## a\n\n## b\n\n```\ncode\n```\n")
@@ -597,20 +597,20 @@ test "C9: コードは常にフェンス。info が空でも囲いは 3 本" {
 
 ///|
 test "囲いは中身の最長のバッククォート連なりより 1 本長い" {
-  let n = make_node(
+  let n = make_branch(
     3,
     Explicit(form=Heading, label="a", folded=false, body=[
       Content(Code(info="js", text="```\nx")),
     ]),
     [],
   )
-  let doc = make_doc([write_tree(2, "r", [make_branch(Right, n)])])
+  let doc = make_doc([write_tree(2, "r", [make_slot(Right, n)])])
   assert_eq(serialize(doc), "# r\n\n## a\n\n````js\n```\nx\n````\n")
 }
 
 ///|
 test "絵・リンク・svg はそれぞれの正規綴りで 1 行に書く" {
-  let a = make_node(
+  let a = make_branch(
     3,
     Explicit(form=Heading, label="a", folded=false, body=[
       Content(Image(alt="alt", src="./img/a.png")),
@@ -619,7 +619,7 @@ test "絵・リンク・svg はそれぞれの正規綴りで 1 行に書く" {
     ]),
     [],
   )
-  let doc = make_doc([write_tree(2, "r", [make_branch(Right, a)])])
+  let doc = make_doc([write_tree(2, "r", [make_slot(Right, a)])])
   assert_eq(
     serialize(doc),
     "# r\n\n## a\n\n![alt](./img/a.png)\n\n[title](https://example.com)\n\n<svg><rect/></svg>\n",
@@ -632,7 +632,7 @@ test "絵・リンク・svg はそれぞれの正規綴りで 1 行に書く" {
 /// あること、兄弟の間に空行が無いこと。1 つでも崩れると、外のパーサはそこで
 /// リストを閉じ、続く項目は別のリスト・深い字下げはコードブロックに化ける。
 test "項目の中身は逐語のまま、その項目の中身の列へ塊で入る" {
-  let a = make_node(
+  let a = make_branch(
     3,
     Explicit(form=Item, label="a", folded=false, body=[
       Opaque("| x | y |\n| - | - |"),
@@ -641,8 +641,8 @@ test "項目の中身は逐語のまま、その項目の中身の列へ塊で�
   )
   let doc = make_doc([
     write_tree(2, "r", [
-      make_branch(Right, a),
-      make_branch(Right, write_item(5, "c", [])),
+      make_slot(Right, a),
+      make_slot(Right, write_item(5, "c", [])),
     ]),
   ])
   assert_eq(
@@ -732,7 +732,7 @@ fn fence_for(text : String) -> String {
 
 - [ ] **Step 4: 中身を歩きに繋ぐ**
 
-`write_center` と `write_node` の 2 か所に 1 行ずつ足す。差し替え後の全文:
+`write_center` と `write_branch` の 2 か所に 1 行ずつ足す。差し替え後の全文:
 
 ```moonbit
 ///|
@@ -740,18 +740,18 @@ fn write_center(pen : Pen, center : Center) -> Unit {
   write_skeleton(pen, center.skeleton, 1, 0)
   let inner = inner_steps(center.skeleton, 0)
   write_body(pen, center.skeleton, inner)
-  for branch in center.branches {
-    write_node(pen, branch.node, 2, inner)
+  for slot in center.slots {
+    write_branch(pen, slot.branch, 2, inner)
   }
 }
 
 ///|
-fn write_node(pen : Pen, node : Node, depth : Int, steps : Int) -> Unit {
-  write_skeleton(pen, node.skeleton, depth, steps)
-  let inner = inner_steps(node.skeleton, steps)
-  write_body(pen, node.skeleton, inner)
-  for child in node.children {
-    write_node(pen, child, depth + 1, inner)
+fn write_branch(pen : Pen, branch : Branch, depth : Int, steps : Int) -> Unit {
+  write_skeleton(pen, branch.skeleton, depth, steps)
+  let inner = inner_steps(branch.skeleton, steps)
+  write_body(pen, branch.skeleton, inner)
+  for child in branch.children {
+    write_branch(pen, child, depth + 1, inner)
   }
 }
 ```
@@ -783,9 +783,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 中身を�
 - Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Branch` / `Side`（G1）、`put` / `write_node`（Task 41）
+- Consumes: `Slot` / `Side`（G1）、`put` / `write_branch`（Task 41）
 - Produces:
-  - `fn write_branches(pen : Pen, branches : Array[Branch], steps : Int) -> Unit`
+  - `fn write_slots(pen : Pen, slots : Array[Slot], steps : Int) -> Unit`
   - `fn turned(prev : Side?, side : Side) -> Bool`
   - `fn same_side(a : Side, b : Side) -> Bool`（`Side` に `Eq` は無い。**G4 の `map_bucket` もこれを呼ぶ**）
 
@@ -798,8 +798,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 中身を�
 test "C4: 先頭が左ならスロットの前に 1 本、変わり目にも 1 本" {
   let doc = make_doc([
     write_tree(2, "r", [
-      make_branch(Left, write_head(3, "a", [])),
-      make_branch(Right, write_head(4, "b", [])),
+      make_slot(Left, write_head(3, "a", [])),
+      make_slot(Right, write_head(4, "b", [])),
     ]),
   ])
   assert_eq(serialize(doc), "# r\n\n---\n\n## a\n\n---\n\n## b\n")
@@ -808,16 +808,16 @@ test "C4: 先頭が左ならスロットの前に 1 本、変わり目にも 1 �
 ///|
 test "C16: 占有者が Implicit でも隙間にトグルは書ける" {
   let deep = write_gap(3, [write_gap(4, [write_head(5, "b", [])])])
-  let doc = make_doc([write_tree(2, "r", [make_branch(Left, deep)])])
+  let doc = make_doc([write_tree(2, "r", [make_slot(Left, deep)])])
   assert_eq(serialize(doc), "# r\n\n---\n\n#### b\n")
 }
 
 ///|
 test "C15: 項目 center のトグルは center の中身の列に置く" {
   let center = make_center(2, make_item("center"), [
-    make_branch(Right, write_item(3, "a", [])),
-    make_branch(Right, write_item(4, "b", [])),
-    make_branch(Left, write_item(5, "c", [])),
+    make_slot(Right, write_item(3, "a", [])),
+    make_slot(Right, write_item(4, "b", [])),
+    make_slot(Left, write_item(5, "c", [])),
   ])
   assert_eq(
     serialize(make_doc([center])),
@@ -845,14 +845,14 @@ Total tests: 16, passed: 13, failed: 3.
 ```moonbit
 ///|
 /// スロットの列。側の変わり目にちょうど 1 本、先頭が左ならその前にも 1 本。
-fn write_branches(pen : Pen, branches : Array[Branch], steps : Int) -> Unit {
+fn write_slots(pen : Pen, slots : Array[Slot], steps : Int) -> Unit {
   let mut prev : Side? = None
-  for branch in branches {
-    if turned(prev, branch.side) {
+  for slot in slots {
+    if turned(prev, slot.side) {
       put(pen, Loud, steps, spell.toggle)
     }
-    write_node(pen, branch.node, 2, steps)
-    prev = Some(branch.side)
+    write_branch(pen, slot.branch, 2, steps)
+    prev = Some(slot.side)
   }
 }
 
@@ -898,7 +898,7 @@ fn write_center(pen : Pen, center : Center) -> Unit {
   write_skeleton(pen, center.skeleton, 1, 0)
   let inner = inner_steps(center.skeleton, 0)
   write_body(pen, center.skeleton, inner)
-  write_branches(pen, center.branches, inner)
+  write_slots(pen, center.slots, inner)
 }
 ```
 
@@ -948,17 +948,17 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 側の変�
 ```moonbit
 ///|
 test "C8: details は骨格行の外、summary に label。ネストは残る" {
-  let b = make_node(
+  let b = make_branch(
     4,
     Explicit(form=Heading, label="b", folded=true, body=[]),
     [write_head(5, "c", [])],
   )
-  let a = make_node(
+  let a = make_branch(
     3,
     Explicit(form=Heading, label="a", folded=true, body=[]),
     [b],
   )
-  let doc = make_doc([write_tree(2, "r", [make_branch(Right, a)])])
+  let doc = make_doc([write_tree(2, "r", [make_slot(Right, a)])])
   assert_eq(
     serialize(doc),
     "# r\n\n## a\n\n<details>\n\n<summary>a</summary>\n\n### b\n\n<details>\n\n<summary>b</summary>\n\n#### c\n\n</details>\n\n</details>\n",
@@ -967,7 +967,7 @@ test "C8: details は骨格行の外、summary に label。ネストは残る" {
 
 ///|
 test "項目の畳みも中身も、その項目の中身の列に入る" {
-  let x = make_node(
+  let x = make_branch(
     3,
     Explicit(form=Item, label="x", folded=true, body=[
       Opaque("text"),
@@ -975,7 +975,7 @@ test "項目の畳みも中身も、その項目の中身の列に入る" {
     ]),
     [write_item(4, "y", [])],
   )
-  let doc = make_doc([write_tree(2, "r", [make_branch(Right, x)])])
+  let doc = make_doc([write_tree(2, "r", [make_slot(Right, x)])])
   assert_eq(
     serialize(doc),
     "# r\n\n- x\n\n  <details>\n\n  <summary>x</summary>\n\n  text\n\n  ```\n  1\n  ```\n  - y\n\n  </details>\n",
@@ -1028,7 +1028,7 @@ fn write_fold_close(pen : Pen, skeleton : Skeleton, steps : Int) -> Unit {
 
 - [ ] **Step 4: 包みを歩きに繋ぐ**
 
-`write_center` と `write_node` に開きと閉じを挟む。差し替え後の全文:
+`write_center` と `write_branch` に開きと閉じを挟む。差し替え後の全文:
 
 ```moonbit
 ///|
@@ -1037,20 +1037,20 @@ fn write_center(pen : Pen, center : Center) -> Unit {
   let inner = inner_steps(center.skeleton, 0)
   write_fold_open(pen, center.skeleton, inner)
   write_body(pen, center.skeleton, inner)
-  write_branches(pen, center.branches, inner)
+  write_slots(pen, center.slots, inner)
   write_fold_close(pen, center.skeleton, inner)
 }
 
 ///|
-fn write_node(pen : Pen, node : Node, depth : Int, steps : Int) -> Unit {
-  write_skeleton(pen, node.skeleton, depth, steps)
-  let inner = inner_steps(node.skeleton, steps)
-  write_fold_open(pen, node.skeleton, inner)
-  write_body(pen, node.skeleton, inner)
-  for child in node.children {
-    write_node(pen, child, depth + 1, inner)
+fn write_branch(pen : Pen, branch : Branch, depth : Int, steps : Int) -> Unit {
+  write_skeleton(pen, branch.skeleton, depth, steps)
+  let inner = inner_steps(branch.skeleton, steps)
+  write_fold_open(pen, branch.skeleton, inner)
+  write_body(pen, branch.skeleton, inner)
+  for child in branch.children {
+    write_branch(pen, child, depth + 1, inner)
   }
-  write_fold_close(pen, node.skeleton, inner)
+  write_fold_close(pen, branch.skeleton, inner)
 }
 ```
 
@@ -1097,7 +1097,7 @@ test "C11: 封筒は柵ごと逐語。CRLF は 1 つのダイヤルで全行に�
     frontmatter: Some("image-folder: img"),
     eol: Crlf,
     body: [],
-    centers: [write_tree(2, "r", [make_branch(Left, write_head(3, "a", []))])],
+    centers: [write_tree(2, "r", [make_slot(Left, write_head(3, "a", []))])],
   }
   assert_eq(
     serialize(doc),

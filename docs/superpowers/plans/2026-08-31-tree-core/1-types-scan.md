@@ -28,7 +28,7 @@ G3 Task 40 が持つ — **G1 はテストを足さない**（契約 §19 G1）�
 ### 前提
 
 - 作業ディレクトリ: `D:/1.atrium/mmm/.worktrees/feat/tree-core`（ブランチ `feat/tree-core`）。
-  ワークツリーが無ければ先に切る（CLAUDE.md の Branch・Worktree 規約）
+  ワークツリーが無ければ先に切る（CLAUDE.md の Slot・Worktree 規約）
 - **既存ファイルは 1 行も触らない。** `package.json` の scripts と `.github/workflows/ci.yml` と
   `test/tsconfig.json` は G4 が触る（契約 §2）。G1 は `core/tree/` に足すだけ
 - 旧 core（`mmm-app/core` と `mmm-app/core/js`）は同じディレクトリツリーに同居する。
@@ -74,15 +74,15 @@ Step 2 / Step 4 は**ファイル指定**で走らせる（契約 §17）ので�
 
 | 住所 | 名前 |
 |---|---|
-| `doc.mbt`（型） | `Doc` `Center` `Branch` `Node` `Skeleton` `Form` `Side` `Eol` `Block` `Content` `Verdict` |
+| `doc.mbt`（型） | `Doc` `Center` `Slot` `Branch` `Skeleton` `Form` `Side` `Eol` `Block` `Content` `Verdict` |
 | `doc.mbt`（構築子） | `Implicit` `Explicit` `Heading` `Item` `Right` `Left` `Lf` `Crlf` `Content` `Rule` `Opaque` `Image` `Link` `Code` `Svg` `Applied` `Rejected` |
 | `doc.mbt`（定数） | `doc_id`（= 1）`first_id`（= 2） |
-| `check.mbt` | `check`（pub）`fault` `check_node` `check_one` `check_kin` `is_item` |
-| `sig.mbt` | `sig`（pub）`sig_center` `sig_node` `sig_skeleton` `sig_blocks` `sig_content` `sig_text` |
+| `check.mbt` | `check`（pub）`fault` `check_branch` `check_one` `check_kin` `is_item` |
+| `sig.mbt` | `sig`（pub）`sig_center` `sig_branch` `sig_skeleton` `sig_blocks` `sig_content` `sig_text` |
 | `scan.mbt`（型） | `Token`（構築子 `Blank` `Head` `Bullet` `Bar` `Fence` `Open` `Close` `Verse`）`Scan` |
 | `scan.mbt` | `scan`（pub）`Row` `rows_of` `row_of` `envelope` `is_front` `head_at` `setext_at` `setext` `bar_at` `bullet_at` `fence_at` `fenced` `close_len` `indented` `is_fold_open` `is_fold_close` `opens_comment` `closes_comment` `starts` `strip` `trim_end` `is_blank` `cut` `joined` |
 | `spell.mbt` | `Spell` `spell`（pub）`eol_text`（pub） |
-| `make_wbtest.mbt` | `make_doc` `make_center` `make_branch` `make_node` `make_head` `make_item` |
+| `make_wbtest.mbt` | `make_doc` `make_center` `make_slot` `make_branch` `make_head` `make_item` |
 | `scan_wbtest.mbt` | `scan_sig` `scan_flat` |
 | `sig_wbtest.mbt` / `check_wbtest.mbt` | ヘルパを持たない（`sig_` は `sig.mbt` が使い切っている。木は `make_*` で組む） |
 
@@ -178,9 +178,9 @@ CLAUDE.md の規約 `<Type>: <Emoji> #<Issue Number> <Title>`。Issue 番号が�
 - Produces:
   - パッケージ `mmm-app/core/tree`
   - `pub(all) struct Doc { frontmatter : String?; eol : Eol; body : Array[Block]; centers : Array[Center] }`
-  - `pub(all) struct Center { id : Int; skeleton : Skeleton; branches : Array[Branch] }`
-  - `pub(all) struct Branch { side : Side; node : Node }`
-  - `pub(all) struct Node { id : Int; skeleton : Skeleton; children : Array[Node] }`
+  - `pub(all) struct Center { id : Int; skeleton : Skeleton; slots : Array[Slot] }`
+  - `pub(all) struct Slot { side : Side; branch : Branch }`
+  - `pub(all) struct Branch { id : Int; skeleton : Skeleton; children : Array[Branch] }`
   - `pub(all) enum Skeleton { Implicit; Explicit(form~ : Form, label~ : String, folded~ : Bool, body~ : Array[Block]) }`
   - `pub(all) enum Form { Heading; Item }` / `pub(all) enum Side { Right; Left }` / `pub(all) enum Eol { Lf; Crlf }`
   - `pub(all) enum Block { Content(Content); Rule; Opaque(String) }`
@@ -188,9 +188,9 @@ CLAUDE.md の規約 `<Type>: <Emoji> #<Issue Number> <Title>`。Issue 番号が�
   - `pub(all) enum Verdict { Applied; Rejected(String) }`
   - `pub let doc_id : Int = 1` / `pub let first_id : Int = 2`
   - `fn make_doc(centers : Array[Center]) -> Doc`
-  - `fn make_center(id : Int, skeleton : Skeleton, branches : Array[Branch]) -> Center`
-  - `fn make_branch(side : Side, node : Node) -> Branch`
-  - `fn make_node(id : Int, skeleton : Skeleton, children : Array[Node]) -> Node`
+  - `fn make_center(id : Int, skeleton : Skeleton, slots : Array[Slot]) -> Center`
+  - `fn make_slot(side : Side, branch : Branch) -> Slot`
+  - `fn make_branch(id : Int, skeleton : Skeleton, children : Array[Branch]) -> Branch`
   - `fn make_head(label : String) -> Skeleton` / `fn make_item(label : String) -> Skeleton`
 
 - [ ] **Step 1: 失敗するテストを書く**
@@ -218,17 +218,17 @@ fn make_doc(centers : Array[Center]) -> Doc {
 }
 
 ///|
-fn make_center(id : Int, skeleton : Skeleton, branches : Array[Branch]) -> Center {
-  { id, skeleton, branches }
+fn make_center(id : Int, skeleton : Skeleton, slots : Array[Slot]) -> Center {
+  { id, skeleton, slots }
 }
 
 ///|
-fn make_branch(side : Side, node : Node) -> Branch {
-  { side, node }
+fn make_slot(side : Side, branch : Branch) -> Slot {
+  { side, branch }
 }
 
 ///|
-fn make_node(id : Int, skeleton : Skeleton, children : Array[Node]) -> Node {
+fn make_branch(id : Int, skeleton : Skeleton, children : Array[Branch]) -> Branch {
   { id, skeleton, children }
 }
 
@@ -257,18 +257,18 @@ test "型の全構成要素が 1 本の木として組める" {
           Content(Code(info="js", text="1")),
         ]),
         [
-          make_branch(Right, make_node(3, make_item("x"), [])),
-          make_branch(
+          make_slot(Right, make_branch(3, make_item("x"), [])),
+          make_slot(
             Left,
-            make_node(4, Implicit, [make_node(5, make_head("y"), [])]),
+            make_branch(4, Implicit, [make_branch(5, make_head("y"), [])]),
           ),
         ],
       ),
     ],
   }
   assert_eq(doc.body.length(), 3)
-  assert_eq(doc.centers[0].branches.length(), 2)
-  assert_eq(doc.centers[0].branches[1].node.children.length(), 1)
+  assert_eq(doc.centers[0].slots.length(), 2)
+  assert_eq(doc.centers[0].slots[1].branch.children.length(), 1)
   assert_eq(doc_id, 1)
   assert_eq(first_id, 2)
 }
@@ -280,7 +280,7 @@ test "型の全構成要素が 1 本の木として組める" {
 
 Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/make_wbtest.mbt`
 
-Expected: `Error: [4032]` / `The type Doc is undefined.`（`Center` `Branch` `Node` `Skeleton` `Side` `Eol` も同じ）
+Expected: `Error: [4032]` / `The type Doc is undefined.`（`Center` `Slot` `Branch` `Skeleton` `Side` `Eol` も同じ）
 + `Error: [4021]` / `The value identifier doc_id is unbound.`。EXIT=1
 
 - [ ] **Step 3: 最小の実装を書く**
@@ -305,23 +305,23 @@ pub(all) struct Doc {
 pub(all) struct Center {
   id : Int
   skeleton : Skeleton
-  branches : Array[Branch]
+  slots : Array[Slot]
 }
 
 ///|
 /// スロット = 場所。占有者を問わず側を持ち、id は持たない。
 /// side が「center 直下のスロット → 側」の部分写像であることが、そのまま型になっている。
-pub(all) struct Branch {
+pub(all) struct Slot {
   side : Side
-  node : Node
+  branch : Branch
 }
 
 ///|
 /// 深さ 3 以降は一様。
-pub(all) struct Node {
+pub(all) struct Branch {
   id : Int
   skeleton : Skeleton
-  children : Array[Node]
+  children : Array[Branch]
 }
 
 ///|
@@ -404,8 +404,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 新 core �
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/sig_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` `Center` `Branch` `Node` `Skeleton` `Form` `Side` `Eol` `Block` `Content`（Task 1）/
-  `make_doc` `make_center` `make_branch` `make_node` `make_head`（Task 1）
+- Consumes: `Doc` `Center` `Slot` `Branch` `Skeleton` `Form` `Side` `Eol` `Block` `Content`（Task 1）/
+  `make_doc` `make_center` `make_slot` `make_branch` `make_head`（Task 1）
 - Produces: `pub fn sig(doc : Doc) -> String` — id を含まない木の綴り。法則 1・2 の唯一の比較子
 
 - [ ] **Step 1: 失敗するテストを書く**
@@ -420,7 +420,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 新 core �
 test "例 1: `# r` + `## a`" {
   let doc = make_doc([
     make_center(2, make_head("r"), [
-      make_branch(Right, make_node(3, make_head("a"), [])),
+      make_slot(Right, make_branch(3, make_head("a"), [])),
     ]),
   ])
   assert_eq(sig(doc), "D-n()[Reh_1:r()[>Neh_1:a()[]]]")
@@ -430,10 +430,10 @@ test "例 1: `# r` + `## a`" {
 test "例 2: `# r` + `---` + `#### b`（C16。先頭スロットが左、占有者は Implicit 2 段）" {
   let doc = make_doc([
     make_center(2, make_head("r"), [
-      make_branch(
+      make_slot(
         Left,
-        make_node(3, Implicit, [
-          make_node(4, Implicit, [make_node(5, make_head("b"), [])]),
+        make_branch(3, Implicit, [
+          make_branch(4, Implicit, [make_branch(5, make_head("b"), [])]),
         ]),
       ),
     ]),
@@ -449,9 +449,9 @@ test "例 3: 封筒・CRLF・doc の散文・畳んだ項目 center・飾りの�
     body: [Opaque("intro")],
     centers: [
       make_center(2, Explicit(form=Item, label="c", folded=true, body=[Rule]), [
-        make_branch(
+        make_slot(
           Right,
-          make_node(
+          make_branch(
             3,
             Explicit(form=Heading, label="x", folded=false, body=[
               Content(Code(info="js", text="1")),
@@ -527,25 +527,25 @@ fn sig_center(sb : StringBuilder, center : Center) -> Unit {
   sb.write_string("R")
   sig_skeleton(sb, center.skeleton)
   sb.write_string("[")
-  for b in center.branches {
+  for b in center.slots {
     sb.write_string(
       match b.side {
         Right => ">"
         Left => "<"
       },
     )
-    sig_node(sb, b.node)
+    sig_branch(sb, b.branch)
   }
   sb.write_string("]")
 }
 
 ///|
-fn sig_node(sb : StringBuilder, node : Node) -> Unit {
+fn sig_branch(sb : StringBuilder, branch : Branch) -> Unit {
   sb.write_string("N")
-  sig_skeleton(sb, node.skeleton)
+  sig_skeleton(sb, branch.skeleton)
   sb.write_string("[")
-  for c in node.children {
-    sig_node(sb, c)
+  for c in branch.children {
+    sig_branch(sb, c)
   }
   sb.write_string("]")
 }
@@ -644,7 +644,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 木の指�
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/check_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` `Center` `Branch` `Node` `Skeleton` `Form` `doc_id`（Task 1）/ `make_*`（Task 1）
+- Consumes: `Doc` `Center` `Slot` `Branch` `Skeleton` `Form` `doc_id`（Task 1）/ `make_*`（Task 1）
 - Produces: `pub fn check(doc : Doc) -> Array[String]` — 破れを全部集めて返す（空 = 健全）
 
 - [ ] **Step 1: 失敗するテストを書く**
@@ -659,13 +659,13 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 木の指�
 test "健全な木では破れが 1 つも出ない" {
   let doc = make_doc([
     make_center(2, make_head("r"), [
-      make_branch(
+      make_slot(
         Right,
-        make_node(3, make_item("x"), [make_node(4, make_item("y"), [])]),
+        make_branch(3, make_item("x"), [make_branch(4, make_item("y"), [])]),
       ),
-      make_branch(
+      make_slot(
         Left,
-        make_node(5, Implicit, [make_node(6, make_head("b"), [])]),
+        make_branch(5, Implicit, [make_branch(6, make_head("b"), [])]),
       ),
     ]),
   ])
@@ -687,7 +687,7 @@ test "条件 1: id は文書内で一意。文書 id を名乗ったノードも
 test "条件 2: Implicit は子を持つ限りにおいて存在する" {
   let doc = make_doc([
     make_center(2, make_head("r"), [
-      make_branch(Right, make_node(7, Implicit, [])),
+      make_slot(Right, make_branch(7, Implicit, [])),
     ]),
   ])
   assert_eq(check(doc), ["Implicit に子が無い (id=7)"])
@@ -697,10 +697,10 @@ test "条件 2: Implicit は子を持つ限りにおいて存在する" {
 test "条件 3: Implicit の前の兄弟はすべて項目" {
   let doc = make_doc([
     make_center(2, make_head("r"), [
-      make_branch(Right, make_node(3, make_head("a"), [])),
-      make_branch(
+      make_slot(Right, make_branch(3, make_head("a"), [])),
+      make_slot(
         Right,
-        make_node(7, Implicit, [make_node(8, make_head("b"), [])]),
+        make_branch(7, Implicit, [make_branch(8, make_head("b"), [])]),
       ),
     ]),
   ])
@@ -713,9 +713,9 @@ test "条件 3: Implicit の前の兄弟はすべて項目" {
 test "条件 4: Implicit の子に項目は居ない" {
   let doc = make_doc([
     make_center(2, make_head("r"), [
-      make_branch(
+      make_slot(
         Right,
-        make_node(6, Implicit, [make_node(7, make_item("x"), [])]),
+        make_branch(6, Implicit, [make_branch(7, make_item("x"), [])]),
       ),
     ]),
   ])
@@ -726,10 +726,10 @@ test "条件 4: Implicit の子に項目は居ない" {
 test "条件 4: Implicit の連鎖は合法（C16）" {
   let doc = make_doc([
     make_center(2, make_head("r"), [
-      make_branch(
+      make_slot(
         Left,
-        make_node(3, Implicit, [
-          make_node(4, Implicit, [make_node(5, make_head("b"), [])]),
+        make_branch(3, Implicit, [
+          make_branch(4, Implicit, [make_branch(5, make_head("b"), [])]),
         ]),
       ),
     ]),
@@ -755,9 +755,9 @@ test "条件 5: 同じ親の子は項目が先、見出しが後" {
 test "条件 6: 項目の子孫はすべて項目" {
   let doc = make_doc([
     make_center(2, make_head("r"), [
-      make_branch(
+      make_slot(
         Right,
-        make_node(3, make_item("x"), [make_node(7, make_head("h"), [])]),
+        make_branch(3, make_item("x"), [make_branch(7, make_head("h"), [])]),
       ),
     ]),
   ])
@@ -798,10 +798,10 @@ pub fn check(doc : Doc) -> Array[String] {
       seen,
       r.id,
       r.skeleton,
-      r.branches.map(fn(b) { (b.node.id, b.node.skeleton) }),
+      r.slots.map(fn(b) { (b.branch.id, b.branch.skeleton) }),
     )
-    for b in r.branches {
-      check_node(faults, seen, b.node, is_item(r.skeleton))
+    for b in r.slots {
+      check_branch(faults, seen, b.branch, is_item(r.skeleton))
     }
   }
   faults
@@ -809,26 +809,26 @@ pub fn check(doc : Doc) -> Array[String] {
 
 ///|
 /// item = 祖先に項目が居るか（単調性の見張り）。
-fn check_node(
+fn check_branch(
   faults : Array[String],
   seen : Array[Int],
-  node : Node,
+  branch : Branch,
   item : Bool,
 ) -> Unit {
   // 条件 6: 項目の子孫はすべて項目（Implicit も違反）
-  if item && !is_item(node.skeleton) {
-    faults.push(fault("項目の子孫が項目でない", node.id))
+  if item && !is_item(branch.skeleton) {
+    faults.push(fault("項目の子孫が項目でない", branch.id))
   }
   check_one(
     faults,
     seen,
-    node.id,
-    node.skeleton,
-    node.children.map(fn(c) { (c.id, c.skeleton) }),
+    branch.id,
+    branch.skeleton,
+    branch.children.map(fn(c) { (c.id, c.skeleton) }),
   )
-  let deep = item || is_item(node.skeleton)
-  for c in node.children {
-    check_node(faults, seen, c, deep)
+  let deep = item || is_item(branch.skeleton)
+  for c in branch.children {
+    check_branch(faults, seen, c, deep)
   }
 }
 

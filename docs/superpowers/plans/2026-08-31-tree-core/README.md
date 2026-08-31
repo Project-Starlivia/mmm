@@ -7,13 +7,13 @@
 **Goal:** md と同型の文書モデルを MoonBit に新設し、parse / serialize / 操作 3 種 /
 反映 v0 までを、法則のファズで検証しながら作る。
 
-**Architecture:** テキストが真実。`parse` が md を役割型の木（Doc > Center > Branch > Node）に読み、
+**Architecture:** テキストが真実。`parse` が md を役割型の木（Doc > Center > Slot > Branch）に読み、
 `serialize` が正規形の md を吐く。操作は木を直接変異させ、差分を editSets として返す。
 型の異種性は**道具 4 つ（resolve / pluck / graft / amend）に幽閉**し、操作に腕を生やさない。
 正しさは 4 つの法則が持ち、実在コーパスとランダム生成の両方で機械検証する。
 
 **Tech Stack:** MoonBit（新パッケージ `mmm-app/core/tree`。外部依存ゼロ）/
-TypeScript（`node --test`。`@lezer/markdown` は法則 4 の外部審判）/ 旧 core とは別パッケージで共存。
+TypeScript（`branch --test`。`@lezer/markdown` は法則 4 の外部審判）/ 旧 core とは別パッケージで共存。
 
 **Spec:**
 - [文書モデル設計（憲法）](../../specs/2026-08-29-doc-model-design.md)

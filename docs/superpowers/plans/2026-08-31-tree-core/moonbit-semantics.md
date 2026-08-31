@@ -18,22 +18,22 @@
 Finished. moon: ran 2 tasks, now up to date (19 warnings, 0 errors)
 ```
 
-19 warning は全部 `struct_never_constructed` / `unused_constructor`（構築子を一度でも使えば消える。実際 `lib/useall.mbt` で全構築子を触ったら 0 warning になった）。相互再帰（Center → Array[Branch] → Branch → Node → Array[Node]、Skeleton → Array[Block] → Content）は前方参照も含めて**宣言順に関係なく通る**。
+19 warning は全部 `struct_never_constructed` / `unused_constructor`（構築子を一度でも使えば消える。実際 `lib/useall.mbt` で全構築子を触ったら 0 warning になった）。相互再帰（Center → Array[Slot] → Slot → Branch → Array[Branch]、Skeleton → Array[Block] → Content）は前方参照も含めて**宣言順に関係なく通る**。
 
 ---
 
 ## 1. struct は**参照**。取り出した先の変更は元に届く
 
 ```moonbit
-let doc = sample()          // centers[0].branches に 1 要素
+let doc = sample()          // centers[0].slots に 1 要素
 let r = doc.centers[0]
-r.branches.push({ side: Left, node: leaf(30) })
+r.slots.push({ side: Left, branch: leaf(30) })
 ```
 ```
-P1a doc.centers[0].branches.length = 2
-P1a r.branches.length = 2
+P1a doc.centers[0].slots.length = 2
+P1a r.slots.length = 2
 P1b physical_equal(a, b) = true                      // let a = doc.centers[0]; let b = doc.centers[0]
-P1b physical_equal(a.branches, b.branches) = true
+P1b physical_equal(a.slots, b.slots) = true
 P1c after grow = 2                                   // fn grow(r : Center) に渡しても同じ
 ```
 
@@ -44,49 +44,49 @@ P1c after grow = 2                                   // fn grow(r : Center) に�
 ## 3. 関数の戻り値を経由した変更も**元の木に届く**
 
 ```moonbit
-fn at(doc : Doc, path : Array[Int]) -> Node {
-  let mut node = doc.centers[path[0]].branches[path[1]].node
-  for k in 2..<path.length() { node = node.children[k] }
-  node
+fn at(doc : Doc, path : Array[Int]) -> Branch {
+  let mut branch = doc.centers[path[0]].slots[path[1]].branch
+  for k in 2..<path.length() { branch = branch.children[k] }
+  branch
 }
 let n = at(doc, [0, 0])
 n.children.push(leaf(40))
 ```
 ```
-P3 via return value = 1        // doc.centers[0].branches[0].node.children.length()
+P3 via return value = 1        // doc.centers[0].slots[0].branch.children.length()
 ```
 
 4 段の深さでも同じ（`5x`）:
 ```
-5x removed id = 40             // doc.centers[0].branches[0].node.children[0].children.remove(0)
+5x removed id = 40             // doc.centers[0].slots[0].branch.children[0].children.remove(0)
 5x owner len  = 0
 5x 元の doc に届いた = 0
-5x branches len = 2            // doc.centers[0].branches.insert(0, { side: Left, node: taken })
-5x branches[0].node.id = 40
+5x slots len = 2            // doc.centers[0].slots.insert(0, { side: Left, branch: taken })
+5x slots[0].branch.id = 40
 ```
 
 → **pluck / graft の「配列を掴んで remove / insert」は、深さに関係なく元の doc に直接効く。木の再構築は一切不要。**
 
 ---
 
-## 2. 入れ子の代入 — **`doc.centers[i].branches[j] = { ..b, side: Left }` は書ける**
+## 2. 入れ子の代入 — **`doc.centers[i].slots[j] = { ..b, side: Left }` は書ける**
 
 ```moonbit
-let b = doc.centers[0].branches[0]
-doc.centers[0].branches[0] = { ..b, side: Left }
+let b = doc.centers[0].slots[0]
+doc.centers[0].slots[0] = { ..b, side: Left }
 ```
 ```
 P2a side = Left
-P2a node id kept = 20
+P2a branch id kept = 20
 ```
 
 対して**フィールドへの直接代入は不可**（`lib/neg1.mbt`、その後削除）:
 ```moonbit
-doc.centers[0].branches[0].side = Left
+doc.centers[0].slots[0].side = Left
 ```
 ```
 Error: [4087]
- 3 │   doc.centers[0].branches[0].side = Left
+ 3 │   doc.centers[0].slots[0].side = Left
    │   ──────────────────┬─────────────────
    │                     ╰─────────────────── The record field side is immutable.
 Failed with 0 warnings, 1 errors.
@@ -104,7 +104,7 @@ Failed with 0 warnings, 1 errors.
 
 ## 4. `mut` フィールド — できること / できないこと
 
-対照型 `MBranch { mut side; mut node }` / `MRoot { mut skeleton; branches }` / `MNode { mut skeleton; children }` を作って比較。
+対照型 `MSlot { mut side; mut branch }` / `MRoot { mut skeleton; slots }` / `MBranch { mut skeleton; children }` を作って比較。
 
 | | 不変 `{ side : Side }` | `{ mut side : Side }` |
 |---|---|---|
@@ -121,19 +121,19 @@ Failed with 0 warnings, 1 errors.
 Error: [4036]
  8 │   { ..b, side: Left }
    │   ─────────┬─────────
-   │            ╰─────────── Cannot create values of the read-only type: @probe-a/lib.Branch.
+   │            ╰─────────── Cannot create values of the read-only type: @probe-a/lib.Slot.
 Error: [4021]
  8 │   { ..b, side: Left }
    │                ──┬─
    │                  ╰─── The value identifier Left is unbound.
 Error: [4036]
-14 │   doc.centers[0].branches[0] = { ..b, side: Left }
+14 │   doc.centers[0].slots[0] = { ..b, side: Left }
    │                              ─────────┬─────────
-   │                                       ╰─────────── Cannot create values of the read-only type: @probe-a/lib.Branch.
+   │                                       ╰─────────── Cannot create values of the read-only type: @probe-a/lib.Slot.
 Failed with 6 warnings, 9 errors.
 ```
 ```
-Error: [4094]（`pub struct MBranch` の mut フィールドへの別パッケージからの書き込み）
+Error: [4094]（`pub struct MSlot` の mut フィールドへの別パッケージからの書き込み）
  3 │   b.side = @lib.Left
    │   ─────────┬────────
    │            ╰────────── Cannot modify a read-only field: side
@@ -148,7 +148,7 @@ Finished. moon: ran 6 tasks, now up to date (2 warnings, 0 errors)
 
 一方、**Array フィールドの破壊的操作は `pub` のままで別パッケージからできる**（`user/read_wbtest.mbt`）:
 ```
-X2 branches after remove = 1     // doc.centers[0].branches.remove(0)
+X2 slots after remove = 1     // doc.centers[0].slots.remove(0)
 ```
 → `pub` は「読み取り専用」を意味しない。**配列の中身は素通し**。
 
@@ -156,15 +156,15 @@ X2 branches after remove = 1     // doc.centers[0].branches.remove(0)
 
 ## 5. 木の奥を書き替える 3 パターン — 実測比較
 
-### (a) 純粋な再構築（`amend_pure` + `amend_node_pure`）
+### (a) 純粋な再構築（`amend_pure` + `amend_branch_pure`）
 ```moonbit
 [i, j, .. rest] => {
   let centers = doc.centers.copy()
   let r = centers[i]
-  let branches = r.branches.copy()
-  let b = branches[j]
-  branches[j] = { ..b, node: amend_node_pure(b.node, rest, f) }
-  centers[i] = { ..r, branches, }
+  let slots = r.slots.copy()
+  let b = slots[j]
+  slots[j] = { ..b, branch: amend_branch_pure(b.branch, rest, f) }
+  centers[i] = { ..r, slots, }
   { ..doc, centers, }
 }
 ```
@@ -180,7 +180,7 @@ X2 branches after remove = 1     // doc.centers[0].branches.remove(0)
 match path {
   [] => ()
   [i] => doc.centers[i].skeleton = f(doc.centers[i].skeleton)
-  _ => { let n = mnode_at(doc, path[:]); n.skeleton = f(n.skeleton) }
+  _ => { let n = mbranch_at(doc, path[:]); n.skeleton = f(n.skeleton) }
 }
 ```
 ```
@@ -188,14 +188,14 @@ match path {
 5b 中間  = n30/false
 ```
 書き味: **最短（腕 3 本、深部は 2 行）**。落とし穴 3 つ:
-- `Center` と `Node` の両方に `mut skeleton` が要る＝**型が「書き替えられる」と宣言してしまう**
+- `Center` と `Branch` の両方に `mut skeleton` が要る＝**型が「書き替えられる」と宣言してしまう**
 - 定義パッケージ内で一度も書かないと `Error: [0015] unused_mut` でビルドが止まる（`moonbit-probe.md §3(f)` の再確認）
 - 別パッケージから書くには `pub(all)` が必須
 
 ### (c) 配列要素への代入（採用候補、`lib/ops.mbt` の `amend`）
 ```moonbit
 [.. head, last] => {
-  let owner = node_at(doc, head)
+  let owner = branch_at(doc, head)
   let n = owner.children[last]
   owner.children[last] = { ..n, skeleton: f(n.skeleton) }
 }
@@ -206,11 +206,11 @@ O6 slot  = n2!/true
 O6 深部  = n4!/true
 O6 中間は無傷 = n3/false
 ```
-書き味: `mut` ゼロ、戻り値なし（`Unit`）、元の doc がその場で更新される。落とし穴は 1 つだけ — **`[i, j]`（スロット）の腕だけは Branch と Node の 2 段を包み直す**:
+書き味: `mut` ゼロ、戻り値なし（`Unit`）、元の doc がその場で更新される。落とし穴は 1 つだけ — **`[i, j]`（スロット）の腕だけは Slot と Branch の 2 段を包み直す**:
 ```moonbit
 [i, j] => {
-  let b = doc.centers[i].branches[j]
-  doc.centers[i].branches[j] = { ..b, node: { ..b.node, skeleton: f(b.node.skeleton) } }
+  let b = doc.centers[i].slots[j]
+  doc.centers[i].slots[j] = { ..b, branch: { ..b.branch, skeleton: f(b.branch.skeleton) } }
 }
 ```
 
@@ -233,11 +233,11 @@ match path { []; [i]; [i, j]; [i, j, .. rest] }
 6b split_path([5]) = center:5
 ```
 
-**`.. rest` で束縛される `rest` の型は `ArrayView[Int]`**（`Array[Int]` ではない）。`Array[Int]` を取る関数に渡すときは `path[:]` でビューに落とす。`ArrayView` に対しても同じ配列パターンが使える（`amend_node_pure` / `mnode_at` で実測）。`rest[0:rest.length() - 1]` のビューの再スライスも通る。
+**`.. rest` で束縛される `rest` の型は `ArrayView[Int]`**（`Array[Int]` ではない）。`Array[Int]` を取る関数に渡すときは `path[:]` でビューに落とす。`ArrayView` に対しても同じ配列パターンが使える（`amend_branch_pure` / `mbranch_at` で実測）。`rest[0:rest.length() - 1]` のビューの再スライスも通る。
 
 **末尾束縛 `[.. head, last]` が通ることが今回の最大の収穫** — pluck の深部の腕がこれ 1 行になる:
 ```moonbit
-[.. head, last] => Some(Limb(node_at(doc, head).children.remove(last)))
+[.. head, last] => Some(Part(branch_at(doc, head).children.remove(last)))
 ```
 
 ---
@@ -316,13 +316,13 @@ let fold = fn(s : Skeleton) -> Skeleton { ... }   // let 束縛（型注釈は�
 9 out = H/hello/true/1
 9 identity closure ok = true
 ```
-`Array::map` / `filter` へのクロージャ、再帰関数を名前で渡す形（`n.children.map(clone_node)`）も動く。
+`Array::map` / `filter` へのクロージャ、再帰関数を名前で渡す形（`n.children.map(clone_branch)`）も動く。
 
 ---
 
 ## 11. 3 つの型を歩く再帰関数（trait 無し）— **素直に書ける**
 
-`Doc → Center → Branch → Node → Node` を型ごとに関数を分ける形（`sig_center` / `sig_node`）で通る。
+`Doc → Center → Slot → Branch → Branch` を型ごとに関数を分ける形（`sig_center` / `sig_branch`）で通る。
 
 ```
 O1 shape = doc(R1[>2(3(4))] R5[<6])
@@ -354,7 +354,7 @@ Explicit(form~, label~, folded=true, body~)
 9 out = H/hello/true/1
 O6 center = r1!/true
 ```
-struct 側の punning も通る: `{ side, node: as_node(sub) }` / `{ ..doc, centers, }` / `{ ..b, side, }`（**末尾のカンマが要る** — `{ ..doc, centers }` は書けるが `moon fmt` が `{ ..doc, centers, }` に寄せる）。
+struct 側の punning も通る: `{ side, branch: as_branch(sub) }` / `{ ..doc, centers, }` / `{ ..b, side, }`（**末尾のカンマが要る** — `{ ..doc, centers }` は書けるが `moon fmt` が `{ ..doc, centers, }` に寄せる）。
 
 ---
 
@@ -380,15 +380,15 @@ doc.body.is_empty()
 
 ### A. **エイリアシングの罠**（struct が参照であることの直接の帰結）
 
-同じ `Sub` を 2 回 graft すると、**中の Node が物理的に共有される**:
+同じ `Sub` を 2 回 graft すると、**中の Branch が物理的に共有される**:
 ```
 A1 shape = doc(R2[>3(4)] R2[>3(4)] R1[] R5[<6])
 A1 深部ノードは共有 physical_equal = true
 A1 片方を空にすると もう一方 = doc(R2[>3 <77] R2[>3] R1[] R5[<6])   ← 両方から 4 が消えた
 ```
-（`as_center` / `as_node` が新しい struct と `.map` の新配列を作る層だけは隔離される: `A1 physical_equal(centers[0], centers[1]) = false`、`A1 centers[1].branches len = 1`。**1 段だけ守られて 2 段目から共有**という一番危ない形。）
+（`as_center` / `as_branch` が新しい struct と `.map` の新配列を作る層だけは隔離される: `A1 physical_equal(centers[0], centers[1]) = false`、`A1 centers[1].slots len = 1`。**1 段だけ守られて 2 段目から共有**という一番危ない形。）
 
-隔離が要るなら明示の深いコピーが要る（`{ ..n, children: n.children.map(clone_node) }`、3 関数で書ける）:
+隔離が要るなら明示の深いコピーが要る（`{ ..n, children: n.children.map(clone_branch) }`、3 関数で書ける）:
 ```
 A2 元 = doc(R1[>2(3(4))] R5[<6])
 A2 複 = doc(R1[] R5[<6])
@@ -417,16 +417,16 @@ Warning: [0029]
 
 - **struct は参照。コピーは一度も起きない。**（`physical_equal(doc.centers[0], doc.centers[0]) == true`）関数の戻り値・引数を経由しても同一実体。→ `resolve` が返す `Path` の代わりに「ノードそのもの」を返す設計も物理的には成立するが、**不変フィールドの差し替えに親の配列 + index が要る**ので Path のままが正しい。
 - **不変 struct + 可変 Array の組み合わせで、道具 4 つは全部書ける。`mut` は 1 つも要らない。** `lib/ops.mbt`（`resolve` / `pluck` / `graft` / `amend` / `set_side`）が `mut` ゼロで `moon check` 0 errors、`moon test` 28/28 pass。
-- **腕数は 3 で止まった。** `pluck` 3 腕（centers / branches / children）、`graft` 3 腕 + 変換 2 関数（`as_center` / `as_node`）、`resolve` 腕なし。move の 9 組合せのうち代表 4 本を実測して全部通った:
+- **腕数は 3 で止まった。** `pluck` 3 腕（centers / slots / children）、`graft` 3 腕 + 変換 2 関数（`as_center` / `as_branch`）、`resolve` 腕なし。move の 9 組合せのうち代表 4 本を実測して全部通った:
   ```
   O2 深い枝 → 別 center のスロット   = doc(R1[>2] R5[>3(4) <6])
-  O3 スロット → doc 直下（Limb→Center 化） = doc(R2[>3(4)] R1[] R5[<6])
+  O3 スロット → doc 直下（Part→Center 化） = doc(R2[>3(4)] R1[] R5[<6])
   O4 center → スロット（Tree 解体）  = doc(R1[>2(3(4)) <5(6)])
   O5 center の並べ替え（Tree 無変換） = doc(R5[<6] R1[>2(3(4))])
   O7 set_side                      = doc(R1[<2(3(4))] R5[<6])
   ```
   O4 が `<5(6)` になっている＝**Tree 解体で side が消え、行き先の `side` 引数（Left）が採られた**。「側は場所の属性」が型と実装の両方で成立している。
-- **`amend` だけが 4 腕**（`[]` / `[i]` / `[i, j]` / `[.. head, last]`）。原因は 1 つ — **スロットのノードは `Array[Node]` ではなく `Branch` の中に居る**。`Branch` に `mut node : Node` を 1 つ足すだけで 3 腕になる（`opsmut.mbt` の `amend_m` で実測）。**これが「殺す条件」の唯一のきしみ**。今は 4 腕で止まっているので許容範囲だが、`amend` に 5 本目が生えたらこの `mut` 1 個を検討する順序が正しい。
+- **`amend` だけが 4 腕**（`[]` / `[i]` / `[i, j]` / `[.. head, last]`）。原因は 1 つ — **スロットのノードは `Array[Branch]` ではなく `Slot` の中に居る**。`Slot` に `mut branch : Branch` を 1 つ足すだけで 3 腕になる（`opsmut.mbt` の `amend_m` で実測）。**これが「殺す条件」の唯一のきしみ**。今は 4 腕で止まっているので許容範囲だが、`amend` に 5 本目が生えたらこの `mut` 1 個を検討する順序が正しい。
 - **`pub` では別パッケージから組み立てられない。** テストを別パッケージ（blackbox）に置く／JS エクスポート層が `Doc` を作るなら、**全型を `pub(all)` にする以外にない**（`[4036] Cannot create values of the read-only type`）。一方で `pub` のままでも**配列の中身は素通しで壊せる**ので、`pub` に封じ込めの効果を期待してはならない。
 - **`insert` の範囲外は catch 不能な panic。** graft は `at` を `[0, len]` に clamp する契約を持つこと。
 - **エイリアシングは型で防げない。** 同じ `Sub` の二重 graft、あるいは pluck 前の `Sub` の保持で木が物理共有される（実測: 片方を空にすると両方から消える）。**`Sub` は「一度だけ使える通貨」という不変条件を op.mbt 内で守る必要がある**（graft が `Sub` を消費する API 形か、graft 後の再利用を型で禁じる工夫）。id 一意性の check がここを拾える保険にはなる（二重 graft で id 2/3/4 が重複した）。
@@ -439,16 +439,16 @@ Warning: [0029]
 **理由**:
 
 1. **`mut` が 1 つも要らない。** 型が「書き替えられる場所」を宣言しないので、憲法の「型で殺す」方針と衝突しない。`unused_mut` の地雷（`[0015]`、定義パッケージ内で一度書かないとビルドが止まる）も、`pub(all)` 強制の連鎖も踏まない。
-2. **pluck / graft と同じ地面に立っている。** pluck/graft は「所有する配列 + index」で書く以外にない（`Array::remove` / `insert`）。amend も同じ座標系で書けるので、`node_at(doc, head)` という**ヘルパ 1 本を 4 つの道具全部が共有する**。(a) 純粋形はここで座標系が割れる（doc を作り直すので pluck/graft と混ぜられない）。
+2. **pluck / graft と同じ地面に立っている。** pluck/graft は「所有する配列 + index」で書く以外にない（`Array::remove` / `insert`）。amend も同じ座標系で書けるので、`branch_at(doc, head)` という**ヘルパ 1 本を 4 つの道具全部が共有する**。(a) 純粋形はここで座標系が割れる（doc を作り直すので pluck/graft と混ぜられない）。
 3. **元の doc がその場で更新される。** 戻り値は `Unit`。JS 側が保持する参照、id 表、履歴の基準点が差し替わらない。(a) は毎回 `Doc` が別物になるので、統一サイクル（md が変わった → projectJson → render）の入口で誰が最新の `Doc` を持つかという問いを新たに生む。
-4. **腕は 3 で止まった。** amend の 4 腕目はスロット 1 箇所だけで、しかもそれは (b) でも (a) でも構造的に同じ場所（Branch という包み）に生じるコストであり、(c) 固有の負債ではない。
+4. **腕は 3 で止まった。** amend の 4 腕目はスロット 1 箇所だけで、しかもそれは (b) でも (a) でも構造的に同じ場所（Slot という包み）に生じるコストであり、(c) 固有の負債ではない。
 
 **採るべき綴り**（`lib/ops.mbt` そのまま、`moon check` 0 errors / `moon test` 28/28 pass）:
 
 ```moonbit
-fn node_at(doc : Doc, path : ArrayView[Int]) -> Node {
+fn branch_at(doc : Doc, path : ArrayView[Int]) -> Branch {
   guard! path is [i, j, .. rest]
-  let mut n = doc.centers[i].branches[j].node
+  let mut n = doc.centers[i].slots[j].branch
   for k in rest { n = n.children[k] }
   n
 }
@@ -457,21 +457,21 @@ pub fn pluck(doc : Doc, path : Array[Int]) -> Sub? {
   match path {
     [] => None
     [i] => Some(Whole(doc.centers.remove(i)))
-    [i, j] => Some(Limb(doc.centers[i].branches.remove(j).node))
-    [.. head, last] => Some(Limb(node_at(doc, head).children.remove(last)))
+    [i, j] => Some(Part(doc.centers[i].slots.remove(j).branch))
+    [.. head, last] => Some(Part(branch_at(doc, head).children.remove(last)))
   }
 }
 
 pub fn graft(doc : Doc, parent : Array[Int], at : Int, sub : Sub, side : Side) -> Unit {
   match parent {
     [] => doc.centers.insert(at, as_center(sub))
-    [i] => doc.centers[i].branches.insert(at, { side, node: as_node(sub) })
-    _ => node_at(doc, parent[:]).children.insert(at, as_node(sub))
+    [i] => doc.centers[i].slots.insert(at, { side, branch: as_branch(sub) })
+    _ => branch_at(doc, parent[:]).children.insert(at, as_branch(sub))
   }
 }
 ```
 
-**併せて計画に書くべき制約**: (i) `graft` は `at` を clamp する（`insert` の範囲外は catch 不能）、(ii) `Sub` は一度しか graft してはならない（エイリアシング）、(iii) 型は `pub(all)`（別パッケージのテスト / JS 層が構築するなら必須）、(iv) `Center` / `Node` の `skeleton` を `mut` にする誘惑は `amend` に 5 本目の腕が生えるまで保留。
+**併せて計画に書くべき制約**: (i) `graft` は `at` を clamp する（`insert` の範囲外は catch 不能）、(ii) `Sub` は一度しか graft してはならない（エイリアシング）、(iii) 型は `pub(all)`（別パッケージのテスト / JS 層が構築するなら必須）、(iv) `Center` / `Branch` の `skeleton` を `mut` にする誘惑は `amend` に 5 本目の腕が生えるまで保留。
 
 ---
 
