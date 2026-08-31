@@ -6,17 +6,9 @@
   "type": "module",
   "packageManager": "pnpm@11.21.0",
   "scripts": {
-    "core": "cd core && moon build --target js --release",
-    "dev": "pnpm run core && vite",
-    "build": "pnpm run core && tsc --noEmit && vite build",
-    "test": "node --test \"test/*.test.ts\"",
-    "test:core": "cd core && moon test -p mmm-app/core",
-    "check": "tsc --noEmit && tsc -p test --noEmit",
-    "perf": "pnpm run core && node test/tools/perf.ts",
-    "fixtures": "node test/tools/gen-load.ts",
-    "preview": "vite preview",
-    "deploy": "pnpm run build && wrangler deploy",
-    "deploy:dry": "wrangler deploy --dry-run"
+    "check:core": "cd core && moon check && moon fmt --check tree",
+    "test:core": "cd core && moon test -p mmm-app/core/tree",
+    "fixtures": "node test/tools/gen-load.ts"
   },
   "devDependencies": {
     "@lezer/markdown": "^1.7.2",
