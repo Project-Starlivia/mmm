@@ -2511,7 +2511,7 @@ moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt --check tree
 Expected:
 - `Total tests: 293, passed: 293, failed: 0.`
   （内訳 — 旧 core `mmm-app/core` が **192**（`out/repo.md` の実測）+ 新パッケージ
-  `mmm-app/core/tree` が **101**（G1 25 + G2 23 + G3 21 + G5 32。契約 §16）。
+  `mmm-app/core/tree` が **103**（G1 25 + G2 25 + G3 21 + G5 32。契約 §16）。
   **`Total tests: 0` なら `-p` の綴り間違い**。契約 §17 の罠）
 - `moon fmt --check tree` は EXIT=0（失敗は EXIT=127）。
   **`tree/js` は対象に入れない** — 裁定 3 の依存順で G5 は G4 より前に走り、

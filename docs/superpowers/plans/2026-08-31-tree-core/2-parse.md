@@ -939,6 +939,22 @@ test "後ろに中身が続く `---` は隙間ではなく飾り" {
 test "木と木の間の区切りは側にならない" {
   assert_eq(parse_sig("# r\n\n---\n\n# s\n"), "D-n()[Reh_1:r(r)[]Reh_1:s()[]]")
 }
+
+///|
+test "最初の木より前の区切りは doc の body に落ちる" {
+  // 憲法 §2「木と木の間（doc 直下の隙間）の区切りは無意味のまま」。
+  // トグルになれるのは root 直下の翼の前だけで、level 1 の見出しの前は doc 直下。
+  // 側にはならないが**消えもしない** — doc.body の Rule として着地する
+  assert_eq(parse_sig("x\n\n---\n\n# r\n"), "D-n(o1:xr)[Reh_1:r()[]]")
+}
+
+///|
+test "同じ位置でも次が深い見出しなら先頭トグルになる" {
+  // 上と 1 文字違い（`# r` → `## a`）。`## a` は level 2 なので Implicit の root が
+  // 導出され、その**翼の前の隙間**に区切りが居ることになる。Implicit は骨格行を
+  // 書かないので、doc 直下の隙間と翼の前の隙間が textual に重なる
+  assert_eq(parse_sig("x\n\n---\n\n## a\n"), "D-n(o1:x)[Ri[<Neh_1:a()[]]]")
+}
 ```
 
 備考: 1 本目が C4 の読み戻し（先頭トグル = 左開始。2 本連続は元へ戻る）。2 本目が C16（占有者が Implicit でも
@@ -950,7 +966,7 @@ test "木と木の間の区切りは側にならない" {
 
 Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/parse_wbtest.mbt`
 Expected: 区切りが全部その場の飾りになっているので、側が立たず body に Rule が増える。
-`Total tests: 17, passed: 12, failed: 5.` EXIT=2
+`Total tests: 19, passed: 12, failed: 7.` EXIT=2
 
 ```
 [mmm-app/core] test tree/parse_wbtest.mbt:… ("隙間の `---` は次の翼の側を裏返す") failed: … FAILED: `"D-n()[Reh_1:r()[>Neh_1:a(r)[]>Neh_1:b()[]]]" != "D-n()[Reh_1:r()[>Neh_1:a()[]<Neh_1:b()[]]]"`
@@ -1108,7 +1124,7 @@ fn to_root(f : Frame) -> Root {
 - [ ] **Step 4: テストを走らせて通過を確認**
 
 Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/parse_wbtest.mbt`
-Expected: `Total tests: 17, passed: 17, failed: 0.` EXIT=0
+Expected: `Total tests: 19, passed: 19, failed: 0.` EXIT=0
 
 - [ ] **Step 5: コミット**
 
@@ -1195,7 +1211,7 @@ test "summary は details の直後の 1 枚だけ読み飛ばす（法則 1・2
 
 Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/parse_wbtest.mbt`
 Expected: `<details>` も `<summary>` も `_ => ()` と Verse の腕に落ちて何も起きない。
-`Total tests: 20, passed: 17, failed: 3.` EXIT=2（実測）
+`Total tests: 22, passed: 19, failed: 3.` EXIT=2（実測）
 
 ```
 [mmm-app/core] test tree/parse_wbtest.mbt:… ("details は骨格行の外側を包む") failed: … FAILED: `"D-n()[Reh_1:r()[>Neh_1:a()[Neh_1:b()[]]]]" != "D-n()[Reh_1:r()[>Neh^1:a()[Neh_1:b()[]]]]"`
@@ -1332,7 +1348,7 @@ fn is_summary(text : String) -> Bool {
 - [ ] **Step 4: テストを走らせて通過を確認**
 
 Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/parse_wbtest.mbt`
-Expected: `Total tests: 20, passed: 20, failed: 0.` EXIT=0
+Expected: `Total tests: 22, passed: 22, failed: 0.` EXIT=0
 
 - [ ] **Step 5: コミット**
 
@@ -1437,7 +1453,7 @@ test "read は Token の列だけで木を建てる" {
 - [ ] **Step 2: テストを走らせて、最初から通ることを確認**
 
 Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/parse_wbtest.mbt`
-Expected: `Total tests: 23, passed: 23, failed: 0.` EXIT=0
+Expected: `Total tests: 25, passed: 25, failed: 0.` EXIT=0
 
 破れたときの読み方（違反の逐語は契約 §7）:
 
@@ -1466,7 +1482,7 @@ Expected:
   parse.mbt 由来の警告は 0 であること）
 - `moon … fmt --check tree` → `Finished. moon: ran N tasks, now up to date` EXIT=0（失敗は **EXIT=127**）
 - `moon … test -p …` → `failed: 0.` EXIT=0。**`Total tests:` が 0 でないことを目で見る**
-  （`-p` の綴り間違いは黙って緑になる）。他群と並行しているので総数は動く — **G2 の取り分は 23 本**。
+  （`-p` の綴り間違いは黙って緑になる）。他群と並行しているので総数は動く — **G2 の取り分は 25 本**。
 
 - [ ] **Step 4: コミット**
 

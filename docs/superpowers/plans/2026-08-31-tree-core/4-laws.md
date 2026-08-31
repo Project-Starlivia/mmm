@@ -135,7 +135,7 @@ G4 は自分の所有ファイル以外を直さない。
 | TS | `test/treeOps.test.ts` | 5 |
 | TS | （G4 合計） | **37** |
 
-新パッケージの mbt 合計は 111 本（G1 25 / G2 23 / G3 21 / G5 32 / G4 10）。
+新パッケージの mbt 合計は 113 本（G1 25 / G2 25 / G3 21 / G5 32 / G4 10）。
 旧 core が 192 本なので、`pnpm run test:core` の締めは **303 本**。
 
 ---
@@ -739,7 +739,7 @@ export function sig(md: MoonBit.String): MoonBit.String;
 Run: `pnpm run test:core`
 （cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: `Total tests: 301, passed: 301, failed: 0.` EXIT=0
-（旧 core 192 + G1 25 + G2 23 + G3 21 + G5 32 + G4 の json 5・project 3 = 301。
+（旧 core 192 + G1 25 + G2 25 + G3 21 + G5 32 + G4 の json 5・project 3 = 303。
 `laws_wbtest` の 2 本は Task 68 で足すので、締めの Task 71 で 303 になる。
 **`Total tests: 0` なら `-p` の綴りを疑う** — 契約 §17 の罠）
 
@@ -2519,7 +2519,7 @@ Expected: `Warning: package \`mmm-app/core/nope\` not found` /
 Run: `pnpm run test:core`
 （cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: `Total tests: 303, passed: 303, failed: 0.` EXIT=0
-（旧 core 192 + 新パッケージ 111 = G1 25 + G2 23 + G3 21 + G5 32 + G4 10）
+（旧 core 192 + 新パッケージ 113 = G1 25 + G2 25 + G3 21 + G5 32 + G4 10）
 
 Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test -p mmm-app/core -p mmm-app/core/tree`
 Expected: 同じく `Total tests: 303, passed: 303, failed: 0.` EXIT=0（群の締めだけ `-p`）
@@ -2762,7 +2762,7 @@ pnpm test                                                     ℹ fail 0
 （`<root>` = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 
 新しく緑になっている mbt のテスト本数: `json_wbtest` 5 / `project_wbtest` 3 /
-`laws_wbtest` 2 = **10 本**（新パッケージ全体で 111 本）。
+`laws_wbtest` 2 = **10 本**（新パッケージ全体で 113 本）。
 新しく緑になっている TS のテスト本数: `treeLaws` 12 / `treeDialect` 3 /
 `treeCases` 17 / `treeOps` 5 = **37 本**。
 

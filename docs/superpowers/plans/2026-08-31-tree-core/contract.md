@@ -1685,7 +1685,7 @@ const READING: { md: string; sig: string; why: string }[] = [
 | `core/tree/check_wbtest.mbt` | G1 | 6 条件それぞれの破れと、健全な木で空になること | — |
 | `core/tree/sig_wbtest.mbt` | G1 | §8 の例 3 つ + 長さ前置の曖昧さの無さ | — |
 | （G1 合計） | | | **25** |
-| `core/tree/parse_wbtest.mbt` | G2 | 骨格の認定・Implicit の導出・側の割り当て・畳み・`<summary>` | **23** |
+| `core/tree/parse_wbtest.mbt` | G2 | 骨格の認定・Implicit の導出・側の割り当て・畳み・`<summary>` | **25** |
 | `core/tree/serialize_wbtest.mbt` | G3 | 正規形の綴り 1 つずつ + `spell` の値 | **21** |
 | `core/tree/tool_wbtest.mbt` | G5 | 道具 5 本・graft の変換表・腕数 | 6 |
 | `core/tree/op_wbtest.mbt` | G5 | move 9 組合せ / flipSide / delete / 拒否 | 19 |
@@ -1696,7 +1696,7 @@ const READING: { md: string; sig: string; why: string }[] = [
 | `core/tree/laws_wbtest.mbt` | G4 | 木の生成器と法則 1 の本丸 | 2 |
 | （G4 mbt 合計） | | | **10** |
 
-**mbt 合計 111 本。**
+**mbt 合計 113 本。**
 
 **制約（実測）**: 同一パッケージの `*_wbtest.mbt` は名前空間を共有し、同名のトップレベル定義は
 `Error: [4051] ... is declared twice`。**ヘルパ名はそのファイルの接頭辞で始めること**
@@ -1716,7 +1716,7 @@ const READING: { md: string; sig: string; why: string }[] = [
 | `test/treeCases.test.ts` | G4 | カタログ C1〜C17 | **17** |
 | `test/treeOps.test.ts` | G4 | 操作の性質のファズ（設計は G5 由来） | **5** |
 
-**TS 合計 37 本。総計 148 本。**
+**TS 合計 37 本。総計 150 本。**
 
 既存の `test/_helpers.ts` と `test/*.test.ts` は**そのまま残す**（旧 core を守る）。
 `branch --test "test/*.test.ts"` の glob が新しい 4 本を自動で拾う。`_tree.ts` は `_` 始まりなので
