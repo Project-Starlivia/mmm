@@ -3,7 +3,13 @@
 // ここは**見るための道具**なので、解釈は 1 つも持たない。
 // 規則はすべて core にあり、この画面はその出力を並べるだけ。
 
+import { EditorView, keymap, lineNumbers } from "@codemirror/view";
+import { EditorState } from "@codemirror/state";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { markdown } from "@codemirror/lang-markdown";
+import { oneDark } from "@codemirror/theme-one-dark";
 import * as mbt from "../core/_build/js/release/build/tree/js/js.js";
+import { paintAst, paintJson, paintSig } from "./paint.ts";
 
 /** 見て回りたくなる形を、最初から手元に置いておく。 */
 const SAMPLES: [string, string][] = [
@@ -21,13 +27,6 @@ const SAMPLES: [string, string][] = [
   ["7 個以上の #", "###### f\n\n####### g\n"],
 ];
 
-const md = pick<HTMLTextAreaElement>("md", HTMLTextAreaElement);
-const out = {
-  ast: pick<HTMLPreElement>("ast", HTMLPreElement),
-  sig: pick<HTMLPreElement>("sig", HTMLPreElement),
-  json: pick<HTMLPreElement>("json", HTMLPreElement),
-};
-
 /** 名乗らせず確かめる（外れていても誰も気づけないため）。 */
 function pick<T extends Element>(id: string, kind: new () => T): T {
   const el = document.getElementById(id);
@@ -35,11 +34,16 @@ function pick<T extends Element>(id: string, kind: new () => T): T {
   return el;
 }
 
-function show(): void {
-  const text = md.value;
-  out.ast.textContent = mbt.astSig(text);
-  out.sig.textContent = mbt.treeSig(text);
-  out.json.textContent = pretty(mbt.treeJson(text));
+const out = {
+  ast: pick("ast", HTMLPreElement),
+  sig: pick("sig", HTMLPreElement),
+  json: pick("json", HTMLPreElement),
+};
+
+function show(text: string): void {
+  out.ast.replaceChildren(paintAst(mbt.astSig(text)));
+  out.sig.replaceChildren(paintSig(mbt.treeSig(text)));
+  out.json.replaceChildren(paintJson(pretty(mbt.treeJson(text))));
   localStorage.setItem("mmm-lab", text);
 }
 
@@ -52,18 +56,35 @@ function pretty(s: string): string {
   }
 }
 
-const samples = pick<HTMLDivElement>("samples", HTMLDivElement);
+const editor = new EditorView({
+  parent: pick("md", HTMLDivElement),
+  state: EditorState.create({
+    doc: localStorage.getItem("mmm-lab") ?? SAMPLES[0][1],
+    extensions: [
+      lineNumbers(),
+      history(),
+      keymap.of([...defaultKeymap, ...historyKeymap]),
+      markdown(),
+      oneDark,
+      EditorView.lineWrapping,
+      EditorView.updateListener.of((v) => {
+        if (v.docChanged) show(v.state.doc.toString());
+      }),
+    ],
+  }),
+});
+
+const samples = pick("samples", HTMLDivElement);
 for (const [name, text] of SAMPLES) {
   const b = document.createElement("button");
   b.textContent = name;
   b.addEventListener("click", () => {
-    md.value = text;
-    show();
-    md.focus();
+    editor.dispatch({
+      changes: { from: 0, to: editor.state.doc.length, insert: text },
+    });
+    editor.focus();
   });
   samples.append(b);
 }
 
-md.value = localStorage.getItem("mmm-lab") ?? SAMPLES[0][1];
-md.addEventListener("input", show);
-show();
+show(editor.state.doc.toString());

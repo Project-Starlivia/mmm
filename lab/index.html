@@ -17,20 +17,20 @@
 
     <main>
       <section class="pane">
-        <label for="md">md</label>
-        <textarea id="md" spellcheck="false"></textarea>
+        <label>md</label>
+        <div id="md" class="editor"></div>
         <div class="samples" id="samples"></div>
       </section>
 
       <section class="pane">
-        <label for="ast">① AST の指紋<span>種類[原文の範囲]</span></label>
+        <label>① AST の指紋<span>種類[原文の範囲]</span></label>
         <pre id="ast"></pre>
 
-        <label for="sig">② 木の指紋<span># 見出し · Implicit &gt; 右 &lt; 左</span></label>
+        <label>② 木の指紋<span># 見出し · Implicit &gt; 右 &lt; 左</span></label>
         <pre id="sig"></pre>
 
-        <label for="json">③ 木ぜんぶ</label>
-        <pre id="json"></pre>
+        <label>③ 木ぜんぶ</label>
+        <pre id="json" class="grow"></pre>
       </section>
     </main>
 
