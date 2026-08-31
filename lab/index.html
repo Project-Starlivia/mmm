@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mmm lab — md がどう読まれるか</title>
+    <link rel="stylesheet" href="./lab.css" />
+  </head>
+  <body>
+    <header>
+      <h1>mmm lab</h1>
+      <p>
+        md を打つと、<b>ライブラリの読み</b>と<b>mmm の木</b>が出る。
+        どちらが変かで、AST の問題か build の問題かが分かれる。
+      </p>
+    </header>
+
+    <main>
+      <section class="pane">
+        <label for="md">md</label>
+        <textarea id="md" spellcheck="false"></textarea>
+        <div class="samples" id="samples"></div>
+      </section>
+
+      <section class="pane">
+        <label for="ast">① AST の指紋<span>種類[原文の範囲]</span></label>
+        <pre id="ast"></pre>
+
+        <label for="sig">② 木の指紋<span># 見出し · Implicit &gt; 右 &lt; 左</span></label>
+        <pre id="sig"></pre>
+
+        <label for="json">③ 木ぜんぶ</label>
+        <pre id="json"></pre>
+      </section>
+    </main>
+
+    <script type="module" src="./lab.ts"></script>
+  </body>
+</html>

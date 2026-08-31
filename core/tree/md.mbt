@@ -13,3 +13,47 @@
 pub fn read(md : String) -> @markdown.Document {
   @markdown.parse(md).document
 }
+
+///|
+/// ブロック 1 枚の指紋。`種類[from,to]`。入れ子は括弧の中に並べる。
+fn dump(b : @markdown.Block) -> String {
+  match b {
+    ThematicBreak(marker~, count~, span~, ..) =>
+      "Rule\{marker}\{count}\{at(span)}"
+    Heading(level~, style~, span~, ..) => "H\{level}\{style}\{at(span)}"
+    Paragraph(span~, ..) => "P\{at(span)}"
+    FencedCode(info~, span~, ..) => "Fence(\{info})\{at(span)}"
+    IndentedCode(span~, ..) => "Indent\{at(span)}"
+    HtmlBlock(span~, ..) => "Html\{at(span)}"
+    BlankLines(count~, span~) => "Blank\{count}\{at(span)}"
+    BulletList(marker~, tight~, items~, span~, ..) =>
+      "List\{marker}\{tight}\{at(span)}(\{items.length()})"
+    OrderedList(items~, span~, ..) => "Ord\{at(span)}(\{items.length()})"
+    Blockquote(span~, ..) => "Quote\{at(span)}"
+    Table(span~, ..) => "Table\{at(span)}"
+    _ => "?"
+  }
+}
+
+///|
+fn at(s : @markdown.Span) -> String {
+  "[\{s.from},\{s.to}]"
+}
+
+///|
+/// 文書ぜんぶの指紋。frontmatter が在れば頭に付く。
+pub fn ast_sig(md : String) -> String {
+  let doc = read(md)
+  let sb = StringBuilder::new()
+  match doc.frontmatter {
+    Some(f) => sb.write_string("Front\{at(f.span)} ")
+    None => ()
+  }
+  for i, b in doc.children {
+    if i > 0 {
+      sb.write_string(" ")
+    }
+    sb.write_string(dump(b))
+  }
+  sb.to_string()
+}

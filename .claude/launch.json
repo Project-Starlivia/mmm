@@ -2,22 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "mmm",
+      "name": "mmm-lab",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "run",
-        "dev"
-      ],
-      "port": 13131
-    },
-    {
-      "name": "mmm-dist",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "run",
-        "preview"
-      ],
-      "port": 4173
+      "runtimeArgs": ["run", "lab"],
+      "port": 13132
     }
   ]
 }
