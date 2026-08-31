@@ -22,3 +22,7 @@ keywords = []
 preferred_target = "js"
 
 description = ""
+
+import {
+  "mizchi/markdown@0.8.3",
+}
