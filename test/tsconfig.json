@@ -17,6 +17,6 @@
     "../src/app/externalChange.ts"
   ],
   // 計測ハーネスは playwright を要求し、ブラウザ側で評価する式に DOM を含む。
-  // どちらもここには無いので型チェックの対象外（docs/audit/PERF.md 参照）。
+  // どちらもここには無いので型チェックの対象外。
   "exclude": ["tools/perf.ts", "tools/perf-detail.ts", "tools/perf-heap.ts"]
 }

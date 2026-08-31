@@ -1,8 +1,8 @@
 // フェーズ3: 構造コマンド・undo/redo・hide/show の往復性質。
 // 実行: pnpm test
 //
-// 発見された不具合は docs/audit/FINDINGS.md に F-0xx として記録し、
-// 直った後もこのファイルのテストを回帰ガードとして残している。
+// 監査で見つけた不具合は F-0xx として名前を付け、直った後もその形の
+// テストを回帰ガードとしてここに残している。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -249,7 +249,7 @@ test("C9a: indent は全ノードの id を保存する", () => {
 // F-004（outdent で id が捨てられ選択が外れる）の回帰テスト。
 // 原因は doc.mbt の map_offset が「見出し開始位置ちょうどでの純削除」を
 // 無条件に「その見出しは消えた」と解釈していたこと。改行をまたぐ削除だけを
-// 破壊扱いにするよう修正済み（docs/audit/FIXES-2026-08-13.md #7）。
+// 破壊扱いにするよう修正済み。
 test("C9b: outdent は対象ノードの id を保存する（F-004 の回帰）", () => {
   const failures: string[] = [];
   for (let seed = 1; seed <= CASES; seed++) {
