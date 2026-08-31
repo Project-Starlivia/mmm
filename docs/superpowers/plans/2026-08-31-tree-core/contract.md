@@ -150,37 +150,37 @@ G1（型・走査・spell・指紋・不変条件）
 
 | 住所 | 名前 |
 |---|---|
-| `doc.mbt`（型） | `Doc` `Center` `Slot` `Branch` `Skeleton` `Form` `Side` `Eol` `Block` `Content` `Verdict` |
+| `doc.mbt`（型） | `Doc` `Root` `Wing` `Branch` `Node` `Sign` `Side` `Eol` `Block` `Content` `Verdict` |
 | `doc.mbt`（構築子） | `Implicit` `Explicit` `Heading` `Item` `Right` `Left` `Lf` `Crlf` `Content` `Rule` `Opaque` `Image` `Link` `Code` `Svg` `Applied` `Rejected` |
 | `doc.mbt`（定数） | `doc_id`（= 1）`first_id`（= 2） |
 | `check.mbt` | `check`（pub）`fault` `check_branch` `check_one` `check_kin` `is_item` |
-| `sig.mbt` | `sig`（pub）`sig_center` `sig_branch` `sig_skeleton` `sig_blocks` `sig_content` `sig_text` |
+| `sig.mbt` | `sig`（pub）`sig_root` `sig_branch` `sig_node` `sig_blocks` `sig_content` `sig_text` |
 | `scan.mbt`（型） | `Token`（構築子 `Blank` `Head` `Bullet` `Bar` `Fence` `Open` `Close` `Verse`）`Scan` |
 | `scan.mbt` | `scan`（pub）`Row` `rows_of` `row_of` `envelope` `is_front` `head_at` `setext_at` `setext` `bar_at` `bullet_at` `fence_at` `fenced` `close_len` `indented` `is_fold_open` `is_fold_close` `opens_comment` `closes_comment` `starts` `strip` `trim_end` `is_blank` `cut` `joined` |
 | `spell.mbt` | `Spell` `spell`（pub）`eol_text`（pub） |
-| `make_wbtest.mbt` | `make_doc` `make_center` `make_slot` `make_branch` `make_head` **`make_item`** |
+| `make_wbtest.mbt` | `make_doc` `make_root` `make_wing` `make_branch` `make_head` **`make_item`** |
 | `scan_wbtest.mbt` | `scan_sig` `scan_flat` |
 | `sig_wbtest.mbt` / `check_wbtest.mbt` | **ヘルパを持たない**（`sig_` は `sig.mbt` が使い切っている。木は `make_*` で組む） |
 
-- **`make_list` → `make_item` に改名。** 型は `Form::Item`、G3 も独立に `write_item` と名乗った。
+- **`make_list` → `make_item` に改名。** 型は `Sign::Item`、G3 も独立に `write_item` と名乗った。
   同じものを 2 つの語彙（Item / list）で呼ばない
 - `make_wbtest.mbt` の役割は「**G1 が置き、G3・G4・G5 のテストが葉の組み立てに使う**」。
   前版の「全群が使う」は事実に反していたので、**事実のほうを揃える**（§18 R1-12 / R3-16）
 
 ### G2 — `parse.mbt` / `parse_wbtest.mbt`
 
-`parse`（pub）`read` `Frame` `Build` `Pend` `top` `item` `bud` `to_center` `to_branch` `bone`
+`parse`（pub）`read` `Frame` `Build` `Pend` `top` `item` `bud` `to_root` `to_branch` `bone`
 `grow` **`hashes`**（`(level : Int, label : String) -> String`）`shed` `knit` `card` `pair`
 `spill` `spill_at` **`is_summary`**（新設・裁定 1）/ テスト: `parse_sig` `parse_ids` `parse_walk` `parse_faults`
 
 ### G3 — `serialize.mbt` / `serialize_wbtest.mbt`
 
 `serialize`（pub）`Voice`（構築子 `Loud` `Quiet`）`Pen` `is_loud` `put` `split_nl` `repeat`
-`write_front` `write_center` `write_slots` `turned` **`same_side`** `write_branch` `inner_steps`
-`write_skeleton` `write_fold_open` `write_fold_close` `write_body` `write_blocks` `write_block`
+`write_front` `write_root` `write_wings` `turned` **`same_side`** `write_branch` `inner_steps`
+`write_node` `write_fold_open` `write_fold_close` `write_body` `write_blocks` `write_block`
 `write_content` `fence_for` / テスト: `write_tree` `write_head` `write_item` `write_gap`
 
-- **`write_of` と `write_slot` は削除**（`make_doc` / `make_slot` と 1 バイトも違わない）
+- **`write_of` と `write_wing` は削除**（`make_doc` / `make_wing` と 1 バイトも違わない）
 - 残す 4 本は `make_*` の合成として書く（生の struct リテラルを書かない）。例:
   `fn write_head(id : Int, label : String, children : Array[Branch]) -> Branch { make_branch(id, make_head(label), children) }`
 - **`split_nl` / `repeat` / `same_side` は名前が汎用。** 他群は再定義せずこれを呼ぶ
@@ -194,10 +194,10 @@ G1（型・走査・spell・指紋・不変条件）
 | `project.mbt` | `project`（pub）`map_bucket` `map_branch` `map_node` `map_card` |
 | `project_wbtest.mbt` | （新設なし。木の組み立ては G1 の `make_*` を呼ぶ） |
 | `json_wbtest.mbt` | ヘルパを持たない（`json_` を予約） |
-| `laws_wbtest.mbt` | `Law` `law_pick` `law_id` `law_head_label` `law_item_label` `law_block` `law_side` `law_skeleton` `law_branches` `law_branch` `law_slots` `law_implicit_center` `law_doc` |
+| `laws_wbtest.mbt` | `Law` `law_pick` `law_id` `law_head_label` `law_item_label` `law_block` `law_side` `law_node` `law_branches` `law_branch` `law_wings` `law_implicit_root` `law_doc` |
 | `js/exports.mbt`（別パッケージ） | `sig` `format` `check` `project` `move_nodes` `flip_side` `delete_nodes` |
 | `test/_tree.ts` | `Edit` `Reflection` `Card` `MapNode` `MapBranch` `MapTree` `Mindmap` `doc` `mbt` `apply` `cardText` `rng` `randomDoc` `pathological` `shrink` `corpus` `fuzzCases` `brief` |
-| `test/treeDialect.test.ts` | `outerSkeletons` `mmmSkeletons` `DIALECT` **`READING`** |
+| `test/treeDialect.test.ts` | `outerNodes` `mmmNodes` `DIALECT` **`READING`** |
 | `test/treeCases.test.ts` | `idOf` |
 | `test/treeOps.test.ts` | `idsOf` `holds` |
 | `package.json` | `fmt:doc` |
@@ -212,10 +212,10 @@ G1（型・走査・spell・指紋・不変条件）
 
 | 住所 | 名前 |
 |---|---|
-| `tool.mbt` | `Sub`（構築子 `Tree` `Part`）`resolve` `find_in` `branch_at` **`kin_at`** **`parent_at`** `pluck` `graft` `amend` `set_side` `as_center` `as_branch` |
+| `tool.mbt` | `Sub`（構築子 `Tree` `Part`）`resolve` `find_in` `branch_at` **`kin_at`** **`parent_at`** `pluck` `graft` `amend` `set_side` `as_root` `as_branch` |
 | `op.mbt` | `move_nodes`（pub）`flip_side`（pub）`delete_nodes`（pub）`crown` **`ahead`** `under` `dest` `clamp` `flipped` `pick` `missing` `cyclic` `shallow` `prune` `alive` `conform` `sink` `raised` `itemed`（private 16 本） |
 | `diff.mbt` | `Edit`（pub(all)）**`Reflection`（pub(all)）** `reflect`（pub）`diff`（pub）`apply`（pub）`safe_edits` `line_start` `line_end` `code_at` |
-| wbtest | `tool_doc` `tool_fold` `op_doc` `op_said` `op_shape` `op_implied` `op_limb` `op_forms` `op_form_branch` `op_mark` `diff_*`（`diff_` 接頭辞。`diff_holds` を含む） |
+| wbtest | `tool_doc` `tool_fold` `op_doc` `op_said` `op_shape` `op_implied` `op_limb` `op_signs` `op_sign_branch` `op_mark` `diff_*`（`diff_` 接頭辞。`diff_holds` を含む） |
 
 - **`ahead` を予約する**（`crown` が文書順に挿すのに使う。前版は一覧から漏れていた。§18 R2-14 / R3-11）
 - **`op_head` / `op_item` は削除**（`make_head` / `make_item` を呼ぶ）
@@ -265,26 +265,26 @@ G1（型・走査・spell・指紋・不変条件）
 // 綴り（空行の数・マーカーの銘柄）は持たないので Ast ではない。
 
 ///|
-/// 文書は深さ 0 の器。frontmatter と eol は綴りのダイヤルで、意味は body と centers。
+/// 文書は深さ 0 の器。frontmatter と eol は綴りのダイヤルで、意味は body と roots。
 pub(all) struct Doc {
   frontmatter : String? // 封筒の逐語（`---` の柵は含まない）
   eol : Eol
   body : Array[Block] // 最初の骨格より前の散文
-  centers : Array[Center]
+  roots : Array[Root]
 }
 
 ///|
-/// 親が文書のノード。center 専用の操作語彙は無い（文書を親とする move / add）。
-pub(all) struct Center {
+/// 親が文書のノード。root 専用の操作語彙は無い（文書を親とする move / add）。
+pub(all) struct Root {
   id : Int
-  skeleton : Skeleton
-  slots : Array[Slot]
+  node : Node
+  wings : Array[Wing]
 }
 
 ///|
-/// スロット = 場所。占有者を問わず側を持ち、id は持たない。
-/// side が「center 直下のスロット → 側」の部分写像であることが、そのまま型になっている。
-pub(all) struct Slot {
+/// 翼 = 場所。占有者を問わず側を持ち、id は持たない。
+/// side が「root 直下の翼 → 側」の部分写像であることが、そのまま型になっている。
+pub(all) struct Wing {
   side : Side
   branch : Branch
 }
@@ -293,20 +293,20 @@ pub(all) struct Slot {
 /// 深さ 3 以降は一様。
 pub(all) struct Branch {
   id : Int
-  skeleton : Skeleton
+  node : Node
   children : Array[Branch]
 }
 
 ///|
 /// 骨格行の有無。Implicit は「飛びが綴り」なので label も body も型ごと無い。
-pub(all) enum Skeleton {
+pub(all) enum Node {
   Implicit
-  Explicit(form~ : Form, label~ : String, folded~ : Bool, body~ : Array[Block])
+  Explicit(sign~ : Sign, label~ : String, folded~ : Bool, body~ : Array[Block])
 }
 
 ///|
-/// 見出しか項目か。Implicit を入れないのは setForm の引数型だから。
-pub(all) enum Form {
+/// 見出しか項目か。Implicit を入れないのは setSign の引数型だから。
+pub(all) enum Sign {
   Heading
   Item
 }
@@ -366,10 +366,10 @@ pub let first_id : Int = 2
 - **`String?` はそのまま通る**（`match doc.frontmatter { Some(s) => …; None => … }`）
 - **相互再帰は宣言順に関係なく通る**
 - **ラベル付き enum ペイロードの綴り**: 定義と `match` は `~`、**呼び出し側だけ `=`**。
-  `Explicit(form=Heading, label="a", folded=false, body=[])` が正。`form~=Heading` は `[3016]`
+  `Explicit(sign=Heading, label="a", folded=false, body=[])` が正。`sign~=Heading` は `[3016]`
 - **別パッケージからの列挙子は修飾が要る**（式の位置）: `@tree.Left` / `@tree.Implicit`。
   `match` のパターン位置では無修飾で通る
-- 構築子名はパッケージ内で一意。`Form::Item` が居るので、`Token` のリスト項目は **`Bullet`**
+- 構築子名はパッケージ内で一意。`Sign::Item` が居るので、`Token` のリスト項目は **`Bullet`**
 
 ### 走査の前提（Token の意味。申し送り S3）
 
@@ -396,7 +396,7 @@ pub let first_id : Int = 2
 ## §7. 不変条件
 
 型で死んだもの（**ここに書かない**）: doc の汚れ / 深いノードの side / 側つきで綴り無し /
-implicit×label / implicit×body / implicit×folded / implicit×Item / setForm(Implicit) / sides と children の整合。
+implicit×label / implicit×body / implicit×folded / implicit×Item / setSign(Implicit) / sides と children の整合。
 
 残る関係的なものは 6 つ。**`check(doc) -> Array[String]` は破れを全部集めて返す**（空 = 健全）。
 違反の綴りは 1 つだけ — `<破れ> (id=<n>)`。
@@ -422,7 +422,7 @@ fn fault(what : String, id : Int) -> String {
 
 **条件 4 の文言とメッセージを直した理由**（前版は「Implicit の子はすべて見出し」/
 `Implicit の子が見出しでない`）: 実装は `if is_item(k.1) { fault(...) }` で **Implicit の子に Implicit を許す**
-（許さないと C16 の `Ni[Ni[Neh_1:b()[]]]` が check を通らない）。`Skeleton` は Implicit / Heading / Item の
+（許さないと C16 の `Ni[Ni[Neh_1:b()[]]]` が check を通らない）。`Node` は Implicit / Heading / Item の
 3 つしかないので、破れの実体はちょうど「子が項目」。**メッセージが破れの実体を名指していないのは負債**なので、
 文言もメッセージも実体に揃える。査読は「G1 のテストが逐語で固定しているから据え置き」を提案したが、
 G1 は未着手であり据え置きの理由が成立しない。
@@ -437,7 +437,7 @@ G1 は未着手であり据え置きの理由が成立しない。
 ## §8. 指紋（sig）の形式
 
 法則 1（`parse(serialize(M)) = M`）と法則 2（serialize の冪等）の**唯一の比較子**。id を含まない。
-Doc / Center / Slot / Branch の 4 型を歩く。
+Doc / Root / Wing / Branch の 4 型を歩く。
 
 文字列はすべて**長さ前置**（`<10進の長さ>:<中身>`）なので、逃がし規則が要らず、どの文字が中身に入っていても
 曖昧さが構造的に生じない。長さは UTF-16 コード単位（`String::length()`）。
@@ -445,18 +445,18 @@ Doc / Center / Slot / Branch の 4 型を歩く。
 ### 文法（1 文字も曖昧さを残さない）
 
 ```
-Doc      := "D" front eol blocks "[" center* "]"
+Doc      := "D" front eol blocks "[" root* "]"
 front    := "-"                                  frontmatter = None
           | "+" text                             frontmatter = Some
 eol      := "n"                                  Lf
           | "r"                                  Crlf
-center     := "R" skel "[" slot* "]"
-slot   := ">" branch                             side = Right
+root     := "R" skel "[" wing* "]"
+wing   := ">" branch                             side = Right
           | "<" branch                             side = Left
 branch     := "N" skel "[" branch* "]"
 skel     := "i"                                  Implicit
-          | "e" form fold text blocks            Explicit
-form     := "h"                                  Heading
+          | "e" sign fold text blocks            Explicit
+sign     := "h"                                  Heading
           | "l"                                  Item
 fold     := "^"                                  folded = true
           | "_"                                  folded = false
@@ -481,13 +481,13 @@ text     := <10進の長さ> ":" <中身の逐語>
 D-n()[Reh_1:r()[>Neh_1:a()[]]]
 ```
 
-**例 2** — `# r` + `---` + `#### b`（C16。先頭スロットが左、占有者は Implicit 2 段）
+**例 2** — `# r` + `---` + `#### b`（C16。先頭翼が左、占有者は Implicit 2 段）
 
 ```
 D-n()[Reh_1:r()[<Ni[Ni[Neh_1:b()[]]]]]
 ```
 
-**例 3** — 封筒つき・CRLF・doc の散文・畳んだ項目 center・飾りの水平線・コードカード
+**例 3** — 封筒つき・CRLF・doc の散文・畳んだ項目 root・飾りの水平線・コードカード
 
 ```
 D+17:image-folder: imgr(o5:intro)[Rel^1:c(r)[>Neh_1:x(cc2:js1:1)[]]]
@@ -520,19 +520,19 @@ pub fn sig(doc : Doc) -> String {
   )
   sig_blocks(sb, doc.body)
   sb.write_string("[")
-  for r in doc.centers {
-    sig_center(sb, r)
+  for r in doc.roots {
+    sig_root(sb, r)
   }
   sb.write_string("]")
   sb.to_string()
 }
 
 ///|
-fn sig_center(sb : StringBuilder, center : Center) -> Unit {
+fn sig_root(sb : StringBuilder, root : Root) -> Unit {
   sb.write_string("R")
-  sig_skeleton(sb, center.skeleton)
+  sig_node(sb, root.node)
   sb.write_string("[")
-  for b in center.slots {
+  for b in root.wings {
     sb.write_string(
       match b.side {
         Right => ">"
@@ -547,7 +547,7 @@ fn sig_center(sb : StringBuilder, center : Center) -> Unit {
 ///|
 fn sig_branch(sb : StringBuilder, branch : Branch) -> Unit {
   sb.write_string("N")
-  sig_skeleton(sb, branch.skeleton)
+  sig_node(sb, branch.node)
   sb.write_string("[")
   for c in branch.children {
     sig_branch(sb, c)
@@ -556,13 +556,13 @@ fn sig_branch(sb : StringBuilder, branch : Branch) -> Unit {
 }
 
 ///|
-fn sig_skeleton(sb : StringBuilder, skeleton : Skeleton) -> Unit {
-  match skeleton {
+fn sig_node(sb : StringBuilder, node : Node) -> Unit {
+  match node {
     Implicit => sb.write_string("i")
-    Explicit(form~, label~, folded~, body~) => {
+    Explicit(sign~, label~, folded~, body~) => {
       sb.write_string("e")
       sb.write_string(
-        match form {
+        match sign {
           Heading => "h"
           Item => "l"
         },
@@ -830,14 +830,14 @@ pub fn reflect_json(r : Reflection) -> String
 - **操作は `Doc` をその場で書き替え、戻りは `Verdict`。** 元の doc が別物にならないので、
   呼ぶ側は「誰が最新の Doc を持つか」を考えなくてよい（実測: struct は参照）
 - `move_nodes` の `parent` は **id**。文書直下は番兵 `doc_id`（= 1）
-- `move_nodes` の `at` は **slots / children / centers の index**（バケツの index ではない）。
-  バケツ index → slots index の写像は UI 翻訳層の仕事
-- `move_nodes` の `side` は**行き先の側**。center 直下のスロットへ挿すときだけ効き、それ以外では捨てられる
+- `move_nodes` の `at` は **wings / children / roots の index**（バケツの index ではない）。
+  バケツ index → wings index の写像は UI 翻訳層の仕事
+- `move_nodes` の `side` は**行き先の側**。root 直下の翼へ挿すときだけ効き、それ以外では捨てられる
 - `flip_side` は資格の無い id を**黙って飛ばす**。1 つも効かなければ `Rejected`
 - **複数選択は `move_nodes` / `flip_side` / `delete_nodes` の 3 本とも、内部で頂点集合に正規化する**
   （子孫は祖先に吸収）。憲法 §5 の「複数選択は頂点集合に正規化してから適用」は操作一般の規則であり、
   前版が move / delete に限定していたのは翻訳漏れ（裁定 4）。`flip_side` が `crown` を通らないと、
-  center とその直下の枝を同時に選んだとき二重反転して枝が元に戻る
+  root とその直下の枝を同時に選んだとき二重反転して枝が元に戻る
 - `reflect` が操作を closure で受けるのは、腕を生やさずに op を差し替えるため。
   **統一サイクルの唯一の書き手**がここ 1 本になる
 - `reflect` は `Reflection` を返す**純関数**。JSON にするのは G4 の `reflect_json` 1 本
@@ -851,7 +851,7 @@ pub fn reflect_json(r : Reflection) -> String
 ```
 見つからない (id=7)
 子孫へは動かせない (id=7)
-側を変えられるのは center と center 直下の枝だけ (id=7)
+側を変えられるのは root と root 直下の枝だけ (id=7)
 ```
 
 ---
@@ -860,7 +860,7 @@ pub fn reflect_json(r : Reflection) -> String
 
 ### 腕数の定義（これが「殺す条件」の物差し。定義は 1 つだけ）
 
-> **容器の腕** = その関数の `match path` の枝のうち、**3 つの容器（`doc.centers` / `Center::slots` /
+> **容器の腕** = その関数の `match path` の枝のうち、**3 つの容器（`doc.roots` / `Root::wings` /
 > `Branch::children`）のどれかを読むか書くもの**の数。何もしない・拒否するだけの番兵枝（`[]`）は数えない。
 >
 > **意味の腕** = 仕様が定めた場合分けの数（flipSide の資格 3 段など）。容器の異種性とは無関係なので、
@@ -880,18 +880,18 @@ pub fn reflect_json(r : Reflection) -> String
 | `resolve(doc, id) -> Array[Int]?` | 0 | id → 居場所 |
 | `find_in(branch, id) -> Array[Int]?` | 0 | `resolve` の下請け |
 | `branch_at(doc, path) -> Branch` | 1 | 深さ 2 以降のノードそのもの |
-| `kin_at(doc, path) -> Array[Skeleton]` | 3 | path が居る列（自分を含む兄弟）の骨格 |
-| `parent_at(doc, path) -> Skeleton?` | 0 | 親の骨格（None = 文書）。`kin_at` の上に建つ |
+| `kin_at(doc, path) -> Array[Node]` | 3 | path が居る列（自分を含む兄弟）の骨格 |
+| `parent_at(doc, path) -> Node?` | 0 | 親の骨格（None = 文書）。`kin_at` の上に建つ |
 | `pluck(doc, path) -> Sub?` | 3 | 抜く |
 | `graft(doc, parent, at, sub, side)` | 3 | 挿す + 変換の唯一の住所 |
 | `amend(doc, path, f)` | 3 | 骨格を書き替える（2 段包み 1 本） |
-| `set_side(doc, i, j, side)` | 1 | スロットの側を差し替える |
-| `as_center(sub)` / `as_branch(sub)` | — | graft の変換 2 本 |
+| `set_side(doc, i, j, side)` | 1 | 翼の側を差し替える |
+| `as_root(sub)` / `as_branch(sub)` | — | graft の変換 2 本 |
 
 - 操作 3 本（`move_nodes` / `flip_side` / `delete_nodes`）の容器の腕: **0**
 - 回復 2 本（`prune` / `conform`）の容器の腕: **0**
 - `Sub` を変換する場所: **1 か所**
-- 2 段包み（Slot と Branch を両方作り直す枝）: **1 本**（`amend` の `[i, j]`）
+- 2 段包み（Wing と Branch を両方作り直す枝）: **1 本**（`amend` の `[i, j]`）
 - **判定: 合格**
 
 ### 判定基準
@@ -903,7 +903,7 @@ pub fn reflect_json(r : Reflection) -> String
   - `Sub` を変換する場所が **1 か所**
   - 2 段包みが **1 本以下**
 - **警告**（設計は生きているが、次の一手を打つ）
-  - どれかの道具が **4 腕**になった → `Slot` に `mut branch` を 1 つ足して 3 へ戻せるか検討する
+  - どれかの道具が **4 腕**になった → `Wing` に `mut branch` を 1 つ足して 3 へ戻せるか検討する
     （実測済み: 足せば `amend` の 2 段包みが消える）
   - 道具が **6 本目**になった → 増えたのが「読む道具」か「書く道具」かを見る。
     書く道具なら、変換の住所が 2 か所に割れていないか疑う
@@ -918,7 +918,7 @@ pub fn reflect_json(r : Reflection) -> String
 
 ```moonbit
 // 道具 5 本。型の異種性はここに幽閉する（操作には腕を生やさない）。
-// Path = Array[Int]（[] = doc、[i] = center、[i, j] = スロット、以深 = children）。
+// Path = Array[Int]（[] = doc、[i] = root、[i, j] = 翼、以深 = children）。
 // 殺す条件の観測点: 容器の腕が 3 で止まらなくなったら負け。
 ```
 
@@ -926,8 +926,8 @@ pub fn reflect_json(r : Reflection) -> String
 
 ```moonbit
 ///|
-/// 骨格を書き替える。容器 3 腕 — `[i, j]` だけは Slot と Branch の 2 段を包み直す。
-/// （`Slot` に `mut branch` を 1 つ足せば 2 段包みが消える。腕が 4 本目になったら検討する）
+/// 骨格を書き替える。容器 3 腕 — `[i, j]` だけは Wing と Branch の 2 段を包み直す。
+/// （`Wing` に `mut branch` を 1 つ足せば 2 段包みが消える。腕が 4 本目になったら検討する）
 ```
 
 ### 道具の逐語（`moon fmt` 済み・`moon check` 0 errors・実測済み）
@@ -940,18 +940,18 @@ pub fn reflect_json(r : Reflection) -> String
 /// 運搬の通貨。**一度しか graft してはならない**（struct は参照なので、
 /// 二度挿すと中の Branch が物理共有される）。この型は op の外に出ない。
 priv enum Sub {
-  Whole(Center)
+  Whole(Root)
   Part(Branch)
 }
 
 ///|
 /// id からその居場所へ。腕なし。
 fn resolve(doc : Doc, id : Int) -> Array[Int]? {
-  for i, r in doc.centers {
+  for i, r in doc.roots {
     if r.id == id {
       return Some([i])
     }
-    for j, b in r.slots {
+    for j, b in r.wings {
       if find_in(b.branch, id) is Some(tail) {
         let path = [i, j]
         path.append(tail)
@@ -978,13 +978,13 @@ fn find_in(branch : Branch, id : Int) -> Array[Int]? {
 }
 
 ///|
-/// 抜き取る。容器 3 腕（centers / slots / children）。
+/// 抜き取る。容器 3 腕（roots / wings / children）。
 /// **抜いた瞬間 doc から消える** — graft までの間に落とすと木が壊れる。
 fn pluck(doc : Doc, path : Array[Int]) -> Sub? {
   match path {
     [] => None
-    [i] => Some(Whole(doc.centers.remove(i)))
-    [i, j] => Some(Part(doc.centers[i].slots.remove(j).branch))
+    [i] => Some(Whole(doc.roots.remove(i)))
+    [i, j] => Some(Part(doc.roots[i].wings.remove(j).branch))
     [.. head, last] => Some(Part(branch_at(doc, head).children.remove(last)))
   }
 }
@@ -1000,49 +1000,49 @@ fn graft(
   side : Side,
 ) -> Unit {
   match parent {
-    [] => doc.centers.insert(at, as_center(sub))
-    [i] => doc.centers[i].slots.insert(at, { side, branch: as_branch(sub) })
+    [] => doc.roots.insert(at, as_root(sub))
+    [i] => doc.roots[i].wings.insert(at, { side, branch: as_branch(sub) })
     _ => branch_at(doc, parent[:]).children.insert(at, as_branch(sub))
   }
 }
 
 ///|
-/// 骨格を書き替える。容器 3 腕 — `[i, j]` だけは Slot と Branch の 2 段を包み直す。
-/// （`Slot` に `mut branch` を 1 つ足せば 2 段包みが消える。腕が 4 本目になったら検討する）
-fn amend(doc : Doc, path : Array[Int], f : (Skeleton) -> Skeleton) -> Unit {
+/// 骨格を書き替える。容器 3 腕 — `[i, j]` だけは Wing と Branch の 2 段を包み直す。
+/// （`Wing` に `mut branch` を 1 つ足せば 2 段包みが消える。腕が 4 本目になったら検討する）
+fn amend(doc : Doc, path : Array[Int], f : (Node) -> Node) -> Unit {
   match path {
     [] => ()
     [i] => {
-      let r = doc.centers[i]
-      doc.centers[i] = { ..r, skeleton: f(r.skeleton) }
+      let r = doc.roots[i]
+      doc.roots[i] = { ..r, node: f(r.node) }
     }
     [i, j] => {
-      let b = doc.centers[i].slots[j]
-      doc.centers[i].slots[j] = {
+      let b = doc.roots[i].wings[j]
+      doc.roots[i].wings[j] = {
         ..b,
-        branch: { ..b.branch, skeleton: f(b.branch.skeleton) },
+        branch: { ..b.branch, node: f(b.branch.node) },
       }
     }
     [.. head, last] => {
       let owner = branch_at(doc, head)
       let n = owner.children[last]
-      owner.children[last] = { ..n, skeleton: f(n.skeleton) }
+      owner.children[last] = { ..n, node: f(n.node) }
     }
   }
 }
 
 ///|
-/// スロットの側を差し替える（side は場所の属性なので amend では届かない）。
+/// 翼の側を差し替える（side は場所の属性なので amend では届かない）。
 fn set_side(doc : Doc, i : Int, j : Int, side : Side) -> Unit {
-  let b = doc.centers[i].slots[j]
-  doc.centers[i].slots[j] = { ..b, side, }
+  let b = doc.roots[i].wings[j]
+  doc.roots[i].wings[j] = { ..b, side, }
 }
 
 ///|
 /// 深さ 2 以降のノードそのもの。道具が共有する唯一の座標系。
 fn branch_at(doc : Doc, path : ArrayView[Int]) -> Branch {
   guard! path is [i, j, .. rest]
-  let mut n = doc.centers[i].slots[j].branch
+  let mut n = doc.roots[i].wings[j].branch
   for k in rest {
     n = n.children[k]
   }
@@ -1050,28 +1050,28 @@ fn branch_at(doc : Doc, path : ArrayView[Int]) -> Branch {
 }
 
 ///|
-/// doc へ: Part → Center 化（children を Slot(Right) で包む）/ Whole → 無変換
-fn as_center(sub : Sub) -> Center {
+/// doc へ: Part → Root 化（children を Wing(Right) で包む）/ Whole → 無変換
+fn as_root(sub : Sub) -> Root {
   match sub {
     Whole(r) => r
     Part(n) =>
       {
         id: n.id,
-        skeleton: n.skeleton,
-        slots: n.children.map(fn(c) { { side: Right, branch: c } }),
+        node: n.node,
+        wings: n.children.map(fn(c) { { side: Right, branch: c } }),
       }
   }
 }
 
 ///|
-/// center / branch へ: Whole → 解体（sides は深さの物理で消滅）/ Part → そのまま
+/// root / branch へ: Whole → 解体（sides は深さの物理で消滅）/ Part → そのまま
 fn as_branch(sub : Sub) -> Branch {
   match sub {
     Whole(r) =>
       {
         id: r.id,
-        skeleton: r.skeleton,
-        children: r.slots.map(fn(b) { b.branch }),
+        node: r.node,
+        children: r.wings.map(fn(b) { b.branch }),
       }
     Part(n) => n
   }
@@ -1089,15 +1089,15 @@ fn as_branch(sub : Sub) -> Branch {
 
 ### graft の変換表
 
-| 行き先 | `Sub` = `Whole(Center)` | `Sub` = `Part(Branch)` |
+| 行き先 | `Sub` = `Whole(Root)` | `Sub` = `Part(Branch)` |
 |---|---|---|
-| **doc**（`parent = []`） | 無変換。sides が無傷で旅する | **Center 化** — `children` を `Slot(Right)` で包む。`side` 引数は使わない |
-| **center**（`parent = [i]`） | **解体** — `slots` を捨てて `children` に（sides は深さの物理で消滅）。新しい `side` は**引数が決める** | `Slot(side)` で包む |
+| **doc**（`parent = []`） | 無変換。sides が無傷で旅する | **Root 化** — `children` を `Wing(Right)` で包む。`side` 引数は使わない |
+| **root**（`parent = [i]`） | **解体** — `wings` を捨てて `children` に（sides は深さの物理で消滅）。新しい `side` は**引数が決める** | `Wing(side)` で包む |
 | **branch**（2 段以上） | **解体**（同上）。`side` 引数は捨てられる | そのまま。`side` 引数は捨てられる |
 
 ### `amend` の unused_value 警告について
 
-`amend` の呼び手（fold / setForm）は今回のスコープ外なので、`moon check` は
+`amend` の呼び手（fold / setSign）は今回のスコープ外なので、`moon check` は
 `Warning: [0001] Warning (unused_value): Unused function 'amend'` を 1 本出す。
 **`pub` にして黙らせてはならない**（道具の幽閉が破れる）。
 CI の合格条件は `0 errors` であって `0 warnings` ではない。
@@ -1415,7 +1415,7 @@ export interface MapNode {
   /** 骨格行を持たない（飛びが綴り）。中空に描くかは render の自由 */
   readonly implied: boolean;
   readonly folded: boolean;
-  readonly form: "heading" | "item";
+  readonly sign: "heading" | "item";
   readonly cards: readonly Card[];
   /** 絵に描かれない Block の数（Rule と Opaque）。cards.length + buried = body の数 */
   readonly buried: number;
@@ -1446,7 +1446,7 @@ export const doc = {
   /** 破れの一覧。空なら健全 */
   check: (md: string): string[] => JSON.parse(mbt.check(md)),
   project: (md: string): Mindmap => JSON.parse(mbt.project(md)),
-  /** parent は id（文書は 1）。left は行き先の側で、center 直下でだけ効く */
+  /** parent は id（文書は 1）。left は行き先の側で、root 直下でだけ効く */
   moveNodes: (
     md: string,
     ids: number[],
@@ -1539,7 +1539,7 @@ export function randomDoc(seed: number): string {
 }
 
 /** リポジトリ内の実文書。docs/ の md がそのまま法則 1・2 の入力になる */
-export function corpus(center = "."): { path: string; text: string }[] {
+export function corpus(root = "."): { path: string; text: string }[] {
   const skip = new Set([
     "node_modules",
     "_build",
@@ -1558,7 +1558,7 @@ export function corpus(center = "."): { path: string; text: string }[] {
         out.push({ path: p, text: readFileSync(p, "utf8") });
     }
   };
-  walk(center, 0);
+  walk(root, 0);
   return out;
 }
 
@@ -1599,7 +1599,7 @@ interface MapNode {
   label: string;
   implied: boolean;
   folded: boolean;
-  form: "heading" | "item";
+  sign: "heading" | "item";
   cards: Card[];
   buried: number;
 }
@@ -1616,8 +1616,8 @@ interface Mindmap   { trees: MapTree[]; buried: number }
   文書には箱が無いので 1 枚も絵にならない
 - **`cards` は `Content` と 1 対 1。** 解釈も畳み込みもしない
 - **`folded` でも children は出す。** 境界は事実を渡し、描くかどうかは render が決める
-- **`implied` のノードは** `label: ""` / `form: "heading"` / `folded: false` / `cards: []` / `buried: 0`
-- **バケツ分けは `slots` の filter。** `right` と `left` それぞれの中では slots の順序を保つ。
+- **`implied` のノードは** `label: ""` / `sign: "heading"` / `folded: false` / `cards: []` / `buried: 0`
+- **バケツ分けは `wings` の filter。** `right` と `left` それぞれの中では wings の順序を保つ。
   **側をまたぐ読み順はここで意図的に落ちる**。判定は G3 の `same_side` を呼ぶ
 - `Doc.frontmatter` と `Doc.eol` は綴りなので投影されない
 - **MindmapTree は絶対に変異させない**（一方向ループ。投影の逆写像を作らない）。
@@ -1795,7 +1795,7 @@ glob に当たらない。法則 4 の踏み台は既存 `test/seps.test.ts` の
 | 未定義の型 | `Error: [4032]` / `The type Ints is undefined.` |
 | 型不一致 | `Error: [4014]` / `Expr Type Mismatch` / `has type : Int` / `wanted   : String` |
 | 公開定義が private 型に依存 | `Error: [4046]` / `A public definition cannot depend on private type` |
-| 別パッケージから `pub` 型を構築 | `Error: [4036]` / `Cannot create values of the read-only type: @mmm-app/core/tree.Slot.` |
+| 別パッケージから `pub` 型を構築 | `Error: [4036]` / `Cannot create values of the read-only type: @mmm-app/core/tree.Wing.` |
 | 別パッケージで列挙子を無修飾 | `Error: [4021]` / `The value identifier Left is unbound.` |
 | 不変フィールドへの代入 | `Error: [4087]` / `The record field side is immutable.` |
 | 別パッケージで `pub` の `mut` を書く | `Error: [4094]` / `Cannot modify a read-only field: side` |
@@ -1843,8 +1843,8 @@ Total tests: 14, passed: 13, failed: 1.
 | 指摘 | 重み | 直す場所 | 直し方 |
 |---|---|---|---|
 | R1-04 / R2-02 / R3-05 | 重大・致命 | **新設 Task 10.5**（Task 10 と Task 11 の間） | `core/tree/spell.mbt` を **Create**。中身は §12 の逐語（`pub(all) struct Spell` / `pub let spell` / `pub fn eol_text`）。**テストは足さない**（値の固定は G3 Task 40 の 2 本が持つ）。Step 4 Expected: `Total tests: 25, passed: 25, failed: 0.`（Task 3 の +1 を含む）。`moon check` は `0 errors`（読み手がまだ居ないので警告は出うる。**可視性を下げて黙らせない**）。コミット: `feat: ✨ 正規形の綴りを 1 か所に括る` |
-| R1-11 | 軽微 | **Task 3**（check） | 条件 4 の文言を「**Implicit の子に項目は居ない**」に、違反メッセージを **`Implicit の子が項目 (id=7)`** に直す（§7）。テストを 1 本足して意図を固定する — `test "条件 4: Implicit の連鎖は合法（C16）" { let doc = make_doc([make_center(2, make_head("r"), [make_slot(Left, make_branch(3, Implicit, [make_branch(4, Implicit, [make_branch(5, make_head("b"), [])])]))])]); assert_eq(check(doc), []) }`。Task 3 の Expected を 12 → **13**、以降の本数を全部 +1 |
-| R1-12 / R3-16 | 軽微 | **Task 1**（make_wbtest.mbt） | `make_list` → **`make_item`** に改名（型は `Form::Item`。同じものを 2 つの語彙で呼ばない）。役割欄の「**全群が使う**」を「**G1 が置き、G3・G4・G5 のテストが葉の組み立てに使う**」に直す（本書 §4 で事実のほうを揃えたので、この記述は正しくなる） |
+| R1-11 | 軽微 | **Task 3**（check） | 条件 4 の文言を「**Implicit の子に項目は居ない**」に、違反メッセージを **`Implicit の子が項目 (id=7)`** に直す（§7）。テストを 1 本足して意図を固定する — `test "条件 4: Implicit の連鎖は合法（C16）" { let doc = make_doc([make_root(2, make_head("r"), [make_wing(Left, make_branch(3, Implicit, [make_branch(4, Implicit, [make_branch(5, make_head("b"), [])])]))])]); assert_eq(check(doc), []) }`。Task 3 の Expected を 12 → **13**、以降の本数を全部 +1 |
+| R1-12 / R3-16 | 軽微 | **Task 1**（make_wbtest.mbt） | `make_list` → **`make_item`** に改名（型は `Sign::Item`。同じものを 2 つの語彙で呼ばない）。役割欄の「**全群が使う**」を「**G1 が置き、G3・G4・G5 のテストが葉の組み立てに使う**」に直す（本書 §4 で事実のほうを揃えたので、この記述は正しくなる） |
 | R1-07 | 重大 | **Task 11 Step 9** | 申し送り 1・2 を削る（本書 §5・§15 が取り込み済み）。代わりに「**§15 の裁定 9 件が本書に載っていることを確認する**」だけを残す。申し送り 3（G2 への引き継ぎ）は本書 §6・§9 に入ったので、こちらも削る |
 | R3-15 | 軽微 | 全 Task の Run 行 | 既に絶対パス。**Step 2 / 4 のテストはファイル指定に揃える**（`moon -C <root>/core test tree/<file>_wbtest.mbt`）。締め（Task 11）だけ `-p` |
 
@@ -1874,7 +1874,7 @@ Total tests: 14, passed: 13, failed: 1.
 | R1-04 / R2-02 | 重大 | **Task 40** | Files の **Create を削る**（`core/tree/spell.mbt` は G1 Task 10.5 が置き済み）。Step 3 を「**実装は無い。G1 が置いた `spell.mbt` が §12 の逐語であることを確認し、差分があれば §12 に揃えるよう G1 へ差し戻す**」に書き替える。Step 1 の 2 本のテスト（`spell` の値の固定）は**そのまま残す** — これが `spell` の唯一の見張り |
 | **裁定 1 / R1-03 / R2-07 / R3-03** | **致命** | **Task 46** | カタログ C8 の**元 md と新 md の両方**を `<summary>` 込みに訂正する（§9 の逐語をそのまま書く）。触るのは `docs/superpowers/specs/2026-08-29-op-cases.md` の C8 だけで、他のケースには 1 バイトも触らない。mermaid の `〔畳〕` は直さない |
 | R2-12 / R3-10 | 軽微・重大 | **概要「新設する名前の一覧」** | `same_side` の説明から「**G5 の flip_side でも要る**」を削り、「**G4 の `project.mbt` のバケツ分けで要る**」に直す（G5 は `flipped` しか使わない） |
-| R1-12 / R3-16 | 軽微 | **Task 41 の wbtest ヘルパ** | `write_of` と `write_slot` を**削除**して `make_doc` / `make_slot` を呼ぶ。`write_tree` / `write_head` / `write_item` / `write_gap` は残すが、中身を `make_*` の合成で書く（生の struct リテラルを書かない） |
+| R1-12 / R3-16 | 軽微 | **Task 41 の wbtest ヘルパ** | `write_of` と `write_wing` を**削除**して `make_doc` / `make_wing` を呼ぶ。`write_tree` / `write_head` / `write_item` / `write_gap` は残すが、中身を `make_*` の合成で書く（生の struct リテラルを書かない） |
 | S1・S5・S6・S7・S8・S9・S10 | 申し送り | **概要「契約・カタログへ足すこと」** | **節ごと削る**（6 件とも本書 §2・§5・§6・§9・§17 に取り込み済み） |
 | R3-15 | 軽微 | Run 行 | 既に絶対パス。Step 2 / 4 のファイル指定はそのままでよい |
 
@@ -1893,7 +1893,7 @@ Total tests: 14, passed: 13, failed: 1.
 
 | 指摘 | 重み | 直す場所 | 直し方 |
 |---|---|---|---|
-| **裁定 4 / R1-09** | **重大** | **Task 86**（flipSide） | ループの前に `let tops = crown(doc, ids)` を挟み、`for id in tops` に変える（`crown` は resolve できない id を落とすので、`hit` が false のまま抜けたときの `pick(ids)` はそのまま使える）。テストを 1 本足す — `test "center とその直下の枝を同時に選んでも二重には反転しない" { let doc = op_doc(); assert_eq(op_said(flip_side(doc, [2, 3])), "ok"); assert_eq(op_shape(doc), "doc(R2[<3(4(5))] R6[<7])") }`（**期待文字列は g5v の実測で確定させる**）。Task 86 の Expected を +3 → **+4**、G5 累計 31 → **32** |
+| **裁定 4 / R1-09** | **重大** | **Task 86**（flipSide） | ループの前に `let tops = crown(doc, ids)` を挟み、`for id in tops` に変える（`crown` は resolve できない id を落とすので、`hit` が false のまま抜けたときの `pick(ids)` はそのまま使える）。テストを 1 本足す — `test "root とその直下の枝を同時に選んでも二重には反転しない" { let doc = op_doc(); assert_eq(op_said(flip_side(doc, [2, 3])), "ok"); assert_eq(op_shape(doc), "doc(R2[<3(4(5))] R6[<7])") }`（**期待文字列は g5v の実測で確定させる**）。Task 86 の Expected を +3 → **+4**、G5 累計 31 → **32** |
 | **裁定 3 / R2-08 / R3-06** | **致命** | **Task 92**（reflect） | (1) 前提を「**G2 の `parse` と G3 の `serialize` が置かれていること。無ければ Task 91 で止める。スタブは 1 バイトも書かない**」に書き替え、「parse / serialize がスタブでも通る」の 2 行を**削除**する。(2) `reflect_json` を**書かない**（G4 の `json.mbt` へ移管）。`quote` への言及と「G4 より先に着手する場合は…」の但し書きを削除する。(3) `diff.mbt` に `pub(all) struct Reflection { ok : Bool; reason : String; text : String; edits : Array[Edit] }` を新設し、`reflect` の戻りを `String` から **`Reflection`** に変える:<br>`pub fn reflect(md : String, op : (Doc) -> Verdict) -> Reflection { let doc = parse(md); match op(doc) { Rejected(reason) => { ok: false, reason, text: md, edits: [] }; Applied => { let text = serialize(doc); { ok: true, reason: "", text, edits: safe_edits(md, text) } } } }`。(4) 「拒否は無編集」のテストを JSON 比較からフィールド比較に変える（`assert_eq(r.ok, false)` / `assert_eq(r.reason, "見つからない (id=7)")` / `assert_eq(r.text, "#  r  \n\n## a\n")` / `assert_eq(r.edits.length(), 0)`）。JSON の逐語は G4 の `json_wbtest.mbt` が固定する。**本数は 2 本のまま** |
 | **R1-10** | **重大** | **概要** | §「実測の裏付け」を新設し、上の g5v の実測結果（本数表と期待文字列）を貼る |
 | 裁定 5 / R2-16 / R3-07 | 重大 | **Task 80・83・94** | 腕数の定義と数字は**本書 §11 が正**。Task 94 の「腕数の定義」節は本書 §11 を指すだけにし、判定基準の数字（合格 3 以下・警告 4 腕・死 5 腕）と**逐語コメント 2 か所**（`tool.mbt` の冒頭と `amend` の直前）を §11 からそのまま写す。「契約 §6 の数字を直すこと」の申し送りは削る |
@@ -1944,7 +1944,7 @@ Total tests: 14, passed: 13, failed: 1.
 | R3-17 | 軽微 | **Task 64**（pathological） | `["NUL", "# a\n\n \n"]` を `["空白だけの行", "# a\n\n \n"]` に改名し、**本当に NUL を含む行**を 1 本足す（`["NUL", "# a\n\n\u0000\n"]`）。下限は 28 → **29** |
 | R2-15 / R3-15 | 軽微 | 全 Task の Run 行 | `moon -C core ...` / `pnpm ...` を絶対パスに揃え、`pnpm` を使う Step には「（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`。別のワークツリーから叩くと旧 core を測る）」の 1 行を足す |
 | S11・S12・S13・S14・S15 | 申し送り | **概要「契約に足すこと（5 件）」** | **節ごと削る**（本書 §13・§16 に取り込み済み。S14 の 4 件目だけは却下） |
-| **R3-08 / R3-09** | **重大** | **新設 Task 72**（`test/treeOps.test.ts`、G5 Task 93 から移管） | g5.md Task 93 の逐語をそのまま持ってきて、**2 か所だけ直す**。(1) delete のテストは id の同一性ではなく**ノード数**で見る（parse は `first_id` から振り直すので、消した id を次のノードが名乗る）:<br>`const before = idsOf(doc.project(md)).length;` / `const r = doc.deleteNodes(md, [victim]);` / `holds(md, r, "delete");` / `if (r.ok) { assert.ok(idsOf(doc.project(r.text)).length < before, \`delete でノードが減っていない: ${brief(md)}\`); }`<br>(2) 「無操作は無編集」のテストは**左の枝が居る文書を飛ばす** — `if (center.right.length === 0) continue;` の直後に `if (center.left.length > 0) continue; // at は slots の index。バケツの index ではない` を足す。treeOps は **5** 本 |
+| **R3-08 / R3-09** | **重大** | **新設 Task 72**（`test/treeOps.test.ts`、G5 Task 93 から移管） | g5.md Task 93 の逐語をそのまま持ってきて、**2 か所だけ直す**。(1) delete のテストは id の同一性ではなく**ノード数**で見る（parse は `first_id` から振り直すので、消した id を次のノードが名乗る）:<br>`const before = idsOf(doc.project(md)).length;` / `const r = doc.deleteNodes(md, [victim]);` / `holds(md, r, "delete");` / `if (r.ok) { assert.ok(idsOf(doc.project(r.text)).length < before, \`delete でノードが減っていない: ${brief(md)}\`); }`<br>(2) 「無操作は無編集」のテストは**左の枝が居る文書を飛ばす** — `if (root.right.length === 0) continue;` の直後に `if (root.left.length > 0) continue; // at は wings の index。バケツの index ではない` を足す。treeOps は **5** 本 |
 
 **G4 の終わりの形**: `pnpm run core` / `pnpm run check` / `pnpm run test:core`
 （`Total tests: 111` 以上・`Total tests: 0` でない）/ `pnpm test`（`ℹ fail 0`）/
@@ -2020,6 +2020,6 @@ Total tests: 14, passed: 13, failed: 1.
 ## §21. スコープ外（作らない）
 
 UI 接続 / TS の書き換え（`src/coreApi.ts` `src/main.ts` `src/app/paste.ts` は触らない）/
-すげ替え v1 / add・rename・fold・setForm・indent・outdent・content 系 / convert・format コマンド /
+すげ替え v1 / add・rename・fold・setSign・indent・outdent・content 系 / convert・format コマンド /
 旧 core の削除 / render の接続。
-`amend` はスコープ外の fold・setForm のための住所として置くだけ（§11 の警告の話）。
+`amend` はスコープ外の fold・setSign のための住所として置くだけ（§11 の警告の話）。

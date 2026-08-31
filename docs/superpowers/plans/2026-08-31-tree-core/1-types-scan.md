@@ -28,7 +28,7 @@ G3 Task 40 が持つ — **G1 はテストを足さない**（契約 §19 G1）�
 ### 前提
 
 - 作業ディレクトリ: `D:/1.atrium/mmm/.worktrees/feat/tree-core`（ブランチ `feat/tree-core`）。
-  ワークツリーが無ければ先に切る（CLAUDE.md の Slot・Worktree 規約）
+  ワークツリーが無ければ先に切る（CLAUDE.md の Wing・Worktree 規約）
 - **既存ファイルは 1 行も触らない。** `package.json` の scripts と `.github/workflows/ci.yml` と
   `test/tsconfig.json` は G4 が触る（契約 §2）。G1 は `core/tree/` に足すだけ
 - 旧 core（`mmm-app/core` と `mmm-app/core/js`）は同じディレクトリツリーに同居する。
@@ -74,22 +74,22 @@ Step 2 / Step 4 は**ファイル指定**で走らせる（契約 §17）ので�
 
 | 住所 | 名前 |
 |---|---|
-| `doc.mbt`（型） | `Doc` `Center` `Slot` `Branch` `Skeleton` `Form` `Side` `Eol` `Block` `Content` `Verdict` |
+| `doc.mbt`（型） | `Doc` `Root` `Wing` `Branch` `Node` `Sign` `Side` `Eol` `Block` `Content` `Verdict` |
 | `doc.mbt`（構築子） | `Implicit` `Explicit` `Heading` `Item` `Right` `Left` `Lf` `Crlf` `Content` `Rule` `Opaque` `Image` `Link` `Code` `Svg` `Applied` `Rejected` |
 | `doc.mbt`（定数） | `doc_id`（= 1）`first_id`（= 2） |
 | `check.mbt` | `check`（pub）`fault` `check_branch` `check_one` `check_kin` `is_item` |
-| `sig.mbt` | `sig`（pub）`sig_center` `sig_branch` `sig_skeleton` `sig_blocks` `sig_content` `sig_text` |
+| `sig.mbt` | `sig`（pub）`sig_root` `sig_branch` `sig_node` `sig_blocks` `sig_content` `sig_text` |
 | `scan.mbt`（型） | `Token`（構築子 `Blank` `Head` `Bullet` `Bar` `Fence` `Open` `Close` `Verse`）`Scan` |
 | `scan.mbt` | `scan`（pub）`Row` `rows_of` `row_of` `envelope` `is_front` `head_at` `setext_at` `setext` `bar_at` `bullet_at` `fence_at` `fenced` `close_len` `indented` `is_fold_open` `is_fold_close` `opens_comment` `closes_comment` `starts` `strip` `trim_end` `is_blank` `cut` `joined` |
 | `spell.mbt` | `Spell` `spell`（pub）`eol_text`（pub） |
-| `make_wbtest.mbt` | `make_doc` `make_center` `make_slot` `make_branch` `make_head` `make_item` |
+| `make_wbtest.mbt` | `make_doc` `make_root` `make_wing` `make_branch` `make_head` `make_item` |
 | `scan_wbtest.mbt` | `scan_sig` `scan_flat` |
 | `sig_wbtest.mbt` / `check_wbtest.mbt` | ヘルパを持たない（`sig_` は `sig.mbt` が使い切っている。木は `make_*` で組む） |
 
-- **`make_item`**（前版の `make_list` から改名）。型は `Form::Item` で、G3 も独立に `write_item` と
+- **`make_item`**（前版の `make_list` から改名）。型は `Sign::Item` で、G3 も独立に `write_item` と
   名乗った。同じものを 2 つの語彙（Item / list）で呼ばない（査読 R1-12 / R3-16）
 - `make_wbtest.mbt` の役割は「**G1 が置き、G3・G4・G5 のテストが葉の組み立てに使う**」。
-  契約 §4 が G3 の `write_of` / `write_slot`、G5 の `op_head` / `op_item` を削って
+  契約 §4 が G3 の `write_of` / `write_wing`、G5 の `op_head` / `op_item` を削って
   `make_*` へ寄せたので、この記述はそのまま事実になる
 - 同一パッケージの `*_wbtest.mbt` は名前空間を共有する（`Error: [4051]`）。
   ヘルパ名はそのファイルの接頭辞（`make_` / `scan_`）で始める
@@ -177,21 +177,21 @@ CLAUDE.md の規約 `<Type>: <Emoji> #<Issue Number> <Title>`。Issue 番号が�
 - Consumes: なし（この群の起点）
 - Produces:
   - パッケージ `mmm-app/core/tree`
-  - `pub(all) struct Doc { frontmatter : String?; eol : Eol; body : Array[Block]; centers : Array[Center] }`
-  - `pub(all) struct Center { id : Int; skeleton : Skeleton; slots : Array[Slot] }`
-  - `pub(all) struct Slot { side : Side; branch : Branch }`
-  - `pub(all) struct Branch { id : Int; skeleton : Skeleton; children : Array[Branch] }`
-  - `pub(all) enum Skeleton { Implicit; Explicit(form~ : Form, label~ : String, folded~ : Bool, body~ : Array[Block]) }`
-  - `pub(all) enum Form { Heading; Item }` / `pub(all) enum Side { Right; Left }` / `pub(all) enum Eol { Lf; Crlf }`
+  - `pub(all) struct Doc { frontmatter : String?; eol : Eol; body : Array[Block]; roots : Array[Root] }`
+  - `pub(all) struct Root { id : Int; node : Node; wings : Array[Wing] }`
+  - `pub(all) struct Wing { side : Side; branch : Branch }`
+  - `pub(all) struct Branch { id : Int; node : Node; children : Array[Branch] }`
+  - `pub(all) enum Node { Implicit; Explicit(sign~ : Sign, label~ : String, folded~ : Bool, body~ : Array[Block]) }`
+  - `pub(all) enum Sign { Heading; Item }` / `pub(all) enum Side { Right; Left }` / `pub(all) enum Eol { Lf; Crlf }`
   - `pub(all) enum Block { Content(Content); Rule; Opaque(String) }`
   - `pub(all) enum Content { Image(alt~ : String, src~ : String); Link(text~ : String, href~ : String); Code(info~ : String, text~ : String); Svg(String) }`
   - `pub(all) enum Verdict { Applied; Rejected(String) }`
   - `pub let doc_id : Int = 1` / `pub let first_id : Int = 2`
-  - `fn make_doc(centers : Array[Center]) -> Doc`
-  - `fn make_center(id : Int, skeleton : Skeleton, slots : Array[Slot]) -> Center`
-  - `fn make_slot(side : Side, branch : Branch) -> Slot`
-  - `fn make_branch(id : Int, skeleton : Skeleton, children : Array[Branch]) -> Branch`
-  - `fn make_head(label : String) -> Skeleton` / `fn make_item(label : String) -> Skeleton`
+  - `fn make_doc(roots : Array[Root]) -> Doc`
+  - `fn make_root(id : Int, node : Node, wings : Array[Wing]) -> Root`
+  - `fn make_wing(side : Side, branch : Branch) -> Wing`
+  - `fn make_branch(id : Int, node : Node, children : Array[Branch]) -> Branch`
+  - `fn make_head(label : String) -> Node` / `fn make_item(label : String) -> Node`
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -213,33 +213,33 @@ pkgtype(kind: "library")
 // ヘルパに腕を生やさない。
 
 ///|
-fn make_doc(centers : Array[Center]) -> Doc {
-  { frontmatter: None, eol: Lf, body: [], centers }
+fn make_doc(roots : Array[Root]) -> Doc {
+  { frontmatter: None, eol: Lf, body: [], roots }
 }
 
 ///|
-fn make_center(id : Int, skeleton : Skeleton, slots : Array[Slot]) -> Center {
-  { id, skeleton, slots }
+fn make_root(id : Int, node : Node, wings : Array[Wing]) -> Root {
+  { id, node, wings }
 }
 
 ///|
-fn make_slot(side : Side, branch : Branch) -> Slot {
+fn make_wing(side : Side, branch : Branch) -> Wing {
   { side, branch }
 }
 
 ///|
-fn make_branch(id : Int, skeleton : Skeleton, children : Array[Branch]) -> Branch {
-  { id, skeleton, children }
+fn make_branch(id : Int, node : Node, children : Array[Branch]) -> Branch {
+  { id, node, children }
 }
 
 ///|
-fn make_head(label : String) -> Skeleton {
-  Explicit(form=Heading, label~, folded=false, body=[])
+fn make_head(label : String) -> Node {
+  Explicit(sign=Heading, label~, folded=false, body=[])
 }
 
 ///|
-fn make_item(label : String) -> Skeleton {
-  Explicit(form=Item, label~, folded=false, body=[])
+fn make_item(label : String) -> Node {
+  Explicit(sign=Item, label~, folded=false, body=[])
 }
 
 ///|
@@ -248,17 +248,17 @@ test "型の全構成要素が 1 本の木として組める" {
     frontmatter: Some("image-folder: img"),
     eol: Crlf,
     body: [Rule, Opaque("intro"), Content(Svg("<svg/>"))],
-    centers: [
-      make_center(
+    roots: [
+      make_root(
         2,
-        Explicit(form=Item, label="c", folded=true, body=[
+        Explicit(sign=Item, label="c", folded=true, body=[
           Content(Image(alt="a", src="./a.png")),
           Content(Link(text="t", href="https://example.com")),
           Content(Code(info="js", text="1")),
         ]),
         [
-          make_slot(Right, make_branch(3, make_item("x"), [])),
-          make_slot(
+          make_wing(Right, make_branch(3, make_item("x"), [])),
+          make_wing(
             Left,
             make_branch(4, Implicit, [make_branch(5, make_head("y"), [])]),
           ),
@@ -267,8 +267,8 @@ test "型の全構成要素が 1 本の木として組める" {
     ],
   }
   assert_eq(doc.body.length(), 3)
-  assert_eq(doc.centers[0].slots.length(), 2)
-  assert_eq(doc.centers[0].slots[1].branch.children.length(), 1)
+  assert_eq(doc.roots[0].wings.length(), 2)
+  assert_eq(doc.roots[0].wings[1].branch.children.length(), 1)
   assert_eq(doc_id, 1)
   assert_eq(first_id, 2)
 }
@@ -280,7 +280,7 @@ test "型の全構成要素が 1 本の木として組める" {
 
 Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/make_wbtest.mbt`
 
-Expected: `Error: [4032]` / `The type Doc is undefined.`（`Center` `Slot` `Branch` `Skeleton` `Side` `Eol` も同じ）
+Expected: `Error: [4032]` / `The type Doc is undefined.`（`Root` `Wing` `Branch` `Node` `Side` `Eol` も同じ）
 + `Error: [4021]` / `The value identifier doc_id is unbound.`。EXIT=1
 
 - [ ] **Step 3: 最小の実装を書く**
@@ -292,26 +292,26 @@ Expected: `Error: [4032]` / `The type Doc is undefined.`（`Center` `Slot` `Bran
 // 綴り（空行の数・マーカーの銘柄）は持たないので Ast ではない。
 
 ///|
-/// 文書は深さ 0 の器。frontmatter と eol は綴りのダイヤルで、意味は body と centers。
+/// 文書は深さ 0 の器。frontmatter と eol は綴りのダイヤルで、意味は body と roots。
 pub(all) struct Doc {
   frontmatter : String? // 封筒の逐語（`---` の柵は含まない）
   eol : Eol
   body : Array[Block] // 最初の骨格より前の散文
-  centers : Array[Center]
+  roots : Array[Root]
 }
 
 ///|
-/// 親が文書のノード。center 専用の操作語彙は無い（文書を親とする move / add）。
-pub(all) struct Center {
+/// 親が文書のノード。root 専用の操作語彙は無い（文書を親とする move / add）。
+pub(all) struct Root {
   id : Int
-  skeleton : Skeleton
-  slots : Array[Slot]
+  node : Node
+  wings : Array[Wing]
 }
 
 ///|
-/// スロット = 場所。占有者を問わず側を持ち、id は持たない。
-/// side が「center 直下のスロット → 側」の部分写像であることが、そのまま型になっている。
-pub(all) struct Slot {
+/// 翼 = 場所。占有者を問わず側を持ち、id は持たない。
+/// side が「root 直下の翼 → 側」の部分写像であることが、そのまま型になっている。
+pub(all) struct Wing {
   side : Side
   branch : Branch
 }
@@ -320,20 +320,20 @@ pub(all) struct Slot {
 /// 深さ 3 以降は一様。
 pub(all) struct Branch {
   id : Int
-  skeleton : Skeleton
+  node : Node
   children : Array[Branch]
 }
 
 ///|
 /// 骨格行の有無。Implicit は「飛びが綴り」なので label も body も型ごと無い。
-pub(all) enum Skeleton {
+pub(all) enum Node {
   Implicit
-  Explicit(form~ : Form, label~ : String, folded~ : Bool, body~ : Array[Block])
+  Explicit(sign~ : Sign, label~ : String, folded~ : Bool, body~ : Array[Block])
 }
 
 ///|
-/// 見出しか項目か。Implicit を入れないのは setForm の引数型だから。
-pub(all) enum Form {
+/// 見出しか項目か。Implicit を入れないのは setSign の引数型だから。
+pub(all) enum Sign {
   Heading
   Item
 }
@@ -404,8 +404,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 新 core �
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/sig_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` `Center` `Slot` `Branch` `Skeleton` `Form` `Side` `Eol` `Block` `Content`（Task 1）/
-  `make_doc` `make_center` `make_slot` `make_branch` `make_head`（Task 1）
+- Consumes: `Doc` `Root` `Wing` `Branch` `Node` `Sign` `Side` `Eol` `Block` `Content`（Task 1）/
+  `make_doc` `make_root` `make_wing` `make_branch` `make_head`（Task 1）
 - Produces: `pub fn sig(doc : Doc) -> String` — id を含まない木の綴り。法則 1・2 の唯一の比較子
 
 - [ ] **Step 1: 失敗するテストを書く**
@@ -419,18 +419,18 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 新 core �
 ///|
 test "例 1: `# r` + `## a`" {
   let doc = make_doc([
-    make_center(2, make_head("r"), [
-      make_slot(Right, make_branch(3, make_head("a"), [])),
+    make_root(2, make_head("r"), [
+      make_wing(Right, make_branch(3, make_head("a"), [])),
     ]),
   ])
   assert_eq(sig(doc), "D-n()[Reh_1:r()[>Neh_1:a()[]]]")
 }
 
 ///|
-test "例 2: `# r` + `---` + `#### b`（C16。先頭スロットが左、占有者は Implicit 2 段）" {
+test "例 2: `# r` + `---` + `#### b`（C16。先頭翼が左、占有者は Implicit 2 段）" {
   let doc = make_doc([
-    make_center(2, make_head("r"), [
-      make_slot(
+    make_root(2, make_head("r"), [
+      make_wing(
         Left,
         make_branch(3, Implicit, [
           make_branch(4, Implicit, [make_branch(5, make_head("b"), [])]),
@@ -442,18 +442,18 @@ test "例 2: `# r` + `---` + `#### b`（C16。先頭スロットが左、占有�
 }
 
 ///|
-test "例 3: 封筒・CRLF・doc の散文・畳んだ項目 center・飾りの水平線・コードカード" {
+test "例 3: 封筒・CRLF・doc の散文・畳んだ項目 root・飾りの水平線・コードカード" {
   let doc : Doc = {
     frontmatter: Some("image-folder: img"),
     eol: Crlf,
     body: [Opaque("intro")],
-    centers: [
-      make_center(2, Explicit(form=Item, label="c", folded=true, body=[Rule]), [
-        make_slot(
+    roots: [
+      make_root(2, Explicit(sign=Item, label="c", folded=true, body=[Rule]), [
+        make_wing(
           Right,
           make_branch(
             3,
-            Explicit(form=Heading, label="x", folded=false, body=[
+            Explicit(sign=Heading, label="x", folded=false, body=[
               Content(Code(info="js", text="1")),
             ]),
             [],
@@ -470,8 +470,8 @@ test "例 3: 封筒・CRLF・doc の散文・畳んだ項目 center・飾りの�
 
 ///|
 test "長さ前置なので、区切り文字が中身に混ざっても曖昧さが出ない" {
-  let plain = make_doc([make_center(2, make_head("a"), [])])
-  let tricky = make_doc([make_center(2, make_head("a()[]>2:"), [])])
+  let plain = make_doc([make_root(2, make_head("a"), [])])
+  let tricky = make_doc([make_root(2, make_head("a()[]>2:"), [])])
   assert_eq(sig(plain), "D-n()[Reh_1:a()[]]")
   assert_eq(sig(tricky), "D-n()[Reh_8:a()[]>2:()[]]")
   // 中身が構造の綴りを真似ても、長さが先に来るので読み違えようがない
@@ -515,19 +515,19 @@ pub fn sig(doc : Doc) -> String {
   )
   sig_blocks(sb, doc.body)
   sb.write_string("[")
-  for r in doc.centers {
-    sig_center(sb, r)
+  for r in doc.roots {
+    sig_root(sb, r)
   }
   sb.write_string("]")
   sb.to_string()
 }
 
 ///|
-fn sig_center(sb : StringBuilder, center : Center) -> Unit {
+fn sig_root(sb : StringBuilder, root : Root) -> Unit {
   sb.write_string("R")
-  sig_skeleton(sb, center.skeleton)
+  sig_node(sb, root.node)
   sb.write_string("[")
-  for b in center.slots {
+  for b in root.wings {
     sb.write_string(
       match b.side {
         Right => ">"
@@ -542,7 +542,7 @@ fn sig_center(sb : StringBuilder, center : Center) -> Unit {
 ///|
 fn sig_branch(sb : StringBuilder, branch : Branch) -> Unit {
   sb.write_string("N")
-  sig_skeleton(sb, branch.skeleton)
+  sig_node(sb, branch.node)
   sb.write_string("[")
   for c in branch.children {
     sig_branch(sb, c)
@@ -551,13 +551,13 @@ fn sig_branch(sb : StringBuilder, branch : Branch) -> Unit {
 }
 
 ///|
-fn sig_skeleton(sb : StringBuilder, skeleton : Skeleton) -> Unit {
-  match skeleton {
+fn sig_node(sb : StringBuilder, node : Node) -> Unit {
+  match node {
     Implicit => sb.write_string("i")
-    Explicit(form~, label~, folded~, body~) => {
+    Explicit(sign~, label~, folded~, body~) => {
       sb.write_string("e")
       sb.write_string(
-        match form {
+        match sign {
           Heading => "h"
           Item => "l"
         },
@@ -644,7 +644,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 木の指�
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/check_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` `Center` `Slot` `Branch` `Skeleton` `Form` `doc_id`（Task 1）/ `make_*`（Task 1）
+- Consumes: `Doc` `Root` `Wing` `Branch` `Node` `Sign` `doc_id`（Task 1）/ `make_*`（Task 1）
 - Produces: `pub fn check(doc : Doc) -> Array[String]` — 破れを全部集めて返す（空 = 健全）
 
 - [ ] **Step 1: 失敗するテストを書く**
@@ -658,12 +658,12 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 木の指�
 ///|
 test "健全な木では破れが 1 つも出ない" {
   let doc = make_doc([
-    make_center(2, make_head("r"), [
-      make_slot(
+    make_root(2, make_head("r"), [
+      make_wing(
         Right,
         make_branch(3, make_item("x"), [make_branch(4, make_item("y"), [])]),
       ),
-      make_slot(
+      make_wing(
         Left,
         make_branch(5, Implicit, [make_branch(6, make_head("b"), [])]),
       ),
@@ -675,19 +675,19 @@ test "健全な木では破れが 1 つも出ない" {
 ///|
 test "条件 1: id は文書内で一意。文書 id を名乗ったノードも落ちる" {
   let twice = make_doc([
-    make_center(2, make_head("a"), []),
-    make_center(2, make_head("b"), []),
+    make_root(2, make_head("a"), []),
+    make_root(2, make_head("b"), []),
   ])
   assert_eq(check(twice), ["id が重なっている (id=2)"])
-  let sentinel = make_doc([make_center(doc_id, make_head("a"), [])])
+  let sentinel = make_doc([make_root(doc_id, make_head("a"), [])])
   assert_eq(check(sentinel), ["id が重なっている (id=1)"])
 }
 
 ///|
 test "条件 2: Implicit は子を持つ限りにおいて存在する" {
   let doc = make_doc([
-    make_center(2, make_head("r"), [
-      make_slot(Right, make_branch(7, Implicit, [])),
+    make_root(2, make_head("r"), [
+      make_wing(Right, make_branch(7, Implicit, [])),
     ]),
   ])
   assert_eq(check(doc), ["Implicit に子が無い (id=7)"])
@@ -696,9 +696,9 @@ test "条件 2: Implicit は子を持つ限りにおいて存在する" {
 ///|
 test "条件 3: Implicit の前の兄弟はすべて項目" {
   let doc = make_doc([
-    make_center(2, make_head("r"), [
-      make_slot(Right, make_branch(3, make_head("a"), [])),
-      make_slot(
+    make_root(2, make_head("r"), [
+      make_wing(Right, make_branch(3, make_head("a"), [])),
+      make_wing(
         Right,
         make_branch(7, Implicit, [make_branch(8, make_head("b"), [])]),
       ),
@@ -712,8 +712,8 @@ test "条件 3: Implicit の前の兄弟はすべて項目" {
 ///|
 test "条件 4: Implicit の子に項目は居ない" {
   let doc = make_doc([
-    make_center(2, make_head("r"), [
-      make_slot(
+    make_root(2, make_head("r"), [
+      make_wing(
         Right,
         make_branch(6, Implicit, [make_branch(7, make_item("x"), [])]),
       ),
@@ -725,8 +725,8 @@ test "条件 4: Implicit の子に項目は居ない" {
 ///|
 test "条件 4: Implicit の連鎖は合法（C16）" {
   let doc = make_doc([
-    make_center(2, make_head("r"), [
-      make_slot(
+    make_root(2, make_head("r"), [
+      make_wing(
         Left,
         make_branch(3, Implicit, [
           make_branch(4, Implicit, [make_branch(5, make_head("b"), [])]),
@@ -740,12 +740,12 @@ test "条件 4: Implicit の連鎖は合法（C16）" {
 ///|
 test "条件 5: 同じ親の子は項目が先、見出しが後" {
   let ok = make_doc([
-    make_center(2, make_item("x"), []),
-    make_center(3, make_head("h"), []),
+    make_root(2, make_item("x"), []),
+    make_root(3, make_head("h"), []),
   ])
   let ng = make_doc([
-    make_center(3, make_head("h"), []),
-    make_center(7, make_item("x"), []),
+    make_root(3, make_head("h"), []),
+    make_root(7, make_item("x"), []),
   ])
   assert_eq(check(ok), [])
   assert_eq(check(ng), ["見出しの後ろに項目が居る (id=7)"])
@@ -754,8 +754,8 @@ test "条件 5: 同じ親の子は項目が先、見出しが後" {
 ///|
 test "条件 6: 項目の子孫はすべて項目" {
   let doc = make_doc([
-    make_center(2, make_head("r"), [
-      make_slot(
+    make_root(2, make_head("r"), [
+      make_wing(
         Right,
         make_branch(3, make_item("x"), [make_branch(7, make_head("h"), [])]),
       ),
@@ -766,7 +766,7 @@ test "条件 6: 項目の子孫はすべて項目" {
 ```
 
 備考: 契約 §7 の 6 条件と 6 つの違反メッセージ（憲法 §2 の「check に残る関係的不変条件」）。
-条件 5 は doc 直下（centers の列）にも効くことを、同じテストで確かめている。
+条件 5 は doc 直下（roots の列）にも効くことを、同じテストで確かめている。
 条件 4 は破れの実体（子が項目）を名指す文言に揃えてあり、**Implicit の連鎖は合法**である
 （C16 の `Ni[Ni[Neh_1:b()[]]]` が通らないと読み戻せない）ことを 2 本目のテストで固定する。
 
@@ -783,7 +783,7 @@ Expected: `Error: [4021]` / `The value identifier check is unbound.` EXIT=1
 ```moonbit
 // 型で殺せなかった関係的な不変条件だけの検査。破れを全部集めて返す（空 = 健全）。
 // 型で死んだもの（doc の汚れ / 深い side / implicit×label,body,folded,Item /
-// setForm(Implicit) / sides と children の整合）はここに住まない。
+// setSign(Implicit) / sides と children の整合）はここに住まない。
 
 ///|
 /// 破れの一覧。空なら健全。parse が出した Doc は必ずこれが空になる。
@@ -791,17 +791,17 @@ pub fn check(doc : Doc) -> Array[String] {
   let faults : Array[String] = []
   // 番兵を先に登録するので、文書 id を名乗ったノードは条件 1 で落ちる
   let seen : Array[Int] = [doc_id]
-  check_kin(faults, doc.centers.map(fn(r) { (r.id, r.skeleton) }))
-  for r in doc.centers {
+  check_kin(faults, doc.roots.map(fn(r) { (r.id, r.node) }))
+  for r in doc.roots {
     check_one(
       faults,
       seen,
       r.id,
-      r.skeleton,
-      r.slots.map(fn(b) { (b.branch.id, b.branch.skeleton) }),
+      r.node,
+      r.wings.map(fn(b) { (b.branch.id, b.branch.node) }),
     )
-    for b in r.slots {
-      check_branch(faults, seen, b.branch, is_item(r.skeleton))
+    for b in r.wings {
+      check_branch(faults, seen, b.branch, is_item(r.node))
     }
   }
   faults
@@ -816,17 +816,17 @@ fn check_branch(
   item : Bool,
 ) -> Unit {
   // 条件 6: 項目の子孫はすべて項目（Implicit も違反）
-  if item && !is_item(branch.skeleton) {
+  if item && !is_item(branch.node) {
     faults.push(fault("項目の子孫が項目でない", branch.id))
   }
   check_one(
     faults,
     seen,
     branch.id,
-    branch.skeleton,
-    branch.children.map(fn(c) { (c.id, c.skeleton) }),
+    branch.node,
+    branch.children.map(fn(c) { (c.id, c.node) }),
   )
-  let deep = item || is_item(branch.skeleton)
+  let deep = item || is_item(branch.node)
   for c in branch.children {
     check_branch(faults, seen, c, deep)
   }
@@ -838,8 +838,8 @@ fn check_one(
   faults : Array[String],
   seen : Array[Int],
   id : Int,
-  skeleton : Skeleton,
-  kids : Array[(Int, Skeleton)],
+  node : Node,
+  kids : Array[(Int, Node)],
 ) -> Unit {
   // 条件 1: id は文書内で一意（番兵 doc_id を含む）
   if seen.contains(id) {
@@ -847,7 +847,7 @@ fn check_one(
   } else {
     seen.push(id)
   }
-  if skeleton is Implicit {
+  if node is Implicit {
     // 条件 2: Implicit は子を持つ限りにおいて存在する
     if kids.is_empty() {
       faults.push(fault("Implicit に子が無い", id))
@@ -865,7 +865,7 @@ fn check_one(
 ///|
 /// 条件 3: Implicit の前の兄弟はすべて項目（見出しは飛びを飲み込むので読み戻せない）。
 /// 条件 5: 同じ親の子は項目が先、見出しが後（Implicit は見出しの側）。
-fn check_kin(faults : Array[String], kin : Array[(Int, Skeleton)]) -> Unit {
+fn check_kin(faults : Array[String], kin : Array[(Int, Node)]) -> Unit {
   let mut head = false
   for k in kin {
     let item = is_item(k.1)
@@ -884,9 +884,9 @@ fn check_kin(faults : Array[String], kin : Array[(Int, Skeleton)]) -> Unit {
 }
 
 ///|
-fn is_item(skeleton : Skeleton) -> Bool {
-  match skeleton {
-    Explicit(form~, ..) => form is Item
+fn is_item(node : Node) -> Bool {
+  match node {
+    Explicit(sign~, ..) => sign is Item
     Implicit => false
   }
 }
@@ -1502,7 +1502,7 @@ test "怠惰な継続は読まない。列が浅ければ項目の領土から�
 ```
 
 備考: 憲法 §4「マーカーは `-`（`*` `+` は読みのみ）」「順序リストは構造として読み `-` に正規化」。
-C15（`- center` の content indent に置いた `---`）と C17（項目の後ろの列 0 の見出し）。
+C15（`- r` の content indent に置いた `---`）と C17（項目の後ろの列 0 の見出し）。
 契約 §15 の読みの裁定 2（怠惰な継続）・7（順序リストの番号）・8（空白 5 桁以上の hang）を
 ここで固定する。`hang` の定義は契約 §6 の走査の前提 2 のとおり「ラベルの始まる列」。
 

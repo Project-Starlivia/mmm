@@ -7,7 +7,7 @@
 **Goal:** md と同型の文書モデルを MoonBit に新設し、parse / serialize / 操作 3 種 /
 反映 v0 までを、法則のファズで検証しながら作る。
 
-**Architecture:** テキストが真実。`parse` が md を役割型の木（Doc > Center > Slot > Branch）に読み、
+**Architecture:** テキストが真実。`parse` が md を役割型の木（Doc > Root > Wing > Branch）に読み、
 `serialize` が正規形の md を吐く。操作は木を直接変異させ、差分を editSets として返す。
 型の異種性は**道具 4 つ（resolve / pluck / graft / amend）に幽閉**し、操作に腕を生やさない。
 正しさは 4 つの法則が持ち、実在コーパスとランダム生成の両方で機械検証する。
@@ -53,7 +53,7 @@ TypeScript（`branch --test`。`@lezer/markdown` は法則 4 の外部審判）/
 反映 v0（全文正規形 → diff → editSets）/ project（MindmapTree の JSON まで）。
 
 **作らない**（殺す条件の判定後に別計画）: UI 接続 / TS の書き換え / すげ替え v1 /
-add・rename・fold・setForm・indent・outdent・content 系 / convert・format コマンド /
+add・rename・fold・setSign・indent・outdent・content 系 / convert・format コマンド /
 render の接続 / 旧 core の削除。
 
 **殺す条件**: 道具（resolve / pluck / graft / amend）の腕が 3 で止まらなくなったら、
@@ -104,7 +104,7 @@ Edit と apply / diff / 反映 v0 / 殺す条件の判定
 計画を実際のコードの粒度まで書き下ろす過程で、憲法の穴が見つかり、仕様側を改訂して塞いだ。
 
 1. **トグルの帰属** — 「implied は side を持てない（昇格を伴う flipSide）」は誤りで撤回。
-   トグルは隙間に付き、スロットの占有者を問わない（C16 改訂）
+   トグルは隙間に付き、翼の占有者を問わない（C16 改訂）
 2. **`- - -` の裁定** — 旧 core の方言（項目として読む）を捨て、CommonMark の水平線に揃えた
 3. **項目の後ろの見出しは Item の子にならない** — 開いている項目を閉じてから付ける。
    implied の位置制約は「children の先頭」ではなく「前に見出しが居ない」（C17）

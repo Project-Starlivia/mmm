@@ -65,10 +65,10 @@ G5 が終わっていない状態では着手できない（契約 §3）。
 | `quote` / `strings` / `hex` / `reflect_json` | `core/tree/json.mbt` | JSON の綴り |
 | `project` / `map_bucket` / `map_branch` / `map_node` / `map_card` | `core/tree/project.mbt` | 投影 |
 | （新設なし） | — | 木の組み立ては G1 の `make_*` を呼ぶ（契約 §4） |
-| `Law` / `law_pick` / `law_id` / `law_head_label` / `law_item_label` / `law_block` / `law_side` / `law_skeleton` / `law_branches` / `law_branch` / `law_slots` / `law_implicit_center` / `law_doc` | `core/tree/laws_wbtest.mbt` | 木の生成器 |
+| `Law` / `law_pick` / `law_id` / `law_head_label` / `law_item_label` / `law_block` / `law_side` / `law_node` / `law_branches` / `law_branch` / `law_wings` / `law_implicit_root` / `law_doc` | `core/tree/laws_wbtest.mbt` | 木の生成器 |
 | `sig` / `format` / `check` / `project` / `move_nodes` / `flip_side` / `delete_nodes` | `core/tree/js/exports.mbt` | 境界 7 本（別パッケージ） |
 | `Edit` / `Reflection` / `Card` / `MapNode` / `MapBranch` / `MapTree` / `Mindmap` / `doc` / `mbt` / `apply` / `cardText` / `rng` / `randomDoc` / `pathological` / `shrink` / `corpus` / `fuzzCases` / `brief` | `test/_tree.ts` | TS の窓口 |
-| `outerSkeletons` / `mmmSkeletons` / `DIALECT` / `READING` | `test/treeDialect.test.ts` | 外部審判 |
+| `outerNodes` / `mmmNodes` / `DIALECT` / `READING` | `test/treeDialect.test.ts` | 外部審判 |
 | `idOf` | `test/treeCases.test.ts` | ラベル → id |
 | `idsOf` / `holds` | `test/treeOps.test.ts` | 操作の性質 |
 | `fmt:doc` | `package.json` | 新パッケージだけの整形検査 |
@@ -324,7 +324,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ JSON の�
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/project_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` / `Center` / `Slot` / `Branch` / `Skeleton` / `Form` / `Side` / `Eol` /
+- Consumes: `Doc` / `Root` / `Wing` / `Branch` / `Node` / `Sign` / `Side` / `Eol` /
   `Block` / `Content`（G1・契約 §6）、`quote`（Task 60）、
   **`same_side`（G3 `serialize.mbt`）**
 - Produces: `pub fn project(doc : Doc) -> String`（契約 §14 の JSON）/
@@ -347,46 +347,46 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ JSON の�
 // 同じ木を組む道具を 2 セット持たない（契約 §4 の「`make_*` に統一」）。
 
 ///|
-test "バケツ分けは slots の filter — 側ごとに順序を保つ" {
-  let center : Center = {
+test "バケツ分けは wings の filter — 側ごとに順序を保つ" {
+  let root : Root = {
     id: 2,
-    skeleton: Explicit(form=Heading, label="r", folded=false, body=[]),
-    slots: [
+    node: Explicit(sign=Heading, label="r", folded=false, body=[]),
+    wings: [
       { side: Right, branch: make_branch(3, make_head("a"), []) },
       { side: Left, branch: make_branch(4, make_head("b"), []) },
       { side: Right, branch: make_branch(5, make_head("c"), []) },
     ],
   }
   assert_eq(
-    project(make_doc([center])),
+    project(make_doc([root])),
     "{\"trees\":[{\"branch\":{\"id\":2,\"label\":\"r\",\"implied\":false," +
-    "\"folded\":false,\"form\":\"heading\",\"cards\":[],\"buried\":0}," +
+    "\"folded\":false,\"sign\":\"heading\",\"cards\":[],\"buried\":0}," +
     "\"right\":[{\"branch\":{\"id\":3,\"label\":\"a\",\"implied\":false," +
-    "\"folded\":false,\"form\":\"heading\",\"cards\":[],\"buried\":0}," +
+    "\"folded\":false,\"sign\":\"heading\",\"cards\":[],\"buried\":0}," +
     "\"children\":[]},{\"branch\":{\"id\":5,\"label\":\"c\",\"implied\":false," +
-    "\"folded\":false,\"form\":\"heading\",\"cards\":[],\"buried\":0}," +
+    "\"folded\":false,\"sign\":\"heading\",\"cards\":[],\"buried\":0}," +
     "\"children\":[]}],\"left\":[{\"branch\":{\"id\":4,\"label\":\"b\"," +
-    "\"implied\":false,\"folded\":false,\"form\":\"heading\",\"cards\":[]," +
+    "\"implied\":false,\"folded\":false,\"sign\":\"heading\",\"cards\":[]," +
     "\"buried\":0},\"children\":[]}]}],\"buried\":0}",
   )
 }
 
 ///|
 test "buried は絵に出ない Block の数。cards は Content と 1 対 1" {
-  let center : Center = {
+  let root : Root = {
     id: 2,
-    skeleton: Explicit(form=Item, label="r", folded=true, body=[
+    node: Explicit(sign=Item, label="r", folded=true, body=[
       Opaque("> quote"),
       Content(Image(alt="a", src="./x.png")),
       Rule,
       Content(Code(info="js", text="1")),
     ]),
-    slots: [],
+    wings: [],
   }
   assert_eq(
-    project(make_doc([center])),
+    project(make_doc([root])),
     "{\"trees\":[{\"branch\":{\"id\":2,\"label\":\"r\",\"implied\":false," +
-    "\"folded\":true,\"form\":\"item\",\"cards\":[{\"kind\":\"image\"," +
+    "\"folded\":true,\"sign\":\"item\",\"cards\":[{\"kind\":\"image\"," +
     "\"alt\":\"a\",\"src\":\"./x.png\"},{\"kind\":\"code\",\"info\":\"js\"," +
     "\"text\":\"1\"}],\"buried\":2},\"right\":[],\"left\":[]}],\"buried\":0}",
   )
@@ -398,20 +398,20 @@ test "implied は空ラベルの見出しとして出る。文書の散文は tr
     frontmatter: None,
     eol: Lf,
     body: [Opaque("intro"), Rule],
-    centers: [
+    roots: [
       {
         id: 2,
-        skeleton: Implicit,
-        slots: [{ side: Right, branch: make_branch(3, "b") }],
+        node: Implicit,
+        wings: [{ side: Right, branch: make_branch(3, "b") }],
       },
     ],
   }
   assert_eq(
     project(doc),
     "{\"trees\":[{\"branch\":{\"id\":2,\"label\":\"\",\"implied\":true," +
-    "\"folded\":false,\"form\":\"heading\",\"cards\":[],\"buried\":0}," +
+    "\"folded\":false,\"sign\":\"heading\",\"cards\":[],\"buried\":0}," +
     "\"right\":[{\"branch\":{\"id\":3,\"label\":\"b\",\"implied\":false," +
-    "\"folded\":false,\"form\":\"heading\",\"cards\":[],\"buried\":0}," +
+    "\"folded\":false,\"sign\":\"heading\",\"cards\":[],\"buried\":0}," +
     "\"children\":[]}],\"left\":[]}],\"buried\":2}",
   )
 }
@@ -428,23 +428,23 @@ Expected: `Error: [4021]` / `The value identifier project is unbound.` EXIT=1
 
 ```moonbit
 // Doc → MindmapTree。map への矢印はこの 1 本だけ（法則 3）。
-// バケツ分けは slots の filter — 側をまたぐ読み順はここで意図的に落ちる。
+// バケツ分けは wings の filter — 側をまたぐ読み順はここで意図的に落ちる。
 // 側の等値は G3 の same_side を呼ぶ（Side に Eq は無い。判定を 2 か所に割らない）。
 
 ///|
 pub fn project(doc : Doc) -> String {
   let sb = StringBuilder::new()
   sb.write_string("{\"trees\":[")
-  for k, r in doc.centers {
+  for k, r in doc.roots {
     if k > 0 {
       sb.write_string(",")
     }
     sb.write_string("{\"branch\":")
-    map_node(sb, r.id, r.skeleton)
+    map_node(sb, r.id, r.node)
     sb.write_string(",\"right\":")
-    map_bucket(sb, r.slots, Right)
+    map_bucket(sb, r.wings, Right)
     sb.write_string(",\"left\":")
-    map_bucket(sb, r.slots, Left)
+    map_bucket(sb, r.wings, Left)
     sb.write_string("}")
   }
   sb.write_string("],\"buried\":")
@@ -456,12 +456,12 @@ pub fn project(doc : Doc) -> String {
 ///|
 fn map_bucket(
   sb : StringBuilder,
-  slots : Array[Slot],
+  wings : Array[Wing],
   side : Side,
 ) -> Unit {
   sb.write_string("[")
   let mut first = true
-  for b in slots {
+  for b in wings {
     if same_side(b.side, side) {
       if !first {
         sb.write_string(",")
@@ -476,7 +476,7 @@ fn map_bucket(
 ///|
 fn map_branch(sb : StringBuilder, branch : Branch) -> Unit {
   sb.write_string("{\"branch\":")
-  map_node(sb, branch.id, branch.skeleton)
+  map_node(sb, branch.id, branch.node)
   sb.write_string(",\"children\":[")
   for k, c in branch.children {
     if k > 0 {
@@ -488,25 +488,25 @@ fn map_branch(sb : StringBuilder, branch : Branch) -> Unit {
 }
 
 ///|
-/// implied は見出しの飛びからしか生まれないので form は heading、
+/// implied は見出しの飛びからしか生まれないので sign は heading、
 /// label は空、folded は false、cards も buried も 0。
-fn map_node(sb : StringBuilder, id : Int, skeleton : Skeleton) -> Unit {
+fn map_node(sb : StringBuilder, id : Int, node : Node) -> Unit {
   sb.write_string("{\"id\":")
   sb.write_string(id.to_string())
-  match skeleton {
+  match node {
     Implicit =>
       sb.write_string(
         ",\"label\":\"\",\"implied\":true,\"folded\":false," +
-        "\"form\":\"heading\",\"cards\":[],\"buried\":0}",
+        "\"sign\":\"heading\",\"cards\":[],\"buried\":0}",
       )
-    Explicit(form~, label~, folded~, body~) => {
+    Explicit(sign~, label~, folded~, body~) => {
       sb.write_string(",\"label\":")
       sb.write_string(quote(label))
       sb.write_string(",\"implied\":false,\"folded\":")
       sb.write_string(if folded { "true" } else { "false" })
-      sb.write_string(",\"form\":")
+      sb.write_string(",\"sign\":")
       sb.write_string(
-        match form {
+        match sign {
           Heading => "\"heading\""
           Item => "\"item\""
         },
@@ -793,7 +793,7 @@ test("境界: 反映は ok / reason / text / edits の 4 つを返し、edits �
   const md = "# r\n\n## a\n";
   const bad = doc.flipSide(md, [99]);
   assert.equal(bad.ok, false);
-  assert.equal(bad.reason, "側を変えられるのは center と center 直下の枝だけ (id=99)");
+  assert.equal(bad.reason, "側を変えられるのは root と root 直下の枝だけ (id=99)");
   assert.equal(bad.text, md);
   assert.deepEqual(bad.edits, []);
   assert.equal(apply(md, bad.edits), bad.text);
@@ -889,7 +889,7 @@ export interface MapNode {
   /** 骨格行を持たない（飛びが綴り）。中空に描くかは render の自由 */
   readonly implied: boolean;
   readonly folded: boolean;
-  readonly form: "heading" | "item";
+  readonly sign: "heading" | "item";
   readonly cards: readonly Card[];
   /** 絵に描かれない Block の数（Rule と Opaque）。cards.length + buried = body の数 */
   readonly buried: number;
@@ -920,7 +920,7 @@ export const doc = {
   /** 破れの一覧。空なら健全 */
   check: (md: string): string[] => JSON.parse(mbt.check(md)),
   project: (md: string): Mindmap => JSON.parse(mbt.project(md)),
-  /** parent は id（文書は 1）。left は行き先の側で、center 直下でだけ効く */
+  /** parent は id（文書は 1）。left は行き先の側で、root 直下でだけ効く */
   moveNodes: (
     md: string,
     ids: number[],
@@ -1013,7 +1013,7 @@ export function randomDoc(seed: number): string {
 }
 
 /** リポジトリ内の実文書。docs/ の md がそのまま法則 1・2 の入力になる */
-export function corpus(center = "."): { path: string; text: string }[] {
+export function corpus(root = "."): { path: string; text: string }[] {
   const skip = new Set([
     "node_modules",
     "_build",
@@ -1032,7 +1032,7 @@ export function corpus(center = "."): { path: string; text: string }[] {
         out.push({ path: p, text: readFileSync(p, "utf8") });
     }
   };
-  walk(center, 0);
+  walk(root, 0);
   return out;
 }
 
@@ -1158,7 +1158,7 @@ Expected: `SyntaxError` … `The requested module './_tree.ts' does not provide 
 `SKELETONS` と `pathological` を足す（置き場所は `rng` の下、`corpus` の上）。
 
 ```typescript
-/** 骨格行の綴り。マーカーの銘柄・字下げの揺れ・form の混在をここで踏む */
+/** 骨格行の綴り。マーカーの銘柄・字下げの揺れ・sign の混在をここで踏む */
 const SKELETONS = [
   "# ",
   "## ",
@@ -1212,7 +1212,7 @@ const BODIES = [
 
 /**
  * 病的な md を組む。狙って踏むのは
- * 見出しの飛び / 7 個以上の `#` / マーカー混在 / 字下げの揺れ / form 混在 /
+ * 見出しの飛び / 7 個以上の `#` / マーカー混在 / 字下げの揺れ / sign 混在 /
  * トグルと飾り / details のネストと未閉じ / 手書きの summary / 封筒 / setext /
  * インデントコード / フェンス / CRLF / 空行の連続 / 非 ASCII とサロゲートペア。
  */
@@ -1252,7 +1252,7 @@ export function pathological(): { name: string; md: string }[] {
     ["マーカー混在", "- a\n* b\n+ c\n"],
     ["順序リスト", "1. a\n2) b\n"],
     ["字下げの揺れ", "- a\n   - b\n\t- c\n"],
-    ["form 混在", "# r\n\n- x\n\n## h\n\n- y\n"],
+    ["sign 混在", "# r\n\n- x\n\n## h\n\n- y\n"],
     ["トグルと飾り", "# r\n\n## a\n\ntext\n\n---\n\nmore\n\n---\n\n## b\n"],
     [
       "details のネスト",
@@ -1603,7 +1603,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 法則 1 �
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/laws_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` / `Center` / `Slot` / `Branch` / `Skeleton` / `Form` / `Side` / `Eol` /
+- Consumes: `Doc` / `Root` / `Wing` / `Branch` / `Node` / `Sign` / `Side` / `Eol` /
   `Block` / `Content` / `first_id` / `check` / `sig`（G1）、`parse`（G2）、
   `serialize`（G3）、`strings`（Task 60）
 - Produces: なし（法則の固定）
@@ -1614,7 +1614,7 @@ TS 側のファズは md から始まるので、**parse が読めない木を�
 
 **生成器の掟**: **parse が作り得る木しか作らない。**
 端の空白を持つラベル・行頭がマーカーに見える Item ラベル・水平線に見える Opaque を
-出した瞬間、法則 1 は生成器の罪で落ちる。だからラベル集合は form ごとに分かれている。
+出した瞬間、法則 1 は生成器の罪で落ちる。だからラベル集合は sign ごとに分かれている。
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -1697,23 +1697,23 @@ fn law_side(r : Law) -> Side {
 }
 
 ///|
-fn law_skeleton(r : Law, form : Form) -> Skeleton {
+fn law_node(r : Law, sign : Sign) -> Node {
   let body : Array[Block] = []
   for _ in 0..<law_pick(r, 3) {
     body.push(law_block(r))
   }
-  let label = match form {
+  let label = match sign {
     Heading => law_head_label(r)
     Item => law_item_label(r)
   }
-  Explicit(form~, label~, folded=law_pick(r, 4) == 0, body~)
+  Explicit(sign~, label~, folded=law_pick(r, 4) == 0, body~)
 }
 
 ///|
 /// 兄弟の列。項目が先・見出しが後（順序法則）で、Implicit は
 /// 項目の走りの直後に高々 1 つ（前の兄弟がすべて項目という位置の条件）。
 /// 項目の親の下は項目だけ（単調性）。
-fn law_branches(r : Law, parent : Form, depth : Int) -> Array[Branch] {
+fn law_branches(r : Law, parent : Sign, depth : Int) -> Array[Branch] {
   let out : Array[Branch] = []
   if depth <= 0 {
     return out
@@ -1727,7 +1727,7 @@ fn law_branches(r : Law, parent : Form, depth : Int) -> Array[Branch] {
       for _ in 0..<(1 + law_pick(r, 2)) {
         kids.push(law_branch(r, Heading, depth - 1))
       }
-      out.push({ id: law_id(r), skeleton: Implicit, children: kids })
+      out.push({ id: law_id(r), node: Implicit, children: kids })
     }
     for _ in 0..<law_pick(r, 3) {
       out.push(law_branch(r, Heading, depth - 1))
@@ -1737,18 +1737,18 @@ fn law_branches(r : Law, parent : Form, depth : Int) -> Array[Branch] {
 }
 
 ///|
-fn law_branch(r : Law, form : Form, depth : Int) -> Branch {
+fn law_branch(r : Law, sign : Sign, depth : Int) -> Branch {
   {
     id: law_id(r),
-    skeleton: law_skeleton(r, form),
-    children: law_branches(r, form, depth),
+    node: law_node(r, sign),
+    children: law_branches(r, sign, depth),
   }
 }
 
 ///|
-/// スロットの列。側は場所の属性なので、ここで初めて付く。
-fn law_slots(r : Law, parent : Form, depth : Int) -> Array[Slot] {
-  let out : Array[Slot] = []
+/// 翼の列。側は場所の属性なので、ここで初めて付く。
+fn law_wings(r : Law, parent : Sign, depth : Int) -> Array[Wing] {
+  let out : Array[Wing] = []
   for n in law_branches(r, parent, depth) {
     out.push({ side: law_side(r), branch: n })
   }
@@ -1756,39 +1756,39 @@ fn law_slots(r : Law, parent : Form, depth : Int) -> Array[Slot] {
 }
 
 ///|
-/// Implicit の center は子を持つ限りにおいて存在し、その子はすべて見出し。
-fn law_implicit_center(r : Law, depth : Int) -> Center {
-  let slots : Array[Slot] = []
+/// Implicit の root は子を持つ限りにおいて存在し、その子はすべて見出し。
+fn law_implicit_root(r : Law, depth : Int) -> Root {
+  let wings : Array[Wing] = []
   for _ in 0..<(1 + law_pick(r, 2)) {
-    slots.push({ side: law_side(r), branch: law_branch(r, Heading, depth - 1) })
+    wings.push({ side: law_side(r), branch: law_branch(r, Heading, depth - 1) })
   }
-  { id: law_id(r), skeleton: Implicit, slots }
+  { id: law_id(r), node: Implicit, wings }
 }
 
 ///|
-/// 文書 1 通。doc 直下にも順序法則が効く（項目の center が先、見出しの center が後）。
+/// 文書 1 通。doc 直下にも順序法則が効く（項目の root が先、見出しの root が後）。
 fn law_doc(seed : Int, depth : Int) -> Doc {
   let r : Law = { seed: seed * 2 + 1, next_id: first_id }
   let body : Array[Block] = []
   for _ in 0..<law_pick(r, 3) {
     body.push(law_block(r))
   }
-  let centers : Array[Center] = []
+  let roots : Array[Root] = []
   for _ in 0..<law_pick(r, 3) {
-    centers.push({
+    roots.push({
       id: law_id(r),
-      skeleton: law_skeleton(r, Item),
-      slots: law_slots(r, Item, depth),
+      node: law_node(r, Item),
+      wings: law_wings(r, Item, depth),
     })
   }
   if law_pick(r, 3) == 0 {
-    centers.push(law_implicit_center(r, depth))
+    roots.push(law_implicit_root(r, depth))
   }
   for _ in 0..<(1 + law_pick(r, 3)) {
-    centers.push({
+    roots.push({
       id: law_id(r),
-      skeleton: law_skeleton(r, Heading),
-      slots: law_slots(r, Heading, depth),
+      node: law_node(r, Heading),
+      wings: law_wings(r, Heading, depth),
     })
   }
   {
@@ -1803,7 +1803,7 @@ fn law_doc(seed : Int, depth : Int) -> Doc {
       Lf
     },
     body,
-    centers,
+    roots,
   }
 }
 
@@ -1848,7 +1848,7 @@ EXIT=2。**1 本目（check）は必ず緑になること** — 赤なら生成�
 （概要の赤の差し戻し表と同じ）:
 
 - `e` の後の `^`/`_` が違う → 畳みの綴り（G3 Task 44 の `<details>` / G2 Task 25 の `Open`・`Close`）
-- `>`/`<` が違う → 側（G3 Task 43 のトグル / G2 Task 24 のスロット前の隙間）
+- `>`/`<` が違う → 側（G3 Task 43 のトグル / G2 Task 24 の翼前の隙間）
 - `i` が消える／増える → Implicit の導出（G2 Task 21 の level 飛び）
 - `i` が `eh_` に化けた → serialize が勝手に昇格している（G3 Task 41）
 - `(...)` の中身が違う → 中身の認定（G2 Task 23 の `Rule` と `Opaque` の分かれ目）
@@ -1919,7 +1919,7 @@ import { parser } from "@lezer/markdown";
 import { doc, type MapBranch } from "./_tree.ts";
 
 /** 外の CommonMark が骨格と認めた数（見出し + リスト項目） */
-function outerSkeletons(md: string): number {
+function outerNodes(md: string): number {
   const tree = parser.parse(md);
   let n = 0;
   tree.iterate({
@@ -1937,7 +1937,7 @@ function outerSkeletons(md: string): number {
 }
 
 /** mmm が骨格と認めた数（implied は骨格行を持たないので数えない） */
-function mmmSkeletons(md: string): number {
+function mmmNodes(md: string): number {
   let n = 0;
   const walk = (b: MapBranch): void => {
     if (!b.branch.implied) n++;
@@ -2053,12 +2053,12 @@ const READING: { md: string; sig: string; why: string }[] = [
 test("法則 4: 方言表の各行で mmm と外の審判の骨格数が固定どおり", () => {
   for (const row of DIALECT) {
     assert.equal(
-      mmmSkeletons(row.md),
+      mmmNodes(row.md),
       row.mmm,
       `mmm 側が表と違う: ${row.why} / ${JSON.stringify(row.md)}`,
     );
     assert.equal(
-      outerSkeletons(row.md),
+      outerNodes(row.md),
       row.outer,
       `外の審判が表と違う: ${row.why} / ${JSON.stringify(row.md)}`,
     );
@@ -2351,7 +2351,7 @@ test("C13: 読みの道 — 文字列は md として解釈される", () => {
   assert.equal(doc.format(after), after);
 });
 
-test("C14: form は行き先に従う — Item を節の間へ drop", () => {
+test("C14: sign は行き先に従う — Item を節の間へ drop", () => {
   const md = "# r\n\n## a\n\n- x\n\n## b\n";
   assert.equal(
     doc.sig(md),
@@ -2363,28 +2363,28 @@ test("C14: form は行き先に従う — Item を節の間へ drop", () => {
   assert.deepEqual(doc.check(r.text), []);
 });
 
-test("C15: 全リストの map — Item center と content indent のトグル", () => {
-  const md = "- center\n\n  - a\n\n  - b\n\n  ---\n\n  - c\n";
+test("C15: 全リストの map — Item root と content indent のトグル", () => {
+  const md = "- root\n\n  - a\n\n  - b\n\n  ---\n\n  - c\n";
   assert.equal(
     doc.sig(md),
-    "D-n()[Rel_6:center()[>Nel_1:a()[]>Nel_1:b()[]<Nel_1:c()[]]]",
+    "D-n()[Rel_6:root()[>Nel_1:a()[]>Nel_1:b()[]<Nel_1:c()[]]]",
   );
   // 無操作は無編集。format を通すと綴りは正規形へ寄るが、指紋は動かない
   assert.equal(doc.sig(doc.format(md)), doc.sig(md));
   assert.equal(doc.format(doc.format(md)), doc.format(md));
 });
 
-test("C16: implied スロットへの flipSide — 昇格は不要", () => {
+test("C16: implied 翼への flipSide — 昇格は不要", () => {
   const md = "# r\n\n#### b\n";
   assert.equal(doc.sig(md), "D-n()[Reh_1:r()[>Ni[Ni[Neh_1:b()[]]]]]");
-  const slot = doc.project(md).trees[0]!.right[0]!.branch.id;
-  const r = doc.flipSide(md, [slot]);
+  const wing = doc.project(md).trees[0]!.right[0]!.branch.id;
+  const r = doc.flipSide(md, [wing]);
   assert.equal(r.ok, true, r.reason);
   assert.equal(r.text, "# r\n\n---\n\n#### b\n");
   assert.equal(doc.sig(r.text), "D-n()[Reh_1:r()[<Ni[Ni[Neh_1:b()[]]]]]");
 });
 
-test("C17: 項目 center の後ろの見出し — Item の子にはならない", () => {
+test("C17: 項目 root の後ろの見出し — Item の子にはならない", () => {
   const md = "- a\n\n## h\n";
   assert.equal(doc.sig(md), "D-n()[Rel_1:a()[]Ri[>Neh_1:h()[]]]");
   assert.equal(doc.format(md), md);
@@ -2422,7 +2422,7 @@ EXIT=1
 
 赤の大半は G2 の `parse`。概要の**赤の差し戻し表**で担当群を決めて戻す。踏みやすい 3 つ:
 
-- **C17 の「項目 center の後ろの見出し」** → G2 Task 22。列 0 の見出しは開いている項目を
+- **C17 の「項目 root の後ろの見出し」** → G2 Task 22。列 0 の見出しは開いている項目を
   すべて閉じる（md ではリストが終わる）
 - **C8 の `format(md) != md`** → `<summary>` を body に積んでいる。G2 Task 25（契約 §9）
 - **C7 / C9 の綴りが正規形にならない** → G3 Task 41〜45（`spell` の値と `put`）
@@ -2684,11 +2684,11 @@ test("無操作は無編集 — 正規形の文書を同じ場所へ動かして
     const md = doc.format(randomDoc(i));
     const map = doc.project(md);
     if (map.trees.length === 0) continue;
-    const center = map.trees[0]!;
-    if (center.right.length === 0) continue;
-    if (center.left.length > 0) continue; // at は slots の index。バケツの index ではない
-    const first = center.right[0]!.branch.id;
-    const r = doc.moveNodes(md, [first], center.branch.id, 0, false);
+    const root = map.trees[0]!;
+    if (root.right.length === 0) continue;
+    if (root.left.length > 0) continue; // at は wings の index。バケツの index ではない
+    const first = root.right[0]!.branch.id;
+    const r = doc.moveNodes(md, [first], root.branch.id, 0, false);
     holds(md, r, "同位置への move");
     if (r.ok) {
       assert.equal(r.text, md, `同位置への move は無編集: ${brief(md)}`);
