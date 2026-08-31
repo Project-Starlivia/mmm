@@ -7,7 +7,7 @@
 `C:/Users/taker/AppData/Local/Temp/claude/D--1-atrium-mmm--claude-worktrees-dnd-ux-improvement-1ebfc6/954c84b6-8b11-46ca-bd0f-361864110df4/scratchpad/v2/g3probe/`
 （`moon.mod` + `doc/`（library、契約 §6 の型の逐語 + spell.mbt + serialize.mbt + serialize_wbtest.mbt））で、
 Task 40〜45 の**各段階を順に組み立てて**通した。最終状態は
-`moon check` 0 errors / `moon test doc/serialize_wbtest.mbt` **21 passed** / `moon fmt --check doc` EXIT=0。
+`moon check` 0 errors / `moon test tree/serialize_wbtest.mbt` **21 passed** / `moon fmt --check tree` EXIT=0。
 書き出した md は `@lezer/markdown` 1.7.2 にも食わせて、外のパーサが同じ木に読むことを確かめてある（§外の審判）。
 doc-model リポジトリは 1 バイトも変更していない。
 
@@ -24,12 +24,12 @@ doc-model リポジトリは 1 バイトも変更していない。
 
 | ファイル | 所有 | 中身 |
 |---|---|---|
-| `core/doc/serialize.mbt` | **G3** | `serialize(doc) -> String` + 補助 19 本 + priv 型 2 つ |
-| `core/doc/serialize_wbtest.mbt` | **G3** | `spell` の値 2 本 + カタログの md を逐語で固定する 19 本（計 21 本） |
+| `core/tree/serialize.mbt` | **G3** | `serialize(doc) -> String` + 補助 19 本 + priv 型 2 つ |
+| `core/tree/serialize_wbtest.mbt` | **G3** | `spell` の値 2 本 + カタログの md を逐語で固定する 19 本（計 21 本） |
 | `docs/superpowers/specs/2026-08-29-op-cases.md` | **G3** | カタログ C8 の期待 md の訂正だけ（Task 46）。**他のケースには 1 バイトも触らない** |
 
-**読むだけのファイル（1 バイトも書かない）**: `core/doc/doc.mbt`（型）/ `core/doc/spell.mbt`（綴り定数）/
-`core/doc/make_wbtest.mbt`（木を組む葉の道具）— **3 本とも G1 の所有**。
+**読むだけのファイル（1 バイトも書かない）**: `core/tree/doc.mbt`（型）/ `core/tree/spell.mbt`（綴り定数）/
+`core/tree/make_wbtest.mbt`（木を組む葉の道具）— **3 本とも G1 の所有**。
 
 **スコープ外**: `parse`（G2）/ 法則 1・2 のファズ（G4）/ 投影・境界（G4）/ 操作（G5）/
 convert・format コマンド / すげ替え v1。この群が主張できるのは「同じ Doc からは常に同じ綴りが出る」ことと
@@ -39,11 +39,11 @@ convert・format コマンド / すげ替え v1。この群が主張できるの
 
 `G1 → G2 / G3（並行）→ G5 → G4`。G3 が待つのは **G1 だけ**。
 
-- **G1 の Task 1 が済んでいること** — `core/doc/make_wbtest.mbt` の
+- **G1 の Task 1 が済んでいること** — `core/tree/make_wbtest.mbt` の
   `make_doc` / `make_root` / `make_branch` / `make_node` / `make_head` / `make_item` を wbtest が呼ぶ
-- **G1 の Task 10.5 が済んでいること** — `core/doc/spell.mbt`（`Spell` / `spell` / `eol_text`）。
+- **G1 の Task 10.5 が済んでいること** — `core/tree/spell.mbt`（`Spell` / `spell` / `eol_text`）。
   無いと Task 40 が `Error: [4021] The value identifier spell is unbound.` で止まる
-- **G1 の Task 2 が済んでいること** — `core/doc/moon.pkg` と `core/doc/doc.mbt`（契約 §6 の型）が
+- **G1 の Task 2 が済んでいること** — `core/tree/moon.pkg` と `core/tree/doc.mbt`（契約 §6 の型）が
   無いと 1 行もコンパイルできない。`check` / `sig` / `scan` には依存しない
 - G2・G5 とは同じパッケージを共有するだけで、関数の依存は無い（並行して進めてよい）。
   G3 は `parse` を 1 回も呼ばない
@@ -147,8 +147,8 @@ root ごとに:
 ## Task 40: 綴りの定数が §12 の逐語であることを固定する
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize_wbtest.mbt`
-- Read only: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/spell.mbt`（**G1 Task 10.5 の所有**）
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize_wbtest.mbt`
+- Read only: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/spell.mbt`（**G1 Task 10.5 の所有**）
 
 **Interfaces:**
 - Consumes: `Spell` / `spell` / `eol_text` / `Eol`（`Lf` / `Crlf`）— G1 の `spell.mbt` と `doc.mbt`
@@ -161,7 +161,7 @@ G1 が置いたものが契約 §12 の逐語ならそのまま緑、違えば�
 
 - [ ] **Step 1: 綴りを固定するテストを書く**
 
-`core/doc/serialize_wbtest.mbt` を新規に作る。
+`core/tree/serialize_wbtest.mbt` を新規に作る。
 
 ```moonbit
 // 正規形の綴りを 1 つずつ固定する。期待値はカタログの md の逐語。
@@ -195,7 +195,7 @@ test "改行の流儀を逐語にするのは eol_text だけ" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt
 ```
 Expected（G1 Task 10.5 が契約 §12 の逐語を置いていれば緑）:
 ```
@@ -206,22 +206,22 @@ Total tests: 2, passed: 2, failed: 0.
   まだ済んでいない。**`spell.mbt` を自分で作らずに待つ**（他群のファイルは 1 バイトも書かない）
 - **`assert_eq` が落ちたら（EXIT=2）** — G1 が置いた値が契約 §12 と違う。落ちた逐語の形:
   ```
-  [mmm-app/core] test doc/serialize_wbtest.mbt:5 ("綴りの定数は spell 1 か所に集まっている") failed: ... FAILED: `"*" != "-"`
+  [mmm-app/core] test tree/serialize_wbtest.mbt:5 ("綴りの定数は spell 1 か所に集まっている") failed: ... FAILED: `"*" != "-"`
   ```
   **`serialize_wbtest.mbt` の期待値を実装に合わせて緩めてはならない。** 契約 §12 の逐語を添えて
   G1 へ差し戻し、G1 が直してからこの Step に戻る
 
 - [ ] **Step 3: 実装は書かない**
 
-**G3 はこのタスクでコードを 1 行も書かない。** `core/doc/spell.mbt` が契約 §12 の逐語
+**G3 はこのタスクでコードを 1 行も書かない。** `core/tree/spell.mbt` が契約 §12 の逐語
 （`pub(all) struct Spell` の 15 フィールド / `pub let spell` の 15 の値 / `pub fn eol_text`）
 であることを目で確かめるだけ。差分があれば Step 2 の指示どおり G1 へ差し戻す。
 
 - [ ] **Step 4: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/serialize_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 正規形の綴りの値を固定する"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/serialize_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 正規形の綴りの値を固定する"
 ```
 
 ---
@@ -229,8 +229,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 正規形�
 ## Task 41: 筆と骨格行
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize_wbtest.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Doc` / `Root` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol`（G1 `doc.mbt`）、
@@ -250,7 +250,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 正規形�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/serialize_wbtest.mbt` の末尾に足す（備考: 憲法 §4 / カタログ C1・C3・C6・C15）。
+`core/tree/serialize_wbtest.mbt` の末尾に足す（備考: 憲法 §4 / カタログ C1・C3・C6・C15）。
 ヘルパは 4 本だけで、どれも G1 の `make_*` を合成しただけの短縮形（生の struct リテラルは書かない）。
 文書そのものは `make_doc`、スロットは `make_branch` を直に呼ぶ。
 
@@ -342,7 +342,7 @@ test "C15: 項目 root の子は 1 段字下げ（入れ子は相対記法）" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt
 ```
 Expected（実測の逐語。EXIT=1 = ビルドが通らない）:
 ```
@@ -354,7 +354,7 @@ Error: [4021]
 
 - [ ] **Step 3: 筆を書く**
 
-`core/doc/serialize.mbt` を新規に作る。まずファイル冒頭と筆だけ。
+`core/tree/serialize.mbt` を新規に作る。まずファイル冒頭と筆だけ。
 
 ```moonbit
 // Doc → 正規形の md。綴りの逐語は spell.mbt（G1）にしか無く、ここは並べ方だけを決める。
@@ -451,7 +451,7 @@ fn repeat(unit : String, n : Int) -> String {
 
 - [ ] **Step 4: 木の歩きを書く**
 
-`core/doc/serialize.mbt` の末尾に足す。
+`core/tree/serialize.mbt` の末尾に足す。
 
 ```moonbit
 ///|
@@ -519,7 +519,7 @@ fn write_skeleton(
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt
 ```
 Expected:
 ```
@@ -529,8 +529,8 @@ Total tests: 8, passed: 8, failed: 0.
 - [ ] **Step 6: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/serialize.mbt core/doc/serialize_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 骨格行だけの正規形を書き出す"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/serialize.mbt core/tree/serialize_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 骨格行だけの正規形を書き出す"
 ```
 
 ---
@@ -538,8 +538,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 骨格行�
 ## Task 42: 中身をノードの列へ書く
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Block`（`Content` / `Rule` / `Opaque`）/ `Content`（`Image` / `Link` / `Code` / `Svg`）（G1）、
@@ -553,7 +553,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 骨格行�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/serialize_wbtest.mbt` の末尾に足す（備考: 憲法 §4 の「コード」「区切り」、カタログ C5・C9）。
+`core/tree/serialize_wbtest.mbt` の末尾に足す（備考: 憲法 §4 の「コード」「区切り」、カタログ C5・C9）。
 中身を持つ骨格は `make_head` / `make_item` の守備範囲外（あれは中身なし・畳まずの短縮形）なので、
 `make_node` に `Explicit(...)` を直に渡して組む。
 
@@ -656,7 +656,7 @@ test "項目の中身は逐語のまま、その項目の中身の列へ塊で�
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt
 ```
 Expected（EXIT=2。中身が 1 行も出ないので 5 本が落ちる）:
 ```
@@ -664,12 +664,12 @@ Total tests: 13, passed: 8, failed: 5.
 ```
 落ち方の形（1 本目の逐語の骨格）:
 ```
-[mmm-app/core] test doc/serialize_wbtest.mbt:NN ("C5: 中身は骨格行の下へ。飾りの水平線は *** で書く") failed: ... FAILED: `"# r\n\n## head2\n\n### head\n" != "# r\n\n## head2\n\n### head\n\ncontent01\n\n***\n\ncontent02\n"`
+[mmm-app/core] test tree/serialize_wbtest.mbt:NN ("C5: 中身は骨格行の下へ。飾りの水平線は *** で書く") failed: ... FAILED: `"# r\n\n## head2\n\n### head\n" != "# r\n\n## head2\n\n### head\n\ncontent01\n\n***\n\ncontent02\n"`
 ```
 
 - [ ] **Step 3: 中身の書き手を足す**
 
-`core/doc/serialize.mbt` の末尾に足す。
+`core/tree/serialize.mbt` の末尾に足す。
 
 ```moonbit
 ///|
@@ -760,7 +760,7 @@ fn write_node(pen : Pen, node : Node, depth : Int, steps : Int) -> Unit {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt
 ```
 Expected:
 ```
@@ -770,8 +770,8 @@ Total tests: 13, passed: 13, failed: 0.
 - [ ] **Step 6: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/serialize.mbt core/doc/serialize_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 中身をノードの列へ書き出す"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/serialize.mbt core/tree/serialize_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 中身をノードの列へ書き出す"
 ```
 
 ---
@@ -779,8 +779,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 中身を�
 ## Task 43: 側の変わり目に区切りを 1 本だけ書く
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Branch` / `Side`（G1）、`put` / `write_node`（Task 41）
@@ -791,7 +791,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 中身を�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/serialize_wbtest.mbt` の末尾に足す（備考: 憲法 §4「区切り」「先頭トグル」、カタログ C4・C16・C15）。
+`core/tree/serialize_wbtest.mbt` の末尾に足す（備考: 憲法 §4「区切り」「先頭トグル」、カタログ C4・C16・C15）。
 
 ```moonbit
 ///|
@@ -830,7 +830,7 @@ test "C15: 項目 root のトグルは root の中身の列に置く" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt
 ```
 Expected（EXIT=2。区切りが 1 本も出ないので 3 本が落ちる）:
 ```
@@ -840,7 +840,7 @@ Total tests: 16, passed: 13, failed: 3.
 
 - [ ] **Step 3: スロットの列を書く**
 
-`core/doc/serialize.mbt` の `write_root` の直後に足す。
+`core/tree/serialize.mbt` の `write_root` の直後に足す。
 
 ```moonbit
 ///|
@@ -906,7 +906,7 @@ fn write_root(pen : Pen, root : Root) -> Unit {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt
 ```
 Expected:
 ```
@@ -916,8 +916,8 @@ Total tests: 16, passed: 16, failed: 0.
 - [ ] **Step 6: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/serialize.mbt core/doc/serialize_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 側の変わり目に区切りを 1 本だけ書く"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/serialize.mbt core/tree/serialize_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 側の変わり目に区切りを 1 本だけ書く"
 ```
 
 ---
@@ -925,8 +925,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 側の変�
 ## Task 44: 畳みを details で包む
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Skeleton::Explicit(folded~, label~, ..)`（G1）、`put`（Task 41）、
@@ -942,7 +942,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 側の変�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/serialize_wbtest.mbt` の末尾に足す（備考: 憲法 §4「畳み」、カタログ C8。
+`core/tree/serialize_wbtest.mbt` の末尾に足す（備考: 憲法 §4「畳み」、カタログ C8。
 **期待 md は契約 §9 の C8「新 md」の逐語と 1 文字も違わない**。カタログ側の訂正は Task 46）。
 
 ```moonbit
@@ -987,7 +987,7 @@ test "項目の畳みも中身も、その項目の中身の列に入る" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt
 ```
 Expected（EXIT=2）:
 ```
@@ -997,7 +997,7 @@ Total tests: 18, passed: 16, failed: 2.
 
 - [ ] **Step 3: 畳みの開きと閉じを書く**
 
-`core/doc/serialize.mbt` の `write_skeleton` の直後に足す。
+`core/tree/serialize.mbt` の `write_skeleton` の直後に足す。
 
 ```moonbit
 ///|
@@ -1058,7 +1058,7 @@ fn write_node(pen : Pen, node : Node, depth : Int, steps : Int) -> Unit {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt
 ```
 Expected:
 ```
@@ -1068,8 +1068,8 @@ Total tests: 18, passed: 18, failed: 0.
 - [ ] **Step 6: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/serialize.mbt core/doc/serialize_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 畳みを details で包む"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/serialize.mbt core/tree/serialize_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 畳みを details で包む"
 ```
 
 ---
@@ -1077,8 +1077,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 畳みを d
 ## Task 45: 封筒と文書の散文を書き戻す
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Doc.frontmatter : String?` / `Doc.body : Array[Block]` / `Doc.eol`（G1）、
@@ -1087,7 +1087,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 畳みを d
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/serialize_wbtest.mbt` の末尾に足す（備考: 憲法 §4「frontmatter」「EOL」、カタログ C11）。
+`core/tree/serialize_wbtest.mbt` の末尾に足す（備考: 憲法 §4「frontmatter」「EOL」、カタログ C11）。
 `make_doc` は封筒なし・Lf・散文なしの短縮形なので、**ダイヤルを試すこの 3 本だけ `Doc` を直に組む**。
 
 ```moonbit
@@ -1132,7 +1132,7 @@ test "文書の散文は最初の骨格より前に置かれる" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt
 ```
 Expected（EXIT=2）:
 ```
@@ -1141,7 +1141,7 @@ Total tests: 21, passed: 18, failed: 3.
 
 - [ ] **Step 3: 封筒を書く**
 
-`core/doc/serialize.mbt` の `serialize` の直後に足す。
+`core/tree/serialize.mbt` の `serialize` の直後に足す。
 
 ```moonbit
 ///|
@@ -1184,7 +1184,7 @@ pub fn serialize(doc : Doc) -> String {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt
 ```
 Expected:
 ```
@@ -1194,8 +1194,8 @@ Total tests: 21, passed: 21, failed: 0.
 - [ ] **Step 6: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/serialize.mbt core/doc/serialize_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 封筒と改行の流儀を書き戻す"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/serialize.mbt core/tree/serialize_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 封筒と改行の流儀を書き戻す"
 ```
 
 ---
@@ -1203,9 +1203,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 封筒と�
 ## Task 46: 通しの検算と、カタログ C8 の訂正
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize.mbt`（`moon fmt` の結果のみ）
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/serialize_wbtest.mbt`（同上）
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/docs/superpowers/specs/2026-08-29-op-cases.md`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize.mbt`（`moon fmt` の結果のみ）
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize_wbtest.mbt`（同上）
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/docs/superpowers/specs/2026-08-29-op-cases.md`
   （**契約 §2 で G3 が唯一の書き手。C8 だけを触る**）
 
 **Interfaces:**
@@ -1216,18 +1216,18 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 封筒と�
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
 ```
 Expected: `Finished. moon: ran N tasks, now up to date` EXIT=0。
 `moon fmt` は `moon.pkg` も対象なので、**`doc` ディレクトリだけを渡すこと**
-（`js` や `.` を巻き込むと旧 core の差分で即 EXIT=127）。`doc/js` は G4 が建てるのでまだ無い
-（`doc doc/js` は G4 Task 71 の締めが使う。契約 §17）。
+（`js` や `.` を巻き込むと旧 core の差分で即 EXIT=127）。`tree/js` は G4 が建てるのでまだ無い
+（`doc tree/js` は G4 Task 71 の締めが使う。契約 §17）。
 
 - [ ] **Step 2: 整形の確認**
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt --check doc
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt --check tree
 ```
 Expected: `Finished. moon: ran N tasks, now up to date` EXIT=0。
 差分があると EXIT=127（1 でも 2 でもない）で `Error: failed when formatting project`。
@@ -1236,7 +1236,7 @@ Expected: `Finished. moon: ran N tasks, now up to date` EXIT=0。
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core check doc
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core check tree
 ```
 Expected: 末尾が `Finished. moon: ran N tasks, now up to date`（警告があれば `(M warnings, 0 errors)`）
 で EXIT=0。**合格条件は `0 errors`**。`moon check` は wbtest を勘定に入れないので、
@@ -1247,8 +1247,8 @@ wbtest でしか使っていない構築子の `unused_constructor` 警告は残
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test -p mmm-app/core -p mmm-app/core/doc
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test -p mmm-app/core -p mmm-app/core/tree
 ```
 Expected: 1 本目が `Total tests: 21, passed: 21, failed: 0.`。
 2 本目は他の群のぶんを含むので本数は動くが、**`failed: 0` かつ `Total tests: 0` でないこと**
@@ -1320,7 +1320,7 @@ md と指紋のほうが正。契約 §9）。
 
 `docs/` の .md は旧 core の往復テスト（corpus）の入力なので、直した後に確かめる。
 
-Run（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`。別のワークツリーから叩くと旧 core を測る）:
+Run（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`。別のワークツリーから叩くと旧 core を測る）:
 ```
 pnpm test
 ```
@@ -1330,8 +1330,8 @@ Expected: `ℹ fail 0` EXIT=0。コードブロックの中を触るだけなの
 - [ ] **Step 7: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/serialize.mbt core/doc/serialize_wbtest.mbt docs/superpowers/specs/2026-08-29-op-cases.md
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "docs: 📝 畳みの正規形に summary を書き足す"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/serialize.mbt core/tree/serialize_wbtest.mbt docs/superpowers/specs/2026-08-29-op-cases.md
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "docs: 📝 畳みの正規形に summary を書き足す"
 ```
 
 ---
@@ -1355,14 +1355,14 @@ Task 45 まで通した実際の出力を `@lezer/markdown` 1.7.2 に食わせ�
 
 ## この群の終わりの形
 
-- G3 が書いたのは `core/doc/serialize.mbt` と `core/doc/serialize_wbtest.mbt` の 2 本
-  （`core/doc/spell.mbt` は G1 の所有。**G3 は 1 バイトも書いていない**）
+- G3 が書いたのは `core/tree/serialize.mbt` と `core/tree/serialize_wbtest.mbt` の 2 本
+  （`core/tree/spell.mbt` は G1 の所有。**G3 は 1 バイトも書いていない**）
 - カタログ `docs/superpowers/specs/2026-08-29-op-cases.md` は C8 の 2 つの md だけが変わっている
-- `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core check doc` が **0 errors**
-- `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt --check doc` が EXIT=0
-- `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/serialize_wbtest.mbt` が
+- `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core check tree` が **0 errors**
+- `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt --check tree` が EXIT=0
+- `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/serialize_wbtest.mbt` が
   **21 passed / 0 failed**
-- `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test -p mmm-app/core -p mmm-app/core/doc`
+- `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test -p mmm-app/core -p mmm-app/core/tree`
   が `failed: 0` かつ `Total tests: 0` でない
 - 綴りに関わる値が `spell` の外に 1 つも無いこと（`serialize.mbt` に生の `"#"` `"- "` `"  "`
   `"---"` `"***"` `` "`" `` `"<details>"` `"<summary>"` が現れない。現れたら負債）

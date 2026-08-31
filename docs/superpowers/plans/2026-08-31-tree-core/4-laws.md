@@ -15,25 +15,25 @@ TS 側（md を種にする法則 1・2・3、外部審判による法則 4、�
 
 | ファイル | 新規 / 変更 | 中身 |
 |---|---|---|
-| `core/doc/json.mbt` | 新規 | `quote` / `strings` / `hex` / `reflect_json` |
-| `core/doc/json_wbtest.mbt` | 新規 | 逃がし規則と境界の JSON |
-| `core/doc/project.mbt` | 新規 | `project` / `map_bucket` / `map_branch` / `map_node` / `map_card` |
-| `core/doc/project_wbtest.mbt` | 新規 | バケツ分け・buried・implied |
-| `core/doc/laws_wbtest.mbt` | 新規 | **木の生成器**と法則 1 の本丸 |
-| `core/doc/js/moon.pkg` | 新規 | `foreign_library` + import 1 本 |
-| `core/doc/js/exports.mbt` | 新規 | `#export_name` 7 本 |
-| `test/_doc.ts` | 新規 | 窓口・生成器・コーパス・縮小器 |
-| `test/docLaws.test.ts` | 新規 | 法則 1・2・3 |
-| `test/docDialect.test.ts` | 新規 | 法則 4（`DIALECT` + `READING`） |
-| `test/docCases.test.ts` | 新規 | カタログ C1〜C17 |
-| `test/docOps.test.ts` | 新規 | 操作の性質のファズ（設計は G5 由来） |
+| `core/tree/json.mbt` | 新規 | `quote` / `strings` / `hex` / `reflect_json` |
+| `core/tree/json_wbtest.mbt` | 新規 | 逃がし規則と境界の JSON |
+| `core/tree/project.mbt` | 新規 | `project` / `map_bucket` / `map_branch` / `map_node` / `map_card` |
+| `core/tree/project_wbtest.mbt` | 新規 | バケツ分け・buried・implied |
+| `core/tree/laws_wbtest.mbt` | 新規 | **木の生成器**と法則 1 の本丸 |
+| `core/tree/js/moon.pkg` | 新規 | `foreign_library` + import 1 本 |
+| `core/tree/js/exports.mbt` | 新規 | `#export_name` 7 本 |
+| `test/_tree.ts` | 新規 | 窓口・生成器・コーパス・縮小器 |
+| `test/treeLaws.test.ts` | 新規 | 法則 1・2・3 |
+| `test/treeDialect.test.ts` | 新規 | 法則 4（`DIALECT` + `READING`） |
+| `test/treeCases.test.ts` | 新規 | カタログ C1〜C17 |
+| `test/treeOps.test.ts` | 新規 | 操作の性質のファズ（設計は G5 由来） |
 | `test/tsconfig.json` | 変更 | 死んだ 2 行を掃く |
 | `package.json` | 変更 | `test:core` / `fmt:doc` |
 | `.github/workflows/ci.yml` | 変更 | 新パッケージのテスト・整形・`Total tests: 0` の検知 |
 
 **この表に無いファイルには 1 バイトも書かない**（契約 §2）。とくに
-`core/doc/scan.mbt`（G1）/ `core/doc/parse.mbt`（G2）/ `core/doc/serialize.mbt`（G3）/
-`core/doc/tool.mbt` `op.mbt` `diff.mbt`（G5）は**読むだけ**。スタブも、投機的な追加も、
+`core/tree/scan.mbt`（G1）/ `core/tree/parse.mbt`（G2）/ `core/tree/serialize.mbt`（G3）/
+`core/tree/tool.mbt` `op.mbt` `diff.mbt`（G5）は**読むだけ**。スタブも、投機的な追加も、
 警告を消すための小細工も禁止。直しが要ると分かったら、下の差し戻し表で該当群へ戻す。
 
 ### 前提
@@ -41,16 +41,16 @@ TS 側（md を種にする法則 1・2・3、外部審判による法則 4、�
 - **G1 / G2 / G3 / G5 が全部緑になっていること**（契約 §3 の依存順
   `G1 → (G2 / G3) → G5 → G4`）。**G4 は最後に走る検証群**で、
   自分の所有ファイルの中にだけ実装を書く
-- 作業場所は `D:/1.atrium/mmm/.worktrees/feat/doc-core`（ブランチ `feat/doc-core`）
+- 作業場所は `D:/1.atrium/mmm/.worktrees/feat/tree-core`（ブランチ `feat/tree-core`）
 - ツールチェイン: `moon 0.1.20260803` / `moonc v0.10.6+80dc50f24` / Node `v24.16.0` /
   pnpm `11.21.0` / TypeScript `^5.6.0` / `@lezer/markdown` `1.7.2`（devDependencies）
-- **Run 行は絶対パス**。`pnpm` を使う Step は cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`
+- **Run 行は絶対パス**。`pnpm` を使う Step は cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`
 - **Step 2 / Step 4 の mbt テストはファイル指定**、群の締め（Task 71）だけ `-p`（契約 §17）
 
 ### 着手順
 
 ```
-60 json.mbt → 61 project.mbt → 62 境界 → 63 _doc.ts → 64 生成器 → 65 縮小器
+60 json.mbt → 61 project.mbt → 62 境界 → 63 _tree.ts → 64 生成器 → 65 縮小器
   → 66 法則2 → 67 法則1(md)+check → 68 法則1(木・mbt) → 69 法則4
   → 70 カタログ → 71 CI → 72 操作の性質
 ```
@@ -62,15 +62,15 @@ G5 が終わっていない状態では着手できない（契約 §3）。
 
 | 名前 | 住所 | 何 |
 |---|---|---|
-| `quote` / `strings` / `hex` / `reflect_json` | `core/doc/json.mbt` | JSON の綴り |
-| `project` / `map_bucket` / `map_branch` / `map_node` / `map_card` | `core/doc/project.mbt` | 投影 |
+| `quote` / `strings` / `hex` / `reflect_json` | `core/tree/json.mbt` | JSON の綴り |
+| `project` / `map_bucket` / `map_branch` / `map_node` / `map_card` | `core/tree/project.mbt` | 投影 |
 | （新設なし） | — | 木の組み立ては G1 の `make_*` を呼ぶ（契約 §4） |
-| `Law` / `law_pick` / `law_id` / `law_head_label` / `law_item_label` / `law_block` / `law_side` / `law_skeleton` / `law_nodes` / `law_node` / `law_branches` / `law_implicit_root` / `law_doc` | `core/doc/laws_wbtest.mbt` | 木の生成器 |
-| `sig` / `format` / `check` / `project` / `move_nodes` / `flip_side` / `delete_nodes` | `core/doc/js/exports.mbt` | 境界 7 本（別パッケージ） |
-| `Edit` / `Reflection` / `Card` / `MapNode` / `MapBranch` / `MapTree` / `Mindmap` / `doc` / `mbt` / `apply` / `cardText` / `rng` / `randomDoc` / `pathological` / `shrink` / `corpus` / `fuzzCases` / `brief` | `test/_doc.ts` | TS の窓口 |
-| `outerSkeletons` / `mmmSkeletons` / `DIALECT` / `READING` | `test/docDialect.test.ts` | 外部審判 |
-| `idOf` | `test/docCases.test.ts` | ラベル → id |
-| `idsOf` / `holds` | `test/docOps.test.ts` | 操作の性質 |
+| `Law` / `law_pick` / `law_id` / `law_head_label` / `law_item_label` / `law_block` / `law_side` / `law_skeleton` / `law_nodes` / `law_node` / `law_branches` / `law_implicit_root` / `law_doc` | `core/tree/laws_wbtest.mbt` | 木の生成器 |
+| `sig` / `format` / `check` / `project` / `move_nodes` / `flip_side` / `delete_nodes` | `core/tree/js/exports.mbt` | 境界 7 本（別パッケージ） |
+| `Edit` / `Reflection` / `Card` / `MapNode` / `MapBranch` / `MapTree` / `Mindmap` / `doc` / `mbt` / `apply` / `cardText` / `rng` / `randomDoc` / `pathological` / `shrink` / `corpus` / `fuzzCases` / `brief` | `test/_tree.ts` | TS の窓口 |
+| `outerSkeletons` / `mmmSkeletons` / `DIALECT` / `READING` | `test/treeDialect.test.ts` | 外部審判 |
+| `idOf` | `test/treeCases.test.ts` | ラベル → id |
+| `idsOf` / `holds` | `test/treeOps.test.ts` | 操作の性質 |
 | `fmt:doc` | `package.json` | 新パッケージだけの整形検査 |
 
 **作らない名前**（契約 §4）:
@@ -125,14 +125,14 @@ G4 は自分の所有ファイル以外を直さない。
 
 | 場所 | ファイル | 本数 |
 |---|---|---|
-| mbt | `core/doc/json_wbtest.mbt` | 5 |
-| mbt | `core/doc/project_wbtest.mbt` | 3 |
-| mbt | `core/doc/laws_wbtest.mbt` | 2 |
+| mbt | `core/tree/json_wbtest.mbt` | 5 |
+| mbt | `core/tree/project_wbtest.mbt` | 3 |
+| mbt | `core/tree/laws_wbtest.mbt` | 2 |
 | mbt | （G4 合計） | **10** |
-| TS | `test/docLaws.test.ts` | 12 |
-| TS | `test/docDialect.test.ts` | 3 |
-| TS | `test/docCases.test.ts` | 17 |
-| TS | `test/docOps.test.ts` | 5 |
+| TS | `test/treeLaws.test.ts` | 12 |
+| TS | `test/treeDialect.test.ts` | 3 |
+| TS | `test/treeCases.test.ts` | 17 |
+| TS | `test/treeOps.test.ts` | 5 |
 | TS | （G4 合計） | **37** |
 
 新パッケージの mbt 合計は 111 本（G1 25 / G2 23 / G3 21 / G5 32 / G4 10）。
@@ -143,8 +143,8 @@ G4 は自分の所有ファイル以外を直さない。
 ## Task 60: JSON の綴り（`quote` / `strings` / `reflect_json`）
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/json.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/json_wbtest.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/json.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/json_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Reflection` / `Edit`（G5 `diff.mbt`・契約 §10）
@@ -157,7 +157,7 @@ G5 の `reflect` は `Reflection` を返す純関数で済み、依存が 1 本�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/json_wbtest.mbt` を新規作成する。
+`core/tree/json_wbtest.mbt` を新規作成する。
 
 ```moonbit
 // JSON の綴りの固定。境界を渡るのは文字列だけなので、逃がしの規則をここで守る。
@@ -215,13 +215,13 @@ test "reflect_json は境界の形をちょうど 1 つ吐く" {
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/json_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/json_wbtest.mbt`
 Expected: `Error: [4021]` / `The value identifier quote is unbound.`
 （`strings` と `reflect_json` も同じ）。EXIT=1
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/json.mbt` を新規作成する。
+`core/tree/json.mbt` を新規作成する。
 
 ```moonbit
 // JSON の綴り。境界を渡るのは文字列だけなので、逃がし規則はここに 1 か所。
@@ -302,17 +302,17 @@ fn hex(n : Int) -> String {
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/json_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/json_wbtest.mbt`
 Expected: `Total tests: 5, passed: 5, failed: 0.` EXIT=0
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt --check doc`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt --check tree`
 Expected: `Finished. moon: ran N tasks, now up to date` EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/json.mbt core/doc/json_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ JSON の綴りを 1 か所に置く"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/json.mbt core/tree/json_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ JSON の綴りを 1 か所に置く"
 ```
 
 ---
@@ -320,8 +320,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ JSON の綴
 ## Task 61: 投影（Doc → MindmapTree）
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/project.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/project_wbtest.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/project.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/project_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Doc` / `Root` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol` /
@@ -336,7 +336,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ JSON の綴
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/project_wbtest.mbt` を新規作成する。ヘルパの接頭辞は `proj_`
+`core/tree/project_wbtest.mbt` を新規作成する。ヘルパの接頭辞は `proj_`
 （`project.mbt` が `map_node` 等を名乗るので `map_` は使えない。契約 §4）。
 
 ```moonbit
@@ -419,12 +419,12 @@ test "implied は空ラベルの見出しとして出る。文書の散文は tr
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/project_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/project_wbtest.mbt`
 Expected: `Error: [4021]` / `The value identifier project is unbound.` EXIT=1
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/project.mbt` を新規作成する。
+`core/tree/project.mbt` を新規作成する。
 
 ```moonbit
 // Doc → MindmapTree。map への矢印はこの 1 本だけ（法則 3）。
@@ -568,17 +568,17 @@ fn map_card(sb : StringBuilder, content : Content) -> Unit {
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/project_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/project_wbtest.mbt`
 Expected: `Total tests: 3, passed: 3, failed: 0.` EXIT=0
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt --check doc`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt --check tree`
 Expected: EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/project.mbt core/doc/project_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ Doc から MindmapTree への矢印を 1 本だけ引く"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/project.mbt core/tree/project_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ Doc から MindmapTree への矢印を 1 本だけ引く"
 ```
 
 ---
@@ -586,71 +586,71 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ Doc から 
 ## Task 62: 境界（JS へ出す 7 本）
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/js/moon.pkg`
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/js/exports.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/package.json`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/js/moon.pkg`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/js/exports.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/package.json`
 
 **Interfaces:**
 - Consumes: `parse`（G2）/ `serialize`（G3）/ `sig` `check`（G1）/
   `project` `strings` `reflect_json`（Task 60・61）/
   `reflect` `move_nodes` `flip_side` `delete_nodes`（G5）/ `Side`（G1）
 - Produces: JS の 7 関数 `sig` / `format` / `check` / `project` / `moveNodes` /
-  `flipSide` / `deleteNodes`。生成物は `core/_build/js/release/build/doc/js/js.js`
+  `flipSide` / `deleteNodes`。生成物は `core/_build/js/release/build/tree/js/js.js`
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-テストは JS 生成そのもの。まず `core/doc/js/moon.pkg` を新規作成する
+テストは JS 生成そのもの。まず `core/tree/js/moon.pkg` を新規作成する
 （**別名は書かない** — `moon fmt` が最終パスセグメントと同じ別名を剥がす。契約 §13）。
 
 ```
 pkgtype(kind: "foreign_library")
 
 import {
-  "mmm-app/core/doc",
+  "mmm-app/core/tree",
 }
 ```
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
 Run: `pnpm run core`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`。別のワークツリーから叩くと旧 core を測る）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`。別のワークツリーから叩くと旧 core を測る）
 Expected: `Finished.` EXIT=0（`exports.mbt` がまだ無いので中身は空）
 
-Run: `node -e "import('./core/_build/js/release/build/doc/js/js.js').then(m=>console.log(Object.keys(m))).catch(e=>console.log('ERR', e.code))"`
+Run: `node -e "import('./core/_build/js/release/build/tree/js/js.js').then(m=>console.log(Object.keys(m))).catch(e=>console.log('ERR', e.code))"`
 （**この 2 行の Expected は未実測**。空の foreign_library に対して `pnpm run core` が通るか、生成物が出るかは moon の版に依る。実際の出力を見てから Expected を確定させ、落ちる場合は `exports.mbt` を置く順を先に回すこと。合格条件は次の Step 4 の緑）
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: `[]`
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/js/exports.mbt` を新規作成する（契約 §13 の逐語）。
+`core/tree/js/exports.mbt` を新規作成する（契約 §13 の逐語）。
 
 ```moonbit
-// mmm-app/core/doc の薄い JS 層。struct は 1 つも跨がず、出入りは String だけ。
+// mmm-app/core/tree の薄い JS 層。struct は 1 つも跨がず、出入りは String だけ。
 // library パッケージを `moon test` で叩けるように、ここだけ分けてある。
 
 ///|
 #export_name("sig")
 pub fn sig(md : String) -> String {
-  @doc.sig(@doc.parse(md))
+  @tree.sig(@tree.parse(md))
 }
 
 ///|
 #export_name("format")
 pub fn format(md : String) -> String {
-  @doc.serialize(@doc.parse(md))
+  @tree.serialize(@tree.parse(md))
 }
 
 ///|
 #export_name("check")
 pub fn check(md : String) -> String {
-  @doc.strings(@doc.check(@doc.parse(md)))
+  @tree.strings(@tree.check(@tree.parse(md)))
 }
 
 ///|
 #export_name("project")
 pub fn project(md : String) -> String {
-  @doc.project(@doc.parse(md))
+  @tree.project(@tree.parse(md))
 }
 
 ///|
@@ -662,17 +662,17 @@ pub fn move_nodes(
   at : Int,
   left : Bool,
 ) -> String {
-  @doc.reflect_json(
-    @doc.reflect(md, fn(d) {
-      @doc.move_nodes(
+  @tree.reflect_json(
+    @tree.reflect(md, fn(d) {
+      @tree.move_nodes(
         d,
         ids,
         parent,
         at,
         if left {
-          @doc.Left
+          @tree.Left
         } else {
-          @doc.Right
+          @tree.Right
         },
       )
     }),
@@ -682,13 +682,13 @@ pub fn move_nodes(
 ///|
 #export_name("flipSide")
 pub fn flip_side(md : String, ids : Array[Int]) -> String {
-  @doc.reflect_json(@doc.reflect(md, fn(d) { @doc.flip_side(d, ids) }))
+  @tree.reflect_json(@tree.reflect(md, fn(d) { @tree.flip_side(d, ids) }))
 }
 
 ///|
 #export_name("deleteNodes")
 pub fn delete_nodes(md : String, ids : Array[Int]) -> String {
-  @doc.reflect_json(@doc.reflect(md, fn(d) { @doc.delete_nodes(d, ids) }))
+  @tree.reflect_json(@tree.reflect(md, fn(d) { @tree.delete_nodes(d, ids) }))
 }
 ```
 
@@ -699,8 +699,8 @@ pub fn delete_nodes(md : String, ids : Array[Int]) -> String {
 ```
 を
 ```
-"test:core": "cd core && moon test -p mmm-app/core -p mmm-app/core/doc",
-"fmt:doc": "cd core && moon fmt --check doc doc/js",
+"test:core": "cd core && moon test -p mmm-app/core -p mmm-app/core/tree",
+"fmt:doc": "cd core && moon fmt --check tree tree/js",
 ```
 に変える（`fmt:doc` は新規行。**対象は新パッケージのディレクトリだけ** —
 旧 `core/js` を含めた瞬間に赤になる。契約 §17 の罠）。
@@ -708,9 +708,9 @@ pub fn delete_nodes(md : String, ids : Array[Int]) -> String {
 - [ ] **Step 4: テストを走らせて通過を確認**
 
 Run: `pnpm run core`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: `Finished. moon: ran N tasks, now up to date (M warnings, 0 errors)` EXIT=0。
-`core/_build/js/release/build/doc/js/js.d.ts` が契約 §13 の逐語になる:
+`core/_build/js/release/build/tree/js/js.d.ts` が契約 §13 の逐語になる:
 
 ```ts
 import type * as MoonBit from "./moonbit.d.ts";
@@ -737,21 +737,21 @@ export function sig(md: MoonBit.String): MoonBit.String;
 ```
 
 Run: `pnpm run test:core`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: `Total tests: 301, passed: 301, failed: 0.` EXIT=0
 （旧 core 192 + G1 25 + G2 23 + G3 21 + G5 32 + G4 の json 5・project 3 = 301。
 `laws_wbtest` の 2 本は Task 68 で足すので、締めの Task 71 で 303 になる。
 **`Total tests: 0` なら `-p` の綴りを疑う** — 契約 §17 の罠）
 
 Run: `pnpm run fmt:doc`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: `Finished. moon: ran N tasks, now up to date` EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/js package.json
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 新 core の境界を建てる（struct は 1 つも跨がせない）"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/js package.json
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 新 core の境界を建てる（struct は 1 つも跨がせない）"
 ```
 
 ---
@@ -759,12 +759,12 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 新 core �
 ## Task 63: TS の窓口
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/_doc.ts`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/docLaws.test.ts`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/tsconfig.json`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/_tree.ts`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/treeLaws.test.ts`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/tsconfig.json`
 
 **Interfaces:**
-- Consumes: `core/_build/js/release/build/doc/js/js.js` の 7 関数（Task 62）
+- Consumes: `core/_build/js/release/build/tree/js/js.js` の 7 関数（Task 62）
 - Produces: `mbt` / `doc`（7 メソッド）/ `apply` / `cardText` / `rng` / `randomDoc` /
   `corpus` / `fuzzCases` / `brief` と、型 `Edit` / `Reflection` / `Card` /
   `MapNode` / `MapBranch` / `MapTree` / `Mindmap`
@@ -775,19 +775,19 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 新 core �
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`test/docLaws.test.ts` を新規作成する。まずは窓口が生きていることと、法則 3 を見る。
+`test/treeLaws.test.ts` を新規作成する。まずは窓口が生きていることと、法則 3 を見る。
 
 ```typescript
 // 法則 1・2・3 のファズ。土台の証明はここ（操作ゼロ）。
 //
-// 法則 1: parse(serialize(M)) = M   … 木を種にする本丸は core/doc/laws_wbtest.mbt。
+// 法則 1: parse(serialize(M)) = M   … 木を種にする本丸は core/tree/laws_wbtest.mbt。
 //   ここは md を種にした版（sig(format(md)) == sig(md)）で、実文書とコーパスを食わせる。
 // 法則 2: serialize(parse(md)) は 2 回目から不動 … これがフォーマットの定義。
 // 法則 3: map へ出る口は project 1 本 … 境界の輸出そのものを数えて固定する。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { apply, doc, mbt } from "./_doc.ts";
+import { apply, doc, mbt } from "./_tree.ts";
 
 test("境界: 反映は ok / reason / text / edits の 4 つを返し、edits は text へ届く", () => {
   const md = "# r\n\n## a\n";
@@ -823,17 +823,17 @@ test("法則 3: 境界から木の形で出る口は project だけ", () => {
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
-Expected: `ERR_MODULE_NOT_FOUND` / `Cannot find module` … `test/_doc.ts`。
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
+Expected: `ERR_MODULE_NOT_FOUND` / `Cannot find module` … `test/_tree.ts`。
 `ℹ fail` が 0 でない。EXIT=1
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`test/_doc.ts` を新規作成する（契約 §13 の逐語。生成器の強化は Task 64、縮小器は Task 65）。
+`test/_tree.ts` を新規作成する（契約 §13 の逐語。生成器の強化は Task 64、縮小器は Task 65）。
 
 ```typescript
 // 新 core の窓口。JSON の形（フィールド名・並び）を決めるのは
-// core/doc/project.mbt と core/doc/json.mbt で、この `JSON.parse` が唯一の信頼境界。
+// core/tree/project.mbt と core/tree/json.mbt で、この `JSON.parse` が唯一の信頼境界。
 //
 // 重要: 新 core は純関数。モジュールグローバルな状態を持たないので、
 // どのテストも md 文字列から始めてよい（initDoc に当たるものは無い）。
@@ -842,7 +842,7 @@ Expected: `ERR_MODULE_NOT_FOUND` / `Cannot find module` … `test/_doc.ts`。
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import * as mbt from "../core/_build/js/release/build/doc/js/js.js";
+import * as mbt from "../core/_build/js/release/build/tree/js/js.js";
 
 /** 法則 3（map への矢印は project 1 本）を数えるために名前空間ごと出す */
 export { mbt };
@@ -1068,23 +1068,23 @@ export function brief(md: string): string {
 
 に変える（`src/relevel.ts` は `core/relevel.mbt` へ移って消滅、
 `src/app/externalChange.ts` は存在しない。glob が当たらないだけでエラーにならない負債）。
-`test/_doc.ts` は `include` の `"."` が拾うので、追加は要らない。
+`test/_tree.ts` は `include` の `"."` が拾うので、追加は要らない。
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
-Expected: `test/docLaws.test.ts` の **3 本**が緑（`ℹ pass` が 3 増え、`ℹ fail 0`）。EXIT=0
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
+Expected: `test/treeLaws.test.ts` の **3 本**が緑（`ℹ pass` が 3 増え、`ℹ fail 0`）。EXIT=0
 
 Run: `pnpm run check`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: 出力なし EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add test/_doc.ts test/docLaws.test.ts test/tsconfig.json
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 新 core の窓口を置き、死んだ include を掃く"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add test/_tree.ts test/treeLaws.test.ts test/tsconfig.json
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 新 core の窓口を置き、死んだ include を掃く"
 ```
 
 ---
@@ -1092,8 +1092,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 新 core �
 ## Task 64: 病的な md の生成器
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/_doc.ts`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/docLaws.test.ts`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/_tree.ts`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/treeLaws.test.ts`
 
 **Interfaces:**
 - Consumes: `rng`（Task 63）
@@ -1106,10 +1106,10 @@ setext・インデントコード・未閉じフェンス・手書きの `<summa
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`test/docLaws.test.ts` の import を差し替え、生成器の自己確認を 1 本足す。
+`test/treeLaws.test.ts` の import を差し替え、生成器の自己確認を 1 本足す。
 
 ```typescript
-import { apply, doc, mbt, pathological, randomDoc } from "./_doc.ts";
+import { apply, doc, mbt, pathological, randomDoc } from "./_tree.ts";
 ```
 
 ```typescript
@@ -1149,12 +1149,12 @@ test("生成器: 同じ seed は同じ md。狙った角を全部踏む", () => 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
-Expected: `SyntaxError` … `The requested module './_doc.ts' does not provide an export named 'pathological'`。EXIT=1
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
+Expected: `SyntaxError` … `The requested module './_tree.ts' does not provide an export named 'pathological'`。EXIT=1
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`test/_doc.ts` の `LABELS` / `BODIES` / `randomDoc` を次に**差し替え**、
+`test/_tree.ts` の `LABELS` / `BODIES` / `randomDoc` を次に**差し替え**、
 `SKELETONS` と `pathological` を足す（置き場所は `rng` の下、`corpus` の上）。
 
 ```typescript
@@ -1293,18 +1293,18 @@ export function pathological(): { name: string; md: string }[] {
 - [ ] **Step 4: テストを走らせて通過を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
-Expected: `test/docLaws.test.ts` が **4 本**すべて緑（`ℹ pass` が 1 増える）。EXIT=0
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
+Expected: `test/treeLaws.test.ts` が **4 本**すべて緑（`ℹ pass` が 1 増える）。EXIT=0
 
 Run: `pnpm run check`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: 出力なし EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add test/_doc.ts test/docLaws.test.ts
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 病的な md の生成器を置く"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add test/_tree.ts test/treeLaws.test.ts
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 病的な md の生成器を置く"
 ```
 
 ---
@@ -1312,8 +1312,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 病的な m
 ## Task 65: 最小反例の縮小
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/_doc.ts`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/docLaws.test.ts`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/_tree.ts`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/treeLaws.test.ts`
 
 **Interfaces:**
 - Consumes: なし
@@ -1321,10 +1321,10 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 病的な m
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`test/docLaws.test.ts` の import に `shrink` を足し、テストを 1 本足す。
+`test/treeLaws.test.ts` の import に `shrink` を足し、テストを 1 本足す。
 
 ```typescript
-import { apply, doc, mbt, pathological, randomDoc, shrink } from "./_doc.ts";
+import { apply, doc, mbt, pathological, randomDoc, shrink } from "./_tree.ts";
 ```
 
 ```typescript
@@ -1339,12 +1339,12 @@ test("最小反例の縮小 — 落ちたまま小さくなる", () => {
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: `SyntaxError` … `does not provide an export named 'shrink'`。EXIT=1
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`test/_doc.ts` の末尾（`brief` の下）に足す。
+`test/_tree.ts` の末尾（`brief` の下）に足す。
 
 ```typescript
 /**
@@ -1384,18 +1384,18 @@ export function shrink(md: string, fails: (s: string) => boolean): string {
 - [ ] **Step 4: テストを走らせて通過を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
-Expected: `test/docLaws.test.ts` が **5 本**すべて緑（`ℹ pass` が 1 増える）。EXIT=0
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
+Expected: `test/treeLaws.test.ts` が **5 本**すべて緑（`ℹ pass` が 1 増える）。EXIT=0
 
 Run: `pnpm run check`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: 出力なし EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add test/_doc.ts test/docLaws.test.ts
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 落ちた md を落ちたまま小さくする道具を置く"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add test/_tree.ts test/treeLaws.test.ts
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 落ちた md を落ちたまま小さくする道具を置く"
 ```
 
 ---
@@ -1403,7 +1403,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 落ちた m
 ## Task 66: 法則 2 — serialize は 2 回目から不動
 
 **Files:**
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/docLaws.test.ts`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/treeLaws.test.ts`
 
 **Interfaces:**
 - Consumes: `doc.format`（Task 63）/ `randomDoc` `pathological`（Task 64）/
@@ -1412,7 +1412,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 落ちた m
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`test/docLaws.test.ts` の import を最終形にし、法則 2 の 3 本を足す。
+`test/treeLaws.test.ts` の import を最終形にし、法則 2 の 3 本を足す。
 
 ```typescript
 import {
@@ -1425,7 +1425,7 @@ import {
   pathological,
   randomDoc,
   shrink,
-} from "./_doc.ts";
+} from "./_tree.ts";
 
 const CASES = fuzzCases(400);
 ```
@@ -1461,7 +1461,7 @@ test("法則 2: リポジトリ内の実 .md で format は 2 回目から不動
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: G3 の `serialize` が正規形を吐けていなければ
 `AssertionError [ERR_ASSERTION]: 「<ケース名>」で不動でない` が出る。EXIT=1
 
@@ -1472,7 +1472,7 @@ Expected: G3 の `serialize` が正規形を吐けていなければ
 - [ ] **Step 3: 赤の差し戻し**
 
 **この Task では実装を 1 行も書かない。** 法則 2 の実装は G3 の `serialize` が持つ。
-`core/doc/serialize.mbt` / `parse.mbt` / `scan.mbt` には 1 バイトも書かない（契約 §2）。
+`core/tree/serialize.mbt` / `parse.mbt` / `scan.mbt` には 1 バイトも書かない（契約 §2）。
 
 落ちた最小反例（`shrink` が出す）を持って、概要の**赤の差し戻し表**で担当群を決め、
 G2 / G3 へ差し戻す。とくに踏みやすい 2 つ:
@@ -1488,18 +1488,18 @@ G2 / G3 へ差し戻す。とくに踏みやすい 2 つ:
 - [ ] **Step 4: テストを走らせて通過を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
-Expected: `test/docLaws.test.ts` が **8 本**すべて緑（`ℹ pass` が 3 増え、`ℹ fail 0`）。EXIT=0
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
+Expected: `test/treeLaws.test.ts` が **8 本**すべて緑（`ℹ pass` が 3 増え、`ℹ fail 0`）。EXIT=0
 
 Run: `pnpm run check`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: 出力なし EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add test/docLaws.test.ts
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 法則 2（format は 2 回目から不動）を立てる"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add test/treeLaws.test.ts
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 法則 2（format は 2 回目から不動）を立てる"
 ```
 
 ---
@@ -1507,7 +1507,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 法則 2（
 ## Task 67: 法則 1（md を種にした版）と check
 
 **Files:**
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/docLaws.test.ts`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/treeLaws.test.ts`
 
 **Interfaces:**
 - Consumes: `doc.sig` / `doc.format` / `doc.check`（Task 63）、Task 64・65 の道具
@@ -1515,7 +1515,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 法則 2（
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`test/docLaws.test.ts` に 4 本足す。
+`test/treeLaws.test.ts` に 4 本足す。
 
 ```typescript
 test("法則 1: 正規形を読み直しても指紋が変わらない（病的な md）", () => {
@@ -1555,7 +1555,7 @@ test("parse が出した木は必ず check を通る", () => {
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: 指紋が動くケースがあれば
 `AssertionError [ERR_ASSERTION]: 「<ケース名>」で指紋が動いた`、
 check が破れていれば `AssertionError` に `id が重なっている (id=N)` などの
@@ -1581,18 +1581,18 @@ check が破れていれば `AssertionError` に `id が重なっている (id=N
 - [ ] **Step 4: テストを走らせて通過を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
-Expected: `test/docLaws.test.ts` が **12 本**すべて緑（`ℹ pass` が 4 増え、`ℹ fail 0`）。EXIT=0
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
+Expected: `test/treeLaws.test.ts` が **12 本**すべて緑（`ℹ pass` が 4 増え、`ℹ fail 0`）。EXIT=0
 
 Run: `pnpm run check`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: 出力なし EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add test/docLaws.test.ts
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 法則 1 を md 側から立て、check を毎回踏ませる"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add test/treeLaws.test.ts
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 法則 1 を md 側から立て、check を毎回踏ませる"
 ```
 
 ---
@@ -1600,7 +1600,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 法則 1 �
 ## Task 68: 法則 1 の本丸 — 木の生成器
 
 **Files:**
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/laws_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/laws_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Doc` / `Root` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol` /
@@ -1618,7 +1618,7 @@ TS 側のファズは md から始まるので、**parse が読めない木を�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/laws_wbtest.mbt` を新規作成する。
+`core/tree/laws_wbtest.mbt` を新規作成する。
 
 ```moonbit
 // 法則 1（parse(serialize(D)) = D）。木そのものを種にする唯一の場所 —
@@ -1826,11 +1826,11 @@ test "法則 1: parse(serialize(D)) = D（指紋が比較子）" {
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/laws_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/laws_wbtest.mbt`
 Expected: 2 本目が落ちるなら逐語の形は
 
 ```
-[mmm-app/core] test doc/laws_wbtest.mbt:196 ("法則 1: parse(serialize(D)) = D（指紋が比較子）") failed: doc/laws_wbtest.mbt:199:5-199:48@mmm-app/core FAILED: `"<parse が読んだ指紋>" != "<生成した木の指紋>"`
+[mmm-app/core] test tree/laws_wbtest.mbt:196 ("法則 1: parse(serialize(D)) = D（指紋が比較子）") failed: doc/laws_wbtest.mbt:199:5-199:48@mmm-app/core FAILED: `"<parse が読んだ指紋>" != "<生成した木の指紋>"`
 ```
 
 EXIT=2。**1 本目（check）は必ず緑になること** — 赤なら生成器が
@@ -1841,7 +1841,7 @@ EXIT=2。**1 本目（check）は必ず緑になること** — 赤なら生成�
 
 - [ ] **Step 3: 赤の差し戻し**
 
-**この Task では実装を 1 行も書かない。** `core/doc/parse.mbt` / `serialize.mbt` /
+**この Task では実装を 1 行も書かない。** `core/tree/parse.mbt` / `serialize.mbt` /
 `scan.mbt` には 1 バイトも書かない（契約 §2）。
 
 **指紋の食い違いを 1 文字ずつ読んで、どの部分が落ちたかで担当を決める**
@@ -1858,17 +1858,17 @@ EXIT=2。**1 本目（check）は必ず緑になること** — 赤なら生成�
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/laws_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/laws_wbtest.mbt`
 Expected: `Total tests: 2, passed: 2, failed: 0.` EXIT=0
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt --check doc`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt --check tree`
 Expected: EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/laws_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 木を種にして法則 1 を掃く"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/laws_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 木を種にして法則 1 を掃く"
 ```
 
 ---
@@ -1876,7 +1876,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 木を種�
 ## Task 69: 法則 4 — 外部審判（@lezer/markdown）と読みの裁定
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/docDialect.test.ts`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/treeDialect.test.ts`
 
 **Interfaces:**
 - Consumes: `doc.project` / `doc.sig` / `MapBranch`（Task 63）、
@@ -1893,7 +1893,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 木を種�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`test/docDialect.test.ts` を新規作成する。
+`test/treeDialect.test.ts` を新規作成する。
 
 ```typescript
 // 法則 4: parse の骨格判定 = @lezer/markdown のブロック木 + 方言表。
@@ -1916,7 +1916,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 木を種�
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parser } from "@lezer/markdown";
-import { doc, type MapBranch } from "./_doc.ts";
+import { doc, type MapBranch } from "./_tree.ts";
 
 /** 外の CommonMark が骨格と認めた数（見出し + リスト項目） */
 function outerSkeletons(md: string): number {
@@ -2089,7 +2089,7 @@ test("法則 4: 読みの裁定 9 件は指紋まで固定どおり", () => {
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: parse が方言を持っていない行で
 `AssertionError [ERR_ASSERTION]: mmm 側が表と違う: 7 個以上も見出しとして読む（憲法 §4 の方言） / "####### seven\n"`
 のように落ちる。EXIT=1
@@ -2105,7 +2105,7 @@ Expected: parse が方言を持っていない行で
 
 - [ ] **Step 3: 赤の差し戻し**
 
-**新しい実装は書かない。** この Task で `core/doc/scan.mbt` と `core/doc/parse.mbt` に
+**新しい実装は書かない。** この Task で `core/tree/scan.mbt` と `core/tree/parse.mbt` に
 手を入れてはならない（契約 §2。同名の `hashes` を置くと
 `Error: [4051] The toplevel identifier hashes is declared twice` でビルドが止まる）。
 
@@ -2123,18 +2123,18 @@ Expected: parse が方言を持っていない行で
 - [ ] **Step 4: テストを走らせて通過を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
-Expected: `test/docDialect.test.ts` が **3 本**とも緑（`ℹ pass` が 3 増え、`ℹ fail 0`）。EXIT=0
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
+Expected: `test/treeDialect.test.ts` が **3 本**とも緑（`ℹ pass` が 3 増え、`ℹ fail 0`）。EXIT=0
 
 Run: `pnpm run check`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: 出力なし EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add test/docDialect.test.ts
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 方言の面と読みの裁定を外部審判で固定する"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add test/treeDialect.test.ts
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 方言の面と読みの裁定を外部審判で固定する"
 ```
 
 ---
@@ -2142,7 +2142,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 方言の�
 ## Task 70: カタログ C1〜C17 の固定
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/docCases.test.ts`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/treeCases.test.ts`
 
 **Interfaces:**
 - Consumes: `doc`（7 メソッド全部）/ `cardText`（Task 63）
@@ -2156,7 +2156,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 方言の�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`test/docCases.test.ts` を新規作成する。
+`test/treeCases.test.ts` を新規作成する。
 
 ```typescript
 // 操作ケースカタログ C1〜C17 の固定（docs/superpowers/specs/2026-08-29-op-cases.md）。
@@ -2175,7 +2175,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 方言の�
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cardText, doc } from "./_doc.ts";
+import { cardText, doc } from "./_tree.ts";
 
 /** ラベルから id を引く。無ければ分かりやすく落とす */
 function idOf(md: string, label: string): number {
@@ -2398,8 +2398,8 @@ test("C17: 項目 root の後ろの見出し — Item の子にはならない",
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
-Expected: `test/docCases.test.ts` の 17 本のうち、実装が届いていないものが赤。
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
+Expected: `test/treeCases.test.ts` の 17 本のうち、実装が届いていないものが赤。
 逐語の形は
 
 ```
@@ -2417,7 +2417,7 @@ EXIT=1
 
 - [ ] **Step 3: 赤の差し戻し**
 
-**この Task では実装を 1 行も書かない。** `core/doc/parse.mbt` / `serialize.mbt` /
+**この Task では実装を 1 行も書かない。** `core/tree/parse.mbt` / `serialize.mbt` /
 `scan.mbt` には 1 バイトも書かない（契約 §2）。
 
 赤の大半は G2 の `parse`。概要の**赤の差し戻し表**で担当群を決めて戻す。踏みやすい 3 つ:
@@ -2432,18 +2432,18 @@ EXIT=1
 - [ ] **Step 4: テストを走らせて通過を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
-Expected: `test/docCases.test.ts` が **17 本**すべて緑（`ℹ pass` が 17 増え、`ℹ fail 0`）。EXIT=0
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
+Expected: `test/treeCases.test.ts` が **17 本**すべて緑（`ℹ pass` が 17 増え、`ℹ fail 0`）。EXIT=0
 
 Run: `pnpm run check`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: 出力なし EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add test/docCases.test.ts
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 操作ケースカタログ C1〜C17 を固定する"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add test/treeCases.test.ts
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 操作ケースカタログ C1〜C17 を固定する"
 ```
 
 ---
@@ -2451,7 +2451,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 操作ケ�
 ## Task 71: CI に新パッケージを乗せる
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/.github/workflows/ci.yml`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/.github/workflows/ci.yml`
 
 **Interfaces:**
 - Consumes: `pnpm run test:core` / `pnpm run fmt:doc`（Task 62）
@@ -2491,7 +2491,7 @@ CI が `Total tests: 0` を検知しないと、新パッケージのテスト�
 `-p mmm-app/core/nope` に**一時的に**差し替えて
 
 Run: `pnpm run test:core`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: `Warning: package \`mmm-app/core/nope\` not found` /
 `Total tests: 0, passed: 0, failed: 0.` EXIT=0（**赤にならないことがバグ**。
 上の `grep` がこれを拾う）
@@ -2507,7 +2507,7 @@ Expected: `Warning: package \`mmm-app/core/nope\` not found` /
       - name: Format check（新パッケージのみ）
         run: |
           cd core
-          moon fmt --check doc doc/js
+          moon fmt --check tree tree/js
 ```
 
 `cd core` を挟むのは、`pnpm run fmt:doc` が `pnpm install` の後でないと使えないため。
@@ -2517,26 +2517,26 @@ Expected: `Warning: package \`mmm-app/core/nope\` not found` /
 - [ ] **Step 4: テストを走らせて通過を確認**
 
 Run: `pnpm run test:core`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: `Total tests: 303, passed: 303, failed: 0.` EXIT=0
 （旧 core 192 + 新パッケージ 111 = G1 25 + G2 23 + G3 21 + G5 32 + G4 10）
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test -p mmm-app/core -p mmm-app/core/doc`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test -p mmm-app/core -p mmm-app/core/tree`
 Expected: 同じく `Total tests: 303, passed: 303, failed: 0.` EXIT=0（群の締めだけ `-p`）
 
 Run: `pnpm run fmt:doc`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: `Finished. moon: ran N tasks, now up to date` EXIT=0
 
 Run: `pnpm run core` → `pnpm run check` → `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: 3 つとも EXIT=0。`pnpm test` の末尾が `ℹ fail 0`
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add .github/workflows/ci.yml
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "ci: 👷 新 core のテストと整形を CI に乗せ、Total tests: 0 を検知する"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add .github/workflows/ci.yml
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "ci: 👷 新 core のテストと整形を CI に乗せ、Total tests: 0 を検知する"
 ```
 
 ---
@@ -2544,10 +2544,10 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "ci: 👷 新 core の
 ## Task 72: 操作の性質のファズ
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/docOps.test.ts`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/treeOps.test.ts`
 
 **Interfaces:**
-- Consumes: `test/_doc.ts` の `doc` / `apply` / `randomDoc` / `fuzzCases` / `brief` /
+- Consumes: `test/_tree.ts` の `doc` / `apply` / `randomDoc` / `fuzzCases` / `brief` /
   `Mindmap` / `MapBranch` / `Reflection`（Task 63〜65）。
   境界の `moveNodes` / `flipSide` / `deleteNodes` / `check` / `project` / `format` / `sig`（Task 62）
 - Produces: なし（操作の性質の固定）
@@ -2563,7 +2563,7 @@ G5 は着手しない。見る性質は 5 つ:
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`test/docOps.test.ts` を新規作成する。
+`test/treeOps.test.ts` を新規作成する。
 
 ```typescript
 // 操作の性質。ランダムな文書に木の道を通し、法則が操作の後でも立つことを見る。
@@ -2580,7 +2580,7 @@ import {
   type MapBranch,
   type Mindmap,
   type Reflection,
-} from "./_doc.ts";
+} from "./_tree.ts";
 
 /** 絵に出ているノードの id を文書順に集める */
 function idsOf(map: Mindmap): number[] {
@@ -2701,11 +2701,11 @@ test("無操作は無編集 — 正規形の文書を同じ場所へ動かして
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
 Run: `pnpm run check`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
-Expected: 出力なし EXIT=0（型が通らないなら `_doc.ts` の輸出が足りていない）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
+Expected: 出力なし EXIT=0（型が通らないなら `_tree.ts` の輸出が足りていない）
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 Expected: 落ちたアサーションのメッセージが、どの性質
 （拒否は無編集 / 適用後も健全 / 当てれば一致 / 反映の先は不動 / 側の反転は対合）が
 破れたかを名指す。EXIT=1
@@ -2716,7 +2716,7 @@ Expected: 落ちたアサーションのメッセージが、どの性質
 
 - [ ] **Step 3: 赤の差し戻し**
 
-**この Task では実装を 1 行も書かない。** `core/doc/op.mbt` / `diff.mbt` /
+**この Task では実装を 1 行も書かない。** `core/tree/op.mbt` / `diff.mbt` /
 `serialize.mbt` には 1 バイトも書かない（契約 §2）。落ちた場合の差し戻し先は 1 つに決まる:
 
 - **「適用後も健全」が落ちた** → `conform` か `prune`（G5 Task 85 / 87）。
@@ -2731,18 +2731,18 @@ Expected: 落ちたアサーションのメッセージが、どの性質
 - [ ] **Step 4: テストを走らせて通過を確認**
 
 Run: `pnpm test`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
-Expected: `test/docOps.test.ts` が **5 本**とも緑（`ℹ pass` が 5 増え、`ℹ fail 0`）。EXIT=0
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
+Expected: `test/treeOps.test.ts` が **5 本**とも緑（`ℹ pass` が 5 増え、`ℹ fail 0`）。EXIT=0
 
 Run: `$env:MMM_FUZZ = '5000'; pnpm test; Remove-Item Env:MMM_FUZZ`
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`。PowerShell）
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`。PowerShell）
 Expected: 同じく `ℹ fail 0` EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add test/docOps.test.ts
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 操作の後でも法則が立つことをファズで見張る"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add test/treeOps.test.ts
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 操作の後でも法則が立つことをファズで見張る"
 ```
 
 ---
@@ -2751,20 +2751,20 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 操作の�
 
 ```
 moon -C <root>/core check                                     0 errors
-moon -C <root>/core test -p mmm-app/core -p mmm-app/core/doc  Total tests: 303, failed: 0.
-moon -C <root>/core fmt --check doc doc/js                    EXIT=0
+moon -C <root>/core test -p mmm-app/core -p mmm-app/core/tree  Total tests: 303, failed: 0.
+moon -C <root>/core fmt --check tree tree/js                    EXIT=0
 pnpm run core                                                 0 errors
 pnpm run check                                                出力なし
 pnpm run test:core                                            Total tests: 303, failed: 0.
 pnpm test                                                     ℹ fail 0
 ```
 
-（`<root>` = `D:/1.atrium/mmm/.worktrees/feat/doc-core`）
+（`<root>` = `D:/1.atrium/mmm/.worktrees/feat/tree-core`）
 
 新しく緑になっている mbt のテスト本数: `json_wbtest` 5 / `project_wbtest` 3 /
 `laws_wbtest` 2 = **10 本**（新パッケージ全体で 111 本）。
-新しく緑になっている TS のテスト本数: `docLaws` 12 / `docDialect` 3 /
-`docCases` 17 / `docOps` 5 = **37 本**。
+新しく緑になっている TS のテスト本数: `treeLaws` 12 / `treeDialect` 3 /
+`treeCases` 17 / `treeOps` 5 = **37 本**。
 
 ### スコープ外（この群では触らない）
 
@@ -2778,7 +2778,7 @@ pnpm test                                                     ℹ fail 0
   この計画を `docs/superpowers/plans/` に置くなら、それも往復すること
 - **`$env:MMM_FUZZ` でケース数を上げられる**（PowerShell: `$env:MMM_FUZZ = '5000'; pnpm test` /
   後始末 `Remove-Item Env:MMM_FUZZ`）。マージ前に一度 5000 で回すこと
-- **法則 1 の本丸は `core/doc/laws_wbtest.mbt`。** TS 側の法則 1 は md を種にした
+- **法則 1 の本丸は `core/tree/laws_wbtest.mbt`。** TS 側の法則 1 は md を種にした
   影であって、木の生成器の代わりにはならない
 - **G4 は他群のファイルに 1 バイトも書かない。** 赤は必ず差し戻し表を通す。
   差し戻した先が直ったら、その群の wbtest に固定が 1 本増えているはず —

@@ -14,10 +14,10 @@
 
 所有ファイル（契約 §2 の G5 の行。**ここに無いファイルには 1 バイトも書かない**）:
 
-- `core/doc/tool.mbt` — 道具 5 本と `Sub`。型の異種性の牢獄
-- `core/doc/op.mbt` — move_nodes / flip_side / delete_nodes と、回復（prune / conform）
-- `core/doc/diff.mbt` — `Edit` / `Reflection` / `reflect` / `diff` / `apply`
-- `core/doc/tool_wbtest.mbt` / `core/doc/op_wbtest.mbt` / `core/doc/diff_wbtest.mbt`
+- `core/tree/tool.mbt` — 道具 5 本と `Sub`。型の異種性の牢獄
+- `core/tree/op.mbt` — move_nodes / flip_side / delete_nodes と、回復（prune / conform）
+- `core/tree/diff.mbt` — `Edit` / `Reflection` / `reflect` / `diff` / `apply`
+- `core/tree/tool_wbtest.mbt` / `core/tree/op_wbtest.mbt` / `core/tree/diff_wbtest.mbt`
 - `docs/ops.md`
 
 ### 前提（契約 §3 の依存順。裁定 3）
@@ -25,7 +25,7 @@
 依存順は `G1 → (G2 / G3) → G5 → G4`。**G5 は G2・G3 の後、G4 の前**。
 
 - **G1 が終わっていること。** `Doc` / `Root` / `Branch` / `Node` / `Skeleton` / `Side` /
-  `Verdict` / `doc_id`（`core/doc/doc.mbt`）、`sig`（`sig.mbt`）、`check` と `is_item`
+  `Verdict` / `doc_id`（`core/tree/doc.mbt`）、`sig`（`sig.mbt`）、`check` と `is_item`
   （`check.mbt`）、木を組む `make_doc` / `make_root` / `make_branch` / `make_node` /
   `make_head` / `make_item`（`make_wbtest.mbt`）を使う。`is_item` と `make_*` は private だが
   同一パッケージなので見える
@@ -34,7 +34,7 @@
   **スタブは 1 バイトも書かない** — parse.mbt / serialize.mbt は他群の所有ファイル（契約 §2）
 - **G4 には依存しない。** 境界の JSON（`reflect_json`）は G4 の `json.mbt` の所有へ移った（裁定 3）。
   G5 が書くのは `Reflection` を返す純関数の `reflect` まで。`quote` は 1 度も呼ばない
-- **`test/docOps.test.ts`（操作の性質のファズ）は G4 Task 72 の所有**（旧 Task 93 から移管。裁定 2）。
+- **`test/treeOps.test.ts`（操作の性質のファズ）は G4 Task 72 の所有**（旧 Task 93 から移管。裁定 2）。
   G5 は着手しない。設計の出どころが G5 であることだけが `test/` の表に残る
 
 ### 着手順
@@ -56,7 +56,7 @@ T92 だけが G2・G3 を待つ。
 
 ### 新設する名前（契約 §4 の G5 の行。ここに無い名前をトップレベルに置かない）
 
-**`core/doc/tool.mbt`**（`priv` / `fn` — この群の外へは 1 つも出さない）
+**`core/tree/tool.mbt`**（`priv` / `fn` — この群の外へは 1 つも出さない）
 
 | 名前 | 何 | 容器の腕 |
 |---|---|---|
@@ -72,13 +72,13 @@ T92 だけが G2・G3 を待つ。
 | `set_side(doc, i, j, side)` | スロットの側を差し替える | 1 |
 | `as_root(sub) -> Root` / `as_node(sub) -> Node` | graft の変換 2 本 | — |
 
-**`core/doc/op.mbt`**
+**`core/tree/op.mbt`**
 
 `move_nodes` / `flip_side` / `delete_nodes`（pub）、
 `crown` / `ahead` / `under` / `dest` / `clamp` / `flipped` / `pick` / `missing` / `cyclic` /
 `shallow` / `prune` / `alive` / `conform` / `sink` / `raised` / `itemed`（private **16 本**）
 
-**`core/doc/diff.mbt`**
+**`core/tree/diff.mbt`**
 
 `Edit`（pub(all)）/ `Reflection`（pub(all)）/ `reflect` / `diff` / `apply`（pub）、
 `safe_edits` / `line_start` / `line_end` / `code_at`（private **4 本**）。
@@ -120,7 +120,7 @@ T92 だけが G2・G3 を待つ。
 
 ### 実測の場所と手順
 
-`scratchpad/v2/g5v/` に `moon.mod`（`name = "g5v"`）と `core/doc/moon.pkg`
+`scratchpad/v2/g5v/` に `moon.mod`（`name = "g5v"`）と `core/tree/moon.pkg`
 （`pkgtype(kind: "library")`）を置き、そこへ次を写した。
 
 - G1 の確定分（`doc.mbt` / `check.mbt` / `sig.mbt` / `scan.mbt` / `spell.mbt`）と、
@@ -129,13 +129,13 @@ T92 だけが G2・G3 を待つ。
   Task 92 の実測は**拒否の経路しか通らない**ので、この 2 本の中身は測る値に影響しない
 - 本書 Task 80〜92 の `tool.mbt` / `op.mbt` / `diff.mbt` と 3 本の wbtest（逐語そのまま）
 
-走らせたコマンド（実測モジュールの `core/doc` は、実装先の `<root>/core` の `doc` に当たる）:
+走らせたコマンド（実測モジュールの `core/tree` は、実装先の `<root>/core` の `doc` に当たる）:
 
 ```
-moon -C <scratchpad>/v2/g5v check core/doc
-moon -C <scratchpad>/v2/g5v fmt --check core/doc
-moon -C <scratchpad>/v2/g5v test core/doc/<file>_wbtest.mbt
-moon -C <scratchpad>/v2/g5v test -p g5v/core/doc
+moon -C <scratchpad>/v2/g5v check core/tree
+moon -C <scratchpad>/v2/g5v fmt --check core/tree
+moon -C <scratchpad>/v2/g5v test core/tree/<file>_wbtest.mbt
+moon -C <scratchpad>/v2/g5v test -p g5v/core/tree
 ```
 
 ### 実測 1: 各 Task の終わりの本数（累計）
@@ -164,7 +164,7 @@ wbtest を Task の境目で切り詰めて 13 段階を順に走らせた結果
 ### 実測 2: 完成時点の型検査と整形
 
 ```
-moon -C <scratchpad>/v2/g5v check core/doc
+moon -C <scratchpad>/v2/g5v check core/tree
 Finished. moon: ran 3 tasks, now up to date
 ```
 
@@ -172,7 +172,7 @@ EXIT=0。**警告 0・エラー 0**（警告が 1 本も出ないのは、道具
 契約 §11 が触れている `amend` の未使用警告は「呼び手が居ない状態」の話で、G5 完成時点では
 `conform` が `amend` を呼ぶので出ない。CI の合格条件が `0 errors` であることは変わらない）。
 
-`moon fmt --check core/doc` は EXIT=0。**本書の逐語はすべて `moon fmt` を通した後の姿**で、
+`moon fmt --check core/tree` は EXIT=0。**本書の逐語はすべて `moon fmt` を通した後の姿**で、
 写してもう一度 `moon fmt` を掛けても 1 バイトも動かない。
 
 ### 実測 3: EXIT コード（Step 2 / Step 4 の読み方）
@@ -228,7 +228,7 @@ Task 87 の `conform` 4 本の `op_forms` も実測済み — `llhhh`→`llllh` 
 新しいテストだけが落ちる:
 
 ```
-[g5neg] test core/doc/op_wbtest.mbt:198 ("root とその直下の枝を同時に選んでも二重には反転しない")
+[g5neg] test core/tree/op_wbtest.mbt:198 ("root とその直下の枝を同時に選んでも二重には反転しない")
 failed: ... FAILED: `"doc(R2[>3(4(5))] R6[<7])" != "doc(R2[<3(4(5))] R6[<7])"`
 Total tests: 32, passed: 31, failed: 1.
 ```
@@ -246,9 +246,9 @@ root の鏡像で 1 回、枝自身で もう 1 回反転して `>3` に戻る�
 ## Task 80: 道具の座標系 — Sub / resolve / node_at
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/tool.mbt`
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/tool_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/tool_wbtest.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Doc` / `Root` / `Branch` / `Node` / `Skeleton` / `Side`（G1 の `doc.mbt`）、
@@ -261,7 +261,7 @@ root の鏡像で 1 回、枝自身で もう 1 回反転して `>3` に戻る�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/tool_wbtest.mbt` を新規作成する。
+`core/tree/tool_wbtest.mbt` を新規作成する。
 
 ```moonbit
 // 道具の実測。ヘルパ名は `tool_` で始める（wbtest は名前空間を共有する）。
@@ -296,7 +296,7 @@ test "resolve は id から居場所を返す" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/tool_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/tool_wbtest.mbt
 ```
 Expected: **EXIT=1**（実測 3）。
 ```
@@ -306,7 +306,7 @@ The value identifier resolve is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/tool.mbt` を新規作成する。ファイル冒頭の 3 行は**契約 §11 の逐語コメント**
+`core/tree/tool.mbt` を新規作成する。ファイル冒頭の 3 行は**契約 §11 の逐語コメント**
 （1 文字も変えない）。
 
 ```moonbit
@@ -371,7 +371,7 @@ fn node_at(doc : Doc, path : ArrayView[Int]) -> Node {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/tool_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/tool_wbtest.mbt
 ```
 Expected: `Total tests: 1, passed: 1, failed: 0.` EXIT=0（**G5 の累計 1 本**）。
 `Warning: [0001] Unused function 'node_at'` が 1 本出るが、Task 81 で消える。
@@ -379,9 +379,9 @@ Expected: `Total tests: 1, passed: 1, failed: 0.` EXIT=0（**G5 の累計 1 本*
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/tool.mbt core/doc/tool_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 道具の座標系（id から居場所へ）を置く"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/tool.mbt core/tree/tool_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 道具の座標系（id から居場所へ）を置く"
 ```
 
 ---
@@ -389,9 +389,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 道具の�
 ## Task 81: 道具の読み — kin_at / parent_at
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/tool.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/tool_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/tool_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `node_at(doc : Doc, path : ArrayView[Int]) -> Node`
@@ -406,7 +406,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 道具の�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/tool_wbtest.mbt` の末尾に足す。
+`core/tree/tool_wbtest.mbt` の末尾に足す。
 
 ```moonbit
 ///|
@@ -428,7 +428,7 @@ test "kin_at は path が居る列を、parent_at はその親を返す" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/tool_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/tool_wbtest.mbt
 ```
 Expected: **EXIT=1**。
 ```
@@ -438,7 +438,7 @@ The value identifier kin_at is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/tool.mbt` の `node_at` の直後に足す。
+`core/tree/tool.mbt` の `node_at` の直後に足す。
 
 ```moonbit
 ///|
@@ -469,16 +469,16 @@ fn parent_at(doc : Doc, path : Array[Int]) -> Skeleton? {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/tool_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/tool_wbtest.mbt
 ```
 Expected: `Total tests: 2, passed: 2, failed: 0.` EXIT=0（**G5 の累計 2 本**）。
 
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/tool.mbt core/doc/tool_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 行き先を測る読みの道具（兄弟の列と親）を置く"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/tool.mbt core/tree/tool_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 行き先を測る読みの道具（兄弟の列と親）を置く"
 ```
 
 ---
@@ -486,9 +486,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 行き先�
 ## Task 82: 抜き挿し — pluck / graft と変換表
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/tool.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/tool_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/tool_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Sub` / `node_at` / `sig(doc) -> String`
@@ -506,7 +506,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 行き先�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/tool_wbtest.mbt` の末尾に足す。
+`core/tree/tool_wbtest.mbt` の末尾に足す。
 
 ```moonbit
 ///|
@@ -534,7 +534,7 @@ test "graft は Limb を文書へ挿すとき Root 化する" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/tool_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/tool_wbtest.mbt
 ```
 Expected: **EXIT=1**。
 ```
@@ -544,7 +544,7 @@ The value identifier pluck is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/tool.mbt` の `parent_at` の直後に足す（`as_root` / `as_node` はファイル末尾）。
+`core/tree/tool.mbt` の `parent_at` の直後に足す（`as_root` / `as_node` はファイル末尾）。
 
 ```moonbit
 ///|
@@ -613,16 +613,16 @@ fn as_node(sub : Sub) -> Node {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/tool_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/tool_wbtest.mbt
 ```
 Expected: `Total tests: 4, passed: 4, failed: 0.` EXIT=0（**G5 の累計 4 本**）。
 
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/tool.mbt core/doc/tool_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 抜き挿しと、変換の唯一の住所を置く"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/tool.mbt core/tree/tool_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 抜き挿しと、変換の唯一の住所を置く"
 ```
 
 ---
@@ -630,9 +630,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 抜き挿�
 ## Task 83: 書き替え — amend / set_side
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/tool.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/tool_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/tool_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/tool_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `node_at` / `Skeleton` / `Side`
@@ -641,7 +641,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 抜き挿�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/tool_wbtest.mbt` の末尾に足す。
+`core/tree/tool_wbtest.mbt` の末尾に足す。
 
 ```moonbit
 ///|
@@ -676,7 +676,7 @@ test "set_side はスロットの側だけを差し替える" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/tool_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/tool_wbtest.mbt
 ```
 Expected: **EXIT=1**。
 ```
@@ -686,7 +686,7 @@ The value identifier amend is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/tool.mbt` の `graft` の直後に足す。`amend` の直前の 3 行は**契約 §11 の逐語コメント**
+`core/tree/tool.mbt` の `graft` の直後に足す。`amend` の直前の 3 行は**契約 §11 の逐語コメント**
 （1 文字も変えない）。
 
 ```moonbit
@@ -727,7 +727,7 @@ fn set_side(doc : Doc, i : Int, j : Int, side : Side) -> Unit {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/tool_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/tool_wbtest.mbt
 ```
 Expected: `Total tests: 6, passed: 6, failed: 0.` EXIT=0（**G5 の累計 6 本**。
 `tool_wbtest.mbt` はここで完成し、以降 1 本も増えない）。
@@ -736,9 +736,9 @@ Expected: `Total tests: 6, passed: 6, failed: 0.` EXIT=0（**G5 の累計 6 本*
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/tool.mbt core/doc/tool_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 骨格と側の書き替えを置く"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/tool.mbt core/tree/tool_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 骨格と側の書き替えを置く"
 ```
 
 ---
@@ -746,9 +746,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 骨格と�
 ## Task 84: 拒否の文言と頂点集合
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op.mbt`
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op_wbtest.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `resolve` / `node_at` / `doc_id`（G1）、`make_*`（G1 の `make_wbtest.mbt`）
@@ -771,7 +771,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 骨格と�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/op_wbtest.mbt` を新規作成する。
+`core/tree/op_wbtest.mbt` を新規作成する。
 
 ```moonbit
 // 操作の実測。ヘルパ名は `op_` で始める（wbtest は名前空間を共有する）。
@@ -923,7 +923,7 @@ test "拒否の文言は 3 つだけ" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/op_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/op_wbtest.mbt
 ```
 Expected: **EXIT=1**。
 ```
@@ -933,7 +933,7 @@ The value identifier crown is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/op.mbt` を新規作成する。
+`core/tree/op.mbt` を新規作成する。
 
 ```moonbit
 // 木の道。id で語り、道具の合成だけで書く。操作に容器の腕を生やさない。
@@ -1064,7 +1064,7 @@ fn shallow(id : Int) -> String {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/op_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/op_wbtest.mbt
 ```
 Expected: `Total tests: 2, passed: 2, failed: 0.` EXIT=0（**G5 の累計 8 本**）。
 G5 の名前で未使用の警告が出る（実測 — `crown` / `dest` / `clamp` / `flipped` / `pick` /
@@ -1075,9 +1075,9 @@ G5 の名前で未使用の警告が出る（実測 — `crown` / `dest` / `clam
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/op.mbt core/doc/op_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 頂点集合への正規化と、拒否の文言 3 つを置く"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/op.mbt core/tree/op_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 頂点集合への正規化と、拒否の文言 3 つを置く"
 ```
 
 ---
@@ -1085,9 +1085,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 頂点集�
 ## Task 85: delete と、Implicit の存在条件の回復
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `crown` / `resolve` / `pluck` / `pick` / `missing` / `check`（G1）
@@ -1102,7 +1102,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 頂点集�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/op_wbtest.mbt` の末尾に足す。
+`core/tree/op_wbtest.mbt` の末尾に足す。
 
 ```moonbit
 ///|
@@ -1146,7 +1146,7 @@ test "Implicit の root も子を失えば消える" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/op_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/op_wbtest.mbt
 ```
 Expected: **EXIT=1**。
 ```
@@ -1156,7 +1156,7 @@ The value identifier delete_nodes is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/op.mbt` の `crown` の直前に足す（公開 API をファイルの頭に置く）。
+`core/tree/op.mbt` の `crown` の直前に足す（公開 API をファイルの頭に置く）。
 
 ```moonbit
 ///|
@@ -1199,16 +1199,16 @@ fn alive(node : Node) -> Bool {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/op_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/op_wbtest.mbt
 ```
 Expected: `Total tests: 5, passed: 5, failed: 0.` EXIT=0（**G5 の累計 11 本**）。
 
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/op.mbt core/doc/op_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ サブツリー削除と、子を失った Implicit の片付けを置く"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/op.mbt core/tree/op_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ サブツリー削除と、子を失った Implicit の片付けを置く"
 ```
 
 ---
@@ -1216,9 +1216,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ サブツ�
 ## Task 86: flipSide — root は鏡像、スロットは反転、深部は拒否
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `crown` / `resolve` / `set_side` / `flipped` / `pick` / `shallow` / `check`（G1）
@@ -1240,7 +1240,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ サブツ�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/op_wbtest.mbt` の末尾に足す。
+`core/tree/op_wbtest.mbt` の末尾に足す。
 
 ```moonbit
 ///|
@@ -1299,7 +1299,7 @@ test "深いノードと文書への flipSide は拒否される" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/op_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/op_wbtest.mbt
 ```
 Expected: **EXIT=1**。
 ```
@@ -1309,7 +1309,7 @@ The value identifier flip_side is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/op.mbt` の `delete_nodes` の直前に足す。
+`core/tree/op.mbt` の `delete_nodes` の直前に足す。
 
 ```moonbit
 ///|
@@ -1345,16 +1345,16 @@ pub fn flip_side(doc : Doc, ids : Array[Int]) -> Verdict {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/op_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/op_wbtest.mbt
 ```
 Expected: `Total tests: 9, passed: 9, failed: 0.` EXIT=0（**G5 の累計 15 本**）。
 
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/op.mbt core/doc/op_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 側の反転（頂点集合・root は鏡像・深部は拒否）を置く"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/op.mbt core/tree/op_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 側の反転（頂点集合・root は鏡像・深部は拒否）を置く"
 ```
 
 ---
@@ -1362,9 +1362,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 側の反�
 ## Task 87: 回復（挿した側）— conform と sink
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `kin_at` / `parent_at` / `amend` / `pluck` / `graft` /
@@ -1398,7 +1398,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 側の反�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/op_wbtest.mbt` の末尾に足す。
+`core/tree/op_wbtest.mbt` の末尾に足す。
 
 ```moonbit
 ///|
@@ -1491,7 +1491,7 @@ test "conform は飛びを書けない位置の Implicit を昇格させる" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/op_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/op_wbtest.mbt
 ```
 Expected: **EXIT=1**。
 ```
@@ -1501,7 +1501,7 @@ The value identifier conform is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/op.mbt` の `prune` の直後に足す。
+`core/tree/op.mbt` の `prune` の直後に足す。
 
 ```moonbit
 ///|
@@ -1590,16 +1590,16 @@ fn itemed(skeleton : Skeleton) -> Skeleton {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/op_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/op_wbtest.mbt
 ```
 Expected: `Total tests: 13, passed: 13, failed: 0.` EXIT=0（**G5 の累計 19 本**）。
 
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/op.mbt core/doc/op_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 行き先が形を決める回復（順序法則・単調性・昇格）を置く"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/op.mbt core/tree/op_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 行き先が形を決める回復（順序法則・単調性・昇格）を置く"
 ```
 
 ---
@@ -1607,9 +1607,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 行き先�
 ## Task 88: move — 循環の拒否と、側を運ばない付け替え
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `dest` / `crown` / `under` / `resolve` / `pluck` / `graft` / `clamp` /
@@ -1628,7 +1628,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 行き先�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/op_wbtest.mbt` の末尾に足す。
+`core/tree/op_wbtest.mbt` の末尾に足す。
 
 ```moonbit
 ///|
@@ -1685,7 +1685,7 @@ test "複数 id の move は文書順に連続で挿さる" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/op_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/op_wbtest.mbt
 ```
 Expected: **EXIT=1**。
 ```
@@ -1695,7 +1695,7 @@ The value identifier move_nodes is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/op.mbt` の `flip_side` の直前（ファイルの先頭側）に足す。
+`core/tree/op.mbt` の `flip_side` の直前（ファイルの先頭側）に足す。
 
 ```moonbit
 ///|
@@ -1745,16 +1745,16 @@ pub fn move_nodes(
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/op_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/op_wbtest.mbt
 ```
 Expected: `Total tests: 16, passed: 16, failed: 0.` EXIT=0（**G5 の累計 22 本**）。
 
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/op.mbt core/doc/op_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 付け替え（循環の拒否・側の決め直し・連続挿入）を置く"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/op.mbt core/tree/op_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 付け替え（循環の拒否・側の決め直し・連続挿入）を置く"
 ```
 
 ---
@@ -1762,8 +1762,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 付け替�
 ## Task 89: move の 9 組合せの掃引
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/op_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/op_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `move_nodes` / `op_doc` / `op_shape` / `op_said` / `check`
@@ -1786,7 +1786,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 付け替�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/op_wbtest.mbt` の末尾に足す。
+`core/tree/op_wbtest.mbt` の末尾に足す。
 
 ```moonbit
 ///|
@@ -1837,14 +1837,14 @@ test "move 9 組合せ: 深いノードから doc / root / node へ" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/op_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/op_wbtest.mbt
 ```
 Expected: **実装は既に居るので、実測どおりならここで緑になる**
 （`Total tests: 19, passed: 19, failed: 0.` EXIT=0）。
 落ちたら変換表のどこかが違う。落ちたときの逐語は契約 §18 の形（**EXIT=2**）:
 ```
-[mmm-app/core/doc] test doc/op_wbtest.mbt:NN ("move 9 組合せ: ...") failed:
-doc/op_wbtest.mbt:NN:NN-NN:NN@doc FAILED: `"..." != "..."`
+[mmm-app/core/tree] test tree/op_wbtest.mbt:NN ("move 9 組合せ: ...") failed:
+doc/op_wbtest.mbt:NN:NN-NN:NN@tree FAILED: `"..." != "..."`
 ```
 
 - [ ] **Step 3: 最小の実装を書く**
@@ -1857,7 +1857,7 @@ doc/op_wbtest.mbt:NN:NN-NN:NN@doc FAILED: `"..." != "..."`
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/op_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/op_wbtest.mbt
 ```
 Expected: `Total tests: 19, passed: 19, failed: 0.` EXIT=0（**G5 の累計 25 本**。
 `op_wbtest.mbt` はここで完成し、以降 1 本も増えない）。
@@ -1865,9 +1865,9 @@ Expected: `Total tests: 19, passed: 19, failed: 0.` EXIT=0（**G5 の累計 25 �
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/op_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 付け替えの 9 組合せを固定する"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/op_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 付け替えの 9 組合せを固定する"
 ```
 
 ---
@@ -1875,9 +1875,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 付け替�
 ## Task 90: 境界を渡る編集 — Edit と apply
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/diff.mbt`
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/diff_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/diff_wbtest.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/diff.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/diff_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/diff_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: なし（純粋な文字列の算術）
@@ -1890,7 +1890,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "test: ✅ 付け替�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/diff_wbtest.mbt` を新規作成する。
+`core/tree/diff_wbtest.mbt` を新規作成する。
 
 ```moonbit
 // 反映の実測。ヘルパ名は `diff_` で始める（wbtest は名前空間を共有する）。
@@ -1925,7 +1925,7 @@ test "apply はサロゲート対の外側で切れば壊れない" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/diff_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/diff_wbtest.mbt
 ```
 Expected: **EXIT=1**。
 ```
@@ -1935,7 +1935,7 @@ The value identifier apply is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/diff.mbt` を新規作成する。
+`core/tree/diff.mbt` を新規作成する。
 
 ```moonbit
 // 反映。統一サイクルの唯一の書き手で、書くのはここだけ。
@@ -1968,16 +1968,16 @@ pub fn apply(text : String, edits : Array[Edit]) -> String {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/diff_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/diff_wbtest.mbt
 ```
 Expected: `Total tests: 2, passed: 2, failed: 0.` EXIT=0（**G5 の累計 27 本**）。
 
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/diff.mbt core/doc/diff_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 境界を渡る編集の形と、当てる算術を置く"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/diff.mbt core/tree/diff_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 境界を渡る編集の形と、当てる算術を置く"
 ```
 
 ---
@@ -1985,9 +1985,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 境界を�
 ## Task 91: diff — 共通の端を刈り、行境界まで広げる
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/diff.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/diff_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/diff_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/diff.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/diff_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/diff_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Edit` / `apply`
@@ -2009,7 +2009,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 境界を�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/diff_wbtest.mbt` の末尾に足す。**`from = 5` / `to = 10` は実測 6 の値**。
+`core/tree/diff_wbtest.mbt` の末尾に足す。**`from = 5` / `to = 10` は実測 6 の値**。
 
 ```moonbit
 ///|
@@ -2053,7 +2053,7 @@ test "diff はどの端でも当てれば後ろになる" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/diff_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/diff_wbtest.mbt
 ```
 Expected: **EXIT=1**。
 ```
@@ -2063,7 +2063,7 @@ The value identifier diff is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/diff.mbt` の `apply` の直前に `diff` を、`apply` の直後に読みの補助 3 本を足す。
+`core/tree/diff.mbt` の `apply` の直前に `diff` を、`apply` の直後に読みの補助 3 本を足す。
 
 ```moonbit
 ///|
@@ -2133,16 +2133,16 @@ fn code_at(s : String, k : Int) -> String {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/diff_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/diff_wbtest.mbt
 ```
 Expected: `Total tests: 5, passed: 5, failed: 0.` EXIT=0（**G5 の累計 30 本**）。
 
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/diff.mbt core/doc/diff_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 行境界まで広げる差分を置く"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/diff.mbt core/tree/diff_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 行境界まで広げる差分を置く"
 ```
 
 ---
@@ -2150,9 +2150,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 行境界�
 ## Task 92: 反映 v0 — Reflection と自己検査
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/diff.mbt`
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/diff_wbtest.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/diff_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/diff.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/diff_wbtest.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/diff_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `parse`（G2 の `parse.mbt`）/ `serialize`（G3 の `serialize.mbt`）/
@@ -2179,7 +2179,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 行境界�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/diff_wbtest.mbt` の末尾に足す。JSON の逐語は G4 の `json_wbtest.mbt` が固定するので、
+`core/tree/diff_wbtest.mbt` の末尾に足す。JSON の逐語は G4 の `json_wbtest.mbt` が固定するので、
 ここは**フィールドで比べる**。
 
 ```moonbit
@@ -2215,7 +2215,7 @@ test "拒否のとき reflect は元の md をそのまま返す" {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/diff_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/diff_wbtest.mbt
 ```
 Expected: **EXIT=1**。
 ```
@@ -2225,7 +2225,7 @@ The value identifier safe_edits is unbound.
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/diff.mbt` の `Edit` の直後に `Reflection` と `reflect` を足す。
+`core/tree/diff.mbt` の `Edit` の直後に `Reflection` と `reflect` を足す。
 
 ```moonbit
 ///|
@@ -2273,13 +2273,13 @@ fn safe_edits(before : String, after : String) -> Array[Edit] {
 
 Run:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/diff_wbtest.mbt
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/diff_wbtest.mbt
 ```
 Expected: `Total tests: 7, passed: 7, failed: 0.` EXIT=0（**G5 の累計 32 本**）。
 
 続けて型検査:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core check doc
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core check tree
 ```
 Expected: **`0 errors`** EXIT=0。実測（g5v）ではこの時点で**警告も 0**
 （道具・回復・操作が互いを使い切るため）。他群のファイルが警告を出していても
@@ -2289,9 +2289,9 @@ Expected: **`0 errors`** EXIT=0。実測（g5v）ではこの時点で**警告�
 - [ ] **Step 5: コミット**
 
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc/diff.mbt core/doc/diff_wbtest.mbt
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 反映 v0（全文正規形と自己検査）を置く"
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree/diff.mbt core/tree/diff_wbtest.mbt
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 反映 v0（全文正規形と自己検査）を置く"
 ```
 
 ---
@@ -2299,8 +2299,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 反映 v0�
 ## Task 94: 殺す条件の判定と、docs/ops.md
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/docs/ops.md`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/test/roundtrip.test.ts`（既存。新しい md が
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/docs/ops.md`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/test/roundtrip.test.ts`（既存。新しい md が
   旧 core の往復テストの入力になるので、これが緑であることが受け入れ条件）
 
 **Interfaces:**
@@ -2355,9 +2355,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 反映 v0�
 
 Run:
 ```
-node --test D:/1.atrium/mmm/.worktrees/feat/doc-core/test/roundtrip.test.ts
+node --test D:/1.atrium/mmm/.worktrees/feat/tree-core/test/roundtrip.test.ts
 ```
-（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`。別のワークツリーから叩くと旧 core を測る。
+（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`。別のワークツリーから叩くと旧 core を測る。
 事前に `pnpm run core` が要る）
 Expected: `ℹ fail 0`（この時点では `docs/ops.md` がまだ無いので通る）。
 この結果が**基準線**で、Step 3 の後も同じでなければならない。
@@ -2380,7 +2380,7 @@ Expected: `ℹ fail 0`（この時点では `docs/ops.md` がまだ無いので�
 
 Run:
 ```
-node --test D:/1.atrium/mmm/.worktrees/feat/doc-core/test/roundtrip.test.ts
+node --test D:/1.atrium/mmm/.worktrees/feat/tree-core/test/roundtrip.test.ts
 ```
 Expected: `ℹ fail 0`。ここで落ちたら、その綴りが旧 core の正規形と食い違っている
 （`P1: parse→serialize がバイト同一` が落ちる）。疑う順は
@@ -2496,7 +2496,7 @@ GitHub は見出しからアンカーを生成する。だから見出しのラ�
 
 Run:
 ```
-node --test D:/1.atrium/mmm/.worktrees/feat/doc-core/test/roundtrip.test.ts
+node --test D:/1.atrium/mmm/.worktrees/feat/tree-core/test/roundtrip.test.ts
 ```
 Expected: `ℹ fail 0`（Step 1 の基準線と同じ）。
 落ちたら `docs/ops.md` の綴りが旧 core の正規形と食い違っている。
@@ -2505,33 +2505,33 @@ Expected: `ℹ fail 0`（Step 1 の基準線と同じ）。
 
 続けて群の締め（ここだけ `-p`。契約 §17）:
 ```
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test -p mmm-app/core -p mmm-app/core/doc
-moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt --check doc
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test -p mmm-app/core -p mmm-app/core/tree
+moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt --check tree
 ```
 Expected:
 - `Total tests: 293, passed: 293, failed: 0.`
   （内訳 — 旧 core `mmm-app/core` が **192**（`out/repo.md` の実測）+ 新パッケージ
-  `mmm-app/core/doc` が **101**（G1 25 + G2 23 + G3 21 + G5 32。契約 §16）。
+  `mmm-app/core/tree` が **101**（G1 25 + G2 23 + G3 21 + G5 32。契約 §16）。
   **`Total tests: 0` なら `-p` の綴り間違い**。契約 §17 の罠）
-- `moon fmt --check doc` は EXIT=0（失敗は EXIT=127）。
-  **`doc/js` は対象に入れない** — 裁定 3 の依存順で G5 は G4 より前に走り、
-  `core/doc/js/` はまだ存在しない。`doc doc/js` は G4 Task 71 の持ち物
+- `moon fmt --check tree` は EXIT=0（失敗は EXIT=127）。
+  **`tree/js` は対象に入れない** — 裁定 3 の依存順で G5 は G4 より前に走り、
+  `core/tree/js/` はまだ存在しない。`doc tree/js` は G4 Task 71 の持ち物
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add docs/ops.md
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "docs: 📝 操作の回復・拒否と、殺す条件の判定を書き残す"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add docs/ops.md
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "docs: 📝 操作の回復・拒否と、殺す条件の判定を書き残す"
 ```
 
 ---
 
 ## この群の終わりの形
 
-- `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core check doc` が `0 errors`
-- `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test -p mmm-app/core -p mmm-app/core/doc`
+- `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core check tree` が `0 errors`
+- `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test -p mmm-app/core -p mmm-app/core/tree`
   が `failed: 0`。**G5 が足したのは 32 本**（tool 6 / op 19 / diff 7。契約 §16 と一致）
-- `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt --check doc` が EXIT=0
+- `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt --check tree` が EXIT=0
 - `docs/ops.md` が旧 core の往復テスト（P1: バイト同一）を通っている
 - **殺す条件の判定は合格** — 道具 5 本・腕は最大 3・操作と回復の腕は 0・変換の住所は 1 か所
 - **他群のファイルに 1 バイトも書いていない。** `parse.mbt` / `serialize.mbt` / `json.mbt` /
@@ -2543,7 +2543,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "docs: 📝 操作の�
   **JSON にするのは G4 の `reflect_json`**（契約 §13 の逐語）
 - `pub fn move_nodes` / `pub fn flip_side` / `pub fn delete_nodes` の 3 本と、
   拒否の文言 3 つ（契約 §10 の逐語）
-- `test/docOps.test.ts`（操作の性質のファズ）の設計 — 見る性質は 5 つ:
+- `test/treeOps.test.ts`（操作の性質のファズ）の設計 — 見る性質は 5 つ:
   拒否は無編集 / 適用後も健全 / 当てれば一致 / 反映の先は不動 / 側の反転は対合。
   **書くのは G4 Task 72**（契約 §19 の G4 の表に、delete をノード数で見ることと、
   左の枝が居る文書を飛ばすことの 2 つの直しが入っている）
@@ -2552,6 +2552,6 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "docs: 📝 操作の�
 
 すげ替え v1 / add / rename / fold / setForm / indent / outdent / content 系 /
 convert / format コマンド / UI 接続 / `src/` の書き換え / `reflect_json`（G4）/
-`test/docOps.test.ts`（G4 Task 72）。
+`test/treeOps.test.ts`（G4 Task 72）。
 `amend` はスコープ外の fold・setForm のための住所でもあるが、G5 では `conform` が呼ぶので
 未使用にはならない。

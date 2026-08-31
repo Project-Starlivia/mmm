@@ -12,7 +12,7 @@
 型の異種性は**道具 4 つ（resolve / pluck / graft / amend）に幽閉**し、操作に腕を生やさない。
 正しさは 4 つの法則が持ち、実在コーパスとランダム生成の両方で機械検証する。
 
-**Tech Stack:** MoonBit（新パッケージ `mmm-app/core/doc`。外部依存ゼロ）/
+**Tech Stack:** MoonBit（新パッケージ `mmm-app/core/tree`。外部依存ゼロ）/
 TypeScript（`node --test`。`@lezer/markdown` は法則 4 の外部審判）/ 旧 core とは別パッケージで共存。
 
 **Spec:**
@@ -28,12 +28,12 @@ TypeScript（`node --test`。`@lezer/markdown` は法則 4 の外部審判）/ �
 
 この節の要求は、全タスクの要件に暗黙に含まれる。
 
-- **パッケージ**: `mmm-app/core/doc`（新設）。旧 `mmm-app/core` は 1 バイトも触らない
+- **パッケージ**: `mmm-app/core/tree`（新設）。旧 `mmm-app/core` は 1 バイトも触らない
 - **テスト**: 各タスクは**ファイル指定**で走らせる
-  （`moon -C <repo>/core test doc/<file>_wbtest.mbt`）。群の締めだけ `-p mmm-app/core/doc`。
+  （`moon -C <repo>/core test tree/<file>_wbtest.mbt`）。群の締めだけ `-p mmm-app/core/tree`。
   **`-p` の綴りを間違えると黙って EXIT=0（`Total tests: 0`）**になるので、
   Step 4 の Expected には必ず本数を書く
-- **整形**: `moon -C <repo>/core fmt doc` → `fmt --check doc`。掲載コードは fmt 前の姿なので、
+- **整形**: `moon -C <repo>/core fmt tree` → `fmt --check tree`。掲載コードは fmt 前の姿なので、
   当てた差分ごとコミットする（`fmt --check` の失敗は EXIT=127）
 - **綴りの規律（実測由来）**: `pub type X = Y`（`typealias` は無い）/ 否定は `!x` /
   ラベル付きペイロードの呼び出しは `Image(alt="a")`（`alt~=` は `Error: [3016]`）/

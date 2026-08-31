@@ -41,39 +41,39 @@
 
 | パス | 所有 | 責務 | 他群の権限 |
 |---|---|---|---|
-| `core/doc/moon.pkg` | **G1** | `pkgtype(kind: "library")` の 1 行 | 読み |
-| `core/doc/doc.mbt` | **G1** | 型の定義。木そのもの | 読み（全群が型を使う） |
-| `core/doc/check.mbt` | **G1** | 関係的な不変条件の検査 | 読み（G5 が `is_item` を呼ぶ） |
-| `core/doc/sig.mbt` | **G1** | 指紋。法則 1・2 の比較子 | 読み（全群のテストが `sig` を呼ぶ） |
-| `core/doc/scan.mbt` | **G1** | md → Token の列 | 読み（G2 が `scan` を呼ぶ） |
-| `core/doc/spell.mbt` | **G1** | 正規形の綴り定数 1 か所 + `eol_text` | 読み（G2・G3・G4 が `spell` を読む） |
-| `core/doc/make_wbtest.mbt` | **G1** | 木を手で組む葉の道具 `make_*` 6 本 | **呼ぶ**（G3・G4・G5 のテストが使う）。定義は足さない |
-| `core/doc/sig_wbtest.mbt` | **G1** | 指紋の固定 | — |
-| `core/doc/check_wbtest.mbt` | **G1** | 6 条件の破れ | — |
-| `core/doc/scan_wbtest.mbt` | **G1** | Token の列・方言・封筒・改行の流儀 | — |
-| `core/doc/parse.mbt` | **G2** | Token の列 → Doc | 読み（呼ぶのは `parse` だけ） |
-| `core/doc/parse_wbtest.mbt` | **G2** | 読みの見張り | — |
-| `core/doc/serialize.mbt` | **G3** | Doc → 正規形の md | 読み（`serialize` と `same_side` を呼ぶ） |
-| `core/doc/serialize_wbtest.mbt` | **G3** | 正規形の逐語 | — |
-| `core/doc/tool.mbt` | **G5** | 道具 5 本と `Sub`。型の異種性の牢獄 | — |
-| `core/doc/op.mbt` | **G5** | move / flipSide / delete と回復 | 読み（3 本の操作を呼ぶ） |
-| `core/doc/diff.mbt` | **G5** | `Edit` / `Reflection` / `reflect` / `diff` / `apply` | 読み（G4 が `Reflection` を受ける） |
-| `core/doc/tool_wbtest.mbt` | **G5** | 道具と腕数 | — |
-| `core/doc/op_wbtest.mbt` | **G5** | move 9 組合せ / flipSide / delete / 拒否 | — |
-| `core/doc/diff_wbtest.mbt` | **G5** | diff → apply の往復・自己検査 | — |
+| `core/tree/moon.pkg` | **G1** | `pkgtype(kind: "library")` の 1 行 | 読み |
+| `core/tree/doc.mbt` | **G1** | 型の定義。木そのもの | 読み（全群が型を使う） |
+| `core/tree/check.mbt` | **G1** | 関係的な不変条件の検査 | 読み（G5 が `is_item` を呼ぶ） |
+| `core/tree/sig.mbt` | **G1** | 指紋。法則 1・2 の比較子 | 読み（全群のテストが `sig` を呼ぶ） |
+| `core/tree/scan.mbt` | **G1** | md → Token の列 | 読み（G2 が `scan` を呼ぶ） |
+| `core/tree/spell.mbt` | **G1** | 正規形の綴り定数 1 か所 + `eol_text` | 読み（G2・G3・G4 が `spell` を読む） |
+| `core/tree/make_wbtest.mbt` | **G1** | 木を手で組む葉の道具 `make_*` 6 本 | **呼ぶ**（G3・G4・G5 のテストが使う）。定義は足さない |
+| `core/tree/sig_wbtest.mbt` | **G1** | 指紋の固定 | — |
+| `core/tree/check_wbtest.mbt` | **G1** | 6 条件の破れ | — |
+| `core/tree/scan_wbtest.mbt` | **G1** | Token の列・方言・封筒・改行の流儀 | — |
+| `core/tree/parse.mbt` | **G2** | Token の列 → Doc | 読み（呼ぶのは `parse` だけ） |
+| `core/tree/parse_wbtest.mbt` | **G2** | 読みの見張り | — |
+| `core/tree/serialize.mbt` | **G3** | Doc → 正規形の md | 読み（`serialize` と `same_side` を呼ぶ） |
+| `core/tree/serialize_wbtest.mbt` | **G3** | 正規形の逐語 | — |
+| `core/tree/tool.mbt` | **G5** | 道具 5 本と `Sub`。型の異種性の牢獄 | — |
+| `core/tree/op.mbt` | **G5** | move / flipSide / delete と回復 | 読み（3 本の操作を呼ぶ） |
+| `core/tree/diff.mbt` | **G5** | `Edit` / `Reflection` / `reflect` / `diff` / `apply` | 読み（G4 が `Reflection` を受ける） |
+| `core/tree/tool_wbtest.mbt` | **G5** | 道具と腕数 | — |
+| `core/tree/op_wbtest.mbt` | **G5** | move 9 組合せ / flipSide / delete / 拒否 | — |
+| `core/tree/diff_wbtest.mbt` | **G5** | diff → apply の往復・自己検査 | — |
 | `docs/ops.md` | **G5** | 回復・拒否・爆風半径・腕数の判定 | — |
-| `core/doc/json.mbt` | **G4** | `quote` / `strings` / `hex` / `reflect_json` | — |
-| `core/doc/json_wbtest.mbt` | **G4** | 逃がし規則と境界の JSON | — |
-| `core/doc/project.mbt` | **G4** | Doc → MindmapTree の JSON | — |
-| `core/doc/project_wbtest.mbt` | **G4** | バケツ分け・buried・implied | — |
-| `core/doc/laws_wbtest.mbt` | **G4** | 木の生成器と法則 1 の本丸 | — |
-| `core/doc/js/moon.pkg` | **G4** | `foreign_library` + import 1 本 | — |
-| `core/doc/js/exports.mbt` | **G4** | `#export_name` 7 本 | — |
-| `test/_doc.ts` | **G4** | 新 core の窓口・生成器・コーパス・縮小器 | — |
-| `test/docLaws.test.ts` | **G4** | 法則 1・2・3 | — |
-| `test/docDialect.test.ts` | **G4** | 法則 4（外部審判 + 方言表 + 読みの裁定） | — |
-| `test/docCases.test.ts` | **G4** | カタログ C1〜C17 | — |
-| `test/docOps.test.ts` | **G4** | 操作の性質のファズ（設計は G5 由来） | — |
+| `core/tree/json.mbt` | **G4** | `quote` / `strings` / `hex` / `reflect_json` | — |
+| `core/tree/json_wbtest.mbt` | **G4** | 逃がし規則と境界の JSON | — |
+| `core/tree/project.mbt` | **G4** | Doc → MindmapTree の JSON | — |
+| `core/tree/project_wbtest.mbt` | **G4** | バケツ分け・buried・implied | — |
+| `core/tree/laws_wbtest.mbt` | **G4** | 木の生成器と法則 1 の本丸 | — |
+| `core/tree/js/moon.pkg` | **G4** | `foreign_library` + import 1 本 | — |
+| `core/tree/js/exports.mbt` | **G4** | `#export_name` 7 本 | — |
+| `test/_tree.ts` | **G4** | 新 core の窓口・生成器・コーパス・縮小器 | — |
+| `test/treeLaws.test.ts` | **G4** | 法則 1・2・3 | — |
+| `test/treeDialect.test.ts` | **G4** | 法則 4（外部審判 + 方言表 + 読みの裁定） | — |
+| `test/treeCases.test.ts` | **G4** | カタログ C1〜C17 | — |
+| `test/treeOps.test.ts` | **G4** | 操作の性質のファズ（設計は G5 由来） | — |
 
 ### 変更するファイル（4 本）
 
@@ -94,11 +94,11 @@
 
 | もの | 前版 | 確定版 | 理由 |
 |---|---|---|---|
-| `core/doc/spell.mbt` | G3 | **G1** | G2 Task 22 / 25 が `spell` を読むのに G2 と G3 は並行。G1 が置けば依存が消える（裁定 2）。査読 3 は「G3 据え置き + 依存順を割る」を提案したが、**裁定 2 が G1 を選んだ**ので所有ごと動かす |
+| `core/tree/spell.mbt` | G3 | **G1** | G2 Task 22 / 25 が `spell` を読むのに G2 と G3 は並行。G1 が置けば依存が消える（裁定 2）。査読 3 は「G3 据え置き + 依存順を割る」を提案したが、**裁定 2 が G1 を選んだ**ので所有ごと動かす |
 | `same_side` | G3 と G4 に 1 本ずつ | **G3 の 1 本だけ** | 同じ判定が 2 か所に割れる負債。G4 は `same` を作らず `same_side` を呼ぶ（裁定 2） |
 | `hashes` | G2 と G4 に 1 本ずつ | **G2 の `hashes(level, label) -> String` だけ** | 同一パッケージのトップレベル名は一意（`[4051]`）。7 個以上の `#` の読みは G1 の `head_at` が既に持つので G4 版は不要（裁定 2） |
 | `reflect_json` | G5（diff.mbt） | **G4（json.mbt）** | `reflect_json` は `quote` を呼ぶ。G4 へ移せば G5 が G4 に依存しなくなり、依存順が 1 本道になる（裁定 3） |
-| `test/docOps.test.ts` | G5 | **G4** | `test/` は G4 の所有（裁定 2）。G5 → G4 の順なので、G4 の `_doc.ts` と `exports.mbt` を待つ必要も消える |
+| `test/treeOps.test.ts` | G5 | **G4** | `test/` は G4 の所有（裁定 2）。G5 → G4 の順なので、G4 の `_tree.ts` と `exports.mbt` を待つ必要も消える |
 | `docs/superpowers/specs/2026-08-29-op-cases.md` | 誰も持たない | **G3** | C8 の期待 md の訂正が要る（裁定 1）。G3 Task 46 が唯一の書き手 |
 
 ---
@@ -136,13 +136,13 @@ G1（型・走査・spell・指紋・不変条件）
 - G2: Task 20 → 26 の一直線
 - G3: Task 40 → 46 の一直線（Task 40 は「G1 が置いた `spell.mbt` の値を固定する」だけに変わる）
 - G5: Task 80 → 92 → **94**（旧 Task 93 は G4 Task 72 へ移管）
-- G4: Task 60 → 71 → **72（新設: docOps.test.ts）**
+- G4: Task 60 → 71 → **72（新設: treeOps.test.ts）**
 
 ---
 
 ## §4. 名前の割り当て（パッケージ内で一意）
 
-同一パッケージ `mmm-app/core/doc` のトップレベル名は、`*_wbtest.mbt` を含む**全ファイルで一意**でなければ
+同一パッケージ `mmm-app/core/tree` のトップレベル名は、`*_wbtest.mbt` を含む**全ファイルで一意**でなければ
 ならない（`Error: [4051] The toplevel identifier X is declared twice`）。
 **下の表に無い名前をトップレベルに置いてはならない。** 足したくなったら、まず本書を直す。
 
@@ -196,17 +196,17 @@ G1（型・走査・spell・指紋・不変条件）
 | `json_wbtest.mbt` | ヘルパを持たない（`json_` を予約） |
 | `laws_wbtest.mbt` | `Law` `law_pick` `law_id` `law_head_label` `law_item_label` `law_block` `law_side` `law_skeleton` `law_nodes` `law_node` `law_branches` `law_implicit_root` `law_doc` |
 | `js/exports.mbt`（別パッケージ） | `sig` `format` `check` `project` `move_nodes` `flip_side` `delete_nodes` |
-| `test/_doc.ts` | `Edit` `Reflection` `Card` `MapNode` `MapBranch` `MapTree` `Mindmap` `doc` `mbt` `apply` `cardText` `rng` `randomDoc` `pathological` `shrink` `corpus` `fuzzCases` `brief` |
-| `test/docDialect.test.ts` | `outerSkeletons` `mmmSkeletons` `DIALECT` **`READING`** |
-| `test/docCases.test.ts` | `idOf` |
-| `test/docOps.test.ts` | `idsOf` `holds` |
+| `test/_tree.ts` | `Edit` `Reflection` `Card` `MapNode` `MapBranch` `MapTree` `Mindmap` `doc` `mbt` `apply` `cardText` `rng` `randomDoc` `pathological` `shrink` `corpus` `fuzzCases` `brief` |
+| `test/treeDialect.test.ts` | `outerSkeletons` `mmmSkeletons` `DIALECT` **`READING`** |
+| `test/treeCases.test.ts` | `idOf` |
+| `test/treeOps.test.ts` | `idsOf` `holds` |
 | `package.json` | `fmt:doc` |
 
 - **`same` は作らない。** `map_bucket` は G3 の `same_side` を呼ぶ（§18 R2-12 / R3-10）
 - **`hashes(line, at) -> Int` は作らない。** 7 個以上の `#` は G1 の `head_at`（level に上限なし）が既に読む（§18 R1-02 / R2-03 / R3-01）
 - `project_wbtest.mbt` は新しいヘルパを置かない（木の組み立ては G1 の `make_*`）。
   どうしても要るときの接頭辞は **`proj_`**（`map_` は `project.mbt` が使い切っている）
-- `js/exports.mbt` は別パッケージなので `sig` / `check` / `project` が `core/doc` と同名でも衝突しない
+- `js/exports.mbt` は別パッケージなので `sig` / `check` / `project` が `core/tree` と同名でも衝突しない
 
 ### G5 — `tool.mbt` / `op.mbt` / `diff.mbt`
 
@@ -232,25 +232,25 @@ G1（型・走査・spell・指紋・不変条件）
 
 | # | 出どころ | 申し送り | 取り込んだ場所 |
 |---|---|---|---|
-| S1 | G1 | §12 の表に `core/doc/make_wbtest.mbt`(G1) を足す | §2 の所有表・§13 のテスト表。加えて `make_*` を全群の葉の組み立てに統一（§4） |
+| S1 | G1 | §12 の表に `core/tree/make_wbtest.mbt`(G1) を足す | §2 の所有表・§13 のテスト表。加えて `make_*` を全群の葉の組み立てに統一（§4） |
 | S2 | G2 | `spell.mbt` は G1 が置く | §2（所有 = G1）・§17 G1 Task 10.5 |
 | S3 | G2 | Token の `col` / `hang` / 改行の前提 3 つ | §6「走査の前提」 |
-| S4 | G2 | `moon -C core test doc/<file>_wbtest.mbt` を §10 の表に | §14 のコマンド表 |
+| S4 | G2 | `moon -C core test tree/<file>_wbtest.mbt` を §10 の表に | §14 のコマンド表 |
 | S5 | G3 | モデルの中の改行は常に LF・末尾に改行を含まない（4 か所） | §6「モデルの中の文字列」 |
 | S6 | G3 | `Opaque` / `Svg` / `Code.text` は列 0 基準の逐語 | §6「モデルの中の文字列」 |
 | S7 | G3 | parse は `<summary>` を畳みの飾りとして読み飛ばす | §8（裁定 1 で**位置つきの規則に強化**） |
 | S8 | G3 | カタログ C8 の期待 md が `<summary>` を欠く | §8 の C8 逐語・§2 の所有表（op-cases.md = G3）・§17 G3 Task 46 |
 | S9 | G3 | ファイル指定のテストコマンドを §10 の表に | §14（S4 と同じ結論。2 群から独立に出たので 2 件と数える） |
 | S10 | G3 | 法則 4 は封筒を剥がした後の本文に掛ける | §17 G4 Task 69 |
-| S11 | G4 | §12 に `core/doc/json_wbtest.mbt` を足す | §13 のテスト表 |
-| S12 | G4 | §12 に `core/doc/laws_wbtest.mbt` を足す | §13 のテスト表 |
+| S11 | G4 | §12 に `core/tree/json_wbtest.mbt` を足す | §13 のテスト表 |
+| S12 | G4 | §12 に `core/tree/laws_wbtest.mbt` を足す | §13 のテスト表 |
 | S13 | G4 | `project_wbtest.mbt` の接頭辞を `map_` → `proj_` | §4 の名前表・§13 |
-| S14 | G4 | `test/_doc.ts` に 4 つ（`pathological` / `shrink` / 強化 `randomDoc` / 出力の存在検査） | §11 に 3 つを採る。**「出力の存在検査」は却下** — 静的 import が先に `ERR_MODULE_NOT_FOUND` で落ちるので到達しない（§18 R1-14 / R2-10 / R3-13） |
+| S14 | G4 | `test/_tree.ts` に 4 つ（`pathological` / `shrink` / 強化 `randomDoc` / 出力の存在検査） | §11 に 3 つを採る。**「出力の存在検査」は却下** — 静的 import が先に `ERR_MODULE_NOT_FOUND` で落ちるので到達しない（§18 R1-14 / R2-10 / R3-13） |
 | S15 | G4 | 「反映 v0 は全文正規形」の帰結（C7 の `---`→`***`、C15 の無操作でも綴りは正規形へ寄る） | §12「反映 v0 の帰結」 |
 | S16 | G5 | `kin_at` / `parent_at` を道具に足す | §4 の名前表・§7 の道具層 |
 | S17 | G5 | op.mbt の private ヘルパ 16 本 | §4 の名前表 |
 | S18 | G5 | diff.mbt の private ヘルパ 5 本 | §4 の名前表 |
-| S19 | G5 | `test/docOps.test.ts` を §12 の表に | §13 のテスト表（**所有は G4**。裁定 2） |
+| S19 | G5 | `test/treeOps.test.ts` を §12 の表に | §13 のテスト表（**所有は G4**。裁定 2） |
 | S20 | G5 | `docs/ops.md` を所有ファイルに | §2 の所有表（G5） |
 | S21 | G5 | 腕数の定義と、その定義で測り直した数字 | §7「腕数の定義」（裁定 5） |
 
@@ -258,7 +258,7 @@ G1（型・走査・spell・指紋・不変条件）
 
 ## §6. 型の全文
 
-`core/doc/doc.mbt`（**この逐語で `moon check` 0 errors**。前版から 1 バイトも変えていない）。
+`core/tree/doc.mbt`（**この逐語で `moon check` 0 errors**。前版から 1 バイトも変えていない）。
 
 ```moonbit
 // 型の定義。md が表現できる構造だけを、md の語彙で持つ木。
@@ -367,7 +367,7 @@ pub let first_id : Int = 2
 - **相互再帰は宣言順に関係なく通る**
 - **ラベル付き enum ペイロードの綴り**: 定義と `match` は `~`、**呼び出し側だけ `=`**。
   `Explicit(form=Heading, label="a", folded=false, body=[])` が正。`form~=Heading` は `[3016]`
-- **別パッケージからの列挙子は修飾が要る**（式の位置）: `@doc.Left` / `@doc.Implicit`。
+- **別パッケージからの列挙子は修飾が要る**（式の位置）: `@tree.Left` / `@tree.Implicit`。
   `match` のパターン位置では無修飾で通る
 - 構築子名はパッケージ内で一意。`Form::Item` が居るので、`Token` のリスト項目は **`Bullet`**
 
@@ -498,7 +498,7 @@ D+17:image-folder: imgr(o5:intro)[Rel^1:c(r)[>Neh_1:x(cc2:js1:1)[]]]
 `(cc2:js1:1)`（`js` のコード `1`）`[]` `]` `]`。`imgr` の `r` が eol の印なのは、直前の text が
 長さ前置で終端が確定しているから。
 
-### 実装（`core/doc/sig.mbt`、`moon fmt` 済みの逐語）
+### 実装（`core/tree/sig.mbt`、`moon fmt` 済みの逐語）
 
 ```moonbit
 ///|
@@ -748,7 +748,7 @@ mermaid の `〔畳〕` は c に付いているが、憲法 §4「骨格行は�
 
 ## §10. 公開関数のシグネチャ
 
-`mmm-app/core/doc` が外（= `core/doc/js` と wbtest）へ見せるもの。**これが全部。**
+`mmm-app/core/tree` が外（= `core/tree/js` と wbtest）へ見せるもの。**これが全部。**
 
 ```moonbit
 // --- 走査（G1） -------------------------------------------------------------
@@ -914,7 +914,7 @@ pub fn reflect_json(r : Reflection) -> String
 
 ### 逐語コメント（これを写す。1 文字も変えない）
 
-`core/doc/tool.mbt` のファイル冒頭:
+`core/tree/tool.mbt` のファイル冒頭:
 
 ```moonbit
 // 道具 5 本。型の異種性はここに幽閉する（操作には腕を生やさない）。
@@ -1104,7 +1104,7 @@ CI の合格条件は `0 errors` であって `0 warnings` ではない。
 
 ---
 
-## §12. 正規形の綴り定数（`core/doc/spell.mbt`。所有 = G1）
+## §12. 正規形の綴り定数（`core/tree/spell.mbt`。所有 = G1）
 
 **綴りに関わる値はここ以外に書いてはならない。** `serialize.mbt` に生の `"#"` や `"  "` を書いたら負債。
 
@@ -1192,52 +1192,52 @@ pub fn eol_text(eol : Eol) -> String {
 
 ### `moon.pkg` の逐語（**別名は書かない** — `moon fmt` が最終パスセグメントと同じ別名を剥がす）
 
-`core/doc/moon.pkg`:
+`core/tree/moon.pkg`:
 
 ```
 pkgtype(kind: "library")
 ```
 
-`core/doc/js/moon.pkg`:
+`core/tree/js/moon.pkg`:
 
 ```
 pkgtype(kind: "foreign_library")
 
 import {
-  "mmm-app/core/doc",
+  "mmm-app/core/tree",
 }
 ```
 
-呼び出しは `@doc.parse(md)`。
+呼び出しは `@tree.parse(md)`。
 
-### `#export_name` の一覧（`core/doc/js/exports.mbt`、逐語。7 本）
+### `#export_name` の一覧（`core/tree/js/exports.mbt`、逐語。7 本）
 
 ```moonbit
-// mmm-app/core/doc の薄い JS 層。struct は 1 つも跨がず、出入りは String だけ。
+// mmm-app/core/tree の薄い JS 層。struct は 1 つも跨がず、出入りは String だけ。
 // library パッケージを `moon test` で叩けるように、ここだけ分けてある。
 
 ///|
 #export_name("sig")
 pub fn sig(md : String) -> String {
-  @doc.sig(@doc.parse(md))
+  @tree.sig(@tree.parse(md))
 }
 
 ///|
 #export_name("format")
 pub fn format(md : String) -> String {
-  @doc.serialize(@doc.parse(md))
+  @tree.serialize(@tree.parse(md))
 }
 
 ///|
 #export_name("check")
 pub fn check(md : String) -> String {
-  @doc.strings(@doc.check(@doc.parse(md)))
+  @tree.strings(@tree.check(@tree.parse(md)))
 }
 
 ///|
 #export_name("project")
 pub fn project(md : String) -> String {
-  @doc.project(@doc.parse(md))
+  @tree.project(@tree.parse(md))
 }
 
 ///|
@@ -1249,17 +1249,17 @@ pub fn move_nodes(
   at : Int,
   left : Bool,
 ) -> String {
-  @doc.reflect_json(
-    @doc.reflect(md, fn(d) {
-      @doc.move_nodes(
+  @tree.reflect_json(
+    @tree.reflect(md, fn(d) {
+      @tree.move_nodes(
         d,
         ids,
         parent,
         at,
         if left {
-          @doc.Left
+          @tree.Left
         } else {
-          @doc.Right
+          @tree.Right
         },
       )
     }),
@@ -1269,13 +1269,13 @@ pub fn move_nodes(
 ///|
 #export_name("flipSide")
 pub fn flip_side(md : String, ids : Array[Int]) -> String {
-  @doc.reflect_json(@doc.reflect(md, fn(d) { @doc.flip_side(d, ids) }))
+  @tree.reflect_json(@tree.reflect(md, fn(d) { @tree.flip_side(d, ids) }))
 }
 
 ///|
 #export_name("deleteNodes")
 pub fn delete_nodes(md : String, ids : Array[Int]) -> String {
-  @doc.reflect_json(@doc.reflect(md, fn(d) { @doc.delete_nodes(d, ids) }))
+  @tree.reflect_json(@tree.reflect(md, fn(d) { @tree.delete_nodes(d, ids) }))
 }
 ```
 
@@ -1308,7 +1308,7 @@ export function format(md: MoonBit.String): MoonBit.String;
 export function sig(md: MoonBit.String): MoonBit.String;
 ```
 
-**生成物の置き場所**: `core/_build/js/release/build/doc/js/js.js`
+**生成物の置き場所**: `core/_build/js/release/build/tree/js/js.js`
 （旧 core は `core/_build/js/release/build/js/js.js`。実測で 2 つが同時に建つ）。
 
 ### 反映の JSON（`reflect_json` の出力）
@@ -1324,7 +1324,7 @@ export function sig(md: MoonBit.String): MoonBit.String;
 - `reflect` は `safe_edits` で自己検査（`apply(md, edits) == text`）を済ませている。
   合わなかった場合は全文置換 1 ハンクに落ちている（正しさは保たれ、カーソルだけ跳ぶ）
 
-`reflect_json` の逐語（`core/doc/json.mbt`、G4 所有）:
+`reflect_json` の逐語（`core/tree/json.mbt`、G4 所有）:
 
 ```moonbit
 ///|
@@ -1355,11 +1355,11 @@ pub fn reflect_json(r : Reflection) -> String {
 }
 ```
 
-### TS 側の窓口 — `test/_doc.ts`（全文。**tsc `strict` + `noUnusedLocals` で 0 errors**）
+### TS 側の窓口 — `test/_tree.ts`（全文。**tsc `strict` + `noUnusedLocals` で 0 errors**）
 
 ```typescript
 // 新 core の窓口。JSON の形（フィールド名・並び）を決めるのは
-// core/doc/project.mbt と core/doc/json.mbt で、この `JSON.parse` が唯一の信頼境界。
+// core/tree/project.mbt と core/tree/json.mbt で、この `JSON.parse` が唯一の信頼境界。
 //
 // 重要: 新 core は純関数。モジュールグローバルな状態を持たないので、
 // どのテストも md 文字列から始めてよい（initDoc に当たるものは無い）。
@@ -1368,7 +1368,7 @@ pub fn reflect_json(r : Reflection) -> String {
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import * as mbt from "../core/_build/js/release/build/doc/js/js.js";
+import * as mbt from "../core/_build/js/release/build/tree/js/js.js";
 
 /** 法則 3（map への矢印は project 1 本）を数えるために名前空間ごと出す */
 export { mbt };
@@ -1651,7 +1651,7 @@ setext は読む・`<!---`/`--->` 許容・**`#######`（7 個以上）も見出
 | 9 | **HTML コメント（`<!--` 〜 `-->`）の中の行はすべて Verse。** 中の `#` は見出しにならない | `READING` 表（必須） |
 
 `DIALECT`（骨格の数を lezer と比べる表）は**数しか見ないので、裁定 1・2 のように
-「数は合うが読んだ中身が違う」差を捕まえられない**。だから `test/docDialect.test.ts` に
+「数は合うが読んだ中身が違う」差を捕まえられない**。だから `test/treeDialect.test.ts` に
 **2 つ目の表 `READING`**（md → 指紋）を置く。最低限この 4 行は必須:
 
 ```typescript
@@ -1673,27 +1673,27 @@ const READING: { md: string; sig: string; why: string }[] = [
 
 ## §16. テストファイルの命名と置き場所
 
-### mbt 側（`core/doc/` の中）
+### mbt 側（`core/tree/` の中）
 
 - **ホワイトボックス**: `<機能>_wbtest.mbt`。同じパッケージの private を直接見る。今回の主戦場
 - **ブラックボックス**: 今回は作らない — カタログの固定は TS 側（md in / md out）に置くほうが読みやすい
 
 | ファイル | 群 | 見るもの | 本数 |
 |---|---|---|---|
-| `core/doc/make_wbtest.mbt` | G1 | 木を組む葉の道具 + 組み立ての見張り 1 本 | 1 |
-| `core/doc/scan_wbtest.mbt` | G1 | Token の列（方言・封筒・改行の流儀） | — |
-| `core/doc/check_wbtest.mbt` | G1 | 6 条件それぞれの破れと、健全な木で空になること | — |
-| `core/doc/sig_wbtest.mbt` | G1 | §8 の例 3 つ + 長さ前置の曖昧さの無さ | — |
+| `core/tree/make_wbtest.mbt` | G1 | 木を組む葉の道具 + 組み立ての見張り 1 本 | 1 |
+| `core/tree/scan_wbtest.mbt` | G1 | Token の列（方言・封筒・改行の流儀） | — |
+| `core/tree/check_wbtest.mbt` | G1 | 6 条件それぞれの破れと、健全な木で空になること | — |
+| `core/tree/sig_wbtest.mbt` | G1 | §8 の例 3 つ + 長さ前置の曖昧さの無さ | — |
 | （G1 合計） | | | **25** |
-| `core/doc/parse_wbtest.mbt` | G2 | 骨格の認定・Implicit の導出・側の割り当て・畳み・`<summary>` | **23** |
-| `core/doc/serialize_wbtest.mbt` | G3 | 正規形の綴り 1 つずつ + `spell` の値 | **21** |
-| `core/doc/tool_wbtest.mbt` | G5 | 道具 5 本・graft の変換表・腕数 | 6 |
-| `core/doc/op_wbtest.mbt` | G5 | move 9 組合せ / flipSide / delete / 拒否 | 19 |
-| `core/doc/diff_wbtest.mbt` | G5 | diff → apply の往復・自己検査 | 7 |
+| `core/tree/parse_wbtest.mbt` | G2 | 骨格の認定・Implicit の導出・側の割り当て・畳み・`<summary>` | **23** |
+| `core/tree/serialize_wbtest.mbt` | G3 | 正規形の綴り 1 つずつ + `spell` の値 | **21** |
+| `core/tree/tool_wbtest.mbt` | G5 | 道具 5 本・graft の変換表・腕数 | 6 |
+| `core/tree/op_wbtest.mbt` | G5 | move 9 組合せ / flipSide / delete / 拒否 | 19 |
+| `core/tree/diff_wbtest.mbt` | G5 | diff → apply の往復・自己検査 | 7 |
 | （G5 合計） | | | **32** |
-| `core/doc/json_wbtest.mbt` | G4 | 逃がし規則 + `reflect_json` の逐語 | 5 |
-| `core/doc/project_wbtest.mbt` | G4 | バケツ分け・buried・implied（ヘルパは `proj_`） | 3 |
-| `core/doc/laws_wbtest.mbt` | G4 | 木の生成器と法則 1 の本丸 | 2 |
+| `core/tree/json_wbtest.mbt` | G4 | 逃がし規則 + `reflect_json` の逐語 | 5 |
+| `core/tree/project_wbtest.mbt` | G4 | バケツ分け・buried・implied（ヘルパは `proj_`） | 3 |
+| `core/tree/laws_wbtest.mbt` | G4 | 木の生成器と法則 1 の本丸 | 2 |
 | （G4 mbt 合計） | | | **10** |
 
 **mbt 合計 111 本。**
@@ -1710,16 +1710,16 @@ const READING: { md: string; sig: string; why: string }[] = [
 
 | ファイル | 群 | 見るもの | 本数 |
 |---|---|---|---|
-| `test/_doc.ts` | G4 | 窓口・生成器・コーパス・縮小器（§13 に全文） | — |
-| `test/docLaws.test.ts` | G4 | 法則 1・2・3 | **12** |
-| `test/docDialect.test.ts` | G4 | 法則 4（`DIALECT` + `READING`） | **3** |
-| `test/docCases.test.ts` | G4 | カタログ C1〜C17 | **17** |
-| `test/docOps.test.ts` | G4 | 操作の性質のファズ（設計は G5 由来） | **5** |
+| `test/_tree.ts` | G4 | 窓口・生成器・コーパス・縮小器（§13 に全文） | — |
+| `test/treeLaws.test.ts` | G4 | 法則 1・2・3 | **12** |
+| `test/treeDialect.test.ts` | G4 | 法則 4（`DIALECT` + `READING`） | **3** |
+| `test/treeCases.test.ts` | G4 | カタログ C1〜C17 | **17** |
+| `test/treeOps.test.ts` | G4 | 操作の性質のファズ（設計は G5 由来） | **5** |
 
 **TS 合計 37 本。総計 148 本。**
 
 既存の `test/_helpers.ts` と `test/*.test.ts` は**そのまま残す**（旧 core を守る）。
-`node --test "test/*.test.ts"` の glob が新しい 4 本を自動で拾う。`_doc.ts` は `_` 始まりなので
+`node --test "test/*.test.ts"` の glob が新しい 4 本を自動で拾う。`_tree.ts` は `_` 始まりなので
 glob に当たらない。法則 4 の踏み台は既存 `test/seps.test.ts` の `itemsOf()` がそのまま使える
 （`@lezer/markdown` は devDependencies の 1.7.2。`src/` からは一切使わない）。
 
@@ -1730,16 +1730,16 @@ glob に当たらない。法則 4 の踏み台は既存 `test/seps.test.ts` の
 すべて実測。シェルは PowerShell を既定とする。
 **Run 行は絶対パスで書く**（実行エージェントの cwd はツール呼び出しごとに戻る。
 隣の `D:/1.atrium/mmm` から叩くと旧 core を測ってしまう）。作業場所は
-`D:/1.atrium/mmm/.worktrees/feat/doc-core`（ブランチ `feat/doc-core`）。
+`D:/1.atrium/mmm/.worktrees/feat/tree-core`（ブランチ `feat/tree-core`）。
 
 | 目的 | コマンド | 成功時 | 失敗時の EXIT |
 |---|---|---|---|
-| 型検査（新パッケージだけ） | `moon -C <root>/core check doc` | `Finished. moon: ran N tasks, now up to date (M warnings, 0 errors)` EXIT=0 | **127** |
+| 型検査（新パッケージだけ） | `moon -C <root>/core check tree` | `Finished. moon: ran N tasks, now up to date (M warnings, 0 errors)` EXIT=0 | **127** |
 | 型検査（全体） | `moon -C <root>/core check` | 同上 | 127 |
-| **テスト（ファイル 1 本）** | `moon -C <root>/core test doc/<file>_wbtest.mbt` | `Total tests: N, passed: N, failed: 0.` EXIT=0 | 2（落ちた）/ **127**（綴り間違い） |
-| テスト（群の締め） | `moon -C <root>/core test -p mmm-app/core -p mmm-app/core/doc` | 同上 | **2** / **1**（ビルド不通） |
-| 整形の確認 | `moon -C <root>/core fmt --check doc`（G4 の締めだけ `doc doc/js`） | `Finished. moon: ran N tasks, now up to date` EXIT=0 | **127** |
-| 整形の適用 | `moon -C <root>/core fmt doc` | その場で書き換わる。EXIT=0 | — |
+| **テスト（ファイル 1 本）** | `moon -C <root>/core test tree/<file>_wbtest.mbt` | `Total tests: N, passed: N, failed: 0.` EXIT=0 | 2（落ちた）/ **127**（綴り間違い） |
+| テスト（群の締め） | `moon -C <root>/core test -p mmm-app/core -p mmm-app/core/tree` | 同上 | **2** / **1**（ビルド不通） |
+| 整形の確認 | `moon -C <root>/core fmt --check tree`（G4 の締めだけ `doc tree/js`） | `Finished. moon: ran N tasks, now up to date` EXIT=0 | **127** |
+| 整形の適用 | `moon -C <root>/core fmt tree` | その場で書き換わる。EXIT=0 | — |
 | JS 生成 | `pnpm run core`（= `cd core && moon build --target js --release`） | `Finished.` EXIT=0 | **127** |
 | TS 型検査 | `pnpm run check` | 出力なし EXIT=0 | 1 |
 | TS テスト | `pnpm test`（= `node --test "test/*.test.ts"`） | `ℹ fail 0` EXIT=0 | 1 |
@@ -1747,18 +1747,18 @@ glob に当たらない。法則 4 の踏み台は既存 `test/seps.test.ts` の
 
 **テストの絞り方は 1 通りに固める**（申し送り S4・S9）:
 
-- **各 Task の Step 2 / Step 4 はファイル指定**（`moon -C <root>/core test doc/<file>_wbtest.mbt`）。
+- **各 Task の Step 2 / Step 4 はファイル指定**（`moon -C <root>/core test tree/<file>_wbtest.mbt`）。
   本数が他群と独立して固定でき、綴りを間違えると
   `Error: Failed to canonicalize input filter directory` で **EXIT=127** になり、黙って緑にならない
-- **群の締めだけ `-p`**（`-p mmm-app/core -p mmm-app/core/doc`）。ここでは `Total tests:` が 0 でないことを目で見る
+- **群の締めだけ `-p`**（`-p mmm-app/core -p mmm-app/core/tree`）。ここでは `Total tests:` が 0 でないことを目で見る
 
 ### 罠（全部実測）
 
 - **`-p` を省いた `moon test` は必ず落ちる。** foreign_library の `#export_name` が `[4219]`。EXIT=1
 - **`-p` の綴り間違いは EXIT=0 で緑になる。** `Warning: package ... not found` +
   `Total tests: 0, passed: 0, failed: 0.` → CI は `Total tests: 0` を検知すること
-- **`moon test -p mmm-app/core/doc/js` は不可**（foreign_library はテストの的にならない）。EXIT=1
-- **`moon check` に `-p` は無い**（PATH を取る）。絞るなら `moon -C <root>/core check doc`
+- **`moon test -p mmm-app/core/tree/js` は不可**（foreign_library はテストの的にならない）。EXIT=1
+- **`moon check` に `-p` は無い**（PATH を取る）。絞るなら `moon -C <root>/core check tree`
 - **`moon fmt --check` の失敗は EXIT=127**。`moon fmt` は `moon.pkg` も整形対象
 - **旧 `core/js` を fmt の対象に含めた瞬間に赤になる**。**新パッケージのディレクトリだけを対象にする**
 - `pnpm run core` は型検査の前提。`core/_build` が古いと `pnpm run check` が `TS2339` で落ちる
@@ -1770,15 +1770,15 @@ glob に当たらない。法則 4 の踏み台は既存 `test/seps.test.ts` の
 ### `package.json` の scripts（G4 が書き替える）
 
 ```json
-"test:core": "cd core && moon test -p mmm-app/core -p mmm-app/core/doc",
-"fmt:doc": "cd core && moon fmt --check doc doc/js",
+"test:core": "cd core && moon test -p mmm-app/core -p mmm-app/core/tree",
+"fmt:doc": "cd core && moon fmt --check tree tree/js",
 ```
 
 `pnpm test` の glob（`test/*.test.ts`）は新しいテストファイルを自動で拾うので触らない。
 
 ### git
 
-- ブランチ: `feat/doc-core` / ワークツリー: `.worktrees/feat/doc-core`
+- ブランチ: `feat/tree-core` / ワークツリー: `.worktrees/feat/tree-core`
 - コミット: `<Type>: <Emoji> #<Issue> <Title>`
 - **rebase は使わない。** コンフリクトは対象ブランチへの merge で解く
 - PR は Squash Merge。作業が終わったらブランチとワークツリーを破棄する
@@ -1795,7 +1795,7 @@ glob に当たらない。法則 4 の踏み台は既存 `test/seps.test.ts` の
 | 未定義の型 | `Error: [4032]` / `The type Ints is undefined.` |
 | 型不一致 | `Error: [4014]` / `Expr Type Mismatch` / `has type : Int` / `wanted   : String` |
 | 公開定義が private 型に依存 | `Error: [4046]` / `A public definition cannot depend on private type` |
-| 別パッケージから `pub` 型を構築 | `Error: [4036]` / `Cannot create values of the read-only type: @mmm-app/core/doc.Branch.` |
+| 別パッケージから `pub` 型を構築 | `Error: [4036]` / `Cannot create values of the read-only type: @mmm-app/core/tree.Branch.` |
 | 別パッケージで列挙子を無修飾 | `Error: [4021]` / `The value identifier Left is unbound.` |
 | 不変フィールドへの代入 | `Error: [4087]` / `The record field side is immutable.` |
 | 別パッケージで `pub` の `mut` を書く | `Error: [4094]` / `Cannot modify a read-only field: side` |
@@ -1807,13 +1807,13 @@ glob に当たらない。法則 4 の踏み台は既存 `test/seps.test.ts` の
 | 未読のフィールド | `Warning: [0007]` / `Warning (unused_field): Field 'a' is never read` |
 | 使われない `mut` | `Error: [0015]` / ``Warning (unused_mut): The mutability of field 'n' is never used, try remove `mut`.``（**警告ではなくビルドが止まる**） |
 | `guard` に `else` が無い | `Warning: [0087]` / ``Warning (guard_inexhaustive): ... write `guard!` if the panic is intended.`` |
-| 未使用の import | `Warning: [0029]` / `Warning (unused_package): Unused package 'mmm-app/core/doc'` |
+| 未使用の import | `Warning: [0029]` / `Warning (unused_package): Unused package 'mmm-app/core/tree'` |
 | テスト対象のファイル名の綴り間違い | `Error: Failed to canonicalize input filter directory `doc/nope_wbtest.mbt`` EXIT=127 |
 
 **テスト失敗の逐語**（`assert_eq` の形式。EXIT=2）:
 
 ```
-[mmm-app/core] test doc/scan_wbtest.mbt:44 ("...") failed: doc/scan_wbtest.mbt:46:3-46:40@mmm-app/core FAILED: `"x" != "y"`
+[mmm-app/core] test tree/scan_wbtest.mbt:44 ("...") failed: doc/scan_wbtest.mbt:46:3-46:40@mmm-app/core FAILED: `"x" != "y"`
 diff:
 -"x" +"y"
 Total tests: 14, passed: 13, failed: 1.
@@ -1842,15 +1842,15 @@ Total tests: 14, passed: 13, failed: 1.
 
 | 指摘 | 重み | 直す場所 | 直し方 |
 |---|---|---|---|
-| R1-04 / R2-02 / R3-05 | 重大・致命 | **新設 Task 10.5**（Task 10 と Task 11 の間） | `core/doc/spell.mbt` を **Create**。中身は §12 の逐語（`pub(all) struct Spell` / `pub let spell` / `pub fn eol_text`）。**テストは足さない**（値の固定は G3 Task 40 の 2 本が持つ）。Step 4 Expected: `Total tests: 25, passed: 25, failed: 0.`（Task 3 の +1 を含む）。`moon check` は `0 errors`（読み手がまだ居ないので警告は出うる。**可視性を下げて黙らせない**）。コミット: `feat: ✨ 正規形の綴りを 1 か所に括る` |
+| R1-04 / R2-02 / R3-05 | 重大・致命 | **新設 Task 10.5**（Task 10 と Task 11 の間） | `core/tree/spell.mbt` を **Create**。中身は §12 の逐語（`pub(all) struct Spell` / `pub let spell` / `pub fn eol_text`）。**テストは足さない**（値の固定は G3 Task 40 の 2 本が持つ）。Step 4 Expected: `Total tests: 25, passed: 25, failed: 0.`（Task 3 の +1 を含む）。`moon check` は `0 errors`（読み手がまだ居ないので警告は出うる。**可視性を下げて黙らせない**）。コミット: `feat: ✨ 正規形の綴りを 1 か所に括る` |
 | R1-11 | 軽微 | **Task 3**（check） | 条件 4 の文言を「**Implicit の子に項目は居ない**」に、違反メッセージを **`Implicit の子が項目 (id=7)`** に直す（§7）。テストを 1 本足して意図を固定する — `test "条件 4: Implicit の連鎖は合法（C16）" { let doc = make_doc([make_root(2, make_head("r"), [make_branch(Left, make_node(3, Implicit, [make_node(4, Implicit, [make_node(5, make_head("b"), [])])]))])]); assert_eq(check(doc), []) }`。Task 3 の Expected を 12 → **13**、以降の本数を全部 +1 |
 | R1-12 / R3-16 | 軽微 | **Task 1**（make_wbtest.mbt） | `make_list` → **`make_item`** に改名（型は `Form::Item`。同じものを 2 つの語彙で呼ばない）。役割欄の「**全群が使う**」を「**G1 が置き、G3・G4・G5 のテストが葉の組み立てに使う**」に直す（本書 §4 で事実のほうを揃えたので、この記述は正しくなる） |
 | R1-07 | 重大 | **Task 11 Step 9** | 申し送り 1・2 を削る（本書 §5・§15 が取り込み済み）。代わりに「**§15 の裁定 9 件が本書に載っていることを確認する**」だけを残す。申し送り 3（G2 への引き継ぎ）は本書 §6・§9 に入ったので、こちらも削る |
-| R3-15 | 軽微 | 全 Task の Run 行 | 既に絶対パス。**Step 2 / 4 のテストはファイル指定に揃える**（`moon -C <root>/core test doc/<file>_wbtest.mbt`）。締め（Task 11）だけ `-p` |
+| R3-15 | 軽微 | 全 Task の Run 行 | 既に絶対パス。**Step 2 / 4 のテストはファイル指定に揃える**（`moon -C <root>/core test tree/<file>_wbtest.mbt`）。締め（Task 11）だけ `-p` |
 
-**G1 の終わりの形**: `moon -C <root>/core check doc` が 0 errors /
-`moon -C <root>/core test -p mmm-app/core/doc` が `Total tests: 25, failed: 0` /
-`moon -C <root>/core fmt --check doc` が EXIT=0 / 旧 core の JS が今までどおり建つ。
+**G1 の終わりの形**: `moon -C <root>/core check tree` が 0 errors /
+`moon -C <root>/core test -p mmm-app/core/tree` が `Total tests: 25, failed: 0` /
+`moon -C <root>/core fmt --check tree` が EXIT=0 / 旧 core の JS が今までどおり建つ。
 
 ### G2 — 読み（Task 20〜26）。テスト 22 → **23** 本
 
@@ -1861,7 +1861,7 @@ Total tests: 14, passed: 13, failed: 1.
 | R2-02 / R3-05 | 重大・致命 | **前提 §2** | 「`spell.mbt` が置いてあること」の段落から **⚠ の申し送りを削り**、「**前提: G1 Task 10.5 が済んでいること**」に書き替える |
 | R2-09 | 軽微 | **概要 99 行目** | 「綴りを間違えたときは `Total tests: 0` になる」を差し替える → 「ファイル指定は綴りを間違えると `Error: Failed to canonicalize input filter directory` で **EXIT=127** になり、黙って緑にはならない（`Total tests: 0` で緑になるのは `-p` の綴り間違いだけ。§17 の罠）」 |
 | R2-13 | 軽微 | **Task 22 Step 2** | Expected を差し替える → 「領土の判定がまだ無いので、見出しが項目の子になる。`Total tests: 9, passed: 6, failed: 3.` EXIT=2」（Step 1 はテストしか足さないので `[4021]` は起きない） |
-| R2-15 / R3-15 | 軽微 | 全 Task の Run 行 | `moon -C core ...` を絶対パスへ（`moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/parse_wbtest.mbt`） |
+| R2-15 / R3-15 | 軽微 | 全 Task の Run 行 | `moon -C core ...` を絶対パスへ（`moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/parse_wbtest.mbt`） |
 | R1-02 / R2-03 / R3-01 | 致命 | **Task 22（現状維持）** | `hashes(level : Int, label : String) -> String` は **G2 の所有として本書 §4 に登録済み**。G2 は何も変えない。衝突する G4 側が削除される |
 | S3 | 申し送り | **概要「G1 と共有する前提」** | 本書 §6「走査の前提」に入ったので、計画からは「契約の表に足すこと」の文言だけ削り、表は残してよい |
 
@@ -1871,7 +1871,7 @@ Total tests: 14, passed: 13, failed: 1.
 
 | 指摘 | 重み | 直す場所 | 直し方 |
 |---|---|---|---|
-| R1-04 / R2-02 | 重大 | **Task 40** | Files の **Create を削る**（`core/doc/spell.mbt` は G1 Task 10.5 が置き済み）。Step 3 を「**実装は無い。G1 が置いた `spell.mbt` が §12 の逐語であることを確認し、差分があれば §12 に揃えるよう G1 へ差し戻す**」に書き替える。Step 1 の 2 本のテスト（`spell` の値の固定）は**そのまま残す** — これが `spell` の唯一の見張り |
+| R1-04 / R2-02 | 重大 | **Task 40** | Files の **Create を削る**（`core/tree/spell.mbt` は G1 Task 10.5 が置き済み）。Step 3 を「**実装は無い。G1 が置いた `spell.mbt` が §12 の逐語であることを確認し、差分があれば §12 に揃えるよう G1 へ差し戻す**」に書き替える。Step 1 の 2 本のテスト（`spell` の値の固定）は**そのまま残す** — これが `spell` の唯一の見張り |
 | **裁定 1 / R1-03 / R2-07 / R3-03** | **致命** | **Task 46** | カタログ C8 の**元 md と新 md の両方**を `<summary>` 込みに訂正する（§9 の逐語をそのまま書く）。触るのは `docs/superpowers/specs/2026-08-29-op-cases.md` の C8 だけで、他のケースには 1 バイトも触らない。mermaid の `〔畳〕` は直さない |
 | R2-12 / R3-10 | 軽微・重大 | **概要「新設する名前の一覧」** | `same_side` の説明から「**G5 の flip_side でも要る**」を削り、「**G4 の `project.mbt` のバケツ分けで要る**」に直す（G5 は `flipped` しか使わない） |
 | R1-12 / R3-16 | 軽微 | **Task 41 の wbtest ヘルパ** | `write_of` と `write_slot` を**削除**して `make_doc` / `make_branch` を呼ぶ。`write_tree` / `write_head` / `write_item` / `write_gap` は残すが、中身を `make_*` の合成で書く（生の struct リテラルを書かない） |
@@ -1885,7 +1885,7 @@ Total tests: 14, passed: 13, failed: 1.
 ### G5 — 操作（Task 80〜92 + 94。旧 Task 93 は G4 へ移管）。テスト **32** 本
 
 **着手前に必ずやること（裁定 7）**: `scratchpad/v2/g5v/` に `lock` モジュールを写し、
-`core/doc` へ道具層と `op.mbt` / `diff.mbt` / 各 wbtest を置いて **Task 84〜92 を段階ごとに実走**する。
+`core/tree` へ道具層と `op.mbt` / `diff.mbt` / 各 wbtest を置いて **Task 84〜92 を段階ごとに実走**する。
 `g2.md` の §「実測の裏付け」と同じ形式で、**各 Task の終わりの本数表**と
 **`op_shape` の期待文字列**を実測値に置き換えてから計画を確定させる。
 とくに **Task 89 の move 9 組合せの 9 行**、**Task 87 の conform 4 本**、
@@ -1899,9 +1899,9 @@ Total tests: 14, passed: 13, failed: 1.
 | 裁定 5 / R2-16 / R3-07 | 重大 | **Task 80・83・94** | 腕数の定義と数字は**本書 §11 が正**。Task 94 の「腕数の定義」節は本書 §11 を指すだけにし、判定基準の数字（合格 3 以下・警告 4 腕・死 5 腕）と**逐語コメント 2 か所**（`tool.mbt` の冒頭と `amend` の直前）を §11 からそのまま写す。「契約 §6 の数字を直すこと」の申し送りは削る |
 | R2-14 / R3-11 | 軽微 | **Task 84 と名前の一覧** | `fn ahead(a : Array[Int], b : Array[Int]) -> Bool` を Produces と一覧に足す（op.mbt の private は **16 本**） |
 | R3-12 | 軽微 | **Task 84** | `under(path, top)` の第 2 引数を **`anc`** に、`crown` の `let mut top = true` を **`let mut keep = true`** に改名（`if above.length() < path.length() && under(path, above) { keep = false }` / `if keep && !twice`）。G2 の `fn top(b : Build) -> Frame` を影にしない |
-| R3-14 | 軽微 | **Task 94 Step 4** | `moon ... fmt --check doc` の**ままでよい**。査読は `doc doc/js` を提案したが、裁定 3 の依存順で G5 は G4 より前に走るので `doc/js` はまだ存在しない。`doc doc/js` は **G4 Task 71** が持つ |
+| R3-14 | 軽微 | **Task 94 Step 4** | `moon ... fmt --check tree` の**ままでよい**。査読は `doc tree/js` を提案したが、裁定 3 の依存順で G5 は G4 より前に走るので `tree/js` はまだ存在しない。`doc tree/js` は **G4 Task 71** が持つ |
 | 裁定 1 | 致命の随伴 | **Task 94 Step 3**（`docs/ops.md`） | 「注意: rename はリンクを壊す」の隣に、**§9 の爆風半径の 1 行**（手で書いた `<summary>` は残らない）を節として足す。綴りは `docs/` の制約（`---` と `***` と setext を使わない）に従う |
-| R3-08 / R3-09 | 重大 | **Task 93 → 移管** | Task 93（`test/docOps.test.ts`）は **G4 Task 72 へ移す**。G5 は着手しない。2 件の直しも G4 が入れる |
+| R3-08 / R3-09 | 重大 | **Task 93 → 移管** | Task 93（`test/treeOps.test.ts`）は **G4 Task 72 へ移す**。G5 は着手しない。2 件の直しも G4 が入れる |
 | S16〜S21 | 申し送り | **概要「契約に無く、この群で足すもの」** | **表ごと削る**（6 件とも本書に取り込み済み） |
 
 **受け入れ条件（変えない）**: 操作 3 本と回復 2 本の**容器の腕が 0**。`Sub` を変換する場所が 1 か所。
@@ -1930,25 +1930,25 @@ Total tests: 14, passed: 13, failed: 1.
 
 | 指摘 | 重み | 直す場所 | 直し方 |
 |---|---|---|---|
-| **R1-02 / R2-03 / R3-01** | **致命** | **Task 69 Step 3** | `fn hashes(line : String, at : Int) -> Int` のコードブロックを**丸ごと削除**。本文を差し替える → 「**新しい実装は書かない。** 7 個以上の `#` は G1 の `head_at`（level に上限なし）が、項目の領土内の見出しの Opaque 化は G2 Task 22 が既に担当している。赤が出たらその 2 か所へ差し戻す。この Task で `core/doc/scan.mbt` と `core/doc/parse.mbt` に手を入れてはならない（同名の `hashes` を置くと `[4051]` でビルドが止まる）」。Step 5 のコミット対象を `test/docDialect.test.ts` **だけ**にする |
+| **R1-02 / R2-03 / R3-01** | **致命** | **Task 69 Step 3** | `fn hashes(line : String, at : Int) -> Int` のコードブロックを**丸ごと削除**。本文を差し替える → 「**新しい実装は書かない。** 7 個以上の `#` は G1 の `head_at`（level に上限なし）が、項目の領土内の見出しの Opaque 化は G2 Task 22 が既に担当している。赤が出たらその 2 か所へ差し戻す。この Task で `core/tree/scan.mbt` と `core/tree/parse.mbt` に手を入れてはならない（同名の `hashes` を置くと `[4051]` でビルドが止まる）」。Step 5 のコミット対象を `test/treeDialect.test.ts` **だけ**にする |
 | **R1-03 / R2-07 / R3-03** | **致命** | **Task 70（C8）** | 2 つの md を §9 の逐語に揃える。`const md = "# r\n\n## a\n\n### b\n\n<details>\n\n<summary>b</summary>\n\n#### c\n\n</details>\n";` / `const after = "# r\n\n## a\n\n<details>\n\n<summary>a</summary>\n\n### b\n\n<details>\n\n<summary>b</summary>\n\n#### c\n\n</details>\n\n</details>\n";`。**指紋の期待値はそのまま**。冒頭「カタログを読むときの注意」に 1 行足す → 「**C8 の md は `<summary>` 行を含む形が正**（G3 Task 46 が op-cases.md を先に直す）」 |
 | **R1-05 / R2-06** | **重大** | **Task 67 Step 3** | `fn spellable(kin, at)` と「`write_node` の Implicit の腕を 2 択にする」を**削除**。差し戻しの指定に差し替え、1 行足す → 「**飛びが表現できない位置の implied は G5 Task 87 の `conform`（`raised(s, true)`）が操作の側で潰している。** ここで serialize に安全弁を二重に置かない。serialize が model と違うものを書いたら**法則 1 が定義ごと壊れる**。それでも法則 1 が落ちるなら、落ちた木が `check` を通っているかを先に見る」 |
-| **R1-06 / R2-04 / R2-05 / R3-04** | **重大・致命** | **Task 66 / 68 / 69 / 70 の Step 3** | `gap` / `trim_tail` / `spellable` / `fold_owner` / `hashes` / `close_items` の **6 つのコードブロックを全部削除**。上の差し戻し表に置き換える。とくに: `trim_tail` は不要（`put` が各行に eol を 1 つ付けるので出力は必ず改行 1 本で終わる）／`gap` は G3 の受け入れ条件（空行の判断は `put` 1 本）を正面から破る／`sb` と `nl` は G3 のスコープに存在しない（`pen.sb` / `pen.eol`）／`fold_owner` の `open[...] + depth * 0` は無意味／`close_items(stack : Array[Int], ...)` は G2 の `Array[Frame]` と型が合わない。**Step 5 のコミット対象から `core/doc/serialize.mbt` / `parse.mbt` / `scan.mbt` を全部外す**（Task 66 は `test/docLaws.test.ts` のみ、Task 68 は `core/doc/laws_wbtest.mbt` のみ、Task 69 は `test/docDialect.test.ts` のみ、Task 70 は `test/docCases.test.ts` のみ） |
-| **R1-07** | **重大** | **Task 69** | `DIALECT`（骨格の数）に加えて **2 つ目の表 `READING`**（md → 指紋）を置く。§15 の 4 行は必須。残る 5 件は `scan_wbtest.mbt` で固定済みである旨を `why` に併記する。docDialect の本数を 2 → **3** に直す。あわせて**法則 4 は封筒を剥がした後の本文に掛ける**（申し送り S10。封筒は lezer では `HorizontalRule` + `SetextHeading2` に読まれる） |
+| **R1-06 / R2-04 / R2-05 / R3-04** | **重大・致命** | **Task 66 / 68 / 69 / 70 の Step 3** | `gap` / `trim_tail` / `spellable` / `fold_owner` / `hashes` / `close_items` の **6 つのコードブロックを全部削除**。上の差し戻し表に置き換える。とくに: `trim_tail` は不要（`put` が各行に eol を 1 つ付けるので出力は必ず改行 1 本で終わる）／`gap` は G3 の受け入れ条件（空行の判断は `put` 1 本）を正面から破る／`sb` と `nl` は G3 のスコープに存在しない（`pen.sb` / `pen.eol`）／`fold_owner` の `open[...] + depth * 0` は無意味／`close_items(stack : Array[Int], ...)` は G2 の `Array[Frame]` と型が合わない。**Step 5 のコミット対象から `core/tree/serialize.mbt` / `parse.mbt` / `scan.mbt` を全部外す**（Task 66 は `test/treeLaws.test.ts` のみ、Task 68 は `core/tree/laws_wbtest.mbt` のみ、Task 69 は `test/treeDialect.test.ts` のみ、Task 70 は `test/treeCases.test.ts` のみ） |
+| **R1-07** | **重大** | **Task 69** | `DIALECT`（骨格の数）に加えて **2 つ目の表 `READING`**（md → 指紋）を置く。§15 の 4 行は必須。残る 5 件は `scan_wbtest.mbt` で固定済みである旨を `why` に併記する。treeDialect の本数を 2 → **3** に直す。あわせて**法則 4 は封筒を剥がした後の本文に掛ける**（申し送り S10。封筒は lezer では `HorizontalRule` + `SetextHeading2` に読まれる） |
 | **裁定 3** | **致命の随伴** | **Task 60（json.mbt）** | `reflect_json(r : Reflection) -> String` を **G4 が実装する**（§13 の逐語）。`json_wbtest.mbt` に 1 本足す — `test "reflect_json は境界の形をちょうど 1 つ吐く" { assert_eq(reflect_json({ ok: false, reason: "見つからない (id=7)", text: "#  r  \n\n## a\n", edits: [] }), "{\"ok\":false,\"reason\":\"見つからない (id=7)\",\"text\":\"#  r  \\n\\n## a\\n\",\"edits\":[]}") }`。json_wbtest 4 → **5** |
-| **裁定 3** | **致命の随伴** | **Task 62（exports.mbt）** | 3 本の操作を `@doc.reflect_json(@doc.reflect(md, fn(d) { … }))` の形にする（§13 の逐語） |
+| **裁定 3** | **致命の随伴** | **Task 62（exports.mbt）** | 3 本の操作を `@tree.reflect_json(@tree.reflect(md, fn(d) { … }))` の形にする（§13 の逐語） |
 | R2-12 / R3-10 | 重大 | **Task 61 Step 3** | `fn same(a : Side, b : Side) -> Bool` を**削除**し、`map_bucket` の中を `if same_side(b.side, side) {` に変える。Interfaces の Produces から `same` を外し、Consumes に `same_side`（G3 `serialize.mbt`）を足す。§新設する名前の一覧からも `same` を削る |
-| R1-13 | 軽微 | **Task 63 / Task 66** | (1) `test/_doc.ts` の `Edit` / `Reflection` / `Card` / `MapNode` / `MapBranch` / `MapTree` / `Mindmap` を全フィールド **`readonly`**、配列を `readonly T[]` にする（法則 3 と「MindmapTree は変異させない」を型で見張る。実行時コストはゼロ）。`export { mbt }` を足す。(2) `test/docLaws.test.ts` に 1 本足す — `test("法則 3: 境界から木の形で出る口は project だけ", () => { assert.deepEqual(Object.keys(mbt).sort(), ["check","deleteNodes","flipSide","format","moveNodes","project","sig"]) })`。docLaws 11 → **12** |
+| R1-13 | 軽微 | **Task 63 / Task 66** | (1) `test/_tree.ts` の `Edit` / `Reflection` / `Card` / `MapNode` / `MapBranch` / `MapTree` / `Mindmap` を全フィールド **`readonly`**、配列を `readonly T[]` にする（法則 3 と「MindmapTree は変異させない」を型で見張る。実行時コストはゼロ）。`export { mbt }` を足す。(2) `test/treeLaws.test.ts` に 1 本足す — `test("法則 3: 境界から木の形で出る口は project だけ", () => { assert.deepEqual(Object.keys(mbt).sort(), ["check","deleteNodes","flipSide","format","moveNodes","project","sig"]) })`。treeLaws 11 → **12** |
 | R1-14 / R2-10 / R3-13 | 軽微 | **Task 63 Step 3** | `existsSync` / `dirname` / `fileURLToPath` の import、`CORE_JS` の宣言、`if (!existsSync(CORE_JS)) { throw ... }` を**全部削除**し、import 行の上にコメント 1 行を置く → `// 出力が無いと ERR_MODULE_NOT_FOUND で落ちる。先に \`pnpm run core\` を実行すること。`（静的 import が先に評価されるのでガードには到達しない）。`readdirSync, readFileSync, statSync` の import は残す。**申し送り S14 の「出力の存在検査」は却下**なので、その 1 件を申し送りから落とす |
 | R2-11 | 軽微 | **Task 71 Step 1**（ci.yml） | 代入で失敗を握り潰さない形に直す（`bash -e` は `out=$(...)` が非ゼロで終わった瞬間にステップを打ち切り、`echo "$out"` に到達しない）:<br>`set +e` / `out=$(pnpm run test:core 2>&1)` / `status=$?` / `set -e` / `echo "$out"` / `if [ $status -ne 0 ]; then exit $status; fi` / `if echo "$out" \| grep -q "Total tests: 0,"; then echo "テストが 1 本も走っていない（-p の綴りを疑う）"; exit 1; fi` |
 | R3-17 | 軽微 | **Task 64**（pathological） | `["NUL", "# a\n\n \n"]` を `["空白だけの行", "# a\n\n \n"]` に改名し、**本当に NUL を含む行**を 1 本足す（`["NUL", "# a\n\n\u0000\n"]`）。下限は 28 → **29** |
-| R2-15 / R3-15 | 軽微 | 全 Task の Run 行 | `moon -C core ...` / `pnpm ...` を絶対パスに揃え、`pnpm` を使う Step には「（cwd = `D:/1.atrium/mmm/.worktrees/feat/doc-core`。別のワークツリーから叩くと旧 core を測る）」の 1 行を足す |
+| R2-15 / R3-15 | 軽微 | 全 Task の Run 行 | `moon -C core ...` / `pnpm ...` を絶対パスに揃え、`pnpm` を使う Step には「（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`。別のワークツリーから叩くと旧 core を測る）」の 1 行を足す |
 | S11・S12・S13・S14・S15 | 申し送り | **概要「契約に足すこと（5 件）」** | **節ごと削る**（本書 §13・§16 に取り込み済み。S14 の 4 件目だけは却下） |
-| **R3-08 / R3-09** | **重大** | **新設 Task 72**（`test/docOps.test.ts`、G5 Task 93 から移管） | g5.md Task 93 の逐語をそのまま持ってきて、**2 か所だけ直す**。(1) delete のテストは id の同一性ではなく**ノード数**で見る（parse は `first_id` から振り直すので、消した id を次のノードが名乗る）:<br>`const before = idsOf(doc.project(md)).length;` / `const r = doc.deleteNodes(md, [victim]);` / `holds(md, r, "delete");` / `if (r.ok) { assert.ok(idsOf(doc.project(r.text)).length < before, \`delete でノードが減っていない: ${brief(md)}\`); }`<br>(2) 「無操作は無編集」のテストは**左の枝が居る文書を飛ばす** — `if (root.right.length === 0) continue;` の直後に `if (root.left.length > 0) continue; // at は branches の index。バケツの index ではない` を足す。docOps は **5** 本 |
+| **R3-08 / R3-09** | **重大** | **新設 Task 72**（`test/treeOps.test.ts`、G5 Task 93 から移管） | g5.md Task 93 の逐語をそのまま持ってきて、**2 か所だけ直す**。(1) delete のテストは id の同一性ではなく**ノード数**で見る（parse は `first_id` から振り直すので、消した id を次のノードが名乗る）:<br>`const before = idsOf(doc.project(md)).length;` / `const r = doc.deleteNodes(md, [victim]);` / `holds(md, r, "delete");` / `if (r.ok) { assert.ok(idsOf(doc.project(r.text)).length < before, \`delete でノードが減っていない: ${brief(md)}\`); }`<br>(2) 「無操作は無編集」のテストは**左の枝が居る文書を飛ばす** — `if (root.right.length === 0) continue;` の直後に `if (root.left.length > 0) continue; // at は branches の index。バケツの index ではない` を足す。treeOps は **5** 本 |
 
 **G4 の終わりの形**: `pnpm run core` / `pnpm run check` / `pnpm run test:core`
 （`Total tests: 111` 以上・`Total tests: 0` でない）/ `pnpm test`（`ℹ fail 0`）/
-`moon -C <root>/core fmt --check doc doc/js` が EXIT=0 / CI が新パッケージを乗せている。
+`moon -C <root>/core fmt --check tree tree/js` が EXIT=0 / CI が新パッケージを乗せている。
 
 ---
 
@@ -2002,7 +2002,7 @@ Total tests: 14, passed: 13, failed: 1.
 | R3-11 | 軽微 | `ahead`（R2-14 と同一） | §4 | G5 Task 84 |
 | R3-12 | 軽微 | `under` / `top` の名前の影 | §4 | G5 Task 84 |
 | R3-13 | 軽微 | `existsSync`（R1-14 と同一） | §13 | G4 Task 63 |
-| R3-14 | 軽微 | `fmt --check doc doc/js` | §17 — **裁定 3 で前提が消えた**（G5 は `doc` のまま、`doc doc/js` は G4 の締め） | G5 Task 94 / G4 Task 71 |
+| R3-14 | 軽微 | `fmt --check tree tree/js` | §17 — **裁定 3 で前提が消えた**（G5 は `doc` のまま、`doc tree/js` は G4 の締め） | G5 Task 94 / G4 Task 71 |
 | R3-15 | 軽微 | コマンドの綴りが 3 通り | §17 | 全群 |
 | R3-16 | 軽微 | `make_*`「全群が使う」は嘘 | §4（**事実のほうを揃えた**） | G1 Task 1 / G3 / G4 / G5 |
 | R3-17 | 軽微 | `pathological` の NUL が NUL でない | §13 | G4 Task 64 |
@@ -2013,7 +2013,7 @@ Total tests: 14, passed: 13, failed: 1.
 |---|---|---|
 | R3-05 | `spell.mbt` は G3 のまま。依存順を `G1 → G3 Task 40 → (G2 / G3 / G5) → G4` に割る | **裁定 2** がファイル所有権の厳守を求めており、`spell.mbt` は G1 が Task で作ると定めた。依存順を群の内部タスクの粒度で割ると、5 群の並行の単位が崩れる |
 | R1-11 | 違反メッセージ `Implicit の子が見出しでない (id=7)` は据え置き | 据え置きの理由（G1 のテストが逐語で固定している）は **G1 が未着手である以上成立しない**。破れの実体は「子が項目」なので、文言もメッセージも実体に揃える（§7） |
-| S14 の 4 件目 | `test/_doc.ts` に「出力の存在検査」を足す | R1-14 / R2-10 / R3-13 のとおり、静的 import が先に `ERR_MODULE_NOT_FOUND` で落ちるのでガードに到達しない。**動かないコードは負債**なので、素直にエラーを読ませる |
+| S14 の 4 件目 | `test/_tree.ts` に「出力の存在検査」を足す | R1-14 / R2-10 / R3-13 のとおり、静的 import が先に `ERR_MODULE_NOT_FOUND` で落ちるのでガードに到達しない。**動かないコードは負債**なので、素直にエラーを読ませる |
 
 ---
 

@@ -8,18 +8,18 @@
 
 ### 担当範囲
 
-契約 §19 の G1。新パッケージ `mmm-app/core/doc` を建て、**型・指紋・不変条件・行の走査・正規形の綴り**の
+契約 §19 の G1。新パッケージ `mmm-app/core/tree` を建て、**型・指紋・不変条件・行の走査・正規形の綴り**の
 5 つを置く。
 意味の判断（骨格の認定・Implicit の導出・側の割り当て）は 1 つも書かない — それは G2 の仕事。
 
 | 作るもの | ファイル | 契約 |
 |---|---|---|
-| パッケージと型の全文 | `core/doc/moon.pkg` / `core/doc/doc.mbt` | §13（moon.pkg の逐語）/ §6（型の全文） |
-| 手で木を組むテスト用ヘルパ | `core/doc/make_wbtest.mbt` | §2（所有）/ §4（名前）/ §16（テスト表） |
-| 指紋 sig | `core/doc/sig.mbt` / `core/doc/sig_wbtest.mbt` | §8 |
-| 不変条件 check | `core/doc/check.mbt` / `core/doc/check_wbtest.mbt` | §7 |
-| 行の走査 scan | `core/doc/scan.mbt` / `core/doc/scan_wbtest.mbt` | §6（走査の前提）/ §10（Token の全文） |
-| 正規形の綴り spell | `core/doc/spell.mbt` | §12 |
+| パッケージと型の全文 | `core/tree/moon.pkg` / `core/tree/doc.mbt` | §13（moon.pkg の逐語）/ §6（型の全文） |
+| 手で木を組むテスト用ヘルパ | `core/tree/make_wbtest.mbt` | §2（所有）/ §4（名前）/ §16（テスト表） |
+| 指紋 sig | `core/tree/sig.mbt` / `core/tree/sig_wbtest.mbt` | §8 |
+| 不変条件 check | `core/tree/check.mbt` / `core/tree/check_wbtest.mbt` | §7 |
+| 行の走査 scan | `core/tree/scan.mbt` / `core/tree/scan_wbtest.mbt` | §6（走査の前提）/ §10（Token の全文） |
+| 正規形の綴り spell | `core/tree/spell.mbt` | §12 |
 
 `spell.mbt` は前版で所有が G3 と二重になっていた（査読 R1-04 / R2-02 / R3-05）。
 契約 §2 が **G1 の所有**と定めたので、この群が Task 10.5 で置く。値の見張り（テスト 2 本）は
@@ -27,10 +27,10 @@ G3 Task 40 が持つ — **G1 はテストを足さない**（契約 §19 G1）�
 
 ### 前提
 
-- 作業ディレクトリ: `D:/1.atrium/mmm/.worktrees/feat/doc-core`（ブランチ `feat/doc-core`）。
+- 作業ディレクトリ: `D:/1.atrium/mmm/.worktrees/feat/tree-core`（ブランチ `feat/tree-core`）。
   ワークツリーが無ければ先に切る（CLAUDE.md の Branch・Worktree 規約）
 - **既存ファイルは 1 行も触らない。** `package.json` の scripts と `.github/workflows/ci.yml` と
-  `test/tsconfig.json` は G4 が触る（契約 §2）。G1 は `core/doc/` に足すだけ
+  `test/tsconfig.json` は G4 が触る（契約 §2）。G1 は `core/tree/` に足すだけ
 - 旧 core（`mmm-app/core` と `mmm-app/core/js`）は同じディレクトリツリーに同居する。
   `moon.mod` にも上位の `moon.pkg` にも登録は要らない（契約 §2）
 - ツールチェイン: `moon 0.1.20260803` / `moonc v0.10.6+80dc50f24`
@@ -117,24 +117,24 @@ Step 2 / Step 4 は**ファイル指定**で走らせる（契約 §17）ので�
 ### コマンド（契約 §17。すべて実測済み）
 
 ```
-型検査   moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core check doc
-テスト   moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/<file>_wbtest.mbt
-締め     moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test -p mmm-app/core -p mmm-app/core/doc
-整形確認 moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt --check doc
-整形適用 moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc
+型検査   moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core check tree
+テスト   moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/<file>_wbtest.mbt
+締め     moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test -p mmm-app/core -p mmm-app/core/tree
+整形確認 moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt --check tree
+整形適用 moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree
 ```
 
 - **Step 2 / Step 4 はファイル指定**（本数が他群と独立して固定できる）。綴りを間違えると
   `Error: Failed to canonicalize input filter directory` で **EXIT=127** になり、黙って緑にならない
 - **`-p` を使うのは締め（Task 11）と Task 10.5 だけ。** `-p` の綴りを間違えると
   `Total tests: 0` のまま **EXIT=0 で緑になる**（契約 §17 の罠）ので、`Total tests:` の数を目で見る
-- **`moon check` に `-p` は無い**。絞るなら `moon -C <root>/core check doc`
+- **`moon check` に `-p` は無い**。絞るなら `moon -C <root>/core check tree`
 - `moon fmt --check` の失敗は EXIT=127（PowerShell 経由では -1 と出る）
 - `moon fmt` の対象は **`doc` だけ**。既存の `js` を巻き込んだ瞬間に赤になる（契約 §17）。
-  `doc doc/js` は G4 の締めが持つ
+  `doc tree/js` は G4 の締めが持つ
 - テスト失敗の逐語（契約 §18）:
   ```
-  [mmm-app/core] test doc/scan_wbtest.mbt:44 ("...") failed: doc/scan_wbtest.mbt:46:3-46:40@mmm-app/core FAILED: `"x" != "y"`
+  [mmm-app/core] test tree/scan_wbtest.mbt:44 ("...") failed: doc/scan_wbtest.mbt:46:3-46:40@mmm-app/core FAILED: `"x" != "y"`
   diff:
   -"x" +"y"
   Total tests: 14, passed: 13, failed: 1.
@@ -169,14 +169,14 @@ CLAUDE.md の規約 `<Type>: <Emoji> #<Issue Number> <Title>`。Issue 番号が�
 ## Task 1: パッケージの新設と型の全文
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/moon.pkg`
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/doc.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/make_wbtest.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/moon.pkg`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/doc.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/make_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: なし（この群の起点）
 - Produces:
-  - パッケージ `mmm-app/core/doc`
+  - パッケージ `mmm-app/core/tree`
   - `pub(all) struct Doc { frontmatter : String?; eol : Eol; body : Array[Block]; roots : Array[Root] }`
   - `pub(all) struct Root { id : Int; skeleton : Skeleton; branches : Array[Branch] }`
   - `pub(all) struct Branch { side : Side; node : Node }`
@@ -195,13 +195,13 @@ CLAUDE.md の規約 `<Type>: <Emoji> #<Issue Number> <Title>`。Issue 番号が�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/moon.pkg` を作る（**別名は書かない** — `moon fmt` が剥がす。契約 §13）:
+`core/tree/moon.pkg` を作る（**別名は書かない** — `moon fmt` が剥がす。契約 §13）:
 
 ```
 pkgtype(kind: "library")
 ```
 
-`core/doc/make_wbtest.mbt`:
+`core/tree/make_wbtest.mbt`:
 
 ```moonbit
 // 手で木を組む道具。テストの本文が「何を守っているか」だけになるように、
@@ -278,14 +278,14 @@ test "型の全構成要素が 1 本の木として組める" {
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/make_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/make_wbtest.mbt`
 
 Expected: `Error: [4032]` / `The type Doc is undefined.`（`Root` `Branch` `Node` `Skeleton` `Side` `Eol` も同じ）
 + `Error: [4021]` / `The value identifier doc_id is unbound.`。EXIT=1
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/doc.mbt`（契約 §6 の逐語。1 バイトも変えない）:
+`core/tree/doc.mbt`（契約 §6 の逐語。1 バイトも変えない）:
 
 ```moonbit
 // 型の定義。md が表現できる構造だけを、md の語彙で持つ木。
@@ -384,15 +384,15 @@ pub let first_id : Int = 2
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/make_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/make_wbtest.mbt`
 
 Expected: `Total tests: 1, passed: 1, failed: 0.` EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 新 core のパッケージと型を置く"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 新 core のパッケージと型を置く"
 ```
 
 ---
@@ -400,8 +400,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 新 core �
 ## Task 2: 指紋 sig
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/sig.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/sig_wbtest.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/sig.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/sig_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Doc` `Root` `Branch` `Node` `Skeleton` `Form` `Side` `Eol` `Block` `Content`（Task 1）/
@@ -410,7 +410,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 新 core �
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/sig_wbtest.mbt`:
+`core/tree/sig_wbtest.mbt`:
 
 ```moonbit
 // 指紋。法則 1・2 の唯一の比較子なので、綴りを 1 文字も動かさないよう固定する。
@@ -484,13 +484,13 @@ test "長さ前置なので、区切り文字が中身に混ざっても曖昧�
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/sig_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/sig_wbtest.mbt`
 
 Expected: `Error: [4021]` / `The value identifier sig is unbound.` EXIT=1
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/sig.mbt`（契約 §8 の逐語）:
+`core/tree/sig.mbt`（契約 §8 の逐語）:
 
 ```moonbit
 // 指紋 — id を含まない木の綴り。法則 1・2 の唯一の比較子。
@@ -624,15 +624,15 @@ fn sig_text(sb : StringBuilder, s : String) -> Unit {
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/sig_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/sig_wbtest.mbt`
 
 Expected: `Total tests: 4, passed: 4, failed: 0.` EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 木の指紋を置く（法則 1・2 の比較子）"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 木の指紋を置く（法則 1・2 の比較子）"
 ```
 
 ---
@@ -640,8 +640,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 木の指�
 ## Task 3: 不変条件 check
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/check.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/check_wbtest.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/check.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/check_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Doc` `Root` `Branch` `Node` `Skeleton` `Form` `doc_id`（Task 1）/ `make_*`（Task 1）
@@ -649,7 +649,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 木の指�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/check_wbtest.mbt`:
+`core/tree/check_wbtest.mbt`:
 
 ```moonbit
 // 6 つの関係的な不変条件。破れは全部集まり、健全な木では空になる。
@@ -772,13 +772,13 @@ test "条件 6: 項目の子孫はすべて項目" {
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/check_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/check_wbtest.mbt`
 
 Expected: `Error: [4021]` / `The value identifier check is unbound.` EXIT=1
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/check.mbt`:
+`core/tree/check.mbt`:
 
 ```moonbit
 // 型で殺せなかった関係的な不変条件だけの検査。破れを全部集めて返す（空 = 健全）。
@@ -900,15 +900,15 @@ fn fault(what : String, id : Int) -> String {
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/check_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/check_wbtest.mbt`
 
 Expected: `Total tests: 8, passed: 8, failed: 0.` EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 型で殺せない不変条件 6 つの検査を置く"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 型で殺せない不変条件 6 つの検査を置く"
 ```
 
 ---
@@ -916,8 +916,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 型で殺�
 ## Task 4: 走査の骨 — 行・列・改行の流儀
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan_wbtest.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Eol`（Task 1）
@@ -932,7 +932,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 型で殺�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/scan_wbtest.mbt`:
+`core/tree/scan_wbtest.mbt`:
 
 ```moonbit
 // 行の走査。読める綴りの全部と、方言の 1 つずつ。
@@ -1004,14 +1004,14 @@ test "行頭の空白は列として測り、Token の中身からは落ちる�
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `Error: [4032]` / `The type Token is undefined.` +
 `Error: [4021]` / `The value identifier scan is unbound.` EXIT=1
 
 - [ ] **Step 3: 最小の実装を書く**
 
-`core/doc/scan.mbt`:
+`core/tree/scan.mbt`:
 
 ```moonbit
 // md → Token の列。封筒を剥がし、改行の流儀を測り、行を綴りの語彙へ落とす。
@@ -1126,7 +1126,7 @@ fn cut(text : String, a : Int, b : Int) -> String {
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `Total tests: 2, passed: 2, failed: 0.` EXIT=0
 + `Warning: [0007]` / `Warning (unused_field): Field 'start' is never read`（Task 8 まで出る。消さない）
@@ -1134,8 +1134,8 @@ Expected: `Total tests: 2, passed: 2, failed: 0.` EXIT=0
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 行の走査の骨（行・列・改行の流儀）を置く"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 行の走査の骨（行・列・改行の流儀）を置く"
 ```
 
 ---
@@ -1143,8 +1143,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 行の走�
 ## Task 5: 見出し
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Row` `Token` `cut`（Task 4）
@@ -1155,7 +1155,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 行の走�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/scan_wbtest.mbt` の末尾に足す:
+`core/tree/scan_wbtest.mbt` の末尾に足す:
 
 ```moonbit
 
@@ -1179,7 +1179,7 @@ G4 は同じ判定を作らない（契約 §4）。
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `FAILED: `"V0,# r;_;V0,## a" != "H0,1,r;_;H0,2,a"`` +
 `Total tests: 3, passed: 2, failed: 1.` EXIT=2
@@ -1278,15 +1278,15 @@ fn is_blank(c : Int) -> Bool {
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `Total tests: 3, passed: 3, failed: 0.` EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 見出しを読む（level 無制限・閉じの # は飾り）"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 見出しを読む（level 無制限・閉じの # は飾り）"
 ```
 
 ---
@@ -1294,8 +1294,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 見出し�
 ## Task 6: 水平線と setext
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Row` `Token` `trim_end` `is_blank`（Task 4・5）
@@ -1307,7 +1307,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 見出し�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/scan_wbtest.mbt` の末尾に足す:
+`core/tree/scan_wbtest.mbt` の末尾に足す:
 
 ```moonbit
 
@@ -1340,7 +1340,7 @@ test "setext は読む。段落が複数行なら最後の 1 行だけが見出�
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `FAILED: `"V0,---" != "-0"`` + `Total tests: 5, passed: 3, failed: 2.` EXIT=2
 
@@ -1448,15 +1448,15 @@ fn bar_at(text : String, r : Row) -> Bool? {
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `Total tests: 5, passed: 5, failed: 0.` EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 水平線と setext を読む（`- - -` は水平線）"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 水平線と setext を読む（`- - -` は水平線）"
 ```
 
 ---
@@ -1464,8 +1464,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 水平線�
 ## Task 7: リスト項目と容器のスタック
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Row` `Token` `trim_end` `is_blank` `cut`（Task 4・5）/ `hangs`（Task 5）
@@ -1473,7 +1473,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 水平線�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/scan_wbtest.mbt` の末尾に足す:
+`core/tree/scan_wbtest.mbt` の末尾に足す:
 
 ```moonbit
 
@@ -1508,7 +1508,7 @@ C15（`- center` の content indent に置いた `---`）と C17（項目の後�
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `FAILED: `"V0,- a" != "B0,2,a"`` + `Total tests: 7, passed: 5, failed: 2.` EXIT=2
 
@@ -1583,15 +1583,15 @@ fn bullet_at(text : String, r : Row) -> (Int, String)? {
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `Total tests: 7, passed: 7, failed: 0.` EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ リスト項目と容器の列を読む（順序リストも構造）"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ リスト項目と容器の列を読む（順序リストも構造）"
 ```
 
 ---
@@ -1599,8 +1599,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ リスト�
 ## Task 8: フェンスとインデントコード
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Row` `Token` `trim_end` `is_blank` `cut`（Task 4・5）/ `Row.start`（Task 4）
@@ -1614,7 +1614,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ リスト�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/scan_wbtest.mbt` の末尾に足す:
+`core/tree/scan_wbtest.mbt` の末尾に足す:
 
 ```moonbit
 
@@ -1644,7 +1644,7 @@ test "インデントコードは読めるのでフェンスと同じ 1 枚に�
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: ``FAILED: `"V0,```js;V0,1;V0,```" != "F0,js,1"`` +
 `Total tests: 9, passed: 7, failed: 2.` EXIT=2
@@ -1851,7 +1851,7 @@ fn joined(lines : Array[String]) -> String {
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `Total tests: 9, passed: 9, failed: 0.` EXIT=0
 （`Row.start` を `strip` が読むようになったので、`Warning: [0007]` はここで消える）
@@ -1859,8 +1859,8 @@ Expected: `Total tests: 9, passed: 9, failed: 0.` EXIT=0
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ コードの塊を読む（インデントコードもフェンスと同じ 1 枚）"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ コードの塊を読む（インデントコードもフェンスと同じ 1 枚）"
 ```
 
 ---
@@ -1868,8 +1868,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ コード�
 ## Task 9: 畳みの開閉と HTML コメント
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Row` `Token` `trim_end` `is_blank` `cut`（Task 4・5）
@@ -1881,7 +1881,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ コード�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/scan_wbtest.mbt` の末尾に足す:
+`core/tree/scan_wbtest.mbt` の末尾に足す:
 
 ```moonbit
 
@@ -1911,7 +1911,7 @@ test "HTML コメントの中の見出しは構造にならない（`<!---` も 
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `FAILED: `"V0,<details>;..." != "(0;..."`` +
 `Total tests: 11, passed: 9, failed: 2.` EXIT=2
@@ -2023,15 +2023,15 @@ fn starts(text : String, at : Int, end : Int, lit : String) -> Bool {
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `Total tests: 11, passed: 11, failed: 0.` EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 畳みの開閉と HTML コメントを読む"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 畳みの開閉と HTML コメントを読む"
 ```
 
 ---
@@ -2039,8 +2039,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 畳みの�
 ## Task 10: 封筒の裁定
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan.mbt`
-- Test: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan_wbtest.mbt`
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan.mbt`
+- Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan_wbtest.mbt`
 
 **Interfaces:**
 - Consumes: `Row` `trim_end` `cut` `joined`（Task 4・5・8）
@@ -2050,7 +2050,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 畳みの�
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`core/doc/scan_wbtest.mbt` の末尾に足す:
+`core/tree/scan_wbtest.mbt` の末尾に足す:
 
 ```moonbit
 
@@ -2075,7 +2075,7 @@ test "封筒は「直後が空行でなく、閉じがある」ときだけ。�
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `FAILED: `None != Some("image-folder: img")`` +
 `Total tests: 12, passed: 11, failed: 1.` EXIT=2
@@ -2134,15 +2134,15 @@ fn is_front(text : String, r : Row) -> Bool {
 
 - [ ] **Step 4: テストを走らせて通過を確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test doc/scan_wbtest.mbt`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/scan_wbtest.mbt`
 
 Expected: `Total tests: 12, passed: 12, failed: 0.` EXIT=0
 
 - [ ] **Step 5: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 封筒を剥がす（直後が空行なら先頭トグル）"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 封筒を剥がす（直後が空行なら先頭トグル）"
 ```
 
 ---
@@ -2150,7 +2150,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 封筒を�
 ## Task 10.5: 正規形の綴りを 1 か所に括る
 
 **Files:**
-- Create: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/spell.mbt`
+- Create: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/spell.mbt`
 
 **Interfaces:**
 - Consumes: `Eol`（Task 1）
@@ -2166,7 +2166,7 @@ G1 は `spell_wbtest.mbt` を作らない。よって赤→緑の往復は無く
 
 - [ ] **Step 1: 綴りの定数を置く**
 
-`core/doc/spell.mbt`（契約 §12 の逐語。1 バイトも変えない）:
+`core/tree/spell.mbt`（契約 §12 の逐語。1 バイトも変えない）:
 
 ```moonbit
 // 正規形の綴り。将来の lint 的な設定化に備えて 1 か所に括る（設定 UI は作らない）。
@@ -2225,7 +2225,7 @@ pub fn eol_text(eol : Eol) -> String {
 
 - [ ] **Step 2: 型検査**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core check doc`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core check tree`
 
 Expected: `Finished. moon: ran N tasks, now up to date (M warnings, 0 errors)` EXIT=0。
 **合格条件は 0 errors**（契約 §11）。`spell` の読み手（G2 Task 22 / G3 Task 40）はまだ居ないので
@@ -2233,7 +2233,7 @@ Expected: `Finished. moon: ran N tasks, now up to date (M warnings, 0 errors)` E
 
 - [ ] **Step 3: テストの本数が動いていないことを確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test -p mmm-app/core/doc`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test -p mmm-app/core/tree`
 
 Expected: `Total tests: 25, passed: 25, failed: 0.` EXIT=0
 
@@ -2243,8 +2243,8 @@ Expected: `Total tests: 25, passed: 25, failed: 0.` EXIT=0
 - [ ] **Step 4: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 正規形の綴りを 1 か所に括る"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 正規形の綴りを 1 か所に括る"
 ```
 
 ---
@@ -2252,8 +2252,8 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 正規形�
 ## Task 11: 群の締め — 整形・全体の型検査・旧 core の無傷
 
 **Files:**
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/scan.mbt`（`moon fmt` の結果のみ）
-- Modify: `D:/1.atrium/mmm/.worktrees/feat/doc-core/core/doc/check.mbt` / `sig.mbt` / `doc.mbt` /
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/scan.mbt`（`moon fmt` の結果のみ）
+- Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/check.mbt` / `sig.mbt` / `doc.mbt` /
   `spell.mbt` / `make_wbtest.mbt` / `sig_wbtest.mbt` / `check_wbtest.mbt` / `scan_wbtest.mbt`（同上）
 - Test: 既存の `core/*_test.mbt` と `core/*_wbtest.mbt`（旧 core。**1 行も変えない**）
 
@@ -2268,61 +2268,61 @@ git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "feat: ✨ 正規形�
 
 - [ ] **Step 1: 整形の差分を出す**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt --check doc`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt --check tree`
 
 Expected: 差分があれば `git diff` の色付き出力 + `Error: failed when formatting project` EXIT≠0
 （契約 §17 は 127。PowerShell 経由では -1 と出る）。
 差分が無ければ `Finished. moon: ran N tasks, now up to date` EXIT=0
 
 **`doc` 以外を対象にしないこと。** 既存の `js` を含めた瞬間に赤になる（契約 §17）。
-`doc doc/js` は G4 の締めが持つ（この時点で `core/doc/js/` はまだ存在しない）。
+`doc tree/js` は G4 の締めが持つ（この時点で `core/tree/js/` はまだ存在しない）。
 
 - [ ] **Step 2: 整形を当てる**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt doc`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt tree`
 
 Expected: `Finished. moon: ran N tasks, now up to date` EXIT=0。ファイルがその場で書き換わる
 
 - [ ] **Step 3: 整形が落ち着いたことを確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core fmt --check doc`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core fmt --check tree`
 
 Expected: `Finished. moon: ran N tasks, now up to date` EXIT=0
 
 - [ ] **Step 4: 新パッケージのテストが緑のままであることを確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test -p mmm-app/core/doc`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test -p mmm-app/core/tree`
 
 Expected: `Total tests: 25, passed: 25, failed: 0.` EXIT=0
 （内訳: make 1 / sig 4 / check 8 / scan 12。`Total tests: 0` なら `-p` の綴りを疑う）
 
 - [ ] **Step 5: 旧 core が無傷であることを確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core test -p mmm-app/core -p mmm-app/core/doc`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test -p mmm-app/core -p mmm-app/core/tree`
 
 Expected: `Total tests: 217, passed: 217, failed: 0.` EXIT=0
 （旧 core 192 + 新 25。**192 が減っていたら旧 core を壊している**）
 
 - [ ] **Step 6: 全体の型検査**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core check`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core check`
 
 Expected: `Finished. moon: ran N tasks, now up to date (N warnings, 0 errors)` EXIT=0。**合格条件は `0 errors`**（G1 単独の時点では `spell` / `eol_text` の読み手がまだ居ないので `unused` 系の警告が残る。読み手は G2 Task 22・G3 Task 40）
 （`spell` の読み手がまだ居ないぶんの警告は許容。**合格条件は 0 errors**）
 
 - [ ] **Step 7: JS が今までどおり建つことを確認**
 
-Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/doc-core/core build --target js --release`
+Run: `moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core build --target js --release`
 
 Expected: `Finished. moon: ran N tasks, now up to date` EXIT=0。
 `core/_build/js/release/build/js/js.js` が今までどおり生成される
-（新パッケージは library なので `core/doc/js/` は G4 が建てるまで生まれない）
+（新パッケージは library なので `core/tree/js/` は G4 が建てるまで生まれない）
 
 - [ ] **Step 8: コミット**
 
 ```
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core add core/doc
-git -C D:/1.atrium/mmm/.worktrees/feat/doc-core commit -m "style: 🎨 新 core の整形を moon fmt に揃える"
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core add core/tree
+git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "style: 🎨 新 core の整形を moon fmt に揃える"
 ```
 
 - [ ] **Step 9: 読みの裁定 9 件が契約に載っていることを確認する**
@@ -2338,7 +2338,7 @@ G4 の `READING` 表は G4 が書く — G1 は `test/` に 1 バイトも書か
 
 ## この群を終えたときに立っている旗
 
-- `mmm-app/core/doc` が建ち、憲法 §2 の型が 1 バイトも違わずに置かれている
+- `mmm-app/core/tree` が建ち、憲法 §2 の型が 1 バイトも違わずに置かれている
 - **法則 1・2 の比較子（`sig`）が先に在る** — G3 が serialize を書いた瞬間、G4 がファズを回せる
 - **`check` が先に在る** — G2 が parse を書くとき、「parse の出力は必ず check が空」を
   その場で確かめられる（契約 §19 の G2 の受け入れ条件）
