@@ -65,7 +65,7 @@ G5 が終わっていない状態では着手できない（契約 §3）。
 | `quote` / `strings` / `hex` / `reflect_json` | `core/tree/json.mbt` | JSON の綴り |
 | `project` / `map_bucket` / `map_branch` / `map_node` / `map_card` | `core/tree/project.mbt` | 投影 |
 | （新設なし） | — | 木の組み立ては G1 の `make_*` を呼ぶ（契約 §4） |
-| `Law` / `law_pick` / `law_id` / `law_head_label` / `law_item_label` / `law_block` / `law_side` / `law_skeleton` / `law_nodes` / `law_node` / `law_branches` / `law_implicit_root` / `law_doc` | `core/tree/laws_wbtest.mbt` | 木の生成器 |
+| `Law` / `law_pick` / `law_id` / `law_head_label` / `law_item_label` / `law_block` / `law_side` / `law_skeleton` / `law_nodes` / `law_node` / `law_branches` / `law_implicit_center` / `law_doc` | `core/tree/laws_wbtest.mbt` | 木の生成器 |
 | `sig` / `format` / `check` / `project` / `move_nodes` / `flip_side` / `delete_nodes` | `core/tree/js/exports.mbt` | 境界 7 本（別パッケージ） |
 | `Edit` / `Reflection` / `Card` / `MapNode` / `MapBranch` / `MapTree` / `Mindmap` / `doc` / `mbt` / `apply` / `cardText` / `rng` / `randomDoc` / `pathological` / `shrink` / `corpus` / `fuzzCases` / `brief` | `test/_tree.ts` | TS の窓口 |
 | `outerSkeletons` / `mmmSkeletons` / `DIALECT` / `READING` | `test/treeDialect.test.ts` | 外部審判 |
@@ -324,7 +324,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ JSON の�
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/project_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` / `Root` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol` /
+- Consumes: `Doc` / `Center` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol` /
   `Block` / `Content`（G1・契約 §6）、`quote`（Task 60）、
   **`same_side`（G3 `serialize.mbt`）**
 - Produces: `pub fn project(doc : Doc) -> String`（契約 §14 の JSON）/
@@ -348,7 +348,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ JSON の�
 
 ///|
 test "バケツ分けは branches の filter — 側ごとに順序を保つ" {
-  let root : Root = {
+  let center : Center = {
     id: 2,
     skeleton: Explicit(form=Heading, label="r", folded=false, body=[]),
     branches: [
@@ -358,7 +358,7 @@ test "バケツ分けは branches の filter — 側ごとに順序を保つ" {
     ],
   }
   assert_eq(
-    project(make_doc([root])),
+    project(make_doc([center])),
     "{\"trees\":[{\"node\":{\"id\":2,\"label\":\"r\",\"implied\":false," +
     "\"folded\":false,\"form\":\"heading\",\"cards\":[],\"buried\":0}," +
     "\"right\":[{\"node\":{\"id\":3,\"label\":\"a\",\"implied\":false," +
@@ -373,7 +373,7 @@ test "バケツ分けは branches の filter — 側ごとに順序を保つ" {
 
 ///|
 test "buried は絵に出ない Block の数。cards は Content と 1 対 1" {
-  let root : Root = {
+  let center : Center = {
     id: 2,
     skeleton: Explicit(form=Item, label="r", folded=true, body=[
       Opaque("> quote"),
@@ -384,7 +384,7 @@ test "buried は絵に出ない Block の数。cards は Content と 1 対 1" {
     branches: [],
   }
   assert_eq(
-    project(make_doc([root])),
+    project(make_doc([center])),
     "{\"trees\":[{\"node\":{\"id\":2,\"label\":\"r\",\"implied\":false," +
     "\"folded\":true,\"form\":\"item\",\"cards\":[{\"kind\":\"image\"," +
     "\"alt\":\"a\",\"src\":\"./x.png\"},{\"kind\":\"code\",\"info\":\"js\"," +
@@ -398,7 +398,7 @@ test "implied は空ラベルの見出しとして出る。文書の散文は tr
     frontmatter: None,
     eol: Lf,
     body: [Opaque("intro"), Rule],
-    roots: [
+    centers: [
       {
         id: 2,
         skeleton: Implicit,
@@ -435,7 +435,7 @@ Expected: `Error: [4021]` / `The value identifier project is unbound.` EXIT=1
 pub fn project(doc : Doc) -> String {
   let sb = StringBuilder::new()
   sb.write_string("{\"trees\":[")
-  for k, r in doc.roots {
+  for k, r in doc.centers {
     if k > 0 {
       sb.write_string(",")
     }
@@ -793,7 +793,7 @@ test("境界: 反映は ok / reason / text / edits の 4 つを返し、edits �
   const md = "# r\n\n## a\n";
   const bad = doc.flipSide(md, [99]);
   assert.equal(bad.ok, false);
-  assert.equal(bad.reason, "側を変えられるのは root と root 直下の枝だけ (id=99)");
+  assert.equal(bad.reason, "側を変えられるのは center と center 直下の枝だけ (id=99)");
   assert.equal(bad.text, md);
   assert.deepEqual(bad.edits, []);
   assert.equal(apply(md, bad.edits), bad.text);
@@ -920,7 +920,7 @@ export const doc = {
   /** 破れの一覧。空なら健全 */
   check: (md: string): string[] => JSON.parse(mbt.check(md)),
   project: (md: string): Mindmap => JSON.parse(mbt.project(md)),
-  /** parent は id（文書は 1）。left は行き先の側で、root 直下でだけ効く */
+  /** parent は id（文書は 1）。left は行き先の側で、center 直下でだけ効く */
   moveNodes: (
     md: string,
     ids: number[],
@@ -1013,7 +1013,7 @@ export function randomDoc(seed: number): string {
 }
 
 /** リポジトリ内の実文書。docs/ の md がそのまま法則 1・2 の入力になる */
-export function corpus(root = "."): { path: string; text: string }[] {
+export function corpus(center = "."): { path: string; text: string }[] {
   const skip = new Set([
     "node_modules",
     "_build",
@@ -1032,7 +1032,7 @@ export function corpus(root = "."): { path: string; text: string }[] {
         out.push({ path: p, text: readFileSync(p, "utf8") });
     }
   };
-  walk(root, 0);
+  walk(center, 0);
   return out;
 }
 
@@ -1603,7 +1603,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 法則 1 �
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/laws_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` / `Root` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol` /
+- Consumes: `Doc` / `Center` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol` /
   `Block` / `Content` / `first_id` / `check` / `sig`（G1）、`parse`（G2）、
   `serialize`（G3）、`strings`（Task 60）
 - Produces: なし（法則の固定）
@@ -1756,8 +1756,8 @@ fn law_branches(r : Law, parent : Form, depth : Int) -> Array[Branch] {
 }
 
 ///|
-/// Implicit の root は子を持つ限りにおいて存在し、その子はすべて見出し。
-fn law_implicit_root(r : Law, depth : Int) -> Root {
+/// Implicit の center は子を持つ限りにおいて存在し、その子はすべて見出し。
+fn law_implicit_center(r : Law, depth : Int) -> Center {
   let branches : Array[Branch] = []
   for _ in 0..<(1 + law_pick(r, 2)) {
     branches.push({ side: law_side(r), node: law_node(r, Heading, depth - 1) })
@@ -1766,26 +1766,26 @@ fn law_implicit_root(r : Law, depth : Int) -> Root {
 }
 
 ///|
-/// 文書 1 通。doc 直下にも順序法則が効く（項目の root が先、見出しの root が後）。
+/// 文書 1 通。doc 直下にも順序法則が効く（項目の center が先、見出しの center が後）。
 fn law_doc(seed : Int, depth : Int) -> Doc {
   let r : Law = { seed: seed * 2 + 1, next_id: first_id }
   let body : Array[Block] = []
   for _ in 0..<law_pick(r, 3) {
     body.push(law_block(r))
   }
-  let roots : Array[Root] = []
+  let centers : Array[Center] = []
   for _ in 0..<law_pick(r, 3) {
-    roots.push({
+    centers.push({
       id: law_id(r),
       skeleton: law_skeleton(r, Item),
       branches: law_branches(r, Item, depth),
     })
   }
   if law_pick(r, 3) == 0 {
-    roots.push(law_implicit_root(r, depth))
+    centers.push(law_implicit_center(r, depth))
   }
   for _ in 0..<(1 + law_pick(r, 3)) {
-    roots.push({
+    centers.push({
       id: law_id(r),
       skeleton: law_skeleton(r, Heading),
       branches: law_branches(r, Heading, depth),
@@ -1803,7 +1803,7 @@ fn law_doc(seed : Int, depth : Int) -> Doc {
       Lf
     },
     body,
-    roots,
+    centers,
   }
 }
 
@@ -2363,7 +2363,7 @@ test("C14: form は行き先に従う — Item を節の間へ drop", () => {
   assert.deepEqual(doc.check(r.text), []);
 });
 
-test("C15: 全リストの map — Item root と content indent のトグル", () => {
+test("C15: 全リストの map — Item center と content indent のトグル", () => {
   const md = "- center\n\n  - a\n\n  - b\n\n  ---\n\n  - c\n";
   assert.equal(
     doc.sig(md),
@@ -2384,7 +2384,7 @@ test("C16: implied スロットへの flipSide — 昇格は不要", () => {
   assert.equal(doc.sig(r.text), "D-n()[Reh_1:r()[<Ni[Ni[Neh_1:b()[]]]]]");
 });
 
-test("C17: 項目 root の後ろの見出し — Item の子にはならない", () => {
+test("C17: 項目 center の後ろの見出し — Item の子にはならない", () => {
   const md = "- a\n\n## h\n";
   assert.equal(doc.sig(md), "D-n()[Rel_1:a()[]Ri[>Neh_1:h()[]]]");
   assert.equal(doc.format(md), md);
@@ -2422,7 +2422,7 @@ EXIT=1
 
 赤の大半は G2 の `parse`。概要の**赤の差し戻し表**で担当群を決めて戻す。踏みやすい 3 つ:
 
-- **C17 の「項目 root の後ろの見出し」** → G2 Task 22。列 0 の見出しは開いている項目を
+- **C17 の「項目 center の後ろの見出し」** → G2 Task 22。列 0 の見出しは開いている項目を
   すべて閉じる（md ではリストが終わる）
 - **C8 の `format(md) != md`** → `<summary>` を body に積んでいる。G2 Task 25（契約 §9）
 - **C7 / C9 の綴りが正規形にならない** → G3 Task 41〜45（`spell` の値と `put`）
@@ -2684,11 +2684,11 @@ test("無操作は無編集 — 正規形の文書を同じ場所へ動かして
     const md = doc.format(randomDoc(i));
     const map = doc.project(md);
     if (map.trees.length === 0) continue;
-    const root = map.trees[0]!;
-    if (root.right.length === 0) continue;
-    if (root.left.length > 0) continue; // at は branches の index。バケツの index ではない
-    const first = root.right[0]!.node.id;
-    const r = doc.moveNodes(md, [first], root.node.id, 0, false);
+    const center = map.trees[0]!;
+    if (center.right.length === 0) continue;
+    if (center.left.length > 0) continue; // at は branches の index。バケツの index ではない
+    const first = center.right[0]!.node.id;
+    const r = doc.moveNodes(md, [first], center.node.id, 0, false);
     holds(md, r, "同位置への move");
     if (r.ok) {
       assert.equal(r.text, md, `同位置への move は無編集: ${brief(md)}`);

@@ -20,7 +20,7 @@
 
 ### 前提
 
-1. **G1 が終わっていること。** `Doc` / `Root` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol` /
+1. **G1 が終わっていること。** `Doc` / `Center` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol` /
    `Block` / `Content` / `doc_id` / `first_id`（契約 §6）、`Token` / `Scan` / `scan`（契約 §10）、
    `check`（契約 §7）、`sig`（契約 §8）が揃っていること。
    **テストは `sig` と `check` を比較子に使う**ので、この 2 つが無いと 1 本も書けない。
@@ -56,7 +56,7 @@ Task 20 → 26 の一直線。各タスクは前のタスクの上に足す（�
 | `read` | fn | parse の本体（Token の列だけを食う） | 20 |
 | `top` / `item` | fn | 開いている一番深い段 / その段は項目か | 20 |
 | `bud` | fn | 段を 1 つ生やす（id はここで配る） | 20 |
-| `to_root` / `to_node` / `bone` | fn | Frame の木 → Doc の木 | 20 |
+| `to_center` / `to_node` / `bone` | fn | Frame の木 → Doc の木 | 20 |
 | `grow` | fn | 足りない段を Implicit で埋めてから積む | 21 |
 | `hashes` | fn | 領土に落ちた見出しの逐語（`(level : Int, label : String) -> String`） | 22 |
 | `shed` / `knit` / `card` / `pair` | fn | 領土から出る / 散文を綴じる / 正体を見る / `[…](…)` を割る | 23 |
@@ -73,23 +73,23 @@ wbtest のヘルパ名は全部 `parse_` で始める（契約 §16 — 同一�
 
 ### 設計の要点（なぜこの形か）
 
-- **木は `Frame` で建て、最後に 1 回だけ Doc の型へ写す。** `Root` / `Branch` / `Node` は不変 struct なので、
+- **木は `Frame` で建て、最後に 1 回だけ Doc の型へ写す。** `Center` / `Branch` / `Node` は不変 struct なので、
   育ちながら建てるには可変の足場が要る。struct は参照（契約 §6）なので、`bud` が親の `kids` に挿してから
   中身を足せる — 木を組み直す処理は 1 つも要らない。
 - **`stack` の添字 = 深さ。** 底に「文書の器」（level 0・`form: None`）を置いたので、道は常に空でなく、
-  `b.stack[1]` が root、`b.stack[2]` が root 直下のスロットになる（憲法 §2「level 0 の文書に錨を打ったので
+  `b.stack[1]` が center、`b.stack[2]` が center 直下のスロットになる（憲法 §2「level 0 の文書に錨を打ったので
   木ごとの原点ずれが無い」がそのまま座標系になっている）。
 - **順序法則（項目が先・見出しが後）と、Implicit の位置（前の兄弟はすべて項目）を強制するコードは 1 行も無い。**
   閉じる規則（見出しは開いている項目を閉じてから積む・リストは開いている段の子になる）の帰結として、
   破れる並びが**そもそも作れない**。見張りは Task 26 の `check` の網に任せる。
-- **`shed` は root の項目を閉じない。** 領土の外へ出た散文は項目を閉じて親へ置くのが md の読みだが、
-  root の項目を閉じると行き場が文書になり、`Doc.body`（＝最初の骨格より**前**の散文）へ後ろの散文が混ざって
-  順序が壊れる。そこで **root の項目だけは閉じず、その body に置く**。serialize は領土の中に字下げして書き、
+- **`shed` は center の項目を閉じない。** 領土の外へ出た散文は項目を閉じて親へ置くのが md の読みだが、
+  center の項目を閉じると行き場が文書になり、`Doc.body`（＝最初の骨格より**前**の散文）へ後ろの散文が混ざって
+  順序が壊れる。そこで **center の項目だけは閉じず、その body に置く**。serialize は領土の中に字下げして書き、
   読み直せば同じ木になる（法則 1・2 は保たれる）。
 - **区切り（`---`）の行き先は、次の骨格を見るまで決まらない。** 「隙間 = 空白と区切りしか無い末尾区間」
   （憲法 §4 の先頭トグルの規則の一般形）を実装に落とすと、Bar は**溜める**しかない。溜めるときに
   「そのとき開いていた段」を一緒に持つ（`Pend.owner`）ので、後から飾りに落ちても書かれた場所へ正しく戻る。
-- **トグルの資格は 2 つだけ**: `dash`（`***` は飾り確定）と `col <= root.hang`（root の中身の列より深い `---`
+- **トグルの資格は 2 つだけ**: `dash`（`***` は飾り確定）と `col <= center.hang`（center の中身の列より深い `---`
   は子の飾り — C15 備考）。この 2 つを満たし、かつ**深さ 2 の新顔が生まれた**ときだけ側になる。
   占有者が Implicit でも成立する（C16）。
 - **`<summary>` は「`<details>` の直後の 1 行」だけを無条件に読み飛ばす**（契約 §9・裁定 1）。
@@ -163,8 +163,8 @@ moon -C D:/1.atrium/mmm/.worktrees/feat/tree-core/core test tree/parse_wbtest.mb
 - Test: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/parse_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `pub fn scan(text : String) -> Scan`（G1）/ `pub(all) enum Token`（G1）/ `pub(all) struct Scan { frontmatter : String?; eol : Eol; tokens : Array[Token] }`（G1）/ `pub(all) struct Doc / Root / Branch / Node`・`pub(all) enum Skeleton / Form / Side / Block`・`pub let doc_id : Int`・`pub let first_id : Int`（G1）/ `pub fn sig(doc : Doc) -> String`（G1）
-- Produces: `pub fn parse(text : String) -> Doc` / `fn read(scanned : Scan) -> Doc` / `fn top(b : Build) -> Frame` / `fn item(f : Frame) -> Bool` / `fn bud(b : Build, level : Int, form : Form?, label : String, hang : Int) -> Unit` / `fn to_root(f : Frame) -> Root` / `fn to_node(f : Frame) -> Node` / `fn bone(f : Frame) -> Skeleton` / `priv struct Frame` / `priv struct Build` / (test) `fn parse_sig(md : String) -> String` / `fn parse_ids(md : String) -> String` / `fn parse_walk(node : Node, out : Array[String]) -> Unit`
+- Consumes: `pub fn scan(text : String) -> Scan`（G1）/ `pub(all) enum Token`（G1）/ `pub(all) struct Scan { frontmatter : String?; eol : Eol; tokens : Array[Token] }`（G1）/ `pub(all) struct Doc / Center / Branch / Node`・`pub(all) enum Skeleton / Form / Side / Block`・`pub let doc_id : Int`・`pub let first_id : Int`（G1）/ `pub fn sig(doc : Doc) -> String`（G1）
+- Produces: `pub fn parse(text : String) -> Doc` / `fn read(scanned : Scan) -> Doc` / `fn top(b : Build) -> Frame` / `fn item(f : Frame) -> Bool` / `fn bud(b : Build, level : Int, form : Form?, label : String, hang : Int) -> Unit` / `fn to_center(f : Frame) -> Center` / `fn to_node(f : Frame) -> Node` / `fn bone(f : Frame) -> Skeleton` / `priv struct Frame` / `priv struct Build` / (test) `fn parse_sig(md : String) -> String` / `fn parse_ids(md : String) -> String` / `fn parse_walk(node : Node, out : Array[String]) -> Unit`
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -184,7 +184,7 @@ fn parse_sig(md : String) -> String {
 /// 文書順に並べた id。飛びの Implicit も本物のノードとして番号を持つ。
 fn parse_ids(md : String) -> String {
   let out : Array[String] = []
-  for r in parse(md).roots {
+  for r in parse(md).centers {
     out.push(r.id.to_string())
     for b in r.branches {
       parse_walk(b.node, out)
@@ -239,8 +239,8 @@ test "id は first_id から文書順に配られる" {
 }
 ```
 
-備考: 期待値の綴りは契約 §8 の指紋。`Reh_1:r()[…]` = root・Explicit・Heading・畳んでいない・ラベル `r`・body 空。
-憲法 §2「深さ = level で全域一致」と「top-level の Item は level 1 の root」（C15）の読み side を固定する。
+備考: 期待値の綴りは契約 §8 の指紋。`Reh_1:r()[…]` = center・Explicit・Heading・畳んでいない・ラベル `r`・body 空。
+憲法 §2「深さ = level で全域一致」と「top-level の Item は level 1 の center」（C15）の読み side を固定する。
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
 
@@ -324,7 +324,7 @@ fn read(scanned : Scan) -> Doc {
     frontmatter: scanned.frontmatter,
     eol: scanned.eol,
     body: doc.body,
-    roots: doc.kids.map(to_root),
+    centers: doc.kids.map(to_center),
   }
 }
 
@@ -358,7 +358,7 @@ fn bud(
 }
 
 ///|
-fn to_root(f : Frame) -> Root {
+fn to_center(f : Frame) -> Center {
   let branches : Array[Branch] = []
   for k in f.kids {
     branches.push({ side: Right, node: to_node(k) })
@@ -433,7 +433,7 @@ test "level の飛びは Implicit が埋める" {
 }
 
 ///|
-test "最初の見出しが level 2 以上なら implied の root が生える" {
+test "最初の見出しが level 2 以上なら implied の center が生える" {
   assert_eq(parse_sig("## a\n"), "D-n()[Ri[>Neh_1:a()[]]]")
   assert_eq(parse_sig("## a\n\n# r\n"), "D-n()[Ri[>Neh_1:a()[]]Reh_1:r()[]]")
 }
@@ -592,7 +592,7 @@ Expected: 領土の判定がまだ無いので、見出しが項目の子にな�
       }
 ```
 
-(2) `fn to_root` の直前に `hashes` を足す:
+(2) `fn to_center` の直前に `hashes` を足す:
 
 ```moonbit
 ///|
@@ -780,7 +780,7 @@ priv struct Build {
     frontmatter: scanned.frontmatter,
     eol: scanned.eol,
     body: doc.body,
-    roots: doc.kids.map(to_root),
+    centers: doc.kids.map(to_center),
   }
 }
 ```
@@ -790,7 +790,7 @@ priv struct Build {
 ```moonbit
 ///|
 /// 領土の外へ出た中身は、項目を閉じてから置く。
-/// root の項目だけは閉じない（文書には散文の席が無い）。
+/// center の項目だけは閉じない（文書には散文の席が無い）。
 fn shed(b : Build, col : Int) -> Unit {
   while item(top(b)) && top(b).level > 1 && col < top(b).hang {
     ignore(b.stack.unsafe_pop())
@@ -878,7 +878,7 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "feat: ✨ 散文を�
 
 **Interfaces:**
 - Consumes: Task 23 までの `read` / `grow` / `top`、G1 の `Side`
-- Produces: `priv struct Pend` / `fn spill(b : Build) -> Unit` / `fn spill_at(b : Build, root : Frame, slot : Frame?) -> Unit` / `Frame.toggles : Int`（mut）/ `Build.pend : Array[Pend]`
+- Produces: `priv struct Pend` / `fn spill(b : Build) -> Unit` / `fn spill_at(b : Build, center : Frame, slot : Frame?) -> Unit` / `Frame.toggles : Int`（mut）/ `Build.pend : Array[Pend]`
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -912,7 +912,7 @@ test "トグルは隙間に付き、スロットの占有者を問わない" {
 }
 
 ///|
-test "項目 root のトグルは root の中身の列に置く" {
+test "項目 center のトグルは center の中身の列に置く" {
   assert_eq(
     parse_sig("- center\n\n  - a\n\n  - b\n\n  ---\n\n  - c\n"),
     "D-n()[Rel_6:center()[>Nel_1:a()[]>Nel_1:b()[]<Nel_1:c()[]]]",
@@ -942,8 +942,8 @@ test "木と木の間の区切りは側にならない" {
 ```
 
 備考: 1 本目が C4 の読み戻し（先頭トグル = 左開始。2 本連続は元へ戻る）。2 本目が C16（占有者が Implicit でも
-隙間は実在する）。3 本目が C15（root の content indent の `---` はトグル、より深い `---` は子の body の飾り）。
-4 本目が C7（後ろに `more` が居るので隙間ではなく a の body）と、root 直下でないスロットの前の `---`
+隙間は実在する）。3 本目が C15（center の content indent の `---` はトグル、より深い `---` は子の body の飾り）。
+4 本目が C7（後ろに `more` が居るので隙間ではなく a の body）と、center 直下でないスロットの前の `---`
 （＝側になれない位置）。5 本目は憲法 §2「木と木の間（doc 直下の隙間）の区切りは無意味のまま」。
 
 - [ ] **Step 2: テストを走らせて失敗を確認**
@@ -1049,12 +1049,12 @@ priv struct Build {
 
 ```moonbit
 ///|
-/// 溜まった区切りを配る。root 直下の新しいスロットの前の隙間にある
+/// 溜まった区切りを配る。center 直下の新しいスロットの前の隙間にある
 /// `---` だけがトグルで、残りは書かれた場所の飾り（Rule）。
-fn spill_at(b : Build, root : Frame, slot : Frame?) -> Unit {
+fn spill_at(b : Build, center : Frame, slot : Frame?) -> Unit {
   for p in b.pend {
     let mut done = false
-    if p.dash && p.col <= root.hang {
+    if p.dash && p.col <= center.hang {
       match slot {
         Some(f) => {
           f.toggles = f.toggles + 1
@@ -1080,12 +1080,12 @@ fn spill(b : Build) -> Unit {
 }
 ```
 
-(13) `to_root` をまるごと置き換える:
+(13) `to_center` をまるごと置き換える:
 
 ```moonbit
 ///|
 /// スロットの側は、隙間のトグルの積み上げ。先頭のトグルが左開始を表す。
-fn to_root(f : Frame) -> Root {
+fn to_center(f : Frame) -> Center {
   let branches : Array[Branch] = []
   let mut side = Right
   for k in f.kids {

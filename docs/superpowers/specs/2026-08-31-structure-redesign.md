@@ -11,10 +11,10 @@ pub struct Doc {
   frontmatter : String?      // 封筒の逐語（旧名 head — 見出しとの衝突を嫌って改名）
   eol : Eol
   body : Array[Block]        // 最初の骨格より前の散文
-  roots : Array[Root]
+  centers : Array[Center]
 }
 
-pub struct Root {
+pub struct Center {
   id : Int
   skeleton : Skeleton
   branches : Array[Branch]
@@ -74,25 +74,25 @@ id 一意 / implicit の存在条件（子を持つ限り在る）/ implicit の
 > 公開 API は id で語る。型の異種性は**道具 4 つに幽閉**し、操作には腕を生やさない。
 
 ```
-Path = Array[Int]     // [] = doc、[i] = root、[i, j] = スロット、それ以深 = children
-Sub  = Tree(Root) | Limb(Node)   // 運搬の通貨。op.mbt の外に出ない
+Path = Array[Int]     // [] = doc、[i] = center、[i, j] = スロット、それ以深 = children
+Sub  = Whole(Center) | Limb(Node)   // 運搬の通貨。op.mbt の外に出ない
 
 resolve(doc, id) -> Path?        // 腕なし
-pluck(doc, path) -> Sub          // 3 腕（roots / branches / children から抜く）
+pluck(doc, path) -> Sub          // 3 腕（centers / branches / children から抜く）
 graft(doc, parent, at, sub, side) -> Unit
                                  // 3 腕 + 変換の唯一の住所:
-                                 //   doc へ: Limb → Root 化（children を Branch(Right) で包む）
-                                 //   root へ: Tree → 解体（sides は深さの物理で消滅）/ Limb → Branch(side) で包む
-                                 //   node へ: Tree → 解体 / Limb → そのまま
+                                 //   doc へ: Limb → Center 化（children を Branch(Right) で包む）
+                                 //   center へ: Whole → 解体（sides は深さの物理で消滅）/ Limb → Branch(side) で包む
+                                 //   node へ: Whole → 解体 / Limb → そのまま
 amend(doc, path, f : Skeleton -> Skeleton)   // fold / setForm 用（rename は読みの道なので通らない）
 ```
 
 - **殺す条件の観測点**: 道具 4 つの腕が 3 で止まらなくなったら負け
-- Tree は root 位置間では無変換（root の並べ替えで sides が無傷で旅する）
+- Whole は center 位置間では無変換（center の並べ替えで sides が無傷で旅する）
 - **枝の並べ替えで side は運ばれない** — pluck で残置、graft が行き先（ドロップした列 /
   隣の側）で決め直す。「側は場所の属性」の帰結。仕様に明記すること
 - implicit を綴れない位置への graft は昇格（既存の「綴りは行き先に従う」）
-- 全 API 掃引済み: move（9 組合せ）/ delete / flipSide（root=鏡像・スロット・深部 reject）/
+- 全 API 掃引済み: move（9 組合せ）/ delete / flipSide（center=鏡像・スロット・深部 reject）/
   add / fold / setForm / serialize / parse / sig / project / id 写し — 全部この道具の合成で通る
 
 ## project と境界
@@ -125,7 +125,7 @@ type MapNode  = { id: number; label: string; implied: boolean;
 
 - **判定のリトマス**: 型分割を思いついたら move のシグネチャを書く。move が汚れる分割は
   操作の腹を横切っている。今回の採用形が通ったのは、Branch が「ノードの型」でなく
-  「包み」で、深さ 3 以降が一様な Node だから（変換は root 化/降格の 1 ペアだけ）
+  「包み」で、深さ 3 以降が一様な Node だから（変換は center 化/降格の 1 ペアだけ）
 - trait は「OR の代わり」ではない: データの分岐 = enum、振る舞いの契約 = trait。
   trait が刺さる席は反映戦略（v0/v1）と TS のカード描画
 
@@ -137,6 +137,6 @@ type MapNode  = { id: number; label: string; implied: boolean;
 3. **計画 T1〜T5 の型改訂 + 再査読 1 巡** — flat 前提のコード片の書き替え。
    C16 反転の差し替え（README に警告済み）もこのバッチに畳む
 4. **殺す条件（Task 50）の物差しの移設** — op.mbt の関数行数 → 道具 4 つの腕数
-5. **sig（指紋）の形式再設計** — Doc/Root/Branch/Node の走査に合わせる
+5. **sig（指紋）の形式再設計** — Doc/Center/Branch/Node の走査に合わせる
 6. **UI 翻訳層に 1 件追加** — バケツの index（左列の 2 番目）→ branches の index の写像
-7. 保留事項なし — 「Root の複数列挙」は roots 配列 + Tree のままの splice で解決済み
+7. 保留事項なし — 「Center の複数列挙」は centers 配列 + Whole のままの splice で解決済み

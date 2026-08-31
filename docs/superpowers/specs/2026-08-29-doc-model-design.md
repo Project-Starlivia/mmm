@@ -35,10 +35,10 @@
 ```
 MmmTree（トップの型は Doc。2026-08-31 に役割型へ再設計）:
 
-Doc      { frontmatter: String?, eol: Eol, body: [Block], roots: [Root] }
-Root     { id, skeleton: Skeleton, branches: [Branch] }
-Branch   { side: Side, node: Node }   // スロット = 場所。占有者を問わず側を持つ
-Node     { id, skeleton: Skeleton, children: [Node] }   // 深さ 3 以降は一様
+Doc    { frontmatter: String?, eol: Eol, body: [Block], centers: [Center] }
+Center { id, skeleton: Skeleton, branches: [Branch] }   // 木 1 本の中心。側を持つ唯一の型
+Branch { side: Side, node: Node }                       // スロット = 場所。占有者を問わず側を持つ
+Node   { id, skeleton: Skeleton, children: [Node] }     // 深さ 3 以降は一様
 
 Skeleton = Implicit                   // 骨格行なし（飛びが綴り）。label も body も型ごと無い
          | Explicit(form, label, folded, body: [Block])
@@ -57,9 +57,9 @@ implicit×label / implicit×body / implicit×folded / implicit×Item / setForm(I
 
 **操作の原理（抗うゲームの遊び方）**: 公開 API は id で語り、型の異種性は
 **道具 4 つ（resolve / pluck / graft / amend）に幽閉**する。運搬の通貨
-`Sub = Tree(Root) | Limb(Node)` は op.mbt の外に出ない。root 化・降格の変換は
-graft だけに住む（Tree は root 位置間では無変換 — sides が無傷で旅する）。
-Path は素の `Array[Int]`（[] = doc、[i] = root、[i,j] = スロット、以深 = children）。
+`Sub = Whole(Center) | Limb(Node)` は op.mbt の外に出ない。center 化・降格の変換は
+graft だけに住む（Whole は center 位置間では無変換 — sides が無傷で旅する）。
+Path は素の `Array[Int]`（[] = doc、[i] = center、[i,j] = スロット、以深 = children）。
 **殺す条件の観測点は道具の腕数 — 3 で止まらなくなったら負け**。
 枝の並べ替えで side は運ばれない（pluck で残置、graft が行き先で決める —
 「側は場所の属性」の帰結）。rename は読みの道（一言語原則）なので amend を通らない。
@@ -71,9 +71,14 @@ Path は素の `Array[Int]`（[] = doc、[i] = root、[i,j] = スロット、以
 `Tree` は主張が最小で、この中間物を誤解させない。
 外の世界の木（CommonMark のブロック木）は `MarkdownAst` のまま — **Ast は外の言葉、Tree は mmm の言葉**。
 
-- **文書（Doc）は深さ 0 の器**。`#`（level 1）の Root がそれぞれ独立の木。
+**`Center` と呼ぶ理由**: この型が Node と違うのは「**side を持つ**」ことだけ、つまり
+左右が放射する点であることで、根であることではない。`Root` は単数の含みが強く、
+`centers: [Center]` のように複数あるものの 1 つとして読めない。
+map で中央に描かれる当のものでもある。
+
+- **文書（Doc）は深さ 0 の器**。`#`（level 1）の Center がそれぞれ独立の木。
   最初の `#` より前に level 2+ の見出しがあれば、level 0 との段差から implied(1) が
-  導出され、その配下として読まれる（= 空ラベルの root。特例ではなく帰結。文書頭に高々 1 個。
+  導出され、その配下として読まれる（= 空ラベルの center。特例ではなく帰結。文書頭に高々 1 個。
   rename すれば文書タイトル `# ` が生えて昇格する）
 - **implied（暗黙ノード）** — parse が level 飛びから導出する、骨格スパンを持たない空ノード。
   本物のノード（実 id・普通に操作できる・map に中空などで描ける）だが、**存在条件**を持つ:
@@ -96,11 +101,11 @@ Path は素の `Array[Int]`（[] = doc、[i] = root、[i,j] = スロット、以
   （`# r` の後ろの `## x` は必ず r の子になる）。項目の後ろは吸収されないので置ける
 - **順序法則**: 同じ親の子は **Item が先、Heading が後**。見出し節が始まると以降の
   リストは節に食われるという md の物理。doc(level 0) 直下にも同じ法則が効く
-- **top-level の Item は level 1 の root** — `- center` を中心に全リストで map が書ける。
-  その side トグルは root の content indent に置く `---`（子リストがそこで割れる。読み書き一意）
+- **top-level の Item は level 1 の center** — `- center` を中心に全リストで map が書ける。
+  その side トグルは center の content indent に置く `---`（子リストがそこで割れる。読み書き一意）
 - **level は疑似階層** — 親子の level 差 > 1 の空位は implied が埋める。深さ = level で
   全域一致（level 0 の文書に錨を打ったので、木ごとの原点ずれが存在しない）
-- **side は root 直下（level 1 → 2）のスロットの属性**。implied root の木では
+- **side は center 直下（level 1 → 2）のスロットの属性**。implied center の木では
   implied(1) のスロットに当たる。木と木の間（doc 直下の隙間）の区切りは無意味のまま
 - **トグルは隙間に付く。スロットの占有者は問わない** — `---` の付き先は骨格行ではなく
   スロットの前の隙間で、隙間はサブツリーの頂点が implied でも実在する。
@@ -108,8 +113,8 @@ Path は素の `Array[Int]`（[] = doc、[i] = root、[i,j] = スロット、以
   flipSide に昇格は不要 — serialize は隙間にトグルを書くだけで、骨格行は要らない。
   （初出の裁定「implied は側を持てない・昇格して反転」は、帰属規則を
   「直後が書かれた深さ 2 の行」と不要に狭く敷いたことによる誤りだったので撤回。
-  正しい帰属規則: **root 直下のスロットの前の隙間にある区切りが、そのスロットのトグル**）
-- **side の定義と型の一致** — 意味論上、side は「root 直下のスロット → 側」の
+  正しい帰属規則: **center 直下のスロットの前の隙間にある区切りが、そのスロットのトグル**）
+- **side の定義と型の一致** — 意味論上、side は「center 直下のスロット → 側」の
   **部分写像**（場所の属性）。役割型への再設計で `Branch { side, node }` が
   スロットそのものになり、**部分写像がそのまま型になった** — 定義域の外に side を
   書く場所が存在せず、埋め込みの余りと忠実性条件は消滅した
@@ -223,24 +228,24 @@ blockquote/table/一般 HTML/項目内の見出しは Opaque。
   エスケープ・trim・改行拒否といったラベル専用の裁定は存在せず、md 文法が唯一の裁定者。
   `1. x` と打てば入れ子が生え、`# foo` と打てば見出しになる — 文法に逆らわないことが正しい。
   md ペインで打っても カードで打っても、同じ入力は同じ結果になる
-- 構造系の拒否: 子孫への move（循環）/ root より浅い outdent。同位置への move は許可・編集ゼロ
+- 構造系の拒否: 子孫への move（循環）/ center より浅い outdent。同位置への move は許可・編集ゼロ
 - **form は行き先に従う。転形は自動・最小限**:
   Item 親の下へ move された Heading サブツリーはサブツリーごと Item 化（単調性・下向きで比例）/
   Heading 兄弟の間へ置かれた Item は**そのノードだけ** Heading 化（子は Item のままで合法）。
   reject は 1 つだけ — Item 配下のノードへの setForm(Heading)（祖先を変えるのは比例性違反）。
   空ノード（implied 含む）を中空で描くかは render の自由（仕様は縛らない）
 - **綴りは行き先に従う（form 規則の一般化）**: 飛びという綴りは文脈依存なので、
-  implied が飛びで表現できない位置へ来たら（例: implied root の木の前に `#` の木を挿す —
+  implied が飛びで表現できない位置へ来たら（例: implied center の木の前に `#` の木を挿す —
   接頭部が文書頭でなくなり、子が前の木に食われる）、**骨格行を書いて昇格**させる。
   reject ではなく自動昇格 — どの綴りでも表現できない model を作らないための安全弁
 - **操作の効果は、選択したもののサブツリー内に収まるべき**（比例性の原則）
-- **flipSide は root 直下の枝と root にだけ発動**:
-  枝 = そのスロットの反転 / root = **鏡像**（全スロット一括反転。木全体 = root のサブツリーなので比例）。
+- **flipSide は center 直下の枝と center にだけ発動**:
+  枝 = そのスロットの反転 / center = **鏡像**（全スロット一括反転。木全体 = center のサブツリーなので比例）。
   深いノードでは UI に出さず、来たら reject — 委譲（祖先スロットの反転）は効果が選択を
   上向きにはみ出すため却下。自分だけ側を変えたければそれは move の仕事（新しい親はドロップ先が決める）。
-  複数選択では資格のある要素（root 直下の枝・root）だけに効き、他はスキップ
-- **root は「親が文書のノード」** — 並べ替え・add root・枝⇄root の昇降格はすべて
-  「文書を親とする move / add」で、root 専用の操作語彙は無い。
+  複数選択では資格のある要素（center 直下の枝・center）だけに効き、他はスキップ
+- **center は「親が文書のノード」** — 並べ替え・add center・枝⇄center の昇降格はすべて
+  「文書を親とする move / add」で、center 専用の操作語彙は無い。
   add の新スロットの side は末尾スロットの側を継ぐ（居なければ右）
 - **複数選択は頂点集合に正規化**してから適用（子孫の選択は祖先に吸収される）。
   move は文書順を保って連続挿入、rename / カード編集 / add は単独選択のみ

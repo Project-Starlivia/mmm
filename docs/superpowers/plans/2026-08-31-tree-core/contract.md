@@ -150,15 +150,15 @@ G1（型・走査・spell・指紋・不変条件）
 
 | 住所 | 名前 |
 |---|---|
-| `doc.mbt`（型） | `Doc` `Root` `Branch` `Node` `Skeleton` `Form` `Side` `Eol` `Block` `Content` `Verdict` |
+| `doc.mbt`（型） | `Doc` `Center` `Branch` `Node` `Skeleton` `Form` `Side` `Eol` `Block` `Content` `Verdict` |
 | `doc.mbt`（構築子） | `Implicit` `Explicit` `Heading` `Item` `Right` `Left` `Lf` `Crlf` `Content` `Rule` `Opaque` `Image` `Link` `Code` `Svg` `Applied` `Rejected` |
 | `doc.mbt`（定数） | `doc_id`（= 1）`first_id`（= 2） |
 | `check.mbt` | `check`（pub）`fault` `check_node` `check_one` `check_kin` `is_item` |
-| `sig.mbt` | `sig`（pub）`sig_root` `sig_node` `sig_skeleton` `sig_blocks` `sig_content` `sig_text` |
+| `sig.mbt` | `sig`（pub）`sig_center` `sig_node` `sig_skeleton` `sig_blocks` `sig_content` `sig_text` |
 | `scan.mbt`（型） | `Token`（構築子 `Blank` `Head` `Bullet` `Bar` `Fence` `Open` `Close` `Verse`）`Scan` |
 | `scan.mbt` | `scan`（pub）`Row` `rows_of` `row_of` `envelope` `is_front` `head_at` `setext_at` `setext` `bar_at` `bullet_at` `fence_at` `fenced` `close_len` `indented` `is_fold_open` `is_fold_close` `opens_comment` `closes_comment` `starts` `strip` `trim_end` `is_blank` `cut` `joined` |
 | `spell.mbt` | `Spell` `spell`（pub）`eol_text`（pub） |
-| `make_wbtest.mbt` | `make_doc` `make_root` `make_branch` `make_node` `make_head` **`make_item`** |
+| `make_wbtest.mbt` | `make_doc` `make_center` `make_branch` `make_node` `make_head` **`make_item`** |
 | `scan_wbtest.mbt` | `scan_sig` `scan_flat` |
 | `sig_wbtest.mbt` / `check_wbtest.mbt` | **ヘルパを持たない**（`sig_` は `sig.mbt` が使い切っている。木は `make_*` で組む） |
 
@@ -169,14 +169,14 @@ G1（型・走査・spell・指紋・不変条件）
 
 ### G2 — `parse.mbt` / `parse_wbtest.mbt`
 
-`parse`（pub）`read` `Frame` `Build` `Pend` `top` `item` `bud` `to_root` `to_node` `bone`
+`parse`（pub）`read` `Frame` `Build` `Pend` `top` `item` `bud` `to_center` `to_node` `bone`
 `grow` **`hashes`**（`(level : Int, label : String) -> String`）`shed` `knit` `card` `pair`
 `spill` `spill_at` **`is_summary`**（新設・裁定 1）/ テスト: `parse_sig` `parse_ids` `parse_walk` `parse_faults`
 
 ### G3 — `serialize.mbt` / `serialize_wbtest.mbt`
 
 `serialize`（pub）`Voice`（構築子 `Loud` `Quiet`）`Pen` `is_loud` `put` `split_nl` `repeat`
-`write_front` `write_root` `write_branches` `turned` **`same_side`** `write_node` `inner_steps`
+`write_front` `write_center` `write_branches` `turned` **`same_side`** `write_node` `inner_steps`
 `write_skeleton` `write_fold_open` `write_fold_close` `write_body` `write_blocks` `write_block`
 `write_content` `fence_for` / テスト: `write_tree` `write_head` `write_item` `write_gap`
 
@@ -194,7 +194,7 @@ G1（型・走査・spell・指紋・不変条件）
 | `project.mbt` | `project`（pub）`map_bucket` `map_branch` `map_node` `map_card` |
 | `project_wbtest.mbt` | （新設なし。木の組み立ては G1 の `make_*` を呼ぶ） |
 | `json_wbtest.mbt` | ヘルパを持たない（`json_` を予約） |
-| `laws_wbtest.mbt` | `Law` `law_pick` `law_id` `law_head_label` `law_item_label` `law_block` `law_side` `law_skeleton` `law_nodes` `law_node` `law_branches` `law_implicit_root` `law_doc` |
+| `laws_wbtest.mbt` | `Law` `law_pick` `law_id` `law_head_label` `law_item_label` `law_block` `law_side` `law_skeleton` `law_nodes` `law_node` `law_branches` `law_implicit_center` `law_doc` |
 | `js/exports.mbt`（別パッケージ） | `sig` `format` `check` `project` `move_nodes` `flip_side` `delete_nodes` |
 | `test/_tree.ts` | `Edit` `Reflection` `Card` `MapNode` `MapBranch` `MapTree` `Mindmap` `doc` `mbt` `apply` `cardText` `rng` `randomDoc` `pathological` `shrink` `corpus` `fuzzCases` `brief` |
 | `test/treeDialect.test.ts` | `outerSkeletons` `mmmSkeletons` `DIALECT` **`READING`** |
@@ -212,7 +212,7 @@ G1（型・走査・spell・指紋・不変条件）
 
 | 住所 | 名前 |
 |---|---|
-| `tool.mbt` | `Sub`（構築子 `Tree` `Limb`）`resolve` `find_in` `node_at` **`kin_at`** **`parent_at`** `pluck` `graft` `amend` `set_side` `as_root` `as_node` |
+| `tool.mbt` | `Sub`（構築子 `Tree` `Limb`）`resolve` `find_in` `node_at` **`kin_at`** **`parent_at`** `pluck` `graft` `amend` `set_side` `as_center` `as_node` |
 | `op.mbt` | `move_nodes`（pub）`flip_side`（pub）`delete_nodes`（pub）`crown` **`ahead`** `under` `dest` `clamp` `flipped` `pick` `missing` `cyclic` `shallow` `prune` `alive` `conform` `sink` `raised` `itemed`（private 16 本） |
 | `diff.mbt` | `Edit`（pub(all)）**`Reflection`（pub(all)）** `reflect`（pub）`diff`（pub）`apply`（pub）`safe_edits` `line_start` `line_end` `code_at` |
 | wbtest | `tool_doc` `tool_fold` `op_doc` `op_said` `op_shape` `op_implied` `op_limb` `op_forms` `op_form_node` `op_mark` `diff_*`（`diff_` 接頭辞。`diff_holds` を含む） |
@@ -265,17 +265,17 @@ G1（型・走査・spell・指紋・不変条件）
 // 綴り（空行の数・マーカーの銘柄）は持たないので Ast ではない。
 
 ///|
-/// 文書は深さ 0 の器。frontmatter と eol は綴りのダイヤルで、意味は body と roots。
+/// 文書は深さ 0 の器。frontmatter と eol は綴りのダイヤルで、意味は body と centers。
 pub(all) struct Doc {
   frontmatter : String? // 封筒の逐語（`---` の柵は含まない）
   eol : Eol
   body : Array[Block] // 最初の骨格より前の散文
-  roots : Array[Root]
+  centers : Array[Center]
 }
 
 ///|
-/// 親が文書のノード。root 専用の操作語彙は無い（文書を親とする move / add）。
-pub(all) struct Root {
+/// 親が文書のノード。center 専用の操作語彙は無い（文書を親とする move / add）。
+pub(all) struct Center {
   id : Int
   skeleton : Skeleton
   branches : Array[Branch]
@@ -283,7 +283,7 @@ pub(all) struct Root {
 
 ///|
 /// スロット = 場所。占有者を問わず側を持ち、id は持たない。
-/// side が「root 直下のスロット → 側」の部分写像であることが、そのまま型になっている。
+/// side が「center 直下のスロット → 側」の部分写像であることが、そのまま型になっている。
 pub(all) struct Branch {
   side : Side
   node : Node
@@ -437,7 +437,7 @@ G1 は未着手であり据え置きの理由が成立しない。
 ## §8. 指紋（sig）の形式
 
 法則 1（`parse(serialize(M)) = M`）と法則 2（serialize の冪等）の**唯一の比較子**。id を含まない。
-Doc / Root / Branch / Node の 4 型を歩く。
+Doc / Center / Branch / Node の 4 型を歩く。
 
 文字列はすべて**長さ前置**（`<10進の長さ>:<中身>`）なので、逃がし規則が要らず、どの文字が中身に入っていても
 曖昧さが構造的に生じない。長さは UTF-16 コード単位（`String::length()`）。
@@ -445,12 +445,12 @@ Doc / Root / Branch / Node の 4 型を歩く。
 ### 文法（1 文字も曖昧さを残さない）
 
 ```
-Doc      := "D" front eol blocks "[" root* "]"
+Doc      := "D" front eol blocks "[" center* "]"
 front    := "-"                                  frontmatter = None
           | "+" text                             frontmatter = Some
 eol      := "n"                                  Lf
           | "r"                                  Crlf
-root     := "R" skel "[" branch* "]"
+center     := "R" skel "[" branch* "]"
 branch   := ">" node                             side = Right
           | "<" node                             side = Left
 node     := "N" skel "[" node* "]"
@@ -487,7 +487,7 @@ D-n()[Reh_1:r()[>Neh_1:a()[]]]
 D-n()[Reh_1:r()[<Ni[Ni[Neh_1:b()[]]]]]
 ```
 
-**例 3** — 封筒つき・CRLF・doc の散文・畳んだ項目 root・飾りの水平線・コードカード
+**例 3** — 封筒つき・CRLF・doc の散文・畳んだ項目 center・飾りの水平線・コードカード
 
 ```
 D+17:image-folder: imgr(o5:intro)[Rel^1:c(r)[>Neh_1:x(cc2:js1:1)[]]]
@@ -520,19 +520,19 @@ pub fn sig(doc : Doc) -> String {
   )
   sig_blocks(sb, doc.body)
   sb.write_string("[")
-  for r in doc.roots {
-    sig_root(sb, r)
+  for r in doc.centers {
+    sig_center(sb, r)
   }
   sb.write_string("]")
   sb.to_string()
 }
 
 ///|
-fn sig_root(sb : StringBuilder, root : Root) -> Unit {
+fn sig_center(sb : StringBuilder, center : Center) -> Unit {
   sb.write_string("R")
-  sig_skeleton(sb, root.skeleton)
+  sig_skeleton(sb, center.skeleton)
   sb.write_string("[")
-  for b in root.branches {
+  for b in center.branches {
     sb.write_string(
       match b.side {
         Right => ">"
@@ -830,14 +830,14 @@ pub fn reflect_json(r : Reflection) -> String
 - **操作は `Doc` をその場で書き替え、戻りは `Verdict`。** 元の doc が別物にならないので、
   呼ぶ側は「誰が最新の Doc を持つか」を考えなくてよい（実測: struct は参照）
 - `move_nodes` の `parent` は **id**。文書直下は番兵 `doc_id`（= 1）
-- `move_nodes` の `at` は **branches / children / roots の index**（バケツの index ではない）。
+- `move_nodes` の `at` は **branches / children / centers の index**（バケツの index ではない）。
   バケツ index → branches index の写像は UI 翻訳層の仕事
-- `move_nodes` の `side` は**行き先の側**。root 直下のスロットへ挿すときだけ効き、それ以外では捨てられる
+- `move_nodes` の `side` は**行き先の側**。center 直下のスロットへ挿すときだけ効き、それ以外では捨てられる
 - `flip_side` は資格の無い id を**黙って飛ばす**。1 つも効かなければ `Rejected`
 - **複数選択は `move_nodes` / `flip_side` / `delete_nodes` の 3 本とも、内部で頂点集合に正規化する**
   （子孫は祖先に吸収）。憲法 §5 の「複数選択は頂点集合に正規化してから適用」は操作一般の規則であり、
   前版が move / delete に限定していたのは翻訳漏れ（裁定 4）。`flip_side` が `crown` を通らないと、
-  root とその直下の枝を同時に選んだとき二重反転して枝が元に戻る
+  center とその直下の枝を同時に選んだとき二重反転して枝が元に戻る
 - `reflect` が操作を closure で受けるのは、腕を生やさずに op を差し替えるため。
   **統一サイクルの唯一の書き手**がここ 1 本になる
 - `reflect` は `Reflection` を返す**純関数**。JSON にするのは G4 の `reflect_json` 1 本
@@ -851,7 +851,7 @@ pub fn reflect_json(r : Reflection) -> String
 ```
 見つからない (id=7)
 子孫へは動かせない (id=7)
-側を変えられるのは root と root 直下の枝だけ (id=7)
+側を変えられるのは center と center 直下の枝だけ (id=7)
 ```
 
 ---
@@ -860,7 +860,7 @@ pub fn reflect_json(r : Reflection) -> String
 
 ### 腕数の定義（これが「殺す条件」の物差し。定義は 1 つだけ）
 
-> **容器の腕** = その関数の `match path` の枝のうち、**3 つの容器（`doc.roots` / `Root::branches` /
+> **容器の腕** = その関数の `match path` の枝のうち、**3 つの容器（`doc.centers` / `Center::branches` /
 > `Node::children`）のどれかを読むか書くもの**の数。何もしない・拒否するだけの番兵枝（`[]`）は数えない。
 >
 > **意味の腕** = 仕様が定めた場合分けの数（flipSide の資格 3 段など）。容器の異種性とは無関係なので、
@@ -886,7 +886,7 @@ pub fn reflect_json(r : Reflection) -> String
 | `graft(doc, parent, at, sub, side)` | 3 | 挿す + 変換の唯一の住所 |
 | `amend(doc, path, f)` | 3 | 骨格を書き替える（2 段包み 1 本） |
 | `set_side(doc, i, j, side)` | 1 | スロットの側を差し替える |
-| `as_root(sub)` / `as_node(sub)` | — | graft の変換 2 本 |
+| `as_center(sub)` / `as_node(sub)` | — | graft の変換 2 本 |
 
 - 操作 3 本（`move_nodes` / `flip_side` / `delete_nodes`）の容器の腕: **0**
 - 回復 2 本（`prune` / `conform`）の容器の腕: **0**
@@ -918,7 +918,7 @@ pub fn reflect_json(r : Reflection) -> String
 
 ```moonbit
 // 道具 5 本。型の異種性はここに幽閉する（操作には腕を生やさない）。
-// Path = Array[Int]（[] = doc、[i] = root、[i, j] = スロット、以深 = children）。
+// Path = Array[Int]（[] = doc、[i] = center、[i, j] = スロット、以深 = children）。
 // 殺す条件の観測点: 容器の腕が 3 で止まらなくなったら負け。
 ```
 
@@ -940,14 +940,14 @@ pub fn reflect_json(r : Reflection) -> String
 /// 運搬の通貨。**一度しか graft してはならない**（struct は参照なので、
 /// 二度挿すと中の Node が物理共有される）。この型は op の外に出ない。
 priv enum Sub {
-  Tree(Root)
+  Whole(Center)
   Limb(Node)
 }
 
 ///|
 /// id からその居場所へ。腕なし。
 fn resolve(doc : Doc, id : Int) -> Array[Int]? {
-  for i, r in doc.roots {
+  for i, r in doc.centers {
     if r.id == id {
       return Some([i])
     }
@@ -978,13 +978,13 @@ fn find_in(node : Node, id : Int) -> Array[Int]? {
 }
 
 ///|
-/// 抜き取る。容器 3 腕（roots / branches / children）。
+/// 抜き取る。容器 3 腕（centers / branches / children）。
 /// **抜いた瞬間 doc から消える** — graft までの間に落とすと木が壊れる。
 fn pluck(doc : Doc, path : Array[Int]) -> Sub? {
   match path {
     [] => None
-    [i] => Some(Tree(doc.roots.remove(i)))
-    [i, j] => Some(Limb(doc.roots[i].branches.remove(j).node))
+    [i] => Some(Whole(doc.centers.remove(i)))
+    [i, j] => Some(Limb(doc.centers[i].branches.remove(j).node))
     [.. head, last] => Some(Limb(node_at(doc, head).children.remove(last)))
   }
 }
@@ -1000,8 +1000,8 @@ fn graft(
   side : Side,
 ) -> Unit {
   match parent {
-    [] => doc.roots.insert(at, as_root(sub))
-    [i] => doc.roots[i].branches.insert(at, { side, node: as_node(sub) })
+    [] => doc.centers.insert(at, as_center(sub))
+    [i] => doc.centers[i].branches.insert(at, { side, node: as_node(sub) })
     _ => node_at(doc, parent[:]).children.insert(at, as_node(sub))
   }
 }
@@ -1013,12 +1013,12 @@ fn amend(doc : Doc, path : Array[Int], f : (Skeleton) -> Skeleton) -> Unit {
   match path {
     [] => ()
     [i] => {
-      let r = doc.roots[i]
-      doc.roots[i] = { ..r, skeleton: f(r.skeleton) }
+      let r = doc.centers[i]
+      doc.centers[i] = { ..r, skeleton: f(r.skeleton) }
     }
     [i, j] => {
-      let b = doc.roots[i].branches[j]
-      doc.roots[i].branches[j] = {
+      let b = doc.centers[i].branches[j]
+      doc.centers[i].branches[j] = {
         ..b,
         node: { ..b.node, skeleton: f(b.node.skeleton) },
       }
@@ -1034,15 +1034,15 @@ fn amend(doc : Doc, path : Array[Int], f : (Skeleton) -> Skeleton) -> Unit {
 ///|
 /// スロットの側を差し替える（side は場所の属性なので amend では届かない）。
 fn set_side(doc : Doc, i : Int, j : Int, side : Side) -> Unit {
-  let b = doc.roots[i].branches[j]
-  doc.roots[i].branches[j] = { ..b, side, }
+  let b = doc.centers[i].branches[j]
+  doc.centers[i].branches[j] = { ..b, side, }
 }
 
 ///|
 /// 深さ 2 以降のノードそのもの。道具が共有する唯一の座標系。
 fn node_at(doc : Doc, path : ArrayView[Int]) -> Node {
   guard! path is [i, j, .. rest]
-  let mut n = doc.roots[i].branches[j].node
+  let mut n = doc.centers[i].branches[j].node
   for k in rest {
     n = n.children[k]
   }
@@ -1050,10 +1050,10 @@ fn node_at(doc : Doc, path : ArrayView[Int]) -> Node {
 }
 
 ///|
-/// doc へ: Limb → Root 化（children を Branch(Right) で包む）/ Tree → 無変換
-fn as_root(sub : Sub) -> Root {
+/// doc へ: Limb → Center 化（children を Branch(Right) で包む）/ Whole → 無変換
+fn as_center(sub : Sub) -> Center {
   match sub {
-    Tree(r) => r
+    Whole(r) => r
     Limb(n) =>
       {
         id: n.id,
@@ -1064,10 +1064,10 @@ fn as_root(sub : Sub) -> Root {
 }
 
 ///|
-/// root / node へ: Tree → 解体（sides は深さの物理で消滅）/ Limb → そのまま
+/// center / node へ: Whole → 解体（sides は深さの物理で消滅）/ Limb → そのまま
 fn as_node(sub : Sub) -> Node {
   match sub {
-    Tree(r) =>
+    Whole(r) =>
       {
         id: r.id,
         skeleton: r.skeleton,
@@ -1089,10 +1089,10 @@ fn as_node(sub : Sub) -> Node {
 
 ### graft の変換表
 
-| 行き先 | `Sub` = `Tree(Root)` | `Sub` = `Limb(Node)` |
+| 行き先 | `Sub` = `Whole(Center)` | `Sub` = `Limb(Node)` |
 |---|---|---|
-| **doc**（`parent = []`） | 無変換。sides が無傷で旅する | **Root 化** — `children` を `Branch(Right)` で包む。`side` 引数は使わない |
-| **root**（`parent = [i]`） | **解体** — `branches` を捨てて `children` に（sides は深さの物理で消滅）。新しい `side` は**引数が決める** | `Branch(side)` で包む |
+| **doc**（`parent = []`） | 無変換。sides が無傷で旅する | **Center 化** — `children` を `Branch(Right)` で包む。`side` 引数は使わない |
+| **center**（`parent = [i]`） | **解体** — `branches` を捨てて `children` に（sides は深さの物理で消滅）。新しい `side` は**引数が決める** | `Branch(side)` で包む |
 | **node**（2 段以上） | **解体**（同上）。`side` 引数は捨てられる | そのまま。`side` 引数は捨てられる |
 
 ### `amend` の unused_value 警告について
@@ -1446,7 +1446,7 @@ export const doc = {
   /** 破れの一覧。空なら健全 */
   check: (md: string): string[] => JSON.parse(mbt.check(md)),
   project: (md: string): Mindmap => JSON.parse(mbt.project(md)),
-  /** parent は id（文書は 1）。left は行き先の側で、root 直下でだけ効く */
+  /** parent は id（文書は 1）。left は行き先の側で、center 直下でだけ効く */
   moveNodes: (
     md: string,
     ids: number[],
@@ -1539,7 +1539,7 @@ export function randomDoc(seed: number): string {
 }
 
 /** リポジトリ内の実文書。docs/ の md がそのまま法則 1・2 の入力になる */
-export function corpus(root = "."): { path: string; text: string }[] {
+export function corpus(center = "."): { path: string; text: string }[] {
   const skip = new Set([
     "node_modules",
     "_build",
@@ -1558,7 +1558,7 @@ export function corpus(root = "."): { path: string; text: string }[] {
         out.push({ path: p, text: readFileSync(p, "utf8") });
     }
   };
-  walk(root, 0);
+  walk(center, 0);
   return out;
 }
 
@@ -1843,7 +1843,7 @@ Total tests: 14, passed: 13, failed: 1.
 | 指摘 | 重み | 直す場所 | 直し方 |
 |---|---|---|---|
 | R1-04 / R2-02 / R3-05 | 重大・致命 | **新設 Task 10.5**（Task 10 と Task 11 の間） | `core/tree/spell.mbt` を **Create**。中身は §12 の逐語（`pub(all) struct Spell` / `pub let spell` / `pub fn eol_text`）。**テストは足さない**（値の固定は G3 Task 40 の 2 本が持つ）。Step 4 Expected: `Total tests: 25, passed: 25, failed: 0.`（Task 3 の +1 を含む）。`moon check` は `0 errors`（読み手がまだ居ないので警告は出うる。**可視性を下げて黙らせない**）。コミット: `feat: ✨ 正規形の綴りを 1 か所に括る` |
-| R1-11 | 軽微 | **Task 3**（check） | 条件 4 の文言を「**Implicit の子に項目は居ない**」に、違反メッセージを **`Implicit の子が項目 (id=7)`** に直す（§7）。テストを 1 本足して意図を固定する — `test "条件 4: Implicit の連鎖は合法（C16）" { let doc = make_doc([make_root(2, make_head("r"), [make_branch(Left, make_node(3, Implicit, [make_node(4, Implicit, [make_node(5, make_head("b"), [])])]))])]); assert_eq(check(doc), []) }`。Task 3 の Expected を 12 → **13**、以降の本数を全部 +1 |
+| R1-11 | 軽微 | **Task 3**（check） | 条件 4 の文言を「**Implicit の子に項目は居ない**」に、違反メッセージを **`Implicit の子が項目 (id=7)`** に直す（§7）。テストを 1 本足して意図を固定する — `test "条件 4: Implicit の連鎖は合法（C16）" { let doc = make_doc([make_center(2, make_head("r"), [make_branch(Left, make_node(3, Implicit, [make_node(4, Implicit, [make_node(5, make_head("b"), [])])]))])]); assert_eq(check(doc), []) }`。Task 3 の Expected を 12 → **13**、以降の本数を全部 +1 |
 | R1-12 / R3-16 | 軽微 | **Task 1**（make_wbtest.mbt） | `make_list` → **`make_item`** に改名（型は `Form::Item`。同じものを 2 つの語彙で呼ばない）。役割欄の「**全群が使う**」を「**G1 が置き、G3・G4・G5 のテストが葉の組み立てに使う**」に直す（本書 §4 で事実のほうを揃えたので、この記述は正しくなる） |
 | R1-07 | 重大 | **Task 11 Step 9** | 申し送り 1・2 を削る（本書 §5・§15 が取り込み済み）。代わりに「**§15 の裁定 9 件が本書に載っていることを確認する**」だけを残す。申し送り 3（G2 への引き継ぎ）は本書 §6・§9 に入ったので、こちらも削る |
 | R3-15 | 軽微 | 全 Task の Run 行 | 既に絶対パス。**Step 2 / 4 のテストはファイル指定に揃える**（`moon -C <root>/core test tree/<file>_wbtest.mbt`）。締め（Task 11）だけ `-p` |
@@ -1893,7 +1893,7 @@ Total tests: 14, passed: 13, failed: 1.
 
 | 指摘 | 重み | 直す場所 | 直し方 |
 |---|---|---|---|
-| **裁定 4 / R1-09** | **重大** | **Task 86**（flipSide） | ループの前に `let tops = crown(doc, ids)` を挟み、`for id in tops` に変える（`crown` は resolve できない id を落とすので、`hit` が false のまま抜けたときの `pick(ids)` はそのまま使える）。テストを 1 本足す — `test "root とその直下の枝を同時に選んでも二重には反転しない" { let doc = op_doc(); assert_eq(op_said(flip_side(doc, [2, 3])), "ok"); assert_eq(op_shape(doc), "doc(R2[<3(4(5))] R6[<7])") }`（**期待文字列は g5v の実測で確定させる**）。Task 86 の Expected を +3 → **+4**、G5 累計 31 → **32** |
+| **裁定 4 / R1-09** | **重大** | **Task 86**（flipSide） | ループの前に `let tops = crown(doc, ids)` を挟み、`for id in tops` に変える（`crown` は resolve できない id を落とすので、`hit` が false のまま抜けたときの `pick(ids)` はそのまま使える）。テストを 1 本足す — `test "center とその直下の枝を同時に選んでも二重には反転しない" { let doc = op_doc(); assert_eq(op_said(flip_side(doc, [2, 3])), "ok"); assert_eq(op_shape(doc), "doc(R2[<3(4(5))] R6[<7])") }`（**期待文字列は g5v の実測で確定させる**）。Task 86 の Expected を +3 → **+4**、G5 累計 31 → **32** |
 | **裁定 3 / R2-08 / R3-06** | **致命** | **Task 92**（reflect） | (1) 前提を「**G2 の `parse` と G3 の `serialize` が置かれていること。無ければ Task 91 で止める。スタブは 1 バイトも書かない**」に書き替え、「parse / serialize がスタブでも通る」の 2 行を**削除**する。(2) `reflect_json` を**書かない**（G4 の `json.mbt` へ移管）。`quote` への言及と「G4 より先に着手する場合は…」の但し書きを削除する。(3) `diff.mbt` に `pub(all) struct Reflection { ok : Bool; reason : String; text : String; edits : Array[Edit] }` を新設し、`reflect` の戻りを `String` から **`Reflection`** に変える:<br>`pub fn reflect(md : String, op : (Doc) -> Verdict) -> Reflection { let doc = parse(md); match op(doc) { Rejected(reason) => { ok: false, reason, text: md, edits: [] }; Applied => { let text = serialize(doc); { ok: true, reason: "", text, edits: safe_edits(md, text) } } } }`。(4) 「拒否は無編集」のテストを JSON 比較からフィールド比較に変える（`assert_eq(r.ok, false)` / `assert_eq(r.reason, "見つからない (id=7)")` / `assert_eq(r.text, "#  r  \n\n## a\n")` / `assert_eq(r.edits.length(), 0)`）。JSON の逐語は G4 の `json_wbtest.mbt` が固定する。**本数は 2 本のまま** |
 | **R1-10** | **重大** | **概要** | §「実測の裏付け」を新設し、上の g5v の実測結果（本数表と期待文字列）を貼る |
 | 裁定 5 / R2-16 / R3-07 | 重大 | **Task 80・83・94** | 腕数の定義と数字は**本書 §11 が正**。Task 94 の「腕数の定義」節は本書 §11 を指すだけにし、判定基準の数字（合格 3 以下・警告 4 腕・死 5 腕）と**逐語コメント 2 か所**（`tool.mbt` の冒頭と `amend` の直前）を §11 からそのまま写す。「契約 §6 の数字を直すこと」の申し送りは削る |
@@ -1944,7 +1944,7 @@ Total tests: 14, passed: 13, failed: 1.
 | R3-17 | 軽微 | **Task 64**（pathological） | `["NUL", "# a\n\n \n"]` を `["空白だけの行", "# a\n\n \n"]` に改名し、**本当に NUL を含む行**を 1 本足す（`["NUL", "# a\n\n\u0000\n"]`）。下限は 28 → **29** |
 | R2-15 / R3-15 | 軽微 | 全 Task の Run 行 | `moon -C core ...` / `pnpm ...` を絶対パスに揃え、`pnpm` を使う Step には「（cwd = `D:/1.atrium/mmm/.worktrees/feat/tree-core`。別のワークツリーから叩くと旧 core を測る）」の 1 行を足す |
 | S11・S12・S13・S14・S15 | 申し送り | **概要「契約に足すこと（5 件）」** | **節ごと削る**（本書 §13・§16 に取り込み済み。S14 の 4 件目だけは却下） |
-| **R3-08 / R3-09** | **重大** | **新設 Task 72**（`test/treeOps.test.ts`、G5 Task 93 から移管） | g5.md Task 93 の逐語をそのまま持ってきて、**2 か所だけ直す**。(1) delete のテストは id の同一性ではなく**ノード数**で見る（parse は `first_id` から振り直すので、消した id を次のノードが名乗る）:<br>`const before = idsOf(doc.project(md)).length;` / `const r = doc.deleteNodes(md, [victim]);` / `holds(md, r, "delete");` / `if (r.ok) { assert.ok(idsOf(doc.project(r.text)).length < before, \`delete でノードが減っていない: ${brief(md)}\`); }`<br>(2) 「無操作は無編集」のテストは**左の枝が居る文書を飛ばす** — `if (root.right.length === 0) continue;` の直後に `if (root.left.length > 0) continue; // at は branches の index。バケツの index ではない` を足す。treeOps は **5** 本 |
+| **R3-08 / R3-09** | **重大** | **新設 Task 72**（`test/treeOps.test.ts`、G5 Task 93 から移管） | g5.md Task 93 の逐語をそのまま持ってきて、**2 か所だけ直す**。(1) delete のテストは id の同一性ではなく**ノード数**で見る（parse は `first_id` から振り直すので、消した id を次のノードが名乗る）:<br>`const before = idsOf(doc.project(md)).length;` / `const r = doc.deleteNodes(md, [victim]);` / `holds(md, r, "delete");` / `if (r.ok) { assert.ok(idsOf(doc.project(r.text)).length < before, \`delete でノードが減っていない: ${brief(md)}\`); }`<br>(2) 「無操作は無編集」のテストは**左の枝が居る文書を飛ばす** — `if (center.right.length === 0) continue;` の直後に `if (center.left.length > 0) continue; // at は branches の index。バケツの index ではない` を足す。treeOps は **5** 本 |
 
 **G4 の終わりの形**: `pnpm run core` / `pnpm run check` / `pnpm run test:core`
 （`Total tests: 111` 以上・`Total tests: 0` でない）/ `pnpm test`（`ℹ fail 0`）/

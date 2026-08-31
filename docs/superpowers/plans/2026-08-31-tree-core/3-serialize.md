@@ -40,7 +40,7 @@ convert・format コマンド / すげ替え v1。この群が主張できるの
 `G1 → G2 / G3（並行）→ G5 → G4`。G3 が待つのは **G1 だけ**。
 
 - **G1 の Task 1 が済んでいること** — `core/tree/make_wbtest.mbt` の
-  `make_doc` / `make_root` / `make_branch` / `make_node` / `make_head` / `make_item` を wbtest が呼ぶ
+  `make_doc` / `make_center` / `make_branch` / `make_node` / `make_head` / `make_item` を wbtest が呼ぶ
 - **G1 の Task 10.5 が済んでいること** — `core/tree/spell.mbt`（`Spell` / `spell` / `eol_text`）。
   無いと Task 40 が `Error: [4021] The value identifier spell is unbound.` で止まる
 - **G1 の Task 2 が済んでいること** — `core/tree/moon.pkg` と `core/tree/doc.mbt`（契約 §6 の型）が
@@ -63,7 +63,7 @@ G1・G2・G4・G5 はこの一覧の名前を使わないこと。
 
 - 型（priv）: `Voice`（構築子 `Loud` / `Quiet`）/ `Pen`
 - 公開: `serialize`
-- 補助: `is_loud` `put` `split_nl` `repeat` `write_front` `write_root` `write_branches`
+- 補助: `is_loud` `put` `split_nl` `repeat` `write_front` `write_center` `write_branches`
   `turned` `same_side` `write_node` `inner_steps` `write_skeleton` `write_fold_open`
   `write_fold_close` `write_body` `write_blocks` `write_block` `write_content` `fence_for`
 - wbtest の組み立て: `write_tree` `write_head` `write_item` `write_gap`
@@ -80,7 +80,7 @@ G5 は `flipped` しか使わないので `same_side` は要らない。
 ```
 封筒（---・逐語・---）
 文書の散文（Doc.body — 最初の骨格より前）
-root ごとに:
+center ごとに:
   骨格行（Implicit は書かない）
   <details> と <summary>label</summary>（folded のとき）
   中身（body の Block を順に）
@@ -89,7 +89,7 @@ root ごとに:
   </details>（folded のとき）
 ```
 
-- **level = 深さ**。root が 1、スロットの占有者が 2、以下 +1。`#` の数がそのまま深さで、
+- **level = 深さ**。center が 1、スロットの占有者が 2、以下 +1。`#` の数がそのまま深さで、
   7 個以上も書く（憲法 §4「level は無制限」）
 - **字下げは段数（steps）で数える**。1 段 = `spell.step`（2 スペース）。
   見出しは常に 0 段、項目は親の中身の段 + 1、Implicit は何も書かないので親の段のまま
@@ -233,16 +233,16 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 正規形�
 - Modify: `D:/1.atrium/mmm/.worktrees/feat/tree-core/core/tree/serialize_wbtest.mbt`
 
 **Interfaces:**
-- Consumes: `Doc` / `Root` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol`（G1 `doc.mbt`）、
+- Consumes: `Doc` / `Center` / `Branch` / `Node` / `Skeleton` / `Form` / `Side` / `Eol`（G1 `doc.mbt`）、
   `spell` / `eol_text`（G1 `spell.mbt`）、
-  `make_doc` / `make_root` / `make_branch` / `make_node` / `make_head` / `make_item`（G1 `make_wbtest.mbt`）
+  `make_doc` / `make_center` / `make_branch` / `make_node` / `make_head` / `make_item`（G1 `make_wbtest.mbt`）
 - Produces:
   - `pub fn serialize(doc : Doc) -> String`
   - `priv enum Voice { Loud; Quiet }` / `priv struct Pen { sb : StringBuilder; eol : String; mut last : Voice? }`
   - `fn is_loud(voice : Voice) -> Bool`
   - `fn put(pen : Pen, voice : Voice, steps : Int, text : String) -> Unit`
   - `fn split_nl(text : String) -> Array[String]` / `fn repeat(unit : String, n : Int) -> String`
-  - `fn write_root(pen : Pen, root : Root) -> Unit`
+  - `fn write_center(pen : Pen, center : Center) -> Unit`
   - `fn write_node(pen : Pen, node : Node, depth : Int, steps : Int) -> Unit`
   - `fn inner_steps(skeleton : Skeleton, steps : Int) -> Int`
   - `fn write_skeleton(pen : Pen, skeleton : Skeleton, depth : Int, steps : Int) -> Unit`
@@ -256,9 +256,9 @@ git -C D:/1.atrium/mmm/.worktrees/feat/tree-core commit -m "test: ✅ 正規形�
 
 ```moonbit
 ///|
-/// root ひとつ。見出し・畳まず・中身なし。
-fn write_tree(id : Int, label : String, branches : Array[Branch]) -> Root {
-  make_root(id, make_head(label), branches)
+/// center ひとつ。見出し・畳まず・中身なし。
+fn write_tree(id : Int, label : String, branches : Array[Branch]) -> Center {
+  make_center(id, make_head(label), branches)
 }
 
 ///|
@@ -329,8 +329,8 @@ test "level は無制限。7 個以上の見出しも書く" {
 }
 
 ///|
-test "C15: 項目 root の子は 1 段字下げ（入れ子は相対記法）" {
-  let center = make_root(2, make_item("center"), [
+test "C15: 項目 center の子は 1 段字下げ（入れ子は相対記法）" {
+  let center = make_center(2, make_item("center"), [
     make_branch(Right, write_item(3, "a", [write_item(4, "b", [])])),
     make_branch(Right, write_item(5, "c", [])),
   ])
@@ -458,17 +458,17 @@ fn repeat(unit : String, n : Int) -> String {
 /// 正規形の md。決定的で、2 回目から不動（法則 2）。
 pub fn serialize(doc : Doc) -> String {
   let pen = { sb: StringBuilder::new(), eol: eol_text(doc.eol), last: None }
-  for root in doc.roots {
-    write_root(pen, root)
+  for center in doc.centers {
+    write_center(pen, center)
   }
   pen.sb.to_string()
 }
 
 ///|
-fn write_root(pen : Pen, root : Root) -> Unit {
-  write_skeleton(pen, root.skeleton, 1, 0)
-  let inner = inner_steps(root.skeleton, 0)
-  for branch in root.branches {
+fn write_center(pen : Pen, center : Center) -> Unit {
+  write_skeleton(pen, center.skeleton, 1, 0)
+  let inner = inner_steps(center.skeleton, 0)
+  for branch in center.branches {
     write_node(pen, branch.node, 2, inner)
   }
 }
@@ -732,15 +732,15 @@ fn fence_for(text : String) -> String {
 
 - [ ] **Step 4: 中身を歩きに繋ぐ**
 
-`write_root` と `write_node` の 2 か所に 1 行ずつ足す。差し替え後の全文:
+`write_center` と `write_node` の 2 か所に 1 行ずつ足す。差し替え後の全文:
 
 ```moonbit
 ///|
-fn write_root(pen : Pen, root : Root) -> Unit {
-  write_skeleton(pen, root.skeleton, 1, 0)
-  let inner = inner_steps(root.skeleton, 0)
-  write_body(pen, root.skeleton, inner)
-  for branch in root.branches {
+fn write_center(pen : Pen, center : Center) -> Unit {
+  write_skeleton(pen, center.skeleton, 1, 0)
+  let inner = inner_steps(center.skeleton, 0)
+  write_body(pen, center.skeleton, inner)
+  for branch in center.branches {
     write_node(pen, branch.node, 2, inner)
   }
 }
@@ -813,8 +813,8 @@ test "C16: 占有者が Implicit でも隙間にトグルは書ける" {
 }
 
 ///|
-test "C15: 項目 root のトグルは root の中身の列に置く" {
-  let center = make_root(2, make_item("center"), [
+test "C15: 項目 center のトグルは center の中身の列に置く" {
+  let center = make_center(2, make_item("center"), [
     make_branch(Right, write_item(3, "a", [])),
     make_branch(Right, write_item(4, "b", [])),
     make_branch(Left, write_item(5, "c", [])),
@@ -840,7 +840,7 @@ Total tests: 16, passed: 13, failed: 3.
 
 - [ ] **Step 3: スロットの列を書く**
 
-`core/tree/serialize.mbt` の `write_root` の直後に足す。
+`core/tree/serialize.mbt` の `write_center` の直後に足す。
 
 ```moonbit
 ///|
@@ -888,17 +888,17 @@ fn same_side(a : Side, b : Side) -> Bool {
 }
 ```
 
-- [ ] **Step 4: root の枝の並びを差し替える**
+- [ ] **Step 4: center の枝の並びを差し替える**
 
-`write_root` の `for` を 1 行に置き換える。差し替え後の全文:
+`write_center` の `for` を 1 行に置き換える。差し替え後の全文:
 
 ```moonbit
 ///|
-fn write_root(pen : Pen, root : Root) -> Unit {
-  write_skeleton(pen, root.skeleton, 1, 0)
-  let inner = inner_steps(root.skeleton, 0)
-  write_body(pen, root.skeleton, inner)
-  write_branches(pen, root.branches, inner)
+fn write_center(pen : Pen, center : Center) -> Unit {
+  write_skeleton(pen, center.skeleton, 1, 0)
+  let inner = inner_steps(center.skeleton, 0)
+  write_body(pen, center.skeleton, inner)
+  write_branches(pen, center.branches, inner)
 }
 ```
 
@@ -1028,17 +1028,17 @@ fn write_fold_close(pen : Pen, skeleton : Skeleton, steps : Int) -> Unit {
 
 - [ ] **Step 4: 包みを歩きに繋ぐ**
 
-`write_root` と `write_node` に開きと閉じを挟む。差し替え後の全文:
+`write_center` と `write_node` に開きと閉じを挟む。差し替え後の全文:
 
 ```moonbit
 ///|
-fn write_root(pen : Pen, root : Root) -> Unit {
-  write_skeleton(pen, root.skeleton, 1, 0)
-  let inner = inner_steps(root.skeleton, 0)
-  write_fold_open(pen, root.skeleton, inner)
-  write_body(pen, root.skeleton, inner)
-  write_branches(pen, root.branches, inner)
-  write_fold_close(pen, root.skeleton, inner)
+fn write_center(pen : Pen, center : Center) -> Unit {
+  write_skeleton(pen, center.skeleton, 1, 0)
+  let inner = inner_steps(center.skeleton, 0)
+  write_fold_open(pen, center.skeleton, inner)
+  write_body(pen, center.skeleton, inner)
+  write_branches(pen, center.branches, inner)
+  write_fold_close(pen, center.skeleton, inner)
 }
 
 ///|
@@ -1097,7 +1097,7 @@ test "C11: 封筒は柵ごと逐語。CRLF は 1 つのダイヤルで全行に�
     frontmatter: Some("image-folder: img"),
     eol: Crlf,
     body: [],
-    roots: [write_tree(2, "r", [make_branch(Left, write_head(3, "a", []))])],
+    centers: [write_tree(2, "r", [make_branch(Left, write_head(3, "a", []))])],
   }
   assert_eq(
     serialize(doc),
@@ -1111,7 +1111,7 @@ test "空の封筒も柵だけで書ける" {
     frontmatter: Some(""),
     eol: Lf,
     body: [],
-    roots: [write_tree(2, "r", [])],
+    centers: [write_tree(2, "r", [])],
   }
   assert_eq(serialize(doc), "---\n---\n\n# r\n")
 }
@@ -1122,7 +1122,7 @@ test "文書の散文は最初の骨格より前に置かれる" {
     frontmatter: None,
     eol: Lf,
     body: [Opaque("intro")],
-    roots: [write_tree(2, "r", [])],
+    centers: [write_tree(2, "r", [])],
   }
   assert_eq(serialize(doc), "intro\n\n# r\n")
 }
@@ -1173,8 +1173,8 @@ pub fn serialize(doc : Doc) -> String {
   let pen = { sb: StringBuilder::new(), eol: eol_text(doc.eol), last: None }
   write_front(pen, doc.frontmatter)
   write_blocks(pen, doc.body, 0)
-  for root in doc.roots {
-    write_root(pen, root)
+  for center in doc.centers {
+    write_center(pen, center)
   }
   pen.sb.to_string()
 }
