@@ -48,7 +48,8 @@ export async function toHash(text: string): Promise<string> {
   return `#${PREFIX}${toBase64Url(gzipped)}`;
 }
 
-/** 画像を貼った行があるか。`![...](...)` — 画像は旅をしないので警告に使う。 */
+/** 画像を貼った行があるか。`![...](...)` — 画像は旅をしないので、
+ *  Copy link の行に**押す前の但し書き**として出すのに使う。 */
 export function hasImages(text: string): boolean {
   return /!\[[^\]]*\]\([^)]*\)/.test(text);
 }

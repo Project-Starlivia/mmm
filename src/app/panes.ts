@@ -74,17 +74,22 @@ export function toggled(v: Vis, which: "md" | "map", list: readonly Vis[]): Vis 
   return list.length === 3 ? { ...v, [which]: true } : { md: which === "md", map: which === "map" };
 }
 
-/** その一手で何が起きるかを言う（矢印は向きを変えないので、言葉が担う） */
-function describe(from: Vis | undefined, to: Vis | undefined): string {
-  if (!from || !to) return "";
-  // 狭いときは両方が入れ替わる。そのときは**行き先の名前**を言う
-  if (from.md !== to.md && from.map !== to.map) {
-    return to.md ? "Show the Markdown pane" : "Show the map";
-  }
-  if (from.md !== to.md) {
-    return to.md ? "Show the Markdown pane" : "Hide the Markdown pane";
-  }
-  return to.map ? "Show the map" : "Hide the map";
+/**
+ * その姿の名前。**「その一手」ではなく「着く先」を言う。**
+ *
+ * 出す/隠すの動詞で言うと、同じ数か所を行き来する話が何通りにも散り、
+ * 呼び名まで揃わなくなる（`the Markdown pane` と `the map`）。姿に名前を
+ * 付ければ、居場所の数だけで足りる。
+ *
+ * **画面に `pane` とは書かない。** 見えているものの名前は Markdown と
+ * Mindmap の 2 つで、`pane` は器の呼び名（＝こちらの都合）でしかない。
+ * 両方のときだけ 2 つ並べるのは、「両方」と言うために要る語が他に無いから
+ * — 器の名前を借りるくらいなら、中身の名前を 2 つ並べる。
+ */
+function nameOf(v: Vis | undefined): string {
+  if (!v) return "";
+  if (v.md && v.map) return "Markdown + Mindmap";
+  return v.md ? "Markdown only" : "Mindmap only";
 }
 
 export function initPanes(args: {
@@ -126,8 +131,12 @@ export function initPanes(args: {
     const spot = spotOf(list, v);
     goLeft.disabled = spot <= 0;
     goRight.disabled = spot >= list.length - 1;
-    goLeft.title = describe(list[spot], list[spot - 1]);
-    goRight.title = describe(list[spot], list[spot + 1]);
+    // 絵しか持たない矢印。名前は動くたび変わる — 押した先の姿を言い切る
+    // 文言が、そのままアクセシブルネームにもなる
+    goLeft.title = nameOf(list[spot - 1]);
+    goLeft.setAttribute("aria-label", goLeft.title);
+    goRight.title = nameOf(list[spot + 1]);
+    goRight.setAttribute("aria-label", goRight.title);
     // focus must not stay in a hidden pane
     if (!v.md && mdPane.contains(document.activeElement)) mapPane.focus();
     if (!v.map && mapPane.contains(document.activeElement)) args.focusEditor();
@@ -211,7 +220,7 @@ export function initPanes(args: {
 function arrowButton(dir: "left" | "right"): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  const svg = icon("chevron");
+  const svg = icon("chevron-down");
   svg.classList.add(dir === "left" ? "point-left" : "point-right");
   button.append(svg);
   return button;

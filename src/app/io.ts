@@ -63,7 +63,7 @@ async function readDoc(file: FileSystemFileHandle): Promise<Doc> {
 
 async function use(file: FileSystemFileHandle): Promise<Doc> {
   current = file;
-  await handles.saveFile(file);
+  await handles.opened(file);
   return readDoc(file);
 }
 
@@ -79,30 +79,21 @@ async function write(file: FileSystemFileHandle, text: string): Promise<void> {
 export const io = {
   currentFile: (): FileSystemFileHandle | null => current,
 
-  /** 許可が残っている前回のファイルを起動時に読み直す。 */
-  async startupDoc(): Promise<Doc | null> {
-    const file = await handles.file();
-    if (!file) return null;
-    current = file;
-    if ((await file.queryPermission({ mode: "readwrite" })) !== "granted") {
-      return null;
-    }
-    return readDoc(file);
-  },
-
-  /** ファイル名のクリックから、前回の許可を取り直す。 */
-  async restoreDoc(): Promise<Doc | null> {
-    const file = current ?? (await handles.file());
-    if (!file) return null;
+  /**
+   * 覚えている文書を開く。**許可はここで取り直す** — 札は残っていても
+   * 触ってよいかは別の台帳で、押した瞬間しか聞けない（押されたことが
+   * その資格になる）。断られたら null。
+   */
+  async openKnown(file: FileSystemFileHandle): Promise<Doc | null> {
     if ((await file.requestPermission({ mode: "readwrite" })) !== "granted") {
       return null;
     }
     return use(file);
   },
 
-  async close(): Promise<void> {
+  /** いまのファイルを手放す（New file）。**覚えている一覧はそのまま** */
+  close(): void {
     current = null;
-    await handles.clearFile();
   },
 
   /** このブラウザがファイルを開けるか。**スマホには無い** —
@@ -136,7 +127,7 @@ export const io = {
       const file = await pick({ suggestedName: suggested, types: MARKDOWN });
       await write(file, text);
       current = file;
-      await handles.saveFile(file);
+      await handles.opened(file);
       return { name: file.name, text };
     } catch (error) {
       if (isCancel(error)) return null;
@@ -145,19 +136,24 @@ export const io = {
   },
 
   /**
+   * この環境が改名を持つか。**押す前に分かることは、押す前に言う** —
+   * `move` の有無はブラウザで決まっていて、試すまでもない。
+   *
+   * `move` は Chromium だけが持つ（Firefox / Safari は OPFS の中にしか
+   * 無い）。mmm は元から Chromium 限定と言い切っているので前提は変わらない。
+   */
+  canRename: (): boolean =>
+    typeof FileSystemFileHandle.prototype.move === "function",
+
+  /**
    * いま開いているファイル**そのもの**の名前を変える（`move` は同じ
    * フォルダの中での改名になる）。保存していなければ何もしない — 名前を
    * 変える相手がディスクに無い。
-   *
-   * `move` は Chromium だけが持つ（Firefox / Safari は OPFS の中にしか
-   * 無い）。mmm は元から Chromium 限定と言い切っているので前提は変わらないが、
-   * 無い環境で黙って何も起きないのは通らないので、無ければそう言う。
    */
   async rename(name: string): Promise<string | null> {
-    if (!current) return null;
-    if (typeof current.move !== "function") throw new Error("no-rename");
+    if (!current?.move) return null;
     await current.move(name);
-    await handles.saveFile(current);
+    await handles.opened(current);
     return current.name;
   },
 };

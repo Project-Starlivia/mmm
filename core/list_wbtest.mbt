@@ -201,3 +201,31 @@ test "pasted heading fragments with content indent into the list form" {
   let pasted = relevel_text("## x\n\nhttps://e.example\n\n### z\n", 3)
   assert_eq(pasted, "    - x\n\n      https://e.example\n\n      - z\n")
 }
+
+///|
+/// 2 行以上の中身（コードフェンスの開きと閉じ）を一度に足しても、
+/// **全部の行**が項目の中身の列まで字下げされる。先頭だけ字下げしていた頃は
+/// 2 行目から列 0 に落ち、外のパーサがそこでリストを閉じて続く兄弟が
+/// 迷子になった（1 行の追記で踏んだ事故が、複数行で再演する）。
+test "multi-line content is indented on every line" {
+  ignore(init_doc("# r\n\n## a\n\n## b\n"))
+  ignore(set_list_from(1))
+  ignore(reformat(""))
+  let a = st.nodes[1].id
+  ignore(insert_content(a, "```\n\n```", ""))
+  // 中の空行にも基準列ぶんの字下げが入る（フェンスの中では、それは余分な
+  // 空白ではなく塊の基準列）。追記の後ろの空行は block_insert の既存の規則。
+  assert_eq(get_text(), "- r\n  - a\n\n    ```\n    \n    ```\n\n  - b\n")
+  // 足したフェンスは、コアからもフェンスとして読める（中身は木を割らない）
+  assert_eq(st.nodes.length(), 3)
+  assert_eq(st.fences.length(), 1)
+}
+
+///|
+/// 見出しの形（列 0）では字下げしない。空行に空白を置き去りにもしない。
+test "multi-line content in heading form stays at column 0" {
+  ignore(init_doc("# r\n\n## a\n"))
+  let a = st.nodes[1].id
+  ignore(insert_content(a, "```\n\n```", ""))
+  assert_eq(get_text(), "# r\n\n## a\n\n```\n\n```\n")
+}
