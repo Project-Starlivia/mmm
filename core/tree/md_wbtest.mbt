@@ -33,7 +33,7 @@ fn at(s : @markdown.Span) -> String {
 ///|
 /// 文書ぜんぶの指紋。frontmatter が在れば頭に付く。
 fn sig(md : String) -> String {
-  let doc = @markdown.parse(md).document
+  let doc = read(md)
   let sb = StringBuilder::new()
   match doc.frontmatter {
     Some(f) => sb.write_string("Front\{at(f.span)} ")
