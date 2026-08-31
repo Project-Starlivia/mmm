@@ -11,31 +11,17 @@
 **型は名乗らせず確かめる。** `as T` も `!` も置かない — 外れていても誰も
 気づけないため（実際 `<svg id="logo">` を `HTMLElement` と名乗り続けていた）。
 `instanceof` / 型ガード / 既定値のどれかで確かめる。
-守っているかは `test/assertions.test.ts` が見張る。
+（見張っていた `test/assertions.test.ts` は core と一緒に消してある。
+core が揃ったら戻す）
 
 ```
-core/   MoonBit — ドキュメントモデル。テキストが唯一の真実。構造操作はすべて
-        文字オフセットの編集セットに変換されるため、未編集行のバイト列は
-        決して再整形されない。
-  core.mbt      パッケージ先頭の一言(このコメントだけ。実体は無い)
-  parser.mbt    行スキャン(見出し / フェンス区間 / hide 領域を 1 パスで)
-  doc.mbt       状態と木の再構築。ノードは [from, to) の区間に付けた名前
-  edit.mbt      Edit 型と純関数(適用 / 逆転 / オフセットのまとめ写し)
-  history.mbt   単一 Undo スタックとトランザクション
-  heading.mbt   見出し行を書く・整える・探す道具
-  add.mbt       作るコマンド(子 / 兄弟 / 親 / ルート)
-  move.mbt      動かすコマンド(D&D / 並べ替え / インデント)
-  cmds.mbt      その場のコマンド(rename / delete / hide / コピー用テキスト)
-  relevel.mbt   貼り付けた断片の見出しの深さを読み替える(st に触らない純関数)
-  api.mbt       スナップショット契約(文字列 in・JSON 文字列 out)
-  js/           api.mbt を browser 向けに #export_name で包むだけの薄い層
-                (exports.mbt)。分けるのは、core 本体を moon test だけで
-                試験できる状態に保つため
-  core_test.mbt 上記すべての単体テスト(構造コマンド・Undo・hide/show・
-                フェンス区間・id 保持)
-src/    TypeScript — UI
-  coreApi.ts   MoonBit core への型付きラッパー。DocView(テキスト+ノード+
-               フェンス+頭)は必ず同じ rev の組で持ち回る
+core/   MoonBit — 文書モデル。**いま作り直している最中**で、旧 core は
+        消してある(下の「文書モデル(作りかけ)」がこれから作る形)。
+        アプリは繋ぎ先を失っているので、揃うまで組み上がらない。
+  tree/         新しい core。md.mbt が読みの入口、md_wbtest.mbt が
+                「この md はこう読まれる」を指紋で固定したもの
+src/    TypeScript — UI。**core が揃うまで触らない。** 繋ぎ先(旧 coreApi.ts)は
+        消してあるので、いまはコンパイルできない
   editor.ts    Markdown 側(CodeMirror 6、履歴はコアに委譲。フェンスの
                中は map/highlight.ts と同じ言語表で色を付ける)
   mindmap.ts   Mindmap 側(見た目の状態と入力処理)
@@ -67,14 +53,11 @@ src/    TypeScript — UI
                export(Mindmap を外へ出す。ファイルにもクリップボードにも) /
                draw(その場で描く窓) / form(木の書き方 # / n+ / - の切り替え) /
                paneTool(隅に浮く道具の器。押しても下へ抜けない)
-test/   検証 — *.test.ts(往復 / コマンド / コピペ / 貼り付けの判断 / 名前 /
-        画像パス / カード行 / 行とブロックの編集 / 落とし先 / 矢印の行き先 /
-        カーソルの居場所 /
-        座標 / 入力欄の位置 / フェンス編集 / 書き出す範囲 /
-        型アサーションを置かない決めごと / 居場所 / + の置き場所 /
-        指の台帳)、
-        tools/(負荷サンプル生成・性能の物差し)、
-        fixtures/(負荷サンプル。往復テストの入力も兼ねる)
+test/   検証 — core に触らないものだけが残っている(画像パス / 行とブロックの
+        編集 / 座標 / 指の台帳 / コードの色分け / 画面外の針 / ペイン /
+        URL 共有 / 寄せ / + の置き場所)。**core に触る 16 本は旧 core と
+        一緒に消した** — 新しい core が出来てから書き直す。
+        tools/(負荷サンプル生成)、fixtures/(負荷サンプル)
 docs/   記録 — spec.md はこのファイル、shortcuts.md はキーの一覧
         （なぜそのキーかは spec.md 側）、web.md は Web へ戻した理由と段取り、
         origin.md は最初の企画メモ、freedom.md は「自由な Mindmap」との
