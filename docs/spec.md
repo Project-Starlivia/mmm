@@ -1004,24 +1004,24 @@ core を作り直している。**ここから下は今のコードの説明で�
 ### 型
 
 ```
-Doc     { frontmatter: String?, eol: Eol, body: [Block], roots: [Root] }
-Root    = Implicit(id, headings)            // 根も 3 種。種類が翼の種類を決める
-        | Explicit(node, items, headings)   // 項目の翼と見出しの翼は別の列
-        | Item(node, items)
+Doc     { frontmatter: String?, eol: Eol, forest: Forest }   // ファイルの封筒
+Forest  { body: [Block], roots: [Root] }    // 再帰の錨。Fold がしまうのもこれ
+Root    = Head(Heading) | Item(Item)        // 文書順の混在列
 Heading = Implicit(id, headings)            // 綴られなかった見出し(階層の飛び)
-        | Explicit(node, items, headings)
+        | Explicit(node, items, headings)   // 項目の列が先(順序法則)
 Item    { node, children }                  // 子も項目(単調性)
 Node    { id, label, body: [Block] }        // 綴られた節の中身
-Side    = Right | Left                      // 保存しない。継ぎ目からの導出値(下記)
-Block   = Content(Image | Code | Svg | Link) | Rule | Opaque(text)
-        | Fold(summary: String?, doc: Doc)  // <details>。中身は独立した文書
+Block   = Content(Image | Code | Svg | Link) | Rule | Opaque(text) | Fold(Fold)
+Fold    { id, summary: String?, forest: Forest }   // <details>。森をしまう
 ```
 
 - 節の種類ごとに型を分ける。**子に来られるものが親の種類で決まる**ので、
-  単調性(項目の子孫は項目)・順序法則(項目の列が先)・根と翼の対応・
+  単調性(項目の子孫は項目)・順序法則(項目の列が先)・
   「Implicit は綴りを持たない」が構造から不可能になる
-- **側はどこにも保存しない。** 真実は翼の並びと body(継ぎ目を含む)で、
-  側は project が導出する
+- **封筒(frontmatter / eol)はファイルに 1 つ。** 再帰するのは Forest だけなので、
+  しまった森に封筒は紛れ込まない
+- **側と翼はここに無い。** 真実は roots の並びと body(継ぎ目を含む)で、
+  側は project が導出して出力にだけ現れる
 - 型で守れない分は check が見る — id 一意 / Implicit は子を持つ限り在る
 
 `project(Doc)` が側を貼った左右の木を作り、JSON で ts へ渡す。
@@ -1116,7 +1116,6 @@ Rule は body の生ブロックで、書かれた場所に居て、そのまま
 ### 決まっていないこと
 
 - **`Doc` が span をどう持つか。** 反映が要るが、型に載せると `Doc` が特定の原文に縛られる
-- **Fold(しまったもの)の id。** 選択・移動の対象にするなら要る。Block は今どれも id を持たない
 - **しまう / コメントアウトの操作の割り当て。** 旧 `Shift+H` をどちらに渡すか
 - **旧方言で書かれた既存文書の移行。** コメント畳み・`---` トグル・本数の意味は
   もう読まれない。開いたときにどう案内するか
