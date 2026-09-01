@@ -10,7 +10,7 @@
 ///|
 /// 積み上げ中のノード。深さは stack の高さが持つので、自分では持たない。
 priv struct Frame {
-  node : Node
+  mut node : Node
   kids : Array[Frame]
   /// 翼になる深さ 2 の枠だけが意味を持つ。深いところの側は型で存在しない
   mut side : Side
@@ -33,6 +33,7 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
     head: 0,
     side: Right,
     pend: false,
+    folds: 0,
   }
   for block in ast.children {
     take(b, block, 0)
@@ -71,6 +72,8 @@ priv struct Build {
   mut side : Side
   /// 隙間に区切りが有ったか。**本数によらず 1 回**なので Bool で持つ
   mut pend : Bool
+  /// 開いている畳みの数。相手の居ない `</details>` を逐語のまま残すために数える
+  mut folds : Int
 }
 
 ///|
@@ -99,12 +102,44 @@ fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
       } else {
         fill(b, Rule)
       }
+    // 畳みは骨格行の外側に付く。中身と子だけを包むので、いま積んでいる
+    // ノードが畳まれる。`<summary>` は開きと同じ塊に入るので一緒に落ちる
+    HtmlBlock(html~, ..) if opens_fold(html) => {
+      fold(b)
+      b.folds = b.folds + 1
+    }
+    HtmlBlock(html~, ..) if closes_fold(html) && b.folds > 0 =>
+      b.folds = b.folds - 1
     _ =>
       match content_of(b.md, block) {
         Some(c) => fill(b, c)
         None => ()
       }
   }
+}
+
+///|
+/// いま積んでいるノードを畳む。Implicit は綴りが無いので畳めない。
+fn fold(b : Build) -> Unit {
+  guard b.stack.length() > 0 else { return }
+  let f = b.stack[b.stack.length() - 1]
+  match f.node {
+    Explicit(sign~, label~, body~, ..) =>
+      f.node = Explicit(sign~, label~, folded=true, body~)
+    Implicit => ()
+  }
+}
+
+///|
+fn opens_fold(html : String) -> Bool {
+  html.trim().has_prefix("<details")
+}
+
+///|
+/// 相手の居ない `</details>` は畳みを閉じない。逐語のまま中身として残る
+/// （捨てるかエスケープするかは未決 — 落とすと意味が消えるので、いまは残す）。
+fn closes_fold(html : String) -> Bool {
+  html.trim() == "</details>"
 }
 
 ///|
