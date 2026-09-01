@@ -80,6 +80,9 @@ priv struct Build {
 /// ブロック 1 枚を積む。`nest` は項目の入れ子段数。
 fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
   match block {
+    // **単調性 — 項目の子孫は項目。** 項目の領土に書かれた見出しは骨格に
+    // ならず、逐語のまま中身になる（列 0 へ出れば項目が閉じて木が変わる）
+    Heading(..) if nest > 0 => fill(b, Opaque(verbatim(b.md, block)))
     Heading(level~, style~, children~, span~, ..) => {
       b.head = level
       put(
