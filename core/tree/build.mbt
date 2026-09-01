@@ -1,6 +1,6 @@
 // mdAst → mmmTree。mmm の解釈はここにしか無い。
 //
-// 骨格（いまは見出しだけ）を深さで積み上げる。深さが飛んだら、間を Implicit が
+// 骨格（見出しと項目）を深さで積み上げる。深さが飛んだら、間を Implicit が
 // 埋める — 飛びは構造なので保存し、綴りが無いことだけを型で表す。
 //
 // 積むあいだは深さだけを見る平らな Frame で持ち、役割型（Root / Wing / Branch）
@@ -23,29 +23,15 @@ pub fn parse(md : String) -> Doc {
 ///|
 /// mdAst を mmmTree にする。ラベルは原文から切り出す（mmm はインラインを解釈しない）。
 pub fn build(md : String, ast : @markdown.Document) -> Doc {
-  let forest : Array[Frame] = []
-  let stack : Array[Frame] = []
+  let b : Build = { md, forest: [], stack: [], head: 0 }
   for block in ast.children {
-    match block {
-      Heading(level~, style~, children~, span~, ..) =>
-        put(
-          forest,
-          stack,
-          level,
-          Explicit(
-            sign=Heading,
-            label=label_of(md, span, style, children),
-            folded=false,
-            body=[],
-          ),
-        )
-      _ => ()
-    }
+    take(b, block, 0)
   }
   let next = { val: doc_id + 1 }
+  let forest = b.forest
   {
     frontmatter: ast.frontmatter.map(f => f.raw),
-    eol: if md.contains("\r\n") {
+    eol: if b.md.contains("\r\n") {
       Crlf
     } else {
       Lf
@@ -60,34 +46,100 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
 pub let doc_id : Int = 1
 
 ///|
+/// 積み上げの途中。`head` は直近の見出しの深さで、**見出しは入れ子をリセットする**
+/// ので、項目の深さは「直近の見出しの深さ + 1 + 入れ子段数」になる。
+priv struct Build {
+  md : String
+  forest : Array[Frame]
+  stack : Array[Frame]
+  mut head : Int
+}
+
+///|
+/// ブロック 1 枚を積む。`nest` は項目の入れ子段数。
+fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
+  match block {
+    Heading(level~, style~, children~, span~, ..) => {
+      b.head = level
+      put(
+        b,
+        level,
+        Explicit(
+          sign=Heading,
+          label=head_label(b.md, span, style, children),
+          folded=false,
+          body=[],
+        ),
+      )
+    }
+    BulletList(items~, ..) => items_take(b, items, nest)
+    OrderedList(items~, ..) => items_take(b, items, nest)
+    _ => ()
+  }
+}
+
+///|
+/// 項目の列。**最初の段落がラベル**で、残りは中身か入れ子の項目。
+fn items_take(b : Build, items : Array[@markdown.ListItem], nest : Int) -> Unit {
+  for it in items {
+    let rest = []
+    let mut label = ""
+    let mut named = false
+    for c in it.children {
+      if !named && c is Paragraph(..) {
+        label = item_label(b.md, c)
+        named = true
+      } else {
+        rest.push(c)
+      }
+    }
+    put(
+      b,
+      b.head + 1 + nest,
+      Explicit(sign=Item, label~, folded=false, body=[]),
+    )
+    for c in rest {
+      take(b, c, nest + 1)
+    }
+  }
+}
+
+///|
+/// 項目のラベル。段落の span は中身の先頭から始まるので、見出しと違って
+/// マーカーの読み飛ばしが要らない（実測は probe を参照）。
+fn item_label(md : String, p : @markdown.Block) -> String {
+  guard p is Paragraph(children~, span~, ..) else { return "" }
+  if children.is_empty() {
+    return ""
+  }
+  let len = span_of(children[children.length() - 1]).to
+  String::unsafe_substring(md, start=span.from, end=span.from + len)
+}
+
+///|
 /// 深さ level のノードを置く。浅く戻るときは積んだぶんを落とし、
 /// 深く飛ぶときは間を Implicit で埋める（飛びは綴りであって、無ではない）。
-fn put(
-  forest : Array[Frame],
-  stack : Array[Frame],
-  level : Int,
-  node : Node,
-) -> Unit {
-  while stack.length() >= level {
-    ignore(stack.unsafe_pop())
+fn put(b : Build, level : Int, node : Node) -> Unit {
+  while b.stack.length() >= level {
+    ignore(b.stack.unsafe_pop())
   }
-  while stack.length() < level - 1 {
+  while b.stack.length() < level - 1 {
     let gap : Frame = { node: Implicit, kids: [] }
-    seat(forest, stack, gap)
-    stack.push(gap)
+    seat(b, gap)
+    b.stack.push(gap)
   }
   let f : Frame = { node, kids: [] }
-  seat(forest, stack, f)
-  stack.push(f)
+  seat(b, f)
+  b.stack.push(f)
 }
 
 ///|
 /// 積んである親の子にする。親が居なければ森の 1 本として生やす。
-fn seat(forest : Array[Frame], stack : Array[Frame], f : Frame) -> Unit {
-  if stack.is_empty() {
-    forest.push(f)
+fn seat(b : Build, f : Frame) -> Unit {
+  if b.stack.is_empty() {
+    b.forest.push(f)
   } else {
-    stack[stack.length() - 1].kids.push(f)
+    b.stack[b.stack.length() - 1].kids.push(f)
   }
 }
 
@@ -98,7 +150,7 @@ fn seat(forest : Array[Frame], stack : Array[Frame], f : Frame) -> Unit {
 /// インラインの span は**中身に対する 0 始まりの相対**なので、原文の
 /// どこから中身が始まるかは自分で数える。実測（`# a` / `#   a` / `# a #` /
 /// setext）は probe_wbtest.mbt に固定してある。
-fn label_of(
+fn head_label(
   md : String,
   span : @markdown.Span,
   style : @markdown.HeadingStyle,
