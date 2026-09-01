@@ -141,3 +141,170 @@ test "順序法則 — 見出しのあとの項目は子になる" {
     ],
   })
 }
+
+///|
+/// 列 0 の見出しは md でも項目を閉じる。深さの計算だけで項目の下へ潜ると
+/// 単調性が破れるので、見出しを積む前に項目の枠を落とす。C17 を全部の
+/// 深さへ広げたもの。
+test "単調性 — 深い見出しも項目の下へ潜らない" {
+  json_inspect(parse("# r\n\n- b\n\n### x\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "id": 2,
+        "node": [
+          "Explicit",
+          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
+        ],
+        "wings": [
+          {
+            "side": "Right",
+            "branch": {
+              "id": 3,
+              "node": [
+                "Explicit",
+                { "sign": "Item", "label": "b", "folded": false, "body": [] },
+              ],
+              "children": [],
+            },
+          },
+          {
+            "side": "Right",
+            "branch": {
+              "id": 4,
+              "node": "Implicit",
+              "children": [
+                {
+                  "id": 5,
+                  "node": [
+                    "Explicit",
+                    {
+                      "sign": "Heading",
+                      "label": "x",
+                      "folded": false,
+                      "body": [],
+                    },
+                  ],
+                  "children": [],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  })
+}
+
+///|
+test "単調性 — 項目の根の下にも潜らない" {
+  json_inspect(parse("- a\n\n### x\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "id": 2,
+        "node": [
+          "Explicit",
+          { "sign": "Item", "label": "a", "folded": false, "body": [] },
+        ],
+        "wings": [],
+      },
+      {
+        "id": 3,
+        "node": "Implicit",
+        "wings": [
+          {
+            "side": "Right",
+            "branch": {
+              "id": 4,
+              "node": "Implicit",
+              "children": [
+                {
+                  "id": 5,
+                  "node": [
+                    "Explicit",
+                    {
+                      "sign": "Heading",
+                      "label": "x",
+                      "folded": false,
+                      "body": [],
+                    },
+                  ],
+                  "children": [],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  })
+}
+
+///|
+test "単調性 — 入れ子項目の後ろでも潜らない" {
+  json_inspect(parse("# r\n\n- b\n\n  - c\n\n### x\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "id": 2,
+        "node": [
+          "Explicit",
+          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
+        ],
+        "wings": [
+          {
+            "side": "Right",
+            "branch": {
+              "id": 3,
+              "node": [
+                "Explicit",
+                { "sign": "Item", "label": "b", "folded": false, "body": [] },
+              ],
+              "children": [
+                {
+                  "id": 4,
+                  "node": [
+                    "Explicit",
+                    {
+                      "sign": "Item",
+                      "label": "c",
+                      "folded": false,
+                      "body": [],
+                    },
+                  ],
+                  "children": [],
+                },
+              ],
+            },
+          },
+          {
+            "side": "Right",
+            "branch": {
+              "id": 5,
+              "node": "Implicit",
+              "children": [
+                {
+                  "id": 6,
+                  "node": [
+                    "Explicit",
+                    {
+                      "sign": "Heading",
+                      "label": "x",
+                      "folded": false,
+                      "body": [],
+                    },
+                  ],
+                  "children": [],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  })
+}

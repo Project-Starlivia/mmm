@@ -187,6 +187,15 @@ fn item_label(md : String, p : @markdown.Block) -> String {
 /// 深さ level のノードを置く。浅く戻るときは積んだぶんを落とし、
 /// 深く飛ぶときは間を Implicit で埋める（飛びは綴りであって、無ではない）。
 fn put(b : Build, level : Int, node : Node) -> Unit {
+  // **見出しは見出しの背骨にしか積まれない。** 項目の枠は見出しの親に
+  // なれないので落とす（列 0 の見出しは md でも項目を閉じる）。C17 を
+  // 深さ 1 から全部の深さへ広げたもの。これが無いと項目の子が見出しになる
+  if node is Explicit(sign=Heading, ..) {
+    while b.stack.length() > 0 &&
+          b.stack[b.stack.length() - 1].node is Explicit(sign=Item, ..) {
+      ignore(b.stack.unsafe_pop())
+    }
+  }
   if level == 1 || b.stack.is_empty() {
     // 新しい木を始める。待っている区切りは行き先を失うので飾りに落ち、
     // 側は右へ戻る。
