@@ -1011,8 +1011,10 @@ Heading = Implicit(id, headings)            // 綴られなかった見出し(�
 Item    { node, children }                  // 子も項目(単調性)
 Wing[T] { seams: Int, branch: T }           // 子の口。直前の継ぎ目の本数を持つ
 Node    { id, label, body: [Block] }        // 綴られた節の中身
-Block   = Content(Image | Code | Svg | Link) | Rule | Opaque(text) | Fold(Fold)
-Fold    { id, text }                        // <details>。領域の逐語
+Block   = Image | Link | Code | Svg         // 中身 1 枚。包みは無い
+        | Rule                              // 境界にならなかった継ぎ目。線
+        | Fold(id, text)                    // <details>。領域の逐語
+        | Opaque(text)                      // 読み解かない逐語
 ```
 
 (items / headings / children は Wing で包んだ列。表記は省いた)
@@ -1025,6 +1027,9 @@ Fold    { id, text }                        // <details>。領域の逐語
   content として body に残る。**側そのものは保存しない** — seams の偶奇を
   歩けば出る(1 = 反対側、2 = 同じ側の新グループ)。深い所の seams は側を
   持つ相手が居ないので、継ぎ目の線として描くだけ
+- **Block に包みを作らない。** 「解釈できた/できなかった」は `Opaque` という
+  名前が担うので、Content でくくる段を挟まない。カードかどうかは描画側の
+  分類であって、core は意味だけを持つ
 - 型で守れない分は check が見る — id 一意 / Implicit は子を持つ限り在る
 
 `project(Doc)` が側を貼った左右の木を作り、JSON で ts へ渡す。
