@@ -23,7 +23,7 @@ pub fn parse(md : String) -> Doc {
 ///|
 /// mdAst を mmmTree にする。ラベルは原文から切り出す（mmm はインラインを解釈しない）。
 pub fn build(md : String, ast : @markdown.Document) -> Doc {
-  let b : Build = { md, forest: [], stack: [], head: 0 }
+  let b : Build = { md, forest: [], stack: [], body: [], head: 0 }
   for block in ast.children {
     take(b, block, 0)
   }
@@ -36,7 +36,7 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
     } else {
       Lf
     },
-    body: [],
+    body: b.body,
     roots: forest.map(f => to_root(f, next)),
   }
 }
@@ -52,6 +52,8 @@ priv struct Build {
   md : String
   forest : Array[Frame]
   stack : Array[Frame]
+  /// 最初の骨格より前の散文
+  body : Array[Block]
   mut head : Int
 }
 
@@ -74,7 +76,11 @@ fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
     }
     BulletList(items~, ..) => items_take(b, items, nest)
     OrderedList(items~, ..) => items_take(b, items, nest)
-    _ => ()
+    _ =>
+      match content_of(b.md, block) {
+        Some(c) => fill(b, c)
+        None => ()
+      }
   }
 }
 
