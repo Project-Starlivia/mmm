@@ -8,19 +8,19 @@ test "散文はノードの中身になる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          {
-            "sign": "Heading",
+      [
+        "Explicit",
+        {
+          "node": {
+            "id": 2,
             "label": "a",
             "folded": false,
             "body": [["Opaque", "hello"]],
           },
-        ],
-        "wings": [],
-      },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -31,19 +31,19 @@ test "中身は文書順に並ぶ" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          {
-            "sign": "Heading",
+      [
+        "Explicit",
+        {
+          "node": {
+            "id": 2,
             "label": "a",
             "folded": false,
             "body": [["Opaque", "hello"], ["Opaque", "world"]],
           },
-        ],
-        "wings": [],
-      },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -54,36 +54,36 @@ test "中身は深さで振り分けられる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          {
-            "sign": "Heading",
+      [
+        "Explicit",
+        {
+          "node": {
+            "id": 2,
             "label": "a",
             "folded": false,
             "body": [["Opaque", "x"]],
           },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
+          "items": [],
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
                 {
-                  "sign": "Heading",
-                  "label": "b",
-                  "folded": false,
-                  "body": [["Opaque", "y"]],
+                  "node": {
+                    "id": 3,
+                    "label": "b",
+                    "folded": false,
+                    "body": [["Opaque", "y"]],
+                  },
+                  "items": [],
+                  "headings": [],
                 },
               ],
-              "children": [],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -94,14 +94,14 @@ test "最初の骨格より前の散文は文書のもの" {
     "eol": "Lf",
     "body": [["Opaque", "intro"]],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "a", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -112,19 +112,19 @@ test "画像" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          {
-            "sign": "Heading",
+      [
+        "Explicit",
+        {
+          "node": {
+            "id": 2,
             "label": "a",
             "folded": false,
             "body": [["Content", ["Image", { "alt": "alt", "src": "x.png" }]]],
           },
-        ],
-        "wings": [],
-      },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -135,21 +135,21 @@ test "リンク" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          {
-            "sign": "Heading",
+      [
+        "Explicit",
+        {
+          "node": {
+            "id": 2,
             "label": "a",
             "folded": false,
             "body": [
               ["Content", ["Link", { "text": "text", "href": "https://e.com" }]],
             ],
           },
-        ],
-        "wings": [],
-      },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -160,19 +160,19 @@ test "混ざった段落は切り分けない" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          {
-            "sign": "Heading",
+      [
+        "Explicit",
+        {
+          "node": {
+            "id": 2,
             "label": "a",
             "folded": false,
             "body": [["Opaque", "see ![alt](x.png)"]],
           },
-        ],
-        "wings": [],
-      },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -183,21 +183,21 @@ test "フェンスのコード" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          {
-            "sign": "Heading",
+      [
+        "Explicit",
+        {
+          "node": {
+            "id": 2,
             "label": "a",
             "folded": false,
             "body": [
               ["Content", ["Code", { "info": "js", "text": "let x = 1\n" }]],
             ],
           },
-        ],
-        "wings": [],
-      },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -208,19 +208,19 @@ test "インデントコードも読む（書くのはフェンス）" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          {
-            "sign": "Heading",
+      [
+        "Explicit",
+        {
+          "node": {
+            "id": 2,
             "label": "a",
             "folded": false,
             "body": [["Content", ["Code", { "info": "", "text": "code\n" }]]],
           },
-        ],
-        "wings": [],
-      },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -231,19 +231,19 @@ test "SVG" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          {
-            "sign": "Heading",
+      [
+        "Explicit",
+        {
+          "node": {
+            "id": 2,
             "label": "a",
             "folded": false,
             "body": [["Content", ["Svg", "<svg><rect/></svg>\n"]]],
           },
-        ],
-        "wings": [],
-      },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -254,14 +254,14 @@ test "飾りの水平線は Rule" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "a", "folded": false, "body": ["Rule"] },
-        ],
-        "wings": [],
-      },
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "a", "folded": false, "body": ["Rule"] },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -272,19 +272,19 @@ test "引用と表は逐語のまま" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          {
-            "sign": "Heading",
+      [
+        "Explicit",
+        {
+          "node": {
+            "id": 2,
             "label": "a",
             "folded": false,
             "body": [["Opaque", "> quote"]],
           },
-        ],
-        "wings": [],
-      },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -295,19 +295,18 @@ test "項目にも中身が付く" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          {
-            "sign": "Item",
+      [
+        "Item",
+        {
+          "node": {
+            "id": 2,
             "label": "a",
             "folded": false,
             "body": [["Opaque", "hello"]],
           },
-        ],
-        "wings": [],
-      },
+          "items": [],
+        },
+      ],
     ],
   })
 }

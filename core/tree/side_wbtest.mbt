@@ -9,37 +9,37 @@ test "区切りで側が裏返る" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "a", "folded": false, "body": [] },
+                {
+                  "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-          {
-            "side": "Left",
-            "branch": {
-              "id": 4,
-              "node": [
+            {
+              "side": "Left",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "b", "folded": false, "body": [] },
+                {
+                  "node": { "id": 4, "label": "b", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -50,37 +50,37 @@ test "本数によらずトグル 1 回" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "a", "folded": false, "body": [] },
+                {
+                  "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-          {
-            "side": "Left",
-            "branch": {
-              "id": 4,
-              "node": [
+            {
+              "side": "Left",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "b", "folded": false, "body": [] },
+                {
+                  "node": { "id": 4, "label": "b", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -91,26 +91,26 @@ test "先頭の区切りは左開始" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Left",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Left",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "a", "folded": false, "body": [] },
+                {
+                  "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -121,48 +121,48 @@ test "何度でも裏返る" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "a", "folded": false, "body": [] },
+                {
+                  "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-          {
-            "side": "Left",
-            "branch": {
-              "id": 4,
-              "node": [
+            {
+              "side": "Left",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "b", "folded": false, "body": [] },
+                {
+                  "node": { "id": 4, "label": "b", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-          {
-            "side": "Right",
-            "branch": {
-              "id": 5,
-              "node": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "c", "folded": false, "body": [] },
+                {
+                  "node": { "id": 5, "label": "c", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -173,48 +173,50 @@ test "C18 — 深いノードは親に飲まれず反対側の翼になる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "a", "folded": false, "body": [] },
-              ],
-              "children": [],
-            },
-          },
-          {
-            "side": "Left",
-            "branch": {
-              "id": 4,
-              "node": "Implicit",
-              "children": [
                 {
-                  "id": 5,
-                  "node": [
-                    "Explicit",
-                    {
-                      "sign": "Heading",
-                      "label": "x",
-                      "folded": false,
-                      "body": [],
-                    },
-                  ],
-                  "children": [],
+                  "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
                 },
               ],
             },
-          },
-        ],
-      },
+            {
+              "side": "Left",
+              "branch": [
+                "Implicit",
+                {
+                  "id": 4,
+                  "headings": [
+                    [
+                      "Explicit",
+                      {
+                        "node": {
+                          "id": 5,
+                          "label": "x",
+                          "folded": false,
+                          "body": [],
+                        },
+                        "items": [],
+                        "headings": [],
+                      },
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -225,31 +227,31 @@ test "行き先の翼が無い区切りは飾りに落ちる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
                 {
-                  "sign": "Heading",
-                  "label": "a",
-                  "folded": false,
-                  "body": ["Rule"],
+                  "node": {
+                    "id": 3,
+                    "label": "a",
+                    "folded": false,
+                    "body": ["Rule"],
+                  },
+                  "items": [],
+                  "headings": [],
                 },
               ],
-              "children": [],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -260,22 +262,22 @@ test "木をまたぐ区切りも飾り" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": ["Rule"] },
-        ],
-        "wings": [],
-      },
-      {
-        "id": 3,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "s", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": ["Rule"] },
+          "items": [],
+          "headings": [],
+        },
+      ],
+      [
+        "Explicit",
+        {
+          "node": { "id": 3, "label": "s", "folded": false, "body": [] },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -286,46 +288,46 @@ test "木が変わると側は右へ戻る" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Left",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Left",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "a", "folded": false, "body": [] },
+                {
+                  "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-        ],
-      },
-      {
-        "id": 4,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "s", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 5,
-              "node": [
+          ],
+        },
+      ],
+      [
+        "Explicit",
+        {
+          "node": { "id": 4, "label": "s", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "b", "folded": false, "body": [] },
+                {
+                  "node": { "id": 5, "label": "b", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -338,39 +340,41 @@ test "根より前の区切りは側になれない" {
     "eol": "Lf",
     "body": [["Opaque", "aaa"], "Rule"],
     "roots": [
-      {
-        "id": 2,
-        "node": "Implicit",
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Implicit",
+        {
+          "id": 2,
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
                 {
-                  "sign": "Heading",
-                  "label": "root",
-                  "folded": false,
-                  "body": [],
+                  "node": {
+                    "id": 3,
+                    "label": "root",
+                    "folded": false,
+                    "body": [],
+                  },
+                  "items": [],
+                  "headings": [],
                 },
               ],
-              "children": [],
             },
-          },
-          {
-            "side": "Right",
-            "branch": {
-              "id": 4,
-              "node": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "a", "folded": false, "body": [] },
+                {
+                  "node": { "id": 4, "label": "a", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -383,7 +387,10 @@ test "根より前の区切りは、後ろが # でも ## でも同じ" {
   let one = parse("aaa\n\n---\n\n# root\n")
   assert_eq(two.body, one.body)
   assert_eq(two.body, [Opaque("aaa"), Rule])
-  assert_eq(two.roots[0].wings[0].side, Right)
+  match two.roots[0] {
+    Implicit(headings~, ..) => assert_eq(headings[0].side, Right)
+    _ => fail("深さ 2 から始まるので根は Implicit のはず")
+  }
 }
 
 ///|
@@ -392,14 +399,13 @@ test "項目の中の区切りは飾り" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Item", "label": "a", "folded": false, "body": ["Rule"] },
-        ],
-        "wings": [],
-      },
+      [
+        "Item",
+        {
+          "node": { "id": 2, "label": "a", "folded": false, "body": ["Rule"] },
+          "items": [],
+        },
+      ],
     ],
   })
 }

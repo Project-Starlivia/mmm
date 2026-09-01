@@ -10,14 +10,14 @@ test "見出し 1 つが木 1 本になる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "a", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -28,22 +28,22 @@ test "深さ 1 が 2 つなら木も 2 本" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "a", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
-      {
-        "id": 3,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "b", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
+          "items": [],
+          "headings": [],
+        },
+      ],
+      [
+        "Explicit",
+        {
+          "node": { "id": 3, "label": "b", "folded": false, "body": [] },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -54,37 +54,37 @@ test "深さ 2 は根の翼になる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "a", "folded": false, "body": [] },
+                {
+                  "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-          {
-            "side": "Right",
-            "branch": {
-              "id": 4,
-              "node": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "b", "folded": false, "body": [] },
+                {
+                  "node": { "id": 4, "label": "b", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -95,40 +95,40 @@ test "深さ 3 は翼の下の枝" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "a", "folded": false, "body": [] },
-              ],
-              "children": [
                 {
-                  "id": 4,
-                  "node": [
-                    "Explicit",
-                    {
-                      "sign": "Heading",
-                      "label": "x",
-                      "folded": false,
-                      "body": [],
-                    },
+                  "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [
+                    [
+                      "Explicit",
+                      {
+                        "node": {
+                          "id": 4,
+                          "label": "x",
+                          "folded": false,
+                          "body": [],
+                        },
+                        "items": [],
+                        "headings": [],
+                      },
+                    ],
                   ],
-                  "children": [],
                 },
               ],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -139,51 +139,51 @@ test "浅く戻る" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "a", "folded": false, "body": [] },
-              ],
-              "children": [
                 {
-                  "id": 4,
-                  "node": [
-                    "Explicit",
-                    {
-                      "sign": "Heading",
-                      "label": "x",
-                      "folded": false,
-                      "body": [],
-                    },
+                  "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [
+                    [
+                      "Explicit",
+                      {
+                        "node": {
+                          "id": 4,
+                          "label": "x",
+                          "folded": false,
+                          "body": [],
+                        },
+                        "items": [],
+                        "headings": [],
+                      },
+                    ],
                   ],
-                  "children": [],
                 },
               ],
             },
-          },
-          {
-            "side": "Right",
-            "branch": {
-              "id": 5,
-              "node": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "b", "folded": false, "body": [] },
+                {
+                  "node": { "id": 5, "label": "b", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -194,37 +194,39 @@ test "飛びは Implicit が埋める" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": "Implicit",
-              "children": [
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
+                "Implicit",
                 {
-                  "id": 4,
-                  "node": [
-                    "Explicit",
-                    {
-                      "sign": "Heading",
-                      "label": "x",
-                      "folded": false,
-                      "body": [],
-                    },
+                  "id": 3,
+                  "headings": [
+                    [
+                      "Explicit",
+                      {
+                        "node": {
+                          "id": 4,
+                          "label": "x",
+                          "folded": false,
+                          "body": [],
+                        },
+                        "items": [],
+                        "headings": [],
+                      },
+                    ],
                   ],
-                  "children": [],
                 },
               ],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -235,23 +237,25 @@ test "深さ 1 が無ければ根が Implicit になる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": "Implicit",
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Implicit",
+        {
+          "id": 2,
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "a", "folded": false, "body": [] },
+                {
+                  "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                  "items": [],
+                  "headings": [],
+                },
               ],
-              "children": [],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -262,19 +266,19 @@ test "ラベルは原文の逐語（インラインを解釈しない）" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          {
-            "sign": "Heading",
+      [
+        "Explicit",
+        {
+          "node": {
+            "id": 2,
             "label": "a **b** `c`",
             "folded": false,
             "body": [],
           },
-        ],
-        "wings": [],
-      },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -285,14 +289,14 @@ test "中身の無い見出しは空ラベル" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "", "folded": false, "body": [] },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -304,14 +308,14 @@ test "封筒" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "a", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -322,14 +326,14 @@ test "改行の流儀は保存する" {
     "eol": "Crlf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "a", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
+          "items": [],
+          "headings": [],
+        },
+      ],
     ],
   })
 }

@@ -9,14 +9,13 @@ test "項目だけの木" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Item", "label": "root", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
+      [
+        "Item",
+        {
+          "node": { "id": 2, "label": "root", "folded": false, "body": [] },
+          "items": [],
+        },
+      ],
     ],
   })
 }
@@ -27,26 +26,21 @@ test "入れ子は深くなる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Item", "label": "root", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
-                "Explicit",
-                { "sign": "Item", "label": "a", "folded": false, "body": [] },
-              ],
-              "children": [],
+      [
+        "Item",
+        {
+          "node": { "id": 2, "label": "root", "folded": false, "body": [] },
+          "items": [
+            {
+              "side": "Right",
+              "branch": {
+                "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                "children": [],
+              },
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -57,37 +51,28 @@ test "兄弟は並ぶ" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Item", "label": "root", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
-                "Explicit",
-                { "sign": "Item", "label": "a", "folded": false, "body": [] },
-              ],
-              "children": [],
+      [
+        "Item",
+        {
+          "node": { "id": 2, "label": "root", "folded": false, "body": [] },
+          "items": [
+            {
+              "side": "Right",
+              "branch": {
+                "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                "children": [],
+              },
             },
-          },
-          {
-            "side": "Right",
-            "branch": {
-              "id": 4,
-              "node": [
-                "Explicit",
-                { "sign": "Item", "label": "b", "folded": false, "body": [] },
-              ],
-              "children": [],
+            {
+              "side": "Right",
+              "branch": {
+                "node": { "id": 4, "label": "b", "folded": false, "body": [] },
+                "children": [],
+              },
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -98,26 +83,22 @@ test "見出しの下の項目は 1 つ深い" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
-                "Explicit",
-                { "sign": "Item", "label": "a", "folded": false, "body": [] },
-              ],
-              "children": [],
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [
+            {
+              "side": "Right",
+              "branch": {
+                "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+                "children": [],
+              },
             },
-          },
-        ],
-      },
+          ],
+          "headings": [],
+        },
+      ],
     ],
   })
 }
@@ -128,54 +109,46 @@ test "見出しは入れ子をリセットする" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Heading", "label": "r", "folded": false, "body": [] },
-        ],
-        "wings": [
-          {
-            "side": "Right",
-            "branch": {
-              "id": 3,
-              "node": [
+      [
+        "Explicit",
+        {
+          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
+          "items": [],
+          "headings": [
+            {
+              "side": "Right",
+              "branch": [
                 "Explicit",
-                { "sign": "Heading", "label": "s", "folded": false, "body": [] },
-              ],
-              "children": [
                 {
-                  "id": 4,
-                  "node": [
-                    "Explicit",
+                  "node": { "id": 3, "label": "s", "folded": false, "body": [] },
+                  "items": [
                     {
-                      "sign": "Item",
-                      "label": "a",
-                      "folded": false,
-                      "body": [],
-                    },
-                  ],
-                  "children": [
-                    {
-                      "id": 5,
-                      "node": [
-                        "Explicit",
+                      "node": {
+                        "id": 4,
+                        "label": "a",
+                        "folded": false,
+                        "body": [],
+                      },
+                      "children": [
                         {
-                          "sign": "Item",
-                          "label": "b",
-                          "folded": false,
-                          "body": [],
+                          "node": {
+                            "id": 5,
+                            "label": "b",
+                            "folded": false,
+                            "body": [],
+                          },
+                          "children": [],
                         },
                       ],
-                      "children": [],
                     },
                   ],
+                  "headings": [],
                 },
               ],
             },
-          },
-        ],
-      },
+          ],
+        },
+      ],
     ],
   })
 }
@@ -186,28 +159,26 @@ test "マーカーの銘柄は構造に影響しない" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Item", "label": "a", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
+      [
+        "Item",
+        {
+          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
+          "items": [],
+        },
+      ],
     ],
   })
   json_inspect(parse("+ a\n"), content={
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Item", "label": "a", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
+      [
+        "Item",
+        {
+          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
+          "items": [],
+        },
+      ],
     ],
   })
 }
@@ -218,22 +189,20 @@ test "順序リストも項目として読む" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Item", "label": "a", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
-      {
-        "id": 3,
-        "node": [
-          "Explicit",
-          { "sign": "Item", "label": "b", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
+      [
+        "Item",
+        {
+          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
+          "items": [],
+        },
+      ],
+      [
+        "Item",
+        {
+          "node": { "id": 3, "label": "b", "folded": false, "body": [] },
+          "items": [],
+        },
+      ],
     ],
   })
 }
@@ -244,14 +213,13 @@ test "ラベルは原文の逐語" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      {
-        "id": 2,
-        "node": [
-          "Explicit",
-          { "sign": "Item", "label": "a **b**", "folded": false, "body": [] },
-        ],
-        "wings": [],
-      },
+      [
+        "Item",
+        {
+          "node": { "id": 2, "label": "a **b**", "folded": false, "body": [] },
+          "items": [],
+        },
+      ],
     ],
   })
 }

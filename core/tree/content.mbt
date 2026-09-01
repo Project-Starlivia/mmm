@@ -11,11 +11,11 @@ fn fill(b : Build, block : Block) -> Unit {
     b.body.push(block)
     return
   }
-  match b.stack[b.stack.length() - 1].node {
-    Explicit(body~, ..) => body.push(block)
-    // Implicit は綴りが無いので中身も持てない。put は必ず実体を最後に積むので、
+  match b.stack[b.stack.length() - 1].skel {
+    Line(body~, ..) => body.push(block)
+    // 飛びは綴りが無いので中身も持てない。put は必ず実体を最後に積むので、
     // ここに来ることは無い
-    Implicit => ()
+    Gap => ()
   }
 }
 
