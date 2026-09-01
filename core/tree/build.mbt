@@ -184,8 +184,13 @@ fn item_label(md : String, p : @markdown.Block) -> String {
 /// 深さ level のノードを置く。浅く戻るときは積んだぶんを落とし、
 /// 深く飛ぶときは間を Implicit で埋める（飛びは綴りであって、無ではない）。
 fn put(b : Build, level : Int, node : Node) -> Unit {
-  if level == 1 {
-    // 新しい木。待っている区切りは行き先を失うので飾りに落ち、側は右へ戻る
+  if level == 1 || b.stack.is_empty() {
+    // 新しい木を始める。待っている区切りは行き先を失うので飾りに落ち、
+    // 側は右へ戻る。
+    //
+    // **根がまだ無ければ、区切りは側になれない。** 側は根の持ち物なので、
+    // 裏返す相手が居ない。深さ 2 から始まる文書（根が Implicit）でも同じで、
+    // ここを分けないと、後ろが `#` か `##` かで同じ `---` の意味が変わる
     drop_pend(b)
     b.side = Right
   } else if b.pend {

@@ -331,6 +331,62 @@ test "木が変わると側は右へ戻る" {
 }
 
 ///|
+/// 側は根の持ち物なので、根がまだ無い場所の区切りは裏返す相手が居ない。
+/// ここを分けないと、後ろが `#` か `##` かで同じ `---` の意味が変わる。
+test "根より前の区切りは側になれない" {
+  json_inspect(parse("aaa\n\n---\n\n## root\n\n## a\n"), content={
+    "eol": "Lf",
+    "body": [["Opaque", "aaa"], "Rule"],
+    "roots": [
+      {
+        "id": 2,
+        "node": "Implicit",
+        "wings": [
+          {
+            "side": "Right",
+            "branch": {
+              "id": 3,
+              "node": [
+                "Explicit",
+                {
+                  "sign": "Heading",
+                  "label": "root",
+                  "folded": false,
+                  "body": [],
+                },
+              ],
+              "children": [],
+            },
+          },
+          {
+            "side": "Right",
+            "branch": {
+              "id": 4,
+              "node": [
+                "Explicit",
+                { "sign": "Heading", "label": "a", "folded": false, "body": [] },
+              ],
+              "children": [],
+            },
+          },
+        ],
+      },
+    ],
+  })
+}
+
+///|
+test "根より前の区切りは、後ろが # でも ## でも同じ" {
+  // 木の形は違う（`##` は Implicit の根を要る）が、**区切りの行き先は同じ**。
+  // 飾りとして文書に落ち、側は裏返らない
+  let two = parse("aaa\n\n---\n\n## root\n")
+  let one = parse("aaa\n\n---\n\n# root\n")
+  assert_eq(two.body, one.body)
+  assert_eq(two.body, [Opaque("aaa"), Rule])
+  assert_eq(two.roots[0].wings[0].side, Right)
+}
+
+///|
 test "項目の中の区切りは飾り" {
   json_inspect(parse("- a\n\n  ---\n"), content={
     "eol": "Lf",
