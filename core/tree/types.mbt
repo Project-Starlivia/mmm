@@ -13,7 +13,7 @@ pub(all) struct Doc {
   /// 最初の骨格より前の散文
   body : Array[Block]
   roots : Array[Root]
-}
+} derive(Eq, Debug, ToJson)
 
 ///|
 /// 木 1 本の根。**翼を持つ唯一の型**。
@@ -21,7 +21,7 @@ pub(all) struct Root {
   id : Int
   node : Node
   wings : Array[Wing]
-}
+} derive(Eq, Debug, ToJson)
 
 ///|
 /// 左右に伸びるもの。**側はここにしか無い**（占有者ではなく場所の属性）。
@@ -29,7 +29,7 @@ pub(all) struct Root {
 pub(all) struct Wing {
   side : Side
   branch : Branch
-}
+} derive(Eq, Debug, ToJson)
 
 ///|
 /// 枝分かれするもの。深さ 3 以降は一様。
@@ -37,7 +37,7 @@ pub(all) struct Branch {
   id : Int
   node : Node
   children : Array[Branch]
-}
+} derive(Eq, Debug, ToJson)
 
 ///|
 /// ノードの中身そのもの。
@@ -45,27 +45,27 @@ pub(all) enum Node {
   /// 骨格行が無い。階層の飛びが綴り。ラベルも本文も型ごと持たない
   Implicit
   Explicit(sign~ : Sign, label~ : String, folded~ : Bool, body~ : Array[Block])
-}
+} derive(Eq, Debug, ToJson)
 
 ///|
 /// 骨格の記述方式。Implicit を入れないのは、これが「何に変えるか」の引数型だから。
 pub(all) enum Sign {
   Heading
   Item
-} derive(Eq)
+} derive(Eq, Debug, ToJson)
 
 ///|
 pub(all) enum Side {
   Right
   Left
-} derive(Eq)
+} derive(Eq, Debug, ToJson)
 
 ///|
 /// 原文の改行の流儀。保存して書き戻す。
 pub(all) enum Eol {
   Lf
   Crlf
-} derive(Eq)
+} derive(Eq, Debug, ToJson)
 
 ///|
 /// ノードにぶら下がる中身。
@@ -75,7 +75,7 @@ pub(all) enum Block {
   Rule
   /// 読み解かない逐語
   Opaque(String)
-}
+} derive(Eq, Debug, ToJson)
 
 ///|
 /// 絵になる中身。ここに無いものは Opaque。
@@ -84,4 +84,4 @@ pub(all) enum Content {
   Link(text~ : String, href~ : String)
   Code(info~ : String, text~ : String)
   Svg(String)
-}
+} derive(Eq, Debug, ToJson)

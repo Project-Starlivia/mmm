@@ -9,7 +9,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { oneDark } from "@codemirror/theme-one-dark";
 import * as mbt from "../core/_build/js/release/build/tree/js/js.js";
-import { paintAst, paintJson, paintSig } from "./paint.ts";
+import { paintAst, paintJson } from "./paint.ts";
 
 /** 見て回りたくなる形を、最初から手元に置いておく。 */
 const SAMPLES: [string, string][] = [
@@ -36,13 +36,11 @@ function pick<T extends Element>(id: string, kind: new () => T): T {
 
 const out = {
   ast: pick("ast", HTMLPreElement),
-  sig: pick("sig", HTMLPreElement),
   json: pick("json", HTMLPreElement),
 };
 
 function show(text: string): void {
   out.ast.replaceChildren(paintAst(mbt.mdAstSig(text)));
-  out.sig.replaceChildren(paintSig(mbt.mmmTreeSig(text)));
   out.json.replaceChildren(paintJson(pretty(mbt.mmmTreeJson(text))));
   localStorage.setItem("mmm-lab", text);
 }

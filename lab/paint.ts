@@ -20,37 +20,6 @@ function paint(parts: [string, string][]): DocumentFragment {
   return f;
 }
 
-/**
- * mmmTree の指紋。引用符の中はラベル（原文そのまま）なので、そこだけ地の色にして、
- * 構造の記号（`[ ] > < · # -`）を立てる。
- */
-export function paintSig(s: string): DocumentFragment {
-  const parts: [string, string][] = [];
-  let i = 0;
-  while (i < s.length) {
-    if (s[i] === '"') {
-      // ラベル。`\"` は中身なので閉じ引用符として数えない
-      let j = i + 1;
-      while (j < s.length && s[j] !== '"') j += s[j] === "\\" ? 2 : 1;
-      parts.push(["label", s.slice(i, Math.min(j + 1, s.length))]);
-      i = j + 1;
-    } else if ("[]".includes(s[i])) {
-      parts.push(["brace", s[i]]);
-      i += 1;
-    } else if ("><".includes(s[i])) {
-      parts.push(["side", s[i]]);
-      i += 1;
-    } else if ("#-·^".includes(s[i])) {
-      parts.push(["mark", s[i]]);
-      i += 1;
-    } else {
-      parts.push(["", s[i]]);
-      i += 1;
-    }
-  }
-  return paint(parts);
-}
-
 /** mdAst の指紋。`種類[from,to]` の範囲だけ落とす。 */
 export function paintAst(s: string): DocumentFragment {
   const parts: [string, string][] = [];
