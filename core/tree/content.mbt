@@ -20,13 +20,11 @@ fn fill(b : Build, block : Block) -> Unit {
 }
 
 ///|
-/// mdAst のブロック 1 枚を中身にする。骨格として扱うものはここへ来ない。
+/// mdAst のブロック 1 枚を中身にする。骨格と区切りはここへ来ない。
 fn content_of(md : String, block : @markdown.Block) -> Block? {
   match block {
     // 空行は綴りであってモデルには無い。serialize が正規形として置き直す
     BlankLines(..) => None
-    // 飾りの水平線。側のトグル（`---`）とはチャンネルが違う
-    ThematicBreak(marker~, ..) => if marker == '-' { None } else { Some(Rule) }
     FencedCode(info~, code~, ..) => Some(Content(Code(info~, text=code)))
     // インデントコードは読めるが書かない（正規形はフェンス）
     IndentedCode(code~, ..) => Some(Content(Code(info="", text=code)))

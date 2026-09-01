@@ -12,6 +12,8 @@
 priv struct Frame {
   node : Node
   kids : Array[Frame]
+  /// 翼になる深さ 2 の枠だけが意味を持つ。深いところの側は型で存在しない
+  mut side : Side
 }
 
 ///|
@@ -23,10 +25,20 @@ pub fn parse(md : String) -> Doc {
 ///|
 /// mdAst を mmmTree にする。ラベルは原文から切り出す（mmm はインラインを解釈しない）。
 pub fn build(md : String, ast : @markdown.Document) -> Doc {
-  let b : Build = { md, forest: [], stack: [], body: [], head: 0 }
+  let b : Build = {
+    md,
+    forest: [],
+    stack: [],
+    body: [],
+    head: 0,
+    side: Right,
+    pend: false,
+  }
   for block in ast.children {
     take(b, block, 0)
   }
+  // 後続の翼が無いまま終わった区切りは、直前のノードの飾りに落ちる
+  drop_pend(b)
   let next = { val: doc_id + 1 }
   let forest = b.forest
   {
@@ -55,6 +67,10 @@ priv struct Build {
   /// 最初の骨格より前の散文
   body : Array[Block]
   mut head : Int
+  /// 次の翼の側。木が変わるたびに右へ戻る
+  mut side : Side
+  /// 隙間に区切りが有ったか。**本数によらず 1 回**なので Bool で持つ
+  mut pend : Bool
 }
 
 ///|
@@ -76,6 +92,13 @@ fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
     }
     BulletList(items~, ..) => items_take(b, items, nest)
     OrderedList(items~, ..) => items_take(b, items, nest)
+    // 区切りは**根の領土の隙間**でだけ翼の境目になる。項目の中は中身
+    ThematicBreak(marker~, ..) =>
+      if marker == '-' && nest == 0 {
+        b.pend = true
+      } else {
+        fill(b, Rule)
+      }
     _ =>
       match content_of(b.md, block) {
         Some(c) => fill(b, c)
@@ -126,26 +149,64 @@ fn item_label(md : String, p : @markdown.Block) -> String {
 /// 深さ level のノードを置く。浅く戻るときは積んだぶんを落とし、
 /// 深く飛ぶときは間を Implicit で埋める（飛びは綴りであって、無ではない）。
 fn put(b : Build, level : Int, node : Node) -> Unit {
+  if level == 1 {
+    // 新しい木。待っている区切りは行き先を失うので飾りに落ち、側は右へ戻る
+    drop_pend(b)
+    b.side = Right
+  } else if b.pend {
+    // **区切りは翼の境目を作る。** 深さ 3 以降でも親に飲まれず、
+    // 深さ 2 から Implicit が埋める反対側の翼になる
+    while b.stack.length() > 1 {
+      ignore(b.stack.unsafe_pop())
+    }
+  }
   while b.stack.length() >= level {
     ignore(b.stack.unsafe_pop())
   }
   while b.stack.length() < level - 1 {
-    let gap : Frame = { node: Implicit, kids: [] }
+    let gap : Frame = { node: Implicit, kids: [], side: Right }
     seat(b, gap)
     b.stack.push(gap)
   }
-  let f : Frame = { node, kids: [] }
+  let f : Frame = { node, kids: [], side: Right }
   seat(b, f)
   b.stack.push(f)
 }
 
 ///|
 /// 積んである親の子にする。親が居なければ森の 1 本として生やす。
+/// **翼になるのは深さ 2 の枠だけ**で、側が意味を持つのもそこだけ。
 fn seat(b : Build, f : Frame) -> Unit {
   if b.stack.is_empty() {
     b.forest.push(f)
+    return
+  }
+  if b.stack.length() == 1 {
+    if b.pend {
+      b.side = flipped(b.side)
+      b.pend = false
+    }
+    f.side = b.side
+  }
+  b.stack[b.stack.length() - 1].kids.push(f)
+}
+
+///|
+fn flipped(s : Side) -> Side {
+  if s is Right {
+    Left
   } else {
-    b.stack[b.stack.length() - 1].kids.push(f)
+    Right
+  }
+}
+
+///|
+/// 行き先の翼が来ないまま終わった区切りを、飾りの水平線に落とす。
+/// 側は場所の属性なので、置き場所が無ければ側にはなれない。
+fn drop_pend(b : Build) -> Unit {
+  if b.pend {
+    b.pend = false
+    fill(b, Rule)
   }
 }
 
@@ -227,7 +288,7 @@ priv struct Counter {
 }
 
 ///|
-/// 森の 1 本を根にする。子は翼になる（側はいまのところ全部右）。
+/// 森の 1 本を根にする。子は翼になり、側は積むときに決まっている。
 fn to_root(f : Frame, next : Counter) -> Root {
   let id = next.val
   next.val = id + 1
@@ -236,7 +297,7 @@ fn to_root(f : Frame, next : Counter) -> Root {
 
 ///|
 fn to_wing(f : Frame, next : Counter) -> Wing {
-  { side: Right, branch: to_branch(f, next) }
+  { side: f.side, branch: to_branch(f, next) }
 }
 
 ///|
