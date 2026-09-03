@@ -48,21 +48,17 @@ priv struct Tag {
   mark : Mark
   to : Int
   /// 原文がそのまま `spelling(mark)` か。違えば触らずに書き戻せないので畳めない
-  writes : Bool
+  ok : Bool
 }
 
 ///|
 /// 塊 1 つの読み。
 priv struct Spell {
   tags : Array[Tag]
-  /// 綴り以外の文字があった（骨格の行・地の文・知らないタグ）
-  plain : Bool
-}
-
-///|
-/// 綴りだけで出来た塊か。畳みが立ったとき、この塊は丸ごと落ちる。
-fn only_marks(s : Spell) -> Bool {
-  !s.plain && s.tags.length() > 0
+  /// **塊まるごとが綴りで出来ている。** 空白を除いた原文が `spelling` の
+  /// 並びそのもので、地の文も知らないタグも混じっていない。畳みが立つと
+  /// この塊は丸ごと落ちるので、1 つでも書き戻せない字があれば立てられない
+  writes : Bool
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -214,10 +210,10 @@ fn tag_at(md : String, i : Int, to : Int) -> Tag? {
     guard z > 0 else { return None }
     let raw = slice(md, i, z)
     if shut {
-      return Some({ mark: Close, to: z, writes: raw == spelling(Close) })
+      return Some({ mark: Close, to: z, ok: raw == spelling(Close) })
     }
     let mark = Open(open=raw == spelling(Open(open=true)))
-    return Some({ mark, to: z, writes: raw == spelling(mark) })
+    return Some({ mark, to: z, ok: raw == spelling(mark) })
   }
   // 閉じの `</summary>` は開きと組で 1 つの綴りにするので、単独では拾わない
   if !shut && name_at(md, n, "summary", to) {
@@ -227,7 +223,7 @@ fn tag_at(md : String, i : Int, to : Int) -> Tag? {
     let b = z - 10
     guard has(md, b, "</summary>", to) else { return None }
     let mark = Name(slice(md, a, b))
-    return Some({ mark, to: z, writes: slice(md, i, z) == spelling(mark) })
+    return Some({ mark, to: z, ok: slice(md, i, z) == spelling(mark) })
   }
   None
 }
@@ -236,33 +232,37 @@ fn tag_at(md : String, i : Int, to : Int) -> Tag? {
 /// 塊を綴りとして読む。生の HTML の塊だけを見る
 /// （段落の中のタグは md が中身と言っているので、mmm は綴りにしない）。
 fn read_spell(md : String, b : @markdown.Block) -> Spell {
-  guard b is HtmlBlock(..) else { return { tags: [], plain: true } }
+  guard b is HtmlBlock(..) else { return { tags: [], writes: false } }
   let s = block_span(b)
   let tags = []
-  let mut plain = false
+  // **タグの間の空白は綴りではない。** 1 行に並べても行で分けても言っている
+  // ことは同じで、書き戻すときは mmm の並べ方になる
+  let mut writes = true
   let mut i = s.from
   while i < s.to {
     if blank(md[i]) {
       i = i + 1
       continue
     }
+    // コメントと生テキストの中は綴りではない。中のタグを拾わないよう跨ぐ
     if opaque_end(md, i, s.to) is Some(z) {
-      plain = true
+      writes = false
       i = z
       continue
     }
     match tag_at(md, i, s.to) {
       Some(t) => {
         tags.push(t)
+        writes = writes && t.ok
         i = t.to
       }
       None => {
-        plain = true
+        writes = false
         i = i + 1
       }
     }
   }
-  { tags, plain }
+  { tags, writes: writes && tags.length() > 0 }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -319,6 +319,17 @@ fn beyond(blocks : Array[@markdown.Block], gone : Array[Bool], i : Int) -> Int {
 }
 
 ///|
+/// 保留中の水平線が行き先に選ぶ塊。**本数に意味は無い**ので水平線が続くうちは
+/// 先へ送り、骨格でない塊に当たればそこで飾りに落ちる。
+fn lands(blocks : Array[@markdown.Block], gone : Array[Bool], i : Int) -> Int {
+  let mut k = beyond(blocks, gone, i)
+  while k < blocks.length() && blocks[k] is ThematicBreak(..) {
+    k = beyond(blocks, gone, k)
+  }
+  k
+}
+
+///|
 /// 開きの塊が言っている畳み。**塊が綴りだけで出来ていることは `folds` が確かめる**
 /// ので、ここは読むだけ。
 fn fold_of(s : Spell) -> Fold {
@@ -359,6 +370,15 @@ fn covers(
   let mut k = head + 1
   while k <= last {
     guard depth[k].top > level else { return false }
+    // 領域の中に書いた水平線の行き先が領域の外の骨格なら、その水平線は
+    // 部分木のものではない（書き戻すと領域の外に出る）。行き先が中なら、
+    // 引き出された骨格は上の深さで弾かれるか、飾りとして中身に残る
+    if blocks[k] is ThematicBreak(..) {
+      let w = lands(blocks, gone, k)
+      guard !(w > last && w < blocks.length() && depth[w].own < deep) else {
+        return false
+      }
+    }
     k = k + 1
   }
   // 後ろが部分木の中なら狭い
@@ -367,7 +387,7 @@ fn covers(
   // 水平線は単体では中身ではない。**その先が骨格なら境界**（部分木の外）で、
   // そうでなければ飾り＝このノードの中身なので、領域が狭いということ
   if blocks[z] is ThematicBreak(..) {
-    let w = beyond(blocks, gone, z)
+    let w = lands(blocks, gone, z)
     return w < blocks.length() && depth[w].top <= level
   }
   depth[z].top <= level
@@ -401,7 +421,7 @@ fn pieces(
   // に依り、そこに居るのが綴りか中身かは畳みが立つかに依るので、たがいに要る。
   // 全部落ちる側から始めて、落ちないものが出るたびにやり直す。
   // 落ちる塊は減る一方なので必ず止まる。
-  let gone = Array::makei(n, i => only_marks(spells[i]))
+  let gone = Array::makei(n, i => spells[i].writes)
   let ok = ps.map(_ => false)
   let mut depth = depths(md, blocks, gone, nest)
   for _ in 0..<=ps.length() {
@@ -519,21 +539,20 @@ fn folds(
   o : Int,
   c : Int,
 ) -> Bool {
-  guard spots[o].tag.writes && spots[c].tag.writes else { return false }
   let ob = spots[o].block
   let cb = spots[c].block
   // 開きの塊は「開き」か「開き + 名前」だけ。他の文字が混じっていたら
   // 塊ごと落とせないので畳みにできない
   let os = spells[ob]
-  guard !os.plain && os.tags[0].mark is Open(..) else { return false }
+  guard os.writes && os.tags[0].mark is Open(..) else { return false }
   if os.tags.length() == 2 {
-    guard os.tags[1].mark is Name(_) && os.tags[1].writes else { return false }
+    guard os.tags[1].mark is Name(_) else { return false }
   } else {
     guard os.tags.length() == 1 else { return false }
   }
   // 閉じの塊は閉じだけ（重なっていてもよい。落ちるのは塊ごと）
   let cs = spells[cb]
-  guard !cs.plain else { return false }
+  guard cs.writes else { return false }
   for t in cs.tags {
     guard t.mark is Close else { return false }
   }

@@ -1895,3 +1895,123 @@ test "入れ子項目を含む塊でも、持ち主の深さで測る" {
     },
   )
 }
+
+///|
+/// **領域の中に書いた水平線は、領域の中の骨格にしか効かない。** 行き先が
+/// 領域の外なら、その水平線は部分木のものではない（畳みが立つと綴りは木から
+/// 消えるので、書き戻したとき領域の外へ出てしまう）。
+test "領域の中の境界が外の骨格を引き出せば中身" {
+  json_inspect(
+    parse("# r\n\n<details>\n\n## a\n\n---\n\n</details>\n\n## b\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "body": [
+                [
+                  "Details",
+                  { "id": 3, "text": "<details>\n\n## a\n\n---\n\n</details>" },
+                ],
+              ],
+              "children": [
+                [
+                  "HeadingNode",
+                  { "id": 4, "label": "b", "body": [], "children": [] },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// **水平線の本数に意味は無い。** 続けて書いても行き先は 1 つなので、
+/// 閉じの直後の水平線が 2 本でも境界のまま。
+test "閉じの直後の水平線が続いても境界" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n---\n\n---\n\n## b\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "fold": { "open": false, "summary": "a" },
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+                [
+                  "HeadingNode",
+                  { "id": 4, "label": "b", "body": [], "children": [] },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right", "Left"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// **タグの間の空白は綴りではない。** 1 行に並べても行で分けても言っている
+/// ことは同じで、書き戻すときは mmm の並べ方になる。
+test "タブで繋いだ開きと名前も畳み" {
+  json_inspect(
+    parse("# r\n\n<details>	<summary>s</summary>\n\n## a\n\n</details>\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "fold": { "open": false, "summary": "s" },
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
