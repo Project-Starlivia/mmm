@@ -50,6 +50,8 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
     head: 0,
     side: Right,
     pend: false,
+    low: deep,
+    dry: false,
   }
   for piece in pieces(md, ast.children) {
     lay(b, piece, 0)
@@ -93,6 +95,40 @@ priv struct Build {
   mut side : Side
   /// 行き先待ちの水平線が有るか。**本数に意味は無い**ので Bool で持つ
   mut pend : Bool
+  /// このブロックで生まれた一番浅い枠の深さ。骨格でなければ `deep` のまま
+  mut low : Int
+  /// 深さを測るだけの空打ちか。畳みを見ないので、項目の中も読み解かない
+  dry : Bool
+}
+
+///|
+/// 骨格ではない深さ。どの見出しより深い（`# ` 〜 `######` は 1〜6）。
+let deep : Int = 99
+
+///|
+/// 畳みを見ずに骨格だけ積み、ブロックごとに**そこで生まれた一番浅い枠の深さ**
+/// を返す。畳みの領域が部分木と一致するかは、md の見出しの深さではなく
+/// この深さで測る — 境界の `---` は部分木を深さ 2 へ引き出し、飛びは Implicit
+/// で埋まるので、md の `#` の数と積まれた深さはずれる。
+fn depths(md : String, blocks : Array[@markdown.Block]) -> Array[Int] {
+  let b : Build = {
+    md,
+    forest: [],
+    stack: [],
+    body: [],
+    head: 0,
+    side: Right,
+    pend: false,
+    low: deep,
+    dry: true,
+  }
+  let out = Array::make(blocks.length(), deep)
+  for i, block in blocks {
+    b.low = deep
+    take(b, block, 0)
+    out[i] = b.low
+  }
+  out
 }
 
 ///|
@@ -177,7 +213,10 @@ fn items_take(
       }
     }
     put(b, b.head + 1 + nest, Line(sign=Item, label~, details~, open~, body=[]))
-    for c in pieces(b.md, rest) {
+    // 空打ちでは畳みを見ない（深さを測るのに畳みは要らず、
+    // 畳みの判定はこの深さを使うので、呼び合いになる）
+    let inner = if b.dry { rest.map(c => Raw(c)) } else { pieces(b.md, rest) }
+    for c in inner {
       lay(b, c, nest + 1)
     }
   }
@@ -229,12 +268,23 @@ fn put(b : Build, level : Int, skel : Notation) -> Unit {
   }
   while b.stack.length() < level - 1 {
     let gap : Frame = { skel: Gap, kids: [], side: Right, id: 0 }
+    sink(b)
     seat(b, gap)
     b.stack.push(gap)
   }
   let f : Frame = { skel, kids: [], side: Right, id: 0 }
+  sink(b)
   seat(b, f)
   b.stack.push(f)
+}
+
+///|
+/// これから座る枠の深さを控える。深さは stack の高さが持つ。
+fn sink(b : Build) -> Unit {
+  let depth = b.stack.length() + 1
+  if depth < b.low {
+    b.low = depth
+  }
 }
 
 ///|

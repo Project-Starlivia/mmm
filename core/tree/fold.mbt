@@ -256,9 +256,10 @@ fn next(blocks : Array[@markdown.Block], i : Int) -> Int {
 }
 
 ///|
-/// 空行と**綴りだけの塊**を飛ばした次の位置。畳みの綴りは中身ではないので、
-/// 領域の外に何が居るかを見るときは跨ぐ（兄弟の畳みが並んでいても、
-/// 見えるのは次の骨格の行）。
+/// 記法を飛ばした次の位置。空行・畳みの綴りだけの塊・水平線は、それ自体は
+/// 中身ではないので跨ぐ（兄弟の畳みが並んでいても、見えるのは次の骨格の行）。
+/// 水平線が境界か飾りかは**その先が骨格かどうか**で決まるので、ここでは
+/// 跨ぐだけでよく、build の裁定を写す必要がない。
 fn beyond(
   blocks : Array[@markdown.Block],
   spells : Array[Spell],
@@ -266,7 +267,11 @@ fn beyond(
 ) -> Int {
   let mut k = i + 1
   while k < blocks.length() &&
-        (blocks[k] is BlankLines(..) || only_marks(spells[k])) {
+        (
+          blocks[k] is BlankLines(..) ||
+          blocks[k] is ThematicBreak(..) ||
+          only_marks(spells[k])
+        ) {
     k = k + 1
   }
   k
@@ -289,43 +294,36 @@ fn label_of(md : String, b : @markdown.Block) -> String {
 
 ///|
 /// 領域が、1 つのノードの body・children とその body を過不足なく覆っているか。
+///
+/// 深さは md の `#` の数ではなく **build が実際に積んだ深さ**（`depths`）で測る。
+/// 境界の `---` は部分木を深さ 2 へ引き出し、飛びは Implicit で埋まるので、
+/// `#` の数で測ると「領域の外に出た子」を覆っているつもりになる。
 fn covers(
   blocks : Array[@markdown.Block],
   spells : Array[Spell],
+  low : Array[Int],
   head : Int,
   last : Int,
 ) -> Bool {
-  let level = match blocks[head] {
-    Heading(level~, ..) => level
-    BulletList(items~, ..) | OrderedList(items~, ..) =>
-      // 項目は 1 個だけ。後ろの検査は見出しと同じものを使う
-      return items.length() == 1 &&
-        next(blocks, head) > last &&
-        tail(blocks, spells, last, 99)
-    _ => return false
+  // 1 つの塊に項目が 2 つ以上あると、同じ深さの枠が 2 つ生まれる。
+  // 深さの列では見分けられないのでここで見る
+  let alone = match blocks[head] {
+    BulletList(items~, ..) | OrderedList(items~, ..) => items.length() == 1
+    _ => true
   }
-  // 中に同じか浅い見出しが居たら、その部分木より広い
+  guard alone else { return false }
+  let level = low[head]
+  guard level < deep else { return false }
+  // 中に同じか浅い枠が生まれていたら、その部分木より広い
   let mut k = head + 1
   while k <= last {
-    if blocks[k] is Heading(level=l, ..) && l <= level {
-      return false
-    }
+    guard low[k] > level else { return false }
     k = k + 1
   }
-  tail(blocks, spells, last, level)
-}
-
-///|
-/// 領域の後ろが部分木の外か。**綴りだけの塊は跨ぐ** — 兄弟の畳みが並んでいても、
-/// 見えるのは次の骨格の行。
-fn tail(
-  blocks : Array[@markdown.Block],
-  spells : Array[Spell],
-  last : Int,
-  level : Int,
-) -> Bool {
+  // 後ろが部分木の中なら狭い。**綴りだけの塊は跨ぐ** —
+  // 兄弟の畳みが並んでいても、見えるのは次の骨格の行
   let z = beyond(blocks, spells, last)
-  z >= blocks.length() || (blocks[z] is Heading(level=l, ..) && l <= level)
+  z >= blocks.length() || low[z] <= level
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -337,6 +335,7 @@ fn tail(
 ///|
 /// ブロックの並びを、畳みを解いたひと切れの列にする。
 fn pieces(md : String, blocks : Array[@markdown.Block]) -> Array[Piece] {
+  let low = depths(md, blocks)
   let n = blocks.length()
   let spells = blocks.map(b => read_spell(md, b))
   let spots = []
@@ -346,7 +345,7 @@ fn pieces(md : String, blocks : Array[@markdown.Block]) -> Array[Piece] {
     }
   }
   let ps = pairs(spots)
-  let ok = ps.map(p => folds(md, blocks, spells, spots, p.0, p.1))
+  let ok = ps.map(p => folds(md, blocks, spells, low, spots, p.0, p.1))
 
   // 塊が落ちるのは、**その塊の綴りが全部立った畳みのもの**のときだけ。
   // 立っていない綴りが混じっていたら落とせず、落とせない塊に頼る畳みも
@@ -439,6 +438,7 @@ fn folds(
   md : String,
   blocks : Array[@markdown.Block],
   spells : Array[Spell],
+  low : Array[Int],
   spots : Array[Spot],
   o : Int,
   c : Int,
@@ -460,7 +460,7 @@ fn folds(
   let head = next(blocks, ob)
   guard head < cb else { return false }
   guard name == label_of(md, blocks[head]) else { return false }
-  covers(blocks, spells, head, cb - 1)
+  covers(blocks, spells, low, head, cb - 1)
 }
 
 ///|

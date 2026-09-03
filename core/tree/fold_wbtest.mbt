@@ -1325,3 +1325,240 @@ test "コメントの中の閉じは綴りではない" {
     },
   )
 }
+
+///|
+/// **深さは md の `#` の数ではなく、build が実際に積んだ深さで測る。**
+/// 境界の水平線は部分木を深さ 2 へ引き出すので、`### x` は `a` の子ではなく
+/// 兄弟になる。領域は 2 つの部分木に跨っていて、1 ノードを覆っていない。
+test "境界の水平線が領域の中にあれば中身" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n---\n\n### x\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<summary>a</summary>\n\n## a\n\n---\n\n### x\n\n</details>",
+                  },
+                ],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 飾りの水平線は中身なので、部分木の中に居る。畳みは立つ。
+test "飾りの水平線が領域の中なら畳み" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n---\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "details": true,
+                    "open": false,
+                    "body": [["Opaque", "body"], "ThematicBreak"],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 閉じの直後の境界は、部分木の外（兄弟との区切り）なので跨ぐ。
+test "境界の水平線が閉じの直後なら畳み" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n---\n\n## b\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "details": true,
+                    "open": false,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+                [
+                  "HeadingNode",
+                  {
+                    "id": 4,
+                    "label": "b",
+                    "details": false,
+                    "open": false,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right", "Left"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 飾りの水平線とその後ろの中身は `a` の body なので、領域が狭い。
+test "飾りの水平線が閉じの直後なら中身" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n---\n\nsome text\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<summary>a</summary>\n\n## a\n\n</details>",
+                  },
+                ],
+                "ThematicBreak",
+                ["Opaque", "some text"],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 飛びは部分木の中で埋まるので、領域は 1 ノードを覆っている。
+test "飛びが領域の中でも畳み" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n#### deep\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "details": true,
+                    "open": false,
+                    "body": [],
+                    "children": [
+                      [
+                        "ImplicitNode",
+                        {
+                          "id": 4,
+                          "children": [
+                            [
+                              "HeadingNode",
+                              {
+                                "id": 5,
+                                "label": "deep",
+                                "details": false,
+                                "open": false,
+                                "body": [],
+                                "children": [],
+                              },
+                            ],
+                          ],
+                        },
+                      ],
+                    ],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
