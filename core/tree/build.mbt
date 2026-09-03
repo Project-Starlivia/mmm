@@ -45,13 +45,15 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
     side: Right,
     pend: false,
   }
-  for block in ast.children {
-    take(b, block, 0)
+  for piece in pieces(md, ast.children) {
+    lay(b, piece, 0)
   }
   // 行き先の見出し・項目が来ないまま終わった水平線は、その場の中身に落ちる
   spill(b)
   let next = { val: doc_id + 1 }
   let forest = b.forest
+  // 文書の中身は最初の見出し・項目より前にあるので、先に振る
+  number_details(b.body, next)
   for f in forest {
     number(f, next)
   }
@@ -88,8 +90,28 @@ priv struct Build {
 }
 
 ///|
+/// ひと切れを積む。畳みは見出し・項目の行に印を付けるか、中身の 1 枚になる。
+fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
+  match piece {
+    Raw(block) => take(b, block, nest, details=false)
+    Folded(block) => take(b, block, nest, details=true)
+    Capsule(text) => {
+      // 中身が来たので、保留中の水平線は境界になれない
+      spill(b)
+      // id は割り付けの直前に文書順で振るので、ここでは 0 を置く
+      fill(b, Details(id=0, text~))
+    }
+  }
+}
+
+///|
 /// ブロック 1 枚を積む。`nest` は項目の入れ子段数。
-fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
+fn take(
+  b : Build,
+  block : @markdown.Block,
+  nest : Int,
+  details? : Bool = false,
+) -> Unit {
   match block {
     // **単調性 — 項目の子孫は項目。** 項目の領土に書かれた見出しは骨格に
     // ならず、逐語のまま中身になる（列 0 へ出れば項目が閉じて木が変わる）
@@ -102,13 +124,13 @@ fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
         Line(
           sign=Heading,
           label=head_label(b.md, span, style, children),
-          details=false,
+          details~,
           body=[],
         ),
       )
     }
-    BulletList(items~, ..) => items_take(b, items, nest)
-    OrderedList(items~, ..) => items_take(b, items, nest)
+    BulletList(items~, ..) => items_take(b, items, nest, details~)
+    OrderedList(items~, ..) => items_take(b, items, nest, details~)
     // 区切りは**根の領土の隙間**でだけ翼の境目になる。項目の中は中身
     // 記法(`---` `***` `___`)も本数も差別しない。意味は常に「隣を区切る」で、
     // 行き先は**直後のブロックが何か**で決まる。ここでは保留するだけ
@@ -127,7 +149,12 @@ fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
 
 ///|
 /// 項目の列。**最初の段落がラベル**で、残りは中身か入れ子の項目。
-fn items_take(b : Build, items : Array[@markdown.ListItem], nest : Int) -> Unit {
+fn items_take(
+  b : Build,
+  items : Array[@markdown.ListItem],
+  nest : Int,
+  details? : Bool = false,
+) -> Unit {
   for it in items {
     let rest = []
     let mut label = ""
@@ -140,9 +167,9 @@ fn items_take(b : Build, items : Array[@markdown.ListItem], nest : Int) -> Unit 
         rest.push(c)
       }
     }
-    put(b, b.head + 1 + nest, Line(sign=Item, label~, details=false, body=[]))
-    for c in rest {
-      take(b, c, nest + 1)
+    put(b, b.head + 1 + nest, Line(sign=Item, label~, details~, body=[]))
+    for c in pieces(b.md, rest) {
+      lay(b, c, nest + 1)
     }
   }
 }
@@ -321,8 +348,24 @@ priv struct Counter {
 fn number(f : Frame, next : Counter) -> Unit {
   f.id = next.val
   next.val = f.id + 1
+  // 中身は子より前に書かれているので、先に振る
+  match f.skel {
+    Line(body~, ..) => number_details(body, next)
+    Gap => ()
+  }
   for k in f.kids {
     number(k, next)
+  }
+}
+
+///|
+/// 中身に混ざっている畳みへ、文書順の番号を振る。
+fn number_details(body : Array[Block], next : Counter) -> Unit {
+  for i, x in body {
+    if x is Details(text~, ..) {
+      body[i] = Details(id=next.val, text~)
+      next.val = next.val + 1
+    }
   }
 }
 

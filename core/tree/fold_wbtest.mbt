@@ -1,11 +1,243 @@
 // 畳み（`<details>`）を固定する。
 //
-// 骨格行は畳みの外。**中身と子だけを包む**ので、畳まれるのは開きの直前に
-// 積まれていたノード。
+// 領域が**ちょうど 1 つのノードの定義ごと**包んでいれば、そのノードの畳み
+// （`details = true`、中身は普通に読む）。そうでなければ中身の 1 枚（`Details`）。
 
 ///|
-test "details は直前のノードを畳む" {
-  json_inspect(parse("# r\n\n<details>\n\n## a\n\n</details>\n"), content={
+test "定義ごと包んでいれば、そのノードの畳み" {
+  json_inspect(parse("# r\n\n<details>\n\n## h\n\nbody\n\n</details>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [],
+            "children": [
+              [
+                "HeadingNode",
+                {
+                  "id": 3,
+                  "label": "h",
+                  "details": true,
+                  "body": [["Opaque", "body"]],
+                  "children": [],
+                },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// `<summary>` はラベルと文字列が完全一致すれば畳み。
+test "summary が一致すれば畳み" {
+  json_inspect(
+    parse("# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "h",
+                    "details": true,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 一致しなければ、領域は自分の名前を持つ別物なので中身に落ちる。
+test "summary が一致しなければ中身" {
+  json_inspect(
+    parse("# r\n\n<details>\n<summary>x</summary>\n\n## h\n\n</details>\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<summary>x</summary>\n\n## h\n\n</details>",
+                  },
+                ],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 見出しの行が領域の外にあるので、包んでいるのは中身だけ。
+test "中身だけ包んでいれば中身の 1 枚" {
+  json_inspect(parse("# r\n\n## h\n\n<details>\n\nbody\n\n</details>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [],
+            "children": [
+              [
+                "HeadingNode",
+                {
+                  "id": 3,
+                  "label": "h",
+                  "details": false,
+                  "body": [
+                    [
+                      "Details",
+                      { "id": 4, "text": "<details>\n\nbody\n\n</details>" },
+                    ],
+                  ],
+                  "children": [],
+                },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// h の部分木より広いので、ちょうど覆っていない。
+test "2 ノード分を包んでいれば中身" {
+  json_inspect(parse("# r\n\n<details>\n\n## h\n\n## h2\n\n</details>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [
+              [
+                "Details",
+                { "id": 3, "text": "<details>\n\n## h\n\n## h2\n\n</details>" },
+              ],
+            ],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}
+
+///|
+test "最初が段落なら中身" {
+  json_inspect(parse("# r\n\n<details>\n\nbodya\n\n# head\n\n</details>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [
+              [
+                "Details",
+                {
+                  "id": 3,
+                  "text": "<details>\n\nbodya\n\n# head\n\n</details>",
+                },
+              ],
+            ],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}
+
+///|
+/// 空行を挟まないと md は 1 つの Html に潰すので、中の見出しが見出しにならない。
+test "空行なしで 1 塊なら中身" {
+  json_inspect(parse("# r\n\n<details>\n## h\n</details>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [["Opaque", "<details>\n## h\n</details>"]],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}
+
+///|
+/// 打っている途中に文書の残りが吸い込まれないよう、片割れは畳まない。
+test "閉じの無い開きはただの文字" {
+  json_inspect(parse("# r\n\n<details>\n\n## h\n"), content={
     "eol": "Lf",
     "body": [],
     "roots": [
@@ -22,9 +254,9 @@ test "details は直前のノードを畳む" {
                 "HeadingNode",
                 {
                   "id": 3,
-                  "label": "a",
+                  "label": "h",
                   "details": false,
-                  "body": [["Opaque", "</details>"]],
+                  "body": [],
                   "children": [],
                 },
               ],
@@ -38,124 +270,7 @@ test "details は直前のノードを畳む" {
 }
 
 ///|
-test "summary は開きと同じ塊なので落ちる" {
-  json_inspect(
-    parse("# r\n\n<details>\n<summary>r</summary>\n\n## a\n\n</details>\n"),
-    content={
-      "eol": "Lf",
-      "body": [],
-      "roots": [
-        {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "details": false,
-              "body": [["Opaque", "<details>\n<summary>r</summary>"]],
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "a",
-                    "details": false,
-                    "body": [["Opaque", "</details>"]],
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
-          "sides": ["Right"],
-        },
-      ],
-    },
-  )
-}
-
-///|
-test "入れ子の畳み" {
-  json_inspect(
-    parse(
-      "# r\n\n<details>\n\n## a\n\n<details>\n\n### x\n\n</details>\n\n</details>\n",
-    ),
-    content={
-      "eol": "Lf",
-      "body": [],
-      "roots": [
-        {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "details": false,
-              "body": [["Opaque", "<details>"]],
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "a",
-                    "details": false,
-                    "body": [["Opaque", "<details>"]],
-                    "children": [
-                      [
-                        "HeadingNode",
-                        {
-                          "id": 4,
-                          "label": "x",
-                          "details": false,
-                          "body": [
-                            ["Opaque", "</details>"],
-                            ["Opaque", "</details>"],
-                          ],
-                          "children": [],
-                        },
-                      ],
-                    ],
-                  },
-                ],
-              ],
-            },
-          ],
-          "sides": ["Right"],
-        },
-      ],
-    },
-  )
-}
-
-///|
-test "畳んだノードの中身は残る" {
-  json_inspect(parse("# r\n\n<details>\n\ntext\n\n</details>\n"), content={
-    "eol": "Lf",
-    "body": [],
-    "roots": [
-      {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "details": false,
-            "body": [
-              ["Opaque", "<details>"],
-              ["Opaque", "text"],
-              ["Opaque", "</details>"],
-            ],
-            "children": [],
-          },
-        ],
-        "sides": [],
-      },
-    ],
-  })
-}
-
-///|
-test "相手の居ない閉じは逐語のまま残る" {
+test "相手の居ない閉じもただの文字" {
   json_inspect(parse("# r\n\n</details>\n"), content={
     "eol": "Lf",
     "body": [],
@@ -178,38 +293,79 @@ test "相手の居ない閉じは逐語のまま残る" {
 }
 
 ///|
-/// 木が 2 本になるのは畳みのせいではない。列 0 の `<details>` がリストを
-/// 閉じるという md の規則で、`- b` は別のリストとして読まれる。
-test "項目も畳める" {
-  json_inspect(parse("- a\n\n<details>\n\n  - b\n\n</details>\n"), content={
+/// 畳みは見出しの階層に割り込まない。
+test "畳みの後ろは元の深さに戻る" {
+  json_inspect(parse("# r\n\n<details>\n\n## h\n\n</details>\n\n## b\n"), content={
     "eol": "Lf",
     "body": [],
     "roots": [
       {
         "node": [
-          "ListNode",
+          "HeadingNode",
           {
             "id": 2,
-            "label": "a",
+            "label": "r",
             "details": false,
-            "body": [["Opaque", "<details>"]],
-            "children": [],
+            "body": [],
+            "children": [
+              [
+                "HeadingNode",
+                {
+                  "id": 3,
+                  "label": "h",
+                  "details": true,
+                  "body": [],
+                  "children": [],
+                },
+              ],
+              [
+                "HeadingNode",
+                {
+                  "id": 4,
+                  "label": "b",
+                  "details": false,
+                  "body": [],
+                  "children": [],
+                },
+              ],
+            ],
           },
         ],
-        "sides": [],
+        "sides": ["Right", "Right"],
       },
+    ],
+  })
+}
+
+///|
+test "項目も定義ごと包める" {
+  json_inspect(parse("# r\n\n<details>\n\n- a\n\n</details>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
       {
         "node": [
-          "ListNode",
+          "HeadingNode",
           {
-            "id": 3,
-            "label": "b",
+            "id": 2,
+            "label": "r",
             "details": false,
-            "body": [["Opaque", "</details>"]],
-            "children": [],
+            "body": [],
+            "children": [
+              [
+                "ListNode",
+                {
+                  "id": 3,
+                  "label": "a",
+                  "details": true,
+                  "body": [],
+                  "children": [],
+                },
+              ],
+            ],
           },
         ],
-        "sides": [],
+        "sides": ["Right"],
       },
     ],
   })
