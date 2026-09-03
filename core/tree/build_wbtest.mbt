@@ -392,3 +392,29 @@ test "改行の流儀は保存する" {
     ],
   })
 }
+
+///|
+/// **インラインの span は中身に対する相対。** 原文の絶対位置に足すと、
+/// 行ごとの字下げと `\r` の総量ぶん手前で切れてラベルの末尾が消える。
+test "setext のラベルも末尾まで残る" {
+  json_inspect(parse("aaa\r\nbbb\r\n===\r\n"), content={
+    "eol": "Crlf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "aaa\r\nbbb",
+            "details": false,
+            "open": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}

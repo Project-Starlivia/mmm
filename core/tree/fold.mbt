@@ -256,22 +256,13 @@ fn next(blocks : Array[@markdown.Block], i : Int) -> Int {
 }
 
 ///|
-/// 記法を飛ばした次の位置。空行・畳みの綴りだけの塊・水平線は、それ自体は
-/// 中身ではないので跨ぐ（兄弟の畳みが並んでいても、見えるのは次の骨格の行）。
-/// 水平線が境界か飾りかは**その先が骨格かどうか**で決まるので、ここでは
-/// 跨ぐだけでよく、build の裁定を写す必要がない。
-fn beyond(
-  blocks : Array[@markdown.Block],
-  spells : Array[Spell],
-  i : Int,
-) -> Int {
+/// 記法を飛ばした次の位置。空行と**落ちる綴りの塊**だけを跨ぐ。
+/// 兄弟の畳みが並んでいれば、見えるのは次の骨格の行になる。
+/// 立たない畳みの綴りは中身（逐語・ただの文字）になるので跨がない —
+/// 跨ぐと、領域の外に在る中身を畳みの内側へ引き込んでしまう。
+fn beyond(blocks : Array[@markdown.Block], gone : Array[Bool], i : Int) -> Int {
   let mut k = i + 1
-  while k < blocks.length() &&
-        (
-          blocks[k] is BlankLines(..) ||
-          blocks[k] is ThematicBreak(..) ||
-          only_marks(spells[k])
-        ) {
+  while k < blocks.length() && (blocks[k] is BlankLines(..) || gone[k]) {
     k = k + 1
   }
   k
@@ -300,8 +291,8 @@ fn label_of(md : String, b : @markdown.Block) -> String {
 /// `#` の数で測ると「領域の外に出た子」を覆っているつもりになる。
 fn covers(
   blocks : Array[@markdown.Block],
-  spells : Array[Spell],
   low : Array[Int],
+  gone : Array[Bool],
   head : Int,
   last : Int,
 ) -> Bool {
@@ -320,10 +311,16 @@ fn covers(
     guard low[k] > level else { return false }
     k = k + 1
   }
-  // 後ろが部分木の中なら狭い。**綴りだけの塊は跨ぐ** —
-  // 兄弟の畳みが並んでいても、見えるのは次の骨格の行
-  let z = beyond(blocks, spells, last)
-  z >= blocks.length() || low[z] <= level
+  // 後ろが部分木の中なら狭い
+  let z = beyond(blocks, gone, last)
+  guard z < blocks.length() else { return true }
+  // 水平線は単体では中身ではない。**その先が骨格なら境界**（部分木の外）で、
+  // そうでなければ飾り＝このノードの中身なので、領域が狭いということ
+  if blocks[z] is ThematicBreak(..) {
+    let w = beyond(blocks, gone, z)
+    return w < blocks.length() && low[w] <= level
+  }
+  low[z] <= level
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -339,9 +336,9 @@ fn pieces(
   blocks : Array[@markdown.Block],
   nest : Int,
 ) -> Array[Piece] {
-  let low = depths(md, blocks, nest)
   let n = blocks.length()
   let spells = blocks.map(b => read_spell(md, b))
+  let low = depths(md, blocks, spells, nest)
   let spots = []
   for i in 0..<n {
     for t in spells[i].tags {
@@ -349,14 +346,19 @@ fn pieces(
     }
   }
   let ps = pairs(spots)
-  let ok = ps.map(p => folds(md, blocks, spells, low, spots, p.0, p.1))
 
-  // 塊が落ちるのは、**その塊の綴りが全部立った畳みのもの**のときだけ。
-  // 立っていない綴りが混じっていたら落とせず、落とせない塊に頼る畳みも
-  // 立てない（同じ `</details>` が綴りと文字の両方になってしまう）。
-  // 降ろすと別の塊も落とせなくなるので、動かなくなるまで回す
-  let gone = Array::make(n, false)
+  // **どの塊が綴りとして落ちるか**を決める。畳みが立つかは「後ろに何が居るか」
+  // に依り、そこに居るのが綴りか中身かは畳みが立つかに依るので、たがいに要る。
+  // 全部落ちる側から始めて、落ちないものが出るたびにやり直す。
+  // 落ちる塊は減る一方なので必ず止まる。
+  let gone = Array::makei(n, i => only_marks(spells[i]))
+  let ok = ps.map(_ => false)
   for _ in 0..<=ps.length() {
+    for k, p in ps {
+      ok[k] = folds(md, blocks, spells, low, gone, spots, p.0, p.1)
+    }
+    // 塊が落ちるのは、**その塊の綴りが全部立った畳みのもの**のときだけ。
+    // 立っていない綴りが混じっていたら落とせない（その文字が消える）
     let claimed = Array::make(spots.length(), false)
     for k, p in ps {
       if ok[k] {
@@ -374,18 +376,22 @@ fn pieces(
         free[s.block] = false
       }
     }
-    for i in 0..<n {
-      gone[i] = held[i] && free[i]
-    }
     let mut moved = false
-    for k, p in ps {
-      if ok[k] && !(gone[spots[p.0].block] && gone[spots[p.1].block]) {
-        ok[k] = false
+    for i in 0..<n {
+      let now = held[i] && free[i]
+      if gone[i] && !now {
+        gone[i] = false
         moved = true
       }
     }
     if !moved {
       break
+    }
+  }
+  for k, p in ps {
+    // 落とせない塊に頼る畳みは立てない（同じタグが綴りと文字の両方になる）
+    if ok[k] && !(gone[spots[p.0].block] && gone[spots[p.1].block]) {
+      ok[k] = false
     }
   }
 
@@ -443,6 +449,7 @@ fn folds(
   blocks : Array[@markdown.Block],
   spells : Array[Spell],
   low : Array[Int],
+  gone : Array[Bool],
   spots : Array[Spot],
   o : Int,
   c : Int,
@@ -464,5 +471,5 @@ fn folds(
   let head = next(blocks, ob)
   guard head < cb else { return false }
   guard name == label_of(md, blocks[head]) else { return false }
-  covers(blocks, spells, low, head, cb - 1)
+  covers(blocks, low, gone, head, cb - 1)
 }

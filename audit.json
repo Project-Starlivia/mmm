@@ -1,0 +1,218 @@
+[
+ {
+  "title": "項目の中の畳みは、タグが 1 つ残らず消える",
+  "kind": "regression",
+  "md": "\"- Zqitem\\n\\n  <details>\\n  <summary>Zqh</summary>\\n\\n  ## Zqh\\n\\n  </details>\\n\"",
+  "want": "単調性により項目の領土の見出しは骨格にならない。骨格でないものはノードでないので誰の畳みか言えず、②が欠ける。領域まるごと逐語（`Block::Details`）になるべき。"
+ },
+ {
+  "title": "項目のラベルが容器の字下げ・CRLF のぶんだけ後ろから切れる",
+  "kind": "loss",
+  "md": "\"- Zqaaa\\n  Zqbbb\\n\"",
+  "want": "ラベルは項目の 1 行目の逐語。原文の何文字も落としてはならない。"
+ },
+ {
+  "title": "setext 見出しのラベルも同じ理由で切れる（CRLF だけでも起きる）",
+  "kind": "loss",
+  "md": "\"Zqaaa\\r\\nZqbbb\\r\\n===\\r\\n\"",
+  "want": "見出しのラベルは原文の逐語。1 文字も落とさない。"
+ },
+ {
+  "title": "`$$` 数式と `:::` ディレクティブの閉じが消える",
+  "kind": "loss",
+  "md": "\"# r\\n\\n$$\\nZqm\\n$$\\n\"",
+  "want": "閉じの綴りは木から一意に書き戻せない（本体の逐語に入っていない）ので、落としてはいけない。"
+ },
+ {
+  "title": "リンク参照定義がまるごと消える",
+  "kind": "loss",
+  "md": "\"[Zqa]: Zqb \\\"Zqc\\\"\\n\"",
+  "want": "どのブロックにも入らない原文の範囲は、その場の中身として逐語で持つ（読み解かないと決めれば意味は失われない）。"
+ },
+ {
+  "title": "ラベルの無い項目に `<summary>` の名前が付いて、名前が消える",
+  "kind": "regression",
+  "md": "\"# r\\n\\n<details>\\n<summary>Zqlabel</summary>\\n\\n- ```\\n  c\\n  ```\\n\\n  Zqlabel\\n\\n</details>\\n\"",
+  "want": "1 行目が段落でない項目にはラベルが無い。名前の付けようが無いものは畳めないので、領域まるごと逐語。"
+ },
+ {
+  "title": "画像・リンクのタイトルが消える",
+  "kind": "loss",
+  "md": "\"# r\\n\\n![a](b \\\"Zqtitle\\\")\\n\"",
+  "want": "タイトルは alt・src・text・href のどれからも書き戻せない。持つか、持てないなら `sole` を諦めて `Opaque`（逐語）にする。"
+ },
+ {
+  "title": "ATX 見出しの閉じ `#` が消える",
+  "kind": "loss",
+  "md": "\"# Zqa Zqb ###\\n\"",
+  "want": "飾りの字下げ（`   # a`）は木から一意に書き戻せる（常に 0 桁で書く）が、閉じ `#` は在無を木から言えないので、落とすなら綴りではなく失われた文字になる。持つか、飾りと同じ扱いにするなら spec に明記する。"
+ },
+ {
+  "title": "項目の中に書いた `---` が文書の先頭へ移る",
+  "kind": "spec-drift",
+  "md": "\"- Zqa\\n\\n  ---\\n\\n# Zqh\\n\"",
+  "want": "「区切りは根の領土の隙間でだけ翼の境目になる。項目の中は中身」（docs/spec.md）。この `---` は Zqa の body に残るべき。"
+ },
+ {
+  "title": "水平線が 2 本以上並ぶと、1 本ぶんの文字が木から消える",
+  "kind": "loss",
+  "md": "\"# r\\n\\n---\\n\\n---\\n\\n## b\\n\"",
+  "want": "docs/spec.md:1055 の裁定そのもの — 「# r / --- / --- / ## b → ①は直後が水平線なので装飾、②が境界。a.body = [線]、b は左」。①は直後が骨格でないので装飾＝ r.body に線として残り、②だけが境界になる。大前提①より、書き戻せない綴りは落としてはいけない。"
+ },
+ {
+  "title": "畳みの頭が Implicit を生むと、level が節ではなく飛びの深さになり畳みが落ちる",
+  "kind": "regression",
+  "md": "\"# a\\n\\n<details>\\n<summary>c</summary>\\n\\n### c\\n\\n</details>\\n\\n### d\\n\"",
+  "want": "c は gap@2 の下の深さ 3（control \"# a\\n\\n### c\\n\\n### d\\n\" では c と d が同じ gap の子）。領域は c の行だけを過不足なく覆い、d はその兄弟なので details=true。これは mmm が c を畳んだときに書く文字そのもの — 読み戻せないので往復が壊れる。J1（\"# a\\n\\n## b\\n\\n---\\n\\n---\\n\\n<details>…### c…</details>\\n\\n### d\\n\"）は同じ木の形なのに畳みが立っており、判定が場所で割れている。"
+ },
+ {
+  "title": "畳みの前の `---` を空打ちが溶かすので、領域の外の項目が畳みの子になる",
+  "kind": "wrong-reading",
+  "md": "\"# a\\n\\n## b\\n\\n---\\n\\n<details>\\n<summary>c</summary>\\n\\n- c\\n\\n</details>\\n\\n- d\\n\"",
+  "want": "本番では境界の `---` が c を深さ 2 へ引き出すので d は c の子になる。領域は c の children を覆っていないので、docs/spec.md:1113（h の子 x が領域の外 → 中身）どおり領域まるごと逐語 — b.body=[線, Details]、d は b の子。"
+ },
+ {
+  "title": "同じ `---` のずれで、並べて書いた 2 つの畳みが親子に入れ子になる",
+  "kind": "wrong-reading",
+  "md": "\"# a\\n\\n## b\\n\\n---\\n\\n<details>\\n<summary>c</summary>\\n\\n- c\\n\\n</details>\\n\\n<details>\\n<summary>d</summary>\\n\\n- d\\n\\n</details>\\n\"",
+  "want": "兄弟として書かれた 2 つの領域。本番の深さでは d は c の子なので、c の領域は c の children を覆っておらず c は逐語に落ちる（少なくとも両方が畳みで並ぶ形にはならない）。"
+ },
+ {
+  "title": "beyond が「対の立たない領域」を跨ぐので、領域の外の逐語が畳みの body に入る",
+  "kind": "wrong-reading",
+  "md": "\"# a\\n\\n<details>\\n<summary>b</summary>\\n\\n## b\\n\\n</details>\\n\\n<details>\\n<summary>zz</summary>\\n\\n## c\\n\\n</details>\\n\"",
+  "want": "2 つ目の領域は名前が合わないので逐語（Capsule）＝ b の body。それは 1 つ目の領域の外にあるので、1 つ目は「body を過不足なく覆う」を満たさず逐語に落ちる。"
+ },
+ {
+  "title": "beyond が迷子のタグを跨ぐので、領域の外のタグが畳みの body に入る",
+  "kind": "wrong-reading",
+  "md": "\"# a\\n\\n<details>\\n<summary>b</summary>\\n\\n## b\\n\\n</details>\\n\\n<details>\\n\\n## c\\n\"",
+  "want": "docs/spec.md:1136 のとおり対の揃わないタグはただの文字＝ b の body（領域の外）。よって b の畳みは立たず、領域まるごと逐語。"
+ },
+ {
+  "title": "beyond が末尾の水平線を跨ぐので、領域の外の線が畳みの body に入る",
+  "kind": "wrong-reading",
+  "md": "\"# a\\n\\n<details>\\n<summary>b</summary>\\n\\n## b\\n\\n</details>\\n\\n---\\n\"",
+  "want": "その `---` は直後に骨格が無いので装飾＝ b の中身（領域の外）。領域は b の body を覆っていないので逐語。"
+ },
+ {
+  "title": "領域の中の `---` が領域の外のノードの側になり、線の位置が復元できない",
+  "kind": "loss",
+  "md": "\"# a\\n\\n<details>\\n<summary>b</summary>\\n\\n## b\\n\\n---\\n\\n</details>\\n\\n## c\\n\"",
+  "want": "畳みが立つのは原文のその範囲が mmm の書く文字と一致するときだけ。この畳みを書き戻すと `---` は `</details>` の内側に出る（＝ c の側が変わる）ので、綴りが一致しない → 領域まるごと逐語。"
+ },
+ {
+  "title": "項目の中の畳みを、単調性の効かない生の Build で測るので、body が領域から食み出す",
+  "kind": "wrong-reading",
+  "md": "\"# a\\n\\n- b\\n\\n  <details>\\n  <summary>c</summary>\\n\\n  - c\\n\\n  </details>\\n\\n  ## x\\n\"",
+  "want": "単調性より `## x` は骨格にならず c の中身（control \"# a\\n\\n- b\\n\\n  - c\\n\\n  ## x\\n\" では c.body=[Opaque(\"## x\")]）。領域はその body を覆っていないので逐語。"
+ },
+ {
+  "title": "同じ空打ちのずれで、項目の中の正しい畳みが落ちる",
+  "kind": "regression",
+  "md": "\"- a\\n\\n  <details>\\n  <summary>b</summary>\\n\\n  - b\\n\\n  ## x\\n\\n  </details>\\n\"",
+  "want": "`## x` は単調性で b の中身。領域は b の行と body を過不足なく覆っているので details=true（mmm が b を畳んだときに書く文字そのもの）。"
+ },
+ {
+  "title": "逐語に落ちる領域の中の見出しを、空打ちが骨格として数えて外側の畳みを落とす",
+  "kind": "loss",
+  "md": "\"# a\\n\\n<details>\\n<summary>b</summary>\\n\\n## b\\n\\n<details open=\\\"1\\\">\\n<summary>x</summary>\\n\\n## sibling\\n\\n</details>\\n\\n</details>\\n\"",
+  "want": "内側は `open=\\\"1\\\"` が mmm の書く綴りでないので逐語（Capsule）＝ b の中身になり、`## sibling` は木に現れない。よって外側の領域は b とその body を過不足なく覆っており details=true。"
+ },
+ {
+  "title": "項目のラベルの切り出しがずれ、2 行目以降の文字が木から消える",
+  "kind": "loss",
+  "md": "\"- alpha\\n  bravo charlie\\n\"",
+  "want": "綴り（`- ` マーカーと容器の字下げ）以外の文字は必ず逐語で残る。ラベルは \"alpha\\n  bravo charlie\"（あるいは字下げを剥がした \"alpha\\nbravo charlie\"）。"
+ },
+ {
+  "title": "項目の中の畳みは、`<details>`/`<summary>`/`</details>` の 3 行ごと木から消える",
+  "kind": "loss",
+  "md": "\"- a\\n\\n  <details>\\n  <summary>x</summary>\\n\\n  ## x\\n\\n  </details>\\n\"",
+  "want": "単調性により項目の領土の見出しは骨格にならない（`- a\\n\\n  ## h\\n` は Opaque になる）。骨格でない行は畳めないので、領域まるごと逐語＝`- \"a\" body=[Details(\"<details>\\n<summary>x</summary>\\n\\n## x\\n\\n</details>\")]`。"
+ },
+ {
+  "title": "項目の畳みで `<summary>` の名前が落ちる — label_of が items_take と別の答えを返す",
+  "kind": "regression",
+  "md": "\"# r\\n\\n<details>\\n<summary>b</summary>\\n\\n- - x\\n\\n  b\\n\\n</details>\\n\"",
+  "want": "①「包まれた骨格行のラベルと原文の文字列が完全一致」。この項目は 1 行目が段落でないのでラベルは \"\" であり \"b\" と一致しない → 領域まるごと逐語（Block::Details）。"
+ },
+ {
+  "title": "空打ちが畳みの綴りを中身として数えるので、保留中の `---` の行き先がずれ、領域の外の子ごと畳む",
+  "kind": "regression",
+  "md": "\"# r\\n\\n## a\\n\\n---\\n\\n<details>\\n<summary>c</summary>\\n\\n- c\\n\\n</details>\\n\\n- e\\n\"",
+  "want": "`---` は c を深さ 2 へ引き出すので `- e` は c の子。領域は c の children を覆っていない → ② が落ちて領域まるごと逐語。"
+ },
+ {
+  "title": "対にならなかったタグの塊を beyond が跨ぐので、領域の外の文字を畳みの中へ引き込む",
+  "kind": "regression",
+  "md": "\"# r\\n\\n<details>\\n<summary>a</summary>\\n\\n## a\\n\\n</details>\\n\\n<details>\\n\\n## b\\n\"",
+  "want": "対にならないタグはただの文字＝a の body。それが領域の外に在る以上 ② が落ち、領域まるごと逐語。"
+ },
+ {
+  "title": "重なった閉じで、内側の 1 つが立たないと外側の正しい畳みまで潰れる",
+  "kind": "regression",
+  "md": "\"# r\\n\\n<details>\\n<summary>a</summary>\\n\\n## a\\n\\n<details>\\n<summary>zzz</summary>\\n\\n### b\\n\\n</details>\\n</details>\\n\"",
+  "want": "spec「重なった `</details>` だけは、何段ぶんか数えれば分かるので畳みのままでよい」。外側は畳み（a.details=true）、内側は名前が合わないので a.body の逐語 Details。"
+ },
+ {
+  "title": "領域の中の `---` を covers が中身として見逃し、build は領域の外の兄弟の境界にする",
+  "kind": "spec-drift",
+  "md": "\"# r\\n\\n<details>\\n<summary>a</summary>\\n\\n## a\\n\\n---\\n\\n</details>\\n\\n## b\\n\"",
+  "want": "`---` は r の子の並びの記法であって a の body でも children でもない。領域がそれを含んでいる以上 ② が落ち、領域まるごと逐語。"
+ },
+ {
+  "title": "綴りだけの塊を無条件に跨ぐので、領域の外の中身が畳みの中に入る",
+  "kind": "spec-drift",
+  "md": "\"# r\\n\\n<details>\\n<summary>a</summary>\\n\\n## a\\n\\n</details>\\n\\n<details>\\n<summary>NOPE</summary>\\n\\n## b\\n\\n</details>\\n\"",
+  "want": "②「領域がそのノードの body・children とその body を過不足なく覆う」が欠けているので領域まるごと逐語（Block::Details）。外部レンダラでは 2 本目は a の兄弟であり、余った </details> は無視されるだけで a の中には入らない。a.details=true のまま body にこれらを入れると、書き戻したとき原文で領域の外に在った文字が畳みの内側へ移動する（GitHub では隠れる）。比較対象として、跨ぐ相手が普通の段落なら \"...</details>\\n\\ntail\\n\" は正しく逐語に落ちている — 同じ「領域の外の中身」なのに、たまたま綴りに見える塊だけが見逃されている"
+ },
+ {
+  "title": "生テキストの名前を前方一致で見るので、<presentation> が塊の残りを飲む",
+  "kind": "wrong-reading",
+  "md": "\"# r\\n\\n<details>\\n<summary>h</summary>\\n\\n## h\\n\\n<presentation> </details>\\n\\ntail\\n\\n</details>\\n\"",
+  "want": "ブラウザでは <presentation> は未知の要素で、直後の </details> がその畳みを閉じる。よって tail は畳みの外。mmm は </details> を綴りとして見ず、後ろの </details> と対にしたので、原文で領域の外に在った tail を畳みの中へ入れている（GitHub では見えている文字が mmm では隠れる）"
+ },
+ {
+  "title": "生テキストの閉じを大小区別で探すので、<SCRIPT> が塊の残りを飲む",
+  "kind": "wrong-reading",
+  "md": "\"# r\\n\\n<details>\\n<summary>h</summary>\\n\\n## h\\n\\n<SCRIPT>a</SCRIPT></details>\\n\\nZ\\n\\n</details>\\n\"",
+  "want": "HTML の名前は大小を区別しないので </SCRIPT> で生テキストは終わり、続く </details> が畳みを閉じる。Z は畳みの外。開きは name_at で大小を無視して拾っておきながら（spec の「名前の大小は区別せず」）、閉じだけ has の完全一致で探しているので、開きと閉じで規則が食い違っている"
+ },
+ {
+  "title": "<!--> / <!---> を空のコメントと読まないので、塊の残りを飲む",
+  "kind": "wrong-reading",
+  "md": "\"# r\\n\\n<details>\\n<summary>h</summary>\\n\\n## h\\n\\n<!--></details>\\n\\nZ\\n\\n</details>\\n\"",
+  "want": "HTML では <!--> と <!---> はそこで閉じた空のコメント（abrupt-closing-of-empty-comment）なので、続く </details> が畳みを閉じ、Z は畳みの外。spec は「コメントのマーカー判定はエディタや GitHub と同じにしてある」と言っており、閉じ側の緩さ（--> / ---> 可）は入っているのに、開き側の <!--> が抜けている"
+ },
+ {
+  "title": "<pre> を生テキスト扱いしているので、中の <details> を見落として畳みが立つ",
+  "kind": "wrong-reading",
+  "md": "\"# r\\n\\n<details>\\n<summary>h</summary>\\n\\n## h\\n\\n<pre><details></pre>\\n\\n</details>\\n\\n## h2\\n\"",
+  "want": "HTML で生テキスト（raw text）なのは script / style と、RCDATA の textarea / title だけで、pre の中身は普通に解析される。ブラウザでは <pre> の中の <details> が本物の開きになり、続く </details> はその内側を閉じるので、外側の畳みは閉じないまま h2 まで飲み込む。mmm が畳みを立て、しかも h2 を外に置くのは、外部レンダラと逆の読み。② を満たしていると誤認した状態で details=true を立てている"
+ },
+ {
+  "title": "引用符をタグのどこでも引用符として扱うので、タグの終わりが HTML とずれる",
+  "kind": "wrong-reading",
+  "md": "\"# r\\n\\n<details \\\"x>\\n<summary>h</summary>\\n\\n## h\\n\\n</details>\\n\"",
+  "want": "HTML で引用符が値を囲むのは = の直後だけで、それ以外の位置の \" や ' はただの属性名の文字（parse error だが受け付ける）。よって <details \"x> は > で終わる開きタグで、ブラウザは h を包む畳みを描く。spec も「属性の中の > は引用符の中なら数えず」と、引用符を属性値の話として書いている。今の実装は = を見ずに引用符を数えるので、属性値でない \" / ' でタグの終わりが行方不明になり（-1 → タグでない）、対が消える"
+ },
+ {
+  "title": "擬似コメント（<? や <![CDATA[）を跨がないので、その中の </details> を閉じと読む",
+  "kind": "wrong-reading",
+  "md": "\"# r\\n\\n<details>\\n<summary>h</summary>\\n\\n## h\\n\\n<?x </details> ?>\\n\\n</details>\\n\"",
+  "want": "HTML では <? も <! に -- が続かない形も bogus comment で、最初の > までがコメント。よってこの </details> は閉じではなく、ブラウザでは最後の </details> が畳みを閉じて h を包む。mmm は中の </details> と対にしたので、逐語の領域の切れ目が外部レンダラと違う所に落ちる（最後の </details> だけが余る）。<!DOCTYPE html> </details> は偶然どちらも同じ読みになるが、それは > の位置がたまたま一致するだけ"
+ },
+ {
+  "title": "<svg> の中のタグを数えるので、SVG のカードが畳みの逐語に化ける",
+  "kind": "regression",
+  "md": "\"# r\\n\\n## h\\n\\n<svg><details>a</details></svg>\\n\"",
+  "want": "spec の「<svg>…</svg> ブロック → そのまま描画」どおり Svg。HTML の解析では <svg> の中は foreign content で、details は breakout の一覧に無いので SVG の要素であって HTML の details ではない — ブラウザはここで畳みを開かない。綴りとして数える相手ではないので、Svg のまま残らなければならない。content.mbt:32 の is_svg による分類を、畳みの読みが先回りして奪っている"
+ },
+ {
+  "title": "深さの空打ちが項目の入れ子段数を渡さないので、項目の中の見出しで畳みが落ちる",
+  "kind": "wrong-reading",
+  "md": "\"- a\\n\\n  <details>\\n  <summary>a2</summary>\\n\\n  - a2\\n\\n  ## x\\n\\n  </details>\\n\"",
+  "want": "a2 の畳み（a2.details=true、a2.body=[Opaque(\"## x\")]）。単調性の裁定どおり、項目の領土に書かれた見出しは骨格にならず逐語の中身になる（畳みを外した \"- a\\n\\n  - a2\\n\\n  # x\\n\" では実際に a2.body=[Opaque(\"# x\")] になる）。中身なのだから領域は a2 の body を過不足なく覆っており、② は満たされている"
+ }
+]

@@ -1562,3 +1562,203 @@ test "飛びが領域の中でも畳み" {
     },
   )
 }
+
+///|
+/// **跨いでよいのは、実際に落ちる綴りの塊だけ。** 立たない畳みの綴りは中身
+/// （逐語・ただの文字）になるので、跨ぐと領域の外の中身を畳みの内側へ引き込む。
+test "後ろの領域が立たなければ跨がない" {
+  json_inspect(
+    parse(
+      "# a\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n\n<details>\n<summary>zz</summary>\n\n## c\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "a",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                  },
+                ],
+                [
+                  "Details",
+                  {
+                    "id": 4,
+                    "text": "<details>\n<summary>zz</summary>\n\n## c\n\n</details>",
+                  },
+                ],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+test "後ろの迷子のタグは跨がない" {
+  json_inspect(
+    parse(
+      "# a\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n\n<details>\n\n## c\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "a",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                  },
+                ],
+                ["Opaque", "<details>"],
+              ],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 4,
+                    "label": "c",
+                    "details": false,
+                    "open": false,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 文書の末尾の水平線は、その先に骨格が無いので飾り＝このノードの中身。
+/// 領域はそれを覆っていないので畳みは立たない。
+test "末尾の飾りの水平線は跨がない" {
+  json_inspect(
+    parse(
+      "# a\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n\n---\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "a",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                  },
+                ],
+                "ThematicBreak",
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// **空打ちも畳みの綴りを跨ぐ。** 中身として数えると、保留中の水平線が
+/// そこで装飾に落ちて、本番の木と深さがずれる。
+test "畳みの前の境界は空打ちでも境界のまま" {
+  json_inspect(
+    parse(
+      "# r\n\n## a\n\n---\n\n<details>\n<summary>c</summary>\n\n- c\n\n</details>\n\n- e\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "details": false,
+                    "open": false,
+                    "body": [
+                      "ThematicBreak",
+                      [
+                        "Details",
+                        {
+                          "id": 4,
+                          "text": "<details>\n<summary>c</summary>\n\n- c\n\n</details>",
+                        },
+                      ],
+                    ],
+                    "children": [
+                      [
+                        "ListNode",
+                        {
+                          "id": 5,
+                          "label": "e",
+                          "details": false,
+                          "open": false,
+                          "body": [],
+                          "children": [],
+                        },
+                      ],
+                    ],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}

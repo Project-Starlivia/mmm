@@ -113,6 +113,7 @@ let deep : Int = 99
 fn depths(
   md : String,
   blocks : Array[@markdown.Block],
+  spells : Array[Spell],
   nest : Int,
 ) -> Array[Int] {
   let b : Build = {
@@ -128,6 +129,12 @@ fn depths(
   }
   let out = Array::make(blocks.length(), deep)
   for i, block in blocks {
+    // **畳みの綴りだけの塊は跨ぐ。** 測っているのは「この領域が畳みだったら
+    // 部分木を覆うか」なので、その前提では綴りは落ちている。中身として数えると
+    // 保留中の水平線がそこで装飾に落ち、本番の木と深さがずれる
+    if only_marks(spells[i]) {
+      continue
+    }
     b.low = deep
     take(b, block, nest)
     out[i] = b.low
@@ -381,7 +388,7 @@ fn head_label(
   }
   let from = head_start(md, span, style)
   let len = span_of(children[children.length() - 1]).to
-  String::unsafe_substring(md, start=from, end=from + len)
+  String::unsafe_substring(md, start=from, end=reach(md, from, len))
 }
 
 ///|
