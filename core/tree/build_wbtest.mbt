@@ -301,3 +301,80 @@ test "setext のラベルも末尾まで残る" {
     ],
   })
 }
+
+///|
+/// 見出しも同じ。`[q]: /r` が定義として引き取られても、2 行目が消えない。
+test "定義行に見える setext でもラベルは全部残る" {
+  json_inspect(parse("[q]: /r\nZZZ\n---\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ImplicitNode",
+          {
+            "id": 2,
+            "children": [
+              [
+                "HeadingNode",
+                {
+                  "id": 3,
+                  "label": "[q]: /r\nZZZ",
+                  "body": [["Opaque", "[q]: /r"]],
+                  "children": [],
+                },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// 閉じの `#` は飾りなので落ちるが、空白が無ければ中身。
+test "ATX の閉じの # は飾り、空白が無ければ中身" {
+  json_inspect([parse("# a ###\n"), parse("# a#\n"), parse("# a #b\n")], content=[
+    {
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            { "id": 2, "label": "a", "body": [], "children": [] },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+    {
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            { "id": 2, "label": "a#", "body": [], "children": [] },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+    {
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            { "id": 2, "label": "a #b", "body": [], "children": [] },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  ])
+}

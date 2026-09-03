@@ -119,7 +119,7 @@ priv struct Depth {
 fn depths(
   md : String,
   blocks : Array[@markdown.Block],
-  spells : Array[Spell],
+  gone : Array[Bool],
   nest : Int,
 ) -> Array[Depth] {
   let b : Build = {
@@ -136,10 +136,10 @@ fn depths(
   }
   let out = Array::make(blocks.length(), { top: deep, own: deep })
   for i, block in blocks {
-    // **畳みの綴りだけの塊は跨ぐ。** 測っているのは「この領域が畳みだったら
-    // 部分木を覆うか」なので、その前提では綴りは落ちている。中身として数えると
-    // 保留中の水平線がそこで装飾に落ち、本番の木と深さがずれる
-    if only_marks(spells[i]) {
+    // **跨ぐのは実際に落ちる塊だけ。** 綴りに見えても落ちない塊（対にならない
+    // `<summary>` など）は本番では中身になり、そこで保留中の水平線が装飾に落ちる。
+    // 跨いでしまうと水平線が保留のまま次の骨格を引き出し、本番と深さがずれる
+    if gone[i] {
       continue
     }
     b.top = deep
@@ -253,43 +253,11 @@ fn items_take(
 ///|
 /// 項目のラベル。段落の span は中身の先頭から始まるので、見出しと違って
 /// マーカーの読み飛ばしが要らない（実測は probe を参照）。
+/// 見出しと同じく**インラインの並びからは導かない** — mdAst が中身の一部を
+/// リンクの定義として引き取ると、インラインが行の全部を覆わないことがある。
 fn item_label(md : String, p : @markdown.Block) -> String {
-  guard p is Paragraph(children~, span~, ..) else { return "" }
-  if children.is_empty() {
-    return ""
-  }
-  let len = span_of(children[children.length() - 1]).to
-  String::unsafe_substring(md, start=span.from, end=reach(md, span.from, len))
-}
-
-///|
-/// 中身の長さ（容器の字下げと `\r` を除いた数）ぶんだけ原文を進んだ位置。
-/// **インラインの span は中身に対する相対**なので、原文の絶対位置にそのまま
-/// 足すと、行ごとの字下げと `\r` の総量ぶん手前で切れてラベルの末尾が消える。
-fn reach(md : String, from : Int, len : Int) -> Int {
-  let indent = column(md, from)
-  let mut i = from
-  let mut seen = 0
-  let mut head = false
-  while i < md.length() && seen < len {
-    if head {
-      let mut k = 0
-      while k < indent && i < md.length() && (md[i] == ' ' || md[i] == '\t') {
-        i = i + 1
-        k = k + 1
-      }
-      head = false
-      continue
-    }
-    if md[i] == '\r' {
-      i = i + 1
-      continue
-    }
-    head = md[i] == '\n'
-    i = i + 1
-    seen = seen + 1
-  }
-  i
+  guard p is Paragraph(span~, ..) else { return "" }
+  carve(md, span.from, span.to)
 }
 
 ///|
@@ -401,8 +369,48 @@ fn head_label(
     return ""
   }
   let from = head_start(md, span, style)
-  let len = span_of(children[children.length() - 1]).to
-  String::unsafe_substring(md, start=from, end=reach(md, from, len))
+  carve(md, from, head_end(md, span, style))
+}
+
+///|
+/// 見出しの中身が原文で終わる位置。
+///
+/// **インラインの並びからは導けない。** mdAst は 1 行目がリンクの定義行の形を
+/// していると中身の一部を定義として引き取るので、インラインが行の全部を覆わない
+/// ことがある（`[q]: /r` + 改行 + `ZZZ` + `---` で `ZZZ` が落ちていた）。
+/// 記法は md の規則で決まるので、そちらから引く。
+fn head_end(
+  md : String,
+  span : @markdown.Span,
+  style : @markdown.HeadingStyle,
+) -> Int {
+  let mut z = span.to
+  // 末尾の空白と改行は記法
+  while z > span.from && blank(md[z - 1]) {
+    z = z - 1
+  }
+  if style is Atx {
+    // 閉じの `#` は飾り。前に空白があるときだけ（`a#` は中身）
+    let mut h = z
+    while h > span.from && md[h - 1] == '#' {
+      h = h - 1
+    }
+    if h < z && (h == span.from || blank(md[h - 1])) {
+      z = h
+      while z > span.from && blank(md[z - 1]) {
+        z = z - 1
+      }
+    }
+  } else {
+    // setext の下線 1 行ぶんを落とす
+    while z > span.from && md[z - 1] != '\n' {
+      z = z - 1
+    }
+    while z > span.from && blank(md[z - 1]) {
+      z = z - 1
+    }
+  }
+  z
 }
 
 ///|

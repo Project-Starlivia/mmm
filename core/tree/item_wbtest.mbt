@@ -270,7 +270,7 @@ test "途中の段落はラベルにならない" {
 }
 
 ///|
-/// **インラインの span は中身に対する相対**なので、原文の絶対位置に足すと
+/// ラベルは項目の 1 行目の中身。**容器の字下げは剥がす** — 書き戻すとき
 /// 行ごとの字下げと `\r` の総量ぶん手前で切れる。ラベルの末尾が消えていた。
 test "続きの行があるラベルは末尾まで残る" {
   json_inspect(parse("- aaa\n  bbb\n  ccc\n"), content={
@@ -280,7 +280,7 @@ test "続きの行があるラベルは末尾まで残る" {
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "aaa\n  bbb\n  ccc", "body": [], "children": [] },
+          { "id": 2, "label": "aaa\nbbb\nccc", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -297,7 +297,32 @@ test "CRLF でもラベルは末尾まで残る" {
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "aaa\r\n  bbb", "body": [], "children": [] },
+          { "id": 2, "label": "aaa\r\nbbb", "body": [], "children": [] },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}
+
+///|
+/// **ラベルの端はインラインの並びからは導けない。** mdAst は 1 行目がリンクの
+/// 定義行の形をしていると中身の一部を定義として引き取るので、インラインが
+/// 行の全部を覆わないことがある。記法の側から引く。
+test "定義行に見える 1 行目でもラベルは全部残る" {
+  json_inspect(parse("- [q]: /r\n  ZZZ\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "[q]: /r\nZZZ",
+            "body": [["Opaque", "[q]: /r\n"]],
+            "children": [],
+          },
         ],
         "sides": [],
       },

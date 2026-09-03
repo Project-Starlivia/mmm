@@ -1789,3 +1789,63 @@ test "= の後ろでない引用符は囲みを始めない" {
     },
   )
 }
+
+///|
+/// **深さも「実際に落ちる塊」を跨いで測る。** 綴りに見えても落ちない塊
+/// （対にならない `<summary>` など）は本番では中身になり、そこで保留中の
+/// 水平線が装飾に落ちる。跨いでしまうと水平線が保留のまま次の骨格を引き出し、
+/// 領域の外に書かれた見出しが畳みの中へ入る。
+test "落ちない綴りの塊は深さでも跨がない" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n\n## s\n\n---\n\n<summary>z</summary>\n\n</details>\n\n### a\n\n### b\n\n## t\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n\n## s\n\n---\n\n<summary>z</summary>\n\n</details>",
+                  },
+                ],
+              ],
+              "children": [
+                [
+                  "ImplicitNode",
+                  {
+                    "id": 4,
+                    "children": [
+                      [
+                        "HeadingNode",
+                        { "id": 5, "label": "a", "body": [], "children": [] },
+                      ],
+                      [
+                        "HeadingNode",
+                        { "id": 6, "label": "b", "body": [], "children": [] },
+                      ],
+                    ],
+                  },
+                ],
+                [
+                  "HeadingNode",
+                  { "id": 7, "label": "t", "body": [], "children": [] },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right", "Right"],
+        },
+      ],
+    },
+  )
+}

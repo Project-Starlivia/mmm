@@ -389,7 +389,6 @@ fn pieces(
 ) -> Array[Piece] {
   let n = blocks.length()
   let spells = blocks.map(b => read_spell(md, b))
-  let depth = depths(md, blocks, spells, nest)
   let spots = []
   for i in 0..<n {
     for t in spells[i].tags {
@@ -404,7 +403,11 @@ fn pieces(
   // 落ちる塊は減る一方なので必ず止まる。
   let gone = Array::makei(n, i => only_marks(spells[i]))
   let ok = ps.map(_ => false)
+  let mut depth = depths(md, blocks, gone, nest)
   for _ in 0..<=ps.length() {
+    // 深さも同じ `gone` で測る。跨ぐ塊が変われば本番の木も変わるので、
+    // 判定と同じ前提で測り直さないと食い違う
+    depth = depths(md, blocks, gone, nest)
     for k, p in ps {
       ok[k] = folds(blocks, spells, depth, gone, spots, p.0, p.1)
     }
