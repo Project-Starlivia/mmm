@@ -230,7 +230,9 @@ test "空行なしで 1 塊なら中身" {
             "label": "r",
             "details": false,
             "open": false,
-            "body": [["Opaque", "<details>\n## h\n</details>"]],
+            "body": [
+              ["Details", { "id": 3, "text": "<details>\n## h\n</details>" }],
+            ],
             "children": [],
           },
         ],
@@ -649,10 +651,9 @@ test "重なった開きは中身" {
                   "Details",
                   {
                     "id": 3,
-                    "text": "<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>",
+                    "text": "<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>",
                   },
                 ],
-                ["Opaque", "</details>"],
               ],
               "children": [],
             },
@@ -878,8 +879,9 @@ test "3 段の重なりもほどく" {
 }
 
 ///|
-/// ほどいた閉じが余ったら、相手の居ない閉じとしてただの文字になる。
-test "余った閉じはただの文字" {
+/// 閉じが余ると、その塊は綴りとして落とせない（余った `</details>` が消える）。
+/// 落とせない塊に頼る畳みも立たないので、領域は丸ごと逐語になる。
+test "落とせない閉じに頼る畳みは立たない" {
   json_inspect(
     parse(
       "# r\n\n<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>\n",
@@ -901,10 +903,9 @@ test "余った閉じはただの文字" {
                   "Details",
                   {
                     "id": 3,
-                    "text": "<details>\n<summary>y</summary>\n\n## y\n</details>",
+                    "text": "<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>",
                   },
                 ],
-                ["Opaque", "</details>"],
               ],
               "children": [],
             },
@@ -987,6 +988,338 @@ test "記法が違えば一致しない" {
             },
           ],
           "sides": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 世間で一番普通の綴り。行で切ると落ちるので、綴りは字句で拾う。
+test "1 行に書いた開きと名前も畳み" {
+  json_inspect(
+    parse("# r\n\n<details><summary>a</summary>\n\n## a\n\n</details>\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "details": true,
+                    "open": false,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// mmm が兄弟を 2 つ畳んだら書く形。**自分の書いたものを読み戻せること。**
+test "兄弟の畳みは両方立つ" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "details": true,
+                    "open": false,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+                [
+                  "HeadingNode",
+                  {
+                    "id": 4,
+                    "label": "b",
+                    "details": true,
+                    "open": false,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right", "Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// `<details-x>` はカスタム要素で、畳みの開きではない。
+/// 名前の直後が空白・`>`・`/` でなければタグとして読まない。
+test "名前が違うタグは畳みの開きではない" {
+  json_inspect(parse("# r\n\n<details-x>\n\n## a\n\n</details>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "open": false,
+            "body": [["Opaque", "<details-x>"]],
+            "children": [
+              [
+                "HeadingNode",
+                {
+                  "id": 3,
+                  "label": "a",
+                  "details": false,
+                  "open": false,
+                  "body": [["Opaque", "</details>"]],
+                  "children": [],
+                },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// 開きの塊に名前が 2 枚あると、書き戻すとき 1 枚しか書けない。
+/// 落とすと消えるので畳みにしない。
+test "summary が 2 枚なら中身" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>h</summary>\n<summary>ZZZ</summary>\n\n## h\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<summary>h</summary>\n<summary>ZZZ</summary>\n\n## h\n\n</details>",
+                  },
+                ],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 閉じの塊に地の文が続くと、塊ごと落とせないので畳みにしない。
+test "閉じの塊に地の文が続けば中身" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\ntail\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<summary>h</summary>\n\n## h\n\n</details>\ntail",
+                  },
+                ],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 項目も見出しと同じ検査を通る。領域の外の中身を畳みに取り込まない。
+test "項目の畳みも領域の後ろを見る" {
+  json_inspect(
+    parse("# r\n\n<details>\n<summary>a</summary>\n\n- a\n\n</details>\n\nx\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<summary>a</summary>\n\n- a\n\n</details>",
+                  },
+                ],
+                ["Opaque", "x"],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// **生テキストの中は跨ぐ。** `<script>` の中の文字列は閉じではない。
+/// md が「ここは生の HTML」と言った範囲で HTML の字句規則に従うだけ。
+test "script の中の閉じは綴りではない" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<script>\nvar x = \"</details>\";\n</script>\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "details": true,
+                    "open": false,
+                    "body": [
+                      ["Opaque", "<script>\nvar x = \"</details>\";\n</script>"],
+                    ],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// コメントの中身はマップの意味論に一切参加しない。閉じにもならない。
+test "コメントの中の閉じは綴りではない" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<!-- </details> -->\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "details": true,
+                    "open": false,
+                    "body": [["Opaque", "<!-- </details> -->"]],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
         },
       ],
     },

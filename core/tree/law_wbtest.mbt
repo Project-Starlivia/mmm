@@ -460,5 +460,22 @@ test "意味 — 綴りにならなかった文字は消えない" {
     "# r\n\n<details>\n<summary>x</summary>\n\n## h\n\n</details>\n", "<summary>x</summary>",
     1,
   )
+  // 綴りでないタグ
+  keep("# r\n\n<details-x>\n\n## a\n\n</details>\n", "<details-x>", 1)
+  // 閉じの塊に続いた地の文（`<details>` が "tail" を含むので別の語で見る）
+  keep(
+    "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\nxyzzy\n", "xyzzy",
+    1,
+  )
+  // 2 枚目の名前
+  keep(
+    "# r\n\n<details>\n<summary>h</summary>\n<summary>ZZZ</summary>\n\n## h\n\n</details>\n",
+    "ZZZ", 1,
+  )
+  // 生テキストの中の閉じは綴りではないので、文字のまま残る
+  keep(
+    "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<script>\nvar x = \"</details>\";\n</script>\n\n</details>\n",
+    "</details>", 1,
+  )
   json_inspect(gone, content=[])
 }
