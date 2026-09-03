@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mmm lab — md がどう読まれるか</title>
+    <link rel="stylesheet" href="./lab.css" />
+  </head>
+  <body>
+    <header>
+      <h1>mmm lab</h1>
+      <p>
+        md を打つと <b>mdAst</b> と <b>mmmTree</b> が出る。
+        mdAst が変なら読みの問題、mdAst が正しくて mmmTree が変なら build の問題。
+      </p>
+    </header>
+
+    <main>
+      <section class="pane">
+        <label>md</label>
+        <div id="md" class="editor"></div>
+        <div class="samples" id="samples"></div>
+      </section>
+
+      <section class="pane">
+        <label>mdAst<span>ブロックの種類[原文の範囲]</span></label>
+        <pre id="ast"></pre>
+
+        <label>check<span>型で言えない不変条件。空なら健全</span></label>
+        <pre id="check"></pre>
+
+        <label>mmmTree<span>JSON</span></label>
+        <pre id="json" class="grow"></pre>
+      </section>
+    </main>
+
+    <script type="module" src="./lab.ts"></script>
+  </body>
+</html>

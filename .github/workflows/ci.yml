@@ -23,10 +23,16 @@ jobs:
       - uses: actions/checkout@v6
 
       # MoonBit は公式の GitHub Action が無いので、配布スクリプトで入れる。
-      # 置き場所は $HOME/.moon/bin で、PATH に通すのはこちらの仕事
+      # 置き場所は $HOME/.moon/bin で、PATH に通すのはこちらの仕事。
+      #
+      # **版を固定する。** 既定は「そのとき最新」なので、こちらが 1 行も
+      # 書かない日に赤くなる（整形の出す形も非推奨の印も版で変わる）。
+      # 書いてあるのは **moonc の版**（`moon version --all` の 2 行目）で、
+      # 配布物の名前になっているのはこちら。moon 側の日付では引けない。
+      # 上げるときは手元も一緒に上げて、整形し直したものを同じ commit で出す
       - name: Install MoonBit
         run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s 0.10.6+80dc50f24
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
       - run: moon version
 
@@ -49,6 +55,17 @@ jobs:
         run: cd core && moon check && moon fmt --check tree
       - name: Core tests（MoonBit）
         run: cd core && moon test -p mmm-app/core/tree
+
+      # ラボ（core を覗く画面）だけは TS も見る。core を組んでからでないと
+      # 取り込み先が無いので、この順でなければならない
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check（ラボの TypeScript）
+        run: pnpm run core && pnpm run check:lab
 
   deploy:
     needs: check
