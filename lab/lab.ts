@@ -36,11 +36,15 @@ function pick<T extends Element>(id: string, kind: new () => T): T {
 
 const out = {
   ast: pick("ast", HTMLPreElement),
+  check: pick("check", HTMLPreElement),
   json: pick("json", HTMLPreElement),
 };
 
 function show(text: string): void {
   out.ast.replaceChildren(paintAst(mbt.mdAstSig(text)));
+  const flaws = mbt.mmmCheck(text);
+  out.check.textContent = flaws === "[]" ? "健全" : flaws;
+  out.check.classList.toggle("flawed", flaws !== "[]");
   out.json.replaceChildren(paintJson(pretty(mbt.mmmTreeJson(text))));
   localStorage.setItem("mmm-lab", text);
 }

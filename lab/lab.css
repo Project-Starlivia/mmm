@@ -187,3 +187,8 @@ pre.grow {
   border-color: var(--key);
   color: var(--fg);
 }
+
+/* check は空が正常。破れが出たときだけ目に飛び込む */
+#check.flawed {
+  color: var(--bad, #f87171);
+}

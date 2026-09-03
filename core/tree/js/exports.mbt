@@ -17,3 +17,11 @@ pub fn md_ast_sig(md : String) -> String {
 pub fn mmm_tree_json(md : String) -> String {
   @tree.parse(md).to_json().stringify()
 }
+
+///|
+/// 型で言えない不変条件の破れ。**parse の出力は必ず空**になるはずで、
+/// 空でなければ読みのバグ。
+#export_name("mmmCheck")
+pub fn mmm_check(md : String) -> String {
+  @tree.check(@tree.parse(md)).to_json().stringify()
+}
