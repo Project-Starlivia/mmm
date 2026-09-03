@@ -186,7 +186,10 @@ fn take(
     }
     BulletList(items~, ..) => items_take(b, items, nest, details~, open~)
     OrderedList(items~, ..) => items_take(b, items, nest, details~, open~)
-    // 区切りは**根の領土の隙間**でだけ翼の境目になる。項目の中は中身
+    // 区切りは**根の領土の隙間**でだけ翼の境目になる。項目の中は中身なので
+    // 保留せずその場に置く（保留すると、置く前に項目の枠が閉じられたとき
+    // 帰る場所が無くなって文書へ落ちる）
+    ThematicBreak(..) if nest > 0 => fill(b, ThematicBreak)
     // 記法(`---` `***` `___`)も本数も差別しない。意味は常に「隣を区切る」で、
     // 行き先は**直後のブロックが何か**で決まる。ここでは保留するだけ
     ThematicBreak(..) => b.pend = true

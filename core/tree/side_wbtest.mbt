@@ -549,3 +549,44 @@ test "記法は差別しない" {
   assert_eq(dash, parse("# r\n\n***\n\n## a\n"))
   assert_eq(dash, parse("# r\n\n___\n\n## a\n"))
 }
+
+///|
+/// **項目の中の水平線は中身。** 境界になれるのは根の領土の隙間だけなので、
+/// 保留せずその場に置く。保留すると、置く前に項目の枠が閉じられたとき
+/// 帰る場所が無くなって文書へ落ちる。
+test "項目の中の水平線は、後ろが見出しでも項目の中身" {
+  json_inspect(parse("- a\n\n  ---\n\n# h\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "a",
+            "details": false,
+            "open": false,
+            "body": ["ThematicBreak"],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 3,
+            "label": "h",
+            "details": false,
+            "open": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}
