@@ -4,7 +4,8 @@
 // 破れを見つけられることは、手で組んだ壊れた木で確かめる。
 
 ///|
-/// 今日までに集めた綴りを一通り通す。1 つでも破れたら読みがおかしい。
+/// 今日までに集めた綴りと、中身を置ける場所の総当たり（`forms`）を通す。
+/// 1 つでも破れたら読みがおかしい。
 test "parse の出力は必ず通る" {
   let sources = [
     "# a\n", "# a\n\n## b\n\n### c\n", "## a\n", "# r\n\n#### z\n", "- a\n  - b\n",
@@ -26,6 +27,12 @@ test "parse の出力は必ず通る" {
   for md in sources {
     if check(parse(md)).length() > 0 {
       bad.push(md.escape())
+    }
+  }
+  for form in forms() {
+    let (name, md) = form
+    if check(parse(md)).length() > 0 {
+      bad.push(name)
     }
   }
   json_inspect(bad, content=[])
