@@ -1600,31 +1600,26 @@ test "畳みの前の境界は空打ちでも境界のまま" {
               "children": [
                 [
                   "HeadingNode",
+                  { "id": 3, "label": "a", "body": [], "children": [] },
+                ],
+                [
+                  "ListNode",
                   {
-                    "id": 3,
-                    "label": "a",
-                    "body": [
-                      "ThematicBreak",
-                      [
-                        "Details",
-                        {
-                          "id": 4,
-                          "text": "<details>\n<summary>c</summary>\n\n- c\n\n</details>",
-                        },
-                      ],
-                    ],
-                    "children": [
-                      [
-                        "ListNode",
-                        { "id": 5, "label": "e", "body": [], "children": [] },
-                      ],
-                    ],
+                    "id": 4,
+                    "label": "c",
+                    "fold": { "open": false, "summary": "c" },
+                    "body": [],
+                    "children": [],
                   },
+                ],
+                [
+                  "ListNode",
+                  { "id": 5, "label": "e", "body": [], "children": [] },
                 ],
               ],
             },
           ],
-          "sides": ["Right"],
+          "sides": ["Right", "Left", "Left"],
         },
       ],
     },
@@ -1873,31 +1868,28 @@ test "入れ子項目を含む塊でも、持ち主の深さで測る" {
               "children": [
                 [
                   "HeadingNode",
+                  { "id": 3, "label": "h", "body": [], "children": [] },
+                ],
+                [
+                  "ListNode",
                   {
-                    "id": 3,
-                    "label": "h",
-                    "body": [
-                      "ThematicBreak",
-                      [
-                        "Details",
-                        {
-                          "id": 4,
-                          "text": "<details>\n\n- a\n  - b\n\n</details>",
-                        },
-                      ],
-                    ],
+                    "id": 4,
+                    "label": "a",
+                    "fold": { "open": false },
+                    "body": [],
                     "children": [
-                      [
-                        "ListNode",
-                        { "id": 5, "label": "c", "body": [], "children": [] },
-                      ],
+                      { "id": 5, "label": "b", "body": [], "children": [] },
                     ],
                   },
+                ],
+                [
+                  "ListNode",
+                  { "id": 6, "label": "c", "body": [], "children": [] },
                 ],
               ],
             },
           ],
-          "sides": ["Right"],
+          "sides": ["Right", "Left", "Left"],
         },
       ],
     },

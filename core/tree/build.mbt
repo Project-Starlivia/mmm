@@ -41,7 +41,6 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
     forest: [],
     stack: [],
     body: [],
-    head: 0,
     side: Right,
     pend: false,
     top: deep,
@@ -77,15 +76,14 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
 pub let doc_id : Int = 1
 
 ///|
-/// 積み上げの途中。`head` は直近の見出しの深さで、**見出しは入れ子をリセットする**
-/// ので、項目の深さは「直近の見出しの深さ + 1 + 入れ子段数」になる。
+/// 積み上げの途中。**深さを持つのは `stack` だけ** — 見出しの `#` の数を
+/// 控えると、境界が枠を引き出したあとに元の数から数えてしまう。
 priv struct Build {
   md : String
   forest : Array[Frame]
   stack : Array[Frame]
   /// 最初の骨格より前の散文
   body : Array[Block]
-  mut head : Int
   /// 次の子の側。木が変わるたびに右へ戻る
   mut side : Side
   /// 行き先待ちの水平線が有るか。**本数に意味は無い**ので Bool で持つ
@@ -127,7 +125,6 @@ fn depths(
     forest: [],
     stack: [],
     body: [],
-    head: 0,
     side: Right,
     pend: false,
     top: deep,
@@ -181,8 +178,7 @@ fn take(
     // **単調性 — 項目の子孫は項目。** 項目の領土に書かれた見出しは骨格に
     // ならず、原文のまま中身になる（列 0 へ出れば項目が閉じて木が変わる）
     Heading(..) if nest > 0 => fill(b, Opaque(verbatim(b.md, block)))
-    Heading(level~, style~, children~, span~, ..) => {
-      b.head = level
+    Heading(level~, style~, children~, span~, ..) =>
       put(
         b,
         level,
@@ -193,7 +189,6 @@ fn take(
           body=[],
         ),
       )
-    }
     BulletList(items~, ..) => items_take(b, items, nest, fold~)
     OrderedList(items~, ..) => items_take(b, items, nest, fold~)
     // 区切りは**根の領土の隙間**でだけ側の変わり目になる。項目の中は中身なので
@@ -223,11 +218,12 @@ fn items_take(
   nest : Int,
   fold? : Fold? = None,
 ) -> Unit {
-  // **項目の深さは、この列が座る枠の 1 つ下。** 入れ子の段数から数え直すと、
-  // 境界が親の項目を深さ 2 へ引き出したときに元の位置から数えてしまい、
-  // 間に綴られていない項目が生える（項目は相対記法なので飛びは存在しない）。
-  // 列に入る前に 1 度だけ測る — 中で測ると前の兄弟を積んだぶんずれる
-  let level = if nest == 0 { b.head + 1 } else { b.stack.length() + 1 }
+  // **項目の深さは、この列が座る枠の 1 つ下。** 入れ子の段数や `#` の数から
+  // 数え直すと、境界が手前の項目を深さ 2 へ引き出したときに元の位置から
+  // 数えてしまい、間に綴られていない項目が生える（項目は相対記法なので
+  // 飛びは存在しない）。列に入る前に 1 度だけ測る — 中で測ると前の兄弟を
+  // 積んだぶんずれる
+  let mut level = if nest == 0 { spine(b) + 1 } else { b.stack.length() + 1 }
   for it in items {
     // **ラベルは項目の 1 行目。** 途中の段落を引き上げると、その文字が
     // ラベルと中身の両方になる（切り出しはブロックの範囲でやるので、抜いたはずの
@@ -242,6 +238,9 @@ fn items_take(
       }
     }
     put(b, level, Line(sign=Item, label~, fold~, body=[]))
+    // **同じ列の項目は兄弟。** 境界は最初の項目を深さ 2 へ引き出すので、
+    // 残りも引き出された先に並ぶ（数え直すと元の位置から数えてしまう）
+    level = b.stack.length()
     // 空打ちでは畳みを見ない（深さを測るのに畳みは要らず、
     // 畳みの判定はこの深さを使うので、呼び合いになる）
     let inner = if b.dry {
@@ -263,6 +262,17 @@ fn items_take(
 fn item_label(md : String, p : @markdown.Block) -> String {
   guard p is Paragraph(span~, ..) else { return "" }
   carve(md, span.from, span.to)
+}
+
+///|
+/// 列 0 の項目が座る枠の深さ。列 0 へ出た項目は開いている項目を閉じる
+/// （md でもそうなる）ので、見出しの背骨の底が座る枠になる。
+fn spine(b : Build) -> Int {
+  let mut h = b.stack.length()
+  while h > 0 && b.stack[h - 1].skel is Line(sign=Item, ..) {
+    h = h - 1
+  }
+  h
 }
 
 ///|
