@@ -316,3 +316,421 @@ test "項目の側" {
     ),
   )
 }
+
+// ══════════════════════════════════════════════════════════════════
+// 中身 — 絵の 4 つは md の形に、原文で持つものは読み直して並べる
+// ══════════════════════════════════════════════════════════════════
+
+///|
+test "中身は文書順に、塊ごとに空行を挟んで" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("a", body=[
+            Opaque("text"),
+            Image(alt="p", src="x.png", title=""),
+            Link(text="記事", href="https://e", title=""),
+            Code(info="js", text="let x = 1\n"),
+            Svg("<svg><rect/></svg>\n"),
+            ThematicBreak,
+          ]),
+        ),
+      ]),
+    ),
+    content=(
+      #|# a
+      #|
+      #|text
+      #|
+      #|![p](x.png)
+      #|
+      #|[記事](https://e)
+      #|
+      #|```js
+      #|let x = 1
+      #|```
+      #|
+      #|<svg><rect/></svg>
+      #|
+      #|***
+      #|
+    ),
+  )
+}
+
+///|
+test "画像とリンクのタイトル" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("a", body=[
+            Image(alt="p", src="x.png", title="t"),
+            Link(text="l", href="/u", title="v"),
+          ]),
+        ),
+      ]),
+    ),
+    content=(
+      #|# a
+      #|
+      #|![p](x.png "t")
+      #|
+      #|[l](/u "v")
+      #|
+    ),
+  )
+}
+
+///|
+test "最初の骨格より前の中身は文書のもの" {
+  inspect(
+    serialize(doc([root(h("a"))], body=[Opaque("intro")])),
+    content=(
+      #|intro
+      #|
+      #|# a
+      #|
+    ),
+  )
+}
+
+///|
+/// 原文は md として読み直すので、ライブラリの正規化を受ける。
+test "Opaque は正規化される" {
+  inspect(
+    serialize(doc([root(h("a", body=[Opaque("_em_ と *x*")]))])),
+    content=(
+      #|# a
+      #|
+      #|*em* と *x*
+      #|
+    ),
+  )
+}
+
+///|
+/// 定義行は文書ぜんぶで 1 列。ライブラリは末尾に集める。
+test "定義行は末尾へ" {
+  inspect(
+    serialize(doc([root(h("a", body=[Opaque("[q]: /r")], children=[h("b")]))])),
+    content=(
+      #|# a
+      #|
+      #|## b
+      #|
+      #|[q]: /r
+      #|
+    ),
+  )
+}
+
+///|
+/// 畳みに立たなかった `<details>` は領域ごと原文。読み直しても形は同じ。
+test "Details はそのまま" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("r", body=[
+            Details(
+              id=0,
+              text="<details>\n<summary>h</summary>\n\ninner\n\n</details>",
+            ),
+          ]),
+        ),
+      ]),
+    ),
+    content=(
+      #|# r
+      #|
+      #|<details>
+      #|<summary>h</summary>
+      #|
+      #|inner
+      #|
+      #|</details>
+      #|
+    ),
+  )
+}
+
+///|
+/// 中身を持つ項目はラベルと中身を空行で分ける（分けないと 1 つの段落になる）。
+test "項目の中身は項目の列に字下げ" {
+  inspect(
+    serialize(
+      doc([root(h("r", children=[item("a", body=[Opaque("text")]), item("b")]))]),
+    ),
+    content=(
+      #|# r
+      #|
+      #|- a
+      #|
+      #|  text
+      #|- b
+      #|
+    ),
+  )
+}
+
+///|
+test "項目の中のコードは塊ごと字下げ" {
+  inspect(
+    serialize(doc([root(item("a", body=[Code(info="", text="x\n\ny\n")]))])),
+    content=(
+      #|- a
+      #|
+      #|  ```
+      #|  x
+      #|
+      #|  y
+      #|  ```
+      #|
+    ),
+  )
+}
+
+///|
+/// 項目の中の見出しは骨格にならず中身（単調性）。書いても項目の中に居る。
+test "項目の中の見出しは中身のまま" {
+  inspect(
+    serialize(doc([root(item("a", body=[Opaque("# x")]))])),
+    content=(
+      #|- a
+      #|
+      #|  # x
+      #|
+    ),
+  )
+}
+
+///|
+test "コードの中に ``` があれば外を長くする" {
+  inspect(
+    serialize(
+      doc([root(h("a", body=[Code(info="md", text="```js\nx\n```\n")]))]),
+    ),
+    content=(
+      #|# a
+      #|
+      #|````md
+      #|```js
+      #|x
+      #|```
+      #|````
+      #|
+    ),
+  )
+}
+
+///|
+/// ライブラリは閉じの `---` の直後に空行を置かない。読みは同じなので受ける。
+test "封筒は頭に" {
+  inspect(
+    serialize(doc([root(h("a"))], frontmatter=Some("k: v\n"))),
+    content=(
+      #|---
+      #|k: v
+      #|---
+      #|# a
+      #|
+    ),
+  )
+}
+
+///|
+test "CRLF の文書は CRLF で" {
+  inspect(
+    serialize(doc([root(h("a", children=[h("b")]))], eol=Crlf)),
+    content="# a\r\n\r\n## b\r\n",
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 畳み — 定義ごと `<details>` で包む。開きは「開き」か「開き + 名前」
+// ══════════════════════════════════════════════════════════════════
+
+///|
+test "見出しの畳み" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("r", children=[
+            h("h", fold=Some({ open: false, summary: Some("h") }), body=[
+              Opaque("body"),
+            ]),
+          ]),
+        ),
+      ]),
+    ),
+    content=(
+      #|# r
+      #|
+      #|<details>
+      #|<summary>h</summary>
+      #|
+      #|## h
+      #|
+      #|body
+      #|
+      #|</details>
+      #|
+    ),
+  )
+}
+
+///|
+test "open と、名前の無い畳み" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("r", children=[h("h", fold=Some({ open: true, summary: None }))]),
+        ),
+      ]),
+    ),
+    content=(
+      #|# r
+      #|
+      #|<details open>
+      #|
+      #|## h
+      #|
+      #|</details>
+      #|
+    ),
+  )
+}
+
+///|
+test "入れ子の畳み" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("r", children=[
+            h("a", fold=Some({ open: false, summary: Some("a") }), children=[
+              h("a1", fold=Some({ open: false, summary: Some("a1") })),
+            ]),
+          ]),
+        ),
+      ]),
+    ),
+    content=(
+      #|# r
+      #|
+      #|<details>
+      #|<summary>a</summary>
+      #|
+      #|## a
+      #|
+      #|<details>
+      #|<summary>a1</summary>
+      #|
+      #|### a1
+      #|
+      #|</details>
+      #|
+      #|</details>
+      #|
+    ),
+  )
+}
+
+///|
+/// 畳まれた項目は自分の `<details>` に包まれるので、列がそこで割れる。
+test "項目の畳みは列を割る" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("r", children=[
+            item("a"),
+            item("b", fold=Some({ open: false, summary: Some("b") })),
+            item("c"),
+          ]),
+        ),
+      ]),
+    ),
+    content=(
+      #|# r
+      #|
+      #|- a
+      #|
+      #|<details>
+      #|<summary>b</summary>
+      #|
+      #|- b
+      #|
+      #|</details>
+      #|
+      #|- c
+      #|
+    ),
+  )
+}
+
+///|
+/// 入れ子の項目の畳みは親の中身の列に字下げ。`<details>` の塊は空行で
+/// 終わるので、前後を空行で分けないと `- b` が塊に飲み込まれる。
+test "入れ子項目の畳みは親の列に" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          item("a", children=[
+            li("b", fold=Some({ open: false, summary: None })),
+            li("c"),
+          ]),
+        ),
+      ]),
+    ),
+    content=(
+      #|- a
+      #|
+      #|  <details>
+      #|
+      #|  - b
+      #|
+      #|  </details>
+      #|
+      #|  - c
+      #|
+    ),
+  )
+}
+
+///|
+/// 境界の水平線は部分木のものではないので `<details>` の外。
+test "畳みと側" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("r", children=[
+            h("a"),
+            h("b", fold=Some({ open: false, summary: None })),
+          ]),
+          sides=[Right, Left],
+        ),
+      ]),
+    ),
+    content=(
+      #|# r
+      #|
+      #|## a
+      #|
+      #|***
+      #|
+      #|<details>
+      #|
+      #|## b
+      #|
+      #|</details>
+      #|
+    ),
+  )
+}

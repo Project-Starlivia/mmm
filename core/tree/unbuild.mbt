@@ -126,12 +126,15 @@ fn wrap(out : Array[@markdown.Block], fold : Fold?, inner : () -> Unit) -> Unit 
 }
 
 ///|
-/// 項目の列 1 つ。中身を持つ項目が 1 つでもあれば loose
-/// （ラベルと中身を空行で分けないと、md は 1 つの段落に飲み込む）。
+/// 項目の列 1 つ。**ラベルと入れ子の列だけの項目が並ぶときだけ tight。**
+/// 中身は空行で分けないと段落に飲み込まれ、畳まれた子の `<details>` は
+/// 空行で終わる塊なので、分けないと次の項目を飲み込む。
 fn bullets(u : Unbuild, run : Array[ListNode]) -> @markdown.Block {
   BulletList(
     marker=Dash,
-    tight=run.iter().all(l => l.body.is_empty()),
+    tight=run
+      .iter()
+      .all(l => l.body.is_empty() && l.children.iter().all(c => c.fold is None)),
     items=run.map(l => list_item(u, l)),
     span=nowhere,
     leading_trivia=@markdown.Trivia::empty(),
