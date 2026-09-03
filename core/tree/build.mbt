@@ -201,13 +201,14 @@ fn items_take(
   open? : Bool = false,
 ) -> Unit {
   for it in items {
+    // **ラベルは項目の 1 行目。** 途中の段落を引き上げると、その文字が
+    // ラベルと中身の両方になる（逐語はブロックの範囲で切るので、抜いたはずの
+    // 段落が切り出しの内側に入る）。1 行目が段落でなければラベルは無い
     let rest = []
     let mut label = ""
-    let mut named = false
-    for c in it.children {
-      if !named && c is Paragraph(..) {
+    for i, c in it.children {
+      if i == 0 && c is Paragraph(..) {
         label = item_label(b.md, c)
-        named = true
       } else {
         rest.push(c)
       }

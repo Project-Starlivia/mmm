@@ -299,3 +299,67 @@ test "ラベルは原文の逐語" {
     ],
   })
 }
+
+///|
+/// **ラベルは 1 行目。** 途中の段落を引き上げると、その文字がラベルと
+/// 中身の両方に出る（逐語はブロックの範囲で切るので）。
+test "1 行目が段落でなければラベルは無い" {
+  json_inspect(parse("- ```\n  code\n  ```\n\n  x\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "",
+            "details": false,
+            "open": false,
+            "body": [
+              ["Code", { "info": "", "text": "code\n" }],
+              ["Opaque", "x"],
+            ],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}
+
+///|
+test "途中の段落はラベルにならない" {
+  json_inspect(
+    parse("- <details>\n  <summary>a</summary>\n\n  x\n\n  </details>\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "ListNode",
+            {
+              "id": 2,
+              "label": "",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<summary>a</summary>\n\nx\n\n</details>",
+                  },
+                ],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
