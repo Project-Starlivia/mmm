@@ -40,7 +40,7 @@ Block = Image | Link | Code | Svg           // 中身 1 枚。包みは無い
 （深さで型が変わると走査も操作も割れる）。長さが揃うことは型では言えない。
 
 check が見るもの — id 一意 / Implicit は子を持つ / `sides` と根の子の長さが揃う /
-`open` は `details` のときだけ立つ。
+`open` は `details` のときだけ立つ / 畳みのラベルが `<summary>` に書ける。
 
 `project(Doc)` が左右に振り分けた木を作り、JSON で ts へ渡す。
 

@@ -146,3 +146,28 @@ test "畳んでいないのに open が立っていたら見つける" {
   }
   json_inspect(check(doc), content=[["OpenWithoutDetails", 2]])
 }
+
+///|
+/// `<summary>` の中身は最初の `</summary>` までなので、ラベルにそれが入って
+/// いると読み戻したとき名前が一致せず、畳みが黙って解ける。
+test "畳みのラベルが summary に書けなければ見つける" {
+  let doc : Doc = {
+    frontmatter: None,
+    eol: Lf,
+    body: [],
+    roots: [
+      {
+        node: HeadingNode({
+          id: 2,
+          label: "a</summary>b",
+          details: true,
+          open: false,
+          body: [],
+          children: [],
+        }),
+        sides: [],
+      },
+    ],
+  }
+  json_inspect(check(doc), content=[["UnwritableName", 2]])
+}
