@@ -15,12 +15,12 @@ Node = HeadingNode | ListNode | ImplicitNode   // 構築子は型名と同じ。
 
 HeadingNode  { id, label, details, body: [Block], children: [Node] }
 ListNode     { id, label, details, body: [Block], children: [ListNode] }
-ImplicitNode { id, children: [Node] }       // 綴りを持たない
+ImplicitNode { id, children: [Node] }       // 記法を持たない
 
 Side  = Right | Left
 Eol   = Lf | Crlf
 Block = Image | Link | Code | Svg           // 中身 1 枚。包みは無い
-      | Rule                                // 境界にならなかった継ぎ目。線
+      | ThematicBreak                       // 境界にならなかった水平線
       | Details(id, text)                   // <details>。領域の逐語
       | Opaque(text)                        // 読み解かない逐語
 ```
@@ -32,8 +32,8 @@ Block = Image | Link | Code | Svg           // 中身 1 枚。包みは無い
 
 - **項目の子孫は項目**（`ListNode.children : [ListNode]`）。項目の根に見出しが
   生えないことも同時に決まる。項目は相対記法で飛べないので Implicit も無い
-- **Implicit は綴りを持たない**（`ImplicitNode` に label / body / details が無い）。
-  包む骨格行が無いので**畳めないことも同時に決まる**
+- **Implicit は記法を持たない**（`ImplicitNode` に label / body / details が無い）。
+  包む見出し・項目の行が無いので**畳めないことも同時に決まる**
 - **側は根の子だけ**（`sides` は `Root` にしか無い）。深いノードは側を持てない
 
 `children` を全部の深さで `[Node]` に保つため、側は組にせず並走させる
@@ -58,7 +58,7 @@ check が見るもの — id 一意 / Implicit は子を持つ / `sides` と根�
 
 1. 操作が「自分はここを触った」と**申告する**(木を比較しない)
 2. 触ったノードは、**span の範囲**をそのノードの正規形で置き換える
-3. どのノードにも属さないもの(継ぎ目の空行・frontmatter)は
+3. どのノードにも属さないもの(水平線の空行・frontmatter)は
    **隣の span から範囲が出る** — `from = 前の span.to` / `to = 次の span.from`
 4. 入れ子は**一番上だけ**書き換える(範囲が重ならないように)
 5. 出来た文章を**読み直して木と一致するか検証**。違えば全文正規形へ落ちる
@@ -66,17 +66,17 @@ check が見るもの — id 一意 / Implicit は子を持つ / `sides` と根�
 
 正しさは 5 の検証が持つ。だから 1〜4 がどれだけ雑でも壊れない。
 
-## 段の積み方
+## パスの積み方
 
 **結合テストは単体テストが終わってから。** 最後まで作ってから回すと、落ちた
-ときに何が壊れたか割り出せない。段は少しずつ作り、各段に自分のテストを
+ときに何が壊れたか割り出せない。パスは少しずつ作り、各パスに自分のテストを
 付けてから次へ行く。
 
 - `md_wbtest.mbt` がライブラリ(mdAst)の読みを指紋で固定し、その先が我々の読みを固定する
 - `lab/` が mdAst と mmmTree を並べて出すのも、どの段で壊れたかを切り分けるため
 - **serialize のテストは木を手で組む。`parse` で作らない** — `serialize(parse(md))`
   と書くと、書きのテスト全部が読みに依存する
-- 往復(法則 1)・冪等(法則 2)・総当たりは、両側の単体が揃ってからの別段
+- 往復(法則 1)・冪等(法則 2)・総当たりは、両側の単体が揃ってからの別パス
 
 ## 操作の決め
 
@@ -92,7 +92,7 @@ check が見るもの — id 一意 / Implicit は子を持つ / `sides` と根�
 **これより増え始めたら設計を疑う。**
 
 Heading → Item の変換は部分木ごと畳むので情報が落ちる(見出しの子も項目になる)。
-これは「綴りは行き先に従う」の帰結で型のせいではない。**undo は逆操作ではなく
+これは「記法は行き先に従う」の帰結で型のせいではない。**undo は逆操作ではなく
 スナップショットで実装する。**
 
 ## 決まっていないこと

@@ -96,8 +96,8 @@ pub(all) enum Block {
   Link(text~ : String, href~ : String)
   Code(info~ : String, text~ : String)
   Svg(String)
-  /// 水平線
-  Rule
+  /// 水平線。md の要素名そのまま
+  ThematicBreak
   /// `<details>`。**中を読み解かない** — 触っていない畳みが正規形に落ちるのを
   /// 防ぐため、領域を逐語のまま持つ。表示名は覗いて導出する
   Details(id~ : Int, text~ : String)

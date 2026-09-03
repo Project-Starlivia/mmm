@@ -252,7 +252,7 @@ test "行き先の翼が無い区切りは飾りに落ちる" {
                   "id": 3,
                   "label": "a",
                   "details": false,
-                  "body": ["Rule"],
+                  "body": ["ThematicBreak"],
                   "children": [],
                 },
               ],
@@ -278,7 +278,7 @@ test "木をまたぐ区切りも飾り" {
             "id": 2,
             "label": "r",
             "details": false,
-            "body": ["Rule"],
+            "body": ["ThematicBreak"],
             "children": [],
           },
         ],
@@ -365,7 +365,7 @@ test "木が変わると側は右へ戻る" {
 test "根より前の区切りは側になれない" {
   json_inspect(parse("aaa\n\n---\n\n## root\n\n## a\n"), content={
     "eol": "Lf",
-    "body": [["Opaque", "aaa"], "Rule"],
+    "body": [["Opaque", "aaa"], "ThematicBreak"],
     "roots": [
       {
         "node": [
@@ -409,7 +409,7 @@ test "根より前の区切りは、後ろが # でも ## でも同じ" {
   let two = parse("aaa\n\n---\n\n## root\n")
   let one = parse("aaa\n\n---\n\n# root\n")
   assert_eq(two.body, one.body)
-  assert_eq(two.body, [Opaque("aaa"), Rule])
+  assert_eq(two.body, [Opaque("aaa"), ThematicBreak])
   assert_eq(two.roots[0].sides[0], Right)
   assert_eq(two.roots[0].node is ImplicitNode(_), true)
 }
@@ -427,7 +427,7 @@ test "項目の中の区切りは飾り" {
             "id": 2,
             "label": "a",
             "details": false,
-            "body": ["Rule"],
+            "body": ["ThematicBreak"],
             "children": [],
           },
         ],

@@ -256,7 +256,7 @@ test "飾りの水平線は Rule" {
             "id": 2,
             "label": "a",
             "details": false,
-            "body": ["Rule"],
+            "body": ["ThematicBreak"],
             "children": [],
           },
         ],

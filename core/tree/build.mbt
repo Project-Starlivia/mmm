@@ -10,7 +10,7 @@
 ///|
 /// 積み上げ中のノード。深さは stack の高さが持つので、自分では持たない。
 priv struct Frame {
-  skel : Skeleton
+  skel : Notation
   kids : Array[Frame]
   /// 翼になる深さ 2 の枠だけが意味を持つ。深いところの側は型で存在しない
   mut side : Side
@@ -19,10 +19,10 @@ priv struct Frame {
 }
 
 ///|
-/// 積むあいだの骨格。役割（根・翼・見出し・項目）はまだ決まっていないので、
-/// **見出しと項目を 1 つの型で平らに持つ**。割り付けは最後に 1 回だけやる。
-priv enum Skeleton {
-  /// 骨格行が無い。深さの飛びが綴り
+/// 行に書かれていた記法。見出しと項目を 1 つの型で平らに持ち、
+/// 種類ごとの型への割り付けは最後に 1 回だけやる。
+priv enum Notation {
+  /// 記法が無い。深さの飛びがそれを言う
   Gap
   Line(sign~ : Sign, label~ : String, details~ : Bool, body~ : Array[Block])
 }
@@ -114,7 +114,7 @@ fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
       if marker == '-' && nest == 0 {
         b.pend = true
       } else {
-        fill(b, Rule)
+        fill(b, ThematicBreak)
       }
     _ =>
       match content_of(b.md, block) {
@@ -161,7 +161,7 @@ fn item_label(md : String, p : @markdown.Block) -> String {
 ///|
 /// 深さ level のノードを置く。浅く戻るときは積んだぶんを落とし、
 /// 深く飛ぶときは間を Implicit で埋める（飛びは綴りであって、無ではない）。
-fn put(b : Build, level : Int, skel : Skeleton) -> Unit {
+fn put(b : Build, level : Int, skel : Notation) -> Unit {
   // **見出しは見出しの背骨にしか積まれない。** 項目の枠は見出しの親に
   // なれないので落とす（列 0 の見出しは md でも項目を閉じる）。C17 を
   // 深さ 1 から全部の深さへ広げたもの。これが無いと項目の子が見出しになる
@@ -233,7 +233,7 @@ fn flipped(s : Side) -> Side {
 fn drop_pend(b : Build) -> Unit {
   if b.pend {
     b.pend = false
-    fill(b, Rule)
+    fill(b, ThematicBreak)
   }
 }
 
