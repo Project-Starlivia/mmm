@@ -16,6 +16,11 @@ test "parse の出力は必ず通る" {
     "# r\n\n<!-- x -->\n", "---\nk: v\n---\n\n# a\n", "text\n\n![a](b.png)\n\n# a\n",
     "# a\n\n```js\nx\n```\n", "- a\n  # x\n", "# r\n\n- b\n\n### x\n", "###### f\n\n####### g\n",
     "# a\r\n\r\n## b\r\n", "",
+    // 畳み — 綴りになる形と、ならずに逐語へ落ちる形の両方
+     "# r\n\n<details open>\n<summary>h</summary>\n\n## h\n\n</details>\n", "# r\n\n<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>\n",
+    "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n</details>\n</details>\n",
+    "# r\n\n<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>\n", "# r\n\n<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>\n",
+    "# r\n\n<details>\n### x\n\n## y\n</details>\n",
   ]
   let bad = []
   for md in sources {
@@ -115,4 +120,29 @@ test "Details の id も一意さを見る" {
     ],
   }
   json_inspect(check(doc), content=[["DupeId", 5]])
+}
+
+///|
+/// `open` は畳みの綴りの一部なので、畳んでいないノードには立たない。
+/// 立っていると書き出す `<details>` が無く、綴れない木になる。
+test "畳んでいないのに open が立っていたら見つける" {
+  let doc : Doc = {
+    frontmatter: None,
+    eol: Lf,
+    body: [],
+    roots: [
+      {
+        node: HeadingNode({
+          id: 2,
+          label: "a",
+          details: false,
+          open: true,
+          body: [],
+          children: [],
+        }),
+        sides: [],
+      },
+    ],
+  }
+  json_inspect(check(doc), content=[["OpenWithoutDetails", 2]])
 }

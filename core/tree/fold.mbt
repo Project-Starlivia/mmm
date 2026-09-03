@@ -82,27 +82,27 @@ fn closes(html : String) -> Bool {
 }
 
 ///|
-/// 塊が `</details>` の並びだけで出来ていれば、それぞれの終わり位置。
+/// 塊が `</details>` の並びだけで出来ていれば、それぞれの位置。
 /// 空行を挟まないと md は閉じを重ねて 1 つの塊にする。
-fn stack_of(html : String) -> Array[Int]? {
-  let ends = []
+fn stack_of(html : String) -> Array[(Int, Int)]? {
+  let tags = []
   let mut i = 0
+  let tag = "</details>"
   while i < html.length() {
     let c = html[i]
     if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
       i = i + 1
       continue
     }
-    let tag = "</details>"
     guard i + tag.length() <= html.length() else { return None }
     for k in 0..<tag.length() {
       guard html[i + k] == tag[k] else { return None }
     }
+    tags.push((i, i + tag.length()))
     i = i + tag.length()
-    ends.push(i)
   }
-  if ends.length() > 1 {
-    Some(ends)
+  if tags.length() > 1 {
+    Some(tags)
   } else {
     None
   }
@@ -118,20 +118,19 @@ fn unstack(blocks : Array[@markdown.Block]) -> Array[@markdown.Block] {
       HtmlBlock(html~, span~, ..) =>
         match stack_of(html) {
           None => out.push(b)
-          Some(ends) => {
-            let mut from = 0
-            for e in ends {
+          // 間の空白はどの段のものでもないので、どの塊にも入れない
+          Some(tags) =>
+            for t in tags {
+              let (from, to) = t
               out.push(
                 HtmlBlock(
-                  html=String::unsafe_substring(html, start=from, end=e),
-                  span=@markdown.Span::new(span.from + from, span.from + e),
+                  html=String::unsafe_substring(html, start=from, end=to),
+                  span=@markdown.Span::new(span.from + from, span.from + to),
                   leading_trivia=@markdown.Trivia::empty(),
                   trailing_trivia=@markdown.Trivia::empty(),
                 ),
               )
-              from = e
             }
-          }
         }
       _ => out.push(b)
     }

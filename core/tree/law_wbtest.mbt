@@ -340,3 +340,125 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
     ],
   })
 }
+
+///|
+/// 木に書かれている文字ぜんぶ。**綴り**（`#` や `<details>`）は構造とフラグが
+/// 引き受けるので出てこない。綴りとして読めなかったものはここに残るはず。
+fn written(doc : Doc) -> String {
+  let bag = []
+  fn blocks(bs : Array[Block]) -> Unit {
+    for b in bs {
+      match b {
+        Image(alt~, src~) => {
+          bag.push(alt)
+          bag.push(src)
+        }
+        Link(text~, href~) => {
+          bag.push(text)
+          bag.push(href)
+        }
+        Code(info~, text~) => {
+          bag.push(info)
+          bag.push(text)
+        }
+        Svg(s) => bag.push(s)
+        ThematicBreak => ()
+        Details(text~, ..) => bag.push(text)
+        Opaque(s) => bag.push(s)
+      }
+    }
+  }
+
+  fn items(xs : Array[ListNode]) -> Unit {
+    for x in xs {
+      bag.push(x.label)
+      blocks(x.body)
+      items(x.children)
+    }
+  }
+
+  fn nodes(xs : Array[Node]) -> Unit {
+    for x in xs {
+      match x {
+        HeadingNode(h) => {
+          bag.push(h.label)
+          blocks(h.body)
+          nodes(h.children)
+        }
+        ListNode(l) => {
+          bag.push(l.label)
+          blocks(l.body)
+          items(l.children)
+        }
+        ImplicitNode(g) => nodes(g.children)
+      }
+    }
+  }
+
+  if doc.frontmatter is Some(f) {
+    bag.push(f)
+  }
+  blocks(doc.body)
+  for r in doc.roots {
+    nodes([r.node])
+  }
+  bag.join("\n")
+}
+
+///|
+/// s に pat が何回出るか。
+fn tally(s : String, pat : String) -> Int {
+  let mut n = 0
+  let mut i = 0
+  while i + pat.length() <= s.length() {
+    let mut k = 0
+    while k < pat.length() && s[i + k] == pat[k] {
+      k = k + 1
+    }
+    if k == pat.length() {
+      n = n + 1
+      i = i + pat.length()
+    } else {
+      i = i + 1
+    }
+  }
+  n
+}
+
+///|
+/// **意味を 1 ビットも失わない。** 綴りとして読めなかった文字は逐語のまま木に残る。
+/// serialize が無いうちは往復では言えないので、実際に一度ずつ落とした形を名指しで
+/// 見張る。ここが落ちたら、綴りの判定が「読めないものを捨てる」側に倒れている。
+test "意味 — 綴りにならなかった文字は消えない" {
+  let gone = []
+  fn keep(md : String, pat : String, want : Int) -> Unit {
+    let got = tally(written(parse(md)), pat)
+    if got != want {
+      gone.push("\{pat.escape()} × \{got} ≠ \{want} : \{md.escape()}")
+    }
+  }
+
+  // 開きに飲み込まれた骨格の行
+  keep("# r\n\n<details>\n### x\n\n## y\n</details>\n", "### x", 1)
+  // ほどいて余った閉じ
+  keep(
+    "# r\n\n<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>\n", "</details>",
+    2,
+  )
+  // 知らない属性
+  keep(
+    "# r\n\n<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>\n",
+    "class=\"x\"", 1,
+  )
+  // 重なった開き
+  keep(
+    "# r\n\n<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>\n",
+    "<details>", 2,
+  )
+  // 名前が合わない畳み
+  keep(
+    "# r\n\n<details>\n<summary>x</summary>\n\n## h\n\n</details>\n", "<summary>x</summary>",
+    1,
+  )
+  json_inspect(gone, content=[])
+}

@@ -663,3 +663,332 @@ test "重なった開きは中身" {
     },
   )
 }
+
+///|
+/// 項目も見出しと同じ道を通る。
+test "項目の畳みにも open が付く" {
+  json_inspect(
+    parse("# r\n\n<details open>\n<summary>a</summary>\n\n- a\n\n</details>\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "ListNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "details": true,
+                    "open": true,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// open は段ごとに別。外が閉じていて中が開いていてもよい。
+test "内側だけ open" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<details open>\n<summary>a1</summary>\n\n### a1\n\n</details>\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "details": true,
+                    "open": false,
+                    "body": [],
+                    "children": [
+                      [
+                        "HeadingNode",
+                        {
+                          "id": 4,
+                          "label": "a1",
+                          "details": true,
+                          "open": true,
+                          "body": [],
+                          "children": [],
+                        },
+                      ],
+                    ],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 行で分かれていなくても、`</details>` の並びなら数えられる。
+test "同じ行に重なった閉じもほどく" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n</details></details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "x",
+                    "details": true,
+                    "open": false,
+                    "body": [],
+                    "children": [
+                      [
+                        "HeadingNode",
+                        {
+                          "id": 4,
+                          "label": "y",
+                          "details": true,
+                          "open": false,
+                          "body": [],
+                          "children": [],
+                        },
+                      ],
+                    ],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+test "3 段の重なりもほどく" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n\n<details>\n<summary>z</summary>\n\n#### z\n</details>\n</details>\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "x",
+                    "details": true,
+                    "open": false,
+                    "body": [],
+                    "children": [
+                      [
+                        "HeadingNode",
+                        {
+                          "id": 4,
+                          "label": "y",
+                          "details": true,
+                          "open": false,
+                          "body": [],
+                          "children": [
+                            [
+                              "HeadingNode",
+                              {
+                                "id": 5,
+                                "label": "z",
+                                "details": true,
+                                "open": false,
+                                "body": [],
+                                "children": [],
+                              },
+                            ],
+                          ],
+                        },
+                      ],
+                    ],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// ほどいた閉じが余ったら、相手の居ない閉じとしてただの文字になる。
+test "余った閉じはただの文字" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<summary>y</summary>\n\n## y\n</details>",
+                  },
+                ],
+                ["Opaque", "</details>"],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// ラベルも `<summary>` の中身も原文の切り出しなので、記法ごと一致が要る。
+test "summary は記法ごと一致する" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>**h**</summary>\n\n## **h**\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "**h**",
+                    "details": true,
+                    "open": false,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+test "記法が違えば一致しない" {
+  json_inspect(
+    parse("# r\n\n<details>\n<summary>h</summary>\n\n## **h**\n\n</details>\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<summary>h</summary>\n\n## **h**\n\n</details>",
+                  },
+                ],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
