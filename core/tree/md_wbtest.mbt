@@ -25,7 +25,7 @@ test "項目だけの文書" {
 }
 
 ///|
-test "翼のトグルと飾りの水平線" {
+test "境界の水平線と飾りの水平線" {
   inspect(
     md_ast_sig("# r\n\n## a\n\n---\n\n### x\n\n***\n"),
     content=(

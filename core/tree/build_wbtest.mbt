@@ -67,7 +67,7 @@ test "深さ 1 が 2 つなら木も 2 本" {
 }
 
 ///|
-test "深さ 2 は根の翼になる" {
+test "深さ 2 は根の子になる" {
   json_inspect(parse("# r\n\n## a\n\n## b\n"), content={
     "eol": "Lf",
     "body": [],
@@ -114,7 +114,7 @@ test "深さ 2 は根の翼になる" {
 }
 
 ///|
-test "深さ 3 は翼の下の枝" {
+test "深さ 3 は根の子の下" {
   json_inspect(parse("# r\n\n## a\n\n### x\n"), content={
     "eol": "Lf",
     "body": [],
@@ -297,7 +297,7 @@ test "深さ 1 が無ければ根が Implicit になる" {
 }
 
 ///|
-test "ラベルは原文の逐語（インラインを解釈しない）" {
+test "ラベルは原文のまま（インラインを解釈しない）" {
   json_inspect(parse("# a **b** `c`\n"), content={
     "eol": "Lf",
     "body": [],

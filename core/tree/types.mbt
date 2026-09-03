@@ -9,7 +9,7 @@
 ///|
 /// 文書ぜんぶ。木は何本でも生える（`# a` と `# b` は別の木）。
 pub(all) struct Doc {
-  /// 封筒（frontmatter）の逐語。無ければ None
+  /// 封筒（frontmatter）の原文。無ければ None
   frontmatter : String?
   eol : Eol
   /// 最初の骨格より前の中身
@@ -102,8 +102,8 @@ pub(all) enum Block {
   /// 水平線。md の要素名そのまま
   ThematicBreak
   /// `<details>`。**中を読み解かない** — 触っていない畳みが正規形に落ちるのを
-  /// 防ぐため、領域を逐語のまま持つ。表示名は覗いて導出する
+  /// 防ぐため、領域を原文のまま持つ。表示名は覗いて導出する
   Details(id~ : Int, text~ : String)
-  /// 読み解かない逐語。コメントもここ
+  /// 読み解かない原文。コメントもここ
   Opaque(String)
 } derive(Eq, Debug, ToJson)

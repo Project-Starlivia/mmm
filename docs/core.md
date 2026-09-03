@@ -21,8 +21,8 @@ Side  = Right | Left
 Eol   = Lf | Crlf
 Block = Image | Link | Code | Svg           // 中身 1 枚。包みは無い
       | ThematicBreak                       // 境界にならなかった水平線
-      | Details(id, text)                   // <details>。領域の逐語
-      | Opaque(text)                        // 読み解かない逐語
+      | Details(id, text)                   // <details>。領域の原文
+      | Opaque(text)                        // 読み解かない原文
 ```
 
 **型が言うのは「あり得ない形」だけ**で、仕様を満たすのは実装の仕事。

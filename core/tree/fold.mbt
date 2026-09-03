@@ -3,7 +3,7 @@
 // **綴りの定義は 1 つ。** `spelling` が「mmm が畳みを書くときの文字」を返し、
 // 読みはそれとの照合でしかない。畳みが立つのは、原文のその範囲が
 // **mmm がそのノードを畳んだときに書く文字と一致する**ときだけ。
-// 一致しなければ中身の 1 枚（`Block::Details` の逐語）。裁定は docs/spec.md。
+// 一致しなければ中身の 1 枚（`Block::Details`）になる。裁定は docs/spec.md。
 //
 // 「details タグとは何か」を知っているのは `tag_at` だけ。他は `Tag` しか見ない。
 // 対にするのは**タグの並び**で、塊の境目は数えない（md のブロック境界と
@@ -308,7 +308,7 @@ fn next(blocks : Array[@markdown.Block], i : Int) -> Int {
 ///|
 /// 記法を飛ばした次の位置。空行と**落ちる綴りの塊**だけを跨ぐ。
 /// 兄弟の畳みが並んでいれば、見えるのは次の骨格の行になる。
-/// 立たない畳みの綴りは中身（逐語・ただの文字）になるので跨がない —
+/// 立たない畳みの綴りは中身（Details・ただの文字）になるので跨がない —
 /// 跨ぐと、領域の外に在る中身を畳みの内側へ引き込んでしまう。
 fn beyond(blocks : Array[@markdown.Block], gone : Array[Bool], i : Int) -> Int {
   let mut k = i + 1
@@ -448,7 +448,7 @@ fn pieces(
 
   // 畳まれる骨格の行 → open か（-1 は畳みでない）
   let mark = Array::make(n, -1)
-  // 逐語になる領域 → 終わりの塊・原文の範囲
+  // 原文のまま持つ領域 → 終わりの塊・原文の範囲
   let last = Array::make(n, -1)
   let from = Array::make(n, 0)
   let upto = Array::make(n, 0)
@@ -485,7 +485,7 @@ fn pieces(
   while i < n {
     flush(block_span(blocks[i]).from)
     if last[i] >= 0 {
-      // 綴りとして読めなかった領域。丸ごと逐語で持つ
+      // 綴りとして読めなかった領域。丸ごと原文のまま持つ
       out.push(Capsule(carve(md, from[i], upto[i])))
       i = last[i] + 1
     } else if gone[i] {
