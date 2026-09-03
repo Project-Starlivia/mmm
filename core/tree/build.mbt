@@ -24,7 +24,13 @@ priv struct Frame {
 priv enum Notation {
   /// 記法が無い。深さの飛びがそれを言う
   Gap
-  Line(sign~ : Sign, label~ : String, details~ : Bool, body~ : Array[Block])
+  Line(
+    sign~ : Sign,
+    label~ : String,
+    details~ : Bool,
+    open~ : Bool,
+    body~ : Array[Block]
+  )
 }
 
 ///|
@@ -93,8 +99,8 @@ priv struct Build {
 /// ひと切れを積む。畳みは見出し・項目の行に印を付けるか、中身の 1 枚になる。
 fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
   match piece {
-    Raw(block) => take(b, block, nest, details=false)
-    Folded(block) => take(b, block, nest, details=true)
+    Raw(block) => take(b, block, nest, details=false, open=false)
+    Folded(block, open~) => take(b, block, nest, details=true, open~)
     Capsule(text) => {
       // 中身が来たので、保留中の水平線は境界になれない
       spill(b)
@@ -111,6 +117,7 @@ fn take(
   block : @markdown.Block,
   nest : Int,
   details? : Bool = false,
+  open? : Bool = false,
 ) -> Unit {
   match block {
     // **単調性 — 項目の子孫は項目。** 項目の領土に書かれた見出しは骨格に
@@ -125,12 +132,13 @@ fn take(
           sign=Heading,
           label=head_label(b.md, span, style, children),
           details~,
+          open~,
           body=[],
         ),
       )
     }
-    BulletList(items~, ..) => items_take(b, items, nest, details~)
-    OrderedList(items~, ..) => items_take(b, items, nest, details~)
+    BulletList(items~, ..) => items_take(b, items, nest, details~, open~)
+    OrderedList(items~, ..) => items_take(b, items, nest, details~, open~)
     // 区切りは**根の領土の隙間**でだけ翼の境目になる。項目の中は中身
     // 記法(`---` `***` `___`)も本数も差別しない。意味は常に「隣を区切る」で、
     // 行き先は**直後のブロックが何か**で決まる。ここでは保留するだけ
@@ -154,6 +162,7 @@ fn items_take(
   items : Array[@markdown.ListItem],
   nest : Int,
   details? : Bool = false,
+  open? : Bool = false,
 ) -> Unit {
   for it in items {
     let rest = []
@@ -167,7 +176,7 @@ fn items_take(
         rest.push(c)
       }
     }
-    put(b, b.head + 1 + nest, Line(sign=Item, label~, details~, body=[]))
+    put(b, b.head + 1 + nest, Line(sign=Item, label~, details~, open~, body=[]))
     for c in pieces(b.md, rest) {
       lay(b, c, nest + 1)
     }
@@ -380,13 +389,21 @@ fn to_root(f : Frame) -> Root {
 fn to_node(f : Frame) -> Node {
   match f.skel {
     Gap => ImplicitNode({ id: f.id, children: f.kids.map(to_node) })
-    Line(sign=Item, label~, details~, body~) =>
-      ListNode({ id: f.id, label, details, body, children: f.kids.map(to_list) })
-    Line(label~, details~, body~, ..) =>
+    Line(sign=Item, label~, details~, open~, body~) =>
+      ListNode({
+        id: f.id,
+        label,
+        details,
+        open,
+        body,
+        children: f.kids.map(to_list),
+      })
+    Line(label~, details~, open~, body~, ..) =>
       HeadingNode({
         id: f.id,
         label,
         details,
+        open,
         body,
         children: f.kids.map(to_node),
       })
@@ -403,10 +420,11 @@ fn to_list(f : Frame) -> ListNode {
         id: f.id,
         label: "",
         details: false,
+        open: false,
         body: [],
         children: f.kids.map(to_list),
       }
-    Line(label~, details~, body~, ..) =>
-      { id: f.id, label, details, body, children: f.kids.map(to_list) }
+    Line(label~, details~, open~, body~, ..) =>
+      { id: f.id, label, details, open, body, children: f.kids.map(to_list) }
   }
 }

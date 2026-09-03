@@ -17,6 +17,7 @@ test "見出し 1 つが木 1 本になる" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -40,6 +41,7 @@ test "深さ 1 が 2 つなら木も 2 本" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -53,6 +55,7 @@ test "深さ 1 が 2 つなら木も 2 本" {
             "id": 3,
             "label": "b",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -76,6 +79,7 @@ test "深さ 2 は根の翼になる" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -84,6 +88,7 @@ test "深さ 2 は根の翼になる" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -94,6 +99,7 @@ test "深さ 2 は根の翼になる" {
                   "id": 4,
                   "label": "b",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -120,6 +126,7 @@ test "深さ 3 は翼の下の枝" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -128,6 +135,7 @@ test "深さ 3 は翼の下の枝" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [
                     [
@@ -136,6 +144,7 @@ test "深さ 3 は翼の下の枝" {
                         "id": 4,
                         "label": "x",
                         "details": false,
+                        "open": false,
                         "body": [],
                         "children": [],
                       },
@@ -165,6 +174,7 @@ test "浅く戻る" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -173,6 +183,7 @@ test "浅く戻る" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [
                     [
@@ -181,6 +192,7 @@ test "浅く戻る" {
                         "id": 4,
                         "label": "x",
                         "details": false,
+                        "open": false,
                         "body": [],
                         "children": [],
                       },
@@ -194,6 +206,7 @@ test "浅く戻る" {
                   "id": 5,
                   "label": "b",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -220,6 +233,7 @@ test "飛びは Implicit が埋める" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -233,6 +247,7 @@ test "飛びは Implicit が埋める" {
                         "id": 4,
                         "label": "x",
                         "details": false,
+                        "open": false,
                         "body": [],
                         "children": [],
                       },
@@ -267,6 +282,7 @@ test "深さ 1 が無ければ根が Implicit になる" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -293,6 +309,7 @@ test "ラベルは原文の逐語（インラインを解釈しない）" {
             "id": 2,
             "label": "a **b** `c`",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -312,7 +329,14 @@ test "中身の無い見出しは空ラベル" {
       {
         "node": [
           "HeadingNode",
-          { "id": 2, "label": "", "details": false, "body": [], "children": [] },
+          {
+            "id": 2,
+            "label": "",
+            "details": false,
+            "open": false,
+            "body": [],
+            "children": [],
+          },
         ],
         "sides": [],
       },
@@ -334,6 +358,7 @@ test "封筒" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -357,6 +382,7 @@ test "改行の流儀は保存する" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },

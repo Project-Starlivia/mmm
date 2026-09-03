@@ -16,6 +16,7 @@ test "直後が見出しなら境界。側が裏返る" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -24,6 +25,7 @@ test "直後が見出しなら境界。側が裏返る" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -34,6 +36,7 @@ test "直後が見出しなら境界。側が裏返る" {
                   "id": 4,
                   "label": "b",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -60,6 +63,7 @@ test "先頭に置けば最初の子から左になる" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -68,6 +72,7 @@ test "先頭に置けば最初の子から左になる" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -96,6 +101,7 @@ test "深い見出しは Implicit を挟んで深さ 2 へ" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -104,6 +110,7 @@ test "深い見出しは Implicit を挟んで深さ 2 へ" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -119,6 +126,7 @@ test "深い見出しは Implicit を挟んで深さ 2 へ" {
                         "id": 5,
                         "label": "x",
                         "details": false,
+                        "open": false,
                         "body": [],
                         "children": [],
                       },
@@ -149,6 +157,7 @@ test "項目は Implicit を挟まず深さ 2 へ" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -157,6 +166,7 @@ test "項目は Implicit を挟まず深さ 2 へ" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -167,6 +177,7 @@ test "項目は Implicit を挟まず深さ 2 へ" {
                   "id": 4,
                   "label": "b",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -196,6 +207,7 @@ test "見出しと項目が交互に並ぶ" {
               "id": 2,
               "label": "root",
               "details": false,
+              "open": false,
               "body": [],
               "children": [
                 [
@@ -204,6 +216,7 @@ test "見出しと項目が交互に並ぶ" {
                     "id": 3,
                     "label": "h1",
                     "details": false,
+                    "open": false,
                     "body": [],
                     "children": [],
                   },
@@ -214,6 +227,7 @@ test "見出しと項目が交互に並ぶ" {
                     "id": 4,
                     "label": "i1",
                     "details": false,
+                    "open": false,
                     "body": [],
                     "children": [],
                   },
@@ -224,6 +238,7 @@ test "見出しと項目が交互に並ぶ" {
                     "id": 5,
                     "label": "h2",
                     "details": false,
+                    "open": false,
                     "body": [],
                     "children": [],
                   },
@@ -252,6 +267,7 @@ test "兄弟の間の水平線も引き出す" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -260,6 +276,7 @@ test "兄弟の間の水平線も引き出す" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [
                     [
@@ -268,6 +285,7 @@ test "兄弟の間の水平線も引き出す" {
                         "id": 4,
                         "label": "x",
                         "details": false,
+                        "open": false,
                         "body": [],
                         "children": [],
                       },
@@ -286,6 +304,7 @@ test "兄弟の間の水平線も引き出す" {
                         "id": 6,
                         "label": "y",
                         "details": false,
+                        "open": false,
                         "body": [],
                         "children": [],
                       },
@@ -316,6 +335,7 @@ test "中身に挟まれた水平線は装飾" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [["Opaque", "body"], "ThematicBreak", ["Opaque", "body"]],
             "children": [
               [
@@ -324,6 +344,7 @@ test "中身に挟まれた水平線は装飾" {
                   "id": 3,
                   "label": "b",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -351,6 +372,7 @@ test "直前が中身でも、直後が見出しなら境界" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [["Opaque", "body"]],
             "children": [
               [
@@ -359,6 +381,7 @@ test "直前が中身でも、直後が見出しなら境界" {
                   "id": 3,
                   "label": "b",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -386,6 +409,7 @@ test "本数に意味は無い" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -394,6 +418,7 @@ test "本数に意味は無い" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -404,6 +429,7 @@ test "本数に意味は無い" {
                   "id": 4,
                   "label": "b",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -430,6 +456,7 @@ test "文末の水平線は装飾" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -438,6 +465,7 @@ test "文末の水平線は装飾" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": ["ThematicBreak"],
                   "children": [],
                 },
@@ -465,6 +493,7 @@ test "根の直前の水平線は装飾" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": ["ThematicBreak"],
             "children": [],
           },
@@ -478,6 +507,7 @@ test "根の直前の水平線は装飾" {
             "id": 3,
             "label": "s",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -501,6 +531,7 @@ test "最初の見出しより前の水平線は文書の中身" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },

@@ -13,8 +13,8 @@ Root { node: Node, sides: [Side] }          // 側を持つ唯一の型。根の
 
 Node = HeadingNode | ListNode | ImplicitNode   // 構築子は型名と同じ。タグに意味は無い
 
-HeadingNode  { id, label, details, body: [Block], children: [Node] }
-ListNode     { id, label, details, body: [Block], children: [ListNode] }
+HeadingNode  { id, label, details, open, body: [Block], children: [Node] }
+ListNode     { id, label, details, open, body: [Block], children: [ListNode] }
 ImplicitNode { id, children: [Node] }       // 記法を持たない
 
 Side  = Right | Left
@@ -39,7 +39,8 @@ Block = Image | Link | Code | Svg           // 中身 1 枚。包みは無い
 `children` を全部の深さで `[Node]` に保つため、側は組にせず並走させる
 （深さで型が変わると走査も操作も割れる）。長さが揃うことは型では言えない。
 
-check が見るもの — id 一意 / Implicit は子を持つ / `sides` と根の子の長さが揃う。
+check が見るもの — id 一意 / Implicit は子を持つ / `sides` と根の子の長さが揃う /
+`open` は `details` のときだけ立つ。
 
 `project(Doc)` が左右に振り分けた木を作り、JSON で ts へ渡す。
 

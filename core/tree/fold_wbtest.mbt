@@ -21,6 +21,7 @@ test "名前と形が揃えば、そのノードの畳み" {
               "id": 2,
               "label": "r",
               "details": false,
+              "open": false,
               "body": [],
               "children": [
                 [
@@ -29,6 +30,7 @@ test "名前と形が揃えば、そのノードの畳み" {
                     "id": 3,
                     "label": "h",
                     "details": true,
+                    "open": false,
                     "body": [["Opaque", "body"]],
                     "children": [],
                   },
@@ -57,6 +59,7 @@ test "summary が無ければ中身" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [
               [
                 "Details",
@@ -88,6 +91,7 @@ test "summary が一致しなければ中身" {
               "id": 2,
               "label": "r",
               "details": false,
+              "open": false,
               "body": [
                 [
                   "Details",
@@ -121,6 +125,7 @@ test "中身だけ包んでいれば中身の 1 枚" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -129,6 +134,7 @@ test "中身だけ包んでいれば中身の 1 枚" {
                   "id": 3,
                   "label": "h",
                   "details": false,
+                  "open": false,
                   "body": [
                     [
                       "Details",
@@ -161,6 +167,7 @@ test "2 ノード分を包んでいれば中身" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [
               [
                 "Details",
@@ -189,6 +196,7 @@ test "最初が段落なら中身" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [
               [
                 "Details",
@@ -221,6 +229,7 @@ test "空行なしで 1 塊なら中身" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [["Opaque", "<details>\n## h\n</details>"]],
             "children": [],
           },
@@ -245,6 +254,7 @@ test "閉じの無い開きはただの文字" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [["Opaque", "<details>"]],
             "children": [
               [
@@ -253,6 +263,7 @@ test "閉じの無い開きはただの文字" {
                   "id": 3,
                   "label": "h",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -279,6 +290,7 @@ test "相手の居ない閉じもただの文字" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [["Opaque", "</details>"]],
             "children": [],
           },
@@ -307,6 +319,7 @@ test "畳みの後ろは元の深さに戻る" {
               "id": 2,
               "label": "r",
               "details": false,
+              "open": false,
               "body": [],
               "children": [
                 [
@@ -315,6 +328,7 @@ test "畳みの後ろは元の深さに戻る" {
                     "id": 3,
                     "label": "h",
                     "details": true,
+                    "open": false,
                     "body": [],
                     "children": [],
                   },
@@ -325,6 +339,7 @@ test "畳みの後ろは元の深さに戻る" {
                     "id": 4,
                     "label": "b",
                     "details": false,
+                    "open": false,
                     "body": [],
                     "children": [],
                   },
@@ -354,6 +369,7 @@ test "項目も定義ごと包める" {
               "id": 2,
               "label": "r",
               "details": false,
+              "open": false,
               "body": [],
               "children": [
                 [
@@ -362,6 +378,7 @@ test "項目も定義ごと包める" {
                     "id": 3,
                     "label": "a",
                     "details": true,
+                    "open": false,
                     "body": [],
                     "children": [],
                   },
@@ -392,6 +409,7 @@ test "開きに飲み込まれた行があれば中身" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [
               [
                 "Details",
@@ -434,6 +452,7 @@ test "入れ子の畳みも畳み" {
               "id": 2,
               "label": "r",
               "details": false,
+              "open": false,
               "body": [],
               "children": [
                 [
@@ -442,6 +461,7 @@ test "入れ子の畳みも畳み" {
                     "id": 3,
                     "label": "a",
                     "details": true,
+                    "open": false,
                     "body": [],
                     "children": [
                       [
@@ -450,6 +470,7 @@ test "入れ子の畳みも畳み" {
                           "id": 4,
                           "label": "a1",
                           "details": true,
+                          "open": false,
                           "body": [],
                           "children": [],
                         },
@@ -487,6 +508,7 @@ test "閉じが重なった塊は畳みの閉じにしない" {
               "id": 2,
               "label": "r",
               "details": false,
+              "open": false,
               "body": [["Opaque", "<details>\n<summary>x</summary>"]],
               "children": [
                 [
@@ -495,6 +517,7 @@ test "閉じが重なった塊は畳みの閉じにしない" {
                     "id": 3,
                     "label": "x",
                     "details": false,
+                    "open": false,
                     "body": [
                       [
                         "Details",
@@ -511,6 +534,86 @@ test "閉じが重なった塊は畳みの閉じにしない" {
             },
           ],
           "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// `open` は畳みの姿の一部なので意味として持つ。捨てると外部レンダラでの
+/// 見え方が変わってしまう。
+test "open は畳みに持つ" {
+  json_inspect(
+    parse("# r\n\n<details open>\n<summary>h</summary>\n\n## h\n\n</details>\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "h",
+                    "details": true,
+                    "open": true,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 知らない属性は畳みの綴りではない。畳みにすると開きの塊ごと落ちて消えるので、
+/// 領域まるごと逐語で持つ。
+test "知らない属性が付いていれば中身" {
+  json_inspect(
+    parse(
+      "# r\n\n<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>",
+                  },
+                ],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
         },
       ],
     },

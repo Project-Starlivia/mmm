@@ -16,6 +16,7 @@ test "単調性 — 項目の中の見出しは逐語のまま中身になる" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [["Opaque", "# x"]],
             "children": [],
           },
@@ -40,6 +41,7 @@ test "単調性 — 列 0 の見出しは項目を閉じる" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -53,6 +55,7 @@ test "単調性 — 列 0 の見出しは項目を閉じる" {
             "id": 3,
             "label": "x",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -78,6 +81,7 @@ test "順序法則 — 項目のあとの見出しは兄弟になる" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -86,6 +90,7 @@ test "順序法則 — 項目のあとの見出しは兄弟になる" {
                   "id": 3,
                   "label": "b",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -96,6 +101,7 @@ test "順序法則 — 項目のあとの見出しは兄弟になる" {
                   "id": 4,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -124,6 +130,7 @@ test "順序法則 — 見出しのあとの項目は子になる" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -132,6 +139,7 @@ test "順序法則 — 見出しのあとの項目は子になる" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [
                     [
@@ -140,6 +148,7 @@ test "順序法則 — 見出しのあとの項目は子になる" {
                         "id": 4,
                         "label": "b",
                         "details": false,
+                        "open": false,
                         "body": [],
                         "children": [],
                       },
@@ -172,6 +181,7 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -180,6 +190,7 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
                   "id": 3,
                   "label": "b",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -195,6 +206,7 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
                         "id": 5,
                         "label": "x",
                         "details": false,
+                        "open": false,
                         "body": [],
                         "children": [],
                       },
@@ -224,6 +236,7 @@ test "単調性 — 項目の根の下にも潜らない" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -247,6 +260,7 @@ test "単調性 — 項目の根の下にも潜らない" {
                         "id": 5,
                         "label": "x",
                         "details": false,
+                        "open": false,
                         "body": [],
                         "children": [],
                       },
@@ -276,6 +290,7 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -284,12 +299,14 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
                   "id": 3,
                   "label": "b",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [
                     {
                       "id": 4,
                       "label": "c",
                       "details": false,
+                      "open": false,
                       "body": [],
                       "children": [],
                     },
@@ -307,6 +324,7 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
                         "id": 6,
                         "label": "x",
                         "details": false,
+                        "open": false,
                         "body": [],
                         "children": [],
                       },

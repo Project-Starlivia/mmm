@@ -16,6 +16,7 @@ test "項目だけの木" {
             "id": 2,
             "label": "root",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -39,12 +40,14 @@ test "入れ子は深くなる" {
             "id": 2,
             "label": "root",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               {
                 "id": 3,
                 "label": "a",
                 "details": false,
+                "open": false,
                 "body": [],
                 "children": [],
               },
@@ -70,12 +73,14 @@ test "兄弟は並ぶ" {
             "id": 2,
             "label": "root",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               {
                 "id": 3,
                 "label": "a",
                 "details": false,
+                "open": false,
                 "body": [],
                 "children": [],
               },
@@ -83,6 +88,7 @@ test "兄弟は並ぶ" {
                 "id": 4,
                 "label": "b",
                 "details": false,
+                "open": false,
                 "body": [],
                 "children": [],
               },
@@ -108,6 +114,7 @@ test "見出しの下の項目は 1 つ深い" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -116,6 +123,7 @@ test "見出しの下の項目は 1 つ深い" {
                   "id": 3,
                   "label": "a",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [],
                 },
@@ -142,6 +150,7 @@ test "見出しは入れ子をリセットする" {
             "id": 2,
             "label": "r",
             "details": false,
+            "open": false,
             "body": [],
             "children": [
               [
@@ -150,6 +159,7 @@ test "見出しは入れ子をリセットする" {
                   "id": 3,
                   "label": "s",
                   "details": false,
+                  "open": false,
                   "body": [],
                   "children": [
                     [
@@ -158,12 +168,14 @@ test "見出しは入れ子をリセットする" {
                         "id": 4,
                         "label": "a",
                         "details": false,
+                        "open": false,
                         "body": [],
                         "children": [
                           {
                             "id": 5,
                             "label": "b",
                             "details": false,
+                            "open": false,
                             "body": [],
                             "children": [],
                           },
@@ -195,6 +207,7 @@ test "マーカーの銘柄は構造に影響しない" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -214,6 +227,7 @@ test "マーカーの銘柄は構造に影響しない" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -237,6 +251,7 @@ test "順序リストも項目として読む" {
             "id": 2,
             "label": "a",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -250,6 +265,7 @@ test "順序リストも項目として読む" {
             "id": 3,
             "label": "b",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },
@@ -273,6 +289,7 @@ test "ラベルは原文の逐語" {
             "id": 2,
             "label": "a **b**",
             "details": false,
+            "open": false,
             "body": [],
             "children": [],
           },

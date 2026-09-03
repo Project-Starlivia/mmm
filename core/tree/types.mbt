@@ -44,6 +44,8 @@ pub(all) struct HeadingNode {
   label : String
   /// `<details>` がこのノードの定義ごと包んでいた
   details : Bool
+  /// その `<details>` に `open` が付いていた。畳みでないときは常に false
+  open : Bool
   body : Array[Block]
   children : Array[Node]
 } derive(Eq, Debug, ToJson)
@@ -55,6 +57,7 @@ pub(all) struct ListNode {
   id : Int
   label : String
   details : Bool
+  open : Bool
   body : Array[Block]
   children : Array[ListNode]
 } derive(Eq, Debug, ToJson)

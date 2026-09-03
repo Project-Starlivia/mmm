@@ -14,6 +14,8 @@ pub(all) enum Flaw {
   BarrenImplicit(Int)
   /// 側の本数が根の子と合わない
   SideCount(root~ : Int, sides~ : Int, children~ : Int)
+  /// 畳んでいないのに `open` が立っている。書き出す `<details>` が無い
+  OpenWithoutDetails(Int)
 } derive(Eq, ToJson)
 
 ///|
@@ -35,9 +37,16 @@ pub fn check(doc : Doc) -> Array[Flaw] {
     }
   }
 
+  fn shut(n : Int, details : Bool, open : Bool) -> Unit {
+    if open && !details {
+      flaws.push(OpenWithoutDetails(n))
+    }
+  }
+
   fn items(xs : Array[ListNode]) -> Unit {
     for x in xs {
       id(x.id)
+      shut(x.id, x.details, x.open)
       blocks(x.body)
       items(x.children)
     }
@@ -48,11 +57,13 @@ pub fn check(doc : Doc) -> Array[Flaw] {
       match x {
         HeadingNode(h) => {
           id(h.id)
+          shut(h.id, h.details, h.open)
           blocks(h.body)
           nodes(h.children)
         }
         ListNode(l) => {
           id(l.id)
+          shut(l.id, l.details, l.open)
           blocks(l.body)
           items(l.children)
         }

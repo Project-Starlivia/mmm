@@ -10,7 +10,7 @@
 priv enum Piece {
   Raw(@markdown.Block)
   /// 畳まれたノードの見出し・項目の行。中身は普通に読む
-  Folded(@markdown.Block)
+  Folded(@markdown.Block, open~ : Bool)
   /// ちょうど覆っていない領域。逐語のまま中身になる
   Capsule(String)
 }
@@ -23,20 +23,32 @@ fn opens(html : String) -> Bool {
 }
 
 ///|
-/// 開きの塊が `<details>` の行と `<summary>` の行だけか。
+/// 開きの塊が `<details>`（`open` 付きも可）の行と `<summary>` の行だけか。
 /// 空行を挟まないと md は次の行まで飲み込むので、飲み込まれた行があれば偽。
+/// 知らない属性が付いていても偽 — 畳みにすると開きの塊ごと落ちて属性が消える。
 fn bare(html : String) -> Bool {
   for line in html.split("\n") {
     let t = line.trim().to_owned()
-    if t == "" || (t.has_prefix("<details") && t.has_suffix(">")) {
+    if t == "" || t == "<details>" || t == "<details open>" {
       continue
     }
-    if t.has_prefix("<summary") && t.has_suffix("</summary>") {
+    if t.has_prefix("<summary>") && t.has_suffix("</summary>") {
       continue
     }
     return false
   }
   true
+}
+
+///|
+/// 開きに `open` が付いているか。外部レンダラで開いた姿で出る。
+fn open_of(html : String) -> Bool {
+  for line in html.split("\n") {
+    if line.trim().to_owned() == "<details open>" {
+      return true
+    }
+  }
+  false
 }
 
 ///|
@@ -82,7 +94,8 @@ fn pieces(md : String, blocks : Array[@markdown.Block]) -> Array[Piece] {
       Some(j) =>
         if covers(blocks, i, j) && summary_fits(md, blocks, i) {
           // 過不足なく覆っている。タグは落ち、包まれた行が畳まれる
-          out.push(Folded(blocks[next(blocks, i)]))
+          let open = b is HtmlBlock(html~, ..) && open_of(html)
+          out.push(Folded(blocks[next(blocks, i)], open~))
           // 中はまた同じ規則で読む。入れ子の畳みも畳みになる
           let inner = []
           let mut k = next(blocks, i) + 1

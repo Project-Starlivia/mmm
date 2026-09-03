@@ -32,6 +32,7 @@ test "同じ id が 2 度出たら見つける" {
     id: 7,
     label: "a",
     details: false,
+    open: false,
     body: [],
     children: [],
   }
@@ -70,12 +71,14 @@ test "側の本数が子と合わなければ見つける" {
           id: 2,
           label: "r",
           details: false,
+          open: false,
           body: [],
           children: [
             HeadingNode({
               id: 3,
               label: "a",
               details: false,
+              open: false,
               body: [],
               children: [],
             }),
@@ -103,6 +106,7 @@ test "Details の id も一意さを見る" {
           id: 5,
           label: "r",
           details: false,
+          open: false,
           body: [],
           children: [],
         }),
