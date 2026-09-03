@@ -7,8 +7,8 @@
   "packageManager": "pnpm@11.21.0",
   "scripts": {
     "core": "cd core && moon build --target js --release",
-    "check:core": "cd core && moon check && moon fmt --check tree",
-    "test:core": "cd core && moon test -p mmm-app/core/tree",
+    "check:core": "cd core && moon check && moon fmt --check tree view",
+    "test:core": "cd core && moon test -p mmm-app/core/tree -p mmm-app/core/view",
     "lab": "pnpm run core && vite lab --port 13132 --strictPort",
     "check:lab": "tsc -p lab --noEmit",
     "fixtures": "node test/tools/gen-load.ts"

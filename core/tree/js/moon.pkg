@@ -2,4 +2,5 @@ pkgtype(kind: "foreign_library")
 
 import {
   "mmm-app/core/tree",
+  "mmm-app/core/view",
 }
