@@ -479,3 +479,17 @@ test "意味 — 綴りにならなかった文字は消えない" {
   )
   json_inspect(gone, content=[])
 }
+
+///|
+/// **単調性の下では畳みが立たない。** 項目の領土の見出しは骨格にならないので、
+/// ノードでない以上「そのノードを覆う」対象が無い。綴りを落とすと書き戻せない
+/// 木になるので、領域まるごと逐語で持つ。
+test "単調性 — 項目の中の見出しを包んだ畳みは逐語" {
+  let with_fold = parse(
+    "- item\n\n  <details>\n  <summary>h</summary>\n\n  ## h\n\n  </details>\n",
+  )
+  let without = parse("- item\n\n  ## h\n")
+  // 畳みを書いた md と書いていない md が同じ木になってはいけない
+  assert_not_eq(with_fold, without)
+  assert_eq(tally(written(with_fold), "<summary>h</summary>"), 1)
+}

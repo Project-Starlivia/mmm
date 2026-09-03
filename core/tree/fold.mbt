@@ -334,8 +334,12 @@ fn covers(
 
 ///|
 /// ブロックの並びを、畳みを解いたひと切れの列にする。
-fn pieces(md : String, blocks : Array[@markdown.Block]) -> Array[Piece] {
-  let low = depths(md, blocks)
+fn pieces(
+  md : String,
+  blocks : Array[@markdown.Block],
+  nest : Int,
+) -> Array[Piece] {
+  let low = depths(md, blocks, nest)
   let n = blocks.length()
   let spells = blocks.map(b => read_spell(md, b))
   let spots = []

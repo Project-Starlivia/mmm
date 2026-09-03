@@ -363,3 +363,53 @@ test "途中の段落はラベルにならない" {
     },
   )
 }
+
+///|
+/// **インラインの span は中身に対する相対**なので、原文の絶対位置に足すと
+/// 行ごとの字下げと `\r` の総量ぶん手前で切れる。ラベルの末尾が消えていた。
+test "続きの行があるラベルは末尾まで残る" {
+  json_inspect(parse("- aaa\n  bbb\n  ccc\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "aaa\n  bbb\n  ccc",
+            "details": false,
+            "open": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}
+
+///|
+test "CRLF でもラベルは末尾まで残る" {
+  json_inspect(parse("- aaa\r\n  bbb\r\n"), content={
+    "eol": "Crlf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "aaa\r\n  bbb",
+            "details": false,
+            "open": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}

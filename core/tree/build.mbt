@@ -53,7 +53,7 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
     low: deep,
     dry: false,
   }
-  for piece in pieces(md, ast.children) {
+  for piece in pieces(md, ast.children, 0) {
     lay(b, piece, 0)
   }
   // 行き先の見出し・項目が来ないまま終わった水平線は、その場の中身に落ちる
@@ -110,7 +110,11 @@ let deep : Int = 99
 /// を返す。畳みの領域が部分木と一致するかは、md の見出しの深さではなく
 /// この深さで測る — 境界の `---` は部分木を深さ 2 へ引き出し、飛びは Implicit
 /// で埋まるので、md の `#` の数と積まれた深さはずれる。
-fn depths(md : String, blocks : Array[@markdown.Block]) -> Array[Int] {
+fn depths(
+  md : String,
+  blocks : Array[@markdown.Block],
+  nest : Int,
+) -> Array[Int] {
   let b : Build = {
     md,
     forest: [],
@@ -125,7 +129,7 @@ fn depths(md : String, blocks : Array[@markdown.Block]) -> Array[Int] {
   let out = Array::make(blocks.length(), deep)
   for i, block in blocks {
     b.low = deep
-    take(b, block, 0)
+    take(b, block, nest)
     out[i] = b.low
   }
   out
@@ -216,7 +220,11 @@ fn items_take(
     put(b, b.head + 1 + nest, Line(sign=Item, label~, details~, open~, body=[]))
     // 空打ちでは畳みを見ない（深さを測るのに畳みは要らず、
     // 畳みの判定はこの深さを使うので、呼び合いになる）
-    let inner = if b.dry { rest.map(c => Raw(c)) } else { pieces(b.md, rest) }
+    let inner = if b.dry {
+      rest.map(c => Raw(c))
+    } else {
+      pieces(b.md, rest, nest + 1)
+    }
     for c in inner {
       lay(b, c, nest + 1)
     }
@@ -232,7 +240,37 @@ fn item_label(md : String, p : @markdown.Block) -> String {
     return ""
   }
   let len = span_of(children[children.length() - 1]).to
-  String::unsafe_substring(md, start=span.from, end=span.from + len)
+  String::unsafe_substring(md, start=span.from, end=reach(md, span.from, len))
+}
+
+///|
+/// 中身の長さ（容器の字下げと `\r` を除いた数）ぶんだけ原文を進んだ位置。
+/// **インラインの span は中身に対する相対**なので、原文の絶対位置にそのまま
+/// 足すと、行ごとの字下げと `\r` の総量ぶん手前で切れてラベルの末尾が消える。
+fn reach(md : String, from : Int, len : Int) -> Int {
+  let indent = column(md, from)
+  let mut i = from
+  let mut seen = 0
+  let mut head = false
+  while i < md.length() && seen < len {
+    if head {
+      let mut k = 0
+      while k < indent && i < md.length() && (md[i] == ' ' || md[i] == '\t') {
+        i = i + 1
+        k = k + 1
+      }
+      head = false
+      continue
+    }
+    if md[i] == '\r' {
+      i = i + 1
+      continue
+    }
+    head = md[i] == '\n'
+    i = i + 1
+    seen = seen + 1
+  }
+  i
 }
 
 ///|
