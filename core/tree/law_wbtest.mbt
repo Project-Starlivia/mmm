@@ -414,13 +414,14 @@ test "単調性 — 項目の中の見出しを包んだ畳みは原文のまま
 }
 
 ///|
-/// **中身は必ず木に残る。** 綴り（`#` や `<details>`）は構造とフラグが引き受ける
-/// ので消えてよいが、それ以外の文字は 1 つも落ちてはいけない。
+/// **中身は原文と同じ数だけ木に在る。** 綴り（`#` や `<details>`）は構造と
+/// フラグが引き受けるので消えてよいが、それ以外の文字は 1 つも落ちてはいけないし、
+/// 増えてもいけない（書き戻すと触っていない場所に行が生える）。
 ///
-/// 中身を置ける場所ごとに 1 形つくり、目印（`Zq…`）が木に残るかを総当たりで見る。
+/// 中身を置ける場所ごとに 1 形つくり、目印（`Zq…`）の数を総当たりで見る。
 /// 名指しの見張りは「一度落とした形」しか守らないので、**まだ落としていない形**は
 /// ここが守る。落ちたら、その場所の読みがどこかで綴り扱いになっている。
-test "意味 — 中身を置ける場所すべてで文字が残る" {
+test "意味 — 中身を置ける場所すべてで文字が同じ数だけ残る" {
   let forms = [
     ("見出しのラベル", "# Zq1\n"),
     ("setext のラベル", "Zq2\n===\n"),
@@ -470,13 +471,23 @@ test "意味 — 中身を置ける場所すべてで文字が残る" {
       "畳みの入れ子", "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<details>\n<summary>Zq39</summary>\n\n### Zq39\n\n</details>\n\n</details>\n",
     ),
     ("余った閉じの後ろ", "# r\n\n</details>\n\nZq40\n"),
+    ("定義行に食われた行", "[a]: b\nZq41\n"),
+    ("項目の中の定義行", "- a\n\n  [x]: b \"Zq42\"\n"),
+    (
+      "畳めない領域の中の定義行", "# r\n\n<details class=\"z\">\n\n[a]: b \"Zq43\"\n\n## h\n\n</details>\n",
+    ),
+    (
+      "畳みの中の定義行", "# r\n\n<details>\n\n## h\n\n[a]: b \"Zq44\"\n\n</details>\n",
+    ),
   ]
   let gone = []
   for form in forms {
     let (name, md) = form
     let mark = mark_of(md)
-    if tally(written(parse(md)), mark) == 0 {
-      gone.push("\{name} : \{mark} が無い : \{md.escape()}")
+    let want = tally(md, mark)
+    let got = tally(written(parse(md)), mark)
+    if got != want {
+      gone.push("\{name} : \{mark} が \{want} → \{got} : \{md.escape()}")
     }
   }
   json_inspect(gone, content=[])
