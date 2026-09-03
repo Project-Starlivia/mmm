@@ -329,3 +329,105 @@ test "定義行に見える 1 行目でもラベルは全部残る" {
     ],
   })
 }
+
+///|
+/// **項目の深さは、その列が座る枠の 1 つ下。** 入れ子の段数から数え直すと、
+/// 境界が親の項目を深さ 2 へ引き出したときに元の位置から数えてしまい、
+/// 間に綴られていない項目が生える（項目は相対記法なので飛びは存在しない）。
+test "境界のあとの入れ子項目に空の項目が生えない" {
+  json_inspect(parse("# r\n\n## h\n\n---\n\n- a\n  - b\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              [
+                "HeadingNode",
+                { "id": 3, "label": "h", "body": [], "children": [] },
+              ],
+              [
+                "ListNode",
+                {
+                  "id": 4,
+                  "label": "a",
+                  "body": [],
+                  "children": [
+                    { "id": 5, "label": "b", "body": [], "children": [] },
+                  ],
+                },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right", "Left"],
+      },
+    ],
+  })
+}
+
+///|
+/// 同じ経路で、後ろの見出しが項目に化けていた。
+test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
+  json_inspect(parse("# r\n\n## h\n\n### x\n\n---\n\n- a\n  - b\n\n### t\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              [
+                "HeadingNode",
+                {
+                  "id": 3,
+                  "label": "h",
+                  "body": [],
+                  "children": [
+                    [
+                      "HeadingNode",
+                      { "id": 4, "label": "x", "body": [], "children": [] },
+                    ],
+                  ],
+                },
+              ],
+              [
+                "ListNode",
+                {
+                  "id": 5,
+                  "label": "a",
+                  "body": [],
+                  "children": [
+                    { "id": 6, "label": "b", "body": [], "children": [] },
+                  ],
+                },
+              ],
+              [
+                "ImplicitNode",
+                {
+                  "id": 7,
+                  "children": [
+                    [
+                      "HeadingNode",
+                      { "id": 8, "label": "t", "body": [], "children": [] },
+                    ],
+                  ],
+                },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right", "Left", "Left"],
+      },
+    ],
+  })
+}

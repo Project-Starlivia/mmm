@@ -223,6 +223,11 @@ fn items_take(
   nest : Int,
   fold? : Fold? = None,
 ) -> Unit {
+  // **項目の深さは、この列が座る枠の 1 つ下。** 入れ子の段数から数え直すと、
+  // 境界が親の項目を深さ 2 へ引き出したときに元の位置から数えてしまい、
+  // 間に綴られていない項目が生える（項目は相対記法なので飛びは存在しない）。
+  // 列に入る前に 1 度だけ測る — 中で測ると前の兄弟を積んだぶんずれる
+  let level = if nest == 0 { b.head + 1 } else { b.stack.length() + 1 }
   for it in items {
     // **ラベルは項目の 1 行目。** 途中の段落を引き上げると、その文字が
     // ラベルと中身の両方になる（切り出しはブロックの範囲でやるので、抜いたはずの
@@ -236,7 +241,7 @@ fn items_take(
         rest.push(c)
       }
     }
-    put(b, b.head + 1 + nest, Line(sign=Item, label~, fold~, body=[]))
+    put(b, level, Line(sign=Item, label~, fold~, body=[]))
     // 空打ちでは畳みを見ない（深さを測るのに畳みは要らず、
     // 畳みの判定はこの深さを使うので、呼び合いになる）
     let inner = if b.dry {
@@ -300,8 +305,11 @@ fn put(b : Build, level : Int, skel : Notation) -> Unit {
   }
   let f : Frame = { skel, kids: [], side: Right, id: 0 }
   sink(b)
-  // 最後に座るのが**そのブロック自身のノード**。手前の穴埋めは足場でしかない
-  b.own = b.stack.length() + 1
+  // **そのブロック自身のノードは、最初に座る綴られた枠。** 手前の穴埋めは足場、
+  // 後ろに続くのは入れ子の子（1 つの塊が項目を何段も積むことがある）
+  if b.own == deep {
+    b.own = b.stack.length() + 1
+  }
   seat(b, f)
   b.stack.push(f)
 }

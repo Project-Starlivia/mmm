@@ -1849,3 +1849,57 @@ test "落ちない綴りの塊は深さでも跨がない" {
     },
   )
 }
+
+///|
+/// **そのブロック自身のノードは、最初に座る綴られた枠。** 1 つの塊が項目を
+/// 何段も積むので、最後に座った枠を「持ち主の深さ」にすると、領域の外に
+/// 書かれた項目まで畳みの中に入る。
+test "入れ子項目を含む塊でも、持ち主の深さで測る" {
+  json_inspect(
+    parse(
+      "# r\n\n## h\n\n---\n\n<details>\n\n- a\n  - b\n\n</details>\n\n- c\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "h",
+                    "body": [
+                      "ThematicBreak",
+                      [
+                        "Details",
+                        {
+                          "id": 4,
+                          "text": "<details>\n\n- a\n  - b\n\n</details>",
+                        },
+                      ],
+                    ],
+                    "children": [
+                      [
+                        "ListNode",
+                        { "id": 5, "label": "c", "body": [], "children": [] },
+                      ],
+                    ],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
