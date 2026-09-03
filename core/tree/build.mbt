@@ -12,7 +12,7 @@
 priv struct Frame {
   skel : Notation
   kids : Array[Frame]
-  /// 翼になる深さ 2 の枠だけが意味を持つ。深いところの側は型で存在しない
+  /// 深さ 2 の枠だけが持つ。深い所の側は型に存在しない
   mut side : Side
   /// 文書順の番号。形を割り付ける前に振るので、割り付けが順序を動かしても動かない
   mut id : Int
@@ -48,8 +48,8 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
   for block in ast.children {
     take(b, block, 0)
   }
-  // 後続の翼が無いまま終わった区切りは、直前のノードの飾りに落ちる
-  drop_pend(b)
+  // 行き先の見出し・項目が来ないまま終わった水平線は、その場の中身に落ちる
+  spill(b)
   let next = { val: doc_id + 1 }
   let forest = b.forest
   for f in forest {
@@ -81,9 +81,9 @@ priv struct Build {
   /// 最初の骨格より前の散文
   body : Array[Block]
   mut head : Int
-  /// 次の翼の側。木が変わるたびに右へ戻る
+  /// 次の子の側。木が変わるたびに右へ戻る
   mut side : Side
-  /// 隙間に区切りが有ったか。**本数によらず 1 回**なので Bool で持つ
+  /// 行き先待ちの水平線が有るか。**本数に意味は無い**ので Bool で持つ
   mut pend : Bool
 }
 
@@ -110,15 +110,16 @@ fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
     BulletList(items~, ..) => items_take(b, items, nest)
     OrderedList(items~, ..) => items_take(b, items, nest)
     // 区切りは**根の領土の隙間**でだけ翼の境目になる。項目の中は中身
-    ThematicBreak(marker~, ..) =>
-      if marker == '-' && nest == 0 {
-        b.pend = true
-      } else {
-        fill(b, ThematicBreak)
-      }
+    // 記法(`---` `***` `___`)も本数も差別しない。意味は常に「隣を区切る」で、
+    // 行き先は**直後のブロックが何か**で決まる。ここでは保留するだけ
+    ThematicBreak(..) => b.pend = true
     _ =>
       match content_of(b.md, block) {
-        Some(c) => fill(b, c)
+        Some(c) => {
+          // 中身が来た時点で、保留中の水平線は境界になれない
+          spill(b)
+          fill(b, c)
+        }
         None => ()
       }
   }
@@ -162,6 +163,10 @@ fn item_label(md : String, p : @markdown.Block) -> String {
 /// 深さ level のノードを置く。浅く戻るときは積んだぶんを落とし、
 /// 深く飛ぶときは間を Implicit で埋める（飛びは綴りであって、無ではない）。
 fn put(b : Build, level : Int, skel : Notation) -> Unit {
+  // 境界のとき、項目は**深さ 2 に直接置く**。項目は相対記法なので深さが
+  // 導出値で、引き出し先に合わせて置き直せる（見出しは絶対座標なので
+  // 動かせず、足りない深さを Implicit が埋める）
+  let level = if b.pend && skel is Line(sign=Item, ..) { 2 } else { level }
   // **見出しは見出しの背骨にしか積まれない。** 項目の枠は見出しの親に
   // なれないので落とす（列 0 の見出しは md でも項目を閉じる）。C17 を
   // 深さ 1 から全部の深さへ広げたもの。これが無いと項目の子が見出しになる
@@ -172,17 +177,13 @@ fn put(b : Build, level : Int, skel : Notation) -> Unit {
     }
   }
   if level == 1 || b.stack.is_empty() {
-    // 新しい木を始める。待っている区切りは行き先を失うので飾りに落ち、
-    // 側は右へ戻る。
-    //
-    // **根がまだ無ければ、区切りは側になれない。** 側は根の持ち物なので、
-    // 裏返す相手が居ない。深さ 2 から始まる文書（根が Implicit）でも同じで、
-    // ここを分けないと、後ろが `#` か `##` かで同じ `---` の意味が変わる
-    drop_pend(b)
+    // 新しい木を始める。根は側を持たないので、引き出す先が無い —
+    // 保留中の水平線は装飾に落ちる
+    spill(b)
     b.side = Right
   } else if b.pend {
-    // **区切りは翼の境目を作る。** 深さ 3 以降でも親に飲まれず、
-    // 深さ 2 から Implicit が埋める反対側の翼になる
+    // **境界。「直前のものの一部ではない」という宣言**なので、深さ 2 まで
+    // 引き出す。足りない深さは下の穴埋めが Implicit で埋める
     while b.stack.length() > 1 {
       ignore(b.stack.unsafe_pop())
     }
@@ -202,7 +203,7 @@ fn put(b : Build, level : Int, skel : Notation) -> Unit {
 
 ///|
 /// 積んである親の子にする。親が居なければ森の 1 本として生やす。
-/// **翼になるのは深さ 2 の枠だけ**で、側が意味を持つのもそこだけ。
+/// **側を持つのは深さ 2 の枠だけ**（根の子）。
 fn seat(b : Build, f : Frame) -> Unit {
   if b.stack.is_empty() {
     b.forest.push(f)
@@ -228,9 +229,9 @@ fn flipped(s : Side) -> Side {
 }
 
 ///|
-/// 行き先の翼が来ないまま終わった区切りを、飾りの水平線に落とす。
-/// 側は場所の属性なので、置き場所が無ければ側にはなれない。
-fn drop_pend(b : Build) -> Unit {
+/// 境界になれなかった水平線を、その場の中身として落とす。
+/// 書かれた位置がそのまま保たれる。
+fn spill(b : Build) -> Unit {
   if b.pend {
     b.pend = false
     fill(b, ThematicBreak)
