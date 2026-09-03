@@ -11,7 +11,7 @@ test "details は直前のノードを畳む" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -19,7 +19,7 @@ test "details は直前のノードを畳む" {
             "body": [["Opaque", "<details>"]],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -47,7 +47,7 @@ test "summary は開きと同じ塊なので落ちる" {
       "roots": [
         {
           "node": [
-            "Head",
+            "HeadingNode",
             {
               "id": 2,
               "label": "r",
@@ -55,7 +55,7 @@ test "summary は開きと同じ塊なので落ちる" {
               "body": [["Opaque", "<details>\n<summary>r</summary>"]],
               "children": [
                 [
-                  "Head",
+                  "HeadingNode",
                   {
                     "id": 3,
                     "label": "a",
@@ -86,7 +86,7 @@ test "入れ子の畳み" {
       "roots": [
         {
           "node": [
-            "Head",
+            "HeadingNode",
             {
               "id": 2,
               "label": "r",
@@ -94,7 +94,7 @@ test "入れ子の畳み" {
               "body": [["Opaque", "<details>"]],
               "children": [
                 [
-                  "Head",
+                  "HeadingNode",
                   {
                     "id": 3,
                     "label": "a",
@@ -102,7 +102,7 @@ test "入れ子の畳み" {
                     "body": [["Opaque", "<details>"]],
                     "children": [
                       [
-                        "Head",
+                        "HeadingNode",
                         {
                           "id": 4,
                           "label": "x",
@@ -135,7 +135,7 @@ test "畳んだノードの中身は残る" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -162,7 +162,7 @@ test "相手の居ない閉じは逐語のまま残る" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -187,7 +187,7 @@ test "項目も畳める" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "a",
@@ -200,7 +200,7 @@ test "項目も畳める" {
       },
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 3,
             "label": "b",

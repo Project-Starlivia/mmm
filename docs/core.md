@@ -11,9 +11,9 @@ md が何を意味するか（方言の裁定）は [spec.md](spec.md) の「md 
 Doc  { frontmatter: String?, eol: Eol, body: [Block], roots: [Root] }
 Root { node: Node, sides: [Side] }          // 側を持つ唯一の型。根の子と並走
 
-Node = Head(HeadNode) | List(ListNode) | Implicit(ImplicitNode)
+Node = HeadingNode | ListNode | ImplicitNode   // 構築子は型名と同じ。タグに意味は無い
 
-HeadNode     { id, label, details, body: [Block], children: [Node] }
+HeadingNode  { id, label, details, body: [Block], children: [Node] }
 ListNode     { id, label, details, body: [Block], children: [ListNode] }
 ImplicitNode { id, children: [Node] }       // 綴りを持たない
 

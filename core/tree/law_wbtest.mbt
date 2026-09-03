@@ -11,7 +11,7 @@ test "単調性 — 項目の中の見出しは逐語のまま中身になる" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "a",
@@ -35,7 +35,7 @@ test "単調性 — 列 0 の見出しは項目を閉じる" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "a",
@@ -48,7 +48,7 @@ test "単調性 — 列 0 の見出しは項目を閉じる" {
       },
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 3,
             "label": "x",
@@ -73,7 +73,7 @@ test "順序法則 — 項目のあとの見出しは兄弟になる" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -81,7 +81,7 @@ test "順序法則 — 項目のあとの見出しは兄弟になる" {
             "body": [],
             "children": [
               [
-                "List",
+                "ListNode",
                 {
                   "id": 3,
                   "label": "b",
@@ -91,7 +91,7 @@ test "順序法則 — 項目のあとの見出しは兄弟になる" {
                 },
               ],
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 4,
                   "label": "a",
@@ -119,7 +119,7 @@ test "順序法則 — 見出しのあとの項目は子になる" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -127,7 +127,7 @@ test "順序法則 — 見出しのあとの項目は子になる" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -135,7 +135,7 @@ test "順序法則 — 見出しのあとの項目は子になる" {
                   "body": [],
                   "children": [
                     [
-                      "List",
+                      "ListNode",
                       {
                         "id": 4,
                         "label": "b",
@@ -167,7 +167,7 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -175,7 +175,7 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
             "body": [],
             "children": [
               [
-                "List",
+                "ListNode",
                 {
                   "id": 3,
                   "label": "b",
@@ -185,12 +185,12 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
                 },
               ],
               [
-                "Implicit",
+                "ImplicitNode",
                 {
                   "id": 4,
                   "children": [
                     [
-                      "Head",
+                      "HeadingNode",
                       {
                         "id": 5,
                         "label": "x",
@@ -219,7 +219,7 @@ test "単調性 — 項目の根の下にも潜らない" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "a",
@@ -232,17 +232,17 @@ test "単調性 — 項目の根の下にも潜らない" {
       },
       {
         "node": [
-          "Implicit",
+          "ImplicitNode",
           {
             "id": 3,
             "children": [
               [
-                "Implicit",
+                "ImplicitNode",
                 {
                   "id": 4,
                   "children": [
                     [
-                      "Head",
+                      "HeadingNode",
                       {
                         "id": 5,
                         "label": "x",
@@ -271,7 +271,7 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -279,7 +279,7 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
             "body": [],
             "children": [
               [
-                "List",
+                "ListNode",
                 {
                   "id": 3,
                   "label": "b",
@@ -297,12 +297,12 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
                 },
               ],
               [
-                "Implicit",
+                "ImplicitNode",
                 {
                   "id": 5,
                   "children": [
                     [
-                      "Head",
+                      "HeadingNode",
                       {
                         "id": 6,
                         "label": "x",

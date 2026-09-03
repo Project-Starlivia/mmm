@@ -29,15 +29,17 @@ pub(all) struct Root {
 
 ///|
 /// ノード 1 つ。種類はこの 3 つしかない。
+/// 構築子は型名と同じ — **タグ自体に意味は無く**、無名 union が書けないから
+/// 置いているだけなので、別の語を作らない。
 pub(all) enum Node {
-  Head(HeadNode)
-  List(ListNode)
-  Implicit(ImplicitNode)
+  HeadingNode(HeadingNode)
+  ListNode(ListNode)
+  ImplicitNode(ImplicitNode)
 } derive(Eq, Debug, ToJson)
 
 ///|
 /// 見出し（`# a`）。子は何でも来る。
-pub(all) struct HeadNode {
+pub(all) struct HeadingNode {
   id : Int
   label : String
   /// `<details>` がこのノードの定義ごと包んでいた
@@ -68,8 +70,8 @@ pub(all) struct ImplicitNode {
 ///|
 /// 骨格の記述方式。「何に変えるか」の引数型。
 pub(all) enum Sign {
-  Head
-  List
+  Heading
+  Item
 } derive(Eq, Debug, ToJson)
 
 ///|

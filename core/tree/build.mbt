@@ -100,7 +100,7 @@ fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
         b,
         level,
         Line(
-          sign=Head,
+          sign=Heading,
           label=head_label(b.md, span, style, children),
           details=false,
           body=[],
@@ -139,7 +139,7 @@ fn items_take(b : Build, items : Array[@markdown.ListItem], nest : Int) -> Unit 
         rest.push(c)
       }
     }
-    put(b, b.head + 1 + nest, Line(sign=List, label~, details=false, body=[]))
+    put(b, b.head + 1 + nest, Line(sign=Item, label~, details=false, body=[]))
     for c in rest {
       take(b, c, nest + 1)
     }
@@ -165,9 +165,9 @@ fn put(b : Build, level : Int, skel : Skeleton) -> Unit {
   // **見出しは見出しの背骨にしか積まれない。** 項目の枠は見出しの親に
   // なれないので落とす（列 0 の見出しは md でも項目を閉じる）。C17 を
   // 深さ 1 から全部の深さへ広げたもの。これが無いと項目の子が見出しになる
-  if skel is Line(sign=Head, ..) {
+  if skel is Line(sign=Heading, ..) {
     while b.stack.length() > 0 &&
-          b.stack[b.stack.length() - 1].skel is Line(sign=List, ..) {
+          b.stack[b.stack.length() - 1].skel is Line(sign=Item, ..) {
       ignore(b.stack.unsafe_pop())
     }
   }
@@ -335,11 +335,17 @@ fn to_root(f : Frame) -> Root {
 /// 枠をノードにする。項目だけは子も項目に畳む（単調性）。
 fn to_node(f : Frame) -> Node {
   match f.skel {
-    Gap => Implicit({ id: f.id, children: f.kids.map(to_node) })
-    Line(sign=List, label~, details~, body~) =>
-      List({ id: f.id, label, details, body, children: f.kids.map(to_list) })
+    Gap => ImplicitNode({ id: f.id, children: f.kids.map(to_node) })
+    Line(sign=Item, label~, details~, body~) =>
+      ListNode({ id: f.id, label, details, body, children: f.kids.map(to_list) })
     Line(label~, details~, body~, ..) =>
-      Head({ id: f.id, label, details, body, children: f.kids.map(to_node) })
+      HeadingNode({
+        id: f.id,
+        label,
+        details,
+        body,
+        children: f.kids.map(to_node),
+      })
   }
 }
 

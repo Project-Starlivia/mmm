@@ -11,7 +11,7 @@ test "区切りで側が裏返る" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -19,7 +19,7 @@ test "区切りで側が裏返る" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -29,7 +29,7 @@ test "区切りで側が裏返る" {
                 },
               ],
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 4,
                   "label": "b",
@@ -55,7 +55,7 @@ test "本数によらずトグル 1 回" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -63,7 +63,7 @@ test "本数によらずトグル 1 回" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -73,7 +73,7 @@ test "本数によらずトグル 1 回" {
                 },
               ],
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 4,
                   "label": "b",
@@ -99,7 +99,7 @@ test "先頭の区切りは左開始" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -107,7 +107,7 @@ test "先頭の区切りは左開始" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -133,7 +133,7 @@ test "何度でも裏返る" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -141,7 +141,7 @@ test "何度でも裏返る" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -151,7 +151,7 @@ test "何度でも裏返る" {
                 },
               ],
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 4,
                   "label": "b",
@@ -161,7 +161,7 @@ test "何度でも裏返る" {
                 },
               ],
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 5,
                   "label": "c",
@@ -187,7 +187,7 @@ test "C18 — 深いノードは親に飲まれず反対側の翼になる" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -195,7 +195,7 @@ test "C18 — 深いノードは親に飲まれず反対側の翼になる" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -205,12 +205,12 @@ test "C18 — 深いノードは親に飲まれず反対側の翼になる" {
                 },
               ],
               [
-                "Implicit",
+                "ImplicitNode",
                 {
                   "id": 4,
                   "children": [
                     [
-                      "Head",
+                      "HeadingNode",
                       {
                         "id": 5,
                         "label": "x",
@@ -239,7 +239,7 @@ test "行き先の翼が無い区切りは飾りに落ちる" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -247,7 +247,7 @@ test "行き先の翼が無い区切りは飾りに落ちる" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -273,7 +273,7 @@ test "木をまたぐ区切りも飾り" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -286,7 +286,7 @@ test "木をまたぐ区切りも飾り" {
       },
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 3,
             "label": "s",
@@ -309,7 +309,7 @@ test "木が変わると側は右へ戻る" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -317,7 +317,7 @@ test "木が変わると側は右へ戻る" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -333,7 +333,7 @@ test "木が変わると側は右へ戻る" {
       },
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 4,
             "label": "s",
@@ -341,7 +341,7 @@ test "木が変わると側は右へ戻る" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 5,
                   "label": "b",
@@ -369,12 +369,12 @@ test "根より前の区切りは側になれない" {
     "roots": [
       {
         "node": [
-          "Implicit",
+          "ImplicitNode",
           {
             "id": 2,
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "root",
@@ -384,7 +384,7 @@ test "根より前の区切りは側になれない" {
                 },
               ],
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 4,
                   "label": "a",
@@ -411,7 +411,7 @@ test "根より前の区切りは、後ろが # でも ## でも同じ" {
   assert_eq(two.body, one.body)
   assert_eq(two.body, [Opaque("aaa"), Rule])
   assert_eq(two.roots[0].sides[0], Right)
-  assert_eq(two.roots[0].node is Implicit(_), true)
+  assert_eq(two.roots[0].node is ImplicitNode(_), true)
 }
 
 ///|
@@ -422,7 +422,7 @@ test "項目の中の区切りは飾り" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "a",

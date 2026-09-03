@@ -12,7 +12,7 @@ test "見出し 1 つが木 1 本になる" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -35,7 +35,7 @@ test "深さ 1 が 2 つなら木も 2 本" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -48,7 +48,7 @@ test "深さ 1 が 2 つなら木も 2 本" {
       },
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 3,
             "label": "b",
@@ -71,7 +71,7 @@ test "深さ 2 は根の翼になる" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -79,7 +79,7 @@ test "深さ 2 は根の翼になる" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -89,7 +89,7 @@ test "深さ 2 は根の翼になる" {
                 },
               ],
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 4,
                   "label": "b",
@@ -115,7 +115,7 @@ test "深さ 3 は翼の下の枝" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -123,7 +123,7 @@ test "深さ 3 は翼の下の枝" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -131,7 +131,7 @@ test "深さ 3 は翼の下の枝" {
                   "body": [],
                   "children": [
                     [
-                      "Head",
+                      "HeadingNode",
                       {
                         "id": 4,
                         "label": "x",
@@ -160,7 +160,7 @@ test "浅く戻る" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -168,7 +168,7 @@ test "浅く戻る" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -176,7 +176,7 @@ test "浅く戻る" {
                   "body": [],
                   "children": [
                     [
-                      "Head",
+                      "HeadingNode",
                       {
                         "id": 4,
                         "label": "x",
@@ -189,7 +189,7 @@ test "浅く戻る" {
                 },
               ],
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 5,
                   "label": "b",
@@ -215,7 +215,7 @@ test "飛びは Implicit が埋める" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -223,12 +223,12 @@ test "飛びは Implicit が埋める" {
             "body": [],
             "children": [
               [
-                "Implicit",
+                "ImplicitNode",
                 {
                   "id": 3,
                   "children": [
                     [
-                      "Head",
+                      "HeadingNode",
                       {
                         "id": 4,
                         "label": "x",
@@ -257,12 +257,12 @@ test "深さ 1 が無ければ根が Implicit になる" {
     "roots": [
       {
         "node": [
-          "Implicit",
+          "ImplicitNode",
           {
             "id": 2,
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -288,7 +288,7 @@ test "ラベルは原文の逐語（インラインを解釈しない）" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a **b** `c`",
@@ -311,7 +311,7 @@ test "中身の無い見出しは空ラベル" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           { "id": 2, "label": "", "details": false, "body": [], "children": [] },
         ],
         "sides": [],
@@ -329,7 +329,7 @@ test "封筒" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -352,7 +352,7 @@ test "改行の流儀は保存する" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",

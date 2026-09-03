@@ -10,7 +10,7 @@ test "散文はノードの中身になる" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -33,7 +33,7 @@ test "中身は文書順に並ぶ" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -56,7 +56,7 @@ test "中身は深さで振り分けられる" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -64,7 +64,7 @@ test "中身は深さで振り分けられる" {
             "body": [["Opaque", "x"]],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "b",
@@ -90,7 +90,7 @@ test "最初の骨格より前の散文は文書のもの" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -113,7 +113,7 @@ test "画像" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -136,7 +136,7 @@ test "リンク" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -159,7 +159,7 @@ test "混ざった段落は切り分けない" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -182,7 +182,7 @@ test "フェンスのコード" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -205,7 +205,7 @@ test "インデントコードも読む（書くのはフェンス）" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -228,7 +228,7 @@ test "SVG" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -251,7 +251,7 @@ test "飾りの水平線は Rule" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -274,7 +274,7 @@ test "引用と表は逐語のまま" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "a",
@@ -297,7 +297,7 @@ test "項目にも中身が付く" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "a",

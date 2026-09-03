@@ -11,7 +11,7 @@ test "項目だけの木" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "root",
@@ -34,7 +34,7 @@ test "入れ子は深くなる" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "root",
@@ -65,7 +65,7 @@ test "兄弟は並ぶ" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "root",
@@ -103,7 +103,7 @@ test "見出しの下の項目は 1 つ深い" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -111,7 +111,7 @@ test "見出しの下の項目は 1 つ深い" {
             "body": [],
             "children": [
               [
-                "List",
+                "ListNode",
                 {
                   "id": 3,
                   "label": "a",
@@ -137,7 +137,7 @@ test "見出しは入れ子をリセットする" {
     "roots": [
       {
         "node": [
-          "Head",
+          "HeadingNode",
           {
             "id": 2,
             "label": "r",
@@ -145,7 +145,7 @@ test "見出しは入れ子をリセットする" {
             "body": [],
             "children": [
               [
-                "Head",
+                "HeadingNode",
                 {
                   "id": 3,
                   "label": "s",
@@ -153,7 +153,7 @@ test "見出しは入れ子をリセットする" {
                   "body": [],
                   "children": [
                     [
-                      "List",
+                      "ListNode",
                       {
                         "id": 4,
                         "label": "a",
@@ -190,7 +190,7 @@ test "マーカーの銘柄は構造に影響しない" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "a",
@@ -209,7 +209,7 @@ test "マーカーの銘柄は構造に影響しない" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "a",
@@ -232,7 +232,7 @@ test "順序リストも項目として読む" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "a",
@@ -245,7 +245,7 @@ test "順序リストも項目として読む" {
       },
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 3,
             "label": "b",
@@ -268,7 +268,7 @@ test "ラベルは原文の逐語" {
     "roots": [
       {
         "node": [
-          "List",
+          "ListNode",
           {
             "id": 2,
             "label": "a **b**",
