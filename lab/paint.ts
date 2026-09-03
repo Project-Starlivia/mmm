@@ -29,17 +29,22 @@ export function paintAst(s: string): DocumentFragment {
   return paint(parts);
 }
 
-/** 値 1 つを描く。配列と構造体は `<details>` で畳めるようにする。 */
-function paintValue(v: unknown, key?: string): DocumentFragment {
+/** 行末。テキストノードなのでコピーにそのまま入る。 */
+const NL = "\n";
+
+/** 値 1 つを描く。配列と構造体は `<details>` で畳める。
+ *
+ * インデントは**実際の空白文字**で持つ。CSS の余白で寄せるとコピーしたときに
+ * 平らになって階層が読めなくなる（三角は擬似要素なのでコピーに入らない）。 */
+function paintValue(v: unknown, depth: number, key?: string): DocumentFragment {
   const f = document.createDocumentFragment();
-  const head = document.createDocumentFragment();
-  if (key !== undefined) {
-    head.append(span("key", JSON.stringify(key)), ": ");
-  }
+  const lead = document.createDocumentFragment();
+  lead.append("  ".repeat(depth));
+  if (key !== undefined) lead.append(span("key", JSON.stringify(key)), ": ");
 
   if (v === null || typeof v !== "object") {
-    head.append(span(typeof v === "string" ? "label" : typeof v === "number" ? "num" : "lit", JSON.stringify(v)));
-    f.append(head);
+    lead.append(span(kindOf(v), JSON.stringify(v)));
+    f.append(lead, NL);
     return f;
   }
 
@@ -50,27 +55,23 @@ function paintValue(v: unknown, key?: string): DocumentFragment {
 
   // 空はそのまま出す。畳む中身が無いので `<details>` にすると邪魔なだけ
   if (entries.length === 0) {
-    head.append(span("dim", list ? "[]" : "{}"));
-    f.append(head);
+    lead.append(span("dim", list ? "[]" : "{}"));
+    f.append(lead, NL);
     return f;
   }
 
   const d = document.createElement("details");
   d.open = true;
   const sum = document.createElement("summary");
-  sum.append(head, span("dim", list ? `[${entries.length}]` : `{${entries.length}}`));
+  sum.append(span("tri", ""), lead, span("dim", list ? `[${entries.length}]` : `{${entries.length}}`));
   d.append(sum);
-
-  const body = document.createElement("div");
-  body.className = "kids";
-  for (const [k, x] of entries) {
-    const row = document.createElement("div");
-    row.append(paintValue(x, k));
-    body.append(row);
-  }
-  d.append(body);
+  for (const [k, x] of entries) d.append(paintValue(x, depth + 1, k));
   f.append(d);
   return f;
+}
+
+function kindOf(v: unknown): string {
+  return typeof v === "string" ? "label" : typeof v === "number" ? "num" : "lit";
 }
 
 function span(kind: string, text: string): HTMLSpanElement {
@@ -83,7 +84,7 @@ function span(kind: string, text: string): HTMLSpanElement {
 /** JSON。配列と構造体ごとに畳める形で描く。 */
 export function paintTree(s: string): DocumentFragment {
   try {
-    return paintValue(JSON.parse(s));
+    return paintValue(JSON.parse(s), 0);
   } catch {
     return paint([["", s]]);
   }

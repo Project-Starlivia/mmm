@@ -193,23 +193,23 @@ pre.grow {
   color: var(--bad, #f87171);
 }
 
-/* 木は入れ子ごとに畳める。三角は summary の既定を使う（自前で描かない） */
+/* 木は入れ子ごとに畳める。インデントは空白文字が持つので、余白では寄せない */
 #json details {
-  --step: 1.1rem;
+  display: contents;
 }
 #json summary {
   cursor: default;
-  list-style-position: outside;
-  margin-left: var(--step);
+  list-style: none;
 }
-#json summary::marker {
+#json summary::-webkit-details-marker {
+  display: none;
+}
+/* 三角は擬似要素。**コピーに入らない**ので、貼り付けた先が汚れない */
+#json .tri::before {
   color: var(--dim);
+  content: "▾ ";
 }
-#json .kids {
-  margin-left: var(--step);
-  border-left: 1px solid color-mix(in oklab, var(--dim) 30%, transparent);
-  padding-left: calc(var(--step) * 0.5);
+#json details:not([open]) > summary .tri::before {
+  content: "▸ ";
 }
-#json > details > summary {
-  margin-left: 0;
-}
+
