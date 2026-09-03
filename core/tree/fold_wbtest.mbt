@@ -370,3 +370,43 @@ test "項目も定義ごと包める" {
     ],
   })
 }
+
+///|
+/// 空行を挟まないと md は開きの塊に次の行を飲み込む。飲み込まれた行を
+/// 捨てないよう、開きが `<details>` だけでなければ覆っていないものとして扱う。
+/// **意味を 1 ビットも失わない**の帰結。
+test "開きに飲み込まれた行があれば中身" {
+  json_inspect(parse("# r\n\n<details>\n### x\n\n## y\n</details>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [
+              [
+                "Details",
+                { "id": 3, "text": "<details>\n### x\n\n## y\n</details>" },
+              ],
+            ],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}
+
+///|
+/// 同じ md でも空行 1 つで切れ方が変わる。どちらも中身に落ちるが、
+/// 逐語の中身が違う。**md 自身の規則**なので mmm は従うだけ。
+test "空行の有無で逐語が変わる" {
+  let with_blank = parse("# r\n\n<details>\n\n### x\n\n## y\n</details>\n")
+  let without = parse("# r\n\n<details>\n### x\n\n## y\n</details>\n")
+  assert_not_eq(with_blank, without)
+}

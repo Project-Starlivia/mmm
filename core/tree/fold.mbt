@@ -22,6 +22,23 @@ fn opens(html : String) -> Bool {
 }
 
 ///|
+/// 開きの塊が `<details>` の行と `<summary>` の行だけか。
+/// 空行を挟まないと md は次の行まで飲み込むので、飲み込まれた行があれば偽。
+fn bare(html : String) -> Bool {
+  for line in html.split("\n") {
+    let t = line.trim().to_owned()
+    if t == "" || (t.has_prefix("<details") && t.has_suffix(">")) {
+      continue
+    }
+    if t.has_prefix("<summary") && t.has_suffix("</summary>") {
+      continue
+    }
+    return false
+  }
+  true
+}
+
+///|
 /// 閉じだけの塊。
 fn closes(html : String) -> Bool {
   let t = html.trim()
@@ -105,6 +122,10 @@ fn next(blocks : Array[@markdown.Block], i : Int) -> Int {
 /// ③ その部分木でぴったり終わる（中に同じか浅い見出しが無く、
 ///    閉じの直後が部分木の外）
 fn covers(blocks : Array[@markdown.Block], i : Int, j : Int) -> Bool {
+  // 開きの塊が `<details>` と `<summary>` の行だけでなければ、空行を挟まずに
+  // 書かれた行が飲み込まれている。それを捨てないよう、覆っていないものとして扱う
+  guard blocks[i] is HtmlBlock(html~, ..) else { return false }
+  guard bare(html) else { return false }
   let head = next(blocks, i)
   guard head < j else { return false }
   let level = match blocks[head] {
