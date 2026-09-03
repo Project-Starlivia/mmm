@@ -15,8 +15,10 @@ priv enum Piece {
   Raw(@markdown.Block)
   /// 畳まれたノードの見出し・項目の行。中身は普通に読む
   Folded(@markdown.Block, open~ : Bool)
-  /// 綴りとして読めなかった領域。逐語のまま中身になる
+  /// 綴りとして読めなかった領域。原文のまま中身になる
   Capsule(String)
+  /// mdAst がブロックとして返さないもの（リンクの定義行）。原文のまま中身になる
+  Text(String)
 }
 
 ///|
@@ -382,6 +384,7 @@ fn covers(
 fn pieces(
   md : String,
   blocks : Array[@markdown.Block],
+  defs : Array[@markdown.Span],
   nest : Int,
 ) -> Array[Piece] {
   let n = blocks.length()
@@ -467,8 +470,20 @@ fn pieces(
     }
   }
   let out = []
+  // リンクの定義行は mdAst がブロックとして返さない（`Document.definitions`
+  // に分けて持つ）。**書いてあった位置に戻す** — 文書のどこに書いてもよい
+  // 記法なので、まとめて 1 か所へ動かすと触っていない場所が動く
+  let mut d = 0
+  fn flush(before : Int) -> Unit {
+    while d < defs.length() && defs[d].from < before {
+      out.push(Text(carve(md, defs[d].from, defs[d].to)))
+      d = d + 1
+    }
+  }
+
   let mut i = 0
   while i < n {
+    flush(block_span(blocks[i]).from)
     if last[i] >= 0 {
       // 綴りとして読めなかった領域。丸ごと逐語で持つ
       out.push(Capsule(carve(md, from[i], upto[i])))
@@ -486,6 +501,7 @@ fn pieces(
       i = i + 1
     }
   }
+  flush(md.length() + 1)
   out
 }
 

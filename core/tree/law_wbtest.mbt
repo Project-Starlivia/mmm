@@ -349,11 +349,11 @@ fn written(doc : Doc) -> String {
   fn blocks(bs : Array[Block]) -> Unit {
     for b in bs {
       match b {
-        Image(alt~, src~) => {
+        Image(alt~, src~, ..) => {
           bag.push(alt)
           bag.push(src)
         }
-        Link(text~, href~) => {
+        Link(text~, href~, ..) => {
           bag.push(text)
           bag.push(href)
         }

@@ -124,7 +124,7 @@ test "画像" {
             "label": "a",
             "details": false,
             "open": false,
-            "body": [["Image", { "alt": "alt", "src": "x.png" }]],
+            "body": [["Image", { "alt": "alt", "src": "x.png", "title": "" }]],
             "children": [],
           },
         ],
@@ -148,7 +148,9 @@ test "リンク" {
             "label": "a",
             "details": false,
             "open": false,
-            "body": [["Link", { "text": "text", "href": "https://e.com" }]],
+            "body": [
+              ["Link", { "text": "text", "href": "https://e.com", "title": "" }],
+            ],
             "children": [],
           },
         ],
@@ -456,4 +458,134 @@ test "CRLF は逐語の中でも保たれる" {
       ],
     },
   )
+}
+
+///|
+/// **リンクの定義行は書いてあった位置に戻す。** mdAst はこれをブロックとして
+/// 返さず `Document.definitions` に分けて持つので、読まないと行ごと消える。
+/// 文書のどこに書いてもよい記法なので、まとめて 1 か所へ動かすと
+/// 触っていない場所が動く。
+test "リンクの定義行は位置ごと残る" {
+  json_inspect(parse("# r\n\n[a]: b \"c\"\n\n## h\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "open": false,
+            "body": [["Opaque", "[a]: b \"c\""]],
+            "children": [
+              [
+                "HeadingNode",
+                {
+                  "id": 3,
+                  "label": "h",
+                  "details": false,
+                  "open": false,
+                  "body": [],
+                  "children": [],
+                },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+test "定義行が文末にあっても残る" {
+  json_inspect(parse("# r\n\n## h\n\n[a]: b\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "open": false,
+            "body": [],
+            "children": [
+              [
+                "HeadingNode",
+                {
+                  "id": 3,
+                  "label": "h",
+                  "details": false,
+                  "open": false,
+                  "body": [["Opaque", "[a]: b"]],
+                  "children": [],
+                },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// タイトルは中身なので落とさない。木の形と renderer の props は別でよい。
+test "画像とリンクのタイトルは残る" {
+  json_inspect(parse("# r\n\n![a](b.png \"t1\")\n\n[c](d \"t2\")\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "open": false,
+            "body": [
+              ["Image", { "alt": "a", "src": "b.png", "title": "t1" }],
+              ["Link", { "text": "c", "href": "d", "title": "t2" }],
+            ],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}
+
+///|
+/// `$$` と `:::` の span は閉じの行を含まないので、原文のまま持つと閉じが落ちる。
+/// フェンスのコードは `Block::Code` として綴りごと持つので、こちらは要らない。
+test "数式とディレクティブの閉じは残る" {
+  json_inspect(parse("# r\n\n$$\nx\n$$\n\n:::note\ny\n:::\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "open": false,
+            "body": [["Opaque", "$$\nx\n$$"], ["Opaque", ":::note\ny\n:::"]],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
 }

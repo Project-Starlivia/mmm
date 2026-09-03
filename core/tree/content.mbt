@@ -53,9 +53,9 @@ fn sole(
 ) -> Block? {
   guard children.length() == 1 else { return None }
   match children[0] {
-    Image(alt~, url~, ..) => Some(Image(alt~, src=url))
-    Link(children~, url~, ..) =>
-      Some(Link(text=inline_text(md, span.from, children), href=url))
+    Image(alt~, url~, title~, ..) => Some(Image(alt~, src=url, title~))
+    Link(children~, url~, title~, ..) =>
+      Some(Link(text=inline_text(md, span.from, children), href=url, title~))
     _ => None
   }
 }
@@ -80,7 +80,37 @@ fn inline_text(
 /// ブロックが原文で占めている綴りそのもの。
 fn verbatim(md : String, block : @markdown.Block) -> String {
   let s = block_span(block)
-  carve(md, s.from, s.to)
+  carve(md, s.from, closing(md, block, s.to))
+}
+
+///|
+/// 閉じのフェンスまで含めた終わり。`$$` と `:::` の span は閉じの行を含まない
+/// ので、原文のまま持つと閉じが落ちる（フェンスのコードは `Block::Code` として
+/// 綴りごと持つので、こちらは要らない）。
+fn closing(md : String, block : @markdown.Block, to : Int) -> Int {
+  let fence : UInt16 = match block {
+    MathBlock(..) => '$'
+    Directive(..) => ':'
+    _ => return to
+  }
+  // 次の行が閉じのフェンスだけなら、その行の終わりまで
+  let mut i = to
+  while i < md.length() && (md[i] == '\n' || md[i] == '\r' || md[i] == ' ') {
+    i = i + 1
+  }
+  let from = i
+  while i < md.length() && md[i] == fence {
+    i = i + 1
+  }
+  guard i - from >= 2 else { return to }
+  while i < md.length() && (md[i] == ' ' || md[i] == '\t') {
+    i = i + 1
+  }
+  if i >= md.length() || md[i] == '\n' || md[i] == '\r' {
+    i
+  } else {
+    to
+  }
 }
 
 ///|

@@ -95,8 +95,8 @@ pub(all) enum Eol {
 /// 「解釈できた / できなかった」は Opaque という名前が担う。
 /// カードかどうかは描画側の分類で、core は意味だけを持つ。
 pub(all) enum Block {
-  Image(alt~ : String, src~ : String)
-  Link(text~ : String, href~ : String)
+  Image(alt~ : String, src~ : String, title~ : String)
+  Link(text~ : String, href~ : String, title~ : String)
   Code(info~ : String, text~ : String)
   Svg(String)
   /// 水平線。md の要素名そのまま

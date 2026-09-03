@@ -53,7 +53,7 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
     low: deep,
     dry: false,
   }
-  for piece in pieces(md, ast.children, 0) {
+  for piece in pieces(md, ast.children, ast.definitions.map(d => d.span), 0) {
     lay(b, piece, 0)
   }
   // 行き先の見出し・項目が来ないまま終わった水平線は、その場の中身に落ちる
@@ -154,6 +154,10 @@ fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
       // id は割り付けの直前に文書順で振るので、ここでは 0 を置く
       fill(b, Details(id=0, text~))
     }
+    Text(text) => {
+      spill(b)
+      fill(b, Opaque(text))
+    }
   }
 }
 
@@ -233,7 +237,7 @@ fn items_take(
     let inner = if b.dry {
       rest.map(c => Raw(c))
     } else {
-      pieces(b.md, rest, nest + 1)
+      pieces(b.md, rest, [], nest + 1)
     }
     for c in inner {
       lay(b, c, nest + 1)
