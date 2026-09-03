@@ -466,3 +466,53 @@ test "入れ子の畳みも畳み" {
     },
   )
 }
+
+///|
+/// 空行を挟まないと md は閉じを重ねて 1 つの塊にする。それを畳みの閉じに使うと
+/// **もう片方の `</details>` が消える**ので、閉じの塊も記法だけで出来ていること
+/// を求める。**意味を 1 ビットも失わない**の帰結。
+test "閉じが重なった塊は畳みの閉じにしない" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n</details>\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "body": [["Opaque", "<details>\n<summary>x</summary>"]],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "x",
+                    "details": false,
+                    "body": [
+                      [
+                        "Details",
+                        {
+                          "id": 4,
+                          "text": "<details>\n<summary>y</summary>\n\n### y\n</details>\n</details>",
+                        },
+                      ],
+                    ],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}

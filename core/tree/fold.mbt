@@ -40,6 +40,23 @@ fn bare(html : String) -> Bool {
 }
 
 ///|
+/// 閉じの塊が `</details>` の行 1 つだけか。
+/// 空行を挟まないと md は閉じを重ねて 1 つの塊にするので、そのまま畳みの閉じに
+/// 使うと**もう片方の `</details>` を落としてしまう**。
+fn lone(html : String) -> Bool {
+  let mut seen = 0
+  for line in html.split("\n") {
+    let t = line.trim().to_owned()
+    if t == "" {
+      continue
+    }
+    guard t == "</details>" else { return false }
+    seen = seen + 1
+  }
+  seen == 1
+}
+
+///|
 /// 閉じだけの塊。
 fn closes(html : String) -> Bool {
   let t = html.trim()
@@ -122,16 +139,17 @@ fn next(blocks : Array[@markdown.Block], i : Int) -> Int {
 }
 
 ///|
-/// 領域 [i, j] が、ちょうど 1 つのノードの部分木を包んでいるか。
-///
-/// ① 開きの直後が見出し・項目の行
-/// ③ その部分木でぴったり終わる（中に同じか浅い見出しが無く、
-///    閉じの直後が部分木の外）
+/// 領域 [i, j] が、1 つのノードの body・children とその body を過不足なく
+/// 覆っているか。開き・閉じの塊が記法だけで出来ていること、開きの直後が
+/// 見出し・項目の行であること、その部分木でぴったり終わることを見る。
 fn covers(blocks : Array[@markdown.Block], i : Int, j : Int) -> Bool {
   // 開きの塊が `<details>` と `<summary>` の行だけでなければ、空行を挟まずに
   // 書かれた行が飲み込まれている。それを捨てないよう、覆っていないものとして扱う
   guard blocks[i] is HtmlBlock(html~, ..) else { return false }
   guard bare(html) else { return false }
+  // 閉じも同じ — 記法だけで出来ていない塊は畳みの綴りとして使えない
+  guard blocks[j] is HtmlBlock(html=close, ..) else { return false }
+  guard lone(close) else { return false }
   let head = next(blocks, i)
   guard head < j else { return false }
   let level = match blocks[head] {
