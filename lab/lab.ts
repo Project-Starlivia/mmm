@@ -9,7 +9,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { oneDark } from "@codemirror/theme-one-dark";
 import * as mbt from "../core/_build/js/release/build/tree/js/js.js";
-import { paintAst, paintJson } from "./paint.ts";
+import { paintAst, paintTree } from "./paint.ts";
 
 /** 見て回りたくなる形を、最初から手元に置いておく。 */
 const SAMPLES: [string, string][] = [
@@ -45,17 +45,8 @@ function show(text: string): void {
   const flaws = mbt.mmmCheck(text);
   out.check.textContent = flaws === "[]" ? "健全" : flaws;
   out.check.classList.toggle("flawed", flaws !== "[]");
-  out.json.replaceChildren(paintJson(pretty(mbt.mmmTreeJson(text))));
+  out.json.replaceChildren(paintTree(mbt.mmmTreeJson(text)));
   localStorage.setItem("mmm-lab", text);
-}
-
-/** JSON を畳まずに読めるだけの整形。 */
-function pretty(s: string): string {
-  try {
-    return JSON.stringify(JSON.parse(s), null, 2);
-  } catch {
-    return s;
-  }
 }
 
 const editor = new EditorView({

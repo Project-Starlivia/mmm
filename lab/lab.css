@@ -192,3 +192,24 @@ pre.grow {
 #check.flawed {
   color: var(--bad, #f87171);
 }
+
+/* 木は入れ子ごとに畳める。三角は summary の既定を使う（自前で描かない） */
+#json details {
+  --step: 1.1rem;
+}
+#json summary {
+  cursor: default;
+  list-style-position: outside;
+  margin-left: var(--step);
+}
+#json summary::marker {
+  color: var(--dim);
+}
+#json .kids {
+  margin-left: var(--step);
+  border-left: 1px solid color-mix(in oklab, var(--dim) 30%, transparent);
+  padding-left: calc(var(--step) * 0.5);
+}
+#json > details > summary {
+  margin-left: 0;
+}

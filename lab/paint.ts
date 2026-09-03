@@ -29,24 +29,62 @@ export function paintAst(s: string): DocumentFragment {
   return paint(parts);
 }
 
-/** JSON。鍵・文字列・数・真偽を分ける。 */
-export function paintJson(s: string): DocumentFragment {
-  const parts: [string, string][] = [];
-  const re = /("(?:\\.|[^"\\])*")(\s*:)?|(\btrue\b|\bfalse\b|\bnull\b)|(-?\d+)/g;
-  let last = 0;
-  for (const m of s.matchAll(re)) {
-    const at = m.index ?? 0;
-    if (at > last) parts.push(["", s.slice(last, at)]);
-    if (m[1] !== undefined) {
-      parts.push([m[2] ? "key" : "label", m[1]]);
-      if (m[2]) parts.push(["", m[2]]);
-    } else if (m[3] !== undefined) {
-      parts.push(["lit", m[3]]);
-    } else {
-      parts.push(["num", m[4]]);
-    }
-    last = at + m[0].length;
+/** 値 1 つを描く。配列と構造体は `<details>` で畳めるようにする。 */
+function paintValue(v: unknown, key?: string): DocumentFragment {
+  const f = document.createDocumentFragment();
+  const head = document.createDocumentFragment();
+  if (key !== undefined) {
+    head.append(span("key", JSON.stringify(key)), ": ");
   }
-  parts.push(["", s.slice(last)]);
-  return paint(parts);
+
+  if (v === null || typeof v !== "object") {
+    head.append(span(typeof v === "string" ? "label" : typeof v === "number" ? "num" : "lit", JSON.stringify(v)));
+    f.append(head);
+    return f;
+  }
+
+  const list = Array.isArray(v);
+  const entries: [string | undefined, unknown][] = list
+    ? (v as unknown[]).map((x) => [undefined, x])
+    : Object.entries(v as Record<string, unknown>);
+
+  // 空はそのまま出す。畳む中身が無いので `<details>` にすると邪魔なだけ
+  if (entries.length === 0) {
+    head.append(span("dim", list ? "[]" : "{}"));
+    f.append(head);
+    return f;
+  }
+
+  const d = document.createElement("details");
+  d.open = true;
+  const sum = document.createElement("summary");
+  sum.append(head, span("dim", list ? `[${entries.length}]` : `{${entries.length}}`));
+  d.append(sum);
+
+  const body = document.createElement("div");
+  body.className = "kids";
+  for (const [k, x] of entries) {
+    const row = document.createElement("div");
+    row.append(paintValue(x, k));
+    body.append(row);
+  }
+  d.append(body);
+  f.append(d);
+  return f;
+}
+
+function span(kind: string, text: string): HTMLSpanElement {
+  const s = document.createElement("span");
+  s.className = kind;
+  s.textContent = text;
+  return s;
+}
+
+/** JSON。配列と構造体ごとに畳める形で描く。 */
+export function paintTree(s: string): DocumentFragment {
+  try {
+    return paintValue(JSON.parse(s));
+  } catch {
+    return paint([["", s]]);
+  }
 }
