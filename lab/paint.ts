@@ -63,7 +63,19 @@ function paintValue(v: unknown, depth: number, key?: string): DocumentFragment {
   const d = document.createElement("details");
   d.open = true;
   const sum = document.createElement("summary");
-  sum.append(span("tri", ""), lead, span("dim", list ? `[${entries.length}]` : `{${entries.length}}`));
+  // 行末は summary の中に入れる。ブロック要素の境目は**コピーで改行にならない**
+  sum.append(
+    span("tri", ""),
+    lead,
+    span("dim", list ? `[${entries.length}]` : `{${entries.length}}`),
+    NL,
+  );
+  // 開閉できるのは三角の上だけ。行のどこを押しても畳むと、選ぼうとして畳んでしまう
+  sum.addEventListener("click", (e) => {
+    if (!(e.target instanceof Element) || !e.target.classList.contains("tri")) {
+      e.preventDefault();
+    }
+  });
   d.append(sum);
   for (const [k, x] of entries) d.append(paintValue(x, depth + 1, k));
   f.append(d);

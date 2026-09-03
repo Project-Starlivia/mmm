@@ -204,7 +204,13 @@ pre.grow {
 #json summary::-webkit-details-marker {
   display: none;
 }
-/* 三角は擬似要素。**コピーに入らない**ので、貼り付けた先が汚れない */
+/* 三角は擬似要素。**コピーに入らない**ので、貼り付けた先が汚れない。
+   開閉できるのは三角の上だけ — 行のどこを押しても畳むと、選ぼうとして
+   畳んでしまう */
+#json .tri {
+  cursor: pointer;
+  pointer-events: auto;
+}
 #json .tri::before {
   color: var(--dim);
   content: "▾ ";
