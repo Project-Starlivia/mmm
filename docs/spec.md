@@ -23,6 +23,7 @@ core/   MoonBit — 文書モデル。**いま作り直している最中**で�
                 md_wbtest.mbt がライブラリの読みを指紋で固定し、
                 build_wbtest.mbt 以降が「この md はこう読まれる」、
                 unbuild_wbtest.mbt が「この木はこう書かれる」を固定する
+  view/         map が見る木。project が Doc から削るだけで作る
 src/    TypeScript — UI。**core が揃うまで触らない。** 繋ぎ先(旧 coreApi.ts)は
         消してあるので、いまはコンパイルできない
   editor.ts    Markdown 側(CodeMirror 6、履歴はコアに委譲。フェンスの
