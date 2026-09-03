@@ -14,7 +14,7 @@
 priv enum Piece {
   Raw(@markdown.Block)
   /// 畳まれたノードの見出し・項目の行。中身は普通に読む
-  Folded(@markdown.Block, open~ : Bool)
+  Folded(@markdown.Block, fold~ : Fold)
   /// 綴りとして読めなかった領域。原文のまま中身になる
   Capsule(String)
   /// mdAst がブロックとして返さないもの（リンクの定義行）。原文のまま中身になる
@@ -319,18 +319,16 @@ fn beyond(blocks : Array[@markdown.Block], gone : Array[Bool], i : Int) -> Int {
 }
 
 ///|
-/// 包まれた行のラベル。見出しと項目でラベルの切り出し方が違う。
-fn label_of(md : String, b : @markdown.Block) -> String {
-  match b {
-    Heading(style~, children~, span~, ..) =>
-      head_label(md, span, style, children)
-    BulletList(items~, ..) | OrderedList(items~, ..) =>
-      match items[0].children.iter().find_first(c => c is Paragraph(..)) {
-        Some(p) => item_label(md, p)
-        None => ""
-      }
-    _ => ""
+/// 開きの塊が言っている畳み。**塊が綴りだけで出来ていることは `folds` が確かめる**
+/// ので、ここは読むだけ。
+fn fold_of(s : Spell) -> Fold {
+  let open = s.tags[0].mark is Open(open=true)
+  let summary = if s.tags.length() > 1 && s.tags[1].mark is Name(text) {
+    Some(text)
+  } else {
+    None
   }
+  { open, summary }
 }
 
 ///|
@@ -341,7 +339,7 @@ fn label_of(md : String, b : @markdown.Block) -> String {
 /// `#` の数で測ると「領域の外に出た子」を覆っているつもりになる。
 fn covers(
   blocks : Array[@markdown.Block],
-  low : Array[Int],
+  depth : Array[Depth],
   gone : Array[Bool],
   head : Int,
   last : Int,
@@ -353,12 +351,14 @@ fn covers(
     _ => true
   }
   guard alone else { return false }
-  let level = low[head]
+  // 比べる基準は**そのノード自身の深さ**。飛びを埋めた Implicit の深さで比べると、
+  // 兄弟（同じ足場の下に並ぶノード）まで部分木の中に見えてしまう
+  let level = depth[head].own
   guard level < deep else { return false }
   // 中に同じか浅い枠が生まれていたら、その部分木より広い
   let mut k = head + 1
   while k <= last {
-    guard low[k] > level else { return false }
+    guard depth[k].top > level else { return false }
     k = k + 1
   }
   // 後ろが部分木の中なら狭い
@@ -368,9 +368,9 @@ fn covers(
   // そうでなければ飾り＝このノードの中身なので、領域が狭いということ
   if blocks[z] is ThematicBreak(..) {
     let w = beyond(blocks, gone, z)
-    return w < blocks.length() && low[w] <= level
+    return w < blocks.length() && depth[w].top <= level
   }
-  low[z] <= level
+  depth[z].top <= level
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -389,7 +389,7 @@ fn pieces(
 ) -> Array[Piece] {
   let n = blocks.length()
   let spells = blocks.map(b => read_spell(md, b))
-  let low = depths(md, blocks, spells, nest)
+  let depth = depths(md, blocks, spells, nest)
   let spots = []
   for i in 0..<n {
     for t in spells[i].tags {
@@ -406,16 +406,20 @@ fn pieces(
   let ok = ps.map(_ => false)
   for _ in 0..<=ps.length() {
     for k, p in ps {
-      ok[k] = folds(md, blocks, spells, low, gone, spots, p.0, p.1)
+      ok[k] = folds(blocks, spells, depth, gone, spots, p.0, p.1)
     }
     // 塊が落ちるのは、**その塊の綴りが全部立った畳みのもの**のときだけ。
     // 立っていない綴りが混じっていたら落とせない（その文字が消える）
     let claimed = Array::make(spots.length(), false)
     for k, p in ps {
       if ok[k] {
-        // 開きの塊は「開き + 名前」なので、名前も一緒に落ちる
-        claimed[p.0] = true
-        claimed[p.0 + 1] = true
+        // 開きの塊は綴りだけで出来ている（folds が確かめた）ので、
+        // その塊のタグは名前ごと全部落ちる
+        for j, s in spots {
+          if s.block == spots[p.0].block {
+            claimed[j] = true
+          }
+        }
         claimed[p.1] = true
       }
     }
@@ -446,8 +450,8 @@ fn pieces(
     }
   }
 
-  // 畳まれる骨格の行 → open か（-1 は畳みでない）
-  let mark = Array::make(n, -1)
+  // 畳まれる骨格の行 → その畳み（None は畳みでない）
+  let mark : Array[Fold?] = Array::make(n, None)
   // 原文のまま持つ領域 → 終わりの塊・原文の範囲
   let last = Array::make(n, -1)
   let from = Array::make(n, 0)
@@ -455,11 +459,7 @@ fn pieces(
   for k, p in ps {
     let ob = spots[p.0].block
     if ok[k] {
-      mark[next(blocks, ob)] = if spots[p.0].tag.mark is Open(open=true) {
-        1
-      } else {
-        0
-      }
+      mark[next(blocks, ob)] = Some(fold_of(spells[ob]))
     } else if spots[p.1].block > last[ob] {
       // 同じ塊から複数の対が始まるときは、一番外を採る。
       // 切るのは**塊まるごと** — タグからタグまでにすると、同じ塊に居た
@@ -492,10 +492,9 @@ fn pieces(
       i = i + 1
     } else {
       out.push(
-        if mark[i] >= 0 {
-          Folded(blocks[i], open=mark[i] == 1)
-        } else {
-          Raw(blocks[i])
+        match mark[i] {
+          Some(fold) => Folded(blocks[i], fold~)
+          None => Raw(blocks[i])
         },
       )
       i = i + 1
@@ -509,10 +508,9 @@ fn pieces(
 /// 対 (o, c) が畳みとして立つか。**mmm がこのノードを畳んだら書く形**と
 /// 一致するかを見るだけ。
 fn folds(
-  md : String,
   blocks : Array[@markdown.Block],
   spells : Array[Spell],
-  low : Array[Int],
+  depth : Array[Depth],
   gone : Array[Bool],
   spots : Array[Spot],
   o : Int,
@@ -521,19 +519,25 @@ fn folds(
   guard spots[o].tag.writes && spots[c].tag.writes else { return false }
   let ob = spots[o].block
   let cb = spots[c].block
-  // 開きの塊は「開き + 名前」だけ。他の文字が混じっていたら塊ごと落とせない
+  // 開きの塊は「開き」か「開き + 名前」だけ。他の文字が混じっていたら
+  // 塊ごと落とせないので畳みにできない
   let os = spells[ob]
-  guard !os.plain && os.tags.length() == 2 else { return false }
-  guard os.tags[1].mark is Name(name) && os.tags[1].writes else { return false }
+  guard !os.plain && os.tags[0].mark is Open(..) else { return false }
+  if os.tags.length() == 2 {
+    guard os.tags[1].mark is Name(_) && os.tags[1].writes else { return false }
+  } else {
+    guard os.tags.length() == 1 else { return false }
+  }
   // 閉じの塊は閉じだけ（重なっていてもよい。落ちるのは塊ごと）
   let cs = spells[cb]
   guard !cs.plain else { return false }
   for t in cs.tags {
     guard t.mark is Close else { return false }
   }
-  // 開きの次が骨格の行で、名前がそのラベルと一致する
+  // 開きの次が骨格の行で、領域がその部分木を過不足なく覆っている。
+  // **名前は持ち主を決めていない** — 決めているのは範囲のほうなので、
+  // `<summary>` がラベルと一致するかは問わず、書かれたまま持つ
   let head = next(blocks, ob)
   guard head < cb else { return false }
-  guard name == label_of(md, blocks[head]) else { return false }
-  covers(blocks, low, gone, head, cb - 1)
+  covers(blocks, depth, gone, head, cb - 1)
 }

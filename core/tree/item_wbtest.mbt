@@ -12,14 +12,7 @@ test "項目だけの木" {
       {
         "node": [
           "ListNode",
-          {
-            "id": 2,
-            "label": "root",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "root", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -39,19 +32,8 @@ test "入れ子は深くなる" {
           {
             "id": 2,
             "label": "root",
-            "details": false,
-            "open": false,
             "body": [],
-            "children": [
-              {
-                "id": 3,
-                "label": "a",
-                "details": false,
-                "open": false,
-                "body": [],
-                "children": [],
-              },
-            ],
+            "children": [{ "id": 3, "label": "a", "body": [], "children": [] }],
           },
         ],
         "sides": ["Right"],
@@ -72,26 +54,10 @@ test "兄弟は並ぶ" {
           {
             "id": 2,
             "label": "root",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
-              {
-                "id": 3,
-                "label": "a",
-                "details": false,
-                "open": false,
-                "body": [],
-                "children": [],
-              },
-              {
-                "id": 4,
-                "label": "b",
-                "details": false,
-                "open": false,
-                "body": [],
-                "children": [],
-              },
+              { "id": 3, "label": "a", "body": [], "children": [] },
+              { "id": 4, "label": "b", "body": [], "children": [] },
             ],
           },
         ],
@@ -113,20 +79,11 @@ test "見出しの下の項目は 1 つ深い" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
               [
                 "ListNode",
-                {
-                  "id": 3,
-                  "label": "a",
-                  "details": false,
-                  "open": false,
-                  "body": [],
-                  "children": [],
-                },
+                { "id": 3, "label": "a", "body": [], "children": [] },
               ],
             ],
           },
@@ -149,8 +106,6 @@ test "見出しは入れ子をリセットする" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
               [
@@ -158,8 +113,6 @@ test "見出しは入れ子をリセットする" {
                 {
                   "id": 3,
                   "label": "s",
-                  "details": false,
-                  "open": false,
                   "body": [],
                   "children": [
                     [
@@ -167,18 +120,9 @@ test "見出しは入れ子をリセットする" {
                       {
                         "id": 4,
                         "label": "a",
-                        "details": false,
-                        "open": false,
                         "body": [],
                         "children": [
-                          {
-                            "id": 5,
-                            "label": "b",
-                            "details": false,
-                            "open": false,
-                            "body": [],
-                            "children": [],
-                          },
+                          { "id": 5, "label": "b", "body": [], "children": [] },
                         ],
                       },
                     ],
@@ -203,14 +147,7 @@ test "マーカーの銘柄は構造に影響しない" {
       {
         "node": [
           "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "a", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -223,14 +160,7 @@ test "マーカーの銘柄は構造に影響しない" {
       {
         "node": [
           "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "a", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -247,28 +177,14 @@ test "順序リストも項目として読む" {
       {
         "node": [
           "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "a", "body": [], "children": [] },
         ],
         "sides": [],
       },
       {
         "node": [
           "ListNode",
-          {
-            "id": 3,
-            "label": "b",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 3, "label": "b", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -285,14 +201,7 @@ test "ラベルは原文のまま" {
       {
         "node": [
           "ListNode",
-          {
-            "id": 2,
-            "label": "a **b**",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "a **b**", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -314,8 +223,6 @@ test "1 行目が段落でなければラベルは無い" {
           {
             "id": 2,
             "label": "",
-            "details": false,
-            "open": false,
             "body": [
               ["Code", { "info": "", "text": "code\n" }],
               ["Opaque", "x"],
@@ -343,8 +250,6 @@ test "途中の段落はラベルにならない" {
             {
               "id": 2,
               "label": "",
-              "details": false,
-              "open": false,
               "body": [
                 [
                   "Details",
@@ -375,14 +280,7 @@ test "続きの行があるラベルは末尾まで残る" {
       {
         "node": [
           "ListNode",
-          {
-            "id": 2,
-            "label": "aaa\n  bbb\n  ccc",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "aaa\n  bbb\n  ccc", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -399,14 +297,7 @@ test "CRLF でもラベルは末尾まで残る" {
       {
         "node": [
           "ListNode",
-          {
-            "id": 2,
-            "label": "aaa\r\n  bbb",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "aaa\r\n  bbb", "body": [], "children": [] },
         ],
         "sides": [],
       },

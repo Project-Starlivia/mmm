@@ -13,14 +13,7 @@ test "見出し 1 つが木 1 本になる" {
       {
         "node": [
           "HeadingNode",
-          {
-            "id": 2,
-            "label": "a",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "a", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -37,28 +30,14 @@ test "深さ 1 が 2 つなら木も 2 本" {
       {
         "node": [
           "HeadingNode",
-          {
-            "id": 2,
-            "label": "a",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "a", "body": [], "children": [] },
         ],
         "sides": [],
       },
       {
         "node": [
           "HeadingNode",
-          {
-            "id": 3,
-            "label": "b",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 3, "label": "b", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -78,31 +57,15 @@ test "深さ 2 は根の子になる" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
               [
                 "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "a",
-                  "details": false,
-                  "open": false,
-                  "body": [],
-                  "children": [],
-                },
+                { "id": 3, "label": "a", "body": [], "children": [] },
               ],
               [
                 "HeadingNode",
-                {
-                  "id": 4,
-                  "label": "b",
-                  "details": false,
-                  "open": false,
-                  "body": [],
-                  "children": [],
-                },
+                { "id": 4, "label": "b", "body": [], "children": [] },
               ],
             ],
           },
@@ -125,8 +88,6 @@ test "深さ 3 は根の子の下" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
               [
@@ -134,20 +95,11 @@ test "深さ 3 は根の子の下" {
                 {
                   "id": 3,
                   "label": "a",
-                  "details": false,
-                  "open": false,
                   "body": [],
                   "children": [
                     [
                       "HeadingNode",
-                      {
-                        "id": 4,
-                        "label": "x",
-                        "details": false,
-                        "open": false,
-                        "body": [],
-                        "children": [],
-                      },
+                      { "id": 4, "label": "x", "body": [], "children": [] },
                     ],
                   ],
                 },
@@ -173,8 +125,6 @@ test "浅く戻る" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
               [
@@ -182,34 +132,18 @@ test "浅く戻る" {
                 {
                   "id": 3,
                   "label": "a",
-                  "details": false,
-                  "open": false,
                   "body": [],
                   "children": [
                     [
                       "HeadingNode",
-                      {
-                        "id": 4,
-                        "label": "x",
-                        "details": false,
-                        "open": false,
-                        "body": [],
-                        "children": [],
-                      },
+                      { "id": 4, "label": "x", "body": [], "children": [] },
                     ],
                   ],
                 },
               ],
               [
                 "HeadingNode",
-                {
-                  "id": 5,
-                  "label": "b",
-                  "details": false,
-                  "open": false,
-                  "body": [],
-                  "children": [],
-                },
+                { "id": 5, "label": "b", "body": [], "children": [] },
               ],
             ],
           },
@@ -232,8 +166,6 @@ test "飛びは Implicit が埋める" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
               [
@@ -243,14 +175,7 @@ test "飛びは Implicit が埋める" {
                   "children": [
                     [
                       "HeadingNode",
-                      {
-                        "id": 4,
-                        "label": "x",
-                        "details": false,
-                        "open": false,
-                        "body": [],
-                        "children": [],
-                      },
+                      { "id": 4, "label": "x", "body": [], "children": [] },
                     ],
                   ],
                 },
@@ -278,14 +203,7 @@ test "深さ 1 が無ければ根が Implicit になる" {
             "children": [
               [
                 "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "a",
-                  "details": false,
-                  "open": false,
-                  "body": [],
-                  "children": [],
-                },
+                { "id": 3, "label": "a", "body": [], "children": [] },
               ],
             ],
           },
@@ -305,14 +223,7 @@ test "ラベルは原文のまま（インラインを解釈しない）" {
       {
         "node": [
           "HeadingNode",
-          {
-            "id": 2,
-            "label": "a **b** `c`",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "a **b** `c`", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -329,14 +240,7 @@ test "中身の無い見出しは空ラベル" {
       {
         "node": [
           "HeadingNode",
-          {
-            "id": 2,
-            "label": "",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -354,14 +258,7 @@ test "封筒" {
       {
         "node": [
           "HeadingNode",
-          {
-            "id": 2,
-            "label": "a",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "a", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -378,14 +275,7 @@ test "改行の流儀は保存する" {
       {
         "node": [
           "HeadingNode",
-          {
-            "id": 2,
-            "label": "a",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "a", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -404,14 +294,7 @@ test "setext のラベルも末尾まで残る" {
       {
         "node": [
           "HeadingNode",
-          {
-            "id": 2,
-            "label": "aaa\r\nbbb",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "aaa\r\nbbb", "body": [], "children": [] },
         ],
         "sides": [],
       },

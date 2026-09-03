@@ -36,8 +36,7 @@ test "同じ id が 2 度出たら見つける" {
   let n : HeadingNode = {
     id: 7,
     label: "a",
-    details: false,
-    open: false,
+    fold: None,
     body: [],
     children: [],
   }
@@ -75,15 +74,13 @@ test "側の本数が子と合わなければ見つける" {
         node: HeadingNode({
           id: 2,
           label: "r",
-          details: false,
-          open: false,
+          fold: None,
           body: [],
           children: [
             HeadingNode({
               id: 3,
               label: "a",
-              details: false,
-              open: false,
+              fold: None,
               body: [],
               children: [],
             }),
@@ -110,8 +107,7 @@ test "Details の id も一意さを見る" {
         node: HeadingNode({
           id: 5,
           label: "r",
-          details: false,
-          open: false,
+          fold: None,
           body: [],
           children: [],
         }),
@@ -123,9 +119,9 @@ test "Details の id も一意さを見る" {
 }
 
 ///|
-/// `open` は畳みの綴りの一部なので、畳んでいないノードには立たない。
-/// 立っていると書き出す `<details>` が無く、綴れない木になる。
-test "畳んでいないのに open が立っていたら見つける" {
+/// `<summary>` の中身は最初の `</summary>` までなので、名前にそれが入って
+/// いると読み戻したとき別の名前になる。
+test "畳みの名前が summary に書けなければ見つける" {
   let doc : Doc = {
     frontmatter: None,
     eol: Lf,
@@ -134,34 +130,8 @@ test "畳んでいないのに open が立っていたら見つける" {
       {
         node: HeadingNode({
           id: 2,
-          label: "a",
-          details: false,
-          open: true,
-          body: [],
-          children: [],
-        }),
-        sides: [],
-      },
-    ],
-  }
-  json_inspect(check(doc), content=[["OpenWithoutDetails", 2]])
-}
-
-///|
-/// `<summary>` の中身は最初の `</summary>` までなので、ラベルにそれが入って
-/// いると読み戻したとき名前が一致せず、畳みが黙って解ける。
-test "畳みのラベルが summary に書けなければ見つける" {
-  let doc : Doc = {
-    frontmatter: None,
-    eol: Lf,
-    body: [],
-    roots: [
-      {
-        node: HeadingNode({
-          id: 2,
-          label: "a</summary>b",
-          details: true,
-          open: false,
+          label: "x",
+          fold: Some({ open: false, summary: Some("a</summary>b") }),
           body: [],
           children: [],
         }),

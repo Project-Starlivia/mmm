@@ -12,14 +12,7 @@ test "単調性 — 項目の中の見出しは原文のまま中身になる" {
       {
         "node": [
           "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "details": false,
-            "open": false,
-            "body": [["Opaque", "# x"]],
-            "children": [],
-          },
+          { "id": 2, "label": "a", "body": [["Opaque", "# x"]], "children": [] },
         ],
         "sides": [],
       },
@@ -37,28 +30,14 @@ test "単調性 — 列 0 の見出しは項目を閉じる" {
       {
         "node": [
           "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "a", "body": [], "children": [] },
         ],
         "sides": [],
       },
       {
         "node": [
           "HeadingNode",
-          {
-            "id": 3,
-            "label": "x",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 3, "label": "x", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -80,31 +59,15 @@ test "順序法則 — 項目のあとの見出しは兄弟になる" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
               [
                 "ListNode",
-                {
-                  "id": 3,
-                  "label": "b",
-                  "details": false,
-                  "open": false,
-                  "body": [],
-                  "children": [],
-                },
+                { "id": 3, "label": "b", "body": [], "children": [] },
               ],
               [
                 "HeadingNode",
-                {
-                  "id": 4,
-                  "label": "a",
-                  "details": false,
-                  "open": false,
-                  "body": [],
-                  "children": [],
-                },
+                { "id": 4, "label": "a", "body": [], "children": [] },
               ],
             ],
           },
@@ -129,8 +92,6 @@ test "順序法則 — 見出しのあとの項目は子になる" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
               [
@@ -138,20 +99,11 @@ test "順序法則 — 見出しのあとの項目は子になる" {
                 {
                   "id": 3,
                   "label": "a",
-                  "details": false,
-                  "open": false,
                   "body": [],
                   "children": [
                     [
                       "ListNode",
-                      {
-                        "id": 4,
-                        "label": "b",
-                        "details": false,
-                        "open": false,
-                        "body": [],
-                        "children": [],
-                      },
+                      { "id": 4, "label": "b", "body": [], "children": [] },
                     ],
                   ],
                 },
@@ -180,20 +132,11 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
               [
                 "ListNode",
-                {
-                  "id": 3,
-                  "label": "b",
-                  "details": false,
-                  "open": false,
-                  "body": [],
-                  "children": [],
-                },
+                { "id": 3, "label": "b", "body": [], "children": [] },
               ],
               [
                 "ImplicitNode",
@@ -202,14 +145,7 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
                   "children": [
                     [
                       "HeadingNode",
-                      {
-                        "id": 5,
-                        "label": "x",
-                        "details": false,
-                        "open": false,
-                        "body": [],
-                        "children": [],
-                      },
+                      { "id": 5, "label": "x", "body": [], "children": [] },
                     ],
                   ],
                 },
@@ -232,14 +168,7 @@ test "単調性 — 項目の根の下にも潜らない" {
       {
         "node": [
           "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "details": false,
-            "open": false,
-            "body": [],
-            "children": [],
-          },
+          { "id": 2, "label": "a", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -256,14 +185,7 @@ test "単調性 — 項目の根の下にも潜らない" {
                   "children": [
                     [
                       "HeadingNode",
-                      {
-                        "id": 5,
-                        "label": "x",
-                        "details": false,
-                        "open": false,
-                        "body": [],
-                        "children": [],
-                      },
+                      { "id": 5, "label": "x", "body": [], "children": [] },
                     ],
                   ],
                 },
@@ -289,8 +211,6 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
               [
@@ -298,18 +218,9 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
                 {
                   "id": 3,
                   "label": "b",
-                  "details": false,
-                  "open": false,
                   "body": [],
                   "children": [
-                    {
-                      "id": 4,
-                      "label": "c",
-                      "details": false,
-                      "open": false,
-                      "body": [],
-                      "children": [],
-                    },
+                    { "id": 4, "label": "c", "body": [], "children": [] },
                   ],
                 },
               ],
@@ -320,14 +231,7 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
                   "children": [
                     [
                       "HeadingNode",
-                      {
-                        "id": 6,
-                        "label": "x",
-                        "details": false,
-                        "open": false,
-                        "body": [],
-                        "children": [],
-                      },
+                      { "id": 6, "label": "x", "body": [], "children": [] },
                     ],
                   ],
                 },
@@ -371,9 +275,17 @@ fn written(doc : Doc) -> String {
     }
   }
 
+  /// 畳みの名前も中身。綴りとして落ちるのは `<summary>` のタグのほうだけ。
+  fn named(f : Fold?) -> Unit {
+    if f is Some({ summary: Some(s), .. }) {
+      bag.push(s)
+    }
+  }
+
   fn items(xs : Array[ListNode]) -> Unit {
     for x in xs {
       bag.push(x.label)
+      named(x.fold)
       blocks(x.body)
       items(x.children)
     }
@@ -384,11 +296,13 @@ fn written(doc : Doc) -> String {
       match x {
         HeadingNode(h) => {
           bag.push(h.label)
+          named(h.fold)
           blocks(h.body)
           nodes(h.children)
         }
         ListNode(l) => {
           bag.push(l.label)
+          named(l.fold)
           blocks(l.body)
           items(l.children)
         }
@@ -457,9 +371,9 @@ test "意味 — 綴りにならなかった文字は消えない" {
     "# r\n\n<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>\n",
     "<details>", 2,
   )
-  // 名前が合わない畳み
+  // 畳みの名前。タグは綴り（`summary` から書き戻せる）だが、中の文字は中身
   keep(
-    "# r\n\n<details>\n<summary>x</summary>\n\n## h\n\n</details>\n", "<summary>x</summary>",
+    "# r\n\n<details>\n<summary>Zqname</summary>\n\n## h\n\n</details>\n", "Zqname",
     1,
   )
   // 綴りでないタグ

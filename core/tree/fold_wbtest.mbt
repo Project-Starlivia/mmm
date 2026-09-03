@@ -1,11 +1,11 @@
 // 畳み（`<details>`）を固定する。
 //
-// **2 つ揃ったときだけ**そのノードの畳み（`details = true`、中身は普通に読む）:
-// `<summary>` がラベルと一致し、領域がそのノードの body・children とその body を
-// 過不足なく覆っている。欠ければ中身の 1 枚（`Details`）。
+// **形が揃ったときだけ**そのノードの畳み（`fold` が在る、中身は普通に読む）:
+// 領域がそのノードの body・children とその body を過不足なく覆っている。
+// 名前は持ち主を決めていないので、`<summary>` は書かれたまま持つだけ。
 
 ///|
-test "名前と形が揃えば、そのノードの畳み" {
+test "形が揃えば、そのノードの畳み" {
   json_inspect(
     parse(
       "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\nbody\n\n</details>\n",
@@ -20,8 +20,6 @@ test "名前と形が揃えば、そのノードの畳み" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -29,8 +27,7 @@ test "名前と形が揃えば、そのノードの畳み" {
                   {
                     "id": 3,
                     "label": "h",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "h" },
                     "body": [["Opaque", "body"]],
                     "children": [],
                   },
@@ -46,8 +43,8 @@ test "名前と形が揃えば、そのノードの畳み" {
 }
 
 ///|
-/// 名前が無ければ、領域が誰のものか言えていないので畳みではない。
-test "summary が無ければ中身" {
+/// 名前は持ち主を決めていない。決めているのは範囲のほう。
+test "summary が無くても畳み" {
   json_inspect(parse("# r\n\n<details>\n\n## h\n\n</details>\n"), content={
     "eol": "Lf",
     "body": [],
@@ -58,26 +55,30 @@ test "summary が無ければ中身" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
-            "body": [
+            "body": [],
+            "children": [
               [
-                "Details",
-                { "id": 3, "text": "<details>\n\n## h\n\n</details>" },
+                "HeadingNode",
+                {
+                  "id": 3,
+                  "label": "h",
+                  "fold": { "open": false },
+                  "body": [],
+                  "children": [],
+                },
               ],
             ],
-            "children": [],
           },
         ],
-        "sides": [],
+        "sides": ["Right"],
       },
     ],
   })
 }
 
 ///|
-/// 一致しなければ、領域は自分の名前を持つ別物なので中身に落ちる。
-test "summary が一致しなければ中身" {
+/// 名前はそのまま持つ。ラベルと一致していなくても畳みは立つ。
+test "summary はラベルと違ってもよい" {
   json_inspect(
     parse("# r\n\n<details>\n<summary>x</summary>\n\n## h\n\n</details>\n"),
     content={
@@ -90,21 +91,22 @@ test "summary が一致しなければ中身" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
-              "body": [
+              "body": [],
+              "children": [
                 [
-                  "Details",
+                  "HeadingNode",
                   {
                     "id": 3,
-                    "text": "<details>\n<summary>x</summary>\n\n## h\n\n</details>",
+                    "label": "h",
+                    "fold": { "open": false, "summary": "x" },
+                    "body": [],
+                    "children": [],
                   },
                 ],
               ],
-              "children": [],
             },
           ],
-          "sides": [],
+          "sides": ["Right"],
         },
       ],
     },
@@ -124,8 +126,6 @@ test "中身だけ包んでいれば中身の 1 枚" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
               [
@@ -133,8 +133,6 @@ test "中身だけ包んでいれば中身の 1 枚" {
                 {
                   "id": 3,
                   "label": "h",
-                  "details": false,
-                  "open": false,
                   "body": [
                     [
                       "Details",
@@ -166,8 +164,6 @@ test "2 ノード分を包んでいれば中身" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [
               [
                 "Details",
@@ -195,8 +191,6 @@ test "最初が段落なら中身" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [
               [
                 "Details",
@@ -228,8 +222,6 @@ test "空行なしで 1 塊なら中身" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [
               ["Details", { "id": 3, "text": "<details>\n## h\n</details>" }],
             ],
@@ -255,20 +247,11 @@ test "閉じの無い開きはただの文字" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [["Opaque", "<details>"]],
             "children": [
               [
                 "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "h",
-                  "details": false,
-                  "open": false,
-                  "body": [],
-                  "children": [],
-                },
+                { "id": 3, "label": "h", "body": [], "children": [] },
               ],
             ],
           },
@@ -291,8 +274,6 @@ test "相手の居ない閉じもただの文字" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [["Opaque", "</details>"]],
             "children": [],
           },
@@ -320,8 +301,6 @@ test "畳みの後ろは元の深さに戻る" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -329,22 +308,14 @@ test "畳みの後ろは元の深さに戻る" {
                   {
                     "id": 3,
                     "label": "h",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "h" },
                     "body": [],
                     "children": [],
                   },
                 ],
                 [
                   "HeadingNode",
-                  {
-                    "id": 4,
-                    "label": "b",
-                    "details": false,
-                    "open": false,
-                    "body": [],
-                    "children": [],
-                  },
+                  { "id": 4, "label": "b", "body": [], "children": [] },
                 ],
               ],
             },
@@ -370,8 +341,6 @@ test "項目も定義ごと包める" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -379,8 +348,7 @@ test "項目も定義ごと包める" {
                   {
                     "id": 3,
                     "label": "a",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "a" },
                     "body": [],
                     "children": [],
                   },
@@ -410,8 +378,6 @@ test "開きに飲み込まれた行があれば中身" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [
               [
                 "Details",
@@ -453,8 +419,6 @@ test "入れ子の畳みも畳み" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -462,8 +426,7 @@ test "入れ子の畳みも畳み" {
                   {
                     "id": 3,
                     "label": "a",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "a" },
                     "body": [],
                     "children": [
                       [
@@ -471,8 +434,7 @@ test "入れ子の畳みも畳み" {
                         {
                           "id": 4,
                           "label": "a1",
-                          "details": true,
-                          "open": false,
+                          "fold": { "open": false, "summary": "a1" },
                           "body": [],
                           "children": [],
                         },
@@ -509,8 +471,6 @@ test "重なった閉じはほどいて読む" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -518,8 +478,7 @@ test "重なった閉じはほどいて読む" {
                   {
                     "id": 3,
                     "label": "x",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "x" },
                     "body": [],
                     "children": [
                       [
@@ -527,8 +486,7 @@ test "重なった閉じはほどいて読む" {
                         {
                           "id": 4,
                           "label": "y",
-                          "details": true,
-                          "open": false,
+                          "fold": { "open": false, "summary": "y" },
                           "body": [],
                           "children": [],
                         },
@@ -562,8 +520,6 @@ test "open は畳みに持つ" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -571,8 +527,7 @@ test "open は畳みに持つ" {
                   {
                     "id": 3,
                     "label": "h",
-                    "details": true,
-                    "open": true,
+                    "fold": { "open": true, "summary": "h" },
                     "body": [],
                     "children": [],
                   },
@@ -605,8 +560,6 @@ test "知らない属性が付いていれば中身" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [
                 [
                   "Details",
@@ -644,8 +597,6 @@ test "重なった開きは中身" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [
                 [
                   "Details",
@@ -680,8 +631,6 @@ test "項目の畳みにも open が付く" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -689,8 +638,7 @@ test "項目の畳みにも open が付く" {
                   {
                     "id": 3,
                     "label": "a",
-                    "details": true,
-                    "open": true,
+                    "fold": { "open": true, "summary": "a" },
                     "body": [],
                     "children": [],
                   },
@@ -722,8 +670,6 @@ test "内側だけ open" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -731,8 +677,7 @@ test "内側だけ open" {
                   {
                     "id": 3,
                     "label": "a",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "a" },
                     "body": [],
                     "children": [
                       [
@@ -740,8 +685,7 @@ test "内側だけ open" {
                         {
                           "id": 4,
                           "label": "a1",
-                          "details": true,
-                          "open": true,
+                          "fold": { "open": true, "summary": "a1" },
                           "body": [],
                           "children": [],
                         },
@@ -776,8 +720,6 @@ test "同じ行に重なった閉じもほどく" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -785,8 +727,7 @@ test "同じ行に重なった閉じもほどく" {
                   {
                     "id": 3,
                     "label": "x",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "x" },
                     "body": [],
                     "children": [
                       [
@@ -794,8 +735,7 @@ test "同じ行に重なった閉じもほどく" {
                         {
                           "id": 4,
                           "label": "y",
-                          "details": true,
-                          "open": false,
+                          "fold": { "open": false, "summary": "y" },
                           "body": [],
                           "children": [],
                         },
@@ -829,8 +769,6 @@ test "3 段の重なりもほどく" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -838,8 +776,7 @@ test "3 段の重なりもほどく" {
                   {
                     "id": 3,
                     "label": "x",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "x" },
                     "body": [],
                     "children": [
                       [
@@ -847,8 +784,7 @@ test "3 段の重なりもほどく" {
                         {
                           "id": 4,
                           "label": "y",
-                          "details": true,
-                          "open": false,
+                          "fold": { "open": false, "summary": "y" },
                           "body": [],
                           "children": [
                             [
@@ -856,8 +792,7 @@ test "3 段の重なりもほどく" {
                               {
                                 "id": 5,
                                 "label": "z",
-                                "details": true,
-                                "open": false,
+                                "fold": { "open": false, "summary": "z" },
                                 "body": [],
                                 "children": [],
                               },
@@ -896,8 +831,6 @@ test "落とせない閉じに頼る畳みは立たない" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [
                 [
                   "Details",
@@ -918,8 +851,8 @@ test "落とせない閉じに頼る畳みは立たない" {
 }
 
 ///|
-/// ラベルも `<summary>` の中身も原文の切り出しなので、記法ごと一致が要る。
-test "summary は記法ごと一致する" {
+/// `<summary>` の中身は原文の切り出しで、記法ごとそのまま持つ。
+test "summary は原文のまま持つ" {
   json_inspect(
     parse(
       "# r\n\n<details>\n<summary>**h**</summary>\n\n## **h**\n\n</details>\n",
@@ -934,8 +867,6 @@ test "summary は記法ごと一致する" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -943,8 +874,7 @@ test "summary は記法ごと一致する" {
                   {
                     "id": 3,
                     "label": "**h**",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "**h**" },
                     "body": [],
                     "children": [],
                   },
@@ -960,7 +890,7 @@ test "summary は記法ごと一致する" {
 }
 
 ///|
-test "記法が違えば一致しない" {
+test "記法つきのラベルと違う summary も持つ" {
   json_inspect(
     parse("# r\n\n<details>\n<summary>h</summary>\n\n## **h**\n\n</details>\n"),
     content={
@@ -973,21 +903,22 @@ test "記法が違えば一致しない" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
-              "body": [
+              "body": [],
+              "children": [
                 [
-                  "Details",
+                  "HeadingNode",
                   {
                     "id": 3,
-                    "text": "<details>\n<summary>h</summary>\n\n## **h**\n\n</details>",
+                    "label": "**h**",
+                    "fold": { "open": false, "summary": "h" },
+                    "body": [],
+                    "children": [],
                   },
                 ],
               ],
-              "children": [],
             },
           ],
-          "sides": [],
+          "sides": ["Right"],
         },
       ],
     },
@@ -1009,8 +940,6 @@ test "1 行に書いた開きと名前も畳み" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -1018,8 +947,7 @@ test "1 行に書いた開きと名前も畳み" {
                   {
                     "id": 3,
                     "label": "a",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "a" },
                     "body": [],
                     "children": [],
                   },
@@ -1051,8 +979,6 @@ test "兄弟の畳みは両方立つ" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -1060,8 +986,7 @@ test "兄弟の畳みは両方立つ" {
                   {
                     "id": 3,
                     "label": "a",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "a" },
                     "body": [],
                     "children": [],
                   },
@@ -1071,8 +996,7 @@ test "兄弟の畳みは両方立つ" {
                   {
                     "id": 4,
                     "label": "b",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "b" },
                     "body": [],
                     "children": [],
                   },
@@ -1101,8 +1025,6 @@ test "名前が違うタグは畳みの開きではない" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [["Opaque", "<details-x>"]],
             "children": [
               [
@@ -1110,8 +1032,6 @@ test "名前が違うタグは畳みの開きではない" {
                 {
                   "id": 3,
                   "label": "a",
-                  "details": false,
-                  "open": false,
                   "body": [["Opaque", "</details>"]],
                   "children": [],
                 },
@@ -1143,8 +1063,6 @@ test "summary が 2 枚なら中身" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [
                 [
                   "Details",
@@ -1181,8 +1099,6 @@ test "閉じの塊に地の文が続けば中身" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [
                 [
                   "Details",
@@ -1217,8 +1133,6 @@ test "項目の畳みも領域の後ろを見る" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [
                 [
                   "Details",
@@ -1257,8 +1171,6 @@ test "script の中の閉じは綴りではない" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -1266,8 +1178,7 @@ test "script の中の閉じは綴りではない" {
                   {
                     "id": 3,
                     "label": "a",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "a" },
                     "body": [
                       ["Opaque", "<script>\nvar x = \"</details>\";\n</script>"],
                     ],
@@ -1301,8 +1212,6 @@ test "コメントの中の閉じは綴りではない" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -1310,8 +1219,7 @@ test "コメントの中の閉じは綴りではない" {
                   {
                     "id": 3,
                     "label": "a",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "a" },
                     "body": [["Opaque", "<!-- </details> -->"]],
                     "children": [],
                   },
@@ -1345,8 +1253,6 @@ test "境界の水平線が領域の中にあれば中身" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [
                 [
                   "Details",
@@ -1383,8 +1289,6 @@ test "飾りの水平線が領域の中なら畳み" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -1392,8 +1296,7 @@ test "飾りの水平線が領域の中なら畳み" {
                   {
                     "id": 3,
                     "label": "a",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "a" },
                     "body": [["Opaque", "body"], "ThematicBreak"],
                     "children": [],
                   },
@@ -1425,8 +1328,6 @@ test "境界の水平線が閉じの直後なら畳み" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -1434,22 +1335,14 @@ test "境界の水平線が閉じの直後なら畳み" {
                   {
                     "id": 3,
                     "label": "a",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "a" },
                     "body": [],
                     "children": [],
                   },
                 ],
                 [
                   "HeadingNode",
-                  {
-                    "id": 4,
-                    "label": "b",
-                    "details": false,
-                    "open": false,
-                    "body": [],
-                    "children": [],
-                  },
+                  { "id": 4, "label": "b", "body": [], "children": [] },
                 ],
               ],
             },
@@ -1478,8 +1371,6 @@ test "飾りの水平線が閉じの直後なら中身" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [
                 [
                   "Details",
@@ -1518,8 +1409,6 @@ test "飛びが領域の中でも畳み" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -1527,8 +1416,7 @@ test "飛びが領域の中でも畳み" {
                   {
                     "id": 3,
                     "label": "a",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "a" },
                     "body": [],
                     "children": [
                       [
@@ -1541,8 +1429,6 @@ test "飛びが領域の中でも畳み" {
                               {
                                 "id": 5,
                                 "label": "deep",
-                                "details": false,
-                                "open": false,
                                 "body": [],
                                 "children": [],
                               },
@@ -1581,28 +1467,32 @@ test "後ろの領域が立たなければ跨がない" {
             {
               "id": 2,
               "label": "a",
-              "details": false,
-              "open": false,
-              "body": [
+              "body": [],
+              "children": [
                 [
-                  "Details",
+                  "HeadingNode",
                   {
                     "id": 3,
-                    "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                    "label": "b",
+                    "fold": { "open": false, "summary": "b" },
+                    "body": [],
+                    "children": [],
                   },
                 ],
                 [
-                  "Details",
+                  "HeadingNode",
                   {
                     "id": 4,
-                    "text": "<details>\n<summary>zz</summary>\n\n## c\n\n</details>",
+                    "label": "c",
+                    "fold": { "open": false, "summary": "zz" },
+                    "body": [],
+                    "children": [],
                   },
                 ],
               ],
-              "children": [],
             },
           ],
-          "sides": [],
+          "sides": ["Right", "Right"],
         },
       ],
     },
@@ -1625,8 +1515,6 @@ test "後ろの迷子のタグは跨がない" {
             {
               "id": 2,
               "label": "a",
-              "details": false,
-              "open": false,
               "body": [
                 [
                   "Details",
@@ -1640,14 +1528,7 @@ test "後ろの迷子のタグは跨がない" {
               "children": [
                 [
                   "HeadingNode",
-                  {
-                    "id": 4,
-                    "label": "c",
-                    "details": false,
-                    "open": false,
-                    "body": [],
-                    "children": [],
-                  },
+                  { "id": 4, "label": "c", "body": [], "children": [] },
                 ],
               ],
             },
@@ -1677,8 +1558,6 @@ test "末尾の飾りの水平線は跨がない" {
             {
               "id": 2,
               "label": "a",
-              "details": false,
-              "open": false,
               "body": [
                 [
                   "Details",
@@ -1717,8 +1596,6 @@ test "畳みの前の境界は空打ちでも境界のまま" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -1726,8 +1603,6 @@ test "畳みの前の境界は空打ちでも境界のまま" {
                   {
                     "id": 3,
                     "label": "a",
-                    "details": false,
-                    "open": false,
                     "body": [
                       "ThematicBreak",
                       [
@@ -1741,14 +1616,7 @@ test "畳みの前の境界は空打ちでも境界のまま" {
                     "children": [
                       [
                         "ListNode",
-                        {
-                          "id": 5,
-                          "label": "e",
-                          "details": false,
-                          "open": false,
-                          "body": [],
-                          "children": [],
-                        },
+                        { "id": 5, "label": "e", "body": [], "children": [] },
                       ],
                     ],
                   },
@@ -1777,8 +1645,6 @@ test "svg の中のタグは綴りではない" {
           {
             "id": 2,
             "label": "r",
-            "details": false,
-            "open": false,
             "body": [],
             "children": [
               [
@@ -1786,8 +1652,6 @@ test "svg の中のタグは綴りではない" {
                 {
                   "id": 3,
                   "label": "h",
-                  "details": false,
-                  "open": false,
                   "body": [["Svg", "<svg><details>a</details></svg>\n"]],
                   "children": [],
                 },
@@ -1818,8 +1682,6 @@ test "擬似コメントの中の閉じは綴りではない" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [],
               "children": [
                 [
@@ -1827,8 +1689,7 @@ test "擬似コメントの中の閉じは綴りではない" {
                   {
                     "id": 3,
                     "label": "h",
-                    "details": true,
-                    "open": false,
+                    "fold": { "open": false, "summary": "h" },
                     "body": [["Opaque", "<?x </details> ?>"]],
                     "children": [],
                   },
@@ -1861,8 +1722,6 @@ test "pre は生テキストではない" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [["Opaque", "<details>\n<summary>h</summary>"]],
               "children": [
                 [
@@ -1870,8 +1729,6 @@ test "pre は生テキストではない" {
                   {
                     "id": 3,
                     "label": "h",
-                    "details": false,
-                    "open": false,
                     "body": [
                       [
                         "Details",
@@ -1886,14 +1743,7 @@ test "pre は生テキストではない" {
                 ],
                 [
                   "HeadingNode",
-                  {
-                    "id": 5,
-                    "label": "h2",
-                    "details": false,
-                    "open": false,
-                    "body": [],
-                    "children": [],
-                  },
+                  { "id": 5, "label": "h2", "body": [], "children": [] },
                 ],
               ],
             },
@@ -1921,8 +1771,6 @@ test "= の後ろでない引用符は囲みを始めない" {
             {
               "id": 2,
               "label": "r",
-              "details": false,
-              "open": false,
               "body": [
                 [
                   "Details",

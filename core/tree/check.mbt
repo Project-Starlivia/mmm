@@ -14,10 +14,8 @@ pub(all) enum Flaw {
   BarrenImplicit(Int)
   /// 側の本数が根の子と合わない
   SideCount(root~ : Int, sides~ : Int, children~ : Int)
-  /// 畳んでいるのにラベルが `<summary>` に書けない。読み戻すと畳みが解ける
+  /// 畳みの名前が `<summary>` に書けない。読み戻すと名前が変わる
   UnwritableName(Int)
-  /// 畳んでいないのに `open` が立っている。書き出す `<details>` が無い
-  OpenWithoutDetails(Int)
 } derive(Eq, ToJson)
 
 ///|
@@ -40,12 +38,10 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   }
 
   /// 畳みの綴りが書けるか。`<summary>` の中身は最初の `</summary>` までなので、
-  /// ラベルにそれが入っていると読み戻したとき名前が一致せず畳みが解ける。
-  fn shut(n : Int, label : String, details : Bool, open : Bool) -> Unit {
-    if open && !details {
-      flaws.push(OpenWithoutDetails(n))
-    }
-    if details && label.contains("</summary>") {
+  /// 名前にそれが入っていると読み戻したとき別の名前になる。
+  /// 「畳んでいないのに open」は型が殺しているので、ここには来ない。
+  fn named(n : Int, fold : Fold?) -> Unit {
+    if fold is Some({ summary: Some(s), .. }) && s.contains("</summary>") {
       flaws.push(UnwritableName(n))
     }
   }
@@ -53,7 +49,7 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   fn items(xs : Array[ListNode]) -> Unit {
     for x in xs {
       id(x.id)
-      shut(x.id, x.label, x.details, x.open)
+      named(x.id, x.fold)
       blocks(x.body)
       items(x.children)
     }
@@ -64,13 +60,13 @@ pub fn check(doc : Doc) -> Array[Flaw] {
       match x {
         HeadingNode(h) => {
           id(h.id)
-          shut(h.id, h.label, h.details, h.open)
+          named(h.id, h.fold)
           blocks(h.body)
           nodes(h.children)
         }
         ListNode(l) => {
           id(l.id)
-          shut(l.id, l.label, l.details, l.open)
+          named(l.id, l.fold)
           blocks(l.body)
           items(l.children)
         }

@@ -38,14 +38,23 @@ pub(all) enum Node {
 } derive(Eq, Debug, ToJson)
 
 ///|
+/// 畳み。**在ること自体が「このノードは畳まれている」**で、中身は書き戻すのに
+/// 要る綴り。`<details>` と `</details>` は固定なので入らない。
+pub(all) struct Fold {
+  /// `<details open>` と書いてあった
+  open : Bool
+  /// `<summary>…</summary>` の中身。行が無ければ None
+  /// （空文字と区別する — 無いものに空の行を生やすと触っていない場所が動く）
+  summary : String?
+} derive(Eq, Debug, ToJson)
+
+///|
 /// 見出し（`# a`）。子は何でも来る。
 pub(all) struct HeadingNode {
   id : Int
   label : String
   /// `<details>` がこのノードの定義ごと包んでいた
-  details : Bool
-  /// その `<details>` に `open` が付いていた。畳みでないときは常に false
-  open : Bool
+  fold : Fold?
   body : Array[Block]
   children : Array[Node]
 } derive(Eq, Debug, ToJson)
@@ -56,8 +65,7 @@ pub(all) struct HeadingNode {
 pub(all) struct ListNode {
   id : Int
   label : String
-  details : Bool
-  open : Bool
+  fold : Fold?
   body : Array[Block]
   children : Array[ListNode]
 } derive(Eq, Debug, ToJson)

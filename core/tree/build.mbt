@@ -24,13 +24,7 @@ priv struct Frame {
 priv enum Notation {
   /// 記法が無い。深さの飛びがそれを言う
   Gap
-  Line(
-    sign~ : Sign,
-    label~ : String,
-    details~ : Bool,
-    open~ : Bool,
-    body~ : Array[Block]
-  )
+  Line(sign~ : Sign, label~ : String, fold~ : Fold?, body~ : Array[Block])
 }
 
 ///|
@@ -50,7 +44,8 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
     head: 0,
     side: Right,
     pend: false,
-    low: deep,
+    top: deep,
+    own: deep,
     dry: false,
   }
   for piece in pieces(md, ast.children, ast.definitions.map(d => d.span), 0) {
@@ -96,7 +91,9 @@ priv struct Build {
   /// 行き先待ちの水平線が有るか。**本数に意味は無い**ので Bool で持つ
   mut pend : Bool
   /// このブロックで生まれた一番浅い枠の深さ。骨格でなければ `deep` のまま
-  mut low : Int
+  mut top : Int
+  /// このブロック自身のノードの深さ。飛びを埋めた Implicit は数えない
+  mut own : Int
   /// 深さを測るだけの空打ちか。畳みを見ないので、項目の中も読み解かない
   dry : Bool
 }
@@ -104,6 +101,15 @@ priv struct Build {
 ///|
 /// 骨格ではない深さ。どの見出しより深い（`# ` 〜 `######` は 1〜6）。
 let deep : Int = 99
+
+///|
+/// ブロック 1 枚を積んだときにできた枠の深さ。**2 つ要る** — 飛びを埋める
+/// Implicit も枠なので、部分木の中か外かを見るときは一番浅い方（`top`）を、
+/// 「このノード自身の深さ」が要るときは `own` を見る。
+priv struct Depth {
+  top : Int
+  own : Int
+}
 
 ///|
 /// 畳みを見ずに骨格だけ積み、ブロックごとに**そこで生まれた一番浅い枠の深さ**
@@ -115,7 +121,7 @@ fn depths(
   blocks : Array[@markdown.Block],
   spells : Array[Spell],
   nest : Int,
-) -> Array[Int] {
+) -> Array[Depth] {
   let b : Build = {
     md,
     forest: [],
@@ -124,10 +130,11 @@ fn depths(
     head: 0,
     side: Right,
     pend: false,
-    low: deep,
+    top: deep,
+    own: deep,
     dry: true,
   }
-  let out = Array::make(blocks.length(), deep)
+  let out = Array::make(blocks.length(), { top: deep, own: deep })
   for i, block in blocks {
     // **畳みの綴りだけの塊は跨ぐ。** 測っているのは「この領域が畳みだったら
     // 部分木を覆うか」なので、その前提では綴りは落ちている。中身として数えると
@@ -135,9 +142,10 @@ fn depths(
     if only_marks(spells[i]) {
       continue
     }
-    b.low = deep
+    b.top = deep
+    b.own = deep
     take(b, block, nest)
-    out[i] = b.low
+    out[i] = { top: b.top, own: b.own }
   }
   out
 }
@@ -146,8 +154,8 @@ fn depths(
 /// ひと切れを積む。畳みは見出し・項目の行に印を付けるか、中身の 1 枚になる。
 fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
   match piece {
-    Raw(block) => take(b, block, nest, details=false, open=false)
-    Folded(block, open~) => take(b, block, nest, details=true, open~)
+    Raw(block) => take(b, block, nest)
+    Folded(block, fold~) => take(b, block, nest, fold=Some(fold))
     Capsule(text) => {
       // 中身が来たので、保留中の水平線は境界になれない
       spill(b)
@@ -167,8 +175,7 @@ fn take(
   b : Build,
   block : @markdown.Block,
   nest : Int,
-  details? : Bool = false,
-  open? : Bool = false,
+  fold? : Fold? = None,
 ) -> Unit {
   match block {
     // **単調性 — 項目の子孫は項目。** 項目の領土に書かれた見出しは骨格に
@@ -182,14 +189,13 @@ fn take(
         Line(
           sign=Heading,
           label=head_label(b.md, span, style, children),
-          details~,
-          open~,
+          fold~,
           body=[],
         ),
       )
     }
-    BulletList(items~, ..) => items_take(b, items, nest, details~, open~)
-    OrderedList(items~, ..) => items_take(b, items, nest, details~, open~)
+    BulletList(items~, ..) => items_take(b, items, nest, fold~)
+    OrderedList(items~, ..) => items_take(b, items, nest, fold~)
     // 区切りは**根の領土の隙間**でだけ側の変わり目になる。項目の中は中身なので
     // 保留せずその場に置く（保留すると、置く前に項目の枠が閉じられたとき
     // 帰る場所が無くなって文書へ落ちる）
@@ -215,8 +221,7 @@ fn items_take(
   b : Build,
   items : Array[@markdown.ListItem],
   nest : Int,
-  details? : Bool = false,
-  open? : Bool = false,
+  fold? : Fold? = None,
 ) -> Unit {
   for it in items {
     // **ラベルは項目の 1 行目。** 途中の段落を引き上げると、その文字が
@@ -231,7 +236,7 @@ fn items_take(
         rest.push(c)
       }
     }
-    put(b, b.head + 1 + nest, Line(sign=Item, label~, details~, open~, body=[]))
+    put(b, b.head + 1 + nest, Line(sign=Item, label~, fold~, body=[]))
     // 空打ちでは畳みを見ない（深さを測るのに畳みは要らず、
     // 畳みの判定はこの深さを使うので、呼び合いになる）
     let inner = if b.dry {
@@ -327,16 +332,18 @@ fn put(b : Build, level : Int, skel : Notation) -> Unit {
   }
   let f : Frame = { skel, kids: [], side: Right, id: 0 }
   sink(b)
+  // 最後に座るのが**そのブロック自身のノード**。手前の穴埋めは足場でしかない
+  b.own = b.stack.length() + 1
   seat(b, f)
   b.stack.push(f)
 }
 
 ///|
-/// これから座る枠の深さを控える。深さは stack の高さが持つ。
+/// これから座る枠の深さを控える（一番浅いものだけ）。深さは stack の高さが持つ。
 fn sink(b : Build) -> Unit {
   let depth = b.stack.length() + 1
-  if depth < b.low {
-    b.low = depth
+  if depth < b.top {
+    b.top = depth
   }
 }
 
@@ -492,24 +499,10 @@ fn to_root(f : Frame) -> Root {
 fn to_node(f : Frame) -> Node {
   match f.skel {
     Gap => ImplicitNode({ id: f.id, children: f.kids.map(to_node) })
-    Line(sign=Item, label~, details~, open~, body~) =>
-      ListNode({
-        id: f.id,
-        label,
-        details,
-        open,
-        body,
-        children: f.kids.map(to_list),
-      })
-    Line(label~, details~, open~, body~, ..) =>
-      HeadingNode({
-        id: f.id,
-        label,
-        details,
-        open,
-        body,
-        children: f.kids.map(to_node),
-      })
+    Line(sign=Item, label~, fold~, body~) =>
+      ListNode({ id: f.id, label, fold, body, children: f.kids.map(to_list) })
+    Line(label~, fold~, body~, ..) =>
+      HeadingNode({ id: f.id, label, fold, body, children: f.kids.map(to_node) })
   }
 }
 
@@ -522,12 +515,11 @@ fn to_list(f : Frame) -> ListNode {
       {
         id: f.id,
         label: "",
-        details: false,
-        open: false,
+        fold: None,
         body: [],
         children: f.kids.map(to_list),
       }
-    Line(label~, details~, open~, body~, ..) =>
-      { id: f.id, label, details, open, body, children: f.kids.map(to_list) }
+    Line(label~, fold~, body~, ..) =>
+      { id: f.id, label, fold, body, children: f.kids.map(to_list) }
   }
 }

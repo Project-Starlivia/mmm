@@ -13,8 +13,9 @@ Root { node: Node, sides: [Side] }          // 側を持つ唯一の型。根の
 
 Node = HeadingNode | ListNode | ImplicitNode   // 構築子は型名と同じ。タグに意味は無い
 
-HeadingNode  { id, label, details, open, body: [Block], children: [Node] }
-ListNode     { id, label, details, open, body: [Block], children: [ListNode] }
+HeadingNode  { id, label, fold: Fold?, body: [Block], children: [Node] }
+Fold         { open, summary: String? }        // 在ること自体が「畳まれている」
+ListNode     { id, label, fold: Fold?, body: [Block], children: [ListNode] }
 ImplicitNode { id, children: [Node] }       // 記法を持たない
 
 Side  = Right | Left
@@ -32,15 +33,16 @@ Block = Image | Link | Code | Svg           // 中身 1 枚。包みは無い
 
 - **項目の子孫は項目**（`ListNode.children : [ListNode]`）。項目の根に見出しが
   生えないことも同時に決まる。項目は相対記法で飛べないので Implicit も無い
-- **Implicit は記法を持たない**（`ImplicitNode` に label / body / details が無い）。
-  包む見出し・項目の行が無いので**畳めないことも同時に決まる**
+- **Implicit は記法を持たない**（`ImplicitNode` に label / body / fold が無い）。
+  包む見出し・項目の行が無いので**畳めないことも同時に決まる**（`fold` が無い）
 - **側は根の子だけ**（`sides` は `Root` にしか無い）。深いノードは側を持てない
 
 `children` を全部の深さで `[Node]` に保つため、側は組にせず並走させる
 （深さで型が変わると走査も操作も割れる）。長さが揃うことは型では言えない。
 
 check が見るもの — id 一意 / Implicit は子を持つ / `sides` と根の子の長さが揃う /
-`open` は `details` のときだけ立つ / 畳みのラベルが `<summary>` に書ける。
+畳みの名前が `<summary>` に書ける。**`open` と名前が畳みのときだけ在ることは
+型が殺す**（`fold : Fold?` に括ってあるので、畳みでなければ持ちようがない）。
 
 `project(Doc)` が左右に振り分けた木を作り、JSON で ts へ渡す。
 
