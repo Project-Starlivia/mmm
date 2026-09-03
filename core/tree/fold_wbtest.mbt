@@ -1762,3 +1762,182 @@ test "畳みの前の境界は空打ちでも境界のまま" {
     },
   )
 }
+
+///|
+/// **svg は foreign content。** 中の `details` は SVG の要素であって畳みでは
+/// ないので数えない（数えると SVG のカードが畳みの逐語に化ける）。
+test "svg の中のタグは綴りではない" {
+  json_inspect(parse("# r\n\n## h\n\n<svg><details>a</details></svg>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "open": false,
+            "body": [],
+            "children": [
+              [
+                "HeadingNode",
+                {
+                  "id": 3,
+                  "label": "h",
+                  "details": false,
+                  "open": false,
+                  "body": [["Svg", "<svg><details>a</details></svg>\n"]],
+                  "children": [],
+                },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// `<!` に `--` が続かない形と `<?` は擬似コメントで、最初の `>` までが中身。
+test "擬似コメントの中の閉じは綴りではない" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n<?x </details> ?>\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "h",
+                    "details": true,
+                    "open": false,
+                    "body": [["Opaque", "<?x </details> ?>"]],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 生テキストの名前は前方一致では見ない（`<pre` で `<presentation>` を
+/// 拾わない）。`pre` はそもそも生テキストではないので一覧に無い。
+test "pre は生テキストではない" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n<pre><details></pre>\n\n</details>\n\n## h2\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [["Opaque", "<details>\n<summary>h</summary>"]],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "h",
+                    "details": false,
+                    "open": false,
+                    "body": [
+                      [
+                        "Details",
+                        {
+                          "id": 4,
+                          "text": "<pre><details></pre>\n\n</details>",
+                        },
+                      ],
+                    ],
+                    "children": [],
+                  },
+                ],
+                [
+                  "HeadingNode",
+                  {
+                    "id": 5,
+                    "label": "h2",
+                    "details": false,
+                    "open": false,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right", "Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// HTML で引用符が値を囲むのは `=` の直後だけ。それ以外の `\"` は属性名の
+/// ただの文字なので、そこで囲みが始まったことにしない。
+test "= の後ろでない引用符は囲みを始めない" {
+  json_inspect(
+    parse("# r\n\n<details \"x>\n<summary>h</summary>\n\n## h\n\n</details>\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details \"x>\n<summary>h</summary>\n\n## h\n\n</details>",
+                  },
+                ],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}

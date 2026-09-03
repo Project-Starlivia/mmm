@@ -113,40 +113,88 @@ fn after(md : String, i : Int, pat : String, to : Int) -> Int {
 }
 
 ///|
-/// コメントと生テキストの終わり。**中に綴りは無いものとして跨ぐ。**
+/// タグ名がぴったり `name` か。名前の直後は空白・`>`・`/` のどれか
+/// （`<pre` の前方一致で `<presentation>` を生テキストと読まないため）。
+fn elem_name(md : String, i : Int, name : String, to : Int) -> Bool {
+  guard name_at(md, i, name, to) else { return false }
+  let z = i + name.length()
+  z >= to || blank(md[z]) || md[z] == '>' || md[z] == '/'
+}
+
+///|
+/// `</name …>` を大小を無視して探し、その次の位置。無ければ塊の終わり。
+fn raw_end(md : String, i : Int, name : String, to : Int) -> Int {
+  let mut k = i
+  while k < to {
+    if md[k] == '<' &&
+      k + 1 < to &&
+      md[k + 1] == '/' &&
+      elem_name(md, k + 2, name, to) {
+      let z = elem_end(md, k + 2 + name.length(), to)
+      return if z > 0 { z } else { to }
+    }
+    k = k + 1
+  }
+  to
+}
+
+///|
+/// コメント・擬似コメント・生テキストの終わり。**中に綴りは無いものとして跨ぐ。**
 /// md が「ここは生の HTML」と言った範囲で HTML の字句規則に従うだけなので、
 /// md の読み解き直しではない。`<script>var x = "</details>"` を閉じと読まない。
 fn opaque_end(md : String, i : Int, to : Int) -> Int? {
+  guard md[i] == '<' else { return None }
   if has(md, i, "<!--", to) {
+    // `<!-->` と `<!--->` はそこで閉じた空のコメント
+    if has(md, i, "<!-->", to) {
+      return Some(i + 5)
+    }
+    if has(md, i, "<!--->", to) {
+      return Some(i + 6)
+    }
     return Some(after(md, i + 4, "-->", to))
   }
-  for name in ["script", "style", "pre", "textarea", "title"] {
-    if md[i] == '<' && name_at(md, i + 1, name, to) {
-      return Some(after(md, i, "</\{name}>", to))
+  // `<!` に `--` が続かない形と `<?` は擬似コメント。最初の `>` までが中身
+  if has(md, i, "<!", to) || has(md, i, "<?", to) {
+    return Some(after(md, i + 2, ">", to))
+  }
+  // 生テキスト（script / style）と RCDATA（textarea / title）は中を読まない。
+  // svg は foreign content で、中の `details` は SVG の要素であって畳みではない
+  for name in ["script", "style", "textarea", "title", "svg"] {
+    if elem_name(md, i + 1, name, to) {
+      return Some(raw_end(md, i, name, to))
     }
   }
   None
 }
 
 ///|
-/// 開きタグの終わり（`>` の次）。引用符の中の `>` は数えない。
+/// 開きタグの終わり（`>` の次）。属性値を囲む引用符の中の `>` は数えない。
 /// 名前の直後が空白・`>`・`/` でなければタグではない（`<details-x>` を弾く）。
+/// **引用符が値を囲むのは `=` の直後だけ** — それ以外の位置の `"` は
+/// HTML では属性名のただの文字なので、そこで囲みが始まったことにしない。
 fn elem_end(md : String, i : Int, to : Int) -> Int {
   guard i < to else { return -1 }
   let c = md[i]
   guard blank(c) || c == '>' || c == '/' else { return -1 }
   let mut k = i
   let mut quote : UInt16 = 32
+  let mut eq = false
   while k < to {
     let c = md[k]
     if quote != ' ' {
       if c == quote {
         quote = ' '
       }
-    } else if c == '"' || c == '\'' {
-      quote = c
     } else if c == '>' {
       return k + 1
+    } else if c == '=' {
+      eq = true
+    } else if eq && (c == '"' || c == '\'') {
+      quote = c
+      eq = false
+    } else if !blank(c) {
+      eq = false
     }
     k = k + 1
   }
