@@ -16,9 +16,15 @@
 (`moon` が PATH にあること)
 
     pnpm install
-    pnpm run dev        # コアをビルドしてから vite（http://localhost:13131）
+    pnpm run lab        # コアをビルドしてからラボ（http://localhost:13132）
 
-本番ビルド: `pnpm run build` → `pnpm run preview` で確認。
+**エディタ自体は今は動きません。** 文書モデルを作り直している最中で
+（`core/tree`、[docs/core.md](docs/core.md)）、`src/` はまだ落とした旧 core を
+見ています。今動くのはラボで、md を打つと mdAst と mmm の木を並べて出すので、
+どの段で壊れたかが切り分けられます。
+
+    pnpm run test:core   # 読みの規則
+    pnpm run check:core
 
 ## ライセンス
 
