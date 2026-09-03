@@ -8,39 +8,40 @@ md が何を意味するか（方言の裁定）は [spec.md](spec.md) の「md 
 ## 型
 
 ```
-Doc     { frontmatter: String?, eol: Eol, body: [Block], roots: [Root] }
-Root    = Head(Heading) | Item(Item)        // 文書順の混在列
-Heading = Implicit(id, headings)            // 綴られなかった見出し(階層の飛び)
-        | Explicit(node, items, headings)   // 項目の列が先(順序法則)
-Item    { node, children }                  // 子も項目(単調性)
-Wing[T] { seams: Int, branch: T }           // 子の口。直前の継ぎ目の本数を持つ
-Node    { id, label, body: [Block] }        // 綴られた節の中身
-Block   = Image | Link | Code | Svg         // 中身 1 枚。包みは無い
-        | Rule                              // 境界にならなかった継ぎ目。線
-        | Fold(id, text)                    // <details>。領域の逐語
-        | Opaque(text)                      // 読み解かない逐語
+Doc  { frontmatter: String?, eol: Eol, body: [Block], roots: [Root] }
+Root { node: Node, sides: [Side] }          // 側を持つ唯一の型。根の子と並走
+
+Node = Head(HeadNode) | List(ListNode) | Implicit(ImplicitNode)
+
+HeadNode     { id, label, details, body: [Block], children: [Node] }
+ListNode     { id, label, details, body: [Block], children: [ListNode] }
+ImplicitNode { id, children: [Node] }       // 綴りを持たない
+
+Side  = Right | Left
+Eol   = Lf | Crlf
+Block = Image | Link | Code | Svg           // 中身 1 枚。包みは無い
+      | Rule                                // 境界にならなかった継ぎ目。線
+      | Details(id, text)                   // <details>。領域の逐語
+      | Opaque(text)                        // 読み解かない逐語
 ```
 
-(items / headings / children は `Wing` で包んだ列。表記は省いた)
+**型が言うのは「あり得ない形」だけ**で、仕様を満たすのは実装の仕事。
+型の上で作れるものは何でも許容し、細かい充足はテストが受け持つ。
 
-- 節の種類ごとに型を分ける。**子に来られるものが親の種類で決まる**ので、
-  単調性(項目の子孫は項目)・順序法則(項目の列が先)・
-  「Implicit は綴りを持たない」が構造から不可能になる
-- **境界の継ぎ目は側の綴りなので、構造に吸う**(Implicit が階層の飛びを吸うのと
-  同型)。子の直前の連続 Rule は `Wing.seams` に入り、散文の中の Rule だけが
-  中身として `body` に残る。**側そのものは保存しない** — seams の偶奇を
-  歩けば出る。深い所の seams は側を持つ相手が居ないので、線として描くだけ
-- **畳みは中身の一種。** `Fold` は領域の逐語で、中を parse しない。触っていない
-  畳みが正規形に落ちるのを防ぐ（「正規形になるのは触った場所だけ」を守る）。
-  表示名は開かずに覗いて導出する — `<summary>` > 一番強い見出し > 最初の行
-- **Block に包みを作らない。** 「解釈できた/できなかった」は `Opaque` という
-  名前が担うので、Content でくくる段を挟まない。カードかどうかは描画側の
-  分類であって、core は意味だけを持つ
-- 型で守れない分は check が見る — id 一意 / Implicit は子を持つ限り在る /
-  `seams >= 0`
+型で殺しているのは 3 つ:
 
-`project(Doc)` が側を貼った左右の木を作り、JSON で ts へ渡す。**`Side` は
-core に無い** — project の出力にだけ現れる。
+- **項目の子孫は項目**（`ListNode.children : [ListNode]`）。項目の根に見出しが
+  生えないことも同時に決まる。項目は相対記法で飛べないので Implicit も無い
+- **Implicit は綴りを持たない**（`ImplicitNode` に label / body / details が無い）。
+  包む骨格行が無いので**畳めないことも同時に決まる**
+- **側は根の子だけ**（`sides` は `Root` にしか無い）。深いノードは側を持てない
+
+`children` を全部の深さで `[Node]` に保つため、側は組にせず並走させる
+（深さで型が変わると走査も操作も割れる）。長さが揃うことは型では言えない。
+
+check が見るもの — id 一意 / Implicit は子を持つ / `sides` と根の子の長さが揃う。
+
+`project(Doc)` が左右に振り分けた木を作り、JSON で ts へ渡す。
 
 ## パイプライン
 
@@ -79,20 +80,15 @@ core に無い** — project の出力にだけ現れる。
 
 ## 操作の決め
 
-- **側は導出値。** 操作が側を直接書くことはない — 側を変えたければ継ぎ目を編集する。
-  枝を動かしても側は運ばれず、行き先(落とした列)に合わせて継ぎ目が書かれる
+- **側は根のもの。** 枝を動かしても側は運ばれず、行き先(落とした場所)が決め直す
 - **sign は行き先に従う。** Item を見出しの節の間へ落とせば Heading になる
-- **flipSide は seams の編集。** 根 = 最初の子の seams +1(全体が鏡像)。
-  子 = その子と次の子の seams を +1 ずつ(その子だけ裏返り、後続は動かない)。
-  操作は自分の口で完結し、隣の body に手を伸ばさない
-- **取り残された末尾の Rule は seams へ吸う。** 中身の削除で body の末尾に
-  Rule が残り、直後に子が居るなら、それは境界の綴りになったということ —
-  正規化が seams に繰り入れる(昇格が見た目に出る。undo で戻る)
+- **flipSide は 3 段。** 根は `sides` を一括反転(鏡像)、深さ 2 の子はその 1 つを反転、
+  深いノードは反対側へ引き出す(深さは保つので、間を Implicit が埋める)
 - **比例性** — 操作の影響は、選んだサブツリーの中に収まる
 - **文字列は常に md として解釈される。** ラベル専用のエスケープや拒否は作らない
 
 型の異種性は**道具(pluck / graft と種類の変換)に幽閉**し、操作に腕を生やさない。
-道具の行き先は 5 (roots / 項目の列 / 見出しの列 / 項目の子 / 中身)で、
+道具の行き先は 4 (roots / 見出しの子 / 項目の子 / 中身)で、
 **これより増え始めたら設計を疑う。**
 
 Heading → Item の変換は部分木ごと畳むので情報が落ちる(見出しの子も項目になる)。

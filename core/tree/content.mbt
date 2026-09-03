@@ -25,18 +25,18 @@ fn content_of(md : String, block : @markdown.Block) -> Block? {
   match block {
     // 空行は綴りであってモデルには無い。serialize が正規形として置き直す
     BlankLines(..) => None
-    FencedCode(info~, code~, ..) => Some(Content(Code(info~, text=code)))
+    FencedCode(info~, code~, ..) => Some(Code(info~, text=code))
     // インデントコードは読めるが書かない（正規形はフェンス）
-    IndentedCode(code~, ..) => Some(Content(Code(info="", text=code)))
+    IndentedCode(code~, ..) => Some(Code(info="", text=code))
     HtmlBlock(html~, ..) =>
       if is_svg(html) {
-        Some(Content(Svg(html)))
+        Some(Svg(html))
       } else {
         Some(Opaque(verbatim(md, block)))
       }
     Paragraph(children~, span~, ..) =>
       match sole(md, span, children) {
-        Some(c) => Some(Content(c))
+        Some(c) => Some(c)
         None => Some(Opaque(verbatim(md, block)))
       }
     _ => Some(Opaque(verbatim(md, block)))
@@ -50,7 +50,7 @@ fn sole(
   md : String,
   span : @markdown.Span,
   children : Array[@markdown.Inline],
-) -> Content? {
+) -> Block? {
   guard children.length() == 1 else { return None }
   match children[0] {
     Image(alt~, url~, ..) => Some(Image(alt~, src=url))

@@ -9,26 +9,30 @@ test "details は直前のノードを畳む" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": { "id": 2, "label": "r", "folded": true, "body": [] },
-          "items": [],
-          "headings": [
-            {
-              "side": "Right",
-              "branch": [
-                "Explicit",
+      {
+        "node": [
+          "Head",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [["Opaque", "<details>"]],
+            "children": [
+              [
+                "Head",
                 {
-                  "node": { "id": 3, "label": "a", "folded": false, "body": [] },
-                  "items": [],
-                  "headings": [],
+                  "id": 3,
+                  "label": "a",
+                  "details": false,
+                  "body": [["Opaque", "</details>"]],
+                  "children": [],
                 },
               ],
-            },
-          ],
-        },
-      ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
     ],
   })
 }
@@ -41,31 +45,30 @@ test "summary は開きと同じ塊なので落ちる" {
       "eol": "Lf",
       "body": [],
       "roots": [
-        [
-          "Explicit",
-          {
-            "node": { "id": 2, "label": "r", "folded": true, "body": [] },
-            "items": [],
-            "headings": [
-              {
-                "side": "Right",
-                "branch": [
-                  "Explicit",
+        {
+          "node": [
+            "Head",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "body": [["Opaque", "<details>\n<summary>r</summary>"]],
+              "children": [
+                [
+                  "Head",
                   {
-                    "node": {
-                      "id": 3,
-                      "label": "a",
-                      "folded": false,
-                      "body": [],
-                    },
-                    "items": [],
-                    "headings": [],
+                    "id": 3,
+                    "label": "a",
+                    "details": false,
+                    "body": [["Opaque", "</details>"]],
+                    "children": [],
                   },
                 ],
-              },
-            ],
-          },
-        ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
       ],
     },
   )
@@ -81,45 +84,44 @@ test "入れ子の畳み" {
       "eol": "Lf",
       "body": [],
       "roots": [
-        [
-          "Explicit",
-          {
-            "node": { "id": 2, "label": "r", "folded": true, "body": [] },
-            "items": [],
-            "headings": [
-              {
-                "side": "Right",
-                "branch": [
-                  "Explicit",
+        {
+          "node": [
+            "Head",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "body": [["Opaque", "<details>"]],
+              "children": [
+                [
+                  "Head",
                   {
-                    "node": {
-                      "id": 3,
-                      "label": "a",
-                      "folded": true,
-                      "body": [],
-                    },
-                    "items": [],
-                    "headings": [
+                    "id": 3,
+                    "label": "a",
+                    "details": false,
+                    "body": [["Opaque", "<details>"]],
+                    "children": [
                       [
-                        "Explicit",
+                        "Head",
                         {
-                          "node": {
-                            "id": 4,
-                            "label": "x",
-                            "folded": false,
-                            "body": [],
-                          },
-                          "items": [],
-                          "headings": [],
+                          "id": 4,
+                          "label": "x",
+                          "details": false,
+                          "body": [
+                            ["Opaque", "</details>"],
+                            ["Opaque", "</details>"],
+                          ],
+                          "children": [],
                         },
                       ],
                     ],
                   },
                 ],
-              },
-            ],
-          },
-        ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
       ],
     },
   )
@@ -131,19 +133,23 @@ test "畳んだノードの中身は残る" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": {
+      {
+        "node": [
+          "Head",
+          {
             "id": 2,
             "label": "r",
-            "folded": true,
-            "body": [["Opaque", "text"]],
+            "details": false,
+            "body": [
+              ["Opaque", "<details>"],
+              ["Opaque", "text"],
+              ["Opaque", "</details>"],
+            ],
+            "children": [],
           },
-          "items": [],
-          "headings": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -154,19 +160,19 @@ test "相手の居ない閉じは逐語のまま残る" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": {
+      {
+        "node": [
+          "Head",
+          {
             "id": 2,
             "label": "r",
-            "folded": false,
+            "details": false,
             "body": [["Opaque", "</details>"]],
+            "children": [],
           },
-          "items": [],
-          "headings": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -179,20 +185,32 @@ test "項目も畳める" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Item",
-        {
-          "node": { "id": 2, "label": "a", "folded": true, "body": [] },
-          "items": [],
-        },
-      ],
-      [
-        "Item",
-        {
-          "node": { "id": 3, "label": "b", "folded": false, "body": [] },
-          "items": [],
-        },
-      ],
+      {
+        "node": [
+          "List",
+          {
+            "id": 2,
+            "label": "a",
+            "details": false,
+            "body": [["Opaque", "<details>"]],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+      {
+        "node": [
+          "List",
+          {
+            "id": 3,
+            "label": "b",
+            "details": false,
+            "body": [["Opaque", "</details>"]],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
     ],
   })
 }

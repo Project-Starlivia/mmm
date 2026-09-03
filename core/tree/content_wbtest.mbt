@@ -8,19 +8,19 @@ test "散文はノードの中身になる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": {
+      {
+        "node": [
+          "Head",
+          {
             "id": 2,
             "label": "a",
-            "folded": false,
+            "details": false,
             "body": [["Opaque", "hello"]],
+            "children": [],
           },
-          "items": [],
-          "headings": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -31,19 +31,19 @@ test "中身は文書順に並ぶ" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": {
+      {
+        "node": [
+          "Head",
+          {
             "id": 2,
             "label": "a",
-            "folded": false,
+            "details": false,
             "body": [["Opaque", "hello"], ["Opaque", "world"]],
+            "children": [],
           },
-          "items": [],
-          "headings": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -54,36 +54,30 @@ test "中身は深さで振り分けられる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": {
+      {
+        "node": [
+          "Head",
+          {
             "id": 2,
             "label": "a",
-            "folded": false,
+            "details": false,
             "body": [["Opaque", "x"]],
-          },
-          "items": [],
-          "headings": [
-            {
-              "side": "Right",
-              "branch": [
-                "Explicit",
+            "children": [
+              [
+                "Head",
                 {
-                  "node": {
-                    "id": 3,
-                    "label": "b",
-                    "folded": false,
-                    "body": [["Opaque", "y"]],
-                  },
-                  "items": [],
-                  "headings": [],
+                  "id": 3,
+                  "label": "b",
+                  "details": false,
+                  "body": [["Opaque", "y"]],
+                  "children": [],
                 },
               ],
-            },
-          ],
-        },
-      ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
     ],
   })
 }
@@ -94,14 +88,19 @@ test "最初の骨格より前の散文は文書のもの" {
     "eol": "Lf",
     "body": [["Opaque", "intro"]],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
-          "items": [],
-          "headings": [],
-        },
-      ],
+      {
+        "node": [
+          "Head",
+          {
+            "id": 2,
+            "label": "a",
+            "details": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -112,19 +111,19 @@ test "画像" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": {
+      {
+        "node": [
+          "Head",
+          {
             "id": 2,
             "label": "a",
-            "folded": false,
-            "body": [["Content", ["Image", { "alt": "alt", "src": "x.png" }]]],
+            "details": false,
+            "body": [["Image", { "alt": "alt", "src": "x.png" }]],
+            "children": [],
           },
-          "items": [],
-          "headings": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -135,21 +134,19 @@ test "リンク" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": {
+      {
+        "node": [
+          "Head",
+          {
             "id": 2,
             "label": "a",
-            "folded": false,
-            "body": [
-              ["Content", ["Link", { "text": "text", "href": "https://e.com" }]],
-            ],
+            "details": false,
+            "body": [["Link", { "text": "text", "href": "https://e.com" }]],
+            "children": [],
           },
-          "items": [],
-          "headings": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -160,19 +157,19 @@ test "混ざった段落は切り分けない" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": {
+      {
+        "node": [
+          "Head",
+          {
             "id": 2,
             "label": "a",
-            "folded": false,
+            "details": false,
             "body": [["Opaque", "see ![alt](x.png)"]],
+            "children": [],
           },
-          "items": [],
-          "headings": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -183,21 +180,19 @@ test "フェンスのコード" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": {
+      {
+        "node": [
+          "Head",
+          {
             "id": 2,
             "label": "a",
-            "folded": false,
-            "body": [
-              ["Content", ["Code", { "info": "js", "text": "let x = 1\n" }]],
-            ],
+            "details": false,
+            "body": [["Code", { "info": "js", "text": "let x = 1\n" }]],
+            "children": [],
           },
-          "items": [],
-          "headings": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -208,19 +203,19 @@ test "インデントコードも読む（書くのはフェンス）" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": {
+      {
+        "node": [
+          "Head",
+          {
             "id": 2,
             "label": "a",
-            "folded": false,
-            "body": [["Content", ["Code", { "info": "", "text": "code\n" }]]],
+            "details": false,
+            "body": [["Code", { "info": "", "text": "code\n" }]],
+            "children": [],
           },
-          "items": [],
-          "headings": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -231,19 +226,19 @@ test "SVG" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": {
+      {
+        "node": [
+          "Head",
+          {
             "id": 2,
             "label": "a",
-            "folded": false,
-            "body": [["Content", ["Svg", "<svg><rect/></svg>\n"]]],
+            "details": false,
+            "body": [["Svg", "<svg><rect/></svg>\n"]],
+            "children": [],
           },
-          "items": [],
-          "headings": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -254,14 +249,19 @@ test "飾りの水平線は Rule" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": { "id": 2, "label": "a", "folded": false, "body": ["Rule"] },
-          "items": [],
-          "headings": [],
-        },
-      ],
+      {
+        "node": [
+          "Head",
+          {
+            "id": 2,
+            "label": "a",
+            "details": false,
+            "body": ["Rule"],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -272,19 +272,19 @@ test "引用と表は逐語のまま" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": {
+      {
+        "node": [
+          "Head",
+          {
             "id": 2,
             "label": "a",
-            "folded": false,
+            "details": false,
             "body": [["Opaque", "> quote"]],
+            "children": [],
           },
-          "items": [],
-          "headings": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -295,18 +295,19 @@ test "項目にも中身が付く" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Item",
-        {
-          "node": {
+      {
+        "node": [
+          "List",
+          {
             "id": 2,
             "label": "a",
-            "folded": false,
+            "details": false,
             "body": [["Opaque", "hello"]],
+            "children": [],
           },
-          "items": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }

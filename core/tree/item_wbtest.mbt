@@ -9,13 +9,19 @@ test "項目だけの木" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Item",
-        {
-          "node": { "id": 2, "label": "root", "folded": false, "body": [] },
-          "items": [],
-        },
-      ],
+      {
+        "node": [
+          "List",
+          {
+            "id": 2,
+            "label": "root",
+            "details": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -26,21 +32,27 @@ test "入れ子は深くなる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Item",
-        {
-          "node": { "id": 2, "label": "root", "folded": false, "body": [] },
-          "items": [
-            {
-              "side": "Right",
-              "branch": {
-                "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+      {
+        "node": [
+          "List",
+          {
+            "id": 2,
+            "label": "root",
+            "details": false,
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "details": false,
+                "body": [],
                 "children": [],
               },
-            },
-          ],
-        },
-      ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
     ],
   })
 }
@@ -51,28 +63,34 @@ test "兄弟は並ぶ" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Item",
-        {
-          "node": { "id": 2, "label": "root", "folded": false, "body": [] },
-          "items": [
-            {
-              "side": "Right",
-              "branch": {
-                "node": { "id": 3, "label": "a", "folded": false, "body": [] },
+      {
+        "node": [
+          "List",
+          {
+            "id": 2,
+            "label": "root",
+            "details": false,
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "details": false,
+                "body": [],
                 "children": [],
               },
-            },
-            {
-              "side": "Right",
-              "branch": {
-                "node": { "id": 4, "label": "b", "folded": false, "body": [] },
+              {
+                "id": 4,
+                "label": "b",
+                "details": false,
+                "body": [],
                 "children": [],
               },
-            },
-          ],
-        },
-      ],
+            ],
+          },
+        ],
+        "sides": ["Right", "Right"],
+      },
     ],
   })
 }
@@ -83,22 +101,30 @@ test "見出しの下の項目は 1 つ深い" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
-          "items": [
-            {
-              "side": "Right",
-              "branch": {
-                "node": { "id": 3, "label": "a", "folded": false, "body": [] },
-                "children": [],
-              },
-            },
-          ],
-          "headings": [],
-        },
-      ],
+      {
+        "node": [
+          "Head",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [],
+            "children": [
+              [
+                "List",
+                {
+                  "id": 3,
+                  "label": "a",
+                  "details": false,
+                  "body": [],
+                  "children": [],
+                },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
     ],
   })
 }
@@ -109,46 +135,49 @@ test "見出しは入れ子をリセットする" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
-          "items": [],
-          "headings": [
-            {
-              "side": "Right",
-              "branch": [
-                "Explicit",
+      {
+        "node": [
+          "Head",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [],
+            "children": [
+              [
+                "Head",
                 {
-                  "node": { "id": 3, "label": "s", "folded": false, "body": [] },
-                  "items": [
-                    {
-                      "node": {
+                  "id": 3,
+                  "label": "s",
+                  "details": false,
+                  "body": [],
+                  "children": [
+                    [
+                      "List",
+                      {
                         "id": 4,
                         "label": "a",
-                        "folded": false,
+                        "details": false,
                         "body": [],
-                      },
-                      "children": [
-                        {
-                          "node": {
+                        "children": [
+                          {
                             "id": 5,
                             "label": "b",
-                            "folded": false,
+                            "details": false,
                             "body": [],
+                            "children": [],
                           },
-                          "children": [],
-                        },
-                      ],
-                    },
+                        ],
+                      },
+                    ],
                   ],
-                  "headings": [],
                 },
               ],
-            },
-          ],
-        },
-      ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
     ],
   })
 }
@@ -159,26 +188,38 @@ test "マーカーの銘柄は構造に影響しない" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Item",
-        {
-          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
-          "items": [],
-        },
-      ],
+      {
+        "node": [
+          "List",
+          {
+            "id": 2,
+            "label": "a",
+            "details": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
     ],
   })
   json_inspect(parse("+ a\n"), content={
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Item",
-        {
-          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
-          "items": [],
-        },
-      ],
+      {
+        "node": [
+          "List",
+          {
+            "id": 2,
+            "label": "a",
+            "details": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -189,20 +230,32 @@ test "順序リストも項目として読む" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Item",
-        {
-          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
-          "items": [],
-        },
-      ],
-      [
-        "Item",
-        {
-          "node": { "id": 3, "label": "b", "folded": false, "body": [] },
-          "items": [],
-        },
-      ],
+      {
+        "node": [
+          "List",
+          {
+            "id": 2,
+            "label": "a",
+            "details": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+      {
+        "node": [
+          "List",
+          {
+            "id": 3,
+            "label": "b",
+            "details": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -213,13 +266,19 @@ test "ラベルは原文の逐語" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Item",
-        {
-          "node": { "id": 2, "label": "a **b**", "folded": false, "body": [] },
-          "items": [],
-        },
-      ],
+      {
+        "node": [
+          "List",
+          {
+            "id": 2,
+            "label": "a **b**",
+            "details": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
     ],
   })
 }

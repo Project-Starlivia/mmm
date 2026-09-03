@@ -10,7 +10,7 @@
 ///|
 /// 積み上げ中のノード。深さは stack の高さが持つので、自分では持たない。
 priv struct Frame {
-  mut skel : Skeleton
+  skel : Skeleton
   kids : Array[Frame]
   /// 翼になる深さ 2 の枠だけが意味を持つ。深いところの側は型で存在しない
   mut side : Side
@@ -24,7 +24,7 @@ priv struct Frame {
 priv enum Skeleton {
   /// 骨格行が無い。深さの飛びが綴り
   Gap
-  Line(sign~ : Sign, label~ : String, folded~ : Bool, body~ : Array[Block])
+  Line(sign~ : Sign, label~ : String, details~ : Bool, body~ : Array[Block])
 }
 
 ///|
@@ -44,7 +44,6 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
     head: 0,
     side: Right,
     pend: false,
-    folds: 0,
   }
   for block in ast.children {
     take(b, block, 0)
@@ -86,8 +85,6 @@ priv struct Build {
   mut side : Side
   /// 隙間に区切りが有ったか。**本数によらず 1 回**なので Bool で持つ
   mut pend : Bool
-  /// 開いている畳みの数。相手の居ない `</details>` を逐語のまま残すために数える
-  mut folds : Int
 }
 
 ///|
@@ -103,9 +100,9 @@ fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
         b,
         level,
         Line(
-          sign=Heading,
+          sign=Head,
           label=head_label(b.md, span, style, children),
-          folded=false,
+          details=false,
           body=[],
         ),
       )
@@ -119,44 +116,12 @@ fn take(b : Build, block : @markdown.Block, nest : Int) -> Unit {
       } else {
         fill(b, Rule)
       }
-    // 畳みは骨格行の外側に付く。中身と子だけを包むので、いま積んでいる
-    // ノードが畳まれる。`<summary>` は開きと同じ塊に入るので一緒に落ちる
-    HtmlBlock(html~, ..) if opens_fold(html) => {
-      fold(b)
-      b.folds = b.folds + 1
-    }
-    HtmlBlock(html~, ..) if closes_fold(html) && b.folds > 0 =>
-      b.folds = b.folds - 1
     _ =>
       match content_of(b.md, block) {
         Some(c) => fill(b, c)
         None => ()
       }
   }
-}
-
-///|
-/// いま積んでいるノードを畳む。Implicit は綴りが無いので畳めない。
-fn fold(b : Build) -> Unit {
-  guard b.stack.length() > 0 else { return }
-  let f = b.stack[b.stack.length() - 1]
-  match f.skel {
-    Line(sign~, label~, body~, ..) =>
-      f.skel = Line(sign~, label~, folded=true, body~)
-    Gap => ()
-  }
-}
-
-///|
-fn opens_fold(html : String) -> Bool {
-  html.trim().has_prefix("<details")
-}
-
-///|
-/// 相手の居ない `</details>` は畳みを閉じない。逐語のまま中身として残る
-/// （捨てるかエスケープするかは未決 — 落とすと意味が消えるので、いまは残す）。
-fn closes_fold(html : String) -> Bool {
-  html.trim() == "</details>"
 }
 
 ///|
@@ -174,7 +139,7 @@ fn items_take(b : Build, items : Array[@markdown.ListItem], nest : Int) -> Unit 
         rest.push(c)
       }
     }
-    put(b, b.head + 1 + nest, Line(sign=Item, label~, folded=false, body=[]))
+    put(b, b.head + 1 + nest, Line(sign=List, label~, details=false, body=[]))
     for c in rest {
       take(b, c, nest + 1)
     }
@@ -200,9 +165,9 @@ fn put(b : Build, level : Int, skel : Skeleton) -> Unit {
   // **見出しは見出しの背骨にしか積まれない。** 項目の枠は見出しの親に
   // なれないので落とす（列 0 の見出しは md でも項目を閉じる）。C17 を
   // 深さ 1 から全部の深さへ広げたもの。これが無いと項目の子が見出しになる
-  if skel is Line(sign=Heading, ..) {
+  if skel is Line(sign=Head, ..) {
     while b.stack.length() > 0 &&
-          b.stack[b.stack.length() - 1].skel is Line(sign=Item, ..) {
+          b.stack[b.stack.length() - 1].skel is Line(sign=List, ..) {
       ignore(b.stack.unsafe_pop())
     }
   }
@@ -361,69 +326,37 @@ fn number(f : Frame, next : Counter) -> Unit {
 }
 
 ///|
-/// 綴られた節の中身を取り出す。飛びには綴りが無いので空で作る。
-fn spell(f : Frame) -> Node {
+/// 森の 1 本を根にする。子の側は積むときに決まっている。
+fn to_root(f : Frame) -> Root {
+  { node: to_node(f), sides: f.kids.map(k => k.side) }
+}
+
+///|
+/// 枠をノードにする。項目だけは子も項目に畳む（単調性）。
+fn to_node(f : Frame) -> Node {
   match f.skel {
-    Gap => { id: f.id, label: "", folded: false, body: [] }
-    Line(label~, folded~, body~, ..) => { id: f.id, label, folded, body }
+    Gap => Implicit({ id: f.id, children: f.kids.map(to_node) })
+    Line(sign=List, label~, details~, body~) =>
+      List({ id: f.id, label, details, body, children: f.kids.map(to_list) })
+    Line(label~, details~, body~, ..) =>
+      Head({ id: f.id, label, details, body, children: f.kids.map(to_node) })
   }
 }
 
 ///|
-/// 項目の子だけ。**文書順で項目が先**なので、分けても順序は落ちない。
-fn twigs(kids : Array[Frame]) -> Array[Frame] {
-  kids.filter(k => k.skel is Line(sign=Item, ..))
-}
-
-///|
-/// 項目でない子（見出しと飛び）。
-fn heads(kids : Array[Frame]) -> Array[Frame] {
-  kids.filter(k => !(k.skel is Line(sign=Item, ..)))
-}
-
-///|
-/// 森の 1 本を根にする。子は翼になり、側は積むときに決まっている。
-/// **根の種類が翼の種類を決める** — 項目の根に見出しは生えない。
-fn to_root(f : Frame) -> Root {
+/// 項目にする。飛びは綴りが無いので空ラベルへ落ちる（項目の子に飛びは
+/// 来ないので、実際には通らない）。
+fn to_list(f : Frame) -> ListNode {
   match f.skel {
     Gap =>
-      Implicit(
-        id=f.id,
-        headings=f.kids.map(k => { side: k.side, branch: to_heading(k) }),
-      )
-    Line(sign=Item, ..) =>
-      Item(
-        node=spell(f),
-        items=f.kids.map(k => { side: k.side, branch: to_item(k) }),
-      )
-    Line(sign=Heading, ..) =>
-      Explicit(
-        node=spell(f),
-        items=twigs(f.kids).map(k => { side: k.side, branch: to_item(k) }),
-        headings=heads(f.kids).map(k => { side: k.side, branch: to_heading(k) }),
-      )
+      {
+        id: f.id,
+        label: "",
+        details: false,
+        body: [],
+        children: f.kids.map(to_list),
+      }
+    Line(label~, details~, body~, ..) =>
+      { id: f.id, label, details, body, children: f.kids.map(to_list) }
   }
-}
-
-///|
-/// 見出しにする。飛びは綴りを持たないまま Implicit になる。
-/// 項目の枠がここへ来ることは無い（見出しは背骨にしか積まれない）が、
-/// 来ても落とさず見出しとして読む — 黙って中身を捨てないため。
-fn to_heading(f : Frame) -> Heading {
-  match f.skel {
-    Gap => Implicit(id=f.id, headings=f.kids.map(to_heading))
-    Line(..) =>
-      Explicit(
-        node=spell(f),
-        items=twigs(f.kids).map(to_item),
-        headings=heads(f.kids).map(to_heading),
-      )
-  }
-}
-
-///|
-/// 項目にする。飛びは綴りが無く項目としては書けないので、空ラベルへ昇格する
-/// （項目の子に飛びは来ないので、これも実際には通らない）。
-fn to_item(f : Frame) -> Item {
-  { node: spell(f), children: f.kids.map(to_item) }
 }

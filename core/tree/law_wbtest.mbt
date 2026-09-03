@@ -9,18 +9,19 @@ test "単調性 — 項目の中の見出しは逐語のまま中身になる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Item",
-        {
-          "node": {
+      {
+        "node": [
+          "List",
+          {
             "id": 2,
             "label": "a",
-            "folded": false,
+            "details": false,
             "body": [["Opaque", "# x"]],
+            "children": [],
           },
-          "items": [],
-        },
-      ],
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -32,21 +33,32 @@ test "単調性 — 列 0 の見出しは項目を閉じる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Item",
-        {
-          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
-          "items": [],
-        },
-      ],
-      [
-        "Explicit",
-        {
-          "node": { "id": 3, "label": "x", "folded": false, "body": [] },
-          "items": [],
-          "headings": [],
-        },
-      ],
+      {
+        "node": [
+          "List",
+          {
+            "id": 2,
+            "label": "a",
+            "details": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+      {
+        "node": [
+          "Head",
+          {
+            "id": 3,
+            "label": "x",
+            "details": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
     ],
   })
 }
@@ -59,34 +71,40 @@ test "順序法則 — 項目のあとの見出しは兄弟になる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
-          "items": [
-            {
-              "side": "Right",
-              "branch": {
-                "node": { "id": 3, "label": "b", "folded": false, "body": [] },
-                "children": [],
-              },
-            },
-          ],
-          "headings": [
-            {
-              "side": "Right",
-              "branch": [
-                "Explicit",
+      {
+        "node": [
+          "Head",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [],
+            "children": [
+              [
+                "List",
                 {
-                  "node": { "id": 4, "label": "a", "folded": false, "body": [] },
-                  "items": [],
-                  "headings": [],
+                  "id": 3,
+                  "label": "b",
+                  "details": false,
+                  "body": [],
+                  "children": [],
                 },
               ],
-            },
-          ],
-        },
-      ],
+              [
+                "Head",
+                {
+                  "id": 4,
+                  "label": "a",
+                  "details": false,
+                  "body": [],
+                  "children": [],
+                },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right", "Right"],
+      },
     ],
   })
 }
@@ -99,36 +117,41 @@ test "順序法則 — 見出しのあとの項目は子になる" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
-          "items": [],
-          "headings": [
-            {
-              "side": "Right",
-              "branch": [
-                "Explicit",
+      {
+        "node": [
+          "Head",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [],
+            "children": [
+              [
+                "Head",
                 {
-                  "node": { "id": 3, "label": "a", "folded": false, "body": [] },
-                  "items": [
-                    {
-                      "node": {
+                  "id": 3,
+                  "label": "a",
+                  "details": false,
+                  "body": [],
+                  "children": [
+                    [
+                      "List",
+                      {
                         "id": 4,
                         "label": "b",
-                        "folded": false,
+                        "details": false,
                         "body": [],
+                        "children": [],
                       },
-                      "children": [],
-                    },
+                    ],
                   ],
-                  "headings": [],
                 },
               ],
-            },
-          ],
-        },
-      ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
     ],
   })
 }
@@ -142,47 +165,48 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
-          "items": [
-            {
-              "side": "Right",
-              "branch": {
-                "node": { "id": 3, "label": "b", "folded": false, "body": [] },
-                "children": [],
-              },
-            },
-          ],
-          "headings": [
-            {
-              "side": "Right",
-              "branch": [
+      {
+        "node": [
+          "Head",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [],
+            "children": [
+              [
+                "List",
+                {
+                  "id": 3,
+                  "label": "b",
+                  "details": false,
+                  "body": [],
+                  "children": [],
+                },
+              ],
+              [
                 "Implicit",
                 {
                   "id": 4,
-                  "headings": [
+                  "children": [
                     [
-                      "Explicit",
+                      "Head",
                       {
-                        "node": {
-                          "id": 5,
-                          "label": "x",
-                          "folded": false,
-                          "body": [],
-                        },
-                        "items": [],
-                        "headings": [],
+                        "id": 5,
+                        "label": "x",
+                        "details": false,
+                        "body": [],
+                        "children": [],
                       },
                     ],
                   ],
                 },
               ],
-            },
-          ],
-        },
-      ],
+            ],
+          },
+        ],
+        "sides": ["Right", "Right"],
+      },
     ],
   })
 }
@@ -193,45 +217,48 @@ test "単調性 — 項目の根の下にも潜らない" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Item",
-        {
-          "node": { "id": 2, "label": "a", "folded": false, "body": [] },
-          "items": [],
-        },
-      ],
-      [
-        "Implicit",
-        {
-          "id": 3,
-          "headings": [
-            {
-              "side": "Right",
-              "branch": [
+      {
+        "node": [
+          "List",
+          {
+            "id": 2,
+            "label": "a",
+            "details": false,
+            "body": [],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+      {
+        "node": [
+          "Implicit",
+          {
+            "id": 3,
+            "children": [
+              [
                 "Implicit",
                 {
                   "id": 4,
-                  "headings": [
+                  "children": [
                     [
-                      "Explicit",
+                      "Head",
                       {
-                        "node": {
-                          "id": 5,
-                          "label": "x",
-                          "folded": false,
-                          "body": [],
-                        },
-                        "items": [],
-                        "headings": [],
+                        "id": 5,
+                        "label": "x",
+                        "details": false,
+                        "body": [],
+                        "children": [],
                       },
                     ],
                   ],
                 },
               ],
-            },
-          ],
-        },
-      ],
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
     ],
   })
 }
@@ -242,57 +269,56 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
     "eol": "Lf",
     "body": [],
     "roots": [
-      [
-        "Explicit",
-        {
-          "node": { "id": 2, "label": "r", "folded": false, "body": [] },
-          "items": [
-            {
-              "side": "Right",
-              "branch": {
-                "node": { "id": 3, "label": "b", "folded": false, "body": [] },
-                "children": [
-                  {
-                    "node": {
+      {
+        "node": [
+          "Head",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [],
+            "children": [
+              [
+                "List",
+                {
+                  "id": 3,
+                  "label": "b",
+                  "details": false,
+                  "body": [],
+                  "children": [
+                    {
                       "id": 4,
                       "label": "c",
-                      "folded": false,
+                      "details": false,
                       "body": [],
+                      "children": [],
                     },
-                    "children": [],
-                  },
-                ],
-              },
-            },
-          ],
-          "headings": [
-            {
-              "side": "Right",
-              "branch": [
+                  ],
+                },
+              ],
+              [
                 "Implicit",
                 {
                   "id": 5,
-                  "headings": [
+                  "children": [
                     [
-                      "Explicit",
+                      "Head",
                       {
-                        "node": {
-                          "id": 6,
-                          "label": "x",
-                          "folded": false,
-                          "body": [],
-                        },
-                        "items": [],
-                        "headings": [],
+                        "id": 6,
+                        "label": "x",
+                        "details": false,
+                        "body": [],
+                        "children": [],
                       },
                     ],
                   ],
                 },
               ],
-            },
-          ],
-        },
-      ],
+            ],
+          },
+        ],
+        "sides": ["Right", "Right"],
+      },
     ],
   })
 }
