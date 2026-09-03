@@ -349,13 +349,15 @@ fn written(doc : Doc) -> String {
   fn blocks(bs : Array[Block]) -> Unit {
     for b in bs {
       match b {
-        Image(alt~, src~, ..) => {
+        Image(alt~, src~, title~) => {
           bag.push(alt)
           bag.push(src)
+          bag.push(title)
         }
-        Link(text~, href~, ..) => {
+        Link(text~, href~, title~) => {
           bag.push(text)
           bag.push(href)
+          bag.push(title)
         }
         Code(info~, text~) => {
           bag.push(info)
@@ -477,6 +479,9 @@ test "意味 — 綴りにならなかった文字は消えない" {
     "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<script>\nvar x = \"</details>\";\n</script>\n\n</details>\n",
     "</details>", 1,
   )
+  // 閉じのフェンス — 目印を置ける場所が無いので、フェンスそのものを見る
+  keep("# r\n\n$$\nx\n$$\n", "$$", 2)
+  keep("# r\n\n:::note\nx\n:::\n", ":::", 2)
   json_inspect(gone, content=[])
 }
 
@@ -492,4 +497,89 @@ test "単調性 — 項目の中の見出しを包んだ畳みは逐語" {
   // 畳みを書いた md と書いていない md が同じ木になってはいけない
   assert_not_eq(with_fold, without)
   assert_eq(tally(written(with_fold), "<summary>h</summary>"), 1)
+}
+
+///|
+/// **中身は必ず木に残る。** 綴り（`#` や `<details>`）は構造とフラグが引き受ける
+/// ので消えてよいが、それ以外の文字は 1 つも落ちてはいけない。
+///
+/// 中身を置ける場所ごとに 1 形つくり、目印（`Zq…`）が木に残るかを総当たりで見る。
+/// 名指しの見張りは「一度落とした形」しか守らないので、**まだ落としていない形**は
+/// ここが守る。落ちたら、その場所の読みがどこかで綴り扱いになっている。
+test "意味 — 中身を置ける場所すべてで文字が残る" {
+  let forms = [
+    ("見出しのラベル", "# Zq1\n"),
+    ("setext のラベル", "Zq2\n===\n"),
+    ("setext の 2 行目", "Zq3a\nZq3\n===\n"),
+    ("項目のラベル", "- Zq4\n"),
+    ("項目のラベルの続き", "- Zq5a\n  Zq5\n"),
+    ("段落", "# r\n\nZq6\n"),
+    ("コードの中身", "# r\n\n```\nZq7\n```\n"),
+    ("コードの info", "# r\n\n```Zq8\nx\n```\n"),
+    ("字下げコード", "# r\n\n    Zq9\n"),
+    ("画像の alt", "# r\n\n![Zq10](b.png)\n"),
+    ("画像の src", "# r\n\n![a](Zq11.png)\n"),
+    ("画像のタイトル", "# r\n\n![a](b.png \"Zq12\")\n"),
+    ("リンクの text", "# r\n\n[Zq13](b)\n"),
+    ("リンクの href", "# r\n\n[a](Zq14)\n"),
+    ("リンクのタイトル", "# r\n\n[a](b \"Zq15\")\n"),
+    ("リンクの定義行", "# r\n\n[a]: b \"Zq16\"\n"),
+    ("定義行が骨格より前", "[a]: b \"Zq17\"\n\n# r\n"),
+    ("表", "# r\n\n| Zq18 | b |\n| - | - |\n| 1 | 2 |\n"),
+    ("引用", "# r\n\n> Zq19\n"),
+    ("コメント", "# r\n\n<!-- Zq20 -->\n"),
+    ("html の塊", "# r\n\n<div>Zq21</div>\n"),
+    ("svg", "# r\n\n<svg>Zq22</svg>\n"),
+    ("数式の中身", "# r\n\n$$\nZq23\n$$\n"),
+    ("ディレクティブ", "# r\n\n:::Zq25\nx\n:::\n"),
+    ("脚注定義", "# r\n\n[^1]: Zq27\n"),
+    ("frontmatter", "---\nk: Zq28\n---\n\n# a\n"),
+    (
+      "畳みの中身", "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\nZq29\n\n</details>\n",
+    ),
+    (
+      "畳みの名前", "# r\n\n<details>\n<summary>Zq30</summary>\n\n## Zq30\n\n</details>\n",
+    ),
+    (
+      "畳めない領域", "# r\n\n<details class=\"Zq31\">\n<summary>h</summary>\n\n## h\n\n</details>\n",
+    ),
+    ("迷子の開き", "# r\n\n<details Zq32>\n"),
+    (
+      "項目の中の畳み", "- item\n\n  <details>\n  <summary>Zq33</summary>\n\n  ## h\n\n  </details>\n",
+    ),
+    ("項目の中の見出し", "- item\n\n  ## Zq34\n"),
+    ("深い項目の中身", "- a\n  - b\n\n    Zq35\n"),
+    ("項目の中の線の後ろ", "- a\n\n  ---\n\n  Zq36\n"),
+    ("線の後ろの中身", "# r\n\n---\n\nZq37\n"),
+    ("CRLF の段落", "# r\r\n\r\nZq38\r\n"),
+    (
+      "畳みの入れ子", "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<details>\n<summary>Zq39</summary>\n\n### Zq39\n\n</details>\n\n</details>\n",
+    ),
+    ("余った閉じの後ろ", "# r\n\n</details>\n\nZq40\n"),
+  ]
+  let gone = []
+  for form in forms {
+    let (name, md) = form
+    let mark = mark_of(md)
+    if tally(written(parse(md)), mark) == 0 {
+      gone.push("\{name} : \{mark} が無い : \{md.escape()}")
+    }
+  }
+  json_inspect(gone, content=[])
+}
+
+///|
+/// md に埋めた目印（`Zq` に続く英数字）を取り出す。
+fn mark_of(md : String) -> String {
+  let mut at = 0
+  while at + 1 < md.length() && !(md[at] == 'Z' && md[at + 1] == 'q') {
+    at = at + 1
+  }
+  guard at + 1 < md.length() else { return "Zq" }
+  let mut z = at + 2
+  while z < md.length() &&
+        ((md[z] >= '0' && md[z] <= '9') || (md[z] >= 'a' && md[z] <= 'z')) {
+    z = z + 1
+  }
+  String::unsafe_substring(md, start=at, end=z)
 }
