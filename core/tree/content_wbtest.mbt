@@ -385,7 +385,7 @@ test "項目の中の Opaque も列 0 に揃う" {
 /// 改行の流儀は切り出しの中でも保つ（`Doc.eol` は書き戻すときの流儀）。
 test "CRLF は切り出しの中でも保たれる" {
   json_inspect(
-    parse("# r\r\n\r\n<details>\r\n\r\n## h\r\n\r\n</details>\r\n"),
+    parse("# r\r\n\r\n<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>\r\n"),
     content={
       "eol": "Crlf",
       "body": [],
@@ -396,22 +396,19 @@ test "CRLF は切り出しの中でも保たれる" {
             {
               "id": 2,
               "label": "r",
-              "body": [],
-              "children": [
+              "body": [
                 [
-                  "HeadingNode",
+                  "Details",
                   {
                     "id": 3,
-                    "label": "h",
-                    "fold": { "open": false },
-                    "body": [],
-                    "children": [],
+                    "text": "<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>",
                   },
                 ],
               ],
+              "children": [],
             },
           ],
-          "sides": ["Right"],
+          "sides": [],
         },
       ],
     },

@@ -141,3 +141,52 @@ test "畳みの名前が summary に書けなければ見つける" {
   }
   json_inspect(check(doc), content=[["UnwritableName", 2]])
 }
+
+///|
+/// 生の HTML の塊は空行で終わるので、名前に空行が入っていると `</summary>`
+/// が次の塊へ落ちて、読み戻したとき畳みごと消える。名前が変わるだけの
+/// `</summary>` より損が大きい。
+test "畳みの名前に空行が入っていれば見つける" {
+  let doc : Doc = {
+    frontmatter: None,
+    eol: Lf,
+    body: [],
+    roots: [
+      {
+        node: HeadingNode({
+          id: 2,
+          label: "x",
+          fold: Some({ open: false, summary: Some("a\n  \nb") }),
+          body: [],
+          children: [],
+        }),
+        sides: [],
+      },
+    ],
+  }
+  json_inspect(check(doc), content=[["UnwritableName", 2]])
+}
+
+///|
+/// **1 行の改行は塊を割らない。** `<summary>a\nb</summary>` はそのまま読み戻せる
+/// ので、名前に改行が在るだけでは書けないことにならない。
+test "改行だけの名前は書ける" {
+  let doc : Doc = {
+    frontmatter: None,
+    eol: Lf,
+    body: [],
+    roots: [
+      {
+        node: HeadingNode({
+          id: 2,
+          label: "x",
+          fold: Some({ open: false, summary: Some("a\nb\n") }),
+          body: [],
+          children: [],
+        }),
+        sides: [],
+      },
+    ],
+  }
+  json_inspect(check(doc), content=[])
+}

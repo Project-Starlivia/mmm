@@ -14,7 +14,7 @@ pub(all) enum Flaw {
   BarrenImplicit(Int)
   /// 側の本数が根の子と合わない
   SideCount(root~ : Int, sides~ : Int, children~ : Int)
-  /// 畳みの名前が `<summary>` に書けない。読み戻すと名前が変わる
+  /// 畳みの名前が `<summary>` に書けない。読み戻すと別のものになる
   UnwritableName(Int)
 } derive(Eq, ToJson)
 
@@ -37,11 +37,13 @@ pub fn check(doc : Doc) -> Array[Flaw] {
     }
   }
 
-  /// 畳みの綴りが書けるか。`<summary>` の中身は最初の `</summary>` までなので、
-  /// 名前にそれが入っていると読み戻したとき別の名前になる。
+  /// 畳みの名前が `<summary>` に書けるか。**塊が割れる字並びは書けない** —
+  /// `<summary>` の中身は最初の `</summary>` までで、生の HTML の塊は空行で
+  /// 終わる。どちらが名前に入っていても、読み戻すと別のものになる。
   /// 「畳んでいないのに open」は型が殺しているので、ここには来ない。
   fn named(n : Int, fold : Fold?) -> Unit {
-    if fold is Some({ summary: Some(s), .. }) && s.contains("</summary>") {
+    guard fold is Some({ summary: Some(s), .. }) else { return }
+    if s.contains("</summary>") || blank_line(s) {
       flaws.push(UnwritableName(n))
     }
   }
@@ -96,6 +98,27 @@ pub fn check(doc : Doc) -> Array[Flaw] {
     nodes([r.node])
   }
   flaws
+}
+
+///|
+/// 空行が混じっているか。行いっぱいが空白の行は、生の HTML の塊を終わらせる。
+fn blank_line(s : String) -> Bool {
+  let mut i = 0
+  while i < s.length() {
+    guard s[i] == '\n' else {
+      i = i + 1
+      continue
+    }
+    let mut k = i + 1
+    while k < s.length() && (s[k] == ' ' || s[k] == '\t' || s[k] == '\r') {
+      k = k + 1
+    }
+    if k < s.length() && s[k] == '\n' {
+      return true
+    }
+    i = k
+  }
+  false
 }
 
 ///|

@@ -1455,7 +1455,7 @@ test "飛びが領域の中でも畳み" {
 test "後ろの領域が立たなければ跨がない" {
   json_inspect(
     parse(
-      "# a\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n\n<details>\n<summary>zz</summary>\n\n## c\n\n</details>\n",
+      "# a\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n\n<details class=\"z\">\n<summary>c</summary>\n\n## c\n\n</details>\n",
     ),
     content={
       "eol": "Lf",
@@ -1467,32 +1467,26 @@ test "後ろの領域が立たなければ跨がない" {
             {
               "id": 2,
               "label": "a",
-              "body": [],
-              "children": [
+              "body": [
                 [
-                  "HeadingNode",
+                  "Details",
                   {
                     "id": 3,
-                    "label": "b",
-                    "fold": { "open": false, "summary": "b" },
-                    "body": [],
-                    "children": [],
+                    "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
                   },
                 ],
                 [
-                  "HeadingNode",
+                  "Details",
                   {
                     "id": 4,
-                    "label": "c",
-                    "fold": { "open": false, "summary": "zz" },
-                    "body": [],
-                    "children": [],
+                    "text": "<details class=\"z\">\n<summary>c</summary>\n\n## c\n\n</details>",
                   },
                 ],
               ],
+              "children": [],
             },
           ],
-          "sides": ["Right", "Right"],
+          "sides": [],
         },
       ],
     },
