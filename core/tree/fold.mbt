@@ -1,7 +1,8 @@
 // `<details>` を読む。
 //
-// 領域が**ちょうど 1 つのノードの定義ごと**包んでいれば、そのノードの畳み
-// （`details = true`、中身は普通に読む）。そうでなければ中身の 1 枚
+// **限られた形のときだけ**そのノードの畳み（`details = true`、中身は普通に
+// 読む）。`<summary>` がラベルと一致し、領域がそのノードの body・children と
+// その body を過不足なく覆っていること。どちらか欠ければ中身の 1 枚
 // （`Block::Details` の逐語）。裁定は docs/spec.md。
 
 ///|
@@ -63,12 +64,17 @@ fn pieces(md : String, blocks : Array[@markdown.Block]) -> Array[Piece] {
       }
       Some(j) =>
         if covers(blocks, i, j) && summary_fits(md, blocks, i) {
-          // ちょうど覆っている。タグは落ち、包まれた行が畳まれる
+          // 過不足なく覆っている。タグは落ち、包まれた行が畳まれる
           out.push(Folded(blocks[next(blocks, i)]))
+          // 中はまた同じ規則で読む。入れ子の畳みも畳みになる
+          let inner = []
           let mut k = next(blocks, i) + 1
           while k < j {
-            out.push(Raw(blocks[k]))
+            inner.push(blocks[k])
             k = k + 1
+          }
+          for p in pieces(md, inner) {
+            out.push(p)
           }
           i = j + 1
         } else {
@@ -150,14 +156,13 @@ fn covers(blocks : Array[@markdown.Block], i : Int, j : Int) -> Bool {
 }
 
 ///|
-/// `<summary>` があれば、包まれた行のラベルと一致するか。無ければ問わない。
+/// `<summary>` があり、包まれた行のラベルと一致するか。
+/// **名前が無ければ畳みではない** — 領域が誰のものか言えていないので。
 /// 比べるのは**原文の文字列どうし**（どちらも mdAst を通っていない）。
 fn summary_fits(md : String, blocks : Array[@markdown.Block], i : Int) -> Bool {
   guard blocks[i] is HtmlBlock(html~, ..) else { return false }
-  match summary_of(html) {
-    None => true
-    Some(s) => s == label_of(md, blocks[next(blocks, i)])
-  }
+  guard summary_of(html) is Some(s) else { return false }
+  s == label_of(md, blocks[next(blocks, i)])
 }
 
 ///|

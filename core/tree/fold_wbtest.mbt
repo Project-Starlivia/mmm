@@ -1,47 +1,15 @@
 // 畳み（`<details>`）を固定する。
 //
-// 領域が**ちょうど 1 つのノードの定義ごと**包んでいれば、そのノードの畳み
-// （`details = true`、中身は普通に読む）。そうでなければ中身の 1 枚（`Details`）。
+// **2 つ揃ったときだけ**そのノードの畳み（`details = true`、中身は普通に読む）:
+// `<summary>` がラベルと一致し、領域がそのノードの body・children とその body を
+// 過不足なく覆っている。欠ければ中身の 1 枚（`Details`）。
 
 ///|
-test "定義ごと包んでいれば、そのノードの畳み" {
-  json_inspect(parse("# r\n\n<details>\n\n## h\n\nbody\n\n</details>\n"), content={
-    "eol": "Lf",
-    "body": [],
-    "roots": [
-      {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "details": false,
-            "body": [],
-            "children": [
-              [
-                "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "h",
-                  "details": true,
-                  "body": [["Opaque", "body"]],
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
-        "sides": ["Right"],
-      },
-    ],
-  })
-}
-
-///|
-/// `<summary>` はラベルと文字列が完全一致すれば畳み。
-test "summary が一致すれば畳み" {
+test "名前と形が揃えば、そのノードの畳み" {
   json_inspect(
-    parse("# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n"),
+    parse(
+      "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\nbody\n\n</details>\n",
+    ),
     content={
       "eol": "Lf",
       "body": [],
@@ -61,7 +29,7 @@ test "summary が一致すれば畳み" {
                     "id": 3,
                     "label": "h",
                     "details": true,
-                    "body": [],
+                    "body": [["Opaque", "body"]],
                     "children": [],
                   },
                 ],
@@ -73,6 +41,35 @@ test "summary が一致すれば畳み" {
       ],
     },
   )
+}
+
+///|
+/// 名前が無ければ、領域が誰のものか言えていないので畳みではない。
+test "summary が無ければ中身" {
+  json_inspect(parse("# r\n\n<details>\n\n## h\n\n</details>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "details": false,
+            "body": [
+              [
+                "Details",
+                { "id": 3, "text": "<details>\n\n## h\n\n</details>" },
+              ],
+            ],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
 }
 
 ///|
@@ -295,80 +292,88 @@ test "相手の居ない閉じもただの文字" {
 ///|
 /// 畳みは見出しの階層に割り込まない。
 test "畳みの後ろは元の深さに戻る" {
-  json_inspect(parse("# r\n\n<details>\n\n## h\n\n</details>\n\n## b\n"), content={
-    "eol": "Lf",
-    "body": [],
-    "roots": [
-      {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "details": false,
-            "body": [],
-            "children": [
-              [
-                "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "h",
-                  "details": true,
-                  "body": [],
-                  "children": [],
-                },
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n## b\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "h",
+                    "details": true,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
+                [
+                  "HeadingNode",
+                  {
+                    "id": 4,
+                    "label": "b",
+                    "details": false,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
               ],
-              [
-                "HeadingNode",
-                {
-                  "id": 4,
-                  "label": "b",
-                  "details": false,
-                  "body": [],
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
-        "sides": ["Right", "Right"],
-      },
-    ],
-  })
+            },
+          ],
+          "sides": ["Right", "Right"],
+        },
+      ],
+    },
+  )
 }
 
 ///|
 test "項目も定義ごと包める" {
-  json_inspect(parse("# r\n\n<details>\n\n- a\n\n</details>\n"), content={
-    "eol": "Lf",
-    "body": [],
-    "roots": [
-      {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "details": false,
-            "body": [],
-            "children": [
-              [
-                "ListNode",
-                {
-                  "id": 3,
-                  "label": "a",
-                  "details": true,
-                  "body": [],
-                  "children": [],
-                },
+  json_inspect(
+    parse("# r\n\n<details>\n<summary>a</summary>\n\n- a\n\n</details>\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "body": [],
+              "children": [
+                [
+                  "ListNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "details": true,
+                    "body": [],
+                    "children": [],
+                  },
+                ],
               ],
-            ],
-          },
-        ],
-        "sides": ["Right"],
-      },
-    ],
-  })
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
 }
 
 ///|
@@ -409,4 +414,55 @@ test "空行の有無で逐語が変わる" {
   let with_blank = parse("# r\n\n<details>\n\n### x\n\n## y\n</details>\n")
   let without = parse("# r\n\n<details>\n### x\n\n## y\n</details>\n")
   assert_not_eq(with_blank, without)
+}
+
+///|
+/// 入れ子も同じ規則で読む。外を解いたあと、中をまた同じ目で見る。
+test "入れ子の畳みも畳み" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<details>\n<summary>a1</summary>\n\n### a1\n\n</details>\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "details": true,
+                    "body": [],
+                    "children": [
+                      [
+                        "HeadingNode",
+                        {
+                          "id": 4,
+                          "label": "a1",
+                          "details": true,
+                          "body": [],
+                          "children": [],
+                        },
+                      ],
+                    ],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
 }
