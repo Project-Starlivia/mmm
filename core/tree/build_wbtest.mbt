@@ -374,3 +374,37 @@ test "ATX の閉じの # は飾り、空白が無ければ中身" {
     },
   ])
 }
+
+///|
+/// **改行の入ったラベルは setext でしか書けない。** 書く側はラベルに改行が
+/// 在るかで綴りを選ぶので、木は ATX か setext かを持たない。それが成り立つのは
+/// setext の見出しが深さ 1〜2 にしか座らないから — 境界が引き出す先も深さ 2。
+test "setext の見出しは境界の先でも深さ 2" {
+  json_inspect(parse("# r\n\n## a\n\n---\n\nZZZ\nWWW\n---\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              [
+                "HeadingNode",
+                { "id": 3, "label": "a", "body": [], "children": [] },
+              ],
+              [
+                "HeadingNode",
+                { "id": 4, "label": "ZZZ\nWWW", "body": [], "children": [] },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right", "Left"],
+      },
+    ],
+  })
+}
