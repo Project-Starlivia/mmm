@@ -77,14 +77,56 @@ fn inline_text(
 }
 
 ///|
-/// ブロックが原文で占めている綴りそのもの。末尾の改行は綴りなので落とす。
+/// ブロックが原文で占めている綴りそのもの。
 fn verbatim(md : String, block : @markdown.Block) -> String {
   let s = block_span(block)
-  let mut z = s.to
-  while z > s.from && (md[z - 1] == '\n' || md[z - 1] == '\r') {
+  carve(md, s.from, s.to)
+}
+
+///|
+/// 原文の切り出し。**容器の字下げは剥がす** — 項目や引用の中では行頭の空白は
+/// その容器の記法であって中身ではないので、逐語に混ぜると列がずれる
+/// （深く入れ子にすると、逐語を読み直したとき字下げコードに化ける）。
+/// 1 行目は mdAst の span がもう剥がしているので、残りの行を同じだけ揃える。
+/// 末尾の改行も記法なので落とす。
+fn carve(md : String, from : Int, to : Int) -> String {
+  let mut z = to
+  while z > from && (md[z - 1] == '\n' || md[z - 1] == '\r') {
     z = z - 1
   }
-  String::unsafe_substring(md, start=s.from, end=z)
+  let indent = column(md, from)
+  if indent == 0 {
+    return String::unsafe_substring(md, start=from, end=z)
+  }
+  let out = StringBuilder::new()
+  let mut i = from
+  let mut head = false
+  while i < z {
+    if head {
+      let mut n = 0
+      while n < indent && i < z && (md[i] == ' ' || md[i] == '\t') {
+        i = i + 1
+        n = n + 1
+      }
+      head = false
+      continue
+    }
+    let c = md[i]
+    out.write_char(c.unsafe_to_char())
+    head = c == '\n'
+    i = i + 1
+  }
+  out.to_string()
+}
+
+///|
+/// 行頭からの桁。容器の字下げの幅になる。
+fn column(md : String, at : Int) -> Int {
+  let mut i = at
+  while i > 0 && md[i - 1] != '\n' {
+    i = i - 1
+  }
+  at - i
 }
 
 ///|

@@ -325,3 +325,135 @@ test "項目にも中身が付く" {
     ],
   })
 }
+
+///|
+/// **容器の字下げは剥がす。** 項目の中の行頭の空白はその項目の記法であって
+/// 中身ではない。剥がさないと逐語の列がずれ、深い入れ子では読み直したときに
+/// 字下げコードへ化ける。
+test "項目の中の逐語は列 0 に揃う" {
+  json_inspect(parse("- a\n\n  <details>\n\n  ## h\n\n  </details>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "a",
+            "details": false,
+            "open": false,
+            "body": [
+              [
+                "Details",
+                { "id": 3, "text": "<details>\n\n## h\n\n</details>" },
+              ],
+            ],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}
+
+///|
+/// 2 段でも同じ。剥がす幅は容器の字下げそのもの。
+test "入れ子の項目でも列 0 に揃う" {
+  json_inspect(
+    parse("- a\n  - b\n\n    <details>\n\n    ## h\n\n    </details>\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "ListNode",
+            {
+              "id": 2,
+              "label": "a",
+              "details": false,
+              "open": false,
+              "body": [],
+              "children": [
+                {
+                  "id": 3,
+                  "label": "b",
+                  "details": false,
+                  "open": false,
+                  "body": [
+                    [
+                      "Details",
+                      { "id": 4, "text": "<details>\n\n## h\n\n</details>" },
+                    ],
+                  ],
+                  "children": [],
+                },
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// Opaque も同じ規則で切る。
+test "項目の中の Opaque も列 0 に揃う" {
+  json_inspect(parse("- a\n\n  <!-- x\n  y -->\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "a",
+            "details": false,
+            "open": false,
+            "body": [["Opaque", "<!-- x\ny -->"]],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}
+
+///|
+/// 改行の流儀は逐語の中でも保つ（`Doc.eol` は書き戻すときの流儀）。
+test "CRLF は逐語の中でも保たれる" {
+  json_inspect(
+    parse("# r\r\n\r\n<details>\r\n\r\n## h\r\n\r\n</details>\r\n"),
+    content={
+      "eol": "Crlf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  { "id": 3, "text": "<details>\r\n\r\n## h\r\n\r\n</details>" },
+                ],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}

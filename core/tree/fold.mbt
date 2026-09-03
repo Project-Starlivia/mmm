@@ -413,7 +413,7 @@ fn pieces(md : String, blocks : Array[@markdown.Block]) -> Array[Piece] {
   while i < n {
     if last[i] >= 0 {
       // 綴りとして読めなかった領域。丸ごと逐語で持つ
-      out.push(Capsule(cut(md, from[i], upto[i])))
+      out.push(Capsule(carve(md, from[i], upto[i])))
       i = last[i] + 1
     } else if gone[i] {
       i = i + 1
@@ -461,14 +461,4 @@ fn folds(
   guard head < cb else { return false }
   guard name == label_of(md, blocks[head]) else { return false }
   covers(blocks, spells, low, head, cb - 1)
-}
-
-///|
-/// 原文の切り出し。末尾の改行は記法なので落とす。
-fn cut(md : String, from : Int, to : Int) -> String {
-  let mut z = to
-  while z > from && (md[z - 1] == '\n' || md[z - 1] == '\r') {
-    z = z - 1
-  }
-  String::unsafe_substring(md, start=from, end=z)
 }
