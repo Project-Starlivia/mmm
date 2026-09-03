@@ -25,3 +25,17 @@ pub fn mmm_tree_json(md : String) -> String {
 pub fn mmm_check(md : String) -> String {
   @tree.check(@tree.parse(md)).to_json().stringify()
 }
+
+///|
+/// 木を書き戻した正規形の md。
+#export_name("mmmSerialize")
+pub fn mmm_serialize(md : String) -> String {
+  @tree.serialize(@tree.parse(md))
+}
+
+///|
+/// 木を戻した mdAst の指紋。読みの指紋と並べて、どちらの段で形が変わったかを見る。
+#export_name("mmmUnbuildSig")
+pub fn mmm_unbuild_sig(md : String) -> String {
+  @tree.ast_sig(@tree.unbuild(@tree.parse(md)))
+}

@@ -49,14 +49,24 @@ fn dump(b : @markdown.Block) -> String {
 }
 
 ///|
+/// 範囲。組んだ mdAst（unbuild）は位置を持たないので、空なら何も付けない。
 fn at(s : @markdown.Span) -> String {
-  "[\{s.from},\{s.to}]"
+  if s.from == 0 && s.to == 0 {
+    ""
+  } else {
+    "[\{s.from},\{s.to}]"
+  }
+}
+
+///|
+/// md を読んだ mdAst の指紋。
+pub fn md_ast_sig(md : String) -> String {
+  ast_sig(read(md))
 }
 
 ///|
 /// mdAst ぜんぶの指紋。frontmatter が在れば頭に付く。
-pub fn md_ast_sig(md : String) -> String {
-  let doc = read(md)
+pub fn ast_sig(doc : @markdown.Document) -> String {
   let sb = StringBuilder::new()
   match doc.frontmatter {
     Some(f) => sb.write_string("Front\{at(f.span)} ")
