@@ -27,9 +27,14 @@ fn opens(html : String) -> Bool {
 /// 空行を挟まないと md は次の行まで飲み込むので、飲み込まれた行があれば偽。
 /// 知らない属性が付いていても偽 — 畳みにすると開きの塊ごと落ちて属性が消える。
 fn bare(html : String) -> Bool {
+  let mut opens = 0
   for line in html.split("\n") {
     let t = line.trim().to_owned()
-    if t == "" || t == "<details>" || t == "<details open>" {
+    if t == "" {
+      continue
+    }
+    if t == "<details>" || t == "<details open>" {
+      opens = opens + 1
       continue
     }
     if t.has_prefix("<summary>") && t.has_suffix("</summary>") {
@@ -37,7 +42,8 @@ fn bare(html : String) -> Bool {
     }
     return false
   }
-  true
+  // 重なった開きは、どの `<summary>` が誰のものか言えないので綴りにしない
+  opens == 1
 }
 
 ///|
@@ -76,8 +82,67 @@ fn closes(html : String) -> Bool {
 }
 
 ///|
+/// 塊が `</details>` の並びだけで出来ていれば、それぞれの終わり位置。
+/// 空行を挟まないと md は閉じを重ねて 1 つの塊にする。
+fn stack_of(html : String) -> Array[Int]? {
+  let ends = []
+  let mut i = 0
+  while i < html.length() {
+    let c = html[i]
+    if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+      i = i + 1
+      continue
+    }
+    let tag = "</details>"
+    guard i + tag.length() <= html.length() else { return None }
+    for k in 0..<tag.length() {
+      guard html[i + k] == tag[k] else { return None }
+    }
+    i = i + tag.length()
+    ends.push(i)
+  }
+  if ends.length() > 1 {
+    Some(ends)
+  } else {
+    None
+  }
+}
+
+///|
+/// 重なった閉じをほどく。**何段ぶんかは数えれば分かる**ので、段ごとの塊に
+/// 分けてから読む。並べ直すだけで、1 文字も足さず落とさない。
+fn unstack(blocks : Array[@markdown.Block]) -> Array[@markdown.Block] {
+  let out = []
+  for b in blocks {
+    match b {
+      HtmlBlock(html~, span~, ..) =>
+        match stack_of(html) {
+          None => out.push(b)
+          Some(ends) => {
+            let mut from = 0
+            for e in ends {
+              out.push(
+                HtmlBlock(
+                  html=String::unsafe_substring(html, start=from, end=e),
+                  span=@markdown.Span::new(span.from + from, span.from + e),
+                  leading_trivia=@markdown.Trivia::empty(),
+                  trailing_trivia=@markdown.Trivia::empty(),
+                ),
+              )
+              from = e
+            }
+          }
+        }
+      _ => out.push(b)
+    }
+  }
+  out
+}
+
+///|
 /// ブロックの並びを、畳みを解いたひと切れの列にする。
-fn pieces(md : String, blocks : Array[@markdown.Block]) -> Array[Piece] {
+fn pieces(md : String, raw : Array[@markdown.Block]) -> Array[Piece] {
+  let blocks = unstack(raw)
   let out = []
   let mut i = 0
   while i < blocks.length() {

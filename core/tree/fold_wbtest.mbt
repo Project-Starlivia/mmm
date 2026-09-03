@@ -489,10 +489,10 @@ test "入れ子の畳みも畳み" {
 }
 
 ///|
-/// 空行を挟まないと md は閉じを重ねて 1 つの塊にする。それを畳みの閉じに使うと
-/// **もう片方の `</details>` が消える**ので、閉じの塊も記法だけで出来ていること
-/// を求める。**意味を 1 ビットも失わない**の帰結。
-test "閉じが重なった塊は畳みの閉じにしない" {
+/// 空行を挟まないと md は閉じを重ねて 1 つの塊にする。**何段ぶんかは数えれば
+/// 分かる**ので、段ごとにほどいてから読む。外部レンダラが入れ子の畳みとして
+/// 見せるものを、mmm も同じに読む。
+test "重なった閉じはほどいて読む" {
   json_inspect(
     parse(
       "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n</details>\n</details>\n",
@@ -509,25 +509,29 @@ test "閉じが重なった塊は畳みの閉じにしない" {
               "label": "r",
               "details": false,
               "open": false,
-              "body": [["Opaque", "<details>\n<summary>x</summary>"]],
+              "body": [],
               "children": [
                 [
                   "HeadingNode",
                   {
                     "id": 3,
                     "label": "x",
-                    "details": false,
+                    "details": true,
                     "open": false,
-                    "body": [
+                    "body": [],
+                    "children": [
                       [
-                        "Details",
+                        "HeadingNode",
                         {
                           "id": 4,
-                          "text": "<details>\n<summary>y</summary>\n\n### y\n</details>\n</details>",
+                          "label": "y",
+                          "details": true,
+                          "open": false,
+                          "body": [],
+                          "children": [],
                         },
                       ],
                     ],
-                    "children": [],
                   },
                 ],
               ],
@@ -609,6 +613,46 @@ test "知らない属性が付いていれば中身" {
                     "text": "<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>",
                   },
                 ],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 開きが重なっていると、どの `<summary>` が誰のものか言えない。
+/// ほどかず領域まるごと逐語で持つ。
+test "重なった開きは中身" {
+  json_inspect(
+    parse(
+      "# r\n\n<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "details": false,
+              "open": false,
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>",
+                  },
+                ],
+                ["Opaque", "</details>"],
               ],
               "children": [],
             },
