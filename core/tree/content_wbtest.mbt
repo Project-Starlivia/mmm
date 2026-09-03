@@ -530,3 +530,141 @@ test "数式とディレクティブの閉じは残る" {
     ],
   })
 }
+
+///|
+/// **定義行は項目の中にも書ける。** 定義は文書ぜんぶで 1 列なので、項目を
+/// 読み解くときはその項目のぶんだけ切り出して渡す。まとめて外へ出すと、
+/// 触っていない場所が動く。
+test "項目の中の定義行は項目の中に残る" {
+  json_inspect(parse("- a\n  - b\n\n    [q]: /r\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "a",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "b",
+                "body": [["Opaque", "[q]: /r"]],
+                "children": [],
+              },
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// **同じ行を 2 度は出さない。** 原文のまま持つ領域は定義行ごと抱えるので、
+/// そこに重ねて出すと、書き戻したとき定義行が増える。
+test "原文のまま持つ領域の中の定義行は重ねない" {
+  json_inspect(
+    parse("# r\n\n<details>\njunk\n\n[q]: /r\n\n## a\n\n</details>\n"),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "body": [
+                [
+                  "Details",
+                  {
+                    "id": 3,
+                    "text": "<details>\njunk\n\n[q]: /r\n\n## a\n\n</details>",
+                  },
+                ],
+              ],
+              "children": [],
+            },
+          ],
+          "sides": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// **定義行は畳みの領域に入れない。** 開きとノードの間に書いてあれば、それは
+/// そのノードのものではない要素なので①が欠ける（畳みが立つと綴りは木から
+/// 消えるので、書き戻したとき定義行が領域の外へ出る）。
+test "開きとノードの間の定義行があれば中身" {
+  json_inspect(parse("# r\n\n<details>\n\n[q]: /r\n\n## a\n\n</details>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "body": [
+              [
+                "Details",
+                {
+                  "id": 3,
+                  "text": "<details>\n\n[q]: /r\n\n## a\n\n</details>",
+                },
+              ],
+            ],
+            "children": [],
+          },
+        ],
+        "sides": [],
+      },
+    ],
+  })
+}
+
+///|
+/// **定義行は塊にならないが中身。** 保留中の水平線はそこで飾りに落ちるので、
+/// 後ろの見出しは境界の先ではなく普通の子になる。
+test "定義行は保留中の水平線を飾りに落とす" {
+  json_inspect(parse("# r\n\n## a\n\n---\n\n[q]: /r\n\n## b\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              [
+                "HeadingNode",
+                {
+                  "id": 3,
+                  "label": "a",
+                  "body": ["ThematicBreak", ["Opaque", "[q]: /r"]],
+                  "children": [],
+                },
+              ],
+              [
+                "HeadingNode",
+                { "id": 4, "label": "b", "body": [], "children": [] },
+              ],
+            ],
+          },
+        ],
+        "sides": ["Right", "Right"],
+      },
+    ],
+  })
+}

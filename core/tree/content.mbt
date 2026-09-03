@@ -114,6 +114,17 @@ fn closing(md : String, block : @markdown.Block, to : Int) -> Int {
 }
 
 ///|
+/// この範囲に書かれた定義行だけ。定義は文書ぜんぶで 1 列なので、入れ子の中を
+/// 読み解くときは切り出して渡す（そうしないと手前の定義が中へ紛れ込む）。
+fn defs_in(
+  defs : Array[@markdown.Span],
+  from : Int,
+  to : Int,
+) -> Array[@markdown.Span] {
+  defs.filter(s => s.from >= from && s.to <= to)
+}
+
+///|
 /// 原文の切り出し。**容器の字下げは剥がす** — 項目や引用の中では行頭の空白は
 /// その容器の記法であって中身ではないので、切り出しに混ぜると列がずれる
 /// （深く入れ子にすると、切り出しを読み直したとき字下げコードに化ける）。

@@ -319,6 +319,32 @@ fn beyond(blocks : Array[@markdown.Block], gone : Array[Bool], i : Int) -> Int {
 }
 
 ///|
+/// 塊にならない中身が、この塊の手前に在るか。mdAst はリンクの定義行を
+/// ブロックとして返さない（`Document.definitions` に分けて持つ）が、原文には
+/// 在って中身になる。**どの塊の範囲にも入っていないものだけ** — 段落や見出しの
+/// 範囲に入っていれば、その文字はその塊が持っている
+fn ahead_of(
+  blocks : Array[@markdown.Block],
+  defs : Array[@markdown.Span],
+) -> Array[Bool] {
+  let out = Array::make(blocks.length(), false)
+  for s in defs {
+    let mut k = 0
+    while k < blocks.length() && block_span(blocks[k]).from <= s.from {
+      k = k + 1
+    }
+    // k は定義行の後ろの最初の塊。手前の塊が抱えていれば、そこに文字は在る
+    if k > 0 && block_span(blocks[k - 1]).to > s.from {
+      continue
+    }
+    if k < blocks.length() {
+      out[k] = true
+    }
+  }
+  out
+}
+
+///|
 /// 保留中の水平線が行き先に選ぶ塊。**本数に意味は無い**ので水平線が続くうちは
 /// 先へ送り、骨格でない塊に当たればそこで飾りに落ちる。
 fn lands(blocks : Array[@markdown.Block], gone : Array[Bool], i : Int) -> Int {
@@ -416,6 +442,7 @@ fn pieces(
     }
   }
   let ps = pairs(spots)
+  let ahead = ahead_of(blocks, defs)
 
   // **どの塊が綴りとして落ちるか**を決める。畳みが立つかは「後ろに何が居るか」
   // に依り、そこに居るのが綴りか中身かは畳みが立つかに依るので、たがいに要る。
@@ -423,13 +450,13 @@ fn pieces(
   // 落ちる塊は減る一方なので必ず止まる。
   let gone = Array::makei(n, i => spells[i].writes)
   let ok = ps.map(_ => false)
-  let mut depth = depths(md, blocks, gone, nest)
+  let mut depth = depths(md, blocks, gone, ahead, nest)
   for _ in 0..<=ps.length() {
     // 深さも同じ `gone` で測る。跨ぐ塊が変われば本番の木も変わるので、
     // 判定と同じ前提で測り直さないと食い違う
-    depth = depths(md, blocks, gone, nest)
+    depth = depths(md, blocks, gone, ahead, nest)
     for k, p in ps {
-      ok[k] = folds(blocks, spells, depth, gone, spots, p.0, p.1)
+      ok[k] = folds(blocks, spells, depth, gone, ahead, spots, p.0, p.1)
     }
     // 塊が落ちるのは、**その塊の綴りが全部立った畳みのもの**のときだけ。
     // 立っていない綴りが混じっていたら落とせない（その文字が消える）
@@ -497,9 +524,15 @@ fn pieces(
   // に分けて持つ）。**書いてあった位置に戻す** — 文書のどこに書いてもよい
   // 記法なので、まとめて 1 か所へ動かすと触っていない場所が動く
   let mut d = 0
+  // どこまでの原文が、もうひと切れの中に入ったか。**同じ行を 2 度は出さない** —
+  // 原文のまま持つ領域は定義ごと抱えるし、mdAst は定義行を段落や見出しの範囲に
+  // 含めることがある。項目の中の定義は、項目を読み解くときに置かれる
+  let mut carried = 0
   fn flush(before : Int) -> Unit {
     while d < defs.length() && defs[d].from < before {
-      out.push(Text(carve(md, defs[d].from, defs[d].to)))
+      if defs[d].from >= carried {
+        out.push(Text(carve(md, defs[d].from, defs[d].to)))
+      }
       d = d + 1
     }
   }
@@ -510,6 +543,7 @@ fn pieces(
     if last[i] >= 0 {
       // 綴りとして読めなかった領域。丸ごと原文のまま持つ
       out.push(Capsule(carve(md, from[i], upto[i])))
+      carried = upto[i]
       i = last[i] + 1
     } else if gone[i] {
       i = i + 1
@@ -520,6 +554,7 @@ fn pieces(
           None => Raw(blocks[i])
         },
       )
+      carried = block_span(blocks[i]).to
       i = i + 1
     }
   }
@@ -535,6 +570,7 @@ fn folds(
   spells : Array[Spell],
   depth : Array[Depth],
   gone : Array[Bool],
+  ahead : Array[Bool],
   spots : Array[Spot],
   o : Int,
   c : Int,
@@ -561,5 +597,10 @@ fn folds(
   // `<summary>` がラベルと一致するかは問わず、書かれたまま持つ
   let head = next(blocks, ob)
   guard head < cb else { return false }
+  // 定義行は塊にならないので `next` では見えないが、中身であることに変わりは
+  // ない。開きとノードの間に在れば、それはこのノードのものではない要素
+  for k in (ob + 1)..<=head {
+    guard !ahead[k] else { return false }
+  }
   covers(blocks, depth, gone, head, cb - 1)
 }

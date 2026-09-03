@@ -38,6 +38,7 @@ pub fn parse(md : String) -> Doc {
 pub fn build(md : String, ast : @markdown.Document) -> Doc {
   let b : Build = {
     md,
+    defs: ast.definitions.map(d => d.span),
     forest: [],
     stack: [],
     body: [],
@@ -47,7 +48,7 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
     own: deep,
     dry: false,
   }
-  for piece in pieces(md, ast.children, ast.definitions.map(d => d.span), 0) {
+  for piece in pieces(md, ast.children, b.defs, 0) {
     lay(b, piece, 0)
   }
   // 行き先の見出し・項目が来ないまま終わった水平線は、その場の中身に落ちる
@@ -80,6 +81,8 @@ pub let doc_id : Int = 1
 /// 控えると、境界が枠を引き出したあとに元の数から数えてしまう。
 priv struct Build {
   md : String
+  /// 文書ぜんぶのリンクの定義行。項目の中を読み解くときに切り出して渡す
+  defs : Array[@markdown.Span]
   forest : Array[Frame]
   stack : Array[Frame]
   /// 最初の骨格より前の散文
@@ -118,10 +121,12 @@ fn depths(
   md : String,
   blocks : Array[@markdown.Block],
   gone : Array[Bool],
+  ahead : Array[Bool],
   nest : Int,
 ) -> Array[Depth] {
   let b : Build = {
     md,
+    defs: [],
     forest: [],
     stack: [],
     body: [],
@@ -133,6 +138,11 @@ fn depths(
   }
   let out = Array::make(blocks.length(), { top: deep, own: deep })
   for i, block in blocks {
+    // 塊にならない中身（リンクの定義行）も中身なので、保留中の水平線は
+    // そこで飾りに落ちる。本番と同じ前提で測らないと深さが食い違う
+    if ahead[i] {
+      spill(b)
+    }
     // **跨ぐのは実際に落ちる塊だけ。** 綴りに見えても落ちない塊（対にならない
     // `<summary>` など）は本番では中身になり、そこで保留中の水平線が装飾に落ちる。
     // 跨いでしまうと水平線が保留のまま次の骨格を引き出し、本番と深さがずれる
@@ -230,9 +240,12 @@ fn items_take(
     // 段落が切り出しの内側に入る）。1 行目が段落でなければラベルは無い
     let rest = []
     let mut label = ""
+    // ラベルの範囲に入った定義行はラベルが持っている。残りは項目の中身
+    let mut from = it.span.from
     for i, c in it.children {
       if i == 0 && c is Paragraph(..) {
         label = item_label(b.md, c)
+        from = block_span(c).to
       } else {
         rest.push(c)
       }
@@ -246,7 +259,7 @@ fn items_take(
     let inner = if b.dry {
       rest.map(c => Raw(c))
     } else {
-      pieces(b.md, rest, [], nest + 1)
+      pieces(b.md, rest, defs_in(b.defs, from, it.span.to), nest + 1)
     }
     for c in inner {
       lay(b, c, nest + 1)

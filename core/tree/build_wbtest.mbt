@@ -303,7 +303,8 @@ test "setext のラベルも末尾まで残る" {
 }
 
 ///|
-/// 見出しも同じ。`[q]: /r` が定義として引き取られても、2 行目が消えない。
+/// 見出しも同じ。`[q]: /r` が定義として引き取られても、2 行目が消えず、
+/// 引き取られた行が中身として重ねて出ることもない。
 test "定義行に見える setext でもラベルは全部残る" {
   json_inspect(parse("[q]: /r\nZZZ\n---\n"), content={
     "eol": "Lf",
@@ -317,12 +318,7 @@ test "定義行に見える setext でもラベルは全部残る" {
             "children": [
               [
                 "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "[q]: /r\nZZZ",
-                  "body": [["Opaque", "[q]: /r"]],
-                  "children": [],
-                },
+                { "id": 3, "label": "[q]: /r\nZZZ", "body": [], "children": [] },
               ],
             ],
           },
