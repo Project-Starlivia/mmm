@@ -140,3 +140,108 @@ test "知らない id なら None" {
   let d = doc([root(h(2, "r"))])
   assert_eq(splice(d, 9, n => [n]), None)
 }
+
+///|
+test "append は子の末尾。根なら side も足す" {
+  let d = doc([root(h(2, "r", children=[h(3, "a")]), sides=[Right])])
+  assert_eq(
+    append(d, node=2, [h(9, "b")]),
+    Some(
+      doc([
+        root(h(2, "r", children=[h(3, "a"), h(9, "b")]), sides=[Right, Right]),
+      ]),
+    ),
+  )
+  assert_eq(
+    append(d, node=2, side=Left, [h(9, "b")]),
+    Some(
+      doc([
+        root(h(2, "r", children=[h(3, "a"), h(9, "b")]), sides=[Right, Left]),
+      ]),
+    ),
+  )
+  assert_eq(
+    append(d, node=3, [h(9, "x")]),
+    Some(
+      doc([
+        root(h(2, "r", children=[h(3, "a", children=[h(9, "x")])]), sides=[
+          Right,
+        ]),
+      ]),
+    ),
+  )
+}
+
+///|
+test "append の side は、無ければ末尾の子の側、子が無ければ Right" {
+  let d = doc([root(h(2, "r", children=[h(3, "a")]), sides=[Left])])
+  assert_eq(
+    append(d, node=2, [h(9, "b")]),
+    Some(
+      doc([root(h(2, "r", children=[h(3, "a"), h(9, "b")]), sides=[Left, Left])]),
+    ),
+  )
+  let e = doc([root(h(2, "r"))])
+  assert_eq(
+    append(e, node=2, [h(9, "b")]),
+    Some(doc([root(h(2, "r", children=[h(9, "b")]), sides=[Right])])),
+  )
+}
+
+///|
+test "append を doc_id にすれば新しい根" {
+  let d = doc([root(h(2, "r"))])
+  assert_eq(
+    append(d, node=@tree.doc_id, [h(9, "s", children=[h(10, "t")])]),
+    Some(
+      doc([
+        root(h(2, "r")),
+        root(h(9, "s", children=[h(10, "t")]), sides=[Right]),
+      ]),
+    ),
+  )
+}
+
+///|
+test "append は項目の下に項目しか置けない" {
+  let d = doc([root(item(2, "a"), sides=[])])
+  assert_eq(
+    append(d, node=2, [item(9, "b")]),
+    Some(doc([root(item(2, "a", children=[li(9, "b")]), sides=[Right])])),
+  )
+  assert_eq(append(d, node=2, [h(9, "b")]), None)
+  assert_eq(append(d, node=99, [h(9, "b")]), None)
+}
+
+///|
+test "body は持ち主の中身を配列として直す" {
+  let d = doc([
+    root(h(2, "r", body=[pic(3)], children=[gap(4, [h(5, "x")])]), sides=[Right]),
+  ])
+  assert_eq(
+    body(d, node=2, bs => [..bs, code(9)]),
+    Some(
+      doc([
+        root(
+          h(2, "r", body=[pic(3), code(9)], children=[gap(4, [h(5, "x")])]),
+          sides=[Right],
+        ),
+      ]),
+    ),
+  )
+  assert_eq(
+    body(d, node=@tree.doc_id, bs => [..bs, code(9)]),
+    Some(
+      doc(
+        [
+          root(h(2, "r", body=[pic(3)], children=[gap(4, [h(5, "x")])]), sides=[
+            Right,
+          ]),
+        ],
+        body=[code(9)],
+      ),
+    ),
+  )
+  assert_eq(body(d, node=4, bs => bs), None)
+  assert_eq(body(d, node=99, bs => bs), None)
+}

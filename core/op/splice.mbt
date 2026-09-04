@@ -199,3 +199,85 @@ fn items(s : Splice, xs : Array[@tree.ListNode]) -> Array[@tree.ListNode] {
   }
   out
 }
+
+///|
+/// 子の列に足したノード。項目の下に項目でないものは置けない。
+fn with_kids(n : @tree.Node, more : Array[@tree.Node]) -> @tree.Node? {
+  match n {
+    HeadingNode(h) =>
+      Some(HeadingNode({ ..h, children: [..h.children, ..more] }))
+    ImplicitNode(g) =>
+      Some(ImplicitNode({ ..g, children: [..g.children, ..more] }))
+    ListNode(l) => {
+      let children = l.children.copy()
+      for y in more {
+        match y {
+          ListNode(c) => children.push(c)
+          _ => return None
+        }
+      }
+      Some(ListNode({ ..l, children, }))
+    }
+  }
+}
+
+///|
+/// In の席。隣が居ないので f でなく列を受け取り、子の列の末尾に足す。
+/// node が根なら sides も足す — side があればそれ、無ければ末尾の子の側、
+/// 子が無ければ Right。node が doc_id なら新しい根（sides は Right × 子の数）。
+fn append(
+  doc : @tree.Doc,
+  node~ : Int,
+  side? : @tree.Side,
+  nodes : Array[@tree.Node],
+) -> @tree.Doc? {
+  if node == @tree.doc_id {
+    let roots = doc.roots.copy()
+    for y in nodes {
+      roots.push({ node: y, sides: Array::make(kids(y).length(), @tree.Right) })
+    }
+    return Some({ ..doc, roots, })
+  }
+  for i, r in doc.roots {
+    if id_of(r.node) == node {
+      guard with_kids(r.node, nodes) is Some(n) else { return None }
+      let s = match side {
+        Some(s) => s
+        None =>
+          match r.sides.last() {
+            Some(s) => s
+            None => @tree.Right
+          }
+      }
+      let sides = r.sides.copy()
+      for _ in nodes {
+        sides.push(s)
+      }
+      let roots = doc.roots.copy()
+      roots[i] = { node: n, sides }
+      return Some({ ..doc, roots, })
+    }
+  }
+  guard find(doc, node) is Some(n) else { return None }
+  guard with_kids(n, nodes) is Some(m) else { return None }
+  splice(doc, node, _ => [m])
+}
+
+///|
+/// 中身の列を直す。node が doc_id なら文書の散文。Implicit は中身を持たないので None。
+fn body(
+  doc : @tree.Doc,
+  node~ : Int,
+  f : (Array[@tree.Block]) -> Array[@tree.Block],
+) -> @tree.Doc? {
+  if node == @tree.doc_id {
+    return Some({ ..doc, body: f(doc.body) })
+  }
+  guard find(doc, node) is Some(n) else { return None }
+  let m = match n {
+    HeadingNode(h) => @tree.HeadingNode({ ..h, body: f(h.body) })
+    ListNode(l) => @tree.ListNode({ ..l, body: f(l.body) })
+    ImplicitNode(_) => return None
+  }
+  splice(doc, node, _ => [m])
+}
