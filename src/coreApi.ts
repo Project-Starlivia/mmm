@@ -268,6 +268,9 @@ export type Op =
   | { kind: "unfold"; id: number }
   | { kind: "graft"; at: NodePlace; md: string };
 
+/** 文書そのものの id。core の `doc_id` と同じ値で、`NodePlace.in` の node に置けば新しい根 */
+export const DOC_ID = 1;
+
 /** 操作を md に映した結果。focus は編集を当てて読み直した木での id（消した後は null） */
 export interface Edited {
   edits: Edit[];
