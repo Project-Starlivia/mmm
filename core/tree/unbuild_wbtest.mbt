@@ -9,11 +9,11 @@
 ///|
 fn doc(
   roots : Array[Root],
-  body? : Array[Block] = [],
+  body? : Array[Content] = [],
   frontmatter? : String? = None,
   eol? : Eol = Lf,
 ) -> Doc {
-  { frontmatter, eol, body, roots }
+  { frontmatter, eol, body: blocks(body), roots }
 }
 
 ///|
@@ -23,30 +23,35 @@ fn root(node : Node, sides? : Array[Side] = []) -> Root {
 
 ///|
 /// id は書きに関係しないので 0 のまま。
+fn blocks(body : Array[Content]) -> Array[Block] {
+  body.map(content => ({ id: 0, content } : Block))
+}
+
+///|
 fn h(
   label : String,
   children? : Array[Node] = [],
-  body? : Array[Block] = [],
+  body? : Array[Content] = [],
   fold? : Fold? = None,
 ) -> Node {
-  HeadingNode({ id: 0, label, fold, body, children })
+  HeadingNode({ id: 0, label, fold, body: blocks(body), children })
 }
 
 ///|
 fn li(
   label : String,
   children? : Array[ListNode] = [],
-  body? : Array[Block] = [],
+  body? : Array[Content] = [],
   fold? : Fold? = None,
 ) -> ListNode {
-  { id: 0, label, fold, body, children }
+  { id: 0, label, fold, body: blocks(body), children }
 }
 
 ///|
 fn item(
   label : String,
   children? : Array[ListNode] = [],
-  body? : Array[Block] = [],
+  body? : Array[Content] = [],
   fold? : Fold? = None,
 ) -> Node {
   ListNode(li(label, children~, body~, fold~))
@@ -434,10 +439,7 @@ test "Details はそのまま" {
       doc([
         root(
           h("r", body=[
-            Details(
-              id=0,
-              text="<details>\n<summary>h</summary>\n\ninner\n\n</details>",
-            ),
+            Details("<details>\n<summary>h</summary>\n\ninner\n\n</details>"),
           ]),
         ),
       ]),

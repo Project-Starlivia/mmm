@@ -103,12 +103,12 @@ test "側の本数が子と合わなければ見つける" {
 }
 
 ///|
-/// 中身の畳みも同じ id 空間に居る。
-test "Details の id も一意さを見る" {
+/// 中身もノードと同じ id 空間に居る。
+test "中身の id も一意さを見る" {
   let doc : Doc = {
     frontmatter: None,
     eol: Lf,
-    body: [Details(id=5, text="a")],
+    body: [{ id: 5, content: Opaque("a") }],
     roots: [
       {
         node: HeadingNode({

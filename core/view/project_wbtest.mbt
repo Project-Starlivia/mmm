@@ -102,15 +102,15 @@ test "項目も子の項目も同じノードになる" {
 }
 
 ///|
-test "Opaque だけが落ちる。並びは保つ" {
+test "Opaque だけが落ちる。並びも id も保つ" {
   let body : Array[@tree.Block] = [
-    @tree.Image(alt="", src="p.png", title=""),
-    @tree.Opaque("prose"),
-    @tree.Link(text="t", href="u", title=""),
-    @tree.Code(info="js", text="1\n"),
-    @tree.Svg("<svg/>"),
-    @tree.ThematicBreak,
-    @tree.Details(id=3, text="<details>x</details>"),
+    { id: 3, content: @tree.Image(alt="", src="p.png", title="") },
+    { id: 4, content: @tree.Opaque("prose") },
+    { id: 5, content: @tree.Link(text="t", href="u", title="") },
+    { id: 6, content: @tree.Code(info="js", text="1\n") },
+    { id: 7, content: @tree.Svg("<svg/>") },
+    { id: 8, content: @tree.ThematicBreak },
+    { id: 9, content: @tree.Details("<details>x</details>") },
   ]
   json_inspect(project(doc([root(heading(2, "a", body~))])), content=[
     {
@@ -118,12 +118,18 @@ test "Opaque だけが落ちる。並びは保つ" {
         "id": 2,
         "label": "a",
         "blocks": [
-          ["Image", { "alt": "", "src": "p.png", "title": "" }],
-          ["Link", { "text": "t", "href": "u", "title": "" }],
-          ["Code", { "info": "js", "text": "1\n" }],
-          ["Svg", "<svg/>"],
-          "ThematicBreak",
-          ["Details", { "id": 3, "text": "<details>x</details>" }],
+          {
+            "id": 3,
+            "content": ["Image", { "alt": "", "src": "p.png", "title": "" }],
+          },
+          {
+            "id": 5,
+            "content": ["Link", { "text": "t", "href": "u", "title": "" }],
+          },
+          { "id": 6, "content": ["Code", { "info": "js", "text": "1\n" }] },
+          { "id": 7, "content": ["Svg", "<svg/>"] },
+          { "id": 8, "content": "ThematicBreak" },
+          { "id": 9, "content": ["Details", "<details>x</details>"] },
         ],
         "children": [],
       },
@@ -192,12 +198,15 @@ test "書き戻すためだけの欄は消える" {
   let d : @tree.Doc = {
     frontmatter: Some("k: v\n"),
     eol: Crlf,
-    body: [@tree.ThematicBreak, @tree.Opaque("prose")],
-    roots: [root(heading(2, "a"))],
+    body: [
+      { id: 2, content: @tree.ThematicBreak },
+      { id: 3, content: @tree.Opaque("prose") },
+    ],
+    roots: [root(heading(4, "a"))],
   }
   json_inspect(project(d), content=[
     {
-      "node": { "id": 2, "label": "a", "blocks": [], "children": [] },
+      "node": { "id": 4, "label": "a", "blocks": [], "children": [] },
       "sides": [],
     },
   ])

@@ -224,8 +224,8 @@ test "1 行目が段落でなければラベルは無い" {
             "id": 2,
             "label": "",
             "body": [
-              ["Code", { "info": "", "text": "code\n" }],
-              ["Opaque", "x"],
+              { "id": 3, "content": ["Code", { "info": "", "text": "code\n" }] },
+              { "id": 4, "content": ["Opaque", "x"] },
             ],
             "children": [],
           },
@@ -251,13 +251,12 @@ test "途中の段落はラベルにならない" {
               "id": 2,
               "label": "",
               "body": [
-                [
-                  "Details",
-                  {
-                    "id": 3,
-                    "text": "<details>\n<summary>a</summary>\n\nx\n\n</details>",
-                  },
-                ],
+                {
+                  "id": 3,
+                  "content": [
+                    "Details", "<details>\n<summary>a</summary>\n\nx\n\n</details>",
+                  ],
+                },
               ],
               "children": [],
             },
