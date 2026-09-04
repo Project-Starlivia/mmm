@@ -112,6 +112,11 @@ export class MapRenderer {
     return this.edgeEls.get(id);
   }
 
+  /** 選ばれた箱に印を付ける。レイアウトを見直さない軽い塗り替え（値は main.ts のもの） */
+  paintSelection(sel: Set<number>): void {
+    for (const [id, g] of this.nodeEls) g.classList.toggle("selected", sel.has(id));
+  }
+
   private shapeOf(b: Box, p: Scene): NodeShape {
     const n = b.node;
     return {

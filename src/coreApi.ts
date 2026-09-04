@@ -1,6 +1,6 @@
 // core の出口。**JSON の形を整えるだけ** — 意味は 1 つも足さない。
 //
-// 使う側は `import * as core` で `core.View` / `core.view(md)` と書く。
+// 使う側は `import * as core` で `core.View` / `core.survey(md, edits, marks)` と書く。
 // フロントでは view は画面を意味し、`Node` は DOM のグローバル型と衝突するので、
 // 裸の名前を出さない（MoonBit 側の `@view.Tree` と同じ形）。
 //
@@ -56,8 +56,50 @@ export interface View {
   trees: Tree[];
 }
 
-/** md を core に読ませ、map が見る木を受け取る。読みのサイクルの入口 */
-export const view = (md: string): View => decode(JSON.parse(mbt.mmmViewJson(md)));
+/** 地番。ノードが md のどこに書かれているか。label はラベルの頭（Implicit と文書の散文は null） */
+export interface Spot {
+  from: number;
+  label: number | null;
+  to: number;
+}
+
+/** 編集 1 つ。CodeMirror の changes と同じ形（前の座標、from 順、重ならない） */
+export interface Edit {
+  from: number;
+  to: number;
+  insert: string;
+}
+
+/** 前のサイクルの目印。選択を md の打鍵をまたいで持ち越すためのもの */
+export interface Mark {
+  from: number;
+  label: number;
+}
+
+/** 写した目印と、いま当たるノード。当たらなくても目印は生きている */
+export interface Trail {
+  mark: Mark;
+  id: number | null;
+}
+
+/** 打鍵 1 回ぶんの読み */
+export interface Survey {
+  view: View;
+  spots: Map<number, Spot>;
+  /** marks と同じ並び。null は死んだ目印 */
+  trails: (Trail | null)[];
+}
+
+/**
+ * md を core に読ませ、View と地番と、前の目印の行き先を 1 度に受け取る。
+ * 読みのサイクルの唯一の入口
+ */
+export const survey = (md: string, edits: Edit[], marks: Mark[]): Survey => {
+  const r = decodeSurvey(JSON.parse(mbt.mmmSurvey(md, JSON.stringify(edits), JSON.stringify(marks))));
+  // follow は marks を 1:1 で写す。揃わなければ core と ts の対応が壊れている
+  if (r.trails.length !== marks.length) bad("trails が marks と揃わない");
+  return r;
+};
 
 // ---- JSON の形を確かめながら整える ----
 
@@ -165,6 +207,38 @@ export function decode(json: unknown): View {
   };
 }
 
+const spot = (v: unknown): Spot => {
+  const o = record(v);
+  return { from: field(o, "from", num), label: option(o, "label", num), to: field(o, "to", num) };
+};
+
+const mark = (v: unknown): Mark => {
+  const o = record(v);
+  return { from: field(o, "from", num), label: field(o, "label", num) };
+};
+
+const trail = (v: unknown): Trail | null => {
+  if (v === null) return null;
+  const o = record(v);
+  return { mark: field(o, "mark", mark), id: option(o, "id", num) };
+};
+
+/** core の JSON（`mmmSurvey` の出力）を Survey にする。Map の鍵は文字列で来る */
+export function decodeSurvey(json: unknown): Survey {
+  const o = record(json);
+  const spots = new Map<number, Spot>();
+  for (const [k, v] of Object.entries(field(o, "spots", record))) {
+    const id = Number(k);
+    if (!Number.isInteger(id)) bad(`spots の鍵 ${k}`);
+    spots.set(id, spot(v));
+  }
+  return {
+    view: decode(field(o, "view", (v) => v)),
+    spots,
+    trails: field(o, "trails", (t) => list(t, trail)),
+  };
+}
+
 // ---- 操作を core へ送る ----
 //
 // 席は隣の id で言う（添字は無い）。`in` は列の末尾で、side は node が根のときだけ意味を持つ。
@@ -193,13 +267,6 @@ export type Op =
   | { kind: "fold"; id: number; open: boolean }
   | { kind: "unfold"; id: number }
   | { kind: "graft"; at: NodePlace; md: string };
-
-/** 編集 1 つ。CodeMirror の changes と同じ形 */
-export interface Edit {
-  from: number;
-  to: number;
-  insert: string;
-}
 
 /** 操作を md に映した結果。focus は編集を当てて読み直した木での id（消した後は null） */
 export interface Edited {
