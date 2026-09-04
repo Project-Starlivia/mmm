@@ -213,11 +213,13 @@ export class Mindmap {
     this.renderer.paintSelection(new Set(this.host.selection().ids));
   }
 
-  /** その場編集に入る。seed は最初の字。箱が無い（畳まれて埋もれた）ノードは開けない */
-  beginEdit(id: number, seed: string | null): void {
+  /** その場編集に入る。seed は最初の字。箱が無い（畳まれて埋もれた）ノードは
+   *  開けない — 戻り値はそれを呼び出し側（main.ts の apply）に言うためのもの */
+  beginEdit(id: number, seed: string | null): boolean {
     const b = this.layout.boxes.get(id);
-    if (!b) return;
+    if (!b) return false;
     this.label.open(id, b, this.camera, labelOf(b.node), seed);
+    return true;
   }
 
   /**

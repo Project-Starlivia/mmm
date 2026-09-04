@@ -195,7 +195,8 @@ function apply(op: core.Op, edit: boolean): void {
   if (r.focus === null) return;
   // 同じノードに留まる操作（ラベルを打つ）で md を寄せ直さない
   setSelection({ ids: [r.focus], anchor: r.focus }, r.focus !== selection.anchor);
-  if (edit) map.beginEdit(r.focus, null);
+  // 畳まれて埋もれたノードには箱が無く、その場編集を開けない
+  if (edit && !map.beginEdit(r.focus, null)) failed("Couldn't start editing — the node is folded");
 }
 
 /** md のカーソルが動いた。掛かるノードに輪を出す（地図は動かさない） */
