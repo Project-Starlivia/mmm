@@ -36,6 +36,8 @@ test("Enter — 名前のあるノードなら下に兄弟を足して編集、�
     edit: true,
   });
   assert.deepEqual(keyed(L, one(4), k("Enter")), { kind: "edit", id: 4, seed: null });
+  // 何も選んでいなければ拾わない
+  assert.equal(keyed(L, NONE, k("Enter")), null);
 });
 
 test("Shift+Enter は上に兄弟。Tab は子。Shift+Tab は親で包む。どれも編集開始", () => {
@@ -83,10 +85,15 @@ test("空のノードで字を打てば、その字から編集。名前があ�
   assert.equal(keyed(L, one(4), k("x", { mod: true })), null);
 });
 
-test("複数選んでいるときの Tab / Enter は何もしない（段下げは次の段）", () => {
+test("複数選んでいるときの Tab / Shift+Tab は何もしない（段下げは次の段）。Enter は anchor に対して足す", () => {
   assert.equal(keyed(L, { ids: [3, 4], anchor: 4 }, k("Tab")), null);
   assert.equal(keyed(L, { ids: [3, 4], anchor: 4 }, k("Tab", { shift: true })), null);
   assert.equal(keyed(L, NONE, k("Tab")), null);
+  assert.deepEqual(keyed(L, { ids: [3, 4], anchor: 4 }, k("Enter")), {
+    kind: "op",
+    op: { kind: "addNode", at: { kind: "after", node: 4 }, labels: [""] },
+    edit: true,
+  });
 });
 
 test("段 1 のキーはそのまま — 矢印は select、Shift+矢印は伸ばす、Esc は解除、Mod+A は全部、Home は寄せ", () => {
