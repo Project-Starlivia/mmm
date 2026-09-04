@@ -205,9 +205,12 @@ export class Mindmap {
   /** 選んでいるカードの印と、開いている入力欄を今のレイアウト・視点に合わせる。
    *  render 後とカメラが動いたときに呼ぶ（followLabel と同じ理由） */
   private followCard(): void {
+    // 持ち主が畳まれて箱を失えば外す — 見えないカードを選んだままにしない
     const picked = this.host.picked();
-    if (picked === null) this.pick.hide();
-    else this.pick.show(picked, this.cardRectOf(picked));
+    const rect = picked === null ? null : this.cardRectOf(picked);
+    if (picked !== null && rect === null) this.host.setPicked(null);
+    if (picked === null || rect === null) this.pick.hide();
+    else this.pick.show(picked, rect);
     const editing = this.card.editing();
     if (editing === null) return;
     const rect = this.cardRectOf(editing);
@@ -304,7 +307,7 @@ export class Mindmap {
 
   /** カードをその場で開く。畳まれて埋もれている（箱が無い）ときは断る。
    *  `text` は欄に載せる字（省略すれば md の原文）— 変えずに閉じれば書かない */
-  editCard(id: number, from?: number, to?: number, text = this.host.blockText(id)): void {
+  editCard(id: number, from?: number, to?: number, text = this.host.blockText(id).replace(/\n$/, "")): void {
     const rect = this.cardRectOf(id);
     if (rect === null) {
       failed("Couldn't open that card");
@@ -317,7 +320,7 @@ export class Mindmap {
   /**
    * クリップボードの URL をリンクカードにして足し、題（`[]` の中）を打つ。
    * URL として読めなければ `failed`（core にも聞かない — 貼り付けの判定
-   * （app/paste.ts、Task 5）と違い、ここは「URL か否か」だけの単純な形）
+   * （app/paste.ts は骨格の有無を core に読ませるが、ここは「URL か否か」だけの単純な形）
    */
   private async addLink(id: number): Promise<void> {
     let url = "";
@@ -457,6 +460,8 @@ export class Mindmap {
     pane.addEventListener("pointerdown", (e) => {
       if (targetIn(e, ".link-open, .img-connect, .pane-tool, #node-editor, #card-editor")) return;
       if (e.pointerType === "touch" && this.fingers.pinching) return;
+      // 長押しの印は次の押下で用済み（contextmenu を合成しない環境で残らないように）
+      this.menuOpenedByHold = false;
       if (e.button !== 0 && e.button !== 1) return;
       pane.focus();
       // カードと × の上の押下は、そのクリック（bindClick）のもの。ここで
@@ -751,6 +756,9 @@ export class Mindmap {
   /** その画面の点でメニューを開く。箱の外なら閉じるだけ。触った箱がまだ選ばれて
    *  いなければ、それ 1 つに選び直してから並びを組む — 右クリックは選ぶ動作も兼ねる */
   private openMenu(x: number, y: number): void {
+    // 開いている欄は閉じてから。メニューは選択を据え直すので、欄の下で id が動かないように
+    this.label.close();
+    this.card.close();
     const id = this.nodeAt(x, y);
     if (id === null) {
       this.menu.hide();
@@ -846,7 +854,7 @@ export class Mindmap {
       const picked = this.host.picked();
       const intent = picked !== null ? keyedCard(this.layout, picked, key) : keyed(this.layout, this.host.selection(), key);
       if (intent === null) {
-        // 段 3 が段下げに使う。今は拾わないが、地図から焦点を逃がさない
+        // 表が断った Tab（選んでいない・前の兄弟が無い）でも、地図から焦点を逃がさない
         if (e.key === "Tab") e.preventDefault();
         return;
       }

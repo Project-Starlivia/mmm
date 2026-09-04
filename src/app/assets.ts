@@ -403,6 +403,8 @@ export function initAssets(deps: {
         const rel = `${declaredPath()}${parts.join("/")}`;
         // 鍵はカード側が問い合わせてくる形（裸）に合わせる。
         // md へ書くのは mdPath の形（`./x`）。
+        const old = assetUrls.get(bare(rel));
+        if (old) URL.revokeObjectURL(old);
         assetUrls.set(bare(rel), URL.createObjectURL(webpBlob));
         return mdPath(rel);
       } catch {

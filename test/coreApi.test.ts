@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { decode, decodeSurvey, edit, edited, encode, survey } from "../src/coreApi.ts";
+import { type View, decode, decodeSurvey, edit, edited, encode, isNode, survey } from "../src/coreApi.ts";
 
 test("None の鍵は無い → null。Implicit は label が null", () => {
   const v = decode({ trees: [{ node: { id: 2, blocks: [], children: [] }, sides: [] }] });
@@ -165,4 +165,26 @@ test("edit は core を往復する — 編集を当てれば名前が替わり�
 
 test("edit — 同じ名前への Rename は edits が空でも focus は在る（apply が断りと見分ける契約）", () => {
   assert.deepEqual(edit("# a\n", { kind: "rename", id: 2, label: "a" }), { edits: [], focus: 2 });
+});
+
+test("isNode — 根も子孫もノード、中身の id と知らない id は違う", () => {
+  const v: View = {
+    frontmatter: null,
+    trees: [
+      {
+        node: {
+          id: 2,
+          label: "r",
+          fold: null,
+          blocks: [{ id: 3, content: { kind: "thematicBreak" } }],
+          children: [{ id: 4, label: "a", fold: null, blocks: [], children: [] }],
+        },
+        sides: ["Right"],
+      },
+    ],
+  };
+  assert.equal(isNode(v, 2), true);
+  assert.equal(isNode(v, 4), true);
+  assert.equal(isNode(v, 3), false);
+  assert.equal(isNode(v, 9), false);
 });

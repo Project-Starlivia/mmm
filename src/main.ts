@@ -3,8 +3,8 @@
 // 決して書かない。選択はここに値として在り、地図はそれを塗るだけ。
 // ここに居るのは、そのサイクルと、保存とファイル I/O、帯のメニュー。
 //
-// **操作の入口は `apply` 1 本。** 無いのは消す・並べ替え・ドラッグ・カード
-// （後の段で戻す。git に在る）。
+// **操作の入口は `apply` 1 本。** 地図のキー・メニュー・ドラッグ・カード・貼り付けは
+// すべて Op になってここを通る。
 
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import * as core from "./coreApi.ts";
@@ -221,7 +221,6 @@ function setPicked(id: number | null): void {
  * 始まらない）。呼び出し側が続けられるよう focus を返す（Link / Code が使う）
  */
 function apply(op: core.Op, edit: boolean, keep: number | null = null): number | null {
-  if (keep !== null) setSelection({ ids: [keep], anchor: keep }, false);
   const r = core.edit(text, op);
   // core は断りを「編集なし・focus なし」で言う。編集が無くても focus が在るのは、
   // 何も変わらなかった操作（同じ名前への Rename など）で、しらせは出さない
@@ -229,6 +228,8 @@ function apply(op: core.Op, edit: boolean, keep: number | null = null): number |
     failed("Couldn't do that here");
     return null;
   }
+  // 断られた操作で選択を失わないよう、据えるのは通ってから
+  if (keep !== null) setSelection({ ids: [keep], anchor: keep }, false);
   if (r.edits.length > 0) editor.apply(r.edits); // → sync
   if (r.focus === null) return null;
   if (!core.isNode(doc, r.focus)) {
@@ -493,10 +494,11 @@ async function ensurePlace(): Promise<boolean> {
  * 確認も画像フォルダの結び付けも、`assets.saveToDisk` が 1 か所で持つ。
  */
 async function attachImage(id: number, blob: Blob): Promise<void> {
+  const gen = docGen;
   if (!(await ensurePlace())) return;
   const rel = await assets.saveToDisk(blob);
-  // 置いているあいだに文書が入れ替わった／ノードが消えていることがある
-  if (rel === null || !core.isNode(doc, id)) return;
+  // 置いているあいだに文書が入れ替わった（世代）／ノードが消えている（id）ことがある
+  if (rel === null || gen !== docGen || !core.isNode(doc, id)) return;
   apply(
     { kind: "addBlock", at: { kind: "in", node: id }, content: { kind: "image", alt: "", src: rel, title: "" } },
     false,
@@ -529,32 +531,37 @@ function draw(id: number): void {
  */
 function paste(): void {
   const anchor = selection.anchor;
+  const gen = docGen;
   void (async () => {
     // クリップボードに画像があれば、テキストより優先する。
     // try で囲うのは**クリップボードを読むところだけ** — 画像を置く処理まで
     // 囲うと、フォルダ選択の失敗が「クリップボードが読めなかった」と
     // 同じ扱いになり、黙ってテキストの道へ落ちてしまう
     let img: Blob | null = null;
-    if (anchor !== null) {
-      try {
-        if ("read" in navigator.clipboard) {
-          for (const item of await navigator.clipboard.read()) {
-            const t = item.types.find((x) => x.startsWith("image/"));
-            if (t) {
-              img = await item.getType(t);
-              break;
-            }
+    try {
+      if ("read" in navigator.clipboard) {
+        for (const item of await navigator.clipboard.read()) {
+          const t = item.types.find((x) => x.startsWith("image/"));
+          if (t) {
+            img = await item.getType(t);
+            break;
           }
         }
-      } catch {
-        /* clipboard.read が無い／断られた → 字の道へ */
       }
+    } catch {
+      /* clipboard.read が無い／断られた → 字の道へ */
     }
-    if (img !== null && anchor !== null) {
+    if (gen !== docGen) return;
+    if (img !== null) {
+      if (anchor === null) {
+        failed("Select a node to paste an image into");
+        return;
+      }
       await attachImage(anchor, img);
       return;
     }
     const clip = await navigator.clipboard.readText();
+    if (gen !== docGen) return;
     const hasSkeleton = (md: string): boolean => core.survey(md, [], []).view.trees.length > 0;
     const action = decidePaste(clip, hasSkeleton);
     switch (action.kind) {

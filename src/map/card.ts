@@ -2,10 +2,10 @@
 // — カードは打鍵のたびに書かず、**閉じるときに 1 回**書く（コードは打っている
 // 途中の中間状態が md に流れると、フェンスが割れて木が壊れる。spec.md「C カード」）。
 //
-// 枠(border)と余白(padding)はズームに追従しない CSS ピクセルなので、labelPlacement
-// と同じく world の単位で組んでから 1 度だけ倍率を掛ける。カードは `rect` が
-// すでに描画と同じ内容の矩形（layout.cardRect）なので、入力欄の文字の始まりは
-// その原点にそのまま重なる — 枠と余白は外側へ育つ。
+// 枠(border)はズームに追従しない CSS ピクセルなので、labelPlacement と同じく
+// world の単位で組んでから 1 度だけ倍率を掛ける。枠はカードの矩形（layout.cardRect）
+// の上に置き、余白は内側で倍率に乗る。欄の字は描かれたカードの字と数 px ずれるが、
+// 欄が不透明な背景で下のカードを覆うので見えない。
 
 import type { Camera } from "./camera.ts";
 import type { Rect } from "./geometry.ts";
@@ -77,6 +77,8 @@ export class CardEditor {
     this.textarea.addEventListener("keydown", (e) => {
       // 地図のキーへ流さない（Delete がカードを消すに化ける）
       e.stopPropagation();
+      // 変換中の Esc / Enter は IME のもの（label.ts と同じ）
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === "Escape" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) {
         e.preventDefault();
         this.close();

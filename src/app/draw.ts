@@ -227,7 +227,7 @@ export function showDrawing(): Promise<Blob | null> {
     canvas.className = "draw-paper";
     canvas.width = WIDTH * dpr;
     canvas.height = HEIGHT * dpr;
-    // 出来上がる絵は常に WIDTH×HEIGHT。表示だけは窓に入る大きさまで縮む
+    // 絵の比は常に WIDTH:HEIGHT（画素は dpr 倍）。表示だけは窓に入る大きさまで縮む
     // （CSS の max-width。高さは canvas 自身の比から決まる）
     canvas.style.width = `${WIDTH}px`;
     const ctx = canvas.getContext("2d");

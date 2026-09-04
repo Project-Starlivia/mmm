@@ -48,7 +48,7 @@ const add = (at: core.NodePlace): Intent => op({ kind: "addNode", at, labels: ["
  * - 名前がまだ無いノード（label が ""）では「足す」より「埋める」が先: Enter は
  *   そのノードの編集に入り、字を打てばその字から書ける（Enter を挟まない）
  * - ノードが 1 つも無ければ、Enter は最初の根
- * - Tab / Shift+Tab だけは複数選んでいると段下げ・上げ（次の段）に化けるので、いまは拾わない
+ * - Tab / Shift+Tab は 1 つなら足す・包む、複数なら段下げ・上げ（先頭の前の兄弟の子へ / 先頭の親の後ろへ）
  */
 export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
   // Alt が意味を持つのは Alt+↑↓（並べ替え）だけ。それ以外の Alt の組は拾わない。
@@ -138,6 +138,8 @@ export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
  * （箱が無い = 畳まれて埋もれた）null。
  */
 export function keyedCard(L: Layout, picked: number, k: Key): Intent | null {
+  // 外すのに持ち主は要らない（畳まれて箱が無くても、ここから抜けられる）
+  if (k.key === "Escape") return { kind: "pick", id: null };
   const o = ownerOf(L, picked);
   if (o === null) return null;
   const owner = o.box.node;
@@ -164,6 +166,5 @@ export function keyedCard(L: Layout, picked: number, k: Key): Intent | null {
     return next === undefined ? null : move({ kind: "after", block: next.id });
   }
   if (k.mod && k.key === "Enter") return { kind: "editCard", id: picked };
-  if (k.key === "Escape") return { kind: "pick", id: null };
   return null;
 }

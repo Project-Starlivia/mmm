@@ -7,18 +7,15 @@ const IMAGE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 const MARKDOWN = /\.(md|markdown|txt)$/i;
 
 /** ドロップされたもののうち、ファイルのハンドルとして取れたもの */
-async function droppedFiles(
-  data: DataTransfer,
-): Promise<FileSystemFileHandle[]> {
-  const files: FileSystemFileHandle[] = [];
+async function droppedFiles(data: DataTransfer): Promise<FileSystemFileHandle[]> {
+  // 取り出しは**待つ前に全部**始める。最初の await で drop の出来事が終わり、
+  // 以後 items は空に見える（2 枚目からが消える）
+  const pending: Promise<FileSystemHandle | null>[] = [];
   for (const item of data.items) {
-    if (item.kind !== "file" || !item.getAsFileSystemHandle) continue;
-    const handle = await item.getAsFileSystemHandle();
-    // `kind === "file"` では TS は絞り込めない（union ではなく上位型なので）。
-    // 実物を確かめる
-    if (handle instanceof FileSystemFileHandle) files.push(handle);
+    if (item.kind === "file" && item.getAsFileSystemHandle) pending.push(item.getAsFileSystemHandle());
   }
-  return files;
+  // `kind === "file"` では TS は絞り込めない（union ではなく上位型なので）。実物を確かめる
+  return (await Promise.all(pending)).filter((h): h is FileSystemFileHandle => h instanceof FileSystemFileHandle);
 }
 
 export function initDrop(deps: {
