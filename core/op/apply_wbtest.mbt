@@ -628,3 +628,127 @@ test "MoveBlock は空・ノード混じり・知らない id・自分の隣へ�
   assert_eq(run(d, MoveBlock(ids=[9], at=BlockPlace::After(block=4))), None)
   assert_eq(run(d, MoveBlock(ids=[3], at=BlockPlace::Before(block=3))), None)
 }
+
+///|
+test "Graft は parse した根たちを差す。側は捨て、id は鋳直す" {
+  let d = doc([root(h(2, "r", children=[h(3, "a")]), sides=[Left])])
+  assert_eq(
+    run(
+      d,
+      Graft(
+        at=NodePlace::In(node=3, side=None),
+        md="# p\n\n## q\n\n---\n\n## s\n\n# t\n",
+      ),
+    ),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            h(3, "a", children=[
+              h(4, "p", children=[h(5, "q"), h(6, "s")]),
+              h(7, "t"),
+            ]),
+          ]),
+          sides=[Left],
+        ),
+      ]),
+      focus: Some(4),
+    }),
+  )
+}
+
+///|
+test "Graft は根の間にも差せる。先頭の散文は行き先の親の body 末尾へ" {
+  let d = doc([root(h(2, "r", body=[pic(3)]))])
+  assert_eq(
+    run(
+      d,
+      Graft(
+        at=NodePlace::In(node=@tree.doc_id, side=None),
+        md="![](q.png)\n\n# s\n",
+      ),
+    ),
+    Some({
+      doc: doc([root(h(2, "r", body=[pic(3)])), root(h(5, "s"))], body=[
+        { id: 4, content: Image(alt="", src="q.png", title="") },
+      ]),
+      focus: Some(5),
+    }),
+  )
+  assert_eq(
+    run(d, Graft(at=NodePlace::After(node=2), md="text\n")),
+    Some({
+      doc: doc([root(h(2, "r", body=[pic(3)]))], body=[
+        { id: 4, content: Opaque("text") },
+      ]),
+      focus: None,
+    }),
+  )
+}
+
+///|
+test "Graft は空・知らない id・項目の下に見出し、に None" {
+  let d = doc([root(h(2, "r", children=[item(3, "a")]), sides=[Right])])
+  assert_eq(run(d, Graft(at=NodePlace::In(node=2, side=None), md="")), None)
+  assert_eq(
+    run(d, Graft(at=NodePlace::In(node=9, side=None), md="# p\n")),
+    None,
+  )
+  assert_eq(
+    run(d, Graft(at=NodePlace::In(node=3, side=None), md="# p\n")),
+    None,
+  )
+}
+
+///|
+/// 全部の試験で作った木に、代表的な Op を総当たりで当て、Some ならその結果が
+/// check を通ることを見る。落ちた Op と破れを並べる。
+test "apply の結果は check を通る" {
+  let base = doc([
+    root(
+      h(2, "r", body=[pic(3)], children=[
+        h(4, "a", children=[
+          gap(5, [h(6, "x")]),
+          item(7, "b", children=[li(8, "c")]),
+        ]),
+        h(9, "d", body=[code(10)]),
+      ]),
+      sides=[Right, Left],
+    ),
+    root(item(11, "e"), sides=[]),
+  ])
+  let ids = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  let ops : Array[Op] = []
+  for id in ids {
+    ops.push(Rename(id~, label="z"))
+    ops.push(Fold(id~, open=false))
+    ops.push(Unfold(id~))
+    ops.push(Delete(ids=[id]))
+    ops.push(Wrap(id~, label="w"))
+    ops.push(FlipSide(id~))
+    ops.push(SetBlock(id~, content=ThematicBreak))
+    for to in ids {
+      ops.push(Move(ids=[id], at=NodePlace::Before(node=to)))
+      ops.push(Move(ids=[id], at=NodePlace::After(node=to)))
+      ops.push(Move(ids=[id], at=NodePlace::In(node=to, side=Some(Left))))
+      ops.push(MoveBlock(ids=[id], at=BlockPlace::Before(block=to)))
+      ops.push(MoveBlock(ids=[id], at=BlockPlace::In(node=to)))
+      ops.push(Add(at=NodePlace::After(node=to), labels=["n"]))
+      ops.push(AddBlock(at=BlockPlace::In(node=to), content=ThematicBreak))
+      ops.push(Graft(at=NodePlace::In(node=to, side=None), md="# g\n\n- i\n"))
+    }
+  }
+  let bad = []
+  for op in ops {
+    match apply(base, op) {
+      Some(done) => {
+        let flaws = @tree.check(done.doc)
+        if !flaws.is_empty() {
+          bad.push((op, flaws))
+        }
+      }
+      None => ()
+    }
+  }
+  json_inspect(bad, content=[])
+}

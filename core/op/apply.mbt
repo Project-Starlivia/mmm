@@ -17,7 +17,7 @@ pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
     AddBlock(at~, content~) => add_block(doc, at, content)
     SetBlock(id~, content~) => set_block(doc, id, content)
     MoveBlock(ids~, at~) => move_block(doc, ids, at)
-    _ => None
+    Graft(at~, md~) => graft(doc, at, md)
   }
 }
 
@@ -390,4 +390,64 @@ fn anchor_block(at : BlockPlace) -> Int {
     After(block~) => block
     In(node~) => node
   }
+}
+
+///|
+/// 部分木の id をまとめてずらす。parse が振った番号を、いまの木に無い番号へ。
+fn shift(n : @tree.Node, by : Int) -> @tree.Node {
+  fn blocks(bs : Array[@tree.Block]) -> Array[@tree.Block] {
+    bs.map(b => { id: b.id + by, content: b.content })
+  }
+
+  fn list(l : @tree.ListNode) -> @tree.ListNode {
+    { ..l, id: l.id + by, body: blocks(l.body), children: l.children.map(list) }
+  }
+
+  match n {
+    HeadingNode(h) =>
+      @tree.HeadingNode({
+        ..h,
+        id: h.id + by,
+        body: blocks(h.body),
+        children: h.children.map(c => shift(c, by)),
+      })
+    ListNode(l) => @tree.ListNode(list(l))
+    ImplicitNode(g) =>
+      @tree.ImplicitNode({
+        id: g.id + by,
+        children: g.children.map(c => shift(c, by)),
+      })
+  }
+}
+
+///|
+/// md を読んで、根たちを席に差す。側は捨て、綴りは読んだまま。
+/// 先頭の散文は行き先の親の body 末尾へ（In なら node 自身、根の間なら doc の散文）。
+fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
+  let sub = @tree.parse(md)
+  guard !(sub.roots.is_empty() && sub.body.is_empty()) else { return None }
+  let by = fresh(doc) - (@tree.doc_id + 1)
+  let prose = sub.body.map(b => {
+    ({ id: b.id + by, content: b.content } : @tree.Block)
+  })
+  let subs = sub.roots.map(r => shift(r.node, by))
+  let host = match at {
+    In(node~, ..) => node
+    _ => {
+      guard parent(doc, anchor(at)) is Some(p) else { return None }
+      p
+    }
+  }
+  guard has(doc, anchor(at)) || anchor(at) == @tree.doc_id else { return None }
+  let mut cur = doc
+  if !prose.is_empty() {
+    guard body(cur, node=host, bs => [..bs, ..prose]) is Some(d) else {
+      return None
+    }
+    cur = d
+  }
+  if subs.is_empty() {
+    return Some({ doc: cur, focus: None })
+  }
+  done(place(cur, at, subs), Some(id_of(subs[0])))
 }
