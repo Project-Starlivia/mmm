@@ -314,3 +314,206 @@ test "Wrap は中身に None" {
   let d = doc([root(h(2, "r", body=[pic(3)]))])
   assert_eq(run(d, Wrap(id=3, label="p")), None)
 }
+
+///|
+test "Move は文書順を保って抜き、隣の前後に差す" {
+  let d = doc([
+    root(h(2, "r", children=[h(3, "a"), h(4, "b"), h(5, "c")]), sides=[
+      Right,
+      Right,
+      Left,
+    ]),
+  ])
+  assert_eq(
+    run(d, Move(ids=[5, 3], at=NodePlace::After(node=4))),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(4, "b"), h(3, "a"), h(5, "c")]), sides=[
+          Right,
+          Right,
+          Right,
+        ]),
+      ]),
+      focus: Some(3),
+    }),
+  )
+  assert_eq(
+    run(d, Move(ids=[5], at=NodePlace::Before(node=3))),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(5, "c"), h(3, "a"), h(4, "b")]), sides=[
+          Right,
+          Right,
+          Right,
+        ]),
+      ]),
+      focus: Some(5),
+    }),
+  )
+}
+
+///|
+test "Move で子の下へ（indent）と親の後ろへ（outdent）" {
+  let d = doc([
+    root(h(2, "r", children=[h(3, "a"), h(4, "b")]), sides=[Right, Right]),
+  ])
+  let indented = doc([
+    root(h(2, "r", children=[h(3, "a", children=[h(4, "b")])]), sides=[Right]),
+  ])
+  assert_eq(
+    run(d, Move(ids=[4], at=NodePlace::In(node=3, side=None))),
+    Some({ doc: indented, focus: Some(4) }),
+  )
+  assert_eq(
+    run(indented, Move(ids=[4], at=NodePlace::After(node=3))),
+    Some({ doc: d, focus: Some(4) }),
+  )
+}
+
+///|
+test "Move は側を運ばず、行き先が決める。根の脇は side で言う" {
+  let d = doc([
+    root(h(2, "r", children=[h(3, "a"), h(4, "b")]), sides=[Right, Right]),
+  ])
+  assert_eq(
+    run(d, Move(ids=[3], at=NodePlace::In(node=2, side=Some(Left)))),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(4, "b"), h(3, "a")]), sides=[Right, Left]),
+      ]),
+      focus: Some(3),
+    }),
+  )
+}
+
+///|
+test "Move で根の間へ行けば新しい根、根を子にすれば側は消える" {
+  let d = doc([
+    root(h(2, "r", children=[h(3, "a")]), sides=[Left]),
+    root(h(4, "s")),
+  ])
+  assert_eq(
+    run(d, Move(ids=[3], at=NodePlace::Before(node=4))),
+    Some({
+      doc: doc([root(h(2, "r"), sides=[]), root(h(3, "a")), root(h(4, "s"))]),
+      focus: Some(3),
+    }),
+  )
+  assert_eq(
+    run(d, Move(ids=[4], at=NodePlace::In(node=3, side=None))),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(3, "a", children=[h(4, "s")])]), sides=[Left]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+}
+
+///|
+test "Move は綴りを保つ。項目は見出しの下に置け、見出しは項目の下に置けない" {
+  let d = doc([
+    root(h(2, "r", children=[h(3, "a"), item(4, "b")]), sides=[Right, Right]),
+  ])
+  assert_eq(
+    run(d, Move(ids=[4], at=NodePlace::In(node=3, side=None))),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(3, "a", children=[item(4, "b")])]), sides=[
+          Right,
+        ]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  assert_eq(run(d, Move(ids=[3], at=NodePlace::In(node=4, side=None))), None)
+  assert_eq(
+    run(d, Move(ids=[3], at=NodePlace::Before(node=4))).map(x => x.focus),
+    Some(Some(3)),
+  )
+}
+
+///|
+test "Move は空・中身・知らない id・動かすものの中へ、に None" {
+  let d = doc([
+    root(
+      h(2, "r", body=[pic(3)], children=[
+        h(4, "a", children=[h(5, "x")]),
+        h(6, "b"),
+      ]),
+      sides=[Right, Right],
+    ),
+  ])
+  assert_eq(run(d, Move(ids=[], at=NodePlace::After(node=6))), None)
+  assert_eq(run(d, Move(ids=[3], at=NodePlace::After(node=6))), None)
+  assert_eq(run(d, Move(ids=[9], at=NodePlace::After(node=6))), None)
+  assert_eq(run(d, Move(ids=[4], at=NodePlace::In(node=5, side=None))), None)
+  assert_eq(run(d, Move(ids=[4], at=NodePlace::After(node=4))), None)
+}
+
+///|
+test "FlipSide の 3 段: 根は鏡像、根の子は 1 つ、深いものは反対側へ引き出す" {
+  let d = doc([
+    root(
+      h(2, "r", children=[
+        h(3, "a", children=[h(4, "x", children=[h(5, "y")])]),
+        h(6, "b"),
+      ]),
+      sides=[Right, Left],
+    ),
+  ])
+  assert_eq(
+    run(d, FlipSide(id=2)),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            h(3, "a", children=[h(4, "x", children=[h(5, "y")])]),
+            h(6, "b"),
+          ]),
+          sides=[Left, Right],
+        ),
+      ]),
+      focus: Some(2),
+    }),
+  )
+  assert_eq(
+    run(d, FlipSide(id=6)),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            h(3, "a", children=[h(4, "x", children=[h(5, "y")])]),
+            h(6, "b"),
+          ]),
+          sides=[Right, Right],
+        ),
+      ]),
+      focus: Some(6),
+    }),
+  )
+  // y は深さ 4。反対側（Left）の末尾へ、Implicit 2 枚で深さを保つ
+  assert_eq(
+    run(d, FlipSide(id=5)),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            h(3, "a", children=[h(4, "x")]),
+            h(6, "b"),
+            gap(8, [gap(7, [h(5, "y")])]),
+          ]),
+          sides=[Right, Left, Left],
+        ),
+      ]),
+      focus: Some(5),
+    }),
+  )
+}
+
+///|
+test "FlipSide は中身と知らない id に None" {
+  let d = doc([root(h(2, "r", body=[pic(3)]))])
+  assert_eq(run(d, FlipSide(id=3)), None)
+  assert_eq(run(d, FlipSide(id=9)), None)
+}

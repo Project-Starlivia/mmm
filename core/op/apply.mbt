@@ -12,6 +12,8 @@ pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
     Delete(ids~) => delete(doc, ids)
     Add(at~, labels~) => add(doc, at, labels)
     Wrap(id~, label~) => wrap(doc, id, label)
+    Move(ids~, at~) => move(doc, ids, at)
+    FlipSide(id~) => flip(doc, id)
     _ => None
   }
 }
@@ -180,4 +182,102 @@ fn wrap(doc : @tree.Doc, id : Int, label : String) -> Done? {
       @tree.HeadingNode({ id: nid, label, fold: None, body: [], children: [n] })
   }
   done(splice(doc, id, _ => [w]), Some(nid))
+}
+
+///|
+/// 文書順に抜き取る。抜いたものは taken に、残りの木を返す。
+fn take(
+  doc : @tree.Doc,
+  ids : Array[Int],
+  taken : Array[@tree.Node],
+) -> @tree.Doc? {
+  let mut cur = doc
+  for id in ids {
+    let pulled = splice(cur, id, fn(n) {
+      taken.push(n)
+      []
+    })
+    match pulled {
+      Some(d) => cur = d
+      None => return None
+    }
+  }
+  Some(cur)
+}
+
+///|
+/// 席に差す。
+fn place(
+  doc : @tree.Doc,
+  at : NodePlace,
+  nodes : Array[@tree.Node],
+) -> @tree.Doc? {
+  match at {
+    Before(node~) => splice(doc, node, x => [..nodes, x])
+    After(node~) => splice(doc, node, x => [x, ..nodes])
+    In(node~, side~) => append(doc, node~, side?, nodes)
+  }
+}
+
+///|
+/// 動かす。文書順を保って抜き、席に差す。側は行き先が決め、綴りは保つ。
+fn move(doc : @tree.Doc, ids : Array[Int], at : NodePlace) -> Done? {
+  guard !ids.is_empty() else { return None }
+  for id in ids {
+    guard find(doc, id) is Some(_) else { return None }
+  }
+  let picked = pick(doc, ids)
+  guard !within(doc, anchor(at), picked) else { return None }
+  let taken = []
+  guard take(doc, picked, taken) is Some(rest) else { return None }
+  done(place(rest, at, taken), Some(picked[0]))
+}
+
+///|
+fn flipped(s : @tree.Side) -> @tree.Side {
+  match s {
+    Right => Left
+    Left => Right
+  }
+}
+
+///|
+/// 側を裏返す。根は sides を一括反転（鏡像）、根の子はその 1 つ、深いノードは
+/// 反対側の末尾へ引き出す（深さは保つので、間を Implicit が埋める）。
+fn flip(doc : @tree.Doc, id : Int) -> Done? {
+  guard seat(doc, id) is Some(path) else { return None }
+  let roots = doc.roots.copy()
+  let r = roots[path[0]]
+  fn side_at(j : Int) -> @tree.Side {
+    if j < r.sides.length() {
+      r.sides[j]
+    } else {
+      @tree.Right
+    }
+  }
+
+  match path.length() {
+    1 => {
+      roots[path[0]] = { ..r, sides: r.sides.map(flipped) }
+      Some({ doc: { ..doc, roots, }, focus: Some(id) })
+    }
+    2 => {
+      let sides = r.sides.copy()
+      sides[path[1]] = flipped(side_at(path[1]))
+      roots[path[0]] = { ..r, sides, }
+      Some({ doc: { ..doc, roots, }, focus: Some(id) })
+    }
+    depth => {
+      let side = flipped(side_at(path[1]))
+      let mut next = fresh(doc)
+      let taken = []
+      guard take(doc, [id], taken) is Some(rest) else { return None }
+      let mut wrapped = taken[0]
+      for _ in 0..<(depth - 2) {
+        wrapped = @tree.ImplicitNode({ id: next, children: [wrapped] })
+        next = next + 1
+      }
+      done(append(rest, node=id_of(r.node), side~, [wrapped]), Some(id))
+    }
+  }
 }
