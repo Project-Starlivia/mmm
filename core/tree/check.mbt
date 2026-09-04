@@ -26,6 +26,8 @@ pub(all) enum Flaw {
   Swallowed(Int)
   /// 項目の根の子に Left。項目の中の `---` は中身なので側を書けない
   ListSide(Int)
+  /// Implicit の直下の項目。項目は相対記法で深さが飛ばないので、飛びを綴れない
+  GappedItem(Int)
 } derive(Eq, ToJson)
 
 ///|
@@ -113,6 +115,11 @@ pub fn check(doc : Doc) -> Array[Flaw] {
           id(g.id)
           if g.children.is_empty() {
             flaws.push(BarrenImplicit(g.id))
+          }
+          for k in g.children {
+            if k is ListNode(l) {
+              flaws.push(GappedItem(l.id))
+            }
           }
           nodes(g.children, kids(i), _ => [])
         }

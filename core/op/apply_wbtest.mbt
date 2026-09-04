@@ -539,6 +539,28 @@ test "FlipSide の 3 段: 根は鏡像、根の子は 1 つ、深いものは反
 }
 
 ///|
+/// 項目は相対記法で深さを持たないので、Implicit で包まず直に深さ 2 へ。
+test "FlipSide の深い項目は Implicit で包まず引き出す" {
+  let d = doc([
+    root(h(2, "r", children=[item(3, "i", children=[li(4, "j")])]), sides=[
+      Right,
+    ]),
+  ])
+  assert_eq(
+    run(d, FlipSide(id=4)),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[item(3, "i"), item(4, "j")]), sides=[
+          Right,
+          Left,
+        ]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+}
+
+///|
 /// 深いノードを引き出した先が、直前の兄弟と同じ側なら境界が無く、
 /// Implicit はその兄弟に飲み込まれる（check が言う）。
 test "FlipSide の深いノードは、引き出す先に境界が無ければ None" {
@@ -810,6 +832,6 @@ test "apply の結果は check を通る" {
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="296")
+  inspect(some, content="293")
   json_inspect(bad, content=[])
 }
