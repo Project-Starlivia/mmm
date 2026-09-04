@@ -74,6 +74,9 @@ let doc: core.View = { frontmatter: null, trees: [] };
 let spots = new Map<number, core.Spot>();
 /** 何を選んでいるか。地図はこれを塗るだけで、自分では持たない */
 let selection: Selection = NONE;
+/** 選んでいるカードの中身の id。ノードの選択とは片方だけ（spec.md「C カード」）。
+ *  地図はこれも自分では持たない */
+let picked: number | null = null;
 
 /** 持ち越す目印と、それが anchor だったか。幽霊（当たらなかった目印）も同じ形で運ぶ */
 interface Carried {
@@ -146,8 +149,11 @@ function sync(next: string, edits: core.Edit[]): void {
   ids.sort((a, b) => a - b);
   selection = { ids, anchor: anchor ?? (ids.length ? ids[ids.length - 1] : null) };
   ghosts = kept;
+  // 中身の id はノードの目印を持たないので、マークでは追いかけない — 消えて
+  // いれば外すだけ（構造を変える操作で番号が振り直されることは受け入れる）
+  if (picked !== null && !spots.has(picked)) picked = null;
   map.render();
-  editor.highlight(selectedRanges());
+  editor.highlight(currentHighlight());
   // 白紙の言い出し。**出る理由は 1 つ**（まだ木が無い）で、マップ側も
   // render() の中で同じことを見ている
   editor.showHint(doc.trees.length === 0);
@@ -165,16 +171,35 @@ const selectedRanges = (): Range[] =>
     return s ? [{ from: s.from, to: s.to }] : [];
   });
 
-/** 地図で選び直した。幽霊は要らなくなる */
+/** 選んでいるカードの中身の md 側の範囲 */
+const pickedRange = (id: number): Range[] => {
+  const s = spots.get(id);
+  return s ? [{ from: s.from, to: s.to }] : [];
+};
+
+/** いま塗るべき範囲。ノードとカードの選択は片方だけなので、カードが在ればそちら */
+const currentHighlight = (): Range[] => (picked !== null ? pickedRange(picked) : selectedRanges());
+
+/** 地図で選び直した。カードの選択と幽霊は要らなくなる */
 function setSelection(sel: Selection, reveal: boolean): void {
+  picked = null;
   selection = sel;
   ghosts = [];
   map.refreshSelection();
-  editor.highlight(selectedRanges());
+  editor.highlight(currentHighlight());
   if (reveal && sel.anchor !== null) {
     const s = spots.get(sel.anchor);
     if (s) editor.reveal(s.from);
   }
+}
+
+/** カードを選び直した。ノードの選択は外れる */
+function setPicked(id: number | null): void {
+  selection = NONE;
+  ghosts = [];
+  picked = id;
+  map.refreshSelection();
+  editor.highlight(currentHighlight());
 }
 
 /**
@@ -186,22 +211,32 @@ function setSelection(sel: Selection, reveal: boolean): void {
  * `keep` は消す前に選んでおきたい隣の id（keys.ts の `neighbor`）。編集の
  * 前に選択へ据えておけば、その目印が編集列をまたいで消した後の id まで
  * 追いかける（段 1 の目印の仕組みに乗るだけで、ここでは何も特別しない）
+ *
+ * focus はノードとも中身とも限らない（`AddBlock` / `SetBlock` / `MoveBlock` は
+ * 中身の id を返す）。木を見て振り分ける — ノードなら選択して `edit` なら
+ * その場編集、中身ならカードとして選ぶ（中身の編集はカードの入口からしか
+ * 始まらない）。呼び出し側が続けられるよう focus を返す（Link / Code が使う）
  */
-function apply(op: core.Op, edit: boolean, keep: number | null = null): void {
+function apply(op: core.Op, edit: boolean, keep: number | null = null): number | null {
   if (keep !== null) setSelection({ ids: [keep], anchor: keep }, false);
   const r = core.edit(text, op);
   // core は断りを「編集なし・focus なし」で言う。編集が無くても focus が在るのは、
   // 何も変わらなかった操作（同じ名前への Rename など）で、しらせは出さない
   if (r.focus === null && r.edits.length === 0) {
     failed("Couldn't do that here");
-    return;
+    return null;
   }
   if (r.edits.length > 0) editor.apply(r.edits); // → sync
-  if (r.focus === null) return;
+  if (r.focus === null) return null;
+  if (!core.isNode(doc, r.focus)) {
+    setPicked(r.focus);
+    return r.focus;
+  }
   // 同じノードに留まる操作（ラベルを打つ）で md を寄せ直さない
   setSelection({ ids: [r.focus], anchor: r.focus }, r.focus !== selection.anchor);
   // 畳まれて埋もれたノードには箱が無く、その場編集を開けない
   if (edit && !map.beginEdit(r.focus, null)) failed("Couldn't start editing — the node is folded");
+  return r.focus;
 }
 
 /** md のカーソルが動いた。掛かるノードに輪を出す（地図は動かさない） */
@@ -221,6 +256,12 @@ const host: MapHost = {
     })(),
   selection: () => selection,
   setSelection,
+  picked: () => picked,
+  setPicked,
+  blockText: (id) => {
+    const s = spots.get(id);
+    return s ? text.slice(s.from, s.to) : "";
+  },
   apply,
 };
 const map = new Mindmap(mapPane, host);

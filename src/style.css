@@ -696,6 +696,33 @@ html, body {
   }
 }
 
+/* ========== 選んだカードの印 ========== */
+
+/* 枠と、その右上の ×。ノードの中ではなく world に浮かぶ 1 個の印
+   （選ばれているカードは常に高々 1 枚なので） */
+#card-pick {
+  & rect.card-picked {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    rx: 6px;
+    /* 枠は素通りさせる。もう一度押して外せなくなるため */
+    pointer-events: none;
+  }
+  & .card-kill {
+    cursor: pointer;
+
+    & circle { fill: var(--accent); stroke: var(--node-bg); stroke-width: 1.5; }
+    & line {
+      stroke: #fff;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      pointer-events: none;
+    }
+    &:hover circle { fill: #e5534b; }
+  }
+}
+
 /* ========== 二つをまたぐ印 ==========
    矩形選択の面、md のカーソルが掛かるノードの内側の輪、ドラッグの落とし先の線。
    輪の濃さはここだけが持つ — `--accent-soft` は面を塗るための薄さで、
@@ -742,6 +769,52 @@ html, body {
   color: var(--ink);
   outline: none;
   z-index: 10;
+}
+
+/* カードのその場編集。裏に色付きの層（.card-ink）、表に透明な textarea を
+   重ねる。字がずれないよう、font と padding と line-height は入れ物側で
+   1 回だけ決めて両方に継がせる。寸法は map/card.ts の cardPlacement が
+   唯一の定義（place() がズーム込みで書き込む） */
+#card-editor {
+  position: absolute;
+  display: none;
+  box-sizing: border-box;
+  font-family: var(--mono);
+  border-style: solid;
+  border-color: var(--accent);
+  border-radius: 6px;
+  background: var(--bg);
+  overflow: hidden;
+  z-index: 10;
+
+  & .card-ink, & textarea {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    box-sizing: border-box;
+    padding: inherit;
+    font: inherit;
+    line-height: inherit;
+    white-space: pre;
+    overflow: hidden;
+    border: none;
+    background: none;
+  }
+  & .card-ink {
+    color: var(--ink);
+    pointer-events: none;
+  }
+  & textarea {
+    color: transparent;
+    caret-color: var(--accent);
+    resize: none;
+    outline: none;
+    /* 箱を中身に合わせて広げているので、はみ出しは起きない。
+       auto にすると使わないスクロールバーが場所を取って字がずれる */
+    overflow: hidden;
+
+    &::selection { background: var(--accent-soft); }
+  }
 }
 
 /* コードの色は @lezer/highlight の classHighlighter が付ける tok-* に対応させる。

@@ -58,6 +58,13 @@ export interface View {
   trees: Tree[];
 }
 
+/** id がノードのものか（中身の id なら false）。木を辿って確かめる —
+ *  ノードと中身は同じ通し番号を分け合うので、種類は木の形からしか読めない */
+export function isNode(view: View, id: number): boolean {
+  const under = (n: Node): boolean => n.id === id || n.children.some(under);
+  return view.trees.some((t) => under(t.node));
+}
+
 /** 地番。ノードが md のどこに書かれているか。label はラベルの頭（Implicit と文書の散文は null） */
 export interface Spot {
   from: number;

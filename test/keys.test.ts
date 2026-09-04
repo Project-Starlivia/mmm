@@ -6,17 +6,22 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type * as core from "../src/coreApi.ts";
 import { type Layout, type SizeOf, layoutMap } from "../src/map/layout.ts";
-import { type Key, keyed } from "../src/map/keys.ts";
+import { type Key, keyed, keyedCard } from "../src/map/keys.ts";
 import { NONE } from "../src/map/select.ts";
 
 /** 全部 100 × 30 */
 const size: SizeOf = () => ({ w: 100, h: 30 });
 
-const node = (id: number, label: string | null, children: core.Node[] = []): core.Node => ({
+const node = (
+  id: number,
+  label: string | null,
+  children: core.Node[] = [],
+  blocks: core.Block[] = [],
+): core.Node => ({
   id,
   label,
   fold: null,
-  blocks: [],
+  blocks,
   children,
 });
 
@@ -210,4 +215,72 @@ test("Shift+L / Shift+C / Shift+D は 1 つ選んでいるときだけ拾う", (
   assert.deepEqual(keyed(L, one(3), k("D", { shift: true })), { kind: "draw", id: 3 });
   assert.equal(keyed(L, { ids: [3, 4], anchor: 4 }, k("L", { shift: true })), null);
   assert.equal(keyed(L, NONE, k("L", { shift: true })), null);
+});
+
+// ---- keyedCard — カードを選んでいるときの表 ----
+// r(2) に blocks [{ id: 3, thematicBreak }, { id: 4, code }]。持ち主は 2、隣は 3 と 4。
+const C: Layout = layoutMap(
+  [
+    tree(
+      node(2, "r", [], [
+        { id: 3, content: { kind: "thematicBreak" } },
+        { id: 4, content: { kind: "code", info: "", text: "x" } },
+      ]),
+    ),
+  ],
+  size,
+);
+
+test("keyedCard: Delete / Backspace はそのカードを消し、持ち主を keep する", () => {
+  assert.deepEqual(keyedCard(C, 3, k("Delete")), {
+    kind: "op",
+    op: { kind: "delete", ids: [3] },
+    edit: false,
+    keep: 2,
+  });
+  assert.deepEqual(keyedCard(C, 4, k("Backspace")), {
+    kind: "op",
+    op: { kind: "delete", ids: [4] },
+    edit: false,
+    keep: 2,
+  });
+});
+
+test("keyedCard: ↑↓ は隣のカードを選ぶ。端では拾わない", () => {
+  assert.deepEqual(keyedCard(C, 3, k("ArrowDown")), { kind: "pick", id: 4 });
+  assert.equal(keyedCard(C, 4, k("ArrowDown")), null);
+  assert.deepEqual(keyedCard(C, 4, k("ArrowUp")), { kind: "pick", id: 3 });
+  assert.equal(keyedCard(C, 3, k("ArrowUp")), null);
+});
+
+test("keyedCard: ← は持ち主のノードを選ぶ", () => {
+  assert.deepEqual(keyedCard(C, 3, k("ArrowLeft")), {
+    kind: "select",
+    sel: { ids: [2], anchor: 2 },
+    reveal: false,
+  });
+});
+
+test("keyedCard: Alt+↑↓ は前後のカードの前後へ並べ替え。端では拾わない", () => {
+  assert.deepEqual(keyedCard(C, 4, k("ArrowUp", { alt: true })), {
+    kind: "op",
+    op: { kind: "moveBlock", ids: [4], at: { kind: "before", block: 3 } },
+    edit: false,
+  });
+  assert.equal(keyedCard(C, 3, k("ArrowUp", { alt: true })), null);
+  assert.deepEqual(keyedCard(C, 3, k("ArrowDown", { alt: true })), {
+    kind: "op",
+    op: { kind: "moveBlock", ids: [3], at: { kind: "after", block: 4 } },
+    edit: false,
+  });
+  assert.equal(keyedCard(C, 4, k("ArrowDown", { alt: true })), null);
+});
+
+test("keyedCard: Mod+Enter はその場編集。Escape は外す", () => {
+  assert.deepEqual(keyedCard(C, 3, k("Enter", { mod: true })), { kind: "editCard", id: 3 });
+  assert.deepEqual(keyedCard(C, 3, k("Escape")), { kind: "pick", id: null });
+});
+
+test("keyedCard: どのノードの blocks にも居なければ null", () => {
+  assert.equal(keyedCard(C, 99, k("Delete")), null);
 });

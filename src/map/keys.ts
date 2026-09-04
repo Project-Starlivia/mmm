@@ -24,7 +24,11 @@ export type Intent =
   | { kind: "select"; sel: Selection; reveal: boolean }
   /** 選択（無ければ根）を画面の中心へ */
   | { kind: "center" }
-  /** クリップボードの URL をリンクカードにして題を打つ / 空のコードを足して打つ / 描いて貼る（Task 4・5 が実行） */
+  /** カードを選ぶ（null で外す） */
+  | { kind: "pick"; id: number | null }
+  /** カードをその場で直す */
+  | { kind: "editCard"; id: number }
+  /** クリップボードの URL をリンクカードにして題を打つ / 空のコードを足して打つ / 描いて貼る（mindmap.ts の act が実行。draw は Task 5） */
   | { kind: "link"; id: number }
   | { kind: "code"; id: number }
   | { kind: "draw"; id: number };
@@ -121,5 +125,45 @@ export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
   if (blank && anchor !== null && !k.mod && k.key.length === 1 && k.key !== " ") {
     return { kind: "edit", id: anchor, seed: k.key };
   }
+  return null;
+}
+
+/**
+ * カードを選んでいるときの表。持ち主は `node.blocks` に `picked` が居るノード、
+ * 隣はその `blocks` を文書順（= 配列順）に見た前後。持ち主が見つからなければ
+ * （箱が無い = 畳まれて埋もれた）null。
+ */
+export function keyedCard(L: Layout, picked: number, k: Key): Intent | null {
+  let owner: core.Node | null = null;
+  for (const b of L.boxes.values()) {
+    if (b.node.blocks.some((x) => x.id === picked)) {
+      owner = b.node;
+      break;
+    }
+  }
+  if (owner === null) return null;
+  const blocks = owner.blocks;
+  const index = blocks.findIndex((x) => x.id === picked);
+  if ((k.key === "Delete" || k.key === "Backspace") && !k.mod) {
+    return { kind: "op", op: { kind: "delete", ids: [picked] }, edit: false, keep: owner.id };
+  }
+  if ((k.key === "ArrowDown" || k.key === "ArrowUp") && !k.mod && !k.alt) {
+    const next = k.key === "ArrowDown" ? blocks[index + 1] : blocks[index - 1];
+    return next === undefined ? null : { kind: "pick", id: next.id };
+  }
+  if (k.key === "ArrowLeft" && !k.mod) {
+    return { kind: "select", sel: { ids: [owner.id], anchor: owner.id }, reveal: false };
+  }
+  if (k.alt && (k.key === "ArrowUp" || k.key === "ArrowDown") && !k.mod) {
+    const move = (at: core.BlockPlace): Intent => ({ kind: "op", op: { kind: "moveBlock", ids: [picked], at }, edit: false });
+    if (k.key === "ArrowUp") {
+      const prev = blocks[index - 1];
+      return prev === undefined ? null : move({ kind: "before", block: prev.id });
+    }
+    const next = blocks[index + 1];
+    return next === undefined ? null : move({ kind: "after", block: next.id });
+  }
+  if (k.mod && k.key === "Enter") return { kind: "editCard", id: picked };
+  if (k.key === "Escape") return { kind: "pick", id: null };
   return null;
 }
