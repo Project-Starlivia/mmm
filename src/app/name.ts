@@ -7,7 +7,7 @@
 // 表示にも、保存ダイアログの初期値にも同じものを使う。道具が出す提案は
 // **常にファイル名として有効**であること（失敗してから拾いにいかない）。
 
-import type { NodeInfo } from "../coreApi.ts";
+import type * as core from "../coreApi.ts";
 
 /** 見出しが無い / 整形して何も残らない文書の名前 */
 export const EMPTY_NAME = "empty";
@@ -61,15 +61,11 @@ export function toFileName(label: string): string {
 /**
  * まだ保存していない文書の名前（拡張子なし）。
  *
- * いちばん大きい見出し（`#` がいちばん少ないもの）のうち先頭を使う。同じ
- * 大きさが並べば先に書いたほうが勝つ。`##` しか無い文書ならそれがいちばん
- * 大きい。整形して何も残らなければ、文書順で最初の見出しへ落ちる。
+ * 最初の木の根を使う（View では根がいちばん大きい見出しで、木は文書順に
+ * 並ぶ）。Implicit（label 無し）は空と同じ。整形して何も残らなければ empty。
  */
-export function deriveName(nodes: NodeInfo[]): string {
-  if (nodes.length === 0) return EMPTY_NAME;
-  let top = nodes[0];
-  for (const n of nodes) {
-    if (n.depth < top.depth) top = n;
-  }
-  return toFileName(top.label) || toFileName(nodes[0].label) || EMPTY_NAME;
+export function deriveName(view: core.View): string {
+  const first = view.trees[0];
+  if (!first) return EMPTY_NAME;
+  return toFileName(first.node.label ?? "") || EMPTY_NAME;
 }

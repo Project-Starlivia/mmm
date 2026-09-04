@@ -3,14 +3,11 @@
 // 1 枚の <svg> にするのは map/toSvg.ts の仕事で、ここが持つのは
 // **その先の出し口**だけ — 直列化・ラスタ化・ダウンロード・クリップボード。
 //
-// **出し方 4 通りの定義はここ 1 か所**。ヘッダも右クリックも同じ並びを開く。
-// 違うのは対象だけ — ヘッダは常に全体、右クリックは選んでいる枝。
-// 新規 / 開く / 保存 が文書ぜんぶを相手にするのと同じ高さにヘッダを置き、
-// 「これ」を相手にする操作は右クリックへ寄せる。
+// **出し方 4 通りの定義はここ 1 か所**。対象は常に全体 — 新規 / 開く / 保存 が
+// 文書ぜんぶを相手にするのと同じ高さにヘッダを置く（枝だけの書き出しは、
+// 選択が戻ったときに右クリックへ）。
 
-import type { Mindmap } from "../mindmap.ts";
 import { type MenuEntry, openOnClick } from "../map/menu.ts";
-import type { RadialEntry } from "../map/radialMenu.ts";
 import { type IconName, icon, label, nod } from "../icons.ts";
 import { LS_WAY, load, store } from "./persist.ts";
 
@@ -22,7 +19,7 @@ import { LS_WAY, load, store } from "./persist.ts";
 const SCALE = 2;
 
 export interface ExportDeps {
-  map: Mindmap;
+  map: { exportSvg(): Promise<SVGSVGElement | null> };
   /** ダウンロード名の元になる、いまのファイル名 */
   name: () => string;
   /** 果たせなかった */
@@ -170,9 +167,9 @@ const wayOf = (saved: string | null): Way =>
  * チェックで答えるので、答えてよいかを呼ぶ側が知る必要がある。
  * しくじりはここがしらせに出し、約束は拒まない（呼ぶ側に try を書かせない）。
  */
-async function run(deps: ExportDeps, way: Way, whole: boolean): Promise<boolean> {
+async function run(deps: ExportDeps, way: Way): Promise<boolean> {
   try {
-    const svg = await deps.map.exportSvg(whole);
+    const svg = await deps.map.exportSvg();
     if (!svg) {
       // ボタンは沈めてあるので、ここへ来るのはキー（`Mod+E`）から。
       // **触って読める言葉と同じものを出す** — 同じ壁に 2 つの綴りを持たない
@@ -190,19 +187,14 @@ async function run(deps: ExportDeps, way: Way, whole: boolean): Promise<boolean>
 }
 
 /**
- * 出し方の並び。**ヘッダも右クリックも同じものを開く** — 違うのは対象だけで、
- * `whole` なら全体、そうでなければ選んでいる枝。
+ * 出し方の並び（`▾` に出す）。
  *
  * `header` はヘッダから開いたときの走らせ方。**選ばれた出し方を渡すだけで、
  * その先はヘッダが持つ**（次の既定にし、済んだらボタンの絵で答える） —
  * 答える場所がボタンなので、答え方を知っているのもボタンを持つ側。
- * 無ければここが走らせるだけ（右クリック側。押せば閉じて、それで終わる）。
+ * 無ければここが走らせるだけ。
  */
-export function exportWays(
-  deps: ExportDeps,
-  whole: boolean,
-  header?: (way: Way) => void,
-): MenuEntry[] {
+export function exportWays(deps: ExportDeps, header?: (way: Way) => void): MenuEntry[] {
   const entries: MenuEntry[] = [];
   for (const [i, way] of WAYS.entries()) {
     // ダウンロードとコピーのあいだに線を引く（行き先が変わるところ）
@@ -210,12 +202,10 @@ export function exportWays(
     entries.push({
       label: way.label,
       mark: way.mark,
-      // 対象が枝のときは、枝を選んでいること自体が呼び出し側で保証されている
-      // （右クリックの Export は `anchor === -1` で既に閉じている）
-      disabled: whole && deps.empty() && NOTHING,
+      disabled: deps.empty() && NOTHING,
       run: () => {
         if (header) header(way);
-        else void run(deps, way, whole);
+        else void run(deps, way);
       },
     });
   }
@@ -228,13 +218,11 @@ export function exportWays(
  * ボタンには**いまの出し方**が出ていて、押せばそれで出る。`▾` で選び直すと
  * その場で出て、次からの既定になる — 押す前に何が起きるかが常に見えている。
  *
- * 戻り値はキーボードショートカット（`Mod+E` / `Mod+Shift+E`）用。**出し方
- * 4 通りの定義は増やさない** — `run` はこのボタンと同じものを走らせるだけ、
- * `ways` は `WAYS` をラジアルメニュー用の形へ薄く写すだけ
+ * 戻り値はキーボードショートカット（`Mod+E`）用。`run` はこのボタンと同じものを走らせるだけ
  */
 export function initExport(
   deps: ExportDeps & { button: HTMLButtonElement; wayButton: HTMLButtonElement },
-): { run: () => void; ways: () => RadialEntry[]; refresh: () => void } {
+): { run: () => void; refresh: () => void } {
   deps.wayButton.replaceChildren(icon("chevron-down"));
   let way = wayOf(load(LS_WAY));
   const show = (): void => {
@@ -289,13 +277,13 @@ export function initExport(
     const put = (mark: IconName): void => {
       deps.button.replaceChildren(...label(chosen.short, mark, true));
     };
-    void nod(run(deps, chosen, true), put).then((ok) => {
+    void nod(run(deps, chosen), put).then((ok) => {
       if (!ok) return show();
       clearTimeout(back);
       back = setTimeout(undo, HOLD);
     });
   };
-  /** 選び直して出す。次からの既定にもなる（`▾` の並びと放射メニュー） */
+  /** 選び直して出す。次からの既定にもなる */
   const pick = (chosen: Way): void => {
     remember(chosen);
     fire(chosen);
@@ -303,13 +291,11 @@ export function initExport(
 
   deps.button.addEventListener("click", () => fire(way));
 
-  openOnClick(deps.wayButton, () => exportWays(deps, true, pick));
+  openOnClick(deps.wayButton, () => exportWays(deps, pick));
 
   return {
     run: () => fire(way),
-    ways: () =>
-      WAYS.map((w) => ({ mark: w.mark, label: w.short, run: () => pick(w) })),
-    /** 文書が変わった。押せるかどうかを見直す（applySnap から呼ばれる） */
+    /** 文書が変わった。押せるかどうかを見直す（sync から呼ばれる） */
     refresh: show,
   };
 }

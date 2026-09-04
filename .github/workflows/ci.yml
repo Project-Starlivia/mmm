@@ -42,30 +42,37 @@ jobs:
       - name: Update the mooncakes index
         run: moon update
 
-      # ここから下は **core を作り直している間だけの姿**。
-      #
-      # 旧 core を消したので、UI（src/）は繋ぎ先を失っていて組み上がらない。
-      # 落ちると分かっているものを回しても信号にならないので、いまは
-      # MoonBit だけを見る。すべてが揃うまで結合は行わない。
-      #
-      # **main へ戻す前に、型検査・UI テスト・vite build・dist の受け渡しを
-      # ここへ戻すこと。** deploy ジョブは dist を待っているので、
-      # 戻し忘れると main の配布が止まる。
-      - name: Check（MoonBit）
-        run: cd core && moon check && moon fmt --check tree
-      - name: Core tests（MoonBit）
-        run: cd core && moon test -p mmm-app/core/tree
-
-      # ラボ（core を覗く画面）だけは TS も見る。core を組んでからでないと
-      # 取り込み先が無いので、この順でなければならない
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Check（ラボの TypeScript）
-        run: pnpm run core && pnpm run check:lab
+
+      - name: Check（MoonBit）
+        run: pnpm run check:core
+      - name: Core tests（MoonBit）
+        run: pnpm run test:core
+
+      # コアの JS はここで作る。型検査もテストもこれが無いと始まらない
+      - run: pnpm run core
+
+      - name: Type check（src・test・lab）
+        run: pnpm run check
+      - name: UI tests（TypeScript）
+        run: pnpm test
+
+      # 配信されるものが実際に組み上がることまで見る
+      - name: Build
+        run: pnpm exec vite build
+
+      # 配る中身をそのまま渡す。deploy 側で組み直すと、
+      # 確かめたものと配るものが別々になりうる
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dist
+          path: dist
+          retention-days: 1
 
   deploy:
     needs: check

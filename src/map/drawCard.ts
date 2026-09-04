@@ -1,6 +1,6 @@
 // カード 1 行を SVG にする。
 //
-// `cards.ts` が**読み**（本文 → カード行。DOM を知らない）で、こちらが
+// `cards.ts` が**分類**（Block → カード行。DOM を知らない）で、こちらが
 // **見せ方**（カード行 → SVG）。種類ごとに形・クラス・埋め方が縦に並ぶので、
 // リンクカードを直したい人はこのファイルの `link` だけを見ればよい。
 //
@@ -8,10 +8,9 @@
 // 入力欄も同じ数を使う。
 
 import type { CardRow } from "./cards.ts";
-import { CODE_LINE, CODE_PAD } from "./cards.ts";
 import type { Rect } from "./geometry.ts";
 import { tokenize } from "./highlight.ts";
-import { ROW_NORMAL } from "./metrics.ts";
+import { CODE_LINE, CODE_PAD, ROW_NORMAL } from "./metrics.ts";
 import { svgEl } from "./svg.ts";
 
 /** カード 1 行を置く場所。 */
@@ -50,16 +49,16 @@ function link(r: Extract<CardRow, { kind: "link" }>, at: CardSpot): SVGElement[]
     height: h,
   });
   const title = svgEl("text", { class: "link-row", x, y: y + h / 2 });
-  title.textContent = r.link.title;
+  title.textContent = r.title;
   const tip = svgEl("title");
-  tip.textContent = r.link.url;
+  tip.textContent = r.url;
   const open = svgEl("text", {
     class: "link-open",
     // 枠の内側に収める。外へ出すと、選択の枠が本体より小さく見える
     x: x + w,
     y: y + h / 2,
     "text-anchor": "end",
-    "data-url": r.link.url,
+    "data-url": r.url,
   });
   open.textContent = "↗";
   return [hit, title, tip, open];
