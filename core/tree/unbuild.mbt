@@ -187,7 +187,7 @@ fn content(u : Unbuild, out : Array[@markdown.Block], b : Block) -> Unit {
       )
     Svg(s) => out.push(html(s))
     ThematicBreak => out.push(rule())
-    Details(text) => splice(u, out, text)
+    Details(text~, ..) => splice(u, out, text)
     Opaque(text) => splice(u, out, text)
   }
 }

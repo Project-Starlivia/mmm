@@ -32,7 +32,8 @@ export type Content =
   | { kind: "code"; info: string; text: string }
   | { kind: "svg"; markup: string }
   | { kind: "thematicBreak" }
-  | { kind: "details"; text: string };
+  /** `<details>`。open / summary / body は GitHub が描くのと同じ読み取り。text は原文 */
+  | { kind: "details"; text: string; open: boolean; summary: string | null; body: string };
 
 export interface Node {
   id: number;
@@ -119,8 +120,16 @@ function content(v: unknown): Content {
     }
     case "Svg":
       return { kind: "svg", markup: str(body) };
-    case "Details":
-      return { kind: "details", text: str(body) };
+    case "Details": {
+      const o = record(body);
+      return {
+        kind: "details",
+        text: field(o, "text", str),
+        open: field(o, "open", bool),
+        summary: option(o, "summary", str),
+        body: field(o, "body", str),
+      };
+    }
     default:
       return bad(`知らない Content ${String(tag)}`);
   }

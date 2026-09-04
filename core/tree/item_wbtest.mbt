@@ -254,7 +254,13 @@ test "途中の段落はラベルにならない" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n<summary>a</summary>\n\nx\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\n<summary>a</summary>\n\nx\n\n</details>",
+                      "open": false,
+                      "summary": "a",
+                      "body": "x",
+                    },
                   ],
                 },
               ],

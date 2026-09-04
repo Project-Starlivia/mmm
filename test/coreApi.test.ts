@@ -26,7 +26,10 @@ test("Block は enum の形から kind に整う", () => {
             { id: 6, content: ["Code", { info: "js", text: "1\n" }] },
             { id: 7, content: ["Svg", "<svg/>"] },
             { id: 8, content: "ThematicBreak" },
-            { id: 9, content: ["Details", "<details>x</details>"] },
+            {
+              id: 9,
+              content: ["Details", { text: "<details>x</details>", open: false, body: "x" }],
+            },
           ],
           children: [],
         },
@@ -43,6 +46,14 @@ test("Block は enum の形から kind に整う", () => {
     v.trees[0].node.blocks.map((b) => b.id),
     [3, 5, 6, 7, 8, 9],
   );
+  const last = v.trees[0].node.blocks[5].content;
+  assert.deepEqual(last, {
+    kind: "details",
+    text: "<details>x</details>",
+    open: false,
+    summary: null,
+    body: "x",
+  });
 });
 
 test("frontmatter・fold・sides・空のラベルは値のまま通る", () => {

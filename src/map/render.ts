@@ -15,7 +15,7 @@ import { type Box, type Layout, cardRect, edgeEnds } from "./layout.ts";
 import { drawCard } from "./drawCard.ts";
 import { edgePath } from "./edge.ts";
 import { languageEpoch } from "./highlight.ts";
-import { displayLabel, hiddenLabel, labelOf, rowOf, rowTop } from "./metrics.ts";
+import { displayLabel, foldName, hiddenLabel, labelOf, rowOf, rowTop } from "./metrics.ts";
 import { svgEl } from "./svg.ts";
 
 /**
@@ -48,6 +48,9 @@ interface NodeShape {
   hint: string | null;
 }
 
+const sameLines = (a: string[], b: string[]): boolean =>
+  a.length === b.length && a.every((l, i) => l === b[i]);
+
 /** カード 1 枚が、描き直しを要するほど変わったか */
 function sameRow(a: CardRow, b: CardRow): boolean {
   if (a.kind === "link" && b.kind === "link") {
@@ -56,11 +59,11 @@ function sameRow(a: CardRow, b: CardRow): boolean {
   if (a.kind === "svg" && b.kind === "svg") return a.markup === b.markup;
   if (a.kind === "img" && b.kind === "img") return a.path === b.path;
   if (a.kind === "code" && b.kind === "code") {
-    return (
-      a.lang === b.lang &&
-      a.lines.length === b.lines.length &&
-      a.lines.every((l, i) => l === b.lines[i])
-    );
+    return a.lang === b.lang && sameLines(a.lines, b.lines);
+  }
+  if (a.kind === "rule" && b.kind === "rule") return true;
+  if (a.kind === "details" && b.kind === "details") {
+    return a.open === b.open && a.summary === b.summary && sameLines(a.lines, b.lines);
   }
   return false;
 }
@@ -118,7 +121,8 @@ export class MapRenderer {
       buried: b.buried,
       // 言語の読み込みは後から効くので、世代も見る
       epoch: languageEpoch(),
-      label: labelOf(n),
+      // 畳んでいれば summary が字になる。summary だけ変わっても描き直すように
+      label: n.fold !== null ? foldName(n) : labelOf(n),
       rows: b.rows,
       // 画像は「まだ読めていない」から「読めた」へ後から変わる
       urls: b.rows.map((r) => (r.kind === "img" ? p.imageUrl(r.path) : null)),
@@ -190,7 +194,7 @@ export class MapRenderer {
         // ここが出すのはレイアウトが計算した数だけ
         svgEl("rect", { class: "box", width: b.w, height: b.h }),
       );
-      const text = labelOf(n);
+      const text = n.fold !== null ? foldName(n) : labelOf(n);
       const label = svgEl("text", {
         class: "label" + (text === "" ? " empty" : ""),
         x: rowOf(n).padX,

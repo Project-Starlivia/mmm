@@ -439,7 +439,12 @@ test "Details はそのまま" {
       doc([
         root(
           h("r", body=[
-            Details("<details>\n<summary>h</summary>\n\ninner\n\n</details>"),
+            Details(
+              text="<details>\n<summary>h</summary>\n\ninner\n\n</details>",
+              open=false,
+              summary=Some("h"),
+              body="inner",
+            ),
           ]),
         ),
       ]),

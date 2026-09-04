@@ -665,6 +665,12 @@ html, body {
     white-space: pre;
   }
 
+  /* ---- 装飾の水平線 / details ---- */
+  & line.card-rule { stroke: var(--line); stroke-width: 1; }
+  & text.details-mark { font-size: 10px; fill: var(--ink-dim); dominant-baseline: central; }
+  & text.details-row { font-size: 12px; fill: var(--ink-dim); dominant-baseline: central; }
+  & text.details-line { font-size: 11px; fill: var(--ink); white-space: pre; dominant-baseline: central; }
+
   &.hidden-node {
     opacity: 0.45;
 

@@ -150,7 +150,8 @@ interface Layout {
 - **Implicit は「ラベルの無いノード」。** 空の見出し（`""`）と同じ `.empty` の箱で、
   render に Implicit の分岐は 1 つも入らない。core.md「ノードの種類は無い。描く側には
   1 つも要らない」のとおり。行があるか無いかは書く側の関心
-- **fold**: 字は `node.label`（`fold.summary` は書き戻す綴りで、古くなりうる）。
+- **fold**: 字は `fold.summary`、無ければ `node.label`（spec「畳み」の表示名の規則。
+  最初は label と決めたが、GitHub が見せるのも summary なので訂正: 2026-09-04）。
   小さく薄く `+N`。自分のカードも出さない（body ごと包まれている）。
   `open` は見ない（spec「今は隠すだけ」）。Box は `node.fold` をそのまま持つので、
   後で見ると決めても形は変わらない
@@ -169,7 +170,9 @@ export function cardRows(blocks: Block[]): CardRow[];   // 見るのは content�
 - `image` は相対パス（scheme 無し。1 文字はドライブ）のときだけ img。外部の画像は出さない
 - `link` は `http(s)` のときだけ。題が空ならホスト名
 - `code` は行に割り、6 行を超えたら `…`。`svg` はそのまま
-- `thematicBreak` / `details` はカードにしない（Details は spec「今は隠すだけ」）
+- `thematicBreak` は細い線の行、`details` は GitHub と同じ見え方（summary か `Details`、
+  `open` なら中身の字）。開閉は md の `open` に従う（追記: 2026-09-04、最初は出さない
+  つもりだったが、書いてあるのに何も出ないのは読めないので出すことにした）
 - TS 側の md 読み（`parseLink` / `parseImage` / フェンス走査 / `linkLine` /
   `imageDest`）は消える。`bare` だけ残す（画像の鍵）
 - カードは表示専用。pick / その場編集 / 移動 / 削除は無い

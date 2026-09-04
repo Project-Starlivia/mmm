@@ -164,10 +164,10 @@ fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
   match piece {
     Raw(block) => take(b, block, nest)
     Folded(block, fold~) => take(b, block, nest, fold=Some(fold))
-    Capsule(text) => {
+    Capsule(text~, open~, summary~, body~) => {
       // 中身が来たので、保留中の水平線は境界になれない
       spill(b)
-      fill(b, Details(text))
+      fill(b, Details(text~, open~, summary~, body~))
     }
     Text(text) => {
       spill(b)
