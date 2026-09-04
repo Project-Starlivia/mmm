@@ -21,6 +21,8 @@ core/   MoonBit — 文書モデル。**いま作り直している最中**で�
   tree/         新しい core。md.mbt が md との境界（read / serialize / fragment）、
                 build.mbt が mdAst → 木と地番、unbuild.mbt が木 → mdAst、
                 reflect.mbt が前後の木の差を原文 md への編集列にする。
+                trial.mbt は反映を試す道具（木を決まった形で少し変える。
+                lab と総当たりのテストが使う）。
                 md_wbtest.mbt がライブラリの読みを指紋で固定し、
                 build_wbtest.mbt 以降が「この md はこう読まれる」、
                 unbuild_wbtest.mbt が「この木はこう書かれる」、

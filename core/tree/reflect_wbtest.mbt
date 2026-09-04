@@ -424,3 +424,45 @@ test "読み直して形が違えば全文へ落ちる" {
     { "from": 0, "to": 16, "insert": "# r\n\n## a\nb\n\n## b\n" },
   ])
 }
+
+///|
+test "ラベルだけなら自分の行だけ。子は触らない" {
+  let md = "# r\n\n## a\n\n## b\n"
+  let (before, spans) = survey(md)
+  let after = change(before, 0, [], relabel("R"))
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 0, "to": 5, "insert": "# R\n" },
+  ])
+}
+
+///|
+test "項目のラベルだけなら、子の字下げは残る" {
+  let md = "- a\n  - b\n- c\n"
+  let (before, spans) = survey(md)
+  let after = change(before, 0, [], relabel("A"))
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 0, "to": 4, "insert": "- A\n" },
+  ])
+  inspect(apply(md, reflect(md, before, spans, after)), content=(
+    #|- A
+    #|  - b
+    #|- c
+    #|
+  ))
+}
+
+///|
+test "自分も子も変われば、自分の行と子列の差分" {
+  let md = "# r\n\n## a\n\n## b\n"
+  let (before, spans) = survey(md)
+  let after = change(
+    change(before, 0, [], relabel("R")),
+    0,
+    [],
+    adopt(fresh("c")),
+  )
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 0, "to": 5, "insert": "# R\n" },
+    { "from": 16, "to": 16, "insert": "## c\n" },
+  ])
+}

@@ -83,17 +83,10 @@ fn plan(
       _ => ()
     }
   }
-  guard kids(
-    r,
-    spans.get(doc_id).unwrap().to,
-    0,
-    before.roots.map(x => x.node),
-    after.roots.map(x => x.node),
-    1,
-    sides,
-  ) else {
-    return None
-  }
+  let olds_n = before.roots.map(x => x.node)
+  let news_n = after.roots.map(x => x.node)
+  guard aligned(olds_n, news_n) else { return None }
+  kids(r, spans.get(doc_id).unwrap().to, 0, olds_n, news_n, 1, sides)
   r.out.sort_by((a, b) => {
     if a.from != b.from {
       a.from - b.from
@@ -110,32 +103,62 @@ fn plain(sides : Array[Side]) -> Bool {
 }
 
 ///|
-/// 前の木の同じ id と比べ、違えばそこで書く。同じなら子へ降りる。
+/// 前の木の同じ id と比べる。種類・畳み・子の並びが変わっていれば部分木ごと書く。
+/// そうでなければ、自分（行と中身）が違うときだけ自分の範囲を書き、子は子列の差分に任せる。
 fn walk(r : Reflect, x : Node, depth : Int, sides : Array[Side]) -> Unit {
   match r.old.get(id_of(x)) {
-    Some(old) if same(old, x) => {
+    // 畳みは `<details>` が部分木を包むので、自分か子列が変わればそこから丸ごと
+    Some(old) if kind(old) == kind(x) &&
+      aligned(children_of(old), children_of(x)) &&
+      (
+        !(folded(old) || folded(x)) ||
+        (same(old, x) && ids(children_of(old)) == ids(children_of(x)))
+      ) => {
       let s = r.spans.get(id_of(x)).unwrap()
       let mine = children_of(x)
+      if !same(old, x) {
+        // 自分の行と中身だけ。最初の子の行頭まで（項目の子の字下げは残す）
+        let head = match mine.get(0) {
+          Some(k) if r.old.contains(id_of(k)) => {
+            let ks = r.spans.get(id_of(k)).unwrap()
+            ks.from - column(r.md, ks.from)
+          }
+          _ => s.to
+        }
+        let alone = with_children(x, [])
+        r.out.push({
+          from: s.from,
+          to: head,
+          insert: indent(
+            fragment(alone, depth, [], r.eol),
+            column(r.md, s.from),
+          ),
+        })
+      }
       // 項目の子は容器の中身の桁（マーカーの 2 つ右）に居る
       let col = match x {
         ListNode(_) => column(r.md, s.from) + 2
         _ => 0
       }
-      // 畳みは `</details>` が子の後ろに在るので、子の出し入れは容器ごと
-      if folded(x) && ids(children_of(old)) != ids(mine) {
-        replace(r, x, depth, sides)
-      } else if !kids(r, s.to, col, children_of(old), mine, depth + 1, Map([])) {
-        replace(r, x, depth, sides)
-      }
+      kids(r, s.to, col, children_of(old), mine, depth + 1, Map([]))
     }
     _ => replace(r, x, depth, sides)
   }
 }
 
 ///|
+/// 残る子の順が前後で同じか。違えば並べ替えで、容器ごと書く。
+fn aligned(olds : Array[Node], news : Array[Node]) -> Bool {
+  let was = Map::from_array(olds.map(x => (id_of(x), x)))
+  let now = Map::from_array(news.map(x => (id_of(x), x)))
+  ids(olds.filter(x => now.contains(id_of(x)))) ==
+  ids(news.filter(x => was.contains(id_of(x))))
+}
+
+///|
 /// 子列の差分。残った子は組にして降り、消えた子は範囲ごと消し、増えた子は
 /// 次に残る子の手前か、最後に残る子の後ろか、容器の尻（`end`・桁 `col`）に差す。
-/// 残った子の順が変わっていれば false — 並べ替えは容器ごと書く。
+/// 残った子の順は同じ（`aligned`）が前提。
 fn kids(
   r : Reflect,
   end : Int,
@@ -144,13 +167,10 @@ fn kids(
   news : Array[Node],
   depth : Int,
   sides : Map[Int, Array[Side]],
-) -> Bool {
+) -> Unit {
   let was = Map::from_array(olds.map(x => (id_of(x), x)))
   let now = Map::from_array(news.map(x => (id_of(x), x)))
   let stay = news.filter(x => was.contains(id_of(x)))
-  guard ids(olds.filter(x => now.contains(id_of(x)))) == ids(stay) else {
-    return false
-  }
   for x in olds {
     if !now.contains(id_of(x)) {
       let s = r.spans.get(id_of(x)).unwrap()
@@ -190,7 +210,6 @@ fn kids(
     }
     r.out.push(insert(r, pos, pad(c) + indent(pend.to_string(), c)))
   }
-  true
 }
 
 ///|
@@ -245,7 +264,7 @@ fn indent(text : String, n : Int) -> String {
 }
 
 ///|
-/// ノード自身が同じか — 種類・ラベル・中身・畳み。子は見ない。
+/// ノード自身が同じか — ラベル・中身・畳み。子は見ない。
 fn same(a : Node, b : Node) -> Bool {
   match (a, b) {
     (HeadingNode(p), HeadingNode(q)) =>
@@ -271,6 +290,34 @@ fn id_of(x : Node) -> Int {
     HeadingNode(h) => h.id
     ListNode(l) => l.id
     ImplicitNode(g) => g.id
+  }
+}
+
+///|
+/// 種類。構築子の名前そのもの
+fn kind(x : Node) -> Int {
+  match x {
+    HeadingNode(_) => 0
+    ListNode(_) => 1
+    ImplicitNode(_) => 2
+  }
+}
+
+///|
+fn with_children(x : Node, kids : Array[Node]) -> Node {
+  match x {
+    HeadingNode(h) => HeadingNode({ ..h, children: kids })
+    ImplicitNode(g) => ImplicitNode({ ..g, children: kids })
+    ListNode(l) =>
+      ListNode({
+        ..l,
+        children: kids.map(k => {
+          match k {
+            ListNode(c) => c
+            _ => abort("項目の子は項目")
+          }
+        }),
+      })
   }
 }
 

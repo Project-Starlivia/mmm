@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mmm lab — 木の差が md のどこに映るか</title>
+    <link rel="stylesheet" href="./lab.css" />
+  </head>
+  <body>
+    <header>
+      <h1>mmm lab — 反映</h1>
+      <p>
+        md を読んだ木のノード 1 つを決まった形で変え（<b>ラベル</b>・<b>消す</b>・<b>子を足す</b>）、
+        前後の木を比べて md に映す。<b>編集</b>が触った所だけなら比例している。
+        <b>全文</b>に落ちたら、検証が「読み直した形が違う」と言ったということ。
+      </p>
+      <nav><a href="./index.html">← 読み書き</a></nav>
+    </header>
+
+    <main>
+      <section class="pane">
+        <label>md<span>前</span></label>
+        <div id="md" class="editor"></div>
+        <div class="samples" id="samples"></div>
+      </section>
+
+      <section class="pane">
+        <label>地番<span>id[from,to]。1 は文書の散文</span></label>
+        <pre id="spans"></pre>
+
+        <div class="knobs">
+          <span>id</span>
+          <input id="id" type="number" min="1" value="2" />
+          <select id="how">
+            <option value="relabel">ラベルに ! を足す</option>
+            <option value="delete">消す</option>
+            <option value="adopt">子を足す</option>
+          </select>
+        </div>
+
+        <label>mmmTree<span>id を探す</span></label>
+        <pre id="json" class="grow"></pre>
+      </section>
+
+      <section class="pane">
+        <label>編集<span id="verdict"></span></label>
+        <pre id="edits"></pre>
+
+        <label>md<span>後。差した字と<del>消えた字</del></span></label>
+        <pre id="out" class="grow"></pre>
+      </section>
+    </main>
+
+    <script type="module" src="./reflect.ts"></script>
+  </body>
+</html>

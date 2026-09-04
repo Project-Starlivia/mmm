@@ -46,3 +46,21 @@ pub fn mmm_serialize(md : String) -> String {
 pub fn mmm_unbuild_sig(md : String) -> String {
   @tree.ast_sig(@tree.unbuild(@tree.parse(md)))
 }
+
+///|
+/// 地番の指紋。`id[from,to]`。
+#export_name("mmmSpansSig")
+pub fn mmm_spans_sig(md : String) -> String {
+  @tree.spans_sig(md)
+}
+
+///|
+/// 反映の試し。id のノードを how（relabel / delete / adopt）で変え、
+/// 編集列と当てた後の md を出す。知らない how は空。
+#export_name("mmmTrial")
+pub fn mmm_trial(md : String, id : Int, how : String) -> String {
+  match @tree.change_of(how) {
+    Some(c) => @tree.trial(md, id, c).to_json().stringify()
+    None => ""
+  }
+}

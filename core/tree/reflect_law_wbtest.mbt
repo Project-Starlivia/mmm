@@ -3,7 +3,7 @@
 //   法則 — 編集を当てて読み直せば、後の木と形が一致する（id は見ない）
 //   比例性 — ラベルを変えただけなら、編集はそのノードの地番の中に 1 つ
 //
-// 文書の見本 × 全ノード × 変え方（ラベル・削除・子を足す）で回す。
+// 文書の見本 × 全ノード × 変え方（trial.mbt の morph）で回す。
 // 形の一致は検証が全文へ落として保つので、ここが見ているのは
 // **落ちずに済む所で落ちていないか**と、落ちる所で壊れていないか。
 
@@ -15,110 +15,6 @@ let corpus : Array[String] = [
   "# a\n\n### x\n\n# b", "- a\n\n  text\n\n  - b\n- c\n", "# r\n\n- i\n  - j\n\n## a\n",
   "hello\n\n- a\n- b\n",
 ]
-
-///|
-/// 木の全ノードの id（文書順）。
-fn all_ids(doc : Doc) -> Array[Int] {
-  let out = []
-  fn go(x : Node) {
-    out.push(id_of(x))
-    for k in children_of(x) {
-      go(k)
-    }
-  }
-
-  for r in doc.roots {
-    go(r.node)
-  }
-  out
-}
-
-///|
-/// id のノードを f で置き換えた Doc。None なら消す。根の側は子と並走を保つ。
-fn morph(doc : Doc, id : Int, f : (Node) -> Node?) -> Doc {
-  let roots = []
-  for r in doc.roots {
-    if id_of(r.node) == id {
-      match f(r.node) {
-        Some(n) => roots.push(({ node: n, sides: fit(r.sides, n) } : Root))
-        None => ()
-      }
-    } else {
-      let (kids, sides) = morph_kids(children_of(r.node), r.sides, id, f)
-      if r.node is ImplicitNode(_) && kids.is_empty() {
-        continue
-      }
-      roots.push(({ node: with_kids(r.node, kids), sides } : Root))
-    }
-  }
-  { ..doc, roots, }
-}
-
-///|
-fn morph_kids(
-  kids : Array[Node],
-  sides : Array[Side],
-  id : Int,
-  f : (Node) -> Node?,
-) -> (Array[Node], Array[Side]) {
-  let out = []
-  let out_sides = []
-  for i, k in kids {
-    let side = if i < sides.length() { sides[i] } else { Right }
-    if id_of(k) == id {
-      match f(k) {
-        Some(n) => {
-          out.push(n)
-          out_sides.push(side)
-        }
-        None => ()
-      }
-    } else {
-      let (kk, _) = morph_kids(children_of(k), [], id, f)
-      // 子を失った Implicit は在り得ない（check が言う）ので、一緒に消える
-      if k is ImplicitNode(_) && kk.is_empty() {
-        continue
-      }
-      out.push(with_kids(k, kk))
-      out_sides.push(side)
-    }
-  }
-  (out, out_sides)
-}
-
-///|
-fn fit(sides : Array[Side], node : Node) -> Array[Side] {
-  let n = children_of(node).length()
-  Array::makei(n, i => if i < sides.length() { sides[i] } else { Right })
-}
-
-///|
-fn with_kids(x : Node, kids : Array[Node]) -> Node {
-  match x {
-    HeadingNode(h) => HeadingNode({ ..h, children: kids })
-    ImplicitNode(g) => ImplicitNode({ ..g, children: kids })
-    ListNode(l) =>
-      ListNode({
-        ..l,
-        children: kids.map(k => {
-          match k {
-            ListNode(c) => c
-            _ => abort("項目の子は項目")
-          }
-        }),
-      })
-  }
-}
-
-///|
-/// 新しいノード（id は前の木に無い番号）。項目の子は項目。
-fn newborn(item : Bool) -> Node {
-  if item {
-    ListNode({ id: 999, label: "new", fold: None, body: [], children: [] })
-  } else {
-    HeadingNode({ id: 999, label: "new", fold: None, body: [], children: [] })
-  }
-}
 
 ///|
 /// 法則 — 当てて読み直せば後の木と形が一致する。編集は from 順で重ならない。
@@ -149,13 +45,7 @@ test "法則 — 全ノードのラベルを変える。比例性も見る" {
   for md in corpus {
     let (before, spans) = survey(md)
     for id in all_ids(before) {
-      let after = morph(before, id, x => {
-        match x {
-          HeadingNode(h) => Some(HeadingNode({ ..h, label: h.label + "!" }))
-          ListNode(l) => Some(ListNode({ ..l, label: l.label + "!" }))
-          other => Some(other)
-        }
-      })
+      let after = changed(before, id, Relabel)
       let edits = law(md, before, spans, after, "relabel \{id} in \{md}")
       let s = spans.get(id).unwrap()
       // Implicit はラベルが無いので変わらない。それ以外は 1 つ、地番の中
@@ -181,7 +71,7 @@ test "法則 — 全ノードを消す" {
   for md in corpus {
     let (before, spans) = survey(md)
     for id in all_ids(before) {
-      let after = morph(before, id, _ => None)
+      let after = changed(before, id, Delete)
       ignore(law(md, before, spans, after, "delete \{id} in \{md}"))
     }
   }
@@ -192,9 +82,7 @@ test "法則 — 全ノードに子を足す" {
   for md in corpus {
     let (before, spans) = survey(md)
     for id in all_ids(before) {
-      let after = morph(before, id, x => {
-        Some(with_kids(x, children_of(x) + [newborn(x is ListNode(_))]))
-      })
+      let after = changed(before, id, Adopt)
       ignore(law(md, before, spans, after, "adopt \{id} in \{md}"))
     }
   }
