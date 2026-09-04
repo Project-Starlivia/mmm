@@ -10,10 +10,12 @@ import { type Camera, type Pane, centerOn, fitToPane, panBy, panToShow, pinch, t
 import { unionRect } from "./map/geometry.ts";
 import { Fingers } from "./map/gesture.ts";
 import { indicatorFor, isVisible } from "./map/indicator.ts";
+import { type Intent, keyed } from "./map/keys.ts";
+import { LabelEditor } from "./map/label.ts";
 import { type Layout, layoutMap, rootBox } from "./map/layout.ts";
-import { nodeSize } from "./map/metrics.ts";
+import { labelOf, nodeSize } from "./map/metrics.ts";
 import { MapRenderer } from "./map/render.ts";
-import { NONE, type Selection, all, arrow, click, extend, hit, isArrowKey, rubber } from "./map/select.ts";
+import { NONE, type Selection, click, hit, rubber } from "./map/select.ts";
 import { svgEl } from "./map/svg.ts";
 import { mapToSvg } from "./map/toSvg.ts";
 import { icon } from "./icons.ts";
@@ -72,6 +74,7 @@ export class Mindmap {
   private tapped: { id: number; x: number; y: number } | null = null;
   /** Space を押している間、左ドラッグはパン */
   private spaceHeld = false;
+  private label: LabelEditor;
 
   constructor(pane: HTMLElement, host: MapHost) {
     this.pane = pane;
@@ -87,6 +90,11 @@ export class Mindmap {
     this.rubber = document.createElement("div");
     this.rubber.id = "rubber";
     pane.append(this.rubber);
+
+    this.label = new LabelEditor(pane, {
+      rename: (id, label) => this.host.apply({ kind: "rename", id, label }, false),
+      closed: () => pane.focus(),
+    });
 
     // md からの始め方は md ペイン自身が同じ器で言う（app/hint.ts）
     this.hint = paneHint("Nothing to show yet — write a ", "# heading", "");
@@ -135,6 +143,9 @@ export class Mindmap {
   private setCamera(c: Camera): void {
     this.camera = c;
     this.applyCamera();
+    const editing = this.label.editing();
+    const b = editing === null ? undefined : this.layout.boxes.get(editing);
+    if (b) this.label.place(b, this.camera);
     this.updateIndicator();
   }
 
@@ -162,6 +173,12 @@ export class Mindmap {
     // updateListener の中で onChange の直後に必ず onCaret が続き、今の輪へ
     // 即座に上書きされるから
     this.showCaret(this.caretIds);
+    const editing = this.label.editing();
+    if (editing !== null) {
+      const b = this.layout.boxes.get(editing);
+      if (b) this.label.place(b, this.camera);
+      else this.label.close();
+    }
     this.updateIndicator();
   }
 
@@ -198,10 +215,11 @@ export class Mindmap {
     this.renderer.paintSelection(new Set(this.host.selection().ids));
   }
 
-  /** その場編集に入る。seed は最初の字 */
+  /** その場編集に入る。seed は最初の字。箱が無い（畳まれて埋もれた）ノードは開けない */
   beginEdit(id: number, seed: string | null): void {
-    void id;
-    void seed;
+    const b = this.layout.boxes.get(id);
+    if (!b) return;
+    this.label.open(id, b, this.camera, labelOf(b.node), seed);
   }
 
   /**
@@ -312,7 +330,7 @@ export class Mindmap {
       true,
     );
     pane.addEventListener("pointerdown", (e) => {
-      if (targetIn(e, ".link-open, .img-connect, .pane-tool")) return;
+      if (targetIn(e, ".link-open, .img-connect, .pane-tool, #node-editor")) return;
       if (e.pointerType === "touch" && this.fingers.pinching) return;
       if (e.button !== 0 && e.button !== 1) return;
       pane.focus();
@@ -432,41 +450,54 @@ export class Mindmap {
     this.renderer.nodeLayer.addEventListener("pointerdown", (e) => {
       if (targetIn(e, ".link-open, .img-connect")) e.stopPropagation();
     });
+    this.pane.addEventListener("dblclick", (e) => {
+      if (targetIn(e, ".link-open, .img-connect, #node-editor")) return;
+      const id = this.nodeAt(e.clientX, e.clientY);
+      if (id === null) return;
+      e.preventDefault();
+      this.beginEdit(id, null);
+    });
+  }
+
+  /** keys.ts が言った「何をするか」を実行する。意味はあちらが持ち、ここは配線だけ */
+  private act(intent: Intent): void {
+    switch (intent.kind) {
+      case "op":
+        this.host.apply(intent.op, intent.edit);
+        return;
+      case "edit":
+        this.beginEdit(intent.id, intent.seed);
+        return;
+      case "select":
+        this.host.setSelection(intent.sel, intent.reveal);
+        // 矢印で辿るときだけ寄せる（Mod+A / Esc は reveal が偽）
+        if (intent.reveal && intent.sel.anchor !== null) this.ensureVisible(intent.sel.anchor);
+        return;
+      case "center":
+        this.centerOnTarget();
+        return;
+    }
   }
 
   /** 地図の中だけで効くキー。全体のキーは app/shortcuts.ts */
   private bindKeys(): void {
     this.pane.addEventListener("keydown", (e) => {
-      const mod = e.ctrlKey || e.metaKey;
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === " ") {
         this.spaceHeld = true;
         this.pane.style.cursor = "grab";
         e.preventDefault();
         return;
       }
-      if (e.key === "Home" && !mod && !e.altKey) {
-        e.preventDefault();
-        this.centerOnTarget();
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        this.host.setSelection(NONE, false);
-        return;
-      }
-      if (mod && !e.altKey && e.key.toLowerCase() === "a") {
-        e.preventDefault();
-        this.host.setSelection(all(this.layout), false);
-        return;
-      }
-      if (isArrowKey(e.key) && !mod && !e.altKey) {
-        e.preventDefault();
-        const sel = this.host.selection();
-        const next = arrow(this.layout, sel.anchor, e.key);
-        if (next === null) return;
-        this.host.setSelection(e.shiftKey ? extend(sel, next) : { ids: [next], anchor: next }, true);
-        this.ensureVisible(next);
-      }
+      const intent = keyed(this.layout, this.host.selection(), {
+        key: e.key,
+        shift: e.shiftKey,
+        mod: e.ctrlKey || e.metaKey,
+        alt: e.altKey,
+      });
+      if (intent === null) return;
+      e.preventDefault();
+      this.act(intent);
     });
     this.pane.addEventListener("keyup", (e) => {
       if (e.key === " ") {
