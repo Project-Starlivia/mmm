@@ -22,3 +22,12 @@ pub(all) struct Node {
   blocks : Array[@tree.Block]
   children : Array[Node]
 } derive(Eq, Debug, ToJson)
+
+///|
+/// map が見るもの全部。frontmatter は画像フォルダの宣言（`image-folder:`）の
+/// 置き場なので、画像カードを引くのに要る。Doc が持っているものを落とすのを
+/// やめるだけで、足すものは無い
+pub(all) struct View {
+  frontmatter : String?
+  trees : Array[Tree]
+} derive(Eq, Debug, ToJson)

@@ -7,17 +7,25 @@
 ///|
 /// 中身を、いま積んでいるノードに足す。骨格がまだ無ければ文書の散文になる。
 /// id は割り付けの直前に文書順で振るので、ここでは 0 を置く。
-fn fill(b : Build, content : Content) -> Unit {
+/// `to` はその中身の原文での尻で、持ち主の地番がそこまで伸びる。
+fn fill(b : Build, content : Content, to~ : Int) -> Unit {
   let block : Block = { id: 0, content }
   if b.stack.is_empty() {
     b.body.push(block)
+    if to > b.body_to {
+      b.body_to = to
+    }
     return
   }
-  match b.stack[b.stack.length() - 1].skel {
+  let f = b.stack[b.stack.length() - 1]
+  match f.skel {
     Line(body~, ..) => body.push(block)
     // 飛びは綴りが無いので中身も持てない。put は必ず実体を最後に積むので、
     // ここに来ることは無い
     Gap => ()
+  }
+  if to > f.to {
+    f.to = to
   }
 }
 

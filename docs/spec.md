@@ -11,60 +11,47 @@
 **型は名乗らせず確かめる。** `as T` も `!` も置かない — 外れていても誰も
 気づけないため（実際 `<svg id="logo">` を `HTMLElement` と名乗り続けていた）。
 `instanceof` / 型ガード / 既定値のどれかで確かめる。
-（見張っていた `test/assertions.test.ts` は core と一緒に消してある。
-core が揃ったら戻す）
+（見張っていた `test/assertions.test.ts` は旧 core と一緒に消してある。
+操作が戻るときに戻す）
 
 ```
-core/   MoonBit — 文書モデル。**いま作り直している最中**で、旧 core は
-        消してある(意味は下の「文書モデル」、内部は core.md)。
-        アプリは繋ぎ先を失っているので、揃うまで組み上がらない。
-  tree/         新しい core。md.mbt が md との境界（read / serialize）、
-                build.mbt が mdAst → 木、unbuild.mbt が木 → mdAst。
-                md_wbtest.mbt がライブラリの読みを指紋で固定し、
-                build_wbtest.mbt 以降が「この md はこう読まれる」、
-                unbuild_wbtest.mbt が「この木はこう書かれる」を固定する
+core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内部は core.md)
+  tree/         md.mbt が md との境界（read / serialize / fragment）、build.mbt が
+                mdAst → 木と地番、unbuild.mbt が木 → mdAst、reflect.mbt が前後の木の
+                差を原文 md への編集列にする。md_wbtest.mbt がライブラリの読みを指紋で
+                固定し、build_wbtest.mbt 以降が「この md はこう読まれる」、
+                unbuild_wbtest.mbt が「この木はこう書かれる」、reflect_wbtest.mbt が
+                「木がこう違えば md はここだけ変わる」を固定する
   view/         map が見る木。project が Doc から削るだけで作る
+                （`View { frontmatter, trees }`。frontmatter は画像フォルダの宣言のため）
   op/           操作。apply(doc, op) が Doc を Doc にする。席は隣の id で言う
                 （NodePlace / BlockPlace）。道具（splice / append / body）が
                 型の異種性を幽閉する。決めは core.md「操作」
-src/    TypeScript — UI。**core が揃うまで触らない。** 繋ぎ先(旧 coreApi.ts)は
-        消してあるので、いまはコンパイルできない
-  editor.ts    Markdown 側(CodeMirror 6、履歴はコアに委譲。フェンスの
-               中は map/highlight.ts と同じ言語表で色を付ける)
-  mindmap.ts   Mindmap 側(見た目の状態と入力処理)
-  edits.ts     行・ブロックの出し入れを 1 回の置き換えに落とす計算
-  caret.ts     md のカーソル・選択が掛かっているノード(区間の重なりだけ)
+src/    TypeScript — UI。**描くだけ。** 選択・操作は操作の API が揃うまで無い（git に在る）
+  coreApi.ts   core の出口。JSON の形を整える唯一の場所。TS では必ず `core.View` と書く
+  editor.ts    Markdown 側(CodeMirror 6、履歴も CodeMirror。フェンスの中は
+               map/highlight.ts と同じ言語表で色を付ける)
+  mindmap.ts   Mindmap 側(視点と描画。パン・ズーム・ピンチ・寄せ・針・書き出し)
   icons.ts     ボタンとメニューの絵の唯一の源(線で引く / currentColor)
   style.css    全体のスタイル(部品ごとの塊。入れ子は CSS 自身の機能)
-  map/         その純粋層 — geometry(座標系) / view(パン・ズーム・寄せ) /
-               edge(線の形) / cards(添付→カード行。DOM を知らない) /
-               drawCard(カード 1 行 → SVG。種類ごとの形はここだけ) /
-               metrics(寸法) / layout(木→箱の配置。カードの置き場所 cardRect も
-               ここが唯一の出所) / drop(落とし先の決定) / navigate(矢印の行き先) /
-               overlay(入力欄の置き場所) / render(SVG の差分更新。**文書から
-               決まるものだけ**を描き、選択やドラッグの印は付けた本人が被せる) /
-               pick(選んだカードの枠と ×。1 個だけの印) /
-               addButtons(選んだノードの上下左右に出す + の置き場所) /
-               gesture(指の台帳。2 本目からを引き受ける) /
-               indicator(画面外の対象を指す針の位置と向き) /
-               menu(メニューの器。入れ子も同じ器) /
-               highlight(コードの色分け) / toSvg(1 枚の svg にする) / svg(要素を作る)
-  main.ts      束ねる場所(選択・同期・ファイル I/O)
+  map/         その純粋層 — geometry(座標系。側 → 符号はここだけ) / camera(視点。
+               world ↔ 画面) / edge(線の形) / cards(Block → カード行。分類だけ) /
+               drawCard(カード 1 行 → SVG) / metrics(寸法の唯一の場所) /
+               layout(View の木 → 箱。畳みの埋没と sides の zip もここ) /
+               render(SVG の差分更新) / highlight(コードの色分け) /
+               toSvg(1 枚の svg にする) / svg(要素を作る) / indicator(画面外の
+               根を指す針) / gesture(指の台帳) / menu(メニューの器)
+  main.ts      束ねる場所(打鍵 → core.view → render の 1 本、ファイル I/O、帯)
   app/         その子系統 — name(文書の名前) / persist(テーマと色) /
                theme(テーマ・アクセントカラー・ロゴ) / panes(2 つの出し分けと分割線) /
-               head(文書の頭の設定。画像フォルダの場所はここが宣言) /
-               assets(画像) /
-               io(File System Access API の窓口) / handles(ハンドルを IndexedDB に
-               置く層) / logo(ロゴの唯一の源) / paste(貼り付けの振り分け) /
-               dnd(落とされたファイルの振り分け) / shortcuts(全体のキー) /
-               export(Mindmap を外へ出す。ファイルにもクリップボードにも) /
-               draw(その場で描く窓) / form(木の書き方 # / n+ / - の切り替え) /
-               paneTool(隅に浮く道具の器。押しても下へ抜けない)
-test/   検証 — core に触らないものだけが残っている(画像パス / 行とブロックの
-        編集 / 座標 / 指の台帳 / コードの色分け / 画面外の針 / ペイン /
-        URL 共有 / 寄せ / + の置き場所)。**core に触る 16 本は旧 core と
-        一緒に消した** — 新しい core が出来てから書き直す。
-        tools/(負荷サンプル生成)、fixtures/(負荷サンプル)
+               head(頭の宣言を読む。画像フォルダの場所はここが答える) /
+               assets(画像を読む) / io(File System Access API の窓口) /
+               handles(ハンドルを IndexedDB に置く層) / logo(ロゴの唯一の源) /
+               shortcuts(全体のキー) / export(Mindmap を外へ出す) /
+               paneTool(隅に浮く道具の器) / hint(白紙の言い出し) / notice / ask
+test/   検証 — core に触らない純粋層(camera / geometry / gesture / highlight /
+        indicator / panes / share / assets)と、core の出口(coreApi)・分類(cards)・
+        配置(layout)。tools/(負荷サンプル生成)、fixtures/(負荷サンプル)
 docs/   記録 — spec.md はこのファイル、core.md は文書モデルの内部
         （型・パイプライン・道具の決め。spec.md は意味だけを持つ）、
         shortcuts.md はキーの一覧
@@ -554,6 +541,10 @@ Mindmap からの追加・編集(`Tab` / rename / D&D / 段の上下)が書く�
   **色が付いたまま**(裏に色付きの層、表に透明な textarea を重ねてある)
 - `<svg>…</svg>` ブロック → そのまま描画(data URL 経由の静的表示)
 - `![](相対パス)` → 画像サムネイル(下記)
+- 境界にならなかった水平線 → 書かれた場所に細い線が 1 本
+- 畳みにならなかった `<details>` → GitHub と同じ見え方。`<summary>` の字(無ければ
+  `Details`)と、`<details open>` なら中身の字(6 行まで)。開閉は md の `open` が決める —
+  Mindmap だけの状態は持たない
 
 リンク(`Shift+L`)とコード(`Shift+C`)は、**Mindmap 側からも足せる**。どちらも
 専用のポップアップは持たず、その場のカード入力欄が開くだけ — 器を増やさずに、
@@ -1197,7 +1188,7 @@ mmm の木で言えるのは「この部分木がまるごと畳まれている�
   中身ではないので、切り出しは列 0 に揃える(剥がさないと深い入れ子で字下げコードに化ける)。
   一方、列 0 の行に付いた 1〜3 個の空白は**見出しの `   # a` と同じ飾り**で、
   マーカーの銘柄や空行の数と同じく触ったときに正規形へ落ちる
-- Details の表示名は覗いて導出: `<summary>` > 一番強い見出し > 最初の行
+- 畳んだノードの表示名は覗いて導出: `<summary>` > 一番強い見出し（そのノードのラベル）> 最初の行
 - **ラベルを書き換えても畳みは降格しない。** 名前は持ち主を決めていないので、
   `fold.summary` が古いまま残るだけ(mmm 経由で触れば揃う)
 
@@ -1205,8 +1196,8 @@ mmm の木で言えるのは「この部分木がまるごと畳まれている�
 
 - **畳む** = そのノードの定義ごと巻き、`<summary>` にラベルを書く
 - **広げる** = タグを外す。中身はその場で普通の md として読み直される
-- マップ上で開いて中を見る(Detailsの text をその時に parse して枠内に描く)・
-  `open` 属性の反映は後の拡張。今は隠すだけ
+- マップでは GitHub と同じく `<summary>` と、`open` なら中身の字を出す(「コンテンツ
+  カード」)。中身を md として描くのは後の拡張
 
 #### コメントアウト(`<!-- -->`)
 

@@ -337,7 +337,14 @@ test "項目の中の切り出しは列 0 に揃う" {
             "body": [
               {
                 "id": 3,
-                "content": ["Details", "<details>\n\n## h\n\n</details>"],
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n\n## h\n\n</details>",
+                    "open": false,
+                    "body": "## h",
+                  },
+                ],
               },
             ],
             "children": [],
@@ -372,7 +379,14 @@ test "入れ子の項目でも列 0 に揃う" {
                   "body": [
                     {
                       "id": 4,
-                      "content": ["Details", "<details>\n\n## h\n\n</details>"],
+                      "content": [
+                        "Details",
+                        {
+                          "text": "<details>\n\n## h\n\n</details>",
+                          "open": false,
+                          "body": "## h",
+                        },
+                      ],
                     },
                   ],
                   "children": [],
@@ -429,7 +443,12 @@ test "CRLF は切り出しの中でも保たれる" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>",
+                    "Details",
+                    {
+                      "text": "<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>",
+                      "open": false,
+                      "body": "## h",
+                    },
                   ],
                 },
               ],
@@ -620,7 +639,12 @@ test "原文のまま持つ領域の中の定義行は重ねない" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\njunk\n\n[q]: /r\n\n## a\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\njunk\n\n[q]: /r\n\n## a\n\n</details>",
+                      "open": false,
+                      "body": "junk\n\n[q]: /r\n\n## a",
+                    },
                   ],
                 },
               ],
@@ -653,7 +677,12 @@ test "開きとノードの間の定義行があれば中身" {
               {
                 "id": 3,
                 "content": [
-                  "Details", "<details>\n\n[q]: /r\n\n## a\n\n</details>",
+                  "Details",
+                  {
+                    "text": "<details>\n\n[q]: /r\n\n## a\n\n</details>",
+                    "open": false,
+                    "body": "[q]: /r\n\n## a",
+                  },
                 ],
               },
             ],

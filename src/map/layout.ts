@@ -1,32 +1,24 @@
-// ノード木 → 箱の配置。DOM を知らない純粋なレイアウト層。
-// すべての木は左から右へ伸びる。
+// View → 箱の配置。DOM を知らない純粋なレイアウト層。
+//
+// core の木をそのまま歩き、幾何（x/y/w/h）と、畳みで埋もれた子孫の数と、
+// 中身から組んだカード行だけを足す。構造は core の語（node / side）のまま読み、
+// 言い換えない。寸法は `sizeOf` で外から受ける — 文字の実測は DOM の仕事で、
+// ここは数だけを扱う（試験も数だけで書ける）。
+//
+// すべての木は根から左右へ伸びる。側を持つのは根の子だけ（`sides` と並走）で、
+// 孫から下は親の側を継ぐ。グループという概念は無い — 側ごとに 1 列積むだけ。
 
-import type { DocView, NodeInfo } from "../coreApi.ts";
-import { type CardRow, cardBleed, cardInset, cardRows, rowH } from "./cards.ts";
-import { type Pt, type Rect, entryEdgeOf, growthEdgeOf } from "./geometry.ts";
-import { ROW_NORMAL, nodeSize, rowTop } from "./metrics.ts";
+import type * as core from "../coreApi.ts";
+import { type CardRow, cardRows } from "./cards.ts";
+import { type Pt, type Rect, dirOf, entryEdgeOf, growthEdgeOf } from "./geometry.ts";
+import { ROW_NORMAL, cardBleed, cardInset, rowH, rowTop } from "./metrics.ts";
 
 export const GAP = {
   x: 45,
   y: 10,
-  /** 同じ側の、グループとグループの間 */
-  group: 26,
+  /** 木と木の間 */
   root: 34,
 };
-
-/** その枝が伸びる向き（右 = 1 / 左 = -1）。**側を読むのはここだけ** */
-export const dirOf = (n: NodeInfo): 1 | -1 => (n.left ? -1 : 1);
-
-/**
- * グループの継ぎ目に引く水平線。**同じ側の列の中の継ぎ目すべて**に出るので、
- * 意味の境界（`---` の位置）と 1 対 1 ではない — 右 A・左 B・右 C の並びでは、
- * 右の列の A と C の間に 1 本出る。線は見せ方であって意味ではない。
- */
-export interface Seam {
-  x: number;
-  y: number;
-  w: number;
-}
 
 /**
  * 親の辺のうち、何割を「付け根の帯」に使うか。子が複数あるとき、線の出口を
@@ -34,20 +26,45 @@ export interface Seam {
  */
 const FAN_BAND = 0.6;
 
+/** 親との繋がり。側は繋がりの性質なのでここに乗る（根は繋がりを持たない） */
+export interface Edge {
+  id: number;
+  side: core.Side;
+}
+
 export interface Box {
-  n: NodeInfo;
+  /** View のノードそのまま。label / fold / blocks はここから読む */
+  node: core.Node;
+  parent: Edge | null;
+  /** 畳んで埋もれた子孫の数（全部の子孫。種類で除かない） */
+  buried: number;
+  /** 親の辺の上での、付け根のずらし量(px)。兄弟と出口が重ならないように */
+  fan: number;
   x: number;
   y: number;
   w: number;
   h: number;
+  /** node.blocks から組んだもの。寸法に要るので持つ */
   rows: CardRow[];
 }
 
+export interface Layout {
+  /** 描くノードの id、文書順（= 重なり順）。畳まれて埋もれたものは入らない */
+  order: number[];
+  boxes: Map<number, Box>;
+}
+
+export interface Size {
+  w: number;
+  h: number;
+}
+
+/** ノードの箱の大きさを答えるもの。実体は metrics.nodeSize */
+export type SizeOf = (node: core.Node, rows: CardRow[], buried: number) => Size;
+
 /**
  * カード 1 行の中身を置く矩形（**箱の左上から見た座標**）。
- *
- * 描くのも、選んだ枠を出すのも、その場で直す入力欄を置くのも、必ずここを
- * 通る。以前は描画とマップが同じ積み方を別々に数えていて、実際に 2px ずれた。
+ * 描くのも書き出すのも、必ずここを通る — 積み方を 2 か所で数えない。
  */
 export function cardRect(b: Box, index: number): Rect | null {
   const r = b.rows[index];
@@ -62,155 +79,83 @@ export function cardRect(b: Box, index: number): Rect | null {
   };
 }
 
-export interface Layout {
-  /** 描くノード、文書順（畳まれて埋もれたものは入らない） */
-  visible: NodeInfo[];
-  boxes: Map<number, Box>;
-  parentOf: Map<number, number>;
-  /** 畳んだノード → その下に埋もれている**子孫**の数（子だけではない） */
-  buriedCount: Map<number, number>;
-  /** 子 → 親の辺の上での、付け根のずらし量(px) */
-  fanOf: Map<number, number>;
-  /** 同じ側の列の中の、グループの継ぎ目 */
-  seams: Seam[];
-}
-
-/**
- * `roots` とその子孫のうち、見えているものすべて。**`roots` が空なら全体**。
- *
- * 書き出しの範囲がこれ。mmm では「選ぶ」がどこでも枝ごとを意味する
- * （コピーもカットも削除も移動も）ので、書き出しだけ別の意味にはしない。
- * 畳んで埋もれているノードは `visible` に入らないため、畳んだまま書き出せば
- * 畳んだ姿がそのまま出る。
- */
-export function branchIds(
-  layout: Layout,
-  roots: ReadonlySet<number>,
-): Set<number> {
-  const out = new Set<number>();
-  for (const n of layout.visible) {
-    if (roots.size === 0) {
-      out.add(n.id);
-      continue;
-    }
-    // 自分から親をたどって、途中に選ばれたものがあれば入る
-    for (let id = n.id; ; ) {
-      if (roots.has(id)) {
-        out.add(n.id);
-        break;
-      }
-      const up = layout.parentOf.get(id);
-      if (up === undefined) break;
-      id = up;
-    }
-  }
-  return out;
-}
-
-/** ルート = 深さ 1 でどの親も持たないノード。無ければ null（空文書）。 */
-export function rootId(layout: Layout): number | null {
-  for (const [id, b] of layout.boxes) {
-    if (b.n.depth === 1 && b.n.parent === -1) return id;
+/** 最初の木の根。無ければ null（空文書） */
+export function rootBox(L: Layout): Box | null {
+  for (const id of L.order) {
+    const b = L.boxes.get(id);
+    if (b && b.parent === null) return b;
   }
   return null;
 }
 
 const gapBefore = (i: number): number => (i === 0 ? 0 : GAP.y);
 
-function collapseHidden(nodes: NodeInfo[]): {
-  visible: NodeInfo[];
-  buried: Set<number>;
-  buriedCount: Map<number, number>;
-} {
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const topOf = new Map<number, number>();
-  const buried = new Set<number>();
-  const buriedCount = new Map<number, number>();
-  for (const n of nodes) {
-    const parent = n.parent === -1 ? undefined : byId.get(n.parent);
-    if (!parent) continue;
-    const top = topOf.get(parent.id) ?? (parent.hidden ? parent.id : undefined);
-    if (top !== undefined) {
-      topOf.set(n.id, top);
-      buried.add(n.id);
-      buriedCount.set(top, (buriedCount.get(top) ?? 0) + 1);
-    }
-  }
-  return { visible: nodes.filter((n) => !buried.has(n.id)), buried, buriedCount };
+/** 子孫の数 */
+function descendants(n: core.Node): number {
+  let c = 0;
+  for (const k of n.children) c += 1 + descendants(k);
+  return c;
 }
 
-export function layoutMap(doc: DocView): Layout {
-  const nodes = doc.nodes;
-  const { visible, buried, buriedCount } = collapseHidden(nodes);
-  const rowsOf = cardRows(doc, buried);
+const SIDES: readonly core.Side[] = ["Right", "Left"];
 
-  const children = new Map<number, NodeInfo[]>();
-  const tops: NodeInfo[] = [];
-  for (const n of visible) {
-    if (n.parent === -1) tops.push(n);
-    else {
-      const list = children.get(n.parent);
-      if (list) list.push(n);
-      else children.set(n.parent, [n]);
-    }
-  }
-  const kidsOf = (n: NodeInfo): NodeInfo[] => children.get(n.id) ?? [];
-  const root = tops.find((n) => n.depth === 1) ?? null;
+export function layoutMap(trees: core.Tree[], sizeOf: SizeOf): Layout {
   const boxes = new Map<number, Box>();
-  const seams: Seam[] = [];
+  const order: number[] = [];
 
-  // 寸法と部分木の高さは**要るときに測って覚える**。先に表を埋めてから
-  // 引き直す形だと「必ず入っているはず」を `!` で言い張ることになり、
-  // 順番を間違えたときに遠くで落ちる
-  const sizes = new Map<number, { w: number; h: number }>();
-  const sizeOf = (n: NodeInfo): { w: number; h: number } => {
-    const hit = sizes.get(n.id);
+  /** 見えている子。畳んだノードの下は無い — 畳みの裁定はここ 1 つ */
+  const kidsOf = (n: core.Node): core.Node[] => (n.fold === null ? n.children : []);
+
+  // ノードごとの、木から決まるもの。要るときに数えて覚える（鍵はノードの参照。
+  // id を介さないので「必ず在るはず」を言わなくてよい）
+  interface Twig {
+    rows: CardRow[];
+    buried: number;
+    size: Size;
+  }
+  const twigs = new Map<core.Node, Twig>();
+  const twigOf = (n: core.Node): Twig => {
+    const hit = twigs.get(n);
     if (hit) return hit;
-    const size = nodeSize(n, rowsOf.get(n.id) ?? [], buriedCount.get(n.id) ?? 0);
-    sizes.set(n.id, size);
-    return size;
+    const folded = n.fold !== null;
+    const rows = folded ? [] : cardRows(n.blocks);
+    const buried = folded ? descendants(n) : 0;
+    const t = { rows, buried, size: sizeOf(n, rows, buried) };
+    twigs.set(n, t);
+    return t;
   };
 
   /**
    * その部分木が縦に占める帯の高さ `h` と、**その帯の上端から見た自分の箱の
    * 中心** `anchor`。
    *
-   * 親の中心は「第 1 子と最終子の中心の中点」で決める（子の重さが偏っても
-   * 外側の子のあいだに立つ、という見せ方）。この中点は帯の幾何学的な中心
-   * とは限らないので、**帯のほうを中心に合わせて広げる**。帯を
-   * 「max(自分の高さ, 子を積んだ高さ)」で見積もっていたころは、箱が帯から
-   * はみ出して隣の兄弟を覆い、木の下端も嘘になり、グループの継ぎ目が箱の
-   * 上を横切っていた（ずれ =（第 1 子の高さ − 最終子の高さ）/4 なので、
-   * 兄弟の隙間 `GAP.y` を超えると必ず重なる）。
+   * 親の中心は「第 1 子と最終子の中心の中点」で決める。この中点は帯の幾何学的な
+   * 中心とは限らないので、帯のほうを中心に合わせて広げる（箱が帯からはみ出して
+   * 隣の兄弟を覆わないように）。
    */
-  const metrics = new Map<number, { h: number; anchor: number }>();
-  const metricsOf = (n: NodeInfo): { h: number; anchor: number } => {
-    const hit = metrics.get(n.id);
+  const metrics = new Map<core.Node, { h: number; anchor: number }>();
+  const metricsOf = (n: core.Node): { h: number; anchor: number } => {
+    const hit = metrics.get(n);
     if (hit) return hit;
-    const size = sizeOf(n);
+    const { size } = twigOf(n);
     const kids = kidsOf(n);
     let m: { h: number; anchor: number };
     if (kids.length === 0) {
       m = { h: size.h, anchor: size.h / 2 };
     } else {
       const mid = stackCenter(kids);
-      // 箱の上端が帯からはみ出すぶんだけ、子の山を下へずらす
       const slide = Math.max(0, size.h / 2 - mid);
       const anchor = slide + mid;
-      m = {
-        h: Math.max(slide + stackH(kids), anchor + size.h / 2),
-        anchor,
-      };
+      m = { h: Math.max(slide + stackH(kids), anchor + size.h / 2), anchor };
     }
-    metrics.set(n.id, m);
+    metrics.set(n, m);
     return m;
   };
 
-  /** その部分木が縦にどれだけ要るか */
-  const heightOf = (n: NodeInfo): number => metricsOf(n).h;
+  const heightOf = (n: core.Node): number => metricsOf(n).h;
 
   /** 子を 0 から積んだときの「第 1 子と最終子の中心の中点」 */
-  function stackCenter(kids: NodeInfo[]): number {
+  function stackCenter(kids: core.Node[]): number {
     let y = 0;
     const centers: number[] = [];
     for (let i = 0; i < kids.length; i++) {
@@ -222,234 +167,163 @@ export function layoutMap(doc: DocView): Layout {
   }
 
   /** 子の山を、その部分木の帯の上端から何 px 下に置くか */
-  const slideOf = (n: NodeInfo): number =>
-    metricsOf(n).anchor - stackCenter(kidsOf(n));
+  const slideOf = (n: core.Node): number => metricsOf(n).anchor - stackCenter(kidsOf(n));
 
   /** 子を縦に積んだときの高さ（あいだの隙間込み） */
-  function stackH(kids: NodeInfo[]): number {
+  function stackH(kids: core.Node[]): number {
     let sum = 0;
     for (let i = 0; i < kids.length; i++) sum += heightOf(kids[i]) + gapBefore(i);
     return sum;
   }
 
   /**
-   * 枝を `dir` 方向へ置く。`nearX` は**親と向かい合う辺**の x
-   * （右向きなら箱の左辺、左向きなら右辺）。左右で式を分けないための座標。
+   * 枝を置く。`nearX` は**親と向かい合う辺**の x（右向きなら箱の左辺、
+   * 左向きなら右辺）。左右で式を分けないための座標。返すのは箱の中心の y。
    */
-  const place = (
-    n: NodeInfo,
-    nearX: number,
-    top: number,
-    dir: 1 | -1,
-  ): number => {
-    const size = sizeOf(n);
+  const place = (n: core.Node, parent: Edge, nearX: number, top: number): number => {
+    const dir = dirOf(parent.side);
+    const { size, rows, buried } = twigOf(n);
     const x = dir === 1 ? nearX : nearX - size.w;
     const kids = kidsOf(n);
     let centerY: number;
     if (kids.length === 0) {
       centerY = top + size.h / 2;
     } else {
-      // 子の山の置き所は `metricsOf` が決めた `slide` から取る。同じ式を
-      // 2 か所で別々に持つと、帯と箱が静かに食い違う（それがこの層の元のバグ）
+      // 子の山の置き所は `metricsOf` が決めた `slide` から取る（同じ式を 2 か所に持たない）
       let y = top + slideOf(n);
       const childNear = dir === 1 ? x + size.w + GAP.x : x - GAP.x;
       const centers: number[] = [];
       for (let i = 0; i < kids.length; i++) {
         y += gapBefore(i);
-        centers.push(place(kids[i], childNear, y, dir));
+        centers.push(place(kids[i], { id: n.id, side: parent.side }, childNear, y));
         y += heightOf(kids[i]);
       }
       centerY = (centers[0] + centers[centers.length - 1]) / 2;
     }
     boxes.set(n.id, {
-      n,
+      node: n,
+      parent,
+      buried,
+      fan: 0,
       x,
       y: centerY - size.h / 2,
       w: size.w,
       h: size.h,
-      rows: rowsOf.get(n.id) ?? [],
+      rows,
     });
     return centerY;
   };
 
-  /** ルート直下の枝を、側ごとにグループへ切り分ける（文書順） */
-  const sideGroups = (root: NodeInfo, left: boolean): NodeInfo[][] => {
-    const out: NodeInfo[][] = [];
-    for (const k of kidsOf(root)) {
-      if (k.left !== left) continue;
-      const last = out[out.length - 1];
-      if (last && last[0].group === k.group) last.push(k);
-      else out.push([k]);
-    }
+  /** その枝と子孫すべての箱を縦にずらす。側を根の中心へ揃えるため */
+  const shiftSubtree = (n: core.Node, dy: number): void => {
+    const b = boxes.get(n.id);
+    if (b) b.y += dy;
+    for (const k of kidsOf(n)) shiftSubtree(k, dy);
+  };
+
+  /** 根の子を側ごとに分ける。**sides を読むのはここだけ。** 足りなければ右 */
+  const splitSides = (t: core.Tree): Record<core.Side, core.Node[]> => {
+    const out: Record<core.Side, core.Node[]> = { Right: [], Left: [] };
+    kidsOf(t.node).forEach((k, i) => out[t.sides[i] ?? "Right"].push(k));
     return out;
   };
 
-  /** グループ列を縦に積んだ高さ（グループの間は GAP.group） */
-  const groupsH = (groups: NodeInfo[][]): number => {
-    let sum = 0;
-    for (let g = 0; g < groups.length; g++) {
-      sum += (g === 0 ? 0 : GAP.group) + stackH(groups[g]);
-    }
-    return sum;
-  };
-
-  /** 木ぜんぶが縦にどれだけ要るか（左右のうち高いほう） */
-  const treeH = (root: NodeInfo): number =>
-    Math.max(
-      sizeOf(root).h,
-      groupsH(sideGroups(root, false)),
-      groupsH(sideGroups(root, true)),
-    );
-
   /**
-   * 木の根を置く。**グループと左右はルート直下にしか無い**ので、根の子だけが
-   * ここを通り、孫から下は `place` がそのまま面倒を見る。区切りの無い文書では
-   * 右のグループが 1 つあるだけになり、置き方は従来（片側 1 列）と一致する。
+   * 木を 1 本置く。側は根の子にしか無いので、根の子だけがここを通り、孫から
+   * 下は `place` が面倒を見る。
+   *
+   * **不変条件: どの側も、第 1 子と最終子の中心の中点が根の中心に乗る。**
+   * 根の中心は右の枝に合わせ（右が無ければ左）、もう一方の側はその中心へ
+   * まとめてずらす。
    */
   const placeTree = (
-    root: NodeInfo,
+    t: core.Tree,
     top: number,
   ): { top: number; bottom: number; shift: (dy: number) => void } => {
-    const size = sizeOf(root);
-    const span = treeH(root);
-    const sides = [
-      { left: false, dir: 1 as const, groups: sideGroups(root, false) },
-      { left: true, dir: -1 as const, groups: sideGroups(root, true) },
-    ];
+    const root = t.node;
+    const { size, rows, buried } = twigOf(root);
+    const sides = splitSides(t);
+    const span = Math.max(size.h, stackH(sides.Right), stackH(sides.Left));
     let centerY = top + span / 2;
-    // 置いた側を控える。**根の中心が決まるまで側の縦位置は確定しない**ので、
-    // いったん置いてから、側ごとにまとめてずらす
-    const placed: {
-      kids: NodeInfo[];
-      centers: number[];
-      mySeams: Seam[];
-      y0: number;
-      h: number;
-    }[] = [];
-    for (const s of sides) {
-      if (s.groups.length === 0) continue;
-      const nearX = s.dir === 1 ? size.w + GAP.x : -GAP.x;
-      const h = groupsH(s.groups);
+    const placed: { kids: core.Node[]; centers: number[]; y0: number; h: number }[] = [];
+    for (const side of SIDES) {
+      const kids = sides[side];
+      if (kids.length === 0) continue;
+      const dir = dirOf(side);
+      const nearX = dir === 1 ? size.w + GAP.x : -GAP.x;
+      const h = stackH(kids);
       const y0 = top + Math.max(0, (span - h) / 2);
       let y = y0;
       const centers: number[] = [];
-      const mine: NodeInfo[] = [];
-      const mySeams: Seam[] = [];
-      for (let g = 0; g < s.groups.length; g++) {
-        if (g > 0) {
-          // 継ぎ目の線は、隣り合うグループの間の真ん中に、
-          // その 2 グループでいちばん広い枝の幅で引く
-          const near = [...s.groups[g - 1], ...s.groups[g]];
-          const w = Math.max(...near.map((k) => sizeOf(k).w));
-          const seam = {
-            x: s.dir === 1 ? nearX : nearX - w,
-            y: y + GAP.group / 2,
-            w,
-          };
-          seams.push(seam);
-          mySeams.push(seam); // 側ごとずらすとき、継ぎ目も連れていく
-          y += GAP.group;
-        }
-        const kids = s.groups[g];
-        for (let i = 0; i < kids.length; i++) {
-          y += gapBefore(i);
-          centers.push(place(kids[i], nearX, y, s.dir));
-          mine.push(kids[i]);
-          y += heightOf(kids[i]);
-        }
+      for (let i = 0; i < kids.length; i++) {
+        y += gapBefore(i);
+        centers.push(place(kids[i], { id: root.id, side }, nearX, y));
+        y += heightOf(kids[i]);
       }
-      placed.push({ kids: mine, centers, mySeams, y0, h });
-      // 根の中心は右の枝に合わせる（右が無ければ左）。区切りの無い文書で
-      // 従来と 1px も変えないための取り決めで、両側にあるときも
-      // 「どちらに合わせるか」を決めておかないと揺れる
-      if (!s.left || sides[0].groups.length === 0) {
+      placed.push({ kids, centers, y0, h });
+      if (side === "Right" || sides.Right.length === 0) {
         centerY = (centers[0] + centers[centers.length - 1]) / 2;
       }
     }
-    // **不変条件: どの側も、第 1 子と最終子の中心の中点が根の中心に乗る。**
-    //
-    // 根は自分の中心をこの尺度で決める（`place` が親を子の上に置くのと同じ）。
-    // なのに側の縦位置は「側の合計の高さを帯の中で幾何学的に中央寄せ」で
-    // 決めていて、**中心の尺度が 2 つあった**。部分木の重さが偏るとその 2 つは
-    // 一致しないので、根が尺度をコピーする採用側だけが噛み合い、もう一方の側は
-    // 根と一度も突き合わせないまま置かれていた（= 線が曲がる）。
-    //
-    // 根以外の親にこの穴が無いのは、**子の山を 1 つしか持たない**から。
-    // 2 つ持つのは根だけで、そこだけ規則が抜けていた。採用した側はずれが 0 に
-    // なるので、この一手で本数に関わらず両側が同じ規則で揃う。
     for (const p of placed) {
       const mid = (p.centers[0] + p.centers[p.centers.length - 1]) / 2;
       const dy = centerY - mid;
       if (dy === 0) continue;
       for (const k of p.kids) shiftSubtree(k, dy);
-      for (const sm of p.mySeams) sm.y += dy;
       p.y0 += dy;
     }
     boxes.set(root.id, {
-      n: root,
+      node: root,
+      parent: null,
+      buried,
+      fan: 0,
       x: 0,
       y: centerY - size.h / 2,
       w: size.w,
       h: size.h,
-      rows: rowsOf.get(root.id) ?? [],
+      rows,
     });
-    // 実際に占めた縦の範囲。**ずらしたぶん `treeH` の見積もりを超えうる**ので、
-    // 木を縦に積む側はこれを見る（見積もりで積むと次の木と重なる）。
-    // 上端も返すのは、側を根へ揃えると渡された `top` より**上**へ伸びうるため。
-    // `shift` は箱だけでなく継ぎ目も連れていく — 木ごと動かす唯一の入口。
+    // 実際に占めた縦の範囲。ずらしたぶん見積もり（span）を超えうるので、
+    // 木を積む側はこれを見る。上へもはみ出しうるので上端も返す
     let lo = centerY - size.h / 2;
     let hi = centerY + size.h / 2;
     for (const p of placed) {
       lo = Math.min(lo, p.y0);
       hi = Math.max(hi, p.y0 + p.h);
     }
-    const shift = (dy: number): void => {
-      if (dy === 0) return;
-      shiftSubtree(root, dy);
-      for (const p of placed) for (const sm of p.mySeams) sm.y += dy;
+    return {
+      top: lo,
+      bottom: hi,
+      shift: (dy) => {
+        if (dy !== 0) shiftSubtree(root, dy);
+      },
     };
-    return { top: lo, bottom: hi, shift };
   };
 
-  /** その枝と子孫すべての箱を縦にずらす。側を根の中心へ揃えるため */
-  const shiftSubtree = (n: NodeInfo, dy: number): void => {
-    const b = boxes.get(n.id);
-    if (b) b.y += dy;
-    for (const k of kidsOf(n)) shiftSubtree(k, dy);
+  /** 文書順に並べる（親が先） */
+  const walk = (n: core.Node): void => {
+    order.push(n.id);
+    for (const k of kidsOf(n)) walk(k);
   };
 
-  let bottom = 0;
-  if (root) bottom = placeTree(root, -treeH(root) / 2).bottom;
-  // 木と木の隙間は `GAP.root` ひとつ。ここだけ 2 倍だったころは、木を 3 本
-  // 以上並べると**最初の 1 か所だけ倍の隙間**が空いていた
-  let top = boxes.size > 0 ? bottom + GAP.root : 0;
-  for (const tree of tops) {
-    if (tree === root) continue;
-    // 積む位置は**実測の下端**から。側を根へ揃えるとその側は `treeH` の
-    // 見積もりからはみ出しうるので、見積もりで積むと次の木と重なる。
-    // 同じ理由で**上へ**もはみ出しうる。そのぶんは押し下げて、頼んだ位置から
-    // 始まるようにする（上端を捨てていたころは、前の木へ食い込んでいた）
-    const put = placeTree(tree, top);
+  let top = 0;
+  for (const t of trees) {
+    const put = placeTree(t, top);
+    // 上へはみ出したぶんは押し下げて、頼んだ位置から始まるようにする
     const up = Math.max(0, top - put.top);
     put.shift(up);
     top = put.bottom + up + GAP.root;
+    walk(t.node);
   }
 
-  const parentOf = new Map<number, number>();
-  const fanOf = new Map<number, number>();
   // 付け根をずらすのは「**同じ辺から**出る線が 2 本以上」あるときだけ。
-  // 扇は出口が重なるのをほどくためのものなので、**側でまとめる** — ルートは
-  // 左右の両辺から線を出す唯一のノードで、反対の辺から出る線は元から重ならない。
-  // 親 id だけでまとめていたころは、左右に 1 本ずつのルートでも 2 本と数えて
-  // 互いに散らし、**どちらの線も真っすぐ出なかった**。
-  // 箱そのものを持ち回るので、id で引き直して「必ず在るはず」を言わなくてよい
+  // 根は左右の両辺から線を出す唯一のノードなので、親 id だけでなく側でまとめる
   const fans = new Map<string, { parent: Box; kids: Box[] }>();
-  for (const [id, b] of boxes) {
-    const pid = b.n.parent;
-    const parent = pid === -1 ? undefined : boxes.get(pid);
+  for (const b of boxes.values()) {
+    if (b.parent === null) continue;
+    const parent = boxes.get(b.parent.id);
     if (!parent) continue;
-    parentOf.set(id, pid);
-    const key = `${pid},${b.n.left}`;
+    const key = `${b.parent.id},${b.parent.side}`;
     const fan = fans.get(key);
     if (fan) fan.kids.push(b);
     else fans.set(key, { parent, kids: [b] });
@@ -460,26 +334,25 @@ export function layoutMap(doc: DocView): Layout {
     const band = parent.h * FAN_BAND;
     const sorted = [...kids].sort((a, b) => centerY(a) - centerY(b));
     for (let i = 0; i < sorted.length; i++) {
-      fanOf.set(sorted[i].n.id, ((i + 0.5) / sorted.length - 0.5) * band);
+      sorted[i].fan = ((i + 0.5) / sorted.length - 0.5) * band;
     }
   }
 
-  return { visible, boxes, parentOf, buriedCount, fanOf, seams };
+  return { order, boxes };
 }
 
 /**
  * 子 id から、その親へ引く線の両端（付け根のずらしも込み）。
- * **描画も当たり判定もここだけを見る** — 同じ式を 2 箇所に書いていた頃、
- * 片方だけ直すと線と当たり判定が静かにずれた。
+ * **描画も書き出しもここだけを見る。**
  */
 export function edgeEnds(L: Layout, id: number): { from: Pt; to: Pt } | null {
   const b = L.boxes.get(id);
-  const pid = L.parentOf.get(id);
-  const p = pid === undefined ? undefined : L.boxes.get(pid);
-  if (!b || !p) return null;
+  if (!b || b.parent === null) return null;
+  const p = L.boxes.get(b.parent.id);
+  if (!p) return null;
   // 線は「親の、子が伸びる側の辺」から出て「子の、親を向いた辺」へ入る
-  const dir = dirOf(b.n);
+  const dir = dirOf(b.parent.side);
   const out = growthEdgeOf(p, dir);
   const into = entryEdgeOf(b, dir);
-  return { from: { x: out.x, y: out.y + (L.fanOf.get(id) ?? 0) }, to: into };
+  return { from: { x: out.x, y: out.y + b.fan }, to: into };
 }

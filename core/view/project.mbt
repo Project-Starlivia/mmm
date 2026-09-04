@@ -1,12 +1,15 @@
 // Doc → View。削るだけで、足すものは無い。
 //
-// 消えるのは、書き戻すためだけの欄（frontmatter・eol・散文の body）と、
-// ノードの種類と、Opaque。core が「読み解かない」と裁定したものだけが
-// map に届かない。
+// 消えるのは、書き戻すためだけの欄（eol・散文の body）と、ノードの種類と、
+// Opaque。frontmatter だけは残す — 画像フォルダの宣言がそこに書かれていて、
+// 描くのに要る。core が「読み解かない」と裁定したものだけが map に届かない。
 
 ///|
-pub fn project(doc : @tree.Doc) -> Array[Tree] {
-  doc.roots.map(r => { node: cast(r.node), sides: r.sides })
+pub fn project(doc : @tree.Doc) -> View {
+  {
+    frontmatter: doc.frontmatter,
+    trees: doc.roots.map(r => { node: cast(r.node), sides: r.sides }),
+  }
 }
 
 ///|

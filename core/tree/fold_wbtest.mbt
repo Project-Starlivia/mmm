@@ -136,7 +136,14 @@ test "中身だけ包んでいれば中身の 1 枚" {
                   "body": [
                     {
                       "id": 4,
-                      "content": ["Details", "<details>\n\nbody\n\n</details>"],
+                      "content": [
+                        "Details",
+                        {
+                          "text": "<details>\n\nbody\n\n</details>",
+                          "open": false,
+                          "body": "body",
+                        },
+                      ],
                     },
                   ],
                   "children": [],
@@ -168,7 +175,12 @@ test "2 ノード分を包んでいれば中身" {
               {
                 "id": 3,
                 "content": [
-                  "Details", "<details>\n\n## h\n\n## h2\n\n</details>",
+                  "Details",
+                  {
+                    "text": "<details>\n\n## h\n\n## h2\n\n</details>",
+                    "open": false,
+                    "body": "## h\n\n## h2",
+                  },
                 ],
               },
             ],
@@ -197,7 +209,12 @@ test "最初が段落なら中身" {
               {
                 "id": 3,
                 "content": [
-                  "Details", "<details>\n\nbodya\n\n# head\n\n</details>",
+                  "Details",
+                  {
+                    "text": "<details>\n\nbodya\n\n# head\n\n</details>",
+                    "open": false,
+                    "body": "bodya\n\n# head",
+                  },
                 ],
               },
             ],
@@ -224,7 +241,17 @@ test "空行なしで 1 塊なら中身" {
             "id": 2,
             "label": "r",
             "body": [
-              { "id": 3, "content": ["Details", "<details>\n## h\n</details>"] },
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n## h\n</details>",
+                    "open": false,
+                    "body": "## h",
+                  },
+                ],
+              },
             ],
             "children": [],
           },
@@ -382,7 +409,14 @@ test "開きに飲み込まれた行があれば中身" {
             "body": [
               {
                 "id": 3,
-                "content": ["Details", "<details>\n### x\n\n## y\n</details>"],
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n### x\n\n## y\n</details>",
+                    "open": false,
+                    "body": "### x\n\n## y",
+                  },
+                ],
               },
             ],
             "children": [],
@@ -565,7 +599,13 @@ test "知らない属性が付いていれば中身" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>",
+                      "open": false,
+                      "summary": "h",
+                      "body": "## h",
+                    },
                   ],
                 },
               ],
@@ -601,7 +641,12 @@ test "重なった開きは中身" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>",
+                      "open": false,
+                      "body": "<details>\n<summary>h</summary>\n\n## h\n\n</details>",
+                    },
                   ],
                 },
               ],
@@ -834,7 +879,13 @@ test "落とせない閉じに頼る畳みは立たない" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>",
+                      "open": false,
+                      "summary": "y",
+                      "body": "## y",
+                    },
                   ],
                 },
               ],
@@ -1065,7 +1116,13 @@ test "summary が 2 枚なら中身" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n<summary>h</summary>\n<summary>ZZZ</summary>\n\n## h\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\n<summary>h</summary>\n<summary>ZZZ</summary>\n\n## h\n\n</details>",
+                      "open": false,
+                      "summary": "h",
+                      "body": "<summary>ZZZ</summary>\n\n## h",
+                    },
                   ],
                 },
               ],
@@ -1100,7 +1157,13 @@ test "閉じの塊に地の文が続けば中身" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n<summary>h</summary>\n\n## h\n\n</details>\ntail",
+                    "Details",
+                    {
+                      "text": "<details>\n<summary>h</summary>\n\n## h\n\n</details>\ntail",
+                      "open": false,
+                      "summary": "h",
+                      "body": "## h",
+                    },
                   ],
                 },
               ],
@@ -1133,7 +1196,13 @@ test "項目の畳みも領域の後ろを見る" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n<summary>a</summary>\n\n- a\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\n<summary>a</summary>\n\n- a\n\n</details>",
+                      "open": false,
+                      "summary": "a",
+                      "body": "- a",
+                    },
                   ],
                 },
                 { "id": 4, "content": ["Opaque", "x"] },
@@ -1259,7 +1328,13 @@ test "境界の水平線が領域の中にあれば中身" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n<summary>a</summary>\n\n## a\n\n---\n\n### x\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\n<summary>a</summary>\n\n## a\n\n---\n\n### x\n\n</details>",
+                      "open": false,
+                      "summary": "a",
+                      "body": "## a\n\n---\n\n### x",
+                    },
                   ],
                 },
               ],
@@ -1379,7 +1454,13 @@ test "飾りの水平線が閉じの直後なら中身" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n<summary>a</summary>\n\n## a\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\n<summary>a</summary>\n\n## a\n\n</details>",
+                      "open": false,
+                      "summary": "a",
+                      "body": "## a",
+                    },
                   ],
                 },
                 { "id": 4, "content": "ThematicBreak" },
@@ -1474,13 +1555,25 @@ test "後ろの領域が立たなければ跨がない" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                      "open": false,
+                      "summary": "b",
+                      "body": "## b",
+                    },
                   ],
                 },
                 {
                   "id": 4,
                   "content": [
-                    "Details", "<details class=\"z\">\n<summary>c</summary>\n\n## c\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details class=\"z\">\n<summary>c</summary>\n\n## c\n\n</details>",
+                      "open": false,
+                      "summary": "c",
+                      "body": "## c",
+                    },
                   ],
                 },
               ],
@@ -1514,7 +1607,13 @@ test "後ろの迷子のタグは跨がない" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                      "open": false,
+                      "summary": "b",
+                      "body": "## b",
+                    },
                   ],
                 },
                 { "id": 4, "content": ["Opaque", "<details>"] },
@@ -1556,7 +1655,13 @@ test "末尾の飾りの水平線は跨がない" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                      "open": false,
+                      "summary": "b",
+                      "body": "## b",
+                    },
                   ],
                 },
                 { "id": 4, "content": "ThematicBreak" },
@@ -1733,7 +1838,12 @@ test "pre は生テキストではない" {
                       {
                         "id": 5,
                         "content": [
-                          "Details", "<pre><details></pre>\n\n</details>",
+                          "Details",
+                          {
+                            "text": "<pre><details></pre>\n\n</details>",
+                            "open": false,
+                            "body": "</pre>",
+                          },
                         ],
                       },
                     ],
@@ -1774,7 +1884,13 @@ test "= の後ろでない引用符は囲みを始めない" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details \"x>\n<summary>h</summary>\n\n## h\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details \"x>\n<summary>h</summary>\n\n## h\n\n</details>",
+                      "open": false,
+                      "summary": "h",
+                      "body": "## h",
+                    },
                   ],
                 },
               ],
@@ -1812,7 +1928,13 @@ test "落ちない綴りの塊は深さでも跨がない" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n\n## s\n\n---\n\n<summary>z</summary>\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\n\n## s\n\n---\n\n<summary>z</summary>\n\n</details>",
+                      "open": false,
+                      "summary": "z",
+                      "body": "",
+                    },
                   ],
                 },
               ],
@@ -1919,7 +2041,12 @@ test "領域の中の境界が外の骨格を引き出せば中身" {
                 {
                   "id": 3,
                   "content": [
-                    "Details", "<details>\n\n## a\n\n---\n\n</details>",
+                    "Details",
+                    {
+                      "text": "<details>\n\n## a\n\n---\n\n</details>",
+                      "open": false,
+                      "body": "## a\n\n---",
+                    },
                   ],
                 },
               ],
@@ -2007,6 +2134,58 @@ test "タブで繋いだ開きと名前も畳み" {
                     "label": "a",
                     "fold": { "open": false, "summary": "s" },
                     "body": [],
+                    "children": [],
+                  },
+                ],
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// 中身の Details は GitHub が描くのと同じものを読む — `open`、直後の `<summary>`、
+/// 閉じまでの間の原文。導出はしない（名前が無ければ無いまま）。
+test "中身の Details は open と summary と中身を読む" {
+  json_inspect(
+    parse(
+      "# r\n\n## h\n\n<details open>\n<summary>s</summary>\n\nbody\n\nmore\n\n</details>\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "HeadingNode",
+            {
+              "id": 2,
+              "label": "r",
+              "body": [],
+              "children": [
+                [
+                  "HeadingNode",
+                  {
+                    "id": 3,
+                    "label": "h",
+                    "body": [
+                      {
+                        "id": 4,
+                        "content": [
+                          "Details",
+                          {
+                            "text": "<details open>\n<summary>s</summary>\n\nbody\n\nmore\n\n</details>",
+                            "open": true,
+                            "summary": "s",
+                            "body": "body\n\nmore",
+                          },
+                        ],
+                      },
+                    ],
                     "children": [],
                   },
                 ],

@@ -7,7 +7,7 @@
 // **DOM を知らない。** 受け取るのはペインの左上から測った画面 px で、
 // 出すのは `map/view.ts` の `Span`。だから値として試験できる。
 
-import type { Span } from "./view.ts";
+import type { Span } from "./camera.ts";
 
 /** 組にする 2 本。**途中で入れ替えない** — 入れ替わると地図が跳ぶ */
 type Pair = [number, number];

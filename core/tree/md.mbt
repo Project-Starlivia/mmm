@@ -20,8 +20,30 @@ pub fn read(md : String) -> @markdown.Document {
 /// 綴り（字下げ・フェンス・空行・エスケープ）はライブラリの仕事。
 /// ライブラリは LF で書くので、CRLF の文書は最後に揃える。
 pub fn serialize(doc : Doc) -> String {
-  let md = @markdown.serialize(unbuild(doc))
-  match doc.eol {
+  write(unbuild(doc), doc.eol)
+}
+
+///|
+/// 部分木 1 つ → 正規形の md（断片）。反映が dirty の地番に差す。
+pub fn fragment(
+  x : Node,
+  depth : Int,
+  sides : Array[Side],
+  eol : Eol,
+) -> String {
+  write(unbuild_node(x, depth, sides), eol)
+}
+
+///|
+/// 散文 → 正規形の md。文書の頭（最初の骨格より前）の断片。
+pub fn prose(body : Array[Block], eol : Eol) -> String {
+  write(unbuild_prose(body), eol)
+}
+
+///|
+fn write(ast : @markdown.Document, eol : Eol) -> String {
+  let md = @markdown.serialize(ast)
+  match eol {
     Lf => md
     Crlf => md.replace_all(old="\n", new="\r\n")
   }

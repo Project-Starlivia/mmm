@@ -7,11 +7,17 @@
   "packageManager": "pnpm@11.21.0",
   "scripts": {
     "core": "cd core && moon build --target js --release",
-    "check:core": "cd core && moon check && moon fmt --check tree view op",
-    "test:core": "cd core && moon test -p mmm-app/core/tree -p mmm-app/core/view -p mmm-app/core/op",
+    "dev": "pnpm run core && vite",
+    "build": "pnpm run core && tsc --noEmit && vite build",
+    "preview": "vite preview",
     "lab": "pnpm run core && vite lab --port 13132 --strictPort",
-    "check:lab": "tsc -p lab --noEmit",
-    "fixtures": "node test/tools/gen-load.ts"
+    "test": "pnpm run core && node --test \"test/*.test.ts\"",
+    "test:core": "cd core && moon test -p mmm-app/core/tree -p mmm-app/core/view -p mmm-app/core/op",
+    "check": "tsc --noEmit && tsc -p test --noEmit && tsc -p lab --noEmit",
+    "check:core": "cd core && moon check && moon fmt --check tree view op",
+    "fixtures": "node test/tools/gen-load.ts",
+    "deploy": "pnpm run build && wrangler deploy",
+    "deploy:dry": "wrangler deploy --dry-run"
   },
   "devDependencies": {
     "@lezer/markdown": "^1.7.2",

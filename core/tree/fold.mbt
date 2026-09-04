@@ -13,12 +13,21 @@
 /// 積む前のひと切れ。
 priv enum Piece {
   Raw(@markdown.Block)
-  /// 畳まれたノードの見出し・項目の行。中身は普通に読む
-  Folded(@markdown.Block, fold~ : Fold)
-  /// 綴りとして読めなかった領域。原文のまま中身になる
-  Capsule(String)
+  /// 畳まれたノードの見出し・項目の行。中身は普通に読む。
+  /// `at` は `<details>` 〜 `</details>` の原文の範囲（地番になる）
+  Folded(@markdown.Block, fold~ : Fold, at~ : @markdown.Span)
+  /// 綴りとして読めなかった領域。原文のまま中身になる。open / summary / body は
+  /// GitHub が描くのと同じ読み取り（最初の開きと、その直後の名前と、閉じまでの間）。
+  /// `to` は原文での尻（地番になる）
+  Capsule(
+    text~ : String,
+    open~ : Bool,
+    summary~ : String?,
+    body~ : String,
+    to~ : Int
+  )
   /// mdAst がブロックとして返さないもの（リンクの定義行）。原文のまま中身になる
-  Text(String)
+  Text(String, to~ : Int)
 }
 
 ///|
@@ -46,6 +55,7 @@ fn spelling(m : Mark) -> String {
 /// （塊の html 文字列の添字は字下げでずれるので、座標には使わない）。
 priv struct Tag {
   mark : Mark
+  from : Int
   to : Int
   /// 原文がそのまま `spelling(mark)` か。違えば触らずに書き戻せないので畳めない
   ok : Bool
@@ -210,10 +220,10 @@ fn tag_at(md : String, i : Int, to : Int) -> Tag? {
     guard z > 0 else { return None }
     let raw = slice(md, i, z)
     if shut {
-      return Some({ mark: Close, to: z, ok: raw == spelling(Close) })
+      return Some({ mark: Close, from: i, to: z, ok: raw == spelling(Close) })
     }
     let mark = Open(open=raw == spelling(Open(open=true)))
-    return Some({ mark, to: z, ok: raw == spelling(mark) })
+    return Some({ mark, from: i, to: z, ok: raw == spelling(mark) })
   }
   // 閉じの `</summary>` は開きと組で 1 つの綴りにするので、単独では拾わない
   if !shut && name_at(md, n, "summary", to) {
@@ -223,7 +233,7 @@ fn tag_at(md : String, i : Int, to : Int) -> Tag? {
     let b = z - 10
     guard has(md, b, "</summary>", to) else { return None }
     let mark = Name(slice(md, a, b))
-    return Some({ mark, to: z, ok: slice(md, i, z) == spelling(mark) })
+    return Some({ mark, from: i, to: z, ok: slice(md, i, z) == spelling(mark) })
   }
   None
 }
@@ -274,6 +284,49 @@ fn read_spell(md : String, b : @markdown.Block) -> Spell {
 priv struct Spot {
   tag : Tag
   block : Int
+}
+
+///|
+/// 原文のまま持つ領域と、その読み取り。GitHub が `<details>` を描くのと同じ
+/// もの — 最初の開きの `open`、その直後に在れば `<summary>` の字、閉じまでの間の
+/// 原文。**読み解かない裁定は変えない**（body は切り出すだけで、意味は付けない）。
+fn capsule(
+  md : String,
+  spots : Array[Spot],
+  head : Int,
+  tail : Int,
+  from : Int,
+  upto : Int,
+) -> Piece {
+  let open = spots[head].tag.mark is Open(open=true)
+  let mut summary = None
+  let mut inner = spots[head].tag.to
+  if head + 1 < tail && spots[head + 1].tag.mark is Name(text) {
+    summary = Some(text)
+    inner = spots[head + 1].tag.to
+  }
+  Capsule(
+    text=carve(md, from, upto),
+    open~,
+    summary~,
+    body=strip(md, inner, spots[tail].tag.from),
+    to=upto,
+  )
+}
+
+///|
+/// 原文の切り出し。前後の改行と空白を落とすだけ（`carve` と違い、行頭から
+/// 始まらないので容器の字下げは見ない）。
+fn strip(md : String, from : Int, to : Int) -> String {
+  let mut a = from
+  while a < to && blank(md[a]) {
+    a = a + 1
+  }
+  let mut z = to
+  while z > a && blank(md[z - 1]) {
+    z = z - 1
+  }
+  slice(md, a, z)
 }
 
 ///|
@@ -498,16 +551,24 @@ fn pieces(
     }
   }
 
-  // 畳まれる骨格の行 → その畳み（None は畳みでない）
-  let mark : Array[Fold?] = Array::make(n, None)
+  // 畳まれる骨格の行 → その畳みと、`<details>` 〜 `</details>` の範囲（None は畳みでない）
+  let mark : Array[(Fold, @markdown.Span)?] = Array::make(n, None)
   // 原文のまま持つ領域 → 終わりの塊・原文の範囲
   let last = Array::make(n, -1)
   let from = Array::make(n, 0)
   let upto = Array::make(n, 0)
+  // 領域の開きと閉じの綴り（spots の添字）。中身として持つときの読み取りに要る
+  let head = Array::make(n, 0)
+  let tail = Array::make(n, 0)
   for k, p in ps {
     let ob = spots[p.0].block
     if ok[k] {
-      mark[next(blocks, ob)] = Some(fold_of(spells[ob]))
+      let cb = spots[p.1].block
+      let at : @markdown.Span = {
+        from: block_span(blocks[ob]).from,
+        to: block_span(blocks[cb]).to,
+      }
+      mark[next(blocks, ob)] = Some((fold_of(spells[ob]), at))
     } else if spots[p.1].block > last[ob] {
       // 同じ塊から複数の対が始まるときは、一番外を採る。
       // 切るのは**塊まるごと** — タグからタグまでにすると、同じ塊に居た
@@ -515,6 +576,8 @@ fn pieces(
       last[ob] = spots[p.1].block
       from[ob] = block_span(blocks[ob]).from
       upto[ob] = block_span(blocks[spots[p.1].block]).to
+      head[ob] = p.0
+      tail[ob] = p.1
     }
   }
   let out = []
@@ -529,7 +592,13 @@ fn pieces(
   fn flush(before : Int) -> Unit {
     while d < defs.length() && defs[d].from < before {
       if defs[d].from >= carried {
-        out.push(Text(carve(md, defs[d].from, defs[d].to)))
+        // 定義行の span だけ改行を含まない（塊は含む）ので、地番の尻は揃える
+        out.push(
+          Text(
+            carve(md, defs[d].from, defs[d].to),
+            to=eol_after(md, defs[d].to),
+          ),
+        )
       }
       d = d + 1
     }
@@ -540,7 +609,7 @@ fn pieces(
     flush(block_span(blocks[i]).from)
     if last[i] >= 0 {
       // 綴りとして読めなかった領域。丸ごと原文のまま持つ
-      out.push(Capsule(carve(md, from[i], upto[i])))
+      out.push(capsule(md, spots, head[i], tail[i], from[i], upto[i]))
       carried = upto[i]
       i = last[i] + 1
     } else if gone[i] {
@@ -548,7 +617,7 @@ fn pieces(
     } else {
       out.push(
         match mark[i] {
-          Some(fold) => Folded(blocks[i], fold~)
+          Some((fold, at)) => Folded(blocks[i], fold~, at~)
           None => Raw(blocks[i])
         },
       )
@@ -558,6 +627,19 @@ fn pieces(
   }
   flush(md.length() + 1)
   out
+}
+
+///|
+/// i に改行が在ればその次、無ければ i。
+fn eol_after(md : String, i : Int) -> Int {
+  let mut z = i
+  if z < md.length() && md[z] == '\r' {
+    z = z + 1
+  }
+  if z < md.length() && md[z] == '\n' {
+    z = z + 1
+  }
+  z
 }
 
 ///|

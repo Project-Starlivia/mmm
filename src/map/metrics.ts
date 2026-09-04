@@ -5,15 +5,52 @@
 //   1. レイアウト（nodeSize が箱の大きさを決める）
 //   2. SVG の描画（text 要素の font-size と x）
 //   3. 編集用の <input> オーバーレイ（幅・高さ・padding・font-size）
-// 以前はこれが 3 箇所に散っていて、通常ノードは 13px/12、hidden ノードは
+// 以前はこれが 3 箇所に散っていて、通常ノードは 13px/12、畳んだノードは
 // 計測 10px・CSS 11px・input 13px と食い違い、折り畳んだノードを編集すると
 // 文字がずれていた。font-size は CSS ではなく属性で入れて、CSS 側に
 // 同じ数字を持たせない。
 
-import type { NodeInfo } from "../coreApi.ts";
-import { type CardRow, rowH, IMG_MIN_W } from "./cards.ts";
+import type * as core from "../coreApi.ts";
+import type { CardRow } from "./cards.ts";
 
-export const HIDDEN_MAX_W = 150; // hidden nodes never grow past this
+export const HIDDEN_MAX_W = 150; // 畳んだノードはこれより広くならない
+
+// ---- カード行の寸法。**ここが唯一の定義** ----
+
+const LINK_ROW = 26; // リンクカード 1 行の高さ
+const IMG_H = 64; // 画像行の中のサムネイルの高さ
+const IMG_ROW = IMG_H + 12; // 画像行の高さ
+export const IMG_MIN_W = 200; // 画像 / svg の中身はこれより狭くならない（余白抜き）
+export const CODE_LINE = 15; // コードのプレビュー 1 行の高さ
+export const CODE_PAD = 8; // コード行の上下の余白
+export const RULE_ROW = 12; // 装飾の水平線の行の高さ
+export const DETAILS_ROW = LINK_ROW; // details の summary の行。リンクと同じ 1 行の字
+export const DETAILS_INDENT = 14; // ▸ のぶん、summary と中身の字を右へ寄せる
+
+/** カード行 1 つぶんの高さ */
+export const rowH = (r: CardRow): number =>
+  r.kind === "img" || r.kind === "svg"
+    ? IMG_ROW
+    : r.kind === "code"
+      ? r.lines.length * CODE_LINE + CODE_PAD * 2
+      : r.kind === "rule"
+        ? RULE_ROW
+        : r.kind === "details"
+          ? DETAILS_ROW + (r.open ? r.lines.length * CODE_LINE + CODE_PAD : 0)
+          : LINK_ROW;
+
+/**
+ * カード 1 行の、行の枠から中身までの上下の余白。描くのも書き出すのも
+ * 同じ場所を指さないと 2px ずれる — 実際にずれた。数字を 2 か所に置かないための唯一の定義。
+ */
+export const cardInset = (r: CardRow): number =>
+  r.kind === "code" ? 5 : r.kind === "link" || r.kind === "details" ? 4 : r.kind === "rule" ? 2 : 6;
+
+/**
+ * カード 1 行が、中身の箱から左右へはみ出す量。コードだけは背景をノードの
+ * 縁近くまで塗るので、その分だけ広い。
+ */
+export const cardBleed = (r: CardRow): number => (r.kind === "code" ? 5 : 0);
 
 /**
  * 字の綴りは **style.css の `--font` / `--mono` ひとつ**。幅を測る canvas は
@@ -56,7 +93,20 @@ export const ROW_HIDDEN: LabelRow = {
   padX: 9,
   rowH: 24,
 };
-export const rowOf = (n: NodeInfo): LabelRow => (n.hidden ? ROW_HIDDEN : ROW_NORMAL);
+/** Implicit は字を持たない。空の見出しと同じく空の字として扱う（種類は無い） */
+export const labelOf = (n: core.Node): string => n.label ?? "";
+
+/**
+ * 畳んだノードに出す字。**`<summary>` > ラベル**（spec「畳み」の表示名の規則。
+ * 3 段目の「最初の行」はラベルも空のときにしか来ないので、いまはプレースホルダに任せる）。
+ * GitHub が畳んだ塊に見せるのも summary なので、鏡としてもこちら
+ */
+export const foldName = (n: core.Node): string => n.fold?.summary ?? labelOf(n);
+
+export const rowOf = (n: core.Node): LabelRow => (n.fold === null ? ROW_NORMAL : ROW_HIDDEN);
+
+/** summary の無い details の名。ブラウザと GitHub の既定と同じ字 */
+export const DETAILS_NAME = "Details";
 
 /** ラベルが空のときに表示するプレースホルダ。表示箇所すべてがこれ 1 つを見る。 */
 export const EMPTY_LABEL = "(empty)";
@@ -113,11 +163,11 @@ export const collapsedBadge = (buried: number): string =>
   buried > 0 ? `  +${buried}` : "";
 
 /**
- * hidden ノードの表示ラベル。幅で詰める（文字数だと CJK で箱からはみ出す）。
+ * 畳んだノードの表示ラベル。幅で詰める（文字数だと CJK で箱からはみ出す）。
  * バッジは詰めの対象にしない — 「+3」が読めなくなっては意味がない。
  */
-export function hiddenLabel(n: NodeInfo, buried: number): string {
-  const raw = displayLabel(n.label);
+export function hiddenLabel(n: core.Node, buried: number): string {
+  const raw = displayLabel(foldName(n));
   const badge = collapsedBadge(buried);
   const budget = HIDDEN_MAX_W - ROW_HIDDEN.padX * 2 - measure(labelFont(ROW_HIDDEN), badge);
   return clipLabel(raw, labelFont(ROW_HIDDEN), budget) + badge;
@@ -136,17 +186,15 @@ export function rowTop(rows: CardRow[], i: number): number {
 }
 
 /** ノードの箱の大きさ。ラベルとカード行から決まる */
-export function nodeSize(n: NodeInfo, rows: CardRow[], buried: number): { w: number; h: number } {
-  if (n.hidden) {
-    // 折り畳み表示: ラベルを詰めた幅だけ。カード類は持たない
+export function nodeSize(n: core.Node, rows: CardRow[], buried: number): { w: number; h: number } {
+  if (n.fold !== null) {
+    // 畳み表示: ラベルを詰めた幅だけ。カード類は持たない
     const w =
-      Math.ceil(
-        Math.min(measure(labelFont(ROW_HIDDEN), hiddenLabel(n, buried)), HIDDEN_MAX_W),
-      ) +
+      Math.ceil(Math.min(measure(labelFont(ROW_HIDDEN), hiddenLabel(n, buried)), HIDDEN_MAX_W)) +
       ROW_HIDDEN.padX * 2;
     return { w, h: ROW_HIDDEN.rowH };
   }
-  const label = displayLabel(n.label);
+  const label = displayLabel(labelOf(n));
   let w = measure(labelFont(ROW_NORMAL), label);
   for (const r of rows) {
     if (r.kind === "img" || r.kind === "svg") {
@@ -155,8 +203,13 @@ export function nodeSize(n: NodeInfo, rows: CardRow[], buried: number): { w: num
       for (const ln of r.lines) {
         w = Math.max(w, measure(monoFont(), ln) + 12);
       }
-    } else {
-      w = Math.max(w, measure(cardFont(), r.link.title) + 22);
+    } else if (r.kind === "details") {
+      w = Math.max(w, measure(cardFont(), r.summary ?? DETAILS_NAME) + DETAILS_INDENT);
+      if (r.open) {
+        for (const ln of r.lines) w = Math.max(w, measure(cardFont(), ln) + DETAILS_INDENT);
+      }
+    } else if (r.kind === "link") {
+      w = Math.max(w, measure(cardFont(), r.title) + 22);
     }
   }
   // w はここまで content 幅（左右パディング抜き）。最終的な箱の幅は

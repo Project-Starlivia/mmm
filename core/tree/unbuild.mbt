@@ -37,6 +37,31 @@ pub fn unbuild(doc : Doc) -> @markdown.Document {
 }
 
 ///|
+/// 部分木 1 つを mdAst にする（断片）。`depth` はその根の見出しの深さ、
+/// `sides` は Doc の根のときだけ在る。定義行は断片の中に留まる。
+pub fn unbuild_node(
+  x : Node,
+  depth : Int,
+  sides : Array[Side],
+) -> @markdown.Document {
+  let u : Unbuild = { defs: [] }
+  let out = []
+  node(u, out, x, depth, sides)
+  { frontmatter: None, children: out, definitions: u.defs, span: nowhere }
+}
+
+///|
+/// 散文（骨格を持たない中身の列）を mdAst にする。
+pub fn unbuild_prose(body : Array[Block]) -> @markdown.Document {
+  let u : Unbuild = { defs: [] }
+  let out = []
+  for b in body {
+    content(u, out, b)
+  }
+  { frontmatter: None, children: out, definitions: u.defs, span: nowhere }
+}
+
+///|
 /// 位置は持たない。mdAst の span は原文の座標で、組んだ木に原文は無い。
 let nowhere : @markdown.Span = @markdown.Span::empty()
 
@@ -187,7 +212,7 @@ fn content(u : Unbuild, out : Array[@markdown.Block], b : Block) -> Unit {
       )
     Svg(s) => out.push(html(s))
     ThematicBreak => out.push(rule())
-    Details(text) => splice(u, out, text)
+    Details(text~, ..) => splice(u, out, text)
     Opaque(text) => splice(u, out, text)
   }
 }
