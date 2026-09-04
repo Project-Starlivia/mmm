@@ -42,17 +42,17 @@ jobs:
       - name: Update the mooncakes index
         run: moon update
 
-      - name: Check（MoonBit）
-        run: pnpm run check:core
-      - name: Core tests（MoonBit）
-        run: pnpm run test:core
-
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      - name: Check（MoonBit）
+        run: pnpm run check:core
+      - name: Core tests（MoonBit）
+        run: pnpm run test:core
 
       # コアの JS はここで作る。型検査もテストもこれが無いと始まらない
       - run: pnpm run core
