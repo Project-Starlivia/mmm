@@ -57,9 +57,17 @@ fn fold(doc : @tree.Doc, id : Int, open : Bool) -> Done? {
     { open, summary: if @tree.writable(label) { Some(label) } else { None } }
   }
 
+  fn next(fold : @tree.Fold?, label : String) -> @tree.Fold {
+    match fold {
+      Some(f) => { ..f, open, }
+      None => folding(label)
+    }
+  }
+
   let m = match n {
-    HeadingNode(h) => @tree.HeadingNode({ ..h, fold: Some(folding(h.label)) })
-    ListNode(l) => @tree.ListNode({ ..l, fold: Some(folding(l.label)) })
+    HeadingNode(h) =>
+      @tree.HeadingNode({ ..h, fold: Some(next(h.fold, h.label)) })
+    ListNode(l) => @tree.ListNode({ ..l, fold: Some(next(l.fold, l.label)) })
     ImplicitNode(_) => return None
   }
   done(splice(doc, id, _ => [m]), Some(id))
@@ -143,7 +151,7 @@ fn anchor(at : NodePlace) -> Int {
 }
 
 ///|
-/// 新しいノードを差す。綴りは隣に従う。
+/// 新しいノードを差す。綴りは隣に従う。根の隣（`In(doc_id)`）は最後の根に従う。
 fn add(doc : @tree.Doc, at : NodePlace, labels : Array[String]) -> Done? {
   guard !labels.is_empty() else { return None }
   let first = fresh(doc)
@@ -151,26 +159,27 @@ fn add(doc : @tree.Doc, at : NodePlace, labels : Array[String]) -> Done? {
     labels.mapi((k, label) => make(sign, first + k, label))
   }
 
-  let out = match at {
+  let sign = match at {
     Before(node~) => {
       guard find(doc, node) is Some(n) else { return None }
-      splice(doc, node, x => [..news(sign_of(n)), x])
+      sign_of(n)
     }
     After(node~) => {
       guard find(doc, node) is Some(n) else { return None }
-      splice(doc, node, x => [x, ..news(sign_of(n))])
+      sign_of(n)
     }
-    In(node~, side~) => {
-      let sign = if node == @tree.doc_id {
-        @tree.Heading
+    In(node~, ..) =>
+      if node == @tree.doc_id {
+        match doc.roots.last() {
+          Some(r) => sign_of(r.node)
+          None => @tree.Heading
+        }
       } else {
         guard find(doc, node) is Some(n) else { return None }
         sign_in(n)
       }
-      append(doc, node~, side?, news(sign))
-    }
   }
-  done(out, Some(first))
+  done(place(doc, at, news(sign)), Some(first))
 }
 
 ///|
@@ -280,7 +289,20 @@ fn flip(doc : @tree.Doc, id : Int) -> Done? {
         wrapped = @tree.ImplicitNode({ id: next, children: [wrapped] })
         next = next + 1
       }
-      done(append(rest, node=id_of(r.node), side~, [wrapped]), Some(id))
+      let root_id = id_of(r.node)
+      // 根の Implicit は引き出す相手しか持たないことがある。掃除で消えた根は、
+      // 引き出したものを子に置き直す。
+      match find(rest, root_id) {
+        Some(_) => done(append(rest, node=root_id, side~, [wrapped]), Some(id))
+        None => {
+          let roots = rest.roots.copy()
+          roots.insert(path[0], {
+            node: @tree.ImplicitNode({ id: root_id, children: [wrapped] }),
+            sides: [side],
+          })
+          Some({ doc: { ..rest, roots, }, focus: Some(id) })
+        }
+      }
     }
   }
 }
@@ -438,7 +460,6 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
       p
     }
   }
-  guard has(doc, anchor(at)) || anchor(at) == @tree.doc_id else { return None }
   let mut cur = doc
   if !prose.is_empty() {
     guard body(cur, node=host, bs => [..bs, ..prose]) is Some(d) else {

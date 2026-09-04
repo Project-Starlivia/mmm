@@ -61,8 +61,9 @@ test "Fold は定義ごと畳み、名前はラベル。畳み済みなら open 
       focus: Some(3),
     }),
   )
+  let custom : @tree.Fold = { open: false, summary: Some("custom") }
   let f = doc([
-    root(h(2, "r", children=[h(3, "a", fold=Some(folded))]), sides=[Right]),
+    root(h(2, "r", children=[h(3, "a", fold=Some(custom))]), sides=[Right]),
   ])
   assert_eq(
     run(f, Fold(id=3, open=true)),
@@ -70,7 +71,7 @@ test "Fold は定義ごと畳み、名前はラベル。畳み済みなら open 
       doc: doc([
         root(
           h(2, "r", children=[
-            h(3, "a", fold=Some({ open: true, summary: Some("a") })),
+            h(3, "a", fold=Some({ open: true, summary: Some("custom") })),
           ]),
           sides=[Right],
         ),
@@ -256,6 +257,15 @@ test "Add を doc_id にすれば新しい根。空の文書にも" {
 }
 
 ///|
+test "Add を doc_id にすれば最後の根の綴りに従う" {
+  let d = doc([root(item(2, "a"))])
+  assert_eq(
+    run(d, Add(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["b"])),
+    Some({ doc: doc([root(item(2, "a")), root(item(3, "b"))]), focus: Some(3) }),
+  )
+}
+
+///|
 test "Add は空のラベル列と知らない id に None" {
   let d = doc([root(h(2, "r"))])
   assert_eq(run(d, Add(at=NodePlace::After(node=2), labels=[])), None)
@@ -428,8 +438,13 @@ test "Move は綴りを保つ。項目は見出しの下に置け、見出しは
   )
   assert_eq(run(d, Move(ids=[3], at=NodePlace::In(node=4, side=None))), None)
   assert_eq(
-    run(d, Move(ids=[3], at=NodePlace::Before(node=4))).map(x => x.focus),
-    Some(Some(3)),
+    run(d, Move(ids=[3], at=NodePlace::Before(node=4))),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(3, "a"), item(4, "b")]), sides=[Right, Right]),
+      ]),
+      focus: Some(3),
+    }),
   )
 }
 
@@ -507,6 +522,18 @@ test "FlipSide の 3 段: 根は鏡像、根の子は 1 つ、深いものは反
         ),
       ]),
       focus: Some(5),
+    }),
+  )
+}
+
+///|
+test "FlipSide の深いノード: 根の Implicit が丸ごと抜ければ、引き出したものを子に置き直す" {
+  let d = doc([root(gap(2, [gap(3, [h(4, "x")])]), sides=[Right])])
+  assert_eq(
+    run(d, FlipSide(id=4)),
+    Some({
+      doc: doc([root(gap(2, [gap(5, [h(4, "x")])]), sides=[Left])]),
+      focus: Some(4),
     }),
   )
 }
@@ -701,7 +728,7 @@ test "Graft は空・知らない id・項目の下に見出し、に None" {
 }
 
 ///|
-/// 全部の試験で作った木に、代表的な Op を総当たりで当て、Some ならその結果が
+/// 代表的な木に、代表的な Op を総当たりで当て、Some ならその結果が
 /// check を通ることを見る。落ちた Op と破れを並べる。
 test "apply の結果は check を通る" {
   let base = doc([
@@ -739,9 +766,11 @@ test "apply の結果は check を通る" {
     }
   }
   let bad = []
+  let mut some = 0
   for op in ops {
     match apply(base, op) {
       Some(done) => {
+        some = some + 1
         let flaws = @tree.check(done.doc)
         if !flaws.is_empty() {
           bad.push((op, flaws))
@@ -750,5 +779,7 @@ test "apply の結果は check を通る" {
       None => ()
     }
   }
+  // 全部 None に潰れる退化を落とすための下限チェック。
+  inspect(some, content="371")
   json_inspect(bad, content=[])
 }

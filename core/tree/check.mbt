@@ -35,9 +35,6 @@ pub fn check(doc : Doc) -> Array[Flaw] {
     }
   }
 
-  /// 畳みの名前が `<summary>` に書けるか。**塊が割れる字並びは書けない** —
-  /// `<summary>` の中身は最初の `</summary>` までで、生の HTML の塊は空行で
-  /// 終わる。どちらが名前に入っていても、読み戻すと別のものになる。
   /// 「畳んでいないのに open」は型が殺しているので、ここには来ない。
   fn named(n : Int, fold : Fold?) -> Unit {
     guard fold is Some({ summary: Some(s), .. }) else { return }

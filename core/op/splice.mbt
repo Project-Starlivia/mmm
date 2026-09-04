@@ -176,6 +176,7 @@ fn nodes(s : Splice, xs : Array[@tree.Node]) -> Array[@tree.Node] {
 }
 
 ///|
+/// 項目 1 つ。子の列を組み直す。
 fn relist(s : Splice, l : @tree.ListNode) -> @tree.ListNode {
   { ..l, children: items(s, l.children) }
 }
