@@ -121,7 +121,11 @@ export class MdEditor {
   setText(text: string): void {
     const before = this.view.state.doc.length;
     this.view.setState(this.state(text));
-    this.onChange(text, [{ from: 0, to: before, insert: text }]);
+    // CodeMirror は内部を常に LF で持つので、真実は引数でなく doc（core.md「改行」）。
+    // CRLF の文書を渡すと EditorState.create が \r\n?|\n で割って LF の行として
+    // 保つので、以降 doc.toString() は引数と食い違う
+    const doc = this.view.state.doc.toString();
+    this.onChange(doc, [{ from: 0, to: before, insert: doc }]);
     this.onCaret(this.caret());
   }
 
