@@ -291,8 +291,12 @@ export class Mindmap {
         if (e.pointerType !== "touch") return;
         const p = this.local(e.clientX, e.clientY);
         this.fingers.down(e.pointerId, p.x, p.y);
-        // 2 本目が乗った時点で 1 本ぶんのパンは畳む
-        if (this.fingers.pinching) this.panning = null;
+        // 2 本目が乗った時点で 1 本ぶんのパンは畳む。tapped も畳む —
+        // 畳まなければピンチ中ずっと最初の指の場所に居座り、離したときに選んでしまう
+        if (this.fingers.pinching) {
+          this.panning = null;
+          this.tapped = null;
+        }
       },
       true,
     );
@@ -362,10 +366,11 @@ export class Mindmap {
       });
     });
     const end = (e: PointerEvent): void => {
-      if (this.tapped) {
+      // 選ぶのは離したとき（pointerup）だけ。cancel は取り消しなので選ばずに捨てる
+      if (this.tapped && e.type === "pointerup") {
         this.host.setSelection(click(this.host.selection(), this.tapped.id, "none", this.layout.order), true);
-        this.tapped = null;
       }
+      this.tapped = null;
       if (this.rubberStart) {
         const dragged =
           this.rubber.style.display === "block" &&
