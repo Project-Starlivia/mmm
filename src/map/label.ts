@@ -50,10 +50,12 @@ export class LabelEditor {
   private input: HTMLInputElement;
   private id: number | null = null;
   private composing = false;
-  private deps: { rename(id: number, label: string): void; closed(): void };
+  private readonly pane: HTMLElement;
+  private readonly rename: (id: number, label: string) => void;
 
-  constructor(pane: HTMLElement, deps: { rename(id: number, label: string): void; closed(): void }) {
-    this.deps = deps;
+  constructor(pane: HTMLElement, rename: (id: number, label: string) => void) {
+    this.pane = pane;
+    this.rename = rename;
     this.input = document.createElement("input");
     this.input.id = "node-editor";
     this.input.spellcheck = false;
@@ -75,7 +77,10 @@ export class LabelEditor {
       e.stopPropagation();
       if (e.key === "Escape" || e.key === "Enter") {
         e.preventDefault();
+        // キー由来の close だけ、地図へフォーカスを戻す。blur は既に
+        // フォーカスが行き先を持っている最中なので奪わない（#3）
         this.close();
+        this.pane.focus();
       } else if (e.key === "Tab") {
         // 編集中の Tab は無効（spec.md）
         e.preventDefault();
@@ -124,10 +129,9 @@ export class LabelEditor {
     }
     this.id = null;
     this.input.style.display = "none";
-    this.deps.closed();
   }
 
   private write(): void {
-    if (this.id !== null) this.deps.rename(this.id, this.input.value);
+    if (this.id !== null) this.rename(this.id, this.input.value);
   }
 }

@@ -91,10 +91,7 @@ export class Mindmap {
     this.rubber.id = "rubber";
     pane.append(this.rubber);
 
-    this.label = new LabelEditor(pane, {
-      rename: (id, label) => this.host.apply({ kind: "rename", id, label }, false),
-      closed: () => pane.focus(),
-    });
+    this.label = new LabelEditor(pane, (id, label) => this.host.apply({ kind: "rename", id, label }, false));
 
     // md からの始め方は md ペイン自身が同じ器で言う（app/hint.ts）
     this.hint = paneHint("Nothing to show yet — write a ", "# heading", "");
