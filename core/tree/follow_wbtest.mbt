@@ -114,6 +114,19 @@ test "消去の後ろの挿入も数える" {
 }
 
 ///|
+/// setext の見出しは `#` が無いのでマーカーが空（from == label）。空のマーカーは
+/// ラベルの頭が消されたときだけ死ぬ — 関係の無い編集で死んではいけない。
+test "setext の見出しは関係の無い編集で死なない" {
+  let md = "r\n=\n\nsub\n---\n\ntail more\n"
+  assert_eq(followed(md, [{ from: 24, to: 24, insert: "x" }], [2, 3]), [
+    Some(2),
+    Some(3),
+  ])
+  // ラベルの頭 `s` を消せば死ぬ
+  assert_eq(followed(md, [{ from: 5, to: 6, insert: "" }], [3]), [None])
+}
+
+///|
 /// 隣り合う消去が合わせてマーカーを消せば死ぬ。`followed` は「死んだ」（Trail 自体
 /// が None）と「亡霊」（Trail はあるが id が None）を id だけでは見分けられないので、
 /// ここは `follow` を直に呼んで Trail のレベルで確かめる。

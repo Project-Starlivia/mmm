@@ -65,7 +65,10 @@ fn carry(edits : Array[Edit], m : Mark) -> Mark? {
     if deleting && e.from <= reach && e.to > reach {
       reach = e.to
     }
-    if reach >= m.label {
+    // setext などラベルの頭が骨格の頭と同じ（マーカーが空）だと reach は
+    // 動かないまま m.label に並ぶので、消去がラベルの頭を実際に飲んだ
+    // ときだけ死ぬ（reach > m.from）。無関係な編集で死んではいけない
+    if reach > m.from && reach >= m.label {
       return None
     }
     // ラベルの頭が消去の内側
