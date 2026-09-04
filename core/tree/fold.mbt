@@ -13,13 +13,21 @@
 /// 積む前のひと切れ。
 priv enum Piece {
   Raw(@markdown.Block)
-  /// 畳まれたノードの見出し・項目の行。中身は普通に読む
-  Folded(@markdown.Block, fold~ : Fold)
+  /// 畳まれたノードの見出し・項目の行。中身は普通に読む。
+  /// `at` は `<details>` 〜 `</details>` の原文の範囲（地番になる）
+  Folded(@markdown.Block, fold~ : Fold, at~ : @markdown.Span)
   /// 綴りとして読めなかった領域。原文のまま中身になる。open / summary / body は
-  /// GitHub が描くのと同じ読み取り（最初の開きと、その直後の名前と、閉じまでの間）
-  Capsule(text~ : String, open~ : Bool, summary~ : String?, body~ : String)
+  /// GitHub が描くのと同じ読み取り（最初の開きと、その直後の名前と、閉じまでの間）。
+  /// `to` は原文での尻（地番になる）
+  Capsule(
+    text~ : String,
+    open~ : Bool,
+    summary~ : String?,
+    body~ : String,
+    to~ : Int
+  )
   /// mdAst がブロックとして返さないもの（リンクの定義行）。原文のまま中身になる
-  Text(String)
+  Text(String, to~ : Int)
 }
 
 ///|
@@ -302,6 +310,7 @@ fn capsule(
     open~,
     summary~,
     body=strip(md, inner, spots[tail].tag.from),
+    to=upto,
   )
 }
 
@@ -542,8 +551,8 @@ fn pieces(
     }
   }
 
-  // 畳まれる骨格の行 → その畳み（None は畳みでない）
-  let mark : Array[Fold?] = Array::make(n, None)
+  // 畳まれる骨格の行 → その畳みと、`<details>` 〜 `</details>` の範囲（None は畳みでない）
+  let mark : Array[(Fold, @markdown.Span)?] = Array::make(n, None)
   // 原文のまま持つ領域 → 終わりの塊・原文の範囲
   let last = Array::make(n, -1)
   let from = Array::make(n, 0)
@@ -554,7 +563,12 @@ fn pieces(
   for k, p in ps {
     let ob = spots[p.0].block
     if ok[k] {
-      mark[next(blocks, ob)] = Some(fold_of(spells[ob]))
+      let cb = spots[p.1].block
+      let at : @markdown.Span = {
+        from: block_span(blocks[ob]).from,
+        to: block_span(blocks[cb]).to,
+      }
+      mark[next(blocks, ob)] = Some((fold_of(spells[ob]), at))
     } else if spots[p.1].block > last[ob] {
       // 同じ塊から複数の対が始まるときは、一番外を採る。
       // 切るのは**塊まるごと** — タグからタグまでにすると、同じ塊に居た
@@ -578,7 +592,13 @@ fn pieces(
   fn flush(before : Int) -> Unit {
     while d < defs.length() && defs[d].from < before {
       if defs[d].from >= carried {
-        out.push(Text(carve(md, defs[d].from, defs[d].to)))
+        // 定義行の span だけ改行を含まない（塊は含む）ので、地番の尻は揃える
+        out.push(
+          Text(
+            carve(md, defs[d].from, defs[d].to),
+            to=eol_after(md, defs[d].to),
+          ),
+        )
       }
       d = d + 1
     }
@@ -597,7 +617,7 @@ fn pieces(
     } else {
       out.push(
         match mark[i] {
-          Some(fold) => Folded(blocks[i], fold~)
+          Some((fold, at)) => Folded(blocks[i], fold~, at~)
           None => Raw(blocks[i])
         },
       )
@@ -607,6 +627,19 @@ fn pieces(
   }
   flush(md.length() + 1)
   out
+}
+
+///|
+/// i に改行が在ればその次、無ければ i。
+fn eol_after(md : String, i : Int) -> Int {
+  let mut z = i
+  if z < md.length() && md[z] == '\r' {
+    z = z + 1
+  }
+  if z < md.length() && md[z] == '\n' {
+    z = z + 1
+  }
+  z
 }
 
 ///|

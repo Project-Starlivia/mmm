@@ -16,10 +16,12 @@
 
 ```
 core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内部は core.md)
-  tree/         md.mbt が md との境界（read / serialize）、build.mbt が mdAst → 木、
-                unbuild.mbt が木 → mdAst。md_wbtest.mbt がライブラリの読みを指紋で
+  tree/         md.mbt が md との境界（read / serialize / fragment）、build.mbt が
+                mdAst → 木と地番、unbuild.mbt が木 → mdAst、reflect.mbt が前後の木の
+                差を原文 md への編集列にする。md_wbtest.mbt がライブラリの読みを指紋で
                 固定し、build_wbtest.mbt 以降が「この md はこう読まれる」、
-                unbuild_wbtest.mbt が「この木はこう書かれる」を固定する
+                unbuild_wbtest.mbt が「この木はこう書かれる」、reflect_wbtest.mbt が
+                「木がこう違えば md はここだけ変わる」を固定する
   view/         map が見る木。project が Doc から削るだけで作る
                 （`View { frontmatter, trees }`。frontmatter は画像フォルダの宣言のため）
 src/    TypeScript — UI。**描くだけ。** 選択・操作は操作の API が揃うまで無い（git に在る）

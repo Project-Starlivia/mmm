@@ -16,6 +16,10 @@ priv struct Frame {
   mut side : Side
   /// 文書順の番号。形を割り付ける前に振るので、割り付けが順序を動かしても動かない
   mut id : Int
+  /// 原文の範囲（地番）。骨格の行の頭から、自分の最後の中身の尻まで。
+  /// 飛び（Gap）は行を持たないので -1 で置き、最後に子の和で埋める
+  mut from : Int
+  mut to : Int
 }
 
 ///|
@@ -30,20 +34,34 @@ priv enum Notation {
 ///|
 /// md を木にする。
 pub fn parse(md : String) -> Doc {
+  build(md, read(md)).0
+}
+
+///|
+/// md を木にし、地番（ノード id → 原文の範囲）も返す。反映が使う。
+pub fn survey(md : String) -> (Doc, Map[Int, @markdown.Span]) {
   build(md, read(md))
 }
 
 ///|
 /// mdAst を mmmTree にする。ラベルは原文から切り出す（mmm はインラインを解釈しない）。
-pub fn build(md : String, ast : @markdown.Document) -> Doc {
+/// 地番は Doc に載せず並べて返す — 載せると Doc が特定の原文に縛られ、
+/// 手で組む木に在り得ない欄が生える。
+pub fn build(
+  md : String,
+  ast : @markdown.Document,
+) -> (Doc, Map[Int, @markdown.Span]) {
   let b : Build = {
     md,
     defs: ast.definitions.map(d => d.span),
     forest: [],
     stack: [],
     body: [],
+    body_to: 0,
     side: Right,
     pend: false,
+    pend_to: 0,
+    fold_at: None,
     top: deep,
     own: deep,
     dry: false,
@@ -60,7 +78,17 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
   for f in forest {
     number(f, next)
   }
-  {
+  let spans : Map[Int, @markdown.Span] = Map([])
+  // 文書の散文は frontmatter の尻から。中身が無ければ空の範囲
+  let from = match ast.frontmatter {
+    Some(f) => f.span.to
+    None => 0
+  }
+  spans[doc_id] = { from, to: if b.body_to > from { b.body_to } else { from } }
+  for f in forest {
+    chart(f, spans)
+  }
+  let doc : Doc = {
     frontmatter: ast.frontmatter.map(f => f.raw),
     eol: if b.md.contains("\r\n") {
       Crlf
@@ -70,6 +98,43 @@ pub fn build(md : String, ast : @markdown.Document) -> Doc {
     body: b.body,
     roots: forest.map(to_root),
   }
+  (doc, spans)
+}
+
+///|
+/// 地番の指紋。`id[from,to]` を id 順に並べる。
+pub fn spans_sig(md : String) -> String {
+  let (_, spans) = survey(md)
+  let ids = spans.keys().collect()
+  ids.sort()
+  ids
+  .map(id => {
+    match spans.get(id) {
+      Some(s) => "\{id}[\{s.from},\{s.to}]"
+      None => ""
+    }
+  })
+  .join(" ")
+}
+
+///|
+/// 地番を id で引けるようにする。飛びは子の和 — 子を先に埋めるので、
+/// 飛びの中の飛びも埋まる。畳みの尻（`</details>`）は子より後ろに在るので、
+/// 大きいほうを採れば保たれる。
+fn chart(f : Frame, spans : Map[Int, @markdown.Span]) -> Unit {
+  for k in f.kids {
+    chart(k, spans)
+  }
+  if !f.kids.is_empty() {
+    if f.from < 0 {
+      f.from = f.kids[0].from
+    }
+    let last = f.kids[f.kids.length() - 1].to
+    if last > f.to {
+      f.to = last
+    }
+  }
+  spans[f.id] = { from: f.from, to: f.to }
 }
 
 ///|
@@ -87,10 +152,16 @@ priv struct Build {
   stack : Array[Frame]
   /// 最初の骨格より前の散文
   body : Array[Block]
+  /// その散文の尻（地番）
+  mut body_to : Int
   /// 次の子の側。木が変わるたびに右へ戻る
   mut side : Side
   /// 行き先待ちの水平線が有るか。**本数に意味は無い**ので Bool で持つ
   mut pend : Bool
+  /// その水平線の尻。飾りに落ちたとき地番に入れる
+  mut pend_to : Int
+  /// いま積む骨格が畳まれているなら、その `<details>` 〜 `</details>` の範囲
+  mut fold_at : @markdown.Span?
   /// このブロックで生まれた一番浅い枠の深さ。骨格でなければ `deep` のまま
   mut top : Int
   /// このブロック自身のノードの深さ。飛びを埋めた Implicit は数えない
@@ -131,8 +202,11 @@ fn depths(
     forest: [],
     stack: [],
     body: [],
+    body_to: 0,
     side: Right,
     pend: false,
+    pend_to: 0,
+    fold_at: None,
     top: deep,
     own: deep,
     dry: true,
@@ -163,15 +237,19 @@ fn depths(
 fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
   match piece {
     Raw(block) => take(b, block, nest)
-    Folded(block, fold~) => take(b, block, nest, fold=Some(fold))
-    Capsule(text~, open~, summary~, body~) => {
+    Folded(block, fold~, at~) => {
+      b.fold_at = Some(at)
+      take(b, block, nest, fold=Some(fold))
+      b.fold_at = None
+    }
+    Capsule(text~, open~, summary~, body~, to~) => {
       // 中身が来たので、保留中の水平線は境界になれない
       spill(b)
-      fill(b, Details(text~, open~, summary~, body~))
+      fill(b, Details(text~, open~, summary~, body~), to~)
     }
-    Text(text) => {
+    Text(text, to~) => {
       spill(b)
-      fill(b, Opaque(text))
+      fill(b, Opaque(text), to~)
     }
   }
 }
@@ -187,7 +265,8 @@ fn take(
   match block {
     // **単調性 — 項目の子孫は項目。** 項目の領土に書かれた見出しは骨格に
     // ならず、原文のまま中身になる（列 0 へ出れば項目が閉じて木が変わる）
-    Heading(..) if nest > 0 => fill(b, Opaque(verbatim(b.md, block)))
+    Heading(span~, ..) if nest > 0 =>
+      fill(b, Opaque(verbatim(b.md, block)), to=span.to)
     Heading(level~, style~, children~, span~, ..) =>
       put(
         b,
@@ -198,22 +277,27 @@ fn take(
           fold~,
           body=[],
         ),
+        at=span,
       )
     BulletList(items~, ..) => items_take(b, items, nest, fold~)
     OrderedList(items~, ..) => items_take(b, items, nest, fold~)
     // 区切りは**根の領土の隙間**でだけ側の変わり目になる。項目の中は中身なので
     // 保留せずその場に置く（保留すると、置く前に項目の枠が閉じられたとき
     // 帰る場所が無くなって文書へ落ちる）
-    ThematicBreak(..) if nest > 0 => fill(b, ThematicBreak)
+    ThematicBreak(span~, ..) if nest > 0 => fill(b, ThematicBreak, to=span.to)
     // 記法(`---` `***` `___`)も本数も差別しない。意味は常に「隣を区切る」で、
     // 行き先は**直後のブロックが何か**で決まる。ここでは保留するだけ
-    ThematicBreak(..) => b.pend = true
+    ThematicBreak(span~, ..) => {
+      b.pend = true
+      b.pend_to = span.to
+    }
     _ =>
       match content_of(b.md, block) {
         Some(c) => {
           // 中身が来た時点で、保留中の水平線は境界になれない
           spill(b)
-          fill(b, c)
+          let s = block_span(block)
+          fill(b, c, to=closing(b.md, block, s.to))
         }
         None => ()
       }
@@ -250,7 +334,7 @@ fn items_take(
         rest.push(c)
       }
     }
-    put(b, level, Line(sign=Item, label~, fold~, body=[]))
+    put(b, level, Line(sign=Item, label~, fold~, body=[]), at=it.span)
     // **同じ列の項目は兄弟。** 境界は最初の項目を深さ 2 へ引き出すので、
     // 残りも引き出された先に並ぶ（数え直すと元の位置から数えてしまう）
     level = b.stack.length()
@@ -291,7 +375,8 @@ fn spine(b : Build) -> Int {
 ///|
 /// 深さ level のノードを置く。浅く戻るときは積んだぶんを落とし、
 /// 深く飛ぶときは間を Implicit で埋める（飛びは綴りであって、無ではない）。
-fn put(b : Build, level : Int, skel : Notation) -> Unit {
+/// `at` はその骨格の行（項目なら入れ子込み）の原文の範囲。
+fn put(b : Build, level : Int, skel : Notation, at~ : @markdown.Span) -> Unit {
   // 境界のとき、項目は**深さ 2 に直接置く**。項目は相対記法なので深さが
   // 導出値で、引き出し先に合わせて置き直せる（見出しは絶対座標なので
   // 動かせず、足りない深さを Implicit が埋める）
@@ -321,12 +406,31 @@ fn put(b : Build, level : Int, skel : Notation) -> Unit {
     ignore(b.stack.unsafe_pop())
   }
   while b.stack.length() < level - 1 {
-    let gap : Frame = { skel: Gap, kids: [], side: Right, id: 0 }
+    let gap : Frame = {
+      skel: Gap,
+      kids: [],
+      side: Right,
+      id: 0,
+      from: -1,
+      to: -1,
+    }
     sink(b)
     seat(b, gap)
     b.stack.push(gap)
   }
-  let f : Frame = { skel, kids: [], side: Right, id: 0 }
+  // 畳まれていれば範囲は `<details>` 〜 `</details>`（部分木を過不足なく覆う）
+  let at = match b.fold_at {
+    Some(s) => s
+    None => at
+  }
+  let f : Frame = {
+    skel,
+    kids: [],
+    side: Right,
+    id: 0,
+    from: at.from,
+    to: at.to,
+  }
   sink(b)
   // **そのブロック自身のノードは、最初に座る綴られた枠。** 手前の穴埋めは足場、
   // 後ろに続くのは入れ子の子（1 つの塊が項目を何段も積むことがある）
@@ -379,7 +483,7 @@ fn flipped(s : Side) -> Side {
 fn spill(b : Build) -> Unit {
   if b.pend {
     b.pend = false
-    fill(b, ThematicBreak)
+    fill(b, ThematicBreak, to=b.pend_to)
   }
 }
 
