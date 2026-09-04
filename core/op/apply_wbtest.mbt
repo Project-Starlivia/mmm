@@ -153,10 +153,10 @@ test "Delete は空と知らない id に None" {
 }
 
 ///|
-test "Add は隣の前後と子の末尾。綴りは隣に従う" {
+test "AddNode は隣の前後と子の末尾。綴りは隣に従う" {
   let d = doc([root(h(2, "r", children=[h(3, "a")]), sides=[Left])])
   assert_eq(
-    run(d, Add(at=NodePlace::After(node=3), labels=["b"])),
+    run(d, AddNode(at=NodePlace::After(node=3), labels=["b"])),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(3, "a"), h(4, "b")]), sides=[Left, Left]),
@@ -165,7 +165,7 @@ test "Add は隣の前後と子の末尾。綴りは隣に従う" {
     }),
   )
   assert_eq(
-    run(d, Add(at=NodePlace::Before(node=3), labels=["b", "c"])),
+    run(d, AddNode(at=NodePlace::Before(node=3), labels=["b", "c"])),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(4, "b"), h(5, "c"), h(3, "a")]), sides=[
@@ -178,7 +178,7 @@ test "Add は隣の前後と子の末尾。綴りは隣に従う" {
     }),
   )
   assert_eq(
-    run(d, Add(at=NodePlace::In(node=3, side=None), labels=[""])),
+    run(d, AddNode(at=NodePlace::In(node=3, side=None), labels=[""])),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(3, "a", children=[h(4, "")])]), sides=[Left]),
@@ -187,7 +187,7 @@ test "Add は隣の前後と子の末尾。綴りは隣に従う" {
     }),
   )
   assert_eq(
-    run(d, Add(at=NodePlace::In(node=2, side=Some(Right)), labels=["b"])),
+    run(d, AddNode(at=NodePlace::In(node=2, side=Some(Right)), labels=["b"])),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(3, "a"), h(4, "b")]), sides=[Left, Right]),
@@ -198,10 +198,10 @@ test "Add は隣の前後と子の末尾。綴りは隣に従う" {
 }
 
 ///|
-test "Add の綴り: 項目の隣は項目、項目の下は項目、見出しの下で子が無ければ見出し" {
+test "AddNode の綴り: 項目の隣は項目、項目の下は項目、見出しの下で子が無ければ見出し" {
   let d = doc([root(h(2, "r", children=[item(3, "a")]), sides=[Right])])
   assert_eq(
-    run(d, Add(at=NodePlace::After(node=3), labels=["b"])),
+    run(d, AddNode(at=NodePlace::After(node=3), labels=["b"])),
     Some({
       doc: doc([
         root(h(2, "r", children=[item(3, "a"), item(4, "b")]), sides=[
@@ -213,7 +213,7 @@ test "Add の綴り: 項目の隣は項目、項目の下は項目、見出し�
     }),
   )
   assert_eq(
-    run(d, Add(at=NodePlace::In(node=3, side=None), labels=["b"])),
+    run(d, AddNode(at=NodePlace::In(node=3, side=None), labels=["b"])),
     Some({
       doc: doc([
         root(h(2, "r", children=[item(3, "a", children=[li(4, "b")])]), sides=[
@@ -224,7 +224,7 @@ test "Add の綴り: 項目の隣は項目、項目の下は項目、見出し�
     }),
   )
   assert_eq(
-    run(d, Add(at=NodePlace::In(node=2, side=None), labels=["b"])),
+    run(d, AddNode(at=NodePlace::In(node=2, side=None), labels=["b"])),
     Some({
       doc: doc([
         root(h(2, "r", children=[item(3, "a"), item(4, "b")]), sides=[
@@ -237,7 +237,7 @@ test "Add の綴り: 項目の隣は項目、項目の下は項目、見出し�
   )
   let e = doc([root(h(2, "r"))])
   assert_eq(
-    run(e, Add(at=NodePlace::In(node=2, side=None), labels=["b"])),
+    run(e, AddNode(at=NodePlace::In(node=2, side=None), labels=["b"])),
     Some({
       doc: doc([root(h(2, "r", children=[h(3, "b")]), sides=[Right])]),
       focus: Some(3),
@@ -246,30 +246,33 @@ test "Add の綴り: 項目の隣は項目、項目の下は項目、見出し�
 }
 
 ///|
-test "Add を doc_id にすれば新しい根。空の文書にも" {
+test "AddNode を doc_id にすれば新しい根。空の文書にも" {
   assert_eq(
     run(
       doc([]),
-      Add(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["r"]),
+      AddNode(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["r"]),
     ),
     Some({ doc: doc([root(h(2, "r"))]), focus: Some(2) }),
   )
 }
 
 ///|
-test "Add を doc_id にすれば最後の根の綴りに従う" {
+test "AddNode を doc_id にすれば最後の根の綴りに従う" {
   let d = doc([root(item(2, "a"))])
   assert_eq(
-    run(d, Add(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["b"])),
+    run(
+      d,
+      AddNode(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["b"]),
+    ),
     Some({ doc: doc([root(item(2, "a")), root(item(3, "b"))]), focus: Some(3) }),
   )
 }
 
 ///|
-test "Add は空のラベル列と知らない id に None" {
+test "AddNode は空のラベル列と知らない id に None" {
   let d = doc([root(h(2, "r"))])
-  assert_eq(run(d, Add(at=NodePlace::After(node=2), labels=[])), None)
-  assert_eq(run(d, Add(at=NodePlace::After(node=9), labels=["a"])), None)
+  assert_eq(run(d, AddNode(at=NodePlace::After(node=2), labels=[])), None)
+  assert_eq(run(d, AddNode(at=NodePlace::After(node=9), labels=["a"])), None)
 }
 
 ///|
@@ -326,7 +329,7 @@ test "Wrap は中身に None" {
 }
 
 ///|
-test "Move は文書順を保って抜き、隣の前後に差す" {
+test "MoveNode は文書順を保って抜き、隣の前後に差す" {
   let d = doc([
     root(h(2, "r", children=[h(3, "a"), h(4, "b"), h(5, "c")]), sides=[
       Right,
@@ -335,7 +338,7 @@ test "Move は文書順を保って抜き、隣の前後に差す" {
     ]),
   ])
   assert_eq(
-    run(d, Move(ids=[5, 3], at=NodePlace::After(node=4))),
+    run(d, MoveNode(ids=[5, 3], at=NodePlace::After(node=4))),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(4, "b"), h(3, "a"), h(5, "c")]), sides=[
@@ -348,7 +351,7 @@ test "Move は文書順を保って抜き、隣の前後に差す" {
     }),
   )
   assert_eq(
-    run(d, Move(ids=[5], at=NodePlace::Before(node=3))),
+    run(d, MoveNode(ids=[5], at=NodePlace::Before(node=3))),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(5, "c"), h(3, "a"), h(4, "b")]), sides=[
@@ -363,7 +366,7 @@ test "Move は文書順を保って抜き、隣の前後に差す" {
 }
 
 ///|
-test "Move で子の下へ（indent）と親の後ろへ（outdent）" {
+test "MoveNode で子の下へ（indent）と親の後ろへ（outdent）" {
   let d = doc([
     root(h(2, "r", children=[h(3, "a"), h(4, "b")]), sides=[Right, Right]),
   ])
@@ -371,22 +374,22 @@ test "Move で子の下へ（indent）と親の後ろへ（outdent）" {
     root(h(2, "r", children=[h(3, "a", children=[h(4, "b")])]), sides=[Right]),
   ])
   assert_eq(
-    run(d, Move(ids=[4], at=NodePlace::In(node=3, side=None))),
+    run(d, MoveNode(ids=[4], at=NodePlace::In(node=3, side=None))),
     Some({ doc: indented, focus: Some(4) }),
   )
   assert_eq(
-    run(indented, Move(ids=[4], at=NodePlace::After(node=3))),
+    run(indented, MoveNode(ids=[4], at=NodePlace::After(node=3))),
     Some({ doc: d, focus: Some(4) }),
   )
 }
 
 ///|
-test "Move は側を運ばず、行き先が決める。根の脇は side で言う" {
+test "MoveNode は側を運ばず、行き先が決める。根の脇は side で言う" {
   let d = doc([
     root(h(2, "r", children=[h(3, "a"), h(4, "b")]), sides=[Right, Right]),
   ])
   assert_eq(
-    run(d, Move(ids=[3], at=NodePlace::In(node=2, side=Some(Left)))),
+    run(d, MoveNode(ids=[3], at=NodePlace::In(node=2, side=Some(Left)))),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(4, "b"), h(3, "a")]), sides=[Right, Left]),
@@ -397,20 +400,20 @@ test "Move は側を運ばず、行き先が決める。根の脇は side で言
 }
 
 ///|
-test "Move で根の間へ行けば新しい根、根を子にすれば側は消える" {
+test "MoveNode で根の間へ行けば新しい根、根を子にすれば側は消える" {
   let d = doc([
     root(h(2, "r", children=[h(3, "a")]), sides=[Left]),
     root(h(4, "s")),
   ])
   assert_eq(
-    run(d, Move(ids=[3], at=NodePlace::Before(node=4))),
+    run(d, MoveNode(ids=[3], at=NodePlace::Before(node=4))),
     Some({
       doc: doc([root(h(2, "r"), sides=[]), root(h(3, "a")), root(h(4, "s"))]),
       focus: Some(3),
     }),
   )
   assert_eq(
-    run(d, Move(ids=[4], at=NodePlace::In(node=3, side=None))),
+    run(d, MoveNode(ids=[4], at=NodePlace::In(node=3, side=None))),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(3, "a", children=[h(4, "s")])]), sides=[Left]),
@@ -421,12 +424,12 @@ test "Move で根の間へ行けば新しい根、根を子にすれば側は消
 }
 
 ///|
-test "Move は綴りを保つ。項目は見出しの下に置け、見出しは項目の下に置けない" {
+test "MoveNode は綴りを保つ。項目は見出しの下に置け、見出しは項目の下に置けない" {
   let d = doc([
     root(h(2, "r", children=[h(3, "a"), item(4, "b")]), sides=[Right, Right]),
   ])
   assert_eq(
-    run(d, Move(ids=[4], at=NodePlace::In(node=3, side=None))),
+    run(d, MoveNode(ids=[4], at=NodePlace::In(node=3, side=None))),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(3, "a", children=[item(4, "b")])]), sides=[
@@ -436,9 +439,12 @@ test "Move は綴りを保つ。項目は見出しの下に置け、見出しは
       focus: Some(4),
     }),
   )
-  assert_eq(run(d, Move(ids=[3], at=NodePlace::In(node=4, side=None))), None)
   assert_eq(
-    run(d, Move(ids=[3], at=NodePlace::Before(node=4))),
+    run(d, MoveNode(ids=[3], at=NodePlace::In(node=4, side=None))),
+    None,
+  )
+  assert_eq(
+    run(d, MoveNode(ids=[3], at=NodePlace::Before(node=4))),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(3, "a"), item(4, "b")]), sides=[Right, Right]),
@@ -449,7 +455,7 @@ test "Move は綴りを保つ。項目は見出しの下に置け、見出しは
 }
 
 ///|
-test "Move は空・中身・知らない id・動かすものの中へ、に None" {
+test "MoveNode は空・中身・知らない id・動かすものの中へ、に None" {
   let d = doc([
     root(
       h(2, "r", body=[pic(3)], children=[
@@ -459,11 +465,14 @@ test "Move は空・中身・知らない id・動かすものの中へ、に No
       sides=[Right, Right],
     ),
   ])
-  assert_eq(run(d, Move(ids=[], at=NodePlace::After(node=6))), None)
-  assert_eq(run(d, Move(ids=[3], at=NodePlace::After(node=6))), None)
-  assert_eq(run(d, Move(ids=[9], at=NodePlace::After(node=6))), None)
-  assert_eq(run(d, Move(ids=[4], at=NodePlace::In(node=5, side=None))), None)
-  assert_eq(run(d, Move(ids=[4], at=NodePlace::After(node=4))), None)
+  assert_eq(run(d, MoveNode(ids=[], at=NodePlace::After(node=6))), None)
+  assert_eq(run(d, MoveNode(ids=[3], at=NodePlace::After(node=6))), None)
+  assert_eq(run(d, MoveNode(ids=[9], at=NodePlace::After(node=6))), None)
+  assert_eq(
+    run(d, MoveNode(ids=[4], at=NodePlace::In(node=5, side=None))),
+    None,
+  )
+  assert_eq(run(d, MoveNode(ids=[4], at=NodePlace::After(node=4))), None)
 }
 
 ///|
@@ -755,12 +764,12 @@ test "apply の結果は check を通る" {
     ops.push(FlipSide(id~))
     ops.push(SetBlock(id~, content=ThematicBreak))
     for to in ids {
-      ops.push(Move(ids=[id], at=NodePlace::Before(node=to)))
-      ops.push(Move(ids=[id], at=NodePlace::After(node=to)))
-      ops.push(Move(ids=[id], at=NodePlace::In(node=to, side=Some(Left))))
+      ops.push(MoveNode(ids=[id], at=NodePlace::Before(node=to)))
+      ops.push(MoveNode(ids=[id], at=NodePlace::After(node=to)))
+      ops.push(MoveNode(ids=[id], at=NodePlace::In(node=to, side=Some(Left))))
       ops.push(MoveBlock(ids=[id], at=BlockPlace::Before(block=to)))
       ops.push(MoveBlock(ids=[id], at=BlockPlace::In(node=to)))
-      ops.push(Add(at=NodePlace::After(node=to), labels=["n"]))
+      ops.push(AddNode(at=NodePlace::After(node=to), labels=["n"]))
       ops.push(AddBlock(at=BlockPlace::In(node=to), content=ThematicBreak))
       ops.push(Graft(at=NodePlace::In(node=to, side=None), md="# g\n\n- i\n"))
     }

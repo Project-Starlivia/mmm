@@ -10,9 +10,9 @@ pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
     Fold(id~, open~) => fold(doc, id, open)
     Unfold(id~) => unfold(doc, id)
     Delete(ids~) => delete(doc, ids)
-    Add(at~, labels~) => add(doc, at, labels)
+    AddNode(at~, labels~) => add_node(doc, at, labels)
     Wrap(id~, label~) => wrap(doc, id, label)
-    Move(ids~, at~) => move_nodes(doc, ids, at)
+    MoveNode(ids~, at~) => move_node(doc, ids, at)
     FlipSide(id~) => flip(doc, id)
     AddBlock(at~, content~) => add_block(doc, at, content)
     SetBlock(id~, content~) => set_block(doc, id, content)
@@ -152,7 +152,7 @@ fn anchor(at : NodePlace) -> Int {
 
 ///|
 /// 新しいノードを差す。綴りは隣に従う。根の隣（`In(doc_id)`）は最後の根に従う。
-fn add(doc : @tree.Doc, at : NodePlace, labels : Array[String]) -> Done? {
+fn add_node(doc : @tree.Doc, at : NodePlace, labels : Array[String]) -> Done? {
   guard !labels.is_empty() else { return None }
   let first = fresh(doc)
   fn news(sign : @tree.Sign) -> Array[@tree.Node] {
@@ -233,7 +233,7 @@ fn place(
 
 ///|
 /// 動かす。文書順を保って抜き、席に差す。側は行き先が決め、綴りは保つ。
-fn move_nodes(doc : @tree.Doc, ids : Array[Int], at : NodePlace) -> Done? {
+fn move_node(doc : @tree.Doc, ids : Array[Int], at : NodePlace) -> Done? {
   guard !ids.is_empty() else { return None }
   for id in ids {
     guard find(doc, id) is Some(_) else { return None }

@@ -126,9 +126,9 @@ span から、操作の後は操作の結果から）。UUID にしても読み�
 NodePlace  = Before(node~)  | After(node~)  | In(node~, side: Side?)   // ノードの席。子の列
 BlockPlace = Before(block~) | After(block~) | In(node~)                 // 中身の席。body の列
 
-Op = Add(at: NodePlace, labels)   | AddBlock(at: BlockPlace, content)
+Op = AddNode(at: NodePlace, labels)   | AddBlock(at: BlockPlace, content)
    | Rename(id, label)            | SetBlock(id, content)
-   | Move(ids, at: NodePlace)     | MoveBlock(ids, at: BlockPlace)
+   | MoveNode(ids, at: NodePlace)     | MoveBlock(ids, at: BlockPlace)
    | Delete(ids)                  // ノードも中身も
    | Wrap(id, label) | FlipSide(id) | Fold(id, open) | Unfold(id)
    | Graft(at: NodePlace, md)
@@ -151,12 +151,12 @@ Done = { doc, focus: Int? }       // 操作後の木と、そこで選ぶべき 
 - **動かすノードは綴りを保つ。** 綴りの変換（見出し ⇄ 項目）は正規形の仕事で、
   操作には無い。見出しを項目の下へ落とすのは型が許さないので `None`
 - **基準の席が操作の途中で消えれば `None`。** 抜き取りで子が尽きた Implicit の
-  掃除がそれ（Move の行き先、Graft の散文の行き先）
+  掃除がそれ（MoveNode の行き先、Graft の散文の行き先）
 - **畳み済みの名前は保つ。** `Fold` は畳んでいないときだけラベルから名前を作り、
   畳み済みなら open だけ替える
 - **flipSide は 3 段。** 根は `sides` を一括反転(鏡像)、根の子はその 1 つを反転、
   深いノードは反対側の末尾へ引き出す(深さは保つので、間を Implicit が埋める)
-- **選んだ祖先の中の子孫は無視する。** `Delete` / `Move` の ids に親と子が両方
+- **選んだ祖先の中の子孫は無視する。** `Delete` / `MoveNode` の ids に親と子が両方
   あれば、子は親と一緒に動く。基準の id が動かすものの中なら `None`
 - **Implicit は子が尽きたら消える。** 根まで登れば Root ごと
 - **Implicit に名を付ければ見出しになる。** 畳みの名前はラベル（`<summary>` に
@@ -191,7 +191,7 @@ Op も ts も数えない。行き先は 4 つ(roots / 見出しの子 / 項目�
 - **旧方言で書かれた既存文書の移行。** コメント畳み・`---` トグル・本数の意味は
   もう読まれない。開いたときにどう案内するか
 - **Reform（モード）と綴りの変換。** 開いたときの自動判定も core の読み関数として
-  一緒に足す。変換が入ったら `Move` の「見出しを項目の下へ」の `None` を開ける
+  一緒に足す。変換が入ったら `MoveNode` の「見出しを項目の下へ」の `None` を開ける
 - **境界。** `edit(md, op) -> { edits, focus }` は反映が入ってから。
   `survey → apply → reflect` を繋ぎ、focus は後の Doc を文書順に振り直して読み替える
 - **fold の `open` の見せ方**と、`Shift+H` が 2 状態を巡回するか 3 状態か

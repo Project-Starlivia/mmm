@@ -26,11 +26,11 @@ pub(all) enum BlockPlace {
 ///|
 /// 操作。1 つの値が 1 回の操作で、apply が木に当てる。
 pub(all) enum Op {
-  Add(at~ : NodePlace, labels~ : Array[String])
+  AddNode(at~ : NodePlace, labels~ : Array[String])
   AddBlock(at~ : BlockPlace, content~ : @tree.Content)
   Rename(id~ : Int, label~ : String)
   SetBlock(id~ : Int, content~ : @tree.Content)
-  Move(ids~ : Array[Int], at~ : NodePlace)
+  MoveNode(ids~ : Array[Int], at~ : NodePlace)
   MoveBlock(ids~ : Array[Int], at~ : BlockPlace)
   /// ノードも中身も。席を取らないので 1 つ
   Delete(ids~ : Array[Int])

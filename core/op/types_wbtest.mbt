@@ -3,9 +3,9 @@
 ///|
 test "Op は JSON の値になる" {
   json_inspect(
-    Op::Move(ids=[3, 5], at=NodePlace::In(node=2, side=Some(Left))),
+    Op::MoveNode(ids=[3, 5], at=NodePlace::In(node=2, side=Some(Left))),
     content=[
-      "Move",
+      "MoveNode",
       { "ids": [3, 5], "at": ["In", { "node": 2, "side": "Left" }] },
     ],
   )
