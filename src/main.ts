@@ -1,9 +1,10 @@
 // 束ねる場所。文書の真実は md ペインの文字列で、マップはその写し。
-// サイクルは 1 本 — 打鍵 → core.view(text) → layout → render。読みは決して書かない。
+// サイクルは 1 本 — 打鍵 → core.survey(text, edits) → layout → render。読みは
+// 決して書かない。選択はここに値として在り、地図はそれを塗るだけ。
 // ここに居るのは、そのサイクルと、保存とファイル I/O、帯のメニュー。
 //
-// **操作（選択・ドラッグ・その場編集・貼り付け・ドロップ）は無い。** 操作の
-// API が揃ったら戻す（git に在る）。
+// **選択より他の操作（ドラッグ・その場編集・貼り付け・ドロップ）は無い。**
+// 後の段で戻す（git に在る）。
 
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import * as core from "./coreApi.ts";
@@ -73,11 +74,18 @@ let doc: core.View = { frontmatter: null, trees: [] };
 let spots = new Map<number, core.Spot>();
 /** 何を選んでいるか。地図はこれを塗るだけで、自分では持たない */
 let selection: Selection = NONE;
+
+/** 持ち越す目印と、それが anchor だったか。幽霊（当たらなかった目印）も同じ形で運ぶ */
+interface Carried {
+  mark: core.Mark;
+  anchor: boolean;
+}
+
 /**
  * 幽霊 — 前のサイクルで当たらなかった目印。捨てずに持ち越す（`## n## a` の
  * 途中のサイクルで捨てると、Enter で戻れない）。地図で選び直したら消える
  */
-let ghosts: core.Mark[] = [];
+let ghosts: Carried[] = [];
 /**
  * loadText を呼ぶたびに進む世代番号。
  *
@@ -110,35 +118,30 @@ const declaredFolder = (): string | null => {
  */
 function sync(next: string, edits: core.Edit[]): void {
   const wasEmpty = doc.trees.length === 0;
-  // 目印と、その持ち主（幽霊は null）。Implicit は行が無いので捨てる
-  const marks: core.Mark[] = [];
-  const owners: (number | null)[] = [];
+  // 目印と、それが anchor か。Implicit は行が無いので捨てる
+  const carried: Carried[] = [];
   for (const id of selection.ids) {
     const s = spots.get(id);
     if (s && s.label !== null) {
-      marks.push({ from: s.from, label: s.label });
-      owners.push(id);
+      carried.push({ mark: { from: s.from, label: s.label }, anchor: id === selection.anchor });
     }
   }
-  for (const g of ghosts) {
-    marks.push(g);
-    owners.push(null);
-  }
-  const r = core.survey(next, edits, marks);
+  for (const g of ghosts) carried.push(g);
+  const r = core.survey(next, edits, carried.map((c) => c.mark));
   text = next;
   doc = r.view;
   spots = r.spots;
   const ids: number[] = [];
-  const kept: core.Mark[] = [];
+  const kept: Carried[] = [];
   let anchor: number | null = null;
   r.trails.forEach((t, i) => {
     if (!t) return;
     if (t.id === null) {
-      kept.push(t.mark);
+      kept.push({ mark: t.mark, anchor: carried[i].anchor });
       return;
     }
     ids.push(t.id);
-    if (owners[i] === selection.anchor) anchor = t.id;
+    if (carried[i].anchor) anchor = t.id;
   });
   ids.sort((a, b) => a - b);
   selection = { ids, anchor: anchor ?? (ids.length ? ids[ids.length - 1] : null) };
