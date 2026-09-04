@@ -12,7 +12,12 @@ test "単調性 — 項目の中の見出しは原文のまま中身になる" {
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "a", "body": [["Opaque", "# x"]], "children": [] },
+          {
+            "id": 2,
+            "label": "a",
+            "body": [{ "id": 3, "content": ["Opaque", "# x"] }],
+            "children": [],
+          },
         ],
         "sides": [],
       },
@@ -252,7 +257,7 @@ fn written(doc : Doc) -> String {
   let bag = []
   fn blocks(bs : Array[Block]) -> Unit {
     for b in bs {
-      match b {
+      match b.content {
         Image(alt~, src~, title~) => {
           bag.push(alt)
           bag.push(src)
@@ -269,7 +274,7 @@ fn written(doc : Doc) -> String {
         }
         Svg(s) => bag.push(s)
         ThematicBreak => ()
-        Details(text~, ..) => bag.push(text)
+        Details(s) => bag.push(s)
         Opaque(s) => bag.push(s)
       }
     }

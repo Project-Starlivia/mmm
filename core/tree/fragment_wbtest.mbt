@@ -86,7 +86,7 @@ test "CRLF" {
 ///|
 test "散文は根を持たない中身の列" {
   inspect(
-    prose([Opaque("hello"), ThematicBreak], Lf),
+    prose(blocks([Opaque("hello"), ThematicBreak]), Lf),
     content=(
       #|hello
       #|

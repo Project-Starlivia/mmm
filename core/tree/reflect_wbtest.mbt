@@ -112,7 +112,7 @@ test "中身を足せば、そのノードの地番" {
   let (before, spans) = survey(md)
   let after = change(before, 0, [0], x => {
     match x {
-      HeadingNode(h) => HeadingNode({ ..h, body: [Opaque("x")] })
+      HeadingNode(h) => HeadingNode({ ..h, body: blocks([Opaque("x")]) })
       other => other
     }
   })
@@ -374,7 +374,7 @@ test "入れ子の項目の子は、容器の中身の桁に差す" {
 test "散文" {
   let md = "hello\n\n# a\n"
   let (before, spans) = survey(md)
-  let after : Doc = { ..before, body: [Opaque("bye")] }
+  let after : Doc = { ..before, body: blocks([Opaque("bye")]) }
   json_inspect(reflect(md, before, spans, after), content=[
     { "from": 0, "to": 6, "insert": "bye\n" },
   ])

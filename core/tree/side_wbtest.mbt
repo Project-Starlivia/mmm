@@ -236,11 +236,15 @@ test "中身に挟まれた水平線は装飾" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Opaque", "body"], "ThematicBreak", ["Opaque", "body"]],
+            "body": [
+              { "id": 3, "content": ["Opaque", "body"] },
+              { "id": 4, "content": "ThematicBreak" },
+              { "id": 5, "content": ["Opaque", "body"] },
+            ],
             "children": [
               [
                 "HeadingNode",
-                { "id": 3, "label": "b", "body": [], "children": [] },
+                { "id": 6, "label": "b", "body": [], "children": [] },
               ],
             ],
           },
@@ -264,11 +268,11 @@ test "直前が中身でも、直後が見出しなら境界" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Opaque", "body"]],
+            "body": [{ "id": 3, "content": ["Opaque", "body"] }],
             "children": [
               [
                 "HeadingNode",
-                { "id": 3, "label": "b", "body": [], "children": [] },
+                { "id": 4, "label": "b", "body": [], "children": [] },
               ],
             ],
           },
@@ -330,7 +334,7 @@ test "文末の水平線は装飾" {
                 {
                   "id": 3,
                   "label": "a",
-                  "body": ["ThematicBreak"],
+                  "body": [{ "id": 4, "content": "ThematicBreak" }],
                   "children": [],
                 },
               ],
@@ -353,14 +357,19 @@ test "根の直前の水平線は装飾" {
       {
         "node": [
           "HeadingNode",
-          { "id": 2, "label": "r", "body": ["ThematicBreak"], "children": [] },
+          {
+            "id": 2,
+            "label": "r",
+            "body": [{ "id": 3, "content": "ThematicBreak" }],
+            "children": [],
+          },
         ],
         "sides": [],
       },
       {
         "node": [
           "HeadingNode",
-          { "id": 3, "label": "s", "body": [], "children": [] },
+          { "id": 4, "label": "s", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -372,12 +381,15 @@ test "根の直前の水平線は装飾" {
 test "最初の見出しより前の水平線は文書の中身" {
   json_inspect(parse("body\n\n---\n\n# a\n"), content={
     "eol": "Lf",
-    "body": [["Opaque", "body"], "ThematicBreak"],
+    "body": [
+      { "id": 2, "content": ["Opaque", "body"] },
+      { "id": 3, "content": "ThematicBreak" },
+    ],
     "roots": [
       {
         "node": [
           "HeadingNode",
-          { "id": 2, "label": "a", "body": [], "children": [] },
+          { "id": 4, "label": "a", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -405,14 +417,19 @@ test "項目の中の水平線は、後ろが見出しでも項目の中身" {
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "a", "body": ["ThematicBreak"], "children": [] },
+          {
+            "id": 2,
+            "label": "a",
+            "body": [{ "id": 3, "content": "ThematicBreak" }],
+            "children": [],
+          },
         ],
         "sides": [],
       },
       {
         "node": [
           "HeadingNode",
-          { "id": 3, "label": "h", "body": [], "children": [] },
+          { "id": 4, "label": "h", "body": [], "children": [] },
         ],
         "sides": [],
       },

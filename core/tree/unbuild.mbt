@@ -190,7 +190,7 @@ fn list_item(u : Unbuild, l : ListNode) -> @markdown.ListItem {
 ///|
 /// 中身 1 枚。絵の 4 つは mdAst の形に、原文で持つものは md として読み直す。
 fn content(u : Unbuild, out : Array[@markdown.Block], b : Block) -> Unit {
-  match b {
+  match b.content {
     Image(alt~, src~, title~) =>
       out.push(paragraph([Image(alt~, url=src, title~, span=nowhere)]))
     Link(text~, href~, title~) =>
@@ -212,7 +212,7 @@ fn content(u : Unbuild, out : Array[@markdown.Block], b : Block) -> Unit {
       )
     Svg(s) => out.push(html(s))
     ThematicBreak => out.push(rule())
-    Details(text~, ..) => splice(u, out, text)
+    Details(text) => splice(u, out, text)
     Opaque(text) => splice(u, out, text)
   }
 }

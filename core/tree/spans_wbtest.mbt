@@ -12,7 +12,9 @@ test "見出し 1 つ" {
 test "親は子の尻まで、子は自分の中身の尻まで" {
   inspect(
     spans_sig("# r\n\n## a\n\nhello\n\n## b\n"),
-    content="1[0,0] 2[0,23] 3[5,17] 4[18,23]",
+    content=(
+      #|1[0,0] 2[0,23] 3[5,17] 5[18,23]
+    ),
   )
 }
 
@@ -48,7 +50,9 @@ test "CRLF は 2 文字" {
 test "文書の散文は frontmatter の尻から最初の根の手前まで" {
   inspect(
     spans_sig("---\nk: v\n---\n\nhello\n\n# a\n"),
-    content="1[13,20] 2[21,25]",
+    content=(
+      #|1[13,20] 3[21,25]
+    ),
   )
 }
 
@@ -65,7 +69,9 @@ test "項目は入れ子込み" {
 test "畳みは <details> から </details> まで" {
   inspect(
     spans_sig("# r\n\n<details>\n\n## a\n\nx\n\n</details>\n\n## b\n"),
-    content="1[0,0] 2[0,42] 3[5,36] 4[37,42]",
+    content=(
+      #|1[0,0] 2[0,42] 3[5,36] 5[37,42]
+    ),
   )
 }
 
@@ -78,6 +84,8 @@ test "定義行も中身（尻は改行込みで他の塊と揃う）" {
 test "対にならない details は原文のまま中身" {
   inspect(
     spans_sig("# a\n\n<details>\nx\n\n# b\n"),
-    content="1[0,0] 2[0,17] 3[18,22]",
+    content=(
+      #|1[0,0] 2[0,17] 4[18,22]
+    ),
   )
 }

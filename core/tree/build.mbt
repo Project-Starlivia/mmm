@@ -74,7 +74,7 @@ pub fn build(
   let next = { val: doc_id + 1 }
   let forest = b.forest
   // 文書の中身は最初の見出し・項目より前にあるので、先に振る
-  number_details(b.body, next)
+  number_blocks(b.body, next)
   for f in forest {
     number(f, next)
   }
@@ -245,8 +245,7 @@ fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
     Capsule(text, to~) => {
       // 中身が来たので、保留中の水平線は境界になれない
       spill(b)
-      // id は割り付けの直前に文書順で振るので、ここでは 0 を置く
-      fill(b, Details(id=0, text~), to~)
+      fill(b, Details(text), to~)
     }
     Text(text, to~) => {
       spill(b)
@@ -613,7 +612,7 @@ fn number(f : Frame, next : Counter) -> Unit {
   next.val = f.id + 1
   // 中身は子より前に書かれているので、先に振る
   match f.skel {
-    Line(body~, ..) => number_details(body, next)
+    Line(body~, ..) => number_blocks(body, next)
     Gap => ()
   }
   for k in f.kids {
@@ -622,13 +621,12 @@ fn number(f : Frame, next : Counter) -> Unit {
 }
 
 ///|
-/// 中身に混ざっている畳みへ、文書順の番号を振る。
-fn number_details(body : Array[Block], next : Counter) -> Unit {
+/// 中身へ、ノードと同じ列で文書順の番号を振る。読み解かなかったものにも
+/// 振るので、View が Opaque を落としても残りの番号は動かない。
+fn number_blocks(body : Array[Block], next : Counter) -> Unit {
   for i, x in body {
-    if x is Details(text~, ..) {
-      body[i] = Details(id=next.val, text~)
-      next.val = next.val + 1
-    }
+    body[i] = { id: next.val, content: x.content }
+    next.val = next.val + 1
   }
 }
 

@@ -6,8 +6,10 @@
 
 ///|
 /// 中身を、いま積んでいるノードに足す。骨格がまだ無ければ文書の散文になる。
+/// id は割り付けの直前に文書順で振るので、ここでは 0 を置く。
 /// `to` はその中身の原文での尻で、持ち主の地番がそこまで伸びる。
-fn fill(b : Build, block : Block, to~ : Int) -> Unit {
+fn fill(b : Build, content : Content, to~ : Int) -> Unit {
+  let block : Block = { id: 0, content }
   if b.stack.is_empty() {
     b.body.push(block)
     if to > b.body_to {
@@ -29,7 +31,7 @@ fn fill(b : Build, block : Block, to~ : Int) -> Unit {
 
 ///|
 /// mdAst のブロック 1 枚を中身にする。骨格と区切りはここへ来ない。
-fn content_of(md : String, block : @markdown.Block) -> Block? {
+fn content_of(md : String, block : @markdown.Block) -> Content? {
   match block {
     // 空行は綴りであってモデルには無い。serialize が正規形として置き直す
     BlankLines(..) => None
@@ -58,7 +60,7 @@ fn sole(
   md : String,
   span : @markdown.Span,
   children : Array[@markdown.Inline],
-) -> Block? {
+) -> Content? {
   guard children.length() == 1 else { return None }
   match children[0] {
     Image(alt~, url~, title~, ..) => Some(Image(alt~, src=url, title~))

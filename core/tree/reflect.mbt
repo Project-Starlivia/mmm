@@ -385,10 +385,5 @@ fn faceless_list(l : ListNode) -> ListNode {
 
 ///|
 fn faceless(body : Array[Block]) -> Array[Block] {
-  body.map(b => {
-    match b {
-      Details(text~, ..) => Details(id=0, text~)
-      other => other
-    }
-  })
+  body.map(b => { id: 0, content: b.content })
 }
