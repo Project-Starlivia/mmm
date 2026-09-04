@@ -41,7 +41,7 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   /// 「畳んでいないのに open」は型が殺しているので、ここには来ない。
   fn named(n : Int, fold : Fold?) -> Unit {
     guard fold is Some({ summary: Some(s), .. }) else { return }
-    if s.contains("</summary>") || blank_line(s) {
+    if !writable(s) {
       flaws.push(UnwritableName(n))
     }
   }
@@ -96,6 +96,14 @@ pub fn check(doc : Doc) -> Array[Flaw] {
     nodes([r.node])
   }
   flaws
+}
+
+///|
+/// 畳みの名前として `<summary>` に書けるか。**塊が割れる字並びは書けない** —
+/// `<summary>` の中身は最初の `</summary>` までで、生の HTML の塊は空行で終わる。
+/// 畳む操作もこれで見て、書けなければ名前を付けずに畳む。
+pub fn writable(s : String) -> Bool {
+  !(s.contains("</summary>") || blank_line(s))
 }
 
 ///|
