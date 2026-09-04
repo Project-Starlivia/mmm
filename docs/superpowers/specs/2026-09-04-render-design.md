@@ -150,7 +150,8 @@ interface Layout {
 - **Implicit は「ラベルの無いノード」。** 空の見出し（`""`）と同じ `.empty` の箱で、
   render に Implicit の分岐は 1 つも入らない。core.md「ノードの種類は無い。描く側には
   1 つも要らない」のとおり。行があるか無いかは書く側の関心
-- **fold**: 字は `node.label`（`fold.summary` は書き戻す綴りで、古くなりうる）。
+- **fold**: 字は `fold.summary`、無ければ `node.label`（spec「畳み」の表示名の規則。
+  最初は label と決めたが、GitHub が見せるのも summary なので訂正: 2026-09-04）。
   小さく薄く `+N`。自分のカードも出さない（body ごと包まれている）。
   `open` は見ない（spec「今は隠すだけ」）。Box は `node.fold` をそのまま持つので、
   後で見ると決めても形は変わらない

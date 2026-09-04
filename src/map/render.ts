@@ -15,7 +15,7 @@ import { type Box, type Layout, cardRect, edgeEnds } from "./layout.ts";
 import { drawCard } from "./drawCard.ts";
 import { edgePath } from "./edge.ts";
 import { languageEpoch } from "./highlight.ts";
-import { displayLabel, hiddenLabel, labelOf, rowOf, rowTop } from "./metrics.ts";
+import { displayLabel, foldName, hiddenLabel, labelOf, rowOf, rowTop } from "./metrics.ts";
 import { svgEl } from "./svg.ts";
 
 /**
@@ -121,7 +121,8 @@ export class MapRenderer {
       buried: b.buried,
       // 言語の読み込みは後から効くので、世代も見る
       epoch: languageEpoch(),
-      label: labelOf(n),
+      // 畳んでいれば summary が字になる。summary だけ変わっても描き直すように
+      label: n.fold !== null ? foldName(n) : labelOf(n),
       rows: b.rows,
       // 画像は「まだ読めていない」から「読めた」へ後から変わる
       urls: b.rows.map((r) => (r.kind === "img" ? p.imageUrl(r.path) : null)),
@@ -193,7 +194,7 @@ export class MapRenderer {
         // ここが出すのはレイアウトが計算した数だけ
         svgEl("rect", { class: "box", width: b.w, height: b.h }),
       );
-      const text = labelOf(n);
+      const text = n.fold !== null ? foldName(n) : labelOf(n);
       const label = svgEl("text", {
         class: "label" + (text === "" ? " empty" : ""),
         x: rowOf(n).padX,

@@ -96,6 +96,13 @@ export const ROW_HIDDEN: LabelRow = {
 /** Implicit は字を持たない。空の見出しと同じく空の字として扱う（種類は無い） */
 export const labelOf = (n: core.Node): string => n.label ?? "";
 
+/**
+ * 畳んだノードに出す字。**`<summary>` > ラベル**（spec「畳み」の表示名の規則。
+ * 3 段目の「最初の行」はラベルも空のときにしか来ないので、いまはプレースホルダに任せる）。
+ * GitHub が畳んだ塊に見せるのも summary なので、鏡としてもこちら
+ */
+export const foldName = (n: core.Node): string => n.fold?.summary ?? labelOf(n);
+
 export const rowOf = (n: core.Node): LabelRow => (n.fold === null ? ROW_NORMAL : ROW_HIDDEN);
 
 /** summary の無い details の名。ブラウザと GitHub の既定と同じ字 */
@@ -160,7 +167,7 @@ export const collapsedBadge = (buried: number): string =>
  * バッジは詰めの対象にしない — 「+3」が読めなくなっては意味がない。
  */
 export function hiddenLabel(n: core.Node, buried: number): string {
-  const raw = displayLabel(labelOf(n));
+  const raw = displayLabel(foldName(n));
   const badge = collapsedBadge(buried);
   const budget = HIDDEN_MAX_W - ROW_HIDDEN.padX * 2 - measure(labelFont(ROW_HIDDEN), badge);
   return clipLabel(raw, labelFont(ROW_HIDDEN), budget) + badge;
