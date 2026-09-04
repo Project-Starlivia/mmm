@@ -3,17 +3,20 @@
 // 持っているのは視点（Camera）と、それを動かす入力（ホイール・ドラッグ・
 // ピンチ・クリック・矩形・矢印）と、画面外の根を指す針だけ。**選択の値は
 // 持たない** — 入力を map/select.ts の値にして host へ渡し、返ってきた
-// Selection を塗るだけ。値そのものは main.ts が持つ。編集などの操作はまだ無い
+// Selection を塗るだけ。値そのものは main.ts が持つ。あるのは選択、その場
+// 編集、Enter / Tab の新規。消す・動かす・カードは次の段。
 
 import type * as core from "./coreApi.ts";
 import { type Camera, type Pane, centerOn, fitToPane, panBy, panToShow, pinch, toWorld, zoomAt } from "./map/camera.ts";
 import { unionRect } from "./map/geometry.ts";
 import { Fingers } from "./map/gesture.ts";
 import { indicatorFor, isVisible } from "./map/indicator.ts";
+import { type Intent, keyed } from "./map/keys.ts";
+import { LabelEditor } from "./map/label.ts";
 import { type Layout, layoutMap, rootBox } from "./map/layout.ts";
-import { nodeSize } from "./map/metrics.ts";
+import { labelOf, nodeSize } from "./map/metrics.ts";
 import { MapRenderer } from "./map/render.ts";
-import { NONE, type Selection, all, arrow, click, extend, hit, isArrowKey, rubber } from "./map/select.ts";
+import { NONE, type Selection, click, hit, rubber } from "./map/select.ts";
 import { svgEl } from "./map/svg.ts";
 import { mapToSvg } from "./map/toSvg.ts";
 import { icon } from "./icons.ts";
@@ -33,6 +36,8 @@ export interface MapHost {
   selection(): Selection;
   /** 地図で選び直した。reveal は md 側をその頭へスクロールするか */
   setSelection(sel: Selection, reveal: boolean): void;
+  /** 操作を md に映す。edit なら、映した後の focus をそのまま編集開始 */
+  apply(op: core.Op, edit: boolean): void;
 }
 
 /** 全体を収めるときの余白（画面 px） */
@@ -70,6 +75,7 @@ export class Mindmap {
   private tapped: { id: number; x: number; y: number } | null = null;
   /** Space を押している間、左ドラッグはパン */
   private spaceHeld = false;
+  private label: LabelEditor;
 
   constructor(pane: HTMLElement, host: MapHost) {
     this.pane = pane;
@@ -85,6 +91,8 @@ export class Mindmap {
     this.rubber = document.createElement("div");
     this.rubber.id = "rubber";
     pane.append(this.rubber);
+
+    this.label = new LabelEditor(pane, (id, label) => this.host.apply({ kind: "rename", id, label }, false));
 
     // md からの始め方は md ペイン自身が同じ器で言う（app/hint.ts）
     this.hint = paneHint("Nothing to show yet — write a ", "# heading", "");
@@ -133,7 +141,18 @@ export class Mindmap {
   private setCamera(c: Camera): void {
     this.camera = c;
     this.applyCamera();
+    this.followLabel();
     this.updateIndicator();
+  }
+
+  /** 編集中の欄を箱に追従させる。書くたび・視点を動かすたびに呼ぶ。
+   *  箱が消えていれば（畳まれて埋もれた）閉じる */
+  private followLabel(): void {
+    const editing = this.label.editing();
+    if (editing === null) return;
+    const b = this.layout.boxes.get(editing);
+    if (b) this.label.place(b, this.camera);
+    else this.label.close();
   }
 
   private applyCamera(): void {
@@ -160,6 +179,7 @@ export class Mindmap {
     // updateListener の中で onChange の直後に必ず onCaret が続き、今の輪へ
     // 即座に上書きされるから
     this.showCaret(this.caretIds);
+    this.followLabel();
     this.updateIndicator();
   }
 
@@ -194,6 +214,15 @@ export class Mindmap {
   /** 選択の塗り直し。レイアウトは見直さない */
   refreshSelection(): void {
     this.renderer.paintSelection(new Set(this.host.selection().ids));
+  }
+
+  /** その場編集に入る。seed は最初の字。箱が無い（畳まれて埋もれた）ノードは
+   *  開けない — 戻り値はそれを呼び出し側（main.ts の apply）に言うためのもの */
+  beginEdit(id: number, seed: string | null): boolean {
+    const b = this.layout.boxes.get(id);
+    if (!b) return false;
+    this.label.open(id, b, this.camera, labelOf(b.node), seed);
+    return true;
   }
 
   /**
@@ -304,7 +333,7 @@ export class Mindmap {
       true,
     );
     pane.addEventListener("pointerdown", (e) => {
-      if (targetIn(e, ".link-open, .img-connect, .pane-tool")) return;
+      if (targetIn(e, ".link-open, .img-connect, .pane-tool, #node-editor")) return;
       if (e.pointerType === "touch" && this.fingers.pinching) return;
       if (e.button !== 0 && e.button !== 1) return;
       pane.focus();
@@ -424,41 +453,58 @@ export class Mindmap {
     this.renderer.nodeLayer.addEventListener("pointerdown", (e) => {
       if (targetIn(e, ".link-open, .img-connect")) e.stopPropagation();
     });
+    this.pane.addEventListener("dblclick", (e) => {
+      if (targetIn(e, ".link-open, .img-connect, #node-editor")) return;
+      const id = this.nodeAt(e.clientX, e.clientY);
+      if (id === null) return;
+      e.preventDefault();
+      this.beginEdit(id, null);
+    });
+  }
+
+  /** keys.ts が言った「何をするか」を実行する。意味はあちらが持ち、ここは配線だけ */
+  private act(intent: Intent): void {
+    switch (intent.kind) {
+      case "op":
+        this.host.apply(intent.op, intent.edit);
+        return;
+      case "edit":
+        this.beginEdit(intent.id, intent.seed);
+        return;
+      case "select":
+        this.host.setSelection(intent.sel, intent.reveal);
+        // 矢印で辿るときだけ寄せる（Mod+A / Esc は reveal が偽）
+        if (intent.reveal && intent.sel.anchor !== null) this.ensureVisible(intent.sel.anchor);
+        return;
+      case "center":
+        this.centerOnTarget();
+        return;
+    }
   }
 
   /** 地図の中だけで効くキー。全体のキーは app/shortcuts.ts */
   private bindKeys(): void {
     this.pane.addEventListener("keydown", (e) => {
-      const mod = e.ctrlKey || e.metaKey;
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === " ") {
         this.spaceHeld = true;
         this.pane.style.cursor = "grab";
         e.preventDefault();
         return;
       }
-      if (e.key === "Home" && !mod && !e.altKey) {
-        e.preventDefault();
-        this.centerOnTarget();
+      const intent = keyed(this.layout, this.host.selection(), {
+        key: e.key,
+        shift: e.shiftKey,
+        mod: e.ctrlKey || e.metaKey,
+        alt: e.altKey,
+      });
+      if (intent === null) {
+        // 段 3 が段下げに使う。今は拾わないが、地図から焦点を逃がさない
+        if (e.key === "Tab") e.preventDefault();
         return;
       }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        this.host.setSelection(NONE, false);
-        return;
-      }
-      if (mod && !e.altKey && e.key.toLowerCase() === "a") {
-        e.preventDefault();
-        this.host.setSelection(all(this.layout), false);
-        return;
-      }
-      if (isArrowKey(e.key) && !mod && !e.altKey) {
-        e.preventDefault();
-        const sel = this.host.selection();
-        const next = arrow(this.layout, sel.anchor, e.key);
-        if (next === null) return;
-        this.host.setSelection(e.shiftKey ? extend(sel, next) : { ids: [next], anchor: next }, true);
-        this.ensureVisible(next);
-      }
+      e.preventDefault();
+      this.act(intent);
     });
     this.pane.addEventListener("keyup", (e) => {
       if (e.key === " ") {

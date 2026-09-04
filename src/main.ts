@@ -3,8 +3,8 @@
 // 決して書かない。選択はここに値として在り、地図はそれを塗るだけ。
 // ここに居るのは、そのサイクルと、保存とファイル I/O、帯のメニュー。
 //
-// **選択より他の操作（ドラッグ・その場編集・貼り付け・ドロップ）は無い。**
-// 後の段で戻す（git に在る）。
+// **操作の入口は `apply` 1 本。** 無いのは消す・並べ替え・ドラッグ・カード
+// （後の段で戻す。git に在る）。
 
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import * as core from "./coreApi.ts";
@@ -177,6 +177,28 @@ function setSelection(sel: Selection, reveal: boolean): void {
   }
 }
 
+/**
+ * 操作を md に映す。**操作の入口はここ 1 本** — 地図は md に触らない。
+ * 操作 1 回 = CodeMirror の 1 トランザクションで、undo は CodeMirror のもの。
+ * 操作の直後は core の focus が選択を決める（新しいノードには目印が無い）。
+ * できない操作は core が空の編集列で言う。いまは雑に、しらせを出すだけ
+ */
+function apply(op: core.Op, edit: boolean): void {
+  const r = core.edit(text, op);
+  // core は断りを「編集なし・focus なし」で言う。編集が無くても focus が在るのは、
+  // 何も変わらなかった操作（同じ名前への Rename など）で、しらせは出さない
+  if (r.focus === null && r.edits.length === 0) {
+    failed("Couldn't do that here");
+    return;
+  }
+  if (r.edits.length > 0) editor.apply(r.edits); // → sync
+  if (r.focus === null) return;
+  // 同じノードに留まる操作（ラベルを打つ）で md を寄せ直さない
+  setSelection({ ids: [r.focus], anchor: r.focus }, r.focus !== selection.anchor);
+  // 畳まれて埋もれたノードには箱が無く、その場編集を開けない
+  if (edit && !map.beginEdit(r.focus, null)) failed("Couldn't start editing — the node is folded");
+}
+
 /** md のカーソルが動いた。掛かるノードに輪を出す（地図は動かさない） */
 function onCaret(ranges: Range[]): void {
   map.showCaret(caretIds(doc, spots, ranges));
@@ -194,6 +216,7 @@ const host: MapHost = {
     })(),
   selection: () => selection,
   setSelection,
+  apply,
 };
 const map = new Mindmap(mapPane, host);
 

@@ -713,6 +713,24 @@ html, body {
   pointer-events: none;
 }
 
+/* ラベルのその場編集。位置と寸法は map/label.ts が world から計算して style に
+   入れる（ズームに追従する）。ここに書くとラベルと入力欄で字の位置がずれる */
+#node-editor {
+  position: absolute;
+  display: none;
+  box-sizing: border-box;
+  font-family: var(--font);
+  /* 太さは map/label.ts の LABEL_BORDER が place() で入れる。labelPlacement()
+     の寸法計算がその値を前提にしているので、太さの源はここではなくあちら */
+  border-style: solid;
+  border-color: var(--accent);
+  border-radius: 10px;
+  background: var(--node-bg);
+  color: var(--ink);
+  outline: none;
+  z-index: 10;
+}
+
 /* コードの色は @lezer/highlight の classHighlighter が付ける tok-* に対応させる。
    SVG は fill、HTML は color で塗るので両方書く — マップのカードと
    その場の編集欄で、同じコードが同じ色になる。

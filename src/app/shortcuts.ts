@@ -11,6 +11,11 @@
 // - 書き出しは `Mod+E`。`E` はブラウザに予約されておらず（`Ctrl+S`/`Ctrl+O`
 //   と同じく preventDefault で上書きできる）、JIS 配列でも物理位置が動かない
 
+/** その場の入力欄（ラベル欄など）にフォーカスが在るか。ネイティブの欄は自分の
+ *  Undo/Redo を持つので、そこでは全体のショートカットに譲る（docs/shortcuts.md） */
+const inField = (e: KeyboardEvent): boolean =>
+  e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+
 export function initShortcuts(deps: {
   save: (asNew: boolean) => void;
   open: () => void;
@@ -46,7 +51,7 @@ export function initShortcuts(deps: {
       } else if (key === "e") {
         e.preventDefault();
         deps.export();
-      } else if (key === "z" || key === "y") {
+      } else if ((key === "z" || key === "y") && !inField(e)) {
         e.preventDefault();
         e.stopPropagation();
         if (key === "y" || e.shiftKey) deps.redo();
@@ -59,6 +64,7 @@ export function initShortcuts(deps: {
   window.addEventListener("keydown", (e) => {
     if (e.isComposing || e.keyCode === 229) return;
     if (!e.altKey || e.ctrlKey || e.metaKey) return;
+    if (inField(e)) return; // 欄の中では Alt+数字も欄自身に譲る
     // 表から引くと値が `string` になり、`as` で締め直すことになる。
     // 2 つしか無いのだから、そのまま書けば型が分かる
     const pane = e.key === "1" ? "md" : e.key === "2" ? "map" : null;
