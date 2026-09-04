@@ -150,3 +150,167 @@ test "Delete は空と知らない id に None" {
   assert_eq(run(d, Delete(ids=[])), None)
   assert_eq(run(d, Delete(ids=[2, 9])), None)
 }
+
+///|
+test "Add は隣の前後と子の末尾。綴りは隣に従う" {
+  let d = doc([root(h(2, "r", children=[h(3, "a")]), sides=[Left])])
+  assert_eq(
+    run(d, Add(at=NodePlace::After(node=3), labels=["b"])),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(3, "a"), h(4, "b")]), sides=[Left, Left]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  assert_eq(
+    run(d, Add(at=NodePlace::Before(node=3), labels=["b", "c"])),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(4, "b"), h(5, "c"), h(3, "a")]), sides=[
+          Left,
+          Left,
+          Left,
+        ]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  assert_eq(
+    run(d, Add(at=NodePlace::In(node=3, side=None), labels=[""])),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(3, "a", children=[h(4, "")])]), sides=[Left]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  assert_eq(
+    run(d, Add(at=NodePlace::In(node=2, side=Some(Right)), labels=["b"])),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(3, "a"), h(4, "b")]), sides=[Left, Right]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+}
+
+///|
+test "Add の綴り: 項目の隣は項目、項目の下は項目、見出しの下で子が無ければ見出し" {
+  let d = doc([root(h(2, "r", children=[item(3, "a")]), sides=[Right])])
+  assert_eq(
+    run(d, Add(at=NodePlace::After(node=3), labels=["b"])),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[item(3, "a"), item(4, "b")]), sides=[
+          Right,
+          Right,
+        ]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  assert_eq(
+    run(d, Add(at=NodePlace::In(node=3, side=None), labels=["b"])),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[item(3, "a", children=[li(4, "b")])]), sides=[
+          Right,
+        ]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  assert_eq(
+    run(d, Add(at=NodePlace::In(node=2, side=None), labels=["b"])),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[item(3, "a"), item(4, "b")]), sides=[
+          Right,
+          Right,
+        ]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  let e = doc([root(h(2, "r"))])
+  assert_eq(
+    run(e, Add(at=NodePlace::In(node=2, side=None), labels=["b"])),
+    Some({
+      doc: doc([root(h(2, "r", children=[h(3, "b")]), sides=[Right])]),
+      focus: Some(3),
+    }),
+  )
+}
+
+///|
+test "Add を doc_id にすれば新しい根。空の文書にも" {
+  assert_eq(
+    run(
+      doc([]),
+      Add(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["r"]),
+    ),
+    Some({ doc: doc([root(h(2, "r"))]), focus: Some(2) }),
+  )
+}
+
+///|
+test "Add は空のラベル列と知らない id に None" {
+  let d = doc([root(h(2, "r"))])
+  assert_eq(run(d, Add(at=NodePlace::After(node=2), labels=[])), None)
+  assert_eq(run(d, Add(at=NodePlace::After(node=9), labels=["a"])), None)
+}
+
+///|
+test "Wrap は席に座って id を唯一の子にする。根なら sides は [Right]" {
+  let d = doc([
+    root(h(2, "r", children=[h(3, "a", children=[h(4, "x")])]), sides=[Left]),
+  ])
+  assert_eq(
+    run(d, Wrap(id=3, label="p")),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            h(5, "p", children=[h(3, "a", children=[h(4, "x")])]),
+          ]),
+          sides=[Left],
+        ),
+      ]),
+      focus: Some(5),
+    }),
+  )
+  assert_eq(
+    run(d, Wrap(id=2, label="top")),
+    Some({
+      doc: doc([
+        root(
+          h(5, "top", children=[
+            h(2, "r", children=[h(3, "a", children=[h(4, "x")])]),
+          ]),
+          sides=[Right],
+        ),
+      ]),
+      focus: Some(5),
+    }),
+  )
+  let e = doc([root(item(2, "a", children=[li(3, "b")]), sides=[Right])])
+  assert_eq(
+    run(e, Wrap(id=3, label="p")),
+    Some({
+      doc: doc([
+        root(item(2, "a", children=[li(4, "p", children=[li(3, "b")])]), sides=[
+          Right,
+        ]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+}
+
+///|
+test "Wrap は中身に None" {
+  let d = doc([root(h(2, "r", body=[pic(3)]))])
+  assert_eq(run(d, Wrap(id=3, label="p")), None)
+}

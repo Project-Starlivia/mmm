@@ -10,6 +10,8 @@ pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
     Fold(id~, open~) => fold(doc, id, open)
     Unfold(id~) => unfold(doc, id)
     Delete(ids~) => delete(doc, ids)
+    Add(at~, labels~) => add(doc, at, labels)
+    Wrap(id~, label~) => wrap(doc, id, label)
     _ => None
   }
 }
@@ -95,4 +97,87 @@ fn delete(doc : @tree.Doc, ids : Array[Int]) -> Done? {
     cur = d
   }
   Some({ doc: cur, focus: None })
+}
+
+///|
+/// その綴りで空のノードを作る。
+fn make(sign : @tree.Sign, id : Int, label : String) -> @tree.Node {
+  match sign {
+    Heading =>
+      @tree.HeadingNode({ id, label, fold: None, body: [], children: [] })
+    Item => @tree.ListNode({ id, label, fold: None, body: [], children: [] })
+  }
+}
+
+///|
+fn sign_of(n : @tree.Node) -> @tree.Sign {
+  match n {
+    ListNode(_) => Item
+    _ => Heading
+  }
+}
+
+///|
+/// この下に足すときの綴り。末尾の子がいればそれに、いなければ親に従う
+/// （項目の下は項目、それ以外は見出し）。
+fn sign_in(n : @tree.Node) -> @tree.Sign {
+  match kids(n).last() {
+    Some(c) => sign_of(c)
+    None => sign_of(n)
+  }
+}
+
+///|
+/// 席が指している id。
+fn anchor(at : NodePlace) -> Int {
+  match at {
+    Before(node~) => node
+    After(node~) => node
+    In(node~, ..) => node
+  }
+}
+
+///|
+/// 新しいノードを差す。綴りは隣に従う。
+fn add(doc : @tree.Doc, at : NodePlace, labels : Array[String]) -> Done? {
+  guard !labels.is_empty() else { return None }
+  let first = fresh(doc)
+  fn news(sign : @tree.Sign) -> Array[@tree.Node] {
+    labels.mapi((k, label) => make(sign, first + k, label))
+  }
+
+  let out = match at {
+    Before(node~) => {
+      guard find(doc, node) is Some(n) else { return None }
+      splice(doc, node, x => [..news(sign_of(n)), x])
+    }
+    After(node~) => {
+      guard find(doc, node) is Some(n) else { return None }
+      splice(doc, node, x => [x, ..news(sign_of(n))])
+    }
+    In(node~, side~) => {
+      let sign = if node == @tree.doc_id {
+        @tree.Heading
+      } else {
+        guard find(doc, node) is Some(n) else { return None }
+        sign_in(n)
+      }
+      append(doc, node~, side?, news(sign))
+    }
+  }
+  done(out, Some(first))
+}
+
+///|
+/// 新しいノードが id の席に座り、id はその唯一の子になる。綴りは id と同じ。
+fn wrap(doc : @tree.Doc, id : Int, label : String) -> Done? {
+  guard find(doc, id) is Some(n) else { return None }
+  let nid = fresh(doc)
+  let w = match n {
+    ListNode(l) =>
+      @tree.ListNode({ id: nid, label, fold: None, body: [], children: [l] })
+    _ =>
+      @tree.HeadingNode({ id: nid, label, fold: None, body: [], children: [n] })
+  }
+  done(splice(doc, id, _ => [w]), Some(nid))
 }
