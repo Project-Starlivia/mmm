@@ -1,16 +1,19 @@
 // マップのペイン。core の View を layout で箱にし、render で SVG に写す。
 //
 // 持っているのは視点（Camera）と、それを動かす入力（ホイール・ドラッグ・
-// ピンチ）と、画面外の根を指す針だけ。**選択も操作も無い** — 操作の API が
-// 揃ったら戻す（git に在る）。
+// ピンチ・クリック・矩形・矢印）と、画面外の根を指す針だけ。**選択の値は
+// 持たない** — 入力を map/select.ts の値にして host へ渡し、返ってきた
+// Selection を塗るだけ。値そのものは main.ts が持つ。編集などの操作はまだ無い
 
 import type * as core from "./coreApi.ts";
-import { type Camera, type Pane, centerOn, fitToPane, panBy, pinch, zoomAt } from "./map/camera.ts";
+import { type Camera, type Pane, centerOn, fitToPane, panBy, panToShow, pinch, toWorld, zoomAt } from "./map/camera.ts";
+import { unionRect } from "./map/geometry.ts";
 import { Fingers } from "./map/gesture.ts";
 import { indicatorFor, isVisible } from "./map/indicator.ts";
 import { type Layout, layoutMap, rootBox } from "./map/layout.ts";
 import { nodeSize } from "./map/metrics.ts";
 import { MapRenderer } from "./map/render.ts";
+import { NONE, type Selection, all, arrow, click, extend, hit, isArrowKey, rubber } from "./map/select.ts";
 import { svgEl } from "./map/svg.ts";
 import { mapToSvg } from "./map/toSvg.ts";
 import { icon } from "./icons.ts";
@@ -26,10 +29,16 @@ export interface MapHost {
   imageHint(): string | null;
   /** その字が押された。画像フォルダを繋ぎ直す */
   connectAssets(): void;
+  /** いま選んでいるもの。値は main.ts が持つ */
+  selection(): Selection;
+  /** 地図で選び直した。reveal は md 側をその頭へスクロールするか */
+  setSelection(sel: Selection, reveal: boolean): void;
 }
 
 /** 全体を収めるときの余白（画面 px） */
 const FIT_MARGIN = 60;
+/** 矢印で辿るとき、選んだ箱が縁から離れている距離（画面 px） */
+const SHOW_MARGIN = 40;
 
 /** その出来事の的が `selector` に当てはまる要素（かその中）なら、それを返す */
 function targetIn(e: Event, selector: string): Element | null {
@@ -50,6 +59,17 @@ export class Mindmap {
   private fingers = new Fingers();
   private panning: { px: number; py: number; ox: number; oy: number } | null = null;
   private fitPending = false;
+  /** カーソルの輪の層。world に浮かぶ別の印（ノードの子にすると、動くたびに中身が作り直される） */
+  private caretLayer: SVGGElement;
+  private caretRings: SVGRectElement[] = [];
+  private caretIds: number[] = [];
+  /** 矩形選択の面（画面 px）。始点は pane の左上から */
+  private rubber: HTMLDivElement;
+  private rubberStart: { x: number; y: number } | null = null;
+  /** 指で押したノード。動かさずに離せば選ぶ */
+  private tapped: { id: number; x: number; y: number } | null = null;
+  /** Space を押している間、左ドラッグはパン */
+  private spaceHeld = false;
 
   constructor(pane: HTMLElement, host: MapHost) {
     this.pane = pane;
@@ -57,9 +77,14 @@ export class Mindmap {
 
     const svg = svgEl("svg", { id: "map-svg" });
     this.world = svgEl("g");
-    this.world.append(this.renderer.edgeLayer, this.renderer.nodeLayer);
+    this.caretLayer = svgEl("g");
+    this.world.append(this.renderer.edgeLayer, this.renderer.nodeLayer, this.caretLayer);
     svg.append(this.world);
     pane.append(svg);
+
+    this.rubber = document.createElement("div");
+    this.rubber.id = "rubber";
+    pane.append(this.rubber);
 
     // md からの始め方は md ペイン自身が同じ器で言う（app/hint.ts）
     this.hint = paneHint("Nothing to show yet — write a ", "# heading", "");
@@ -77,19 +102,14 @@ export class Mindmap {
     centerBtn.title = "Center the view — Home";
     centerBtn.setAttribute("aria-label", "Center the view");
     centerBtn.append(icon("crosshair"));
-    centerBtn.addEventListener("click", () => this.centerOnRoot());
+    centerBtn.addEventListener("click", () => this.centerOnTarget());
     centerTool.append(centerBtn);
     pane.append(centerTool);
 
     this.bindWheel();
     this.bindPointer();
     this.bindClick();
-    pane.addEventListener("keydown", (e) => {
-      if (e.key === "Home") {
-        e.preventDefault();
-        this.centerOnRoot();
-      }
-    });
+    this.bindKeys();
     this.applyCamera();
     // a fitView requested while the pane had no size runs once it gets one
     new ResizeObserver(() => {
@@ -135,6 +155,8 @@ export class Mindmap {
       imageUrl: (path) => this.host.imageUrl(path),
       imageHint: this.host.imageHint(),
     });
+    this.renderer.paintSelection(new Set(this.host.selection().ids));
+    this.showCaret(this.caretIds);
     this.updateIndicator();
   }
 
@@ -150,10 +172,59 @@ export class Mindmap {
     if (c) this.setCamera(c);
   }
 
-  /** 最初の木の根が画面の中心に来るよう寄せる。拡大率は変えない */
-  centerOnRoot(): void {
-    const root = rootBox(this.layout);
-    if (root) this.setCamera(centerOn(this.camera, root, this.paneSize()));
+  /** 選択（無ければ根）を画面の中心へ。拡大率は変えない */
+  centerOnTarget(): void {
+    const sel = this.host.selection().ids.flatMap((id) => {
+      const b = this.layout.boxes.get(id);
+      return b ? [b] : [];
+    });
+    const target = unionRect(sel) ?? rootBox(this.layout);
+    if (target) this.setCamera(centerOn(this.camera, target, this.paneSize()));
+  }
+
+  /** その箱が画面に入るまでだけ寄せる（矢印で選び直したとき） */
+  ensureVisible(id: number): void {
+    const b = this.layout.boxes.get(id);
+    if (b) this.setCamera(panToShow(this.camera, b, this.paneSize(), SHOW_MARGIN));
+  }
+
+  /** 選択の塗り直し。レイアウトは見直さない */
+  refreshSelection(): void {
+    this.renderer.paintSelection(new Set(this.host.selection().ids));
+  }
+
+  /**
+   * カーソルの輪を、掛かっているノードの**内側**へ重ねる。外から掴むのが選択、
+   * 中に居るのがカーソルで、形がそのまま意味になる。箱の無い（畳まれて埋もれた）
+   * ノードには出さない。本数が変わったときだけ作り足す/捨てる
+   */
+  showCaret(ids: number[]): void {
+    this.caretIds = ids;
+    const boxes = ids.flatMap((id) => {
+      const b = this.layout.boxes.get(id);
+      return b ? [b] : [];
+    });
+    while (this.caretRings.length > boxes.length) this.caretRings.pop()?.remove();
+    while (this.caretRings.length < boxes.length) {
+      const ring = svgEl("rect", { class: "caret-ring" });
+      this.caretLayer.append(ring);
+      this.caretRings.push(ring);
+    }
+    const inset = 3;
+    boxes.forEach((b, i) => {
+      const ring = this.caretRings[i];
+      ring.setAttribute("x", String(b.x + inset));
+      ring.setAttribute("y", String(b.y + inset));
+      ring.setAttribute("width", String(b.w - inset * 2));
+      ring.setAttribute("height", String(b.h - inset * 2));
+    });
+  }
+
+  /** 画面の点がどの箱に居るか。無ければ null */
+  private nodeAt(clientX: number, clientY: number): number | null {
+    const p = this.local(clientX, clientY);
+    const w = toWorld(this.camera, p.x, p.y);
+    return hit(this.layout, w.x, w.y);
   }
 
   /** 画面外にある根を控えめな針で指す。ノードが 1 つでも見えていれば出さない */
@@ -230,8 +301,30 @@ export class Mindmap {
       if (e.pointerType === "touch" && this.fingers.pinching) return;
       if (e.button !== 0 && e.button !== 1) return;
       pane.focus();
-      this.panning = { px: e.clientX, py: e.clientY, ox: this.camera.tx, oy: this.camera.ty };
-      pane.style.cursor = "grabbing";
+      const id = this.nodeAt(e.clientX, e.clientY);
+      // パンは 3 つ入り口を持つ: 中クリック / Space+ドラッグ / 指で背景をなぞる。
+      // 担当する手が違うので、どれか 1 つでは塞がる場面がある
+      const pan = e.button === 1 || this.spaceHeld || (e.pointerType === "touch" && id === null);
+      if (pan) {
+        this.panning = { px: e.clientX, py: e.clientY, ox: this.camera.tx, oy: this.camera.ty };
+        pane.style.cursor = "grabbing";
+        pane.setPointerCapture(e.pointerId);
+        e.preventDefault();
+        return;
+      }
+      if (e.pointerType === "touch") {
+        // 指は離したときに選ぶ（なぞったら選ばない）
+        this.tapped = id === null ? null : { id, x: e.clientX, y: e.clientY };
+        return;
+      }
+      if (id !== null) {
+        const mod = e.shiftKey ? "shift" : e.ctrlKey || e.metaKey ? "mod" : "none";
+        this.host.setSelection(click(this.host.selection(), id, mod, this.layout.order), true);
+        e.preventDefault();
+        return;
+      }
+      // 背景。ドラッグすれば矩形選択、動かさずに離せば選択を解く
+      this.rubberStart = this.local(e.clientX, e.clientY);
       pane.setPointerCapture(e.pointerId);
       e.preventDefault();
     });
@@ -246,6 +339,21 @@ export class Mindmap {
         // 2 本乗っているあいだは、1 本ぶんの続きを進めない
         if (this.fingers.pinching) return;
       }
+      if (this.tapped && Math.hypot(e.clientX - this.tapped.x, e.clientY - this.tapped.y) > 8) {
+        this.tapped = null;
+      }
+      if (this.rubberStart) {
+        const p = this.local(e.clientX, e.clientY);
+        const x = Math.min(this.rubberStart.x, p.x);
+        const y = Math.min(this.rubberStart.y, p.y);
+        const w = Math.abs(p.x - this.rubberStart.x);
+        const h = Math.abs(p.y - this.rubberStart.y);
+        Object.assign(this.rubber.style, { display: "block", left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
+        const a = toWorld(this.camera, x, y);
+        const b = toWorld(this.camera, x + w, y + h);
+        this.host.setSelection(rubber(this.layout, { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y }), false);
+        return;
+      }
       if (!this.panning) return;
       this.setCamera({
         k: this.camera.k,
@@ -254,13 +362,25 @@ export class Mindmap {
       });
     });
     const end = (e: PointerEvent): void => {
+      if (this.tapped) {
+        this.host.setSelection(click(this.host.selection(), this.tapped.id, "none", this.layout.order), true);
+        this.tapped = null;
+      }
+      if (this.rubberStart) {
+        const dragged =
+          this.rubber.style.display === "block" &&
+          (parseFloat(this.rubber.style.width) > 3 || parseFloat(this.rubber.style.height) > 3);
+        this.rubber.style.display = "none";
+        this.rubberStart = null;
+        if (!dragged) this.host.setSelection(NONE, false);
+      }
       if (e.pointerType === "touch") {
         this.liftFinger(e.pointerId);
         // 組が壊れて残った指でパンを立て直したなら、その up ではない
         if (this.panning && this.fingers.only()) return;
       }
       this.panning = null;
-      pane.style.cursor = "";
+      pane.style.cursor = this.spaceHeld ? "grab" : "";
     };
     pane.addEventListener("pointerup", end);
     pane.addEventListener("pointercancel", end);
@@ -295,6 +415,48 @@ export class Mindmap {
     });
     this.renderer.nodeLayer.addEventListener("pointerdown", (e) => {
       if (targetIn(e, ".link-open, .img-connect")) e.stopPropagation();
+    });
+  }
+
+  /** 地図の中だけで効くキー。全体のキーは app/shortcuts.ts */
+  private bindKeys(): void {
+    this.pane.addEventListener("keydown", (e) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (e.key === " ") {
+        this.spaceHeld = true;
+        this.pane.style.cursor = "grab";
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "Home" && !mod && !e.altKey) {
+        e.preventDefault();
+        this.centerOnTarget();
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        this.host.setSelection(NONE, false);
+        return;
+      }
+      if (mod && !e.altKey && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        this.host.setSelection(all(this.layout), false);
+        return;
+      }
+      if (isArrowKey(e.key) && !mod && !e.altKey) {
+        e.preventDefault();
+        const sel = this.host.selection();
+        const next = arrow(this.layout, sel.anchor, e.key);
+        if (next === null) return;
+        this.host.setSelection(e.shiftKey ? extend(sel, next) : { ids: [next], anchor: next }, true);
+        this.ensureVisible(next);
+      }
+    });
+    this.pane.addEventListener("keyup", (e) => {
+      if (e.key === " ") {
+        this.spaceHeld = false;
+        if (!this.panning) this.pane.style.cursor = "";
+      }
     });
   }
 }
