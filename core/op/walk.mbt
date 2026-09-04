@@ -1,5 +1,6 @@
-// 木を読むだけの道具。歩きは each 1 本で、seat / owner / pick / fresh はその上に乗る。
-// 3 種のノードの違い（子の型・中身の有無）は id_of / kids / blocks_of で吸う。
+// 木を読むだけの道具。文書順の歩きは each 1 本で、owner / parent / pick / within /
+// fresh / has はその上に乗る。find と seat だけは、ノードそのものと添字が要るので
+// 自分で降りる。3 種のノードの違い（子の型・中身の有無）は id_of / kids / blocks_of で吸う。
 
 ///|
 fn id_of(n : @tree.Node) -> Int {
