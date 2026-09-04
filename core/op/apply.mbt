@@ -296,9 +296,12 @@ fn flip(doc : @tree.Doc, id : Int) -> Done? {
       let taken = []
       guard take(doc, [id], taken) is Some(rest) else { return None }
       let mut wrapped = taken[0]
-      for _ in 0..<(depth - 2) {
-        wrapped = @tree.ImplicitNode({ id: next, children: [wrapped] })
-        next = next + 1
+      // 項目は相対記法で深さを持たないので、飛びを綴れない。直に深さ 2 へ
+      if !(wrapped is ListNode(_)) {
+        for _ in 0..<(depth - 2) {
+          wrapped = @tree.ImplicitNode({ id: next, children: [wrapped] })
+          next = next + 1
+        }
       }
       let root_id = id_of(r.node)
       // 根の Implicit は引き出す相手しか持たないことがある。掃除で消えた根は、

@@ -324,3 +324,40 @@ test "項目の根の子の Left を見つける" {
   }
   json_inspect(check(doc), content=[["ListSide", 2]])
 }
+
+///|
+/// 項目は相対記法で深さが飛ばないので、飛び（Implicit）の直下には居られない。
+/// 書くと Implicit が消え、項目は 1 つ浅く読まれる。
+test "Implicit の直下の項目を見つける" {
+  let doc : Doc = {
+    frontmatter: None,
+    eol: Lf,
+    body: [],
+    roots: [
+      {
+        node: HeadingNode({
+          id: 2,
+          label: "r",
+          fold: None,
+          body: [],
+          children: [
+            ImplicitNode({
+              id: 3,
+              children: [
+                ListNode({
+                  id: 4,
+                  label: "i",
+                  fold: None,
+                  body: [],
+                  children: [],
+                }),
+              ],
+            }),
+          ],
+        }),
+        sides: [Right],
+      },
+    ],
+  }
+  json_inspect(check(doc), content=[["GappedItem", 4]])
+}
