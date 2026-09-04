@@ -58,7 +58,8 @@ TS で `#` や `-` を読み飛ばすと、規則を UI で書き直すことに
 
 ### いつ死ぬか
 
-**目印（行の頭からラベルの頭まで = マーカー）が丸ごと消されたら死ぬ。** それ以外は
+**目印（行の頭からラベルの頭まで = マーカー）が丸ごと消されたら死ぬ。** 隣り合う
+消去が合わせてマーカーを覆うときも死ぬ（消えた範囲を繋いで測る）。それ以外は
 位置を写し続け、毎サイクル引き直す。当たらない間は黙って持ち越すだけ（捨てない）。
 
 | md の操作 | 結果 |
@@ -70,6 +71,8 @@ TS で `#` や `-` を読み飛ばすと、規則を UI で書き直すことに
 | 行を選んでまるごと打ち直す | 死ぬ（書き直したので妥当） |
 | 頭にカーソルを置いて `## n` を打ち、それから Enter | 打った瞬間は `## n## a` で当たらない。Enter で写した位置が `## a` のラベルに戻る |
 | ラベルの頭が消された範囲の中に落ちる（`## a` の `# a` を消す） | 死ぬ |
+| 隣り合う 2 つの消去が合わせてマーカーを覆う | 死ぬ |
+| setext（`#` が無く label == from）の頭に無関係な編集 | 生きる（ラベルの頭そのものを消したときだけ死ぬ） |
 
 「当たらなければ捨てる」だと途中のサイクルで捨ててしまい、「ずっと持つ」だと
 消した行の位置が漂って後で別のノードに当たる。マーカーの生死で切るのがその間。
@@ -84,13 +87,17 @@ Spot { from, label: Int?, to }              // 地番。label はラベルの頭
 survey(md) -> (Doc, Map[Int, Spot])         // 今の地番に label が増えるだけ
 
 Mark { from, label }                         // 前のサイクルの目印（TS が地番から抜く）
-follow(spots, edits, marks) -> [Int?]       // 目印ごとに、いまの id。無ければ None
+Trail { mark, id: Int? }                     // 写した目印と、いま当たる id（当たらなくても目印は返す）
+follow(spots, edits, marks) -> [Trail?]     // 目印ごとに写した Trail。マーカーが死ねば None
 ```
 
 `edits` は反映の `Edit { from, to, insert }` と同じ形（前の座標、from 順、重ならない）。
-写し方は算術: 目印より前の編集ぶんずらす。マーカー `[from, label)` を丸ごと覆う消去が
-あれば None。ラベルの頭が消去の内側（`from < label < to`）に落ちても None。
-ちょうど頭への挿入（`from == to == label`）は動かさない（挿入の前に留まる）。
+写し方は算術: 編集は前の座標で from 順・重ならないので、目印は**元の位置に対する
+差分を合算**して写す（写した位置と元座標の編集を比べると、消去の後ろの挿入を
+取りこぼす）。マーカー `[from, label)` を丸ごと覆う消去があれば None（隣り合う
+消去が合わせて覆うときも、消えた範囲を繋いで測って None）。ラベルの頭が消去の
+内側（`from < label < to`）に落ちても None。ちょうど頭への挿入
+（`from == to == label`）は動かさない（挿入の前に留まる）。
 
 **core は状態を持たない。** 前のサイクルの目印は TS が渡す。core が前の md を
 覚えることも、読み直すことも無い。
@@ -98,13 +105,23 @@ follow(spots, edits, marks) -> [Int?]       // 目印ごとに、いまの id。
 ### 呼び出しは 1 回
 
 打鍵ごとの parse は 1 回に保つ。`mmmSurvey(md, editsJson, marksJson)` が
-View・地番・引き直した id を 1 度に返す。
+View・地番・写した Trail を 1 度に返す。
 
 ```
-mmmSurvey(md, edits, marks) -> { view, spots: { id: [from, label?, to] }, carried: [id?] }
+mmmSurvey(md, edits, marks) -> { view, spots: { id: Spot }, trails: [Trail?] }
 ```
+
+`trails` は `marks` と同じ並び・同じ長さ（`coreApi.survey` が揃うことを確かめる）。
 
 `mmmViewJson` は lab のために残す。
+
+### 幽霊 — 当たらない目印の持ち越し
+
+`Trail.id` が None（当たらない）でも `mark` は返るので、TS（main.ts）は選択の
+id と一緒に**幽霊**（`{ mark, anchor }`。`anchor` はその目印が選択の anchor
+だったか）を持ち越す。次のサイクルで当たれば `ids` に戻り、外れたままなら
+また幽霊のまま次へ回す。地図で選び直したら幽霊は要らなくなる（選択そのものを
+置き換えるので）。`## n## a` の途中のサイクルはこの形で戻る。
 
 ## 派生値 — 二つをまたぐ印
 
@@ -135,8 +152,8 @@ mmmSurvey(md, edits, marks) -> { view, spots: { id: [from, label?, to] }, carrie
 
 `hit(layout, wx, wy)` — world 座標の点がどの箱に居るか（重なりは文書順の後ろが上）。
 
-**背景の左ドラッグは矩形選択になる**ので、パンは `Space+ドラッグ` / 中クリック /
-指の 1 本に移る（spec.md「Mindmap 側」の表のとおり。いまは左ドラッグがパン）。
+**背景の左ドラッグは矩形選択。** パンは `Space+ドラッグ` / 中クリック / 指の 1 本
+（spec.md「Mindmap 側」の表のとおり）。
 
 深さは `Box.parent` を辿って数える（Layout は深さを持たない）。左右の向きは
 `dirOf` だけが読む。
@@ -155,9 +172,9 @@ mmmSurvey(md, edits, marks) -> { view, spots: { id: [from, label?, to] }, carrie
 core/tree/build.mbt          Spot に label を足す（head_start / 項目のマーカーの後ろ）
 core/tree/follow.mbt         follow(spots, edits, marks)
 core/tree/js/exports.mbt     mmmSurvey
-src/coreApi.ts               survey(md, edits, marks) -> { view, spots, carried }
+src/coreApi.ts               survey(md, edits, marks) -> { view, spots, trails }
 src/editor.ts                onChange(text, edits) / onCaret(ranges) / highlight / reveal / caret
-src/caret.ts                 caretIds(spots, order, ranges) — 最深
+src/caret.ts                 caretIds(view, spots, ranges) — 最深
 src/map/select.ts            Selection と click / rubber / arrow / extend / all / none / hit
 src/mindmap.ts               叩く・矩形・キーを値にして host へ。selected と輪を塗る
 src/main.ts                  選択を 1 つ持つ。sync(text, edits) → survey → 選択を引き直す
