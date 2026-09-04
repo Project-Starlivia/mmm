@@ -72,12 +72,12 @@ apply(op, edit?):
 | ノードが 1 つも無いときの `Enter` | `AddNode(In(doc_id), [""])`（最初の根） |
 
 綴り（見出しか項目か）は op が隣に従って決める（core.md「操作の決め」）。
-複数選んでいるときは anchor に対して行う（`Tab` / `Shift+Tab` の段下げ・上げは段 3）。
+**宛先は anchor。いくつ選んでいても、anchor 1 つを選んでいるときと同じことが起きる**
+（`Tab` / `Shift+Tab` だけは複数選択で段下げ・上げに化けるので、段 3 まで拾わない）。
 
 ## 「埋めるが先」と「打ち始めれば書ける」
 
-名前がまだ無いノード（label が `""`。Implicit は label 無しなので含めない）を
-1 つだけ選んでいるとき:
+anchor が名前のまだ無いノード（label が `""`。Implicit は label 無しなので含めない）のとき:
 
 - `Enter` は足さずに**そのノードの編集に入る**（空のまま足しても名無しが 2 つ並ぶだけ）
 - **印字可能な 1 文字**（Space は除く。パンに使う）を打てば、**その字を初期値に**編集に入る。
@@ -104,11 +104,11 @@ keyed(layout, sel, key: { key, shift, mod, alt }) -> Intent | null
 
 | キー | Intent |
 |---|---|
-| `Mod+Enter` | anchor が 1 つ → `edit`。ノードが無い → 最初の根 |
-| `Enter` | 無 → 最初の根 / 空ラベル 1 つ → `edit` / それ以外 → `AddNode(After)` |
+| `Mod+Enter` | anchor → `edit`。ノードが無い → 最初の根 |
+| `Enter` | 無 → 最初の根 / anchor が空ラベル → `edit` / それ以外 → `AddNode(After)` |
 | `Shift+Enter` | `AddNode(Before)` |
 | `Tab` / `Shift+Tab` | `AddNode(In)` / `Wrap`（1 つ選んでいるとき） |
-| 印字可能な 1 字 | 空ラベル 1 つ → `edit` with seed |
+| 印字可能な 1 字 | anchor が空ラベル → `edit` with seed |
 | 矢印 / `Shift+矢印` / `Esc` / `Mod+A` / `Home` | 段 1 のまま（`select` / `center`） |
 
 ## 描画

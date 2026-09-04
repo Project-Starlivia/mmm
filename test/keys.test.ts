@@ -71,9 +71,13 @@ test("ノードが 1 つも無ければ Enter は最初の根", () => {
   });
 });
 
-test("Mod+Enter は編集開始。1 つ選んでいるときだけ", () => {
+test("Mod+Enter は anchor の編集開始。いくつ選んでいても同じ", () => {
   assert.deepEqual(keyed(L, one(3), k("Enter", { mod: true })), { kind: "edit", id: 3, seed: null });
-  assert.equal(keyed(L, { ids: [3, 4], anchor: 4 }, k("Enter", { mod: true })), null);
+  assert.deepEqual(keyed(L, { ids: [3, 4], anchor: 4 }, k("Enter", { mod: true })), {
+    kind: "edit",
+    id: 4,
+    seed: null,
+  });
   assert.equal(keyed(L, NONE, k("Enter", { mod: true })), null);
 });
 
@@ -85,15 +89,22 @@ test("空のノードで字を打てば、その字から編集。名前があ�
   assert.equal(keyed(L, one(4), k("x", { mod: true })), null);
 });
 
-test("複数選んでいるときの Tab / Shift+Tab は何もしない（段下げは次の段）。Enter は anchor に対して足す", () => {
+test("複数選んでいるときの Tab / Shift+Tab は何もしない（段下げは次の段）", () => {
   assert.equal(keyed(L, { ids: [3, 4], anchor: 4 }, k("Tab")), null);
   assert.equal(keyed(L, { ids: [3, 4], anchor: 4 }, k("Tab", { shift: true })), null);
   assert.equal(keyed(L, NONE, k("Tab")), null);
-  assert.deepEqual(keyed(L, { ids: [3, 4], anchor: 4 }, k("Enter")), {
+});
+
+test("複数選んでいても宛先は anchor — 1 つ選んでいるときと同じ", () => {
+  // anchor に名前があれば後ろに足す
+  assert.deepEqual(keyed(L, { ids: [3, 4], anchor: 3 }, k("Enter")), {
     kind: "op",
-    op: { kind: "addNode", at: { kind: "after", node: 4 }, labels: [""] },
+    op: { kind: "addNode", at: { kind: "after", node: 3 }, labels: [""] },
     edit: true,
   });
+  // anchor が空なら「埋めるが先」も同じに効く
+  assert.deepEqual(keyed(L, { ids: [3, 4], anchor: 4 }, k("Enter")), { kind: "edit", id: 4, seed: null });
+  assert.deepEqual(keyed(L, { ids: [3, 4], anchor: 4 }, k("x")), { kind: "edit", id: 4, seed: "x" });
 });
 
 test("段 1 のキーはそのまま — 矢印は select、Shift+矢印は伸ばす、Esc は解除、Mod+A は全部、Home は寄せ", () => {
