@@ -17,7 +17,7 @@ import {
   toWorld,
   zoomAt,
   zoomTo,
-} from "../src/map/view.ts";
+} from "../src/map/camera.ts";
 
 const PANE = { width: 800, height: 600 };
 const V = { k: 1, tx: 60, ty: 60 };

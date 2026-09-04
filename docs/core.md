@@ -23,7 +23,8 @@ Eol   = Lf | Crlf
 Block   { id, content: Content }            // 中身 1 枚。id はノードと同じ列
 Content = Image | Link | Code | Svg         // 解釈の包みは無い
         | ThematicBreak                     // 境界にならなかった水平線
-        | Details(text)                     // <details>。領域の原文
+        | Details(text, open, summary, body) // <details>。text は領域の原文で、書き戻しはこれだけ。
+                                            // 残りは GitHub が描くのと同じ読み取り（導出はしない）
         | Opaque(text)                      // 読み解かない原文
 ```
 
@@ -55,9 +56,13 @@ check が見るもの — id 一意（ノードも中身も） / Implicit は子
 足すものは無い。
 
 ```
+View { frontmatter: String?, trees: [Tree] }
 Tree { node: Node, sides: [Side] }          // 側は Root と同じ。根の子と並走
 Node { id, label: String?, fold: Fold?, blocks: [Block], children: [Node] }
 ```
+
+TS では必ず持ち主を付けて `core.View` / `core.Node` と書く（`import * as core`）。
+フロントで view は画面を意味し、`Node` は DOM の型と衝突するので、裸の名では出さない。
 
 - **ノードの種類は無い。** Doc が 3 種に分けている理由は全部 md の書き方の
   制約で、描く側には 1 つも要らない
@@ -65,10 +70,11 @@ Node { id, label: String?, fold: Fold?, blocks: [Block], children: [Node] }
   型で区別が付く。旗も種類も要らない
 - **`blocks` は body から Opaque を落としたもの。** core が「読み解かない」と
   裁定したものだけが map に届かない。何がカードかは描く側の分類のまま
-- 書き戻すためだけの欄（frontmatter・eol・散文の body）は無い
+- 書き戻すためだけの欄（eol・散文の body）は無い。**frontmatter だけは残す** —
+  画像フォルダの宣言がそこに書かれていて、描くのに要る
 - **id は Doc のまま。** 読みが文書順に振った通し番号で、Opaque にも振ってある
   ので、落としても残りの番号は動かない（View の添字を body の添字へ読み替える
-  段は要らない）。順序を id に読ませない
+  段は要らない）。順序を id に読ませない（下の「id は読みのサイクルを越えて持たない」）
 
 ## パイプライン
 

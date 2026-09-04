@@ -242,10 +242,10 @@ fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
       take(b, block, nest, fold=Some(fold))
       b.fold_at = None
     }
-    Capsule(text, to~) => {
+    Capsule(text~, open~, summary~, body~, to~) => {
       // 中身が来たので、保留中の水平線は境界になれない
       spill(b)
-      fill(b, Details(text), to~)
+      fill(b, Details(text~, open~, summary~, body~), to~)
     }
     Text(text, to~) => {
       spill(b)
