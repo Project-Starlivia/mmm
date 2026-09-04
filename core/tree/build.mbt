@@ -20,6 +20,8 @@ priv struct Frame {
   /// 飛び（Gap）は行を持たないので -1 で置き、最後に子の和で埋める
   mut from : Int
   mut to : Int
+  /// ラベルの頭（マーカーの後ろ）。飛び（Gap）は行を持たないので -1
+  label : Int
 }
 
 ///|
@@ -38,8 +40,18 @@ pub fn parse(md : String) -> Doc {
 }
 
 ///|
+/// 地番。ノードが原文のどこに書かれているか。`label` はラベルの頭（マーカーの後ろ）で、
+/// 選択が md の打鍵をまたいで同じノードを指し続けるための目印（follow.mbt）。
+/// Implicit と文書の散文は行を持たないので None。
+pub(all) struct Spot {
+  from : Int
+  label : Int?
+  to : Int
+} derive(Eq, Debug, ToJson)
+
+///|
 /// md を木にし、地番（ノード id → 原文の範囲）も返す。反映が使う。
-pub fn survey(md : String) -> (Doc, Map[Int, @markdown.Span]) {
+pub fn survey(md : String) -> (Doc, Map[Int, Spot]) {
   build(md, read(md))
 }
 
@@ -47,10 +59,7 @@ pub fn survey(md : String) -> (Doc, Map[Int, @markdown.Span]) {
 /// mdAst を mmmTree にする。ラベルは原文から切り出す（mmm はインラインを解釈しない）。
 /// 地番は Doc に載せず並べて返す — 載せると Doc が特定の原文に縛られ、
 /// 手で組む木に在り得ない欄が生える。
-pub fn build(
-  md : String,
-  ast : @markdown.Document,
-) -> (Doc, Map[Int, @markdown.Span]) {
+pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
   let b : Build = {
     md,
     defs: ast.definitions.map(d => d.span),
@@ -65,6 +74,7 @@ pub fn build(
     top: deep,
     own: deep,
     dry: false,
+    owner: 0,
   }
   for piece in pieces(md, ast.children, b.defs, 0) {
     lay(b, piece, 0)
@@ -76,15 +86,23 @@ pub fn build(
   // 文書の中身は最初の見出し・項目より前にあるので、先に振る
   number_blocks(b.body, next)
   for f in forest {
-    number(f, next)
+    number_frame(f, next)
   }
-  let spans : Map[Int, @markdown.Span] = Map([])
+  let spans : Map[Int, Spot] = Map([])
   // 文書の散文は frontmatter の尻から。中身が無ければ空の範囲
   let from = match ast.frontmatter {
     Some(f) => f.span.to
     None => 0
   }
-  spans[doc_id] = { from, to: if b.body_to > from { b.body_to } else { from } }
+  spans[doc_id] = {
+    from,
+    label: None,
+    to: if b.body_to > from {
+      b.body_to
+    } else {
+      from
+    },
+  }
   for f in forest {
     chart(f, spans)
   }
@@ -102,7 +120,7 @@ pub fn build(
 }
 
 ///|
-/// 地番の指紋。`id[from,to]` を id 順に並べる。
+/// 地番の指紋。`id[from,label,to]` を id 順に並べる。
 pub fn spans_sig(md : String) -> String {
   let (_, spans) = survey(md)
   let ids = spans.keys().collect()
@@ -110,7 +128,13 @@ pub fn spans_sig(md : String) -> String {
   ids
   .map(id => {
     match spans.get(id) {
-      Some(s) => "\{id}[\{s.from},\{s.to}]"
+      Some(s) => {
+        let label = match s.label {
+          Some(l) => l.to_string()
+          None => "-"
+        }
+        "\{id}[\{s.from},\{label},\{s.to}]"
+      }
       None => ""
     }
   })
@@ -121,7 +145,7 @@ pub fn spans_sig(md : String) -> String {
 /// 地番を id で引けるようにする。飛びは子の和 — 子を先に埋めるので、
 /// 飛びの中の飛びも埋まる。畳みの尻（`</details>`）は子より後ろに在るので、
 /// 大きいほうを採れば保たれる。
-fn chart(f : Frame, spans : Map[Int, @markdown.Span]) -> Unit {
+fn chart(f : Frame, spans : Map[Int, Spot]) -> Unit {
   for k in f.kids {
     chart(k, spans)
   }
@@ -134,7 +158,15 @@ fn chart(f : Frame, spans : Map[Int, @markdown.Span]) -> Unit {
       f.to = last
     }
   }
-  spans[f.id] = { from: f.from, to: f.to }
+  spans[f.id] = {
+    from: f.from,
+    label: if f.label < 0 {
+      None
+    } else {
+      Some(f.label)
+    },
+    to: f.to,
+  }
 }
 
 ///|
@@ -168,6 +200,9 @@ priv struct Build {
   mut own : Int
   /// 深さを測るだけの空打ちか。畳みを見ないので、項目の中も読み解かない
   dry : Bool
+  /// いま中身を読んでいる項目の深さ。**入れ子の列はその 1 つ下に座る** —
+  /// stack の高さで測ると、前の列の項目が積まれたままなので次の列がその子になる
+  mut owner : Int
 }
 
 ///|
@@ -210,6 +245,7 @@ fn depths(
     top: deep,
     own: deep,
     dry: true,
+    owner: 0,
   }
   let out = Array::make(blocks.length(), { top: deep, own: deep })
   for i, block in blocks {
@@ -278,6 +314,7 @@ fn take(
           body=[],
         ),
         at=span,
+        label=head_start(b.md, span, style),
       )
     BulletList(items~, ..) => items_take(b, items, nest, fold~)
     OrderedList(items~, ..) => items_take(b, items, nest, fold~)
@@ -317,24 +354,34 @@ fn items_take(
   // 数えてしまい、間に綴られていない項目が生える（項目は相対記法なので
   // 飛びは存在しない）。列に入る前に 1 度だけ測る — 中で測ると前の兄弟を
   // 積んだぶんずれる
-  let mut level = if nest == 0 { spine(b) + 1 } else { b.stack.length() + 1 }
+  let mut level = if nest == 0 { spine(b) + 1 } else { b.owner + 1 }
   for it in items {
     // **ラベルは項目の 1 行目。** 途中の段落を引き上げると、その文字が
     // ラベルと中身の両方になる（切り出しはブロックの範囲でやるので、抜いたはずの
     // 段落が切り出しの内側に入る）。1 行目が段落でなければラベルは無い
     let rest = []
     let mut label = ""
+    // ラベルの頭。1 行目が段落ならその頭（段落の span は中身の先頭から始まる）。
+    // 段落が無ければマーカーを読み飛ばした位置
+    let mut label_at = item_start(b.md, it.span)
     // ラベルの範囲に入った定義行はラベルが持っている。残りは項目の中身
     let mut from = it.span.from
     for i, c in it.children {
       if i == 0 && c is Paragraph(..) {
         label = item_label(b.md, c)
+        label_at = block_span(c).from
         from = block_span(c).to
       } else {
         rest.push(c)
       }
     }
-    put(b, level, Line(sign=Item, label~, fold~, body=[]), at=it.span)
+    put(
+      b,
+      level,
+      Line(sign=Item, label~, fold~, body=[]),
+      at=it.span,
+      label=label_at,
+    )
     // **同じ列の項目は兄弟。** 境界は最初の項目を深さ 2 へ引き出すので、
     // 残りも引き出された先に並ぶ（数え直すと元の位置から数えてしまう）
     level = b.stack.length()
@@ -345,9 +392,12 @@ fn items_take(
     } else {
       pieces(b.md, rest, defs_in(b.defs, from, it.span.to), nest + 1)
     }
+    let outer = b.owner
+    b.owner = level
     for c in inner {
       lay(b, c, nest + 1)
     }
+    b.owner = outer
   }
 }
 
@@ -376,7 +426,13 @@ fn spine(b : Build) -> Int {
 /// 深さ level のノードを置く。浅く戻るときは積んだぶんを落とし、
 /// 深く飛ぶときは間を Implicit で埋める（飛びは綴りであって、無ではない）。
 /// `at` はその骨格の行（項目なら入れ子込み）の原文の範囲。
-fn put(b : Build, level : Int, skel : Notation, at~ : @markdown.Span) -> Unit {
+fn put(
+  b : Build,
+  level : Int,
+  skel : Notation,
+  at~ : @markdown.Span,
+  label~ : Int,
+) -> Unit {
   // 境界のとき、項目は**深さ 2 に直接置く**。項目は相対記法なので深さが
   // 導出値で、引き出し先に合わせて置き直せる（見出しは絶対座標なので
   // 動かせず、足りない深さを Implicit が埋める）
@@ -413,6 +469,7 @@ fn put(b : Build, level : Int, skel : Notation, at~ : @markdown.Span) -> Unit {
       id: 0,
       from: -1,
       to: -1,
+      label: -1,
     }
     sink(b)
     seat(b, gap)
@@ -430,6 +487,7 @@ fn put(b : Build, level : Int, skel : Notation, at~ : @markdown.Span) -> Unit {
     id: 0,
     from: at.from,
     to: at.to,
+    label,
   }
   sink(b)
   // **そのブロック自身のノードは、最初に座る綴られた枠。** 手前の穴埋めは足場、
@@ -568,6 +626,27 @@ fn head_start(
 }
 
 ///|
+/// 項目のラベルの頭。マーカー（`-` `*` `+`、または数字と `.` `)`）と空白を読み飛ばす。
+/// 1 行目が段落ならその span の頭と一致する。段落の無い項目のために持つ。
+fn item_start(md : String, span : @markdown.Span) -> Int {
+  let mut p = skip_blank(md, span.from, span.to)
+  while p < span.to && md[p] >= '0' && md[p] <= '9' {
+    p = p + 1
+  }
+  if p < span.to &&
+    (
+      md[p] == '-' ||
+      md[p] == '*' ||
+      md[p] == '+' ||
+      md[p] == '.' ||
+      md[p] == ')'
+    ) {
+    p = p + 1
+  }
+  skip_blank(md, p, span.to)
+}
+
+///|
 fn skip_blank(md : String, from : Int, to : Int) -> Int {
   let mut p = from
   while p < to && (md[p] == ' ' || md[p] == '	') {
@@ -607,7 +686,7 @@ priv struct Counter {
 ///|
 /// 番号を文書順に振る。形を割り付ける前に済ませるので、割り付けが
 /// 順序を動かしても番号は動かない。
-fn number(f : Frame, next : Counter) -> Unit {
+fn number_frame(f : Frame, next : Counter) -> Unit {
   f.id = next.val
   next.val = f.id + 1
   // 中身は子より前に書かれているので、先に振る
@@ -616,8 +695,64 @@ fn number(f : Frame, next : Counter) -> Unit {
     Gap => ()
   }
   for k in f.kids {
-    number(k, next)
+    number_frame(k, next)
   }
+}
+
+///|
+/// id のノード・中身が、文書順に振り直されたら得る番号。読みと同じ振り方
+/// （文書の中身 → 根ごとに ノード → その中身 → 子）なので、木を書き戻して
+/// 読み直したときの id を先に言える。操作の後の focus を読み替えるのに使う。
+/// 無い id は None。
+pub fn number(doc : Doc, id : Int) -> Int? {
+  if id == doc_id {
+    return Some(doc_id)
+  }
+  let next = { val: doc_id + 1 }
+  fn blocks(body : Array[Block]) -> Int? {
+    for b in body {
+      if b.id == id {
+        return Some(next.val)
+      }
+      next.val = next.val + 1
+    }
+    None
+  }
+
+  fn node(x : Node) -> Int? {
+    if id_of(x) == id {
+      return Some(next.val)
+    }
+    next.val = next.val + 1
+    let body = match x {
+      HeadingNode(h) => h.body
+      ListNode(l) => l.body
+      ImplicitNode(_) => []
+    }
+    match blocks(body) {
+      Some(n) => return Some(n)
+      None => ()
+    }
+    for k in children_of(x) {
+      match node(k) {
+        Some(n) => return Some(n)
+        None => ()
+      }
+    }
+    None
+  }
+
+  match blocks(doc.body) {
+    Some(n) => return Some(n)
+    None => ()
+  }
+  for r in doc.roots {
+    match node(r.node) {
+      Some(n) => return Some(n)
+      None => ()
+    }
+  }
+  None
 }
 
 ///|

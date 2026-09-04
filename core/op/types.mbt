@@ -12,7 +12,7 @@ pub(all) enum NodePlace {
   /// 子の列の末尾。side は node が根のときだけ意味を持つ。
   /// node が doc_id なら新しい根
   In(node~ : Int, side~ : @tree.Side?)
-} derive(Eq, Debug, ToJson)
+} derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 /// 中身の席。body の列の中。
@@ -21,7 +21,7 @@ pub(all) enum BlockPlace {
   After(block~ : Int)
   /// body の末尾。node が doc_id なら文書の散文
   In(node~ : Int)
-} derive(Eq, Debug, ToJson)
+} derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 /// 操作。1 つの値が 1 回の操作で、apply が木に当てる。
@@ -39,7 +39,7 @@ pub(all) enum Op {
   Fold(id~ : Int, open~ : Bool)
   Unfold(id~ : Int)
   Graft(at~ : NodePlace, md~ : String)
-} derive(Eq, Debug, ToJson)
+} derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 /// 操作後の木と、そこで選ぶべき id（消した後は None）。

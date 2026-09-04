@@ -350,6 +350,9 @@ html, body {
    .cm-editor に当てる(map 側の同じ印は #map-pane.pane-focused が持つ) */
 #md-pane.pane-focused .cm-editor { box-shadow: inset 0 0 0 2px var(--ring); }
 
+/* マップで選んでいるノードの、md 側での対応範囲 */
+.cm-mmm-selected { background: var(--accent-soft); }
+
 /* ペインの隅に浮く小さな道具。**そのペインにだけ効くもの**はここに住む
    （帯に出るのは文書ぜんぶに効くものだけ）。低頻度なので沈ませて、
    触れたら起きる — 消さずに優先度だけ下げる、いつもの手。
@@ -592,6 +595,15 @@ html, body {
     rx: 8px;
   }
   &.root rect.box { stroke-width: 2; stroke: var(--node-border-strong); }
+
+  /* ---- 選択（付けるのは map/render.ts の paintSelection）---- */
+  &.selected rect.box {
+    stroke: var(--accent);
+    stroke-width: 2;
+    /* md 側の薄塗りと同じ濃さ。ただし箱は下が透けては困る（地のドットが出る）ので、
+       transparent ではなく node-bg に混ぜる */
+    fill: color-mix(in srgb, var(--accent) var(--accent-mix), var(--node-bg));
+  }
   & text {
     font-family: var(--font);
     dominant-baseline: central;
@@ -678,6 +690,27 @@ html, body {
     & rect.box { rx: 4px; stroke-dasharray: 4 3; }
     & text.label { fill: var(--ink-dim); }
   }
+}
+
+/* ========== 二つをまたぐ印 ==========
+   矩形選択の面と、md のカーソルが掛かるノードの内側の輪。
+   輪の濃さはここだけが持つ — `--accent-soft` は面を塗るための薄さで、
+   2px の線に当てると消える。内側に居る以上は選択と紛れようがない。 */
+#rubber {
+  position: absolute;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  pointer-events: none;
+  display: none;
+}
+
+.caret-ring {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke-width: 2;
+  rx: 5px;
+  /* 印は乗っているだけ。掴めると、下のノードを選べなくなる */
+  pointer-events: none;
 }
 
 /* コードの色は @lezer/highlight の classHighlighter が付ける tok-* に対応させる。

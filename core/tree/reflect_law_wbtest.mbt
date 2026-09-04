@@ -138,7 +138,7 @@ fn fit(sides : Array[Side], node : Node) -> Array[Side] {
 fn law(
   md : String,
   before : Doc,
-  spans : Map[Int, @markdown.Span],
+  spans : Map[Int, Spot],
   after : Doc,
   what : String,
 ) -> Array[Edit] raise {

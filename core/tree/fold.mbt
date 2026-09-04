@@ -32,7 +32,7 @@ priv enum Piece {
 
 ///|
 /// 畳みの綴り 1 つ。
-priv enum Mark {
+priv enum Spelling {
   Open(open~ : Bool)
   Name(String)
   Close
@@ -41,7 +41,7 @@ priv enum Mark {
 ///|
 /// 木からこの綴りを書き戻したときの文字。**mmm が書ける形はこれだけ。**
 /// 「塊が記法だけで出来ているか」の判定は、すべてこの 1 行との比較に還元される。
-fn spelling(m : Mark) -> String {
+fn spelling(m : Spelling) -> String {
   match m {
     Open(open=false) => "<details>"
     Open(open=true) => "<details open>"
@@ -54,7 +54,7 @@ fn spelling(m : Mark) -> String {
 /// 原文に見つけた綴り 1 つ。位置は**原文のバイト**でだけ持つ
 /// （塊の html 文字列の添字は字下げでずれるので、座標には使わない）。
 priv struct Tag {
-  mark : Mark
+  mark : Spelling
   from : Int
   to : Int
   /// 原文がそのまま `spelling(mark)` か。違えば触らずに書き戻せないので畳めない
@@ -281,7 +281,7 @@ fn read_spell(md : String, b : @markdown.Block) -> Spell {
 
 ///|
 /// 綴り 1 つと、それが在った塊。
-priv struct Spot {
+priv struct Found {
   tag : Tag
   block : Int
 }
@@ -292,7 +292,7 @@ priv struct Spot {
 /// 原文。**読み解かない裁定は変えない**（body は切り出すだけで、意味は付けない）。
 fn capsule(
   md : String,
-  spots : Array[Spot],
+  spots : Array[Found],
   head : Int,
   tail : Int,
   from : Int,
@@ -331,7 +331,7 @@ fn strip(md : String, from : Int, to : Int) -> String {
 
 ///|
 /// 開きと閉じの対。相手の居ないタグは対にならず、ただの文字のまま残る。
-fn pairs(spots : Array[Spot]) -> Array[(Int, Int)] {
+fn pairs(spots : Array[Found]) -> Array[(Int, Int)] {
   let stack = []
   let out = []
   for k, s in spots {
@@ -651,7 +651,7 @@ fn folds(
   depth : Array[Depth],
   gone : Array[Bool],
   ahead : Array[Bool],
-  spots : Array[Spot],
+  spots : Array[Found],
   o : Int,
   c : Int,
 ) -> Bool {
