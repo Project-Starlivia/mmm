@@ -144,7 +144,7 @@ fn parent(doc : @tree.Doc, id : Int) -> Int? {
 /// 選んだ id を文書順に並べ、祖先が選ばれているものを落とす（親と一緒に動く）。
 /// 知らない id は落ちる。
 fn pick(doc : @tree.Doc, ids : Array[Int]) -> Array[Int] {
-  let want : Set[Int] = Set::new()
+  let want : Set[Int] = Set([])
   for id in ids {
     want.add(id)
   }

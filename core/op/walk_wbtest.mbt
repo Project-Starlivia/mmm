@@ -43,35 +43,35 @@ test "kids は項目の子も Node に包む" {
 
 ///|
 test "find はノードだけに応える" {
-  inspect(find(sample(), 5).map(id_of), content="Some(5)")
-  inspect(find(sample(), 8).map(id_of), content="Some(8)")
-  inspect(find(sample(), 3).map(id_of), content="None")
-  inspect(find(sample(), 99).map(id_of), content="None")
+  debug_inspect(find(sample(), 5).map(id_of), content="Some(5)")
+  debug_inspect(find(sample(), 8).map(id_of), content="Some(8)")
+  debug_inspect(find(sample(), 3).map(id_of), content="None")
+  debug_inspect(find(sample(), 99).map(id_of), content="None")
 }
 
 ///|
 test "seat は根の添字から辿る道で、長さが深さ" {
-  inspect(seat(sample(), 2), content="Some([0])")
-  inspect(seat(sample(), 6), content="Some([0, 1])")
-  inspect(seat(sample(), 5), content="Some([0, 0, 0])")
-  inspect(seat(sample(), 8), content="Some([1])")
-  inspect(seat(sample(), 3), content="None")
+  debug_inspect(seat(sample(), 2), content="Some([0])")
+  debug_inspect(seat(sample(), 6), content="Some([0, 1])")
+  debug_inspect(seat(sample(), 5), content="Some([0, 0, 0])")
+  debug_inspect(seat(sample(), 8), content="Some([1])")
+  debug_inspect(seat(sample(), 3), content="None")
 }
 
 ///|
 test "owner は中身の持ち主。散文なら doc_id" {
-  inspect(owner(sample(), block=7), content="Some(6)")
-  inspect(owner(sample(), block=3), content="Some(2)")
-  inspect(owner(doc([], body=[pic(2)]), block=2), content="Some(1)")
-  inspect(owner(sample(), block=4), content="None")
+  debug_inspect(owner(sample(), block=7), content="Some(6)")
+  debug_inspect(owner(sample(), block=3), content="Some(2)")
+  debug_inspect(owner(doc([], body=[pic(2)]), block=2), content="Some(1)")
+  debug_inspect(owner(sample(), block=4), content="None")
 }
 
 ///|
 test "parent は親の id。根なら doc_id、中身なら持ち主" {
-  inspect(parent(sample(), 5), content="Some(4)")
-  inspect(parent(sample(), 2), content="Some(1)")
-  inspect(parent(sample(), 7), content="Some(6)")
-  inspect(parent(sample(), 99), content="None")
+  debug_inspect(parent(sample(), 5), content="Some(4)")
+  debug_inspect(parent(sample(), 2), content="Some(1)")
+  debug_inspect(parent(sample(), 7), content="Some(6)")
+  debug_inspect(parent(sample(), 99), content="None")
 }
 
 ///|
