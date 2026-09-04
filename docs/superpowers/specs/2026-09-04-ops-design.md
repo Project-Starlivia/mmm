@@ -35,6 +35,8 @@ UI の段 3〜5 をまとめて 1 本にする。**木の形を変える・枝�
   のは md で
 - カードのドラッグ（別ノードへ / 順番）— `Alt+↑↓` で足りるので後
 - 枝の Export（右クリック）— 段の外
+- 中身を消した後に選ぶものの決め方 — 持ち主を返すのは core の focus（TS は `keep` を
+  持たない。下記「C カード」）
 
 ## 共通の決め
 
@@ -66,12 +68,14 @@ UI の段 3〜5 をまとめて 1 本にする。**木の形を変える・枝�
 - **消した後は隣**（ユーザー決）: 消す並びの次の見えているノード、無ければ前、無ければ
   先頭の親、無ければ何も選ばない。`neighbor(L, ids)` は `select.ts` の純粋関数で、
   消える部分木（選んだものの子孫）は隣に数えない
-- `Intent.op` に `keep?: number`（操作をまたいで選んでおく id）。`apply(op, edit, keep)`
-  は keep が在れば先に選択に据えてから編集を当てる
+- `Intent.op` に `keep?: number`（操作をまたいで選んでおく id）。`apply(op, edit, keep)
+  -> number | null` は keep が在れば先に選択に据えてから編集を当て、返った focus を
+  ノードの選択かカードの `picked` に振り分ける（`main.ts`）
 
 **右クリック / 長押し** — 押した場所のノードが選択に無ければ単独で選んでから開く。
-背景なら閉じる。行は純粋関数 `contextItems(L, sel) -> Item[]`（`map/context.ts`）で、
-地図が `MenuEntry` に写す。行の Intent は `keys.ts` と同じ作り方を引く。
+背景なら閉じる。行は純粋関数 `contextItems(L, sel) -> Entry[]`（`map/context.ts`。
+`Entry = Item | "sep"`）で、地図が `MenuEntry` に写す。行の Intent は `keys.ts` と
+同じ作り方を引く。
 
 | 行 | キー | 沈む理由（hover で読める） |
 |---|---|---|
@@ -95,7 +99,7 @@ UI の段 3〜5 をまとめて 1 本にする。**木の形を変える・枝�
 掴んだのが選択の中ならその全部、外なら単独で選び直してそれ。
 
 **落とし先は純粋関数 `resolveDrop(scene) -> Drop | null`**（`map/drop.ts`。旧コードを
-削って戻す）。
+削って戻す）。`Drop` を Op にするのは同じファイルの `dropOp(drop, ids) -> Op`。
 
 ```
 Drop = { kind: "node", id, pos: 0 | 1 | 2 }   // 0 = 子の末尾 / 1 = 直前 / 2 = 直後
@@ -122,14 +126,20 @@ Drop = { kind: "node", id, pos: 0 | 1 | 2 }   // 0 = 子の末尾 / 1 = 直前 /
 選択は外れる。枠と右上の × は world に浮かぶ 1 つの印（`pick.ts`）。md 側では
 その中身の範囲が薄く塗られる（中身の地番。下記「core に足すもの」）。
 
+持ち主（中身がぶら下がるノード）を探すのは `ownerOf(L, block)`（`map/layout.ts`）。
+表は純粋関数 `keyedCard(L, picked, key) -> Intent | null`（`map/keys.ts`）:
+
 | 入力 | Intent |
 |---|---|
-| `Delete` / `Backspace` / × | `op(Delete([picked]), keep = そのノード)` |
-| `↑` / `↓` | 隣のカード（端で止まる）。`{ kind: "pick", id }` |
+| `Delete` / `Backspace` / × | `op(Delete([picked]))` — focus（持ち主）は core が返すので `keep` は持たない |
+| `↑` / `↓` | 隣のカード（端で null）。`{ kind: "pick", id }` |
 | `←` | 持ち主のノードを選ぶ（`select`） |
 | `Alt+↑` / `Alt+↓` | `MoveBlock([picked], Before(前)/After(次))`（端で null） |
-| `Mod+Enter` / ダブルクリック | その場編集（`{ kind: "editCard", id }`） |
+| `Mod+Enter` | その場編集（`{ kind: "editCard", id }`） |
 | `Esc` | 外す |
+
+ダブルクリックも同じその場編集を開くが、`keyedCard` の表ではなく `mindmap.ts` の
+クリック処理が直に開く（キーではないので）。
 
 **その場編集**: カードに重ねた `<textarea>`（裏に色付きの層。`highlight.ts` の
 `tokenizeBlock`）。値は**その中身の原文**（地番で md から切り出す）。閉じるのは
@@ -150,9 +160,12 @@ URL でなければ `failed("Couldn't read that as a link")`。
 
 ## D 貼る・落とす・描く
 
-**`Mod+V`**（anchor に対して。無ければ文書へ）。判定は純粋関数 `decidePaste(clip, hasAnchor, hasNodes)`
-（`app/paste.ts`）。「見出しや項目があるか」は **core に読ませて決める**
-（`mmmViewJson(clip)` の木が空かどうか。読みの規則を TS で書き直さない）。
+**`Mod+V`**（anchor に対して。無ければ文書へ）。判定は純粋関数
+`decidePaste(clip, hasSkeleton) -> Paste`（`app/paste.ts`）。`hasSkeleton` は
+呼び出す側（`main.ts`）が渡す関数で、「見出しや項目があるか」は **core に読ませて
+決める**（`core.survey(clip, [], []).view.trees` が空かどうか。読みの規則を TS で
+書き直さない）。画像はテキストより先にクリップボードを覗いて main.ts が別に処理する
+（`decidePaste` には来ない）。
 
 | クリップボード | Op |
 |---|---|
@@ -176,7 +189,7 @@ URL でなければ `failed("Couldn't read that as a link")`。
 - **中身の地番。** `survey` の表に中身（Block）の行も載せる（`from` = 原文の範囲、
   `label` は None）。`number_blocks` の隣で範囲を控え、`chart` が出す。指紋
   `spans_sig` に中身の行が増える。使い道: カードを選んだときの md 側の薄塗り、
-  その場編集の原文の切り出し、`Delete` の keep の写し
+  その場編集の原文の切り出し
 - **`Opaque` を ts から送れるように。** `Content` に `{ kind: "opaque"; text }` を足し、
   `encode` は `Svg` と同じく位置で渡す（`Opaque(String)`）。View には今までどおり来ない
 
@@ -189,18 +202,21 @@ URL でなければ `failed("Couldn't read that as a link")`。
 core/tree/build.mbt          中身の地番（Frame.body_at、doc の body_at）
 core/tree/spans_wbtest.mbt   指紋に中身の行
 src/coreApi.ts               Content.opaque、encode の位置渡し
-src/map/select.ts            neighbor(L, ids)、siblings（前の兄弟・次の兄弟・親）
-src/map/keys.ts              Intent に keep / pick / editCard。A・C のキーの行
-src/map/context.ts           contextItems(L, sel, picked) -> Item[]（純粋）
-src/map/drop.ts              resolveDrop（戻す。Shift / Mod を削る）
+src/map/select.ts            neighbor(L, ids)、parentOf / prevSibling / nextSibling、solo
+src/map/keys.ts              Intent に keep / pick / editCard。keyed に A・C の行、
+                              keyedCard(L, picked, key) を足す
+src/map/context.ts           contextItems(L, sel) -> Entry[]（純粋）
+src/map/drop.ts              resolveDrop、dropOp（戻す。Shift / Mod を削る）
 src/map/pick.ts              CardPick（戻す）
 src/map/card.ts              cardPlacement（純粋）と CardEditor（<textarea> + 色付き層）
+src/map/layout.ts            ownerOf(L, block)（中身の持ち主を探す）
 src/app/paste.ts             decidePaste（core に読ませる）
 src/app/dnd.ts               initDrop（戻す）
 src/app/draw.ts              showDrawing（戻す）
 src/app/assets.ts            saveToDisk（戻す）
 src/mindmap.ts               contextmenu / 長押し / ドラッグ / カードの選択と編集 / act の増分
-src/main.ts                  apply(op, edit, keep)、picked、貼り付け・投下・描く・保存の配線
+src/main.ts                  apply(op, edit, keep) -> number | null、picked、
+                              貼り付け・投下・描く・保存の配線
 src/style.css                drop-line / drop-parent / card-picked / card-kill / #card-editor
 test/select.test.ts          neighbor / siblings
 test/keys.test.ts            A・C の行

@@ -32,41 +32,50 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
   edit/         境界。edit(md, op) が survey → apply → reflect を繋ぎ、編集列と
                 読み直した木での focus を返す。law_wbtest.mbt が操作 × 反映の結合を
                 総当たりで固定する。決めは core.md「境界」
-src/    TypeScript — UI。**描いて、選んで、名前を打つ。** 消す・動かす・カードは次の段から
-        （git に在る）
+src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す・動かす・カードを扱う・
+        貼る/落とす/描く。**
   coreApi.ts   core の出口と入口。JSON の形を整える唯一の場所（survey が View・地番・
                目印の行き先を 1 度に受け、edit が Op を送る）。TS では必ず `core.View` と書く
   caret.ts     md のカーソルがどのノードに掛かっているか（最も深いもの。区間の重なりだけ）
   editor.ts    Markdown 側(CodeMirror 6、履歴も CodeMirror。編集列とカーソルを外へ出し、
                地図の選択を薄塗りで受ける。フェンスの中は map/highlight.ts と同じ言語表で色を付ける)
-  mindmap.ts   Mindmap 側(視点と描画と、選択の入力。叩く・矩形・矢印を値にして main へ渡し、
-               選択と輪を塗る。キーは map/keys.ts の表に渡し、返った Intent を
-               実行する。パン・ズーム・ピンチ・寄せ・針・書き出し)
+  mindmap.ts   Mindmap 側(視点と描画と、選択の入力。叩く・矩形・矢印・右クリック・長押し・
+               ドラッグを値にして act へ渡し、選択と輪を塗る。キーは map/keys.ts の表に
+               渡し、返った Intent を実行する。カードの選択とその場編集、ファイルの投下の
+               予告。パン・ズーム・ピンチ・寄せ・針・書き出し)
   icons.ts     ボタンとメニューの絵の唯一の源(線で引く / currentColor)
   style.css    全体のスタイル(部品ごとの塊。入れ子は CSS 自身の機能)
   map/         その純粋層 — geometry(座標系。側 → 符号はここだけ) / camera(視点。
                world ↔ 画面) / edge(線の形) / cards(Block → カード行。分類だけ) /
                drawCard(カード 1 行 → SVG) / metrics(寸法の唯一の場所) /
-               layout(View の木 → 箱。畳みの埋没と sides の zip もここ) /
+               layout(View の木 → 箱。畳みの埋没と sides の zip もここ。ownerOf で
+               中身の持ち主も引く) /
                render(SVG の差分更新) / highlight(コードの色分け) /
-               select(選択の値と、入力でどう変わるか。矩形・矢印・点の当たり) /
+               select(選択の値と、入力でどう変わるか。矩形・矢印・点の当たり・
+               親兄弟と隣) / context(右クリックメニューの行。純粋な表) /
+               drop(ドラッグの落とし先の判定。純粋) / pick(選んでいるカードの枠と ×) /
+               card(カードのその場編集の器と配置) /
                toSvg(1 枚の svg にする) / svg(要素を作る) / indicator(画面外の
                根を指す針) / gesture(指の台帳) / menu(メニューの器) /
                keys(キー → 何をするか。純粋な表) / label(ラベルのその場編集。
                <input> の器と、箱に重ねる算術)
-  main.ts      束ねる場所(打鍵 → core.survey → render の 1 本、操作の入口 apply、
-               選択と幽霊、ファイル I/O、帯)
+  main.ts      束ねる場所(打鍵 → core.survey → render の 1 本、操作の入口 apply(op, edit, keep)
+               — 返った focus を見てノードの選択かカードの picked に振り分ける、選択と幽霊、
+               貼り付け・投下・描いた絵の保存、ファイル I/O、帯)
   app/         その子系統 — name(文書の名前) / persist(テーマと色) /
                theme(テーマ・アクセントカラー・ロゴ) / panes(2 つの出し分けと分割線) /
                head(頭の宣言を読む。画像フォルダの場所はここが答える) /
-               assets(画像を読む) / io(File System Access API の窓口) /
+               assets(画像の読み書き。保存は saveToDisk。宣言は書かない) /
+               paste(クリップボードから何を貼るかの判定。骨格の有無は core に読ませる) /
+               dnd(落ちたファイルの振り分け。.md は開く、画像はノードの上だけ受ける) /
+               draw(その場で描く窓) / io(File System Access API の窓口) /
                handles(ハンドルを IndexedDB に置く層) / logo(ロゴの唯一の源) /
                shortcuts(全体のキー) / export(Mindmap を外へ出す) /
                paneTool(隅に浮く道具の器) / hint(白紙の言い出し) / notice / ask
 test/   検証 — core に触らない純粋層(camera / geometry / gesture / highlight /
         indicator / panes / share / assets)と、core の出口(coreApi)・分類(cards)・
-        配置(layout)・select / caret / keys / label。tools/(負荷サンプル生成)、
-        fixtures/(負荷サンプル)
+        配置(layout)・select / caret / keys / label / context / drop / card / paste。
+        tools/(負荷サンプル生成)、fixtures/(負荷サンプル)
 docs/   記録 — spec.md はこのファイル、core.md は文書モデルの内部
         （型・パイプライン・道具の決め。spec.md は意味だけを持つ）、
         shortcuts.md はキーの一覧
