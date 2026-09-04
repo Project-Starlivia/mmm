@@ -18,20 +18,25 @@
 core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内部は core.md)
   tree/         md.mbt が md との境界（read / serialize / fragment）、build.mbt が
                 mdAst → 木と地番、unbuild.mbt が木 → mdAst、reflect.mbt が前後の木の
-                差を原文 md への編集列にする。md_wbtest.mbt がライブラリの読みを指紋で
-                固定し、build_wbtest.mbt 以降が「この md はこう読まれる」、
-                unbuild_wbtest.mbt が「この木はこう書かれる」、reflect_wbtest.mbt が
+                差を原文 md への編集列にする。follow.mbt が「md がこう変わった。
+                前に選んでいたノードはいまどれか」を答える。md_wbtest.mbt が
+                ライブラリの読みを指紋で固定し、build_wbtest.mbt 以降が
+                「この md はこう読まれる」、unbuild_wbtest.mbt が
+                「この木はこう書かれる」、reflect_wbtest.mbt が
                 「木がこう違えば md はここだけ変わる」を固定する
   view/         map が見る木。project が Doc から削るだけで作る
                 （`View { frontmatter, trees }`。frontmatter は画像フォルダの宣言のため）
   op/           操作。apply(doc, op) が Doc を Doc にする。席は隣の id で言う
                 （NodePlace / BlockPlace）。道具（splice / append / body）が
                 型の異種性を幽閉する。決めは core.md「操作」
-src/    TypeScript — UI。**描くだけ。** 選択・操作は操作の API が揃うまで無い（git に在る）
-  coreApi.ts   core の出口。JSON の形を整える唯一の場所。TS では必ず `core.View` と書く
-  editor.ts    Markdown 側(CodeMirror 6、履歴も CodeMirror。フェンスの中は
-               map/highlight.ts と同じ言語表で色を付ける)
-  mindmap.ts   Mindmap 側(視点と描画。パン・ズーム・ピンチ・寄せ・針・書き出し)
+src/    TypeScript — UI。**描いて、選ぶ。** 操作は次の段から（git に在る）
+  coreApi.ts   core の出口と入口。JSON の形を整える唯一の場所（survey が View・地番・
+               目印の行き先を 1 度に受ける）。TS では必ず `core.View` と書く
+  caret.ts     md のカーソルがどのノードに掛かっているか（最も深いもの。区間の重なりだけ）
+  editor.ts    Markdown 側(CodeMirror 6、履歴も CodeMirror。編集列とカーソルを外へ出し、
+               地図の選択を薄塗りで受ける。フェンスの中は map/highlight.ts と同じ言語表で色を付ける)
+  mindmap.ts   Mindmap 側(視点と描画と、選択の入力。叩く・矩形・矢印を値にして main へ渡し、
+               選択と輪を塗る。パン・ズーム・ピンチ・寄せ・針・書き出し)
   icons.ts     ボタンとメニューの絵の唯一の源(線で引く / currentColor)
   style.css    全体のスタイル(部品ごとの塊。入れ子は CSS 自身の機能)
   map/         その純粋層 — geometry(座標系。側 → 符号はここだけ) / camera(視点。
@@ -39,9 +44,10 @@ src/    TypeScript — UI。**描くだけ。** 選択・操作は操作の API 
                drawCard(カード 1 行 → SVG) / metrics(寸法の唯一の場所) /
                layout(View の木 → 箱。畳みの埋没と sides の zip もここ) /
                render(SVG の差分更新) / highlight(コードの色分け) /
+               select(選択の値と、入力でどう変わるか。矩形・矢印・点の当たり) /
                toSvg(1 枚の svg にする) / svg(要素を作る) / indicator(画面外の
                根を指す針) / gesture(指の台帳) / menu(メニューの器)
-  main.ts      束ねる場所(打鍵 → core.view → render の 1 本、ファイル I/O、帯)
+  main.ts      束ねる場所(打鍵 → core.survey → render の 1 本、選択と幽霊、ファイル I/O、帯)
   app/         その子系統 — name(文書の名前) / persist(テーマと色) /
                theme(テーマ・アクセントカラー・ロゴ) / panes(2 つの出し分けと分割線) /
                head(頭の宣言を読む。画像フォルダの場所はここが答える) /
@@ -51,7 +57,7 @@ src/    TypeScript — UI。**描くだけ。** 選択・操作は操作の API 
                paneTool(隅に浮く道具の器) / hint(白紙の言い出し) / notice / ask
 test/   検証 — core に触らない純粋層(camera / geometry / gesture / highlight /
         indicator / panes / share / assets)と、core の出口(coreApi)・分類(cards)・
-        配置(layout)。tools/(負荷サンプル生成)、fixtures/(負荷サンプル)
+        配置(layout)・select / caret。tools/(負荷サンプル生成)、fixtures/(負荷サンプル)
 docs/   記録 — spec.md はこのファイル、core.md は文書モデルの内部
         （型・パイプライン・道具の決め。spec.md は意味だけを持つ）、
         shortcuts.md はキーの一覧
