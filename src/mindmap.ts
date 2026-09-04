@@ -302,15 +302,16 @@ export class Mindmap {
     return true;
   }
 
-  /** カードをその場で開く。畳まれて埋もれている（箱が無い）ときは断る */
-  editCard(id: number, from?: number, to?: number): void {
+  /** カードをその場で開く。畳まれて埋もれている（箱が無い）ときは断る。
+   *  `text` は欄に載せる字（省略すれば md の原文）— 変えずに閉じれば書かない */
+  editCard(id: number, from?: number, to?: number, text = this.host.blockText(id)): void {
     const rect = this.cardRectOf(id);
     if (rect === null) {
       failed("Couldn't open that card");
       return;
     }
     this.host.setPicked(id);
-    this.card.open(id, rect, this.camera, this.host.blockText(id), from, to);
+    this.card.open(id, rect, this.camera, text, from, to);
   }
 
   /**
@@ -336,13 +337,14 @@ export class Mindmap {
     if (f !== null) this.editCard(f, 1, 1);
   }
 
-  /** 空のコードカードを足して、本文の行を打つ（``` の次の行） */
+  /** 空のコードカードを足して、本文の行を打つ。core は空のコードを開きと閉じの
+   *  2 行で書くので、欄には空行を 1 つ挟んだ形で載せ、そこに頭を置く（打たなければ書かない） */
   private addCode(id: number): void {
     const f = this.host.apply(
       { kind: "addBlock", at: { kind: "in", node: id }, content: { kind: "code", info: "", text: "" } },
       false,
     );
-    if (f !== null) this.editCard(f, 4, 4);
+    if (f !== null) this.editCard(f, 4, 4, "```\n\n```");
   }
 
   /**
