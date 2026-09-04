@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assetTarget, imageType } from "../src/app/assets.ts";
+import { assetTarget, imageType, mdPath, nameProblem } from "../src/app/assets.ts";
 
 // 保存したのに読み戻せなかったバグの回帰。
 // md に書くのは `./x`、カード側が持つのは `x`（cards.ts が `./` を剥がす）。
@@ -53,4 +53,17 @@ test("assetTarget: 絵でないものは、宣言の中にあっても読みに�
 test("assetTarget: 上へ出る宣言は、その中に収まる限り受け取る", () => {
   assert.deepEqual(assetTarget("../pics/", "../pics/a.webp"), ["a.webp"]);
   assert.deepEqual(assetTarget("../pics/", "../pics/sub/a.webp"), ["sub", "a.webp"]);
+});
+
+test("nameProblem — 空・. と ..・使えない字を咎め、通る名前は null", () => {
+  assert.equal(nameProblem("  "), "Give it a name");
+  assert.equal(nameProblem("a/../b"), "Folder names cannot be . or ..");
+  assert.equal(nameProblem("a:b"), "A file name cannot contain :");
+  assert.equal(nameProblem("pics/shot.webp"), null);
+});
+
+test("mdPath — md に書くのは ./ 付き。上へ出る道はそのまま", () => {
+  assert.equal(mdPath("x.webp"), "./x.webp");
+  assert.equal(mdPath("./x.webp"), "./x.webp");
+  assert.equal(mdPath("../x.webp"), "../x.webp");
 });

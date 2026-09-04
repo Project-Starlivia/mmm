@@ -1,16 +1,18 @@
-// Markdown からの相対パスで画像を読む。
+// Markdown からの相対パスで画像を読み書きする。
 //
 // **宣言（md から見てどこか）は .md の頭が持ち、許可（そのフォルダを読み書き
 // してよい）だけをここが持つ。** ブラウザはパス文字列からフォルダハンドルを
 // 作れないので、2 つに分かれること自体は避けられない — どちらが何の真実かを
 // 言い切ることで、食い違いを事故にしない。
 //
-// **宣言を書くのは操作の段。** 今は読むだけで、宣言が無い文書は `./`（md と
-// 同じ場所）として読む。指したフォルダが宣言と食い違っても直さない。
-// 画像を置く（`saveToDisk`）のも同じく操作なので、いまは無い。
+// **宣言を書くのはこの段の範囲外。** 宣言が無い文書は `./`（md と同じ場所）
+// として読み書きする。指したフォルダが宣言と食い違っても直さない — 宣言を
+// 書き換える／初めて決めるのは、まだ無い別の操作の仕事。
 
+import { type Field, type Part, ask } from "./ask.ts";
 import { handles } from "./handles.ts";
 import { io } from "./io.ts";
+import { bare } from "../map/cards.ts";
 import { under } from "./head.ts";
 
 export interface Assets {
@@ -37,6 +39,8 @@ export interface Assets {
   /** このブラウザがフォルダを選べるか（触る道具では持たないことがある） */
   canChooseFolder(): boolean;
   chooseFolder(): Promise<void>;
+  /** 画像を置き、md に書く相対パスを返す。取りやめ / 失敗は null */
+  saveToDisk(blob: Blob): Promise<string | null>;
 }
 
 /**
@@ -97,12 +101,82 @@ export function assetTarget(declared: string, path: string): string[] | null {
 async function nestedFile(
   root: FileSystemDirectoryHandle,
   parts: string[],
+  create: boolean,
 ): Promise<FileSystemFileHandle> {
   let directory = root;
   for (const part of parts.slice(0, -1)) {
-    directory = await directory.getDirectoryHandle(part);
+    directory = await directory.getDirectoryHandle(part, { create });
   }
-  return directory.getFileHandle(parts[parts.length - 1]);
+  return directory.getFileHandle(parts[parts.length - 1], { create });
+}
+
+export function mdPath(rel: string): string {
+  return rel.startsWith("../") ? rel : `./${rel.replace(/^\.\//, "")}`;
+}
+
+// ---- 画像の名前 ----
+//
+// **決めるのも咎めるのも 1 か所**。`nameProblem` はたずね箱が打鍵のたびに
+// 呼び、`nameParts` は通った値だけを受け取る — だめな値がここから先へ
+// 進むことは無いので、書き込む側で二度確かめない。
+
+/** 名前をフォルダの断片に割る（末尾が置くファイル） */
+const nameParts = (typed: string): string[] =>
+  typed
+    .trim()
+    .replace(/\.webp$/i, "")
+    .split("/")
+    .filter(Boolean);
+
+/** その名前では置けない理由。置けるなら null */
+export function nameProblem(typed: string): string | null {
+  const parts = nameParts(typed);
+  if (parts.length === 0) return "Give it a name";
+  if (parts.some((part) => part === "." || part === ".."))
+    return "Folder names cannot be . or ..";
+  const bad = parts.join("").match(/[\\:*?"<>|]/)?.[0];
+  return bad === undefined ? null : `A file name cannot contain ${bad}`;
+}
+
+/**
+ * フォルダの中に**既に在る**綴り（小文字・フォルダからの相対）。
+ *
+ * 名前がぶつかると `createWritable` は黙って上書きする。押す前に言えるよう、
+ * 箱を開く時点で 1 度だけ数える。数えられなくても、上書きの警告が出ない
+ * だけで先へは進める。
+ */
+async function taken(dir: FileSystemDirectoryHandle): Promise<Set<string>> {
+  const out = new Set<string>();
+  const walk = async (d: FileSystemDirectoryHandle, prefix: string): Promise<void> => {
+    for await (const [name, handle] of d.entries()) {
+      const path = `${prefix}${name}`;
+      // 型は名乗らせず確かめる（`kind` を見るだけでは絞り込めない）
+      if (handle instanceof FileSystemDirectoryHandle) await walk(handle, `${path}/`);
+      else out.add(path.toLowerCase());
+    }
+  };
+  try {
+    await walk(dir, "");
+  } catch {
+    /* 数えられない — 警告が出ないだけ */
+  }
+  return out;
+}
+
+async function webp(blob: Blob): Promise<Blob> {
+  if (blob.type === "image/webp") return blob;
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("2d コンテキストを作れない");
+    ctx.drawImage(bitmap, 0, 0);
+    const out = await canvas.convertToBlob({ type: "image/webp", quality: 0.92 });
+    if (out.type !== "image/webp") throw new Error("webp conversion failed");
+    return out;
+  } finally {
+    bitmap.close();
+  }
 }
 
 export function initAssets(deps: {
@@ -155,6 +229,38 @@ export function initAssets(deps: {
     return true;
   }
 
+  /** 握りが腐った。**捨てて、繋ぎ直しの駅へ落とす** — 腐ったまま持っていると
+   *  次も同じところで失敗する。宣言は md に残るので、指し直せば戻る */
+  function forget(): void {
+    cachedBinding = null;
+    live = false;
+    const file = io.currentFile();
+    if (file) void handles.forgetFolder(file);
+    releaseUrls();
+    deps.refresh();
+  }
+
+  /**
+   * 書けるフォルダを用意する。握っていればそれ、無ければ指してもらう。
+   * 取りやめは null。
+   */
+  async function ensureBinding(): Promise<AssetBinding | null> {
+    const binding = await storedBinding();
+    if (binding) {
+      const state = await binding.directory.queryPermission({ mode: "readwrite" });
+      if (
+        state === "granted" ||
+        (state === "prompt" &&
+          (await binding.directory.requestPermission({ mode: "readwrite" })) === "granted")
+      ) {
+        return binding;
+      }
+      // 許可が下りない札は腐っている。捨ててから指し直してもらう
+      forget();
+    }
+    return (await pick()) ? storedBinding() : null;
+  }
+
   async function loadAsset(path: string): Promise<void> {
     try {
       const binding = await storedBinding();
@@ -162,7 +268,7 @@ export function initAssets(deps: {
       const parts = assetTarget(declaredPath(), path);
       if (!parts) return;
       if ((await binding.directory.queryPermission({ mode: "read" })) !== "granted") return;
-      const file = await nestedFile(binding.directory, parts);
+      const file = await nestedFile(binding.directory, parts, false);
       // 種類は名前から引く（`assetTarget` を通った時点で必ず絵）
       const type = imageType(parts[parts.length - 1] ?? "") ?? "image/webp";
       const blob = await (await file.getFile()).arrayBuffer();
@@ -233,6 +339,80 @@ export function initAssets(deps: {
         await pick();
       } catch {
         deps.failed("Couldn't open the image folder");
+      }
+    },
+
+    async saveToDisk(blob) {
+      let binding: AssetBinding | null;
+      try {
+        binding = await ensureBinding();
+      } catch {
+        deps.failed("Couldn't open the image folder");
+        return null;
+      }
+      if (!binding) return null;
+
+      const now = new Date();
+      const two = (value: number): string => String(value).padStart(2, "0");
+      const initial =
+        `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}` +
+        `-${two(now.getHours())}${two(now.getMinutes())}${two(now.getSeconds())}`;
+
+      // **どれの名前を聞かれているのかを、絵が言う。** 何枚も続けて落とした
+      // ときは、字だけでは区別が付かない
+      const shot = URL.createObjectURL(blob);
+      const here = await taken(binding.directory);
+      const name: Field = {
+        value: initial,
+        check: (typed) => {
+          const why = nameProblem(typed);
+          if (why !== null) return why;
+          const parts = nameParts(typed);
+          const last = parts[parts.length - 1];
+          if (last === undefined) return null;
+          const at = [...parts.slice(0, -1), `${last}.webp`].join("/");
+          return here.has(at.toLowerCase()) ? "That name is taken" : null;
+        },
+      };
+      // **分かっているところは字、分からないところだけ欄。** フォルダは既に
+      // 決まっている（宣言、無ければ `./`）ので、打てるのは名前だけ
+      const shape: Part[] = ["![](", declaredPath(), name, ".webp)"];
+      let out: string[] | null;
+      try {
+        out = await ask({ title: "Name this image", ok: "Save", parts: shape, preview: shot });
+      } finally {
+        URL.revokeObjectURL(shot);
+      }
+      if (out === null) return null;
+      const typed = out[0] ?? "";
+
+      const parts = nameParts(typed);
+      const last = parts[parts.length - 1];
+      if (last === undefined) return null;
+      parts[parts.length - 1] = `${last}.webp`;
+
+      try {
+        const webpBlob = await webp(blob);
+        const file = await nestedFile(binding.directory, parts, true);
+        const stream = await file.createWritable();
+        try {
+          await stream.write(webpBlob);
+        } finally {
+          await stream.close();
+        }
+        const rel = `${declaredPath()}${parts.join("/")}`;
+        // 鍵はカード側が問い合わせてくる形（裸）に合わせる。
+        // md へ書くのは mdPath の形（`./x`）。
+        const old = assetUrls.get(bare(rel));
+        if (old) URL.revokeObjectURL(old);
+        assetUrls.set(bare(rel), URL.createObjectURL(webpBlob));
+        return mdPath(rel);
+      } catch {
+        // **触って失敗した握りは腐っている。** 抜かれた USB・消されたフォルダ
+        // を掴んだまま持っていると、次も同じところで転ぶ
+        deps.failed("Couldn't save the image");
+        forget();
+        return null;
       }
     },
   };

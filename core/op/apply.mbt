@@ -113,14 +113,21 @@ fn erase(doc : @tree.Doc, id : Int) -> @tree.Doc? {
 
 ///|
 /// 選んだものを文書順に消す。知らない id が 1 つでもあれば None。
+/// 中身を消したら、その持ち主が focus（消した後に選ぶべきもの）。ノードを消した
+/// 後に選ぶものは無い — 隣を選ぶのは UI の仕事（目印で追う）
 fn delete(doc : @tree.Doc, ids : Array[Int]) -> Done? {
   guard !ids.is_empty() && ids.all(id => has(doc, id)) else { return None }
   let mut cur = doc
+  let mut focus = None
   for id in pick(doc, ids) {
+    if owner(cur, block=id) is Some(o) {
+      focus = Some(o)
+    }
     guard erase(cur, id) is Some(d) else { return None }
     cur = d
   }
-  Some({ doc: cur, focus: None })
+  // 持ち主ごと消えていれば、選ぶものは無い
+  Some({ doc: cur, focus: focus.filter(o => has(cur, o)) })
 }
 
 ///|

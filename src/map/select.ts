@@ -114,3 +114,53 @@ export function extend(sel: Selection, next: number): Selection {
   }
   return { ids: sorted([...sel.ids, next]), anchor: next };
 }
+
+/** 親の id。根なら null */
+export const parentOf = (L: Layout, id: number): number | null => L.boxes.get(id)?.parent?.id ?? null;
+
+/** 同じ親の子（根なら根どうし）を文書順に */
+const siblingsOf = (L: Layout, id: number): number[] => {
+  const p = parentOf(L, id);
+  return L.order.filter((x) => parentOf(L, x) === p);
+};
+
+export function prevSibling(L: Layout, id: number): number | null {
+  const s = siblingsOf(L, id);
+  const i = s.indexOf(id);
+  return i > 0 ? s[i - 1] : null;
+}
+
+export function nextSibling(L: Layout, id: number): number | null {
+  const s = siblingsOf(L, id);
+  const i = s.indexOf(id);
+  return i >= 0 && i < s.length - 1 ? s[i + 1] : null;
+}
+
+/** id の祖先に ids のどれかが居るか（= 一緒に消える） */
+function under(L: Layout, id: number, ids: Set<number>): boolean {
+  let cur: number | null = id;
+  while (cur !== null) {
+    if (ids.has(cur)) return true;
+    cur = parentOf(L, cur);
+  }
+  return false;
+}
+
+/**
+ * 消した後に選ぶ隣。消す並びの次に残るノード、無ければ前に残るノード、無ければ null。
+ * 消える部分木（選んだものの子孫）は隣に数えない。文書順は親が子より先なので、
+ * 「前」にはいつも親が含まれる（先頭の根を消したときだけ前が無い）
+ */
+export function neighbor(L: Layout, ids: number[]): number | null {
+  const gone = new Set(ids);
+  const first = L.order.findIndex((x) => gone.has(x));
+  if (first === -1) return null;
+  const stays = (x: number): boolean => !under(L, x, gone);
+  const after = L.order.slice(first + 1).find(stays);
+  if (after !== undefined) return after;
+  return L.order.slice(0, first).reverse().find(stays) ?? null;
+}
+
+/** ちょうど 1 つ選んでいる id。宛先が 1 つに決まる操作はこれを見る */
+export const solo = (sel: Selection): number | null =>
+  sel.ids.length === 1 && sel.anchor !== null ? sel.anchor : null;

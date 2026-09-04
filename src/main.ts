@@ -3,8 +3,8 @@
 // 決して書かない。選択はここに値として在り、地図はそれを塗るだけ。
 // ここに居るのは、そのサイクルと、保存とファイル I/O、帯のメニュー。
 //
-// **操作の入口は `apply` 1 本。** 無いのは消す・並べ替え・ドラッグ・カード
-// （後の段で戻す。git に在る）。
+// **操作の入口は `apply` 1 本。** 地図のキー・メニュー・ドラッグ・カード・貼り付けは
+// すべて Op になってここを通る。
 
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import * as core from "./coreApi.ts";
@@ -25,6 +25,9 @@ import { ask, askText, askYesNo } from "./app/ask.ts";
 import { blocked, failed } from "./app/notice.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
+import { decidePaste } from "./app/paste.ts";
+import { initDrop } from "./app/dnd.ts";
+import { showDrawing } from "./app/draw.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 import { openOnClick } from "./map/menu.ts";
 
@@ -74,6 +77,9 @@ let doc: core.View = { frontmatter: null, trees: [] };
 let spots = new Map<number, core.Spot>();
 /** 何を選んでいるか。地図はこれを塗るだけで、自分では持たない */
 let selection: Selection = NONE;
+/** 選んでいるカードの中身の id。ノードの選択とは片方だけ（spec.md「C カード」）。
+ *  地図はこれも自分では持たない */
+let picked: number | null = null;
 
 /** 持ち越す目印と、それが anchor だったか。幽霊（当たらなかった目印）も同じ形で運ぶ */
 interface Carried {
@@ -146,8 +152,11 @@ function sync(next: string, edits: core.Edit[]): void {
   ids.sort((a, b) => a - b);
   selection = { ids, anchor: anchor ?? (ids.length ? ids[ids.length - 1] : null) };
   ghosts = kept;
+  // 中身の id はノードの目印を持たないので、マークでは追いかけない — 消えて
+  // いれば外すだけ（構造を変える操作で番号が振り直されることは受け入れる）
+  if (picked !== null && !spots.has(picked)) picked = null;
   map.render();
-  editor.highlight(selectedRanges());
+  editor.highlight(currentHighlight());
   // 白紙の言い出し。**出る理由は 1 つ**（まだ木が無い）で、マップ側も
   // render() の中で同じことを見ている
   editor.showHint(doc.trees.length === 0);
@@ -165,16 +174,35 @@ const selectedRanges = (): Range[] =>
     return s ? [{ from: s.from, to: s.to }] : [];
   });
 
-/** 地図で選び直した。幽霊は要らなくなる */
+/** 選んでいるカードの中身の md 側の範囲 */
+const pickedRange = (id: number): Range[] => {
+  const s = spots.get(id);
+  return s ? [{ from: s.from, to: s.to }] : [];
+};
+
+/** いま塗るべき範囲。ノードとカードの選択は片方だけなので、カードが在ればそちら */
+const currentHighlight = (): Range[] => (picked !== null ? pickedRange(picked) : selectedRanges());
+
+/** 地図で選び直した。カードの選択と幽霊は要らなくなる */
 function setSelection(sel: Selection, reveal: boolean): void {
+  picked = null;
   selection = sel;
   ghosts = [];
   map.refreshSelection();
-  editor.highlight(selectedRanges());
+  editor.highlight(currentHighlight());
   if (reveal && sel.anchor !== null) {
     const s = spots.get(sel.anchor);
     if (s) editor.reveal(s.from);
   }
+}
+
+/** カードを選び直した。ノードの選択は外れる */
+function setPicked(id: number | null): void {
+  selection = NONE;
+  ghosts = [];
+  picked = id;
+  map.refreshSelection();
+  editor.highlight(currentHighlight());
 }
 
 /**
@@ -182,21 +210,37 @@ function setSelection(sel: Selection, reveal: boolean): void {
  * 操作 1 回 = CodeMirror の 1 トランザクションで、undo は CodeMirror のもの。
  * 操作の直後は core の focus が選択を決める（新しいノードには目印が無い）。
  * できない操作は core が空の編集列で言う。いまは雑に、しらせを出すだけ
+ *
+ * `keep` は消す前に選んでおきたい隣の id（keys.ts の `neighbor`）。編集の
+ * 前に選択へ据えておけば、その目印が編集列をまたいで消した後の id まで
+ * 追いかける（段 1 の目印の仕組みに乗るだけで、ここでは何も特別しない）
+ *
+ * focus はノードとも中身とも限らない（`AddBlock` / `SetBlock` / `MoveBlock` は
+ * 中身の id を返す）。木を見て振り分ける — ノードなら選択して `edit` なら
+ * その場編集、中身ならカードとして選ぶ（中身の編集はカードの入口からしか
+ * 始まらない）。呼び出し側が続けられるよう focus を返す（Link / Code が使う）
  */
-function apply(op: core.Op, edit: boolean): void {
+function apply(op: core.Op, edit: boolean, keep: number | null = null): number | null {
   const r = core.edit(text, op);
   // core は断りを「編集なし・focus なし」で言う。編集が無くても focus が在るのは、
   // 何も変わらなかった操作（同じ名前への Rename など）で、しらせは出さない
   if (r.focus === null && r.edits.length === 0) {
     failed("Couldn't do that here");
-    return;
+    return null;
   }
+  // 断られた操作で選択を失わないよう、据えるのは通ってから
+  if (keep !== null) setSelection({ ids: [keep], anchor: keep }, false);
   if (r.edits.length > 0) editor.apply(r.edits); // → sync
-  if (r.focus === null) return;
+  if (r.focus === null) return null;
+  if (!core.isNode(doc, r.focus)) {
+    setPicked(r.focus);
+    return r.focus;
+  }
   // 同じノードに留まる操作（ラベルを打つ）で md を寄せ直さない
   setSelection({ ids: [r.focus], anchor: r.focus }, r.focus !== selection.anchor);
   // 畳まれて埋もれたノードには箱が無く、その場編集を開けない
   if (edit && !map.beginEdit(r.focus, null)) failed("Couldn't start editing — the node is folded");
+  return r.focus;
 }
 
 /** md のカーソルが動いた。掛かるノードに輪を出す（地図は動かさない） */
@@ -216,7 +260,15 @@ const host: MapHost = {
     })(),
   selection: () => selection,
   setSelection,
+  picked: () => picked,
+  setPicked,
+  blockText: (id) => {
+    const s = spots.get(id);
+    return s ? text.slice(s.from, s.to) : "";
+  },
   apply,
+  paste,
+  draw,
 };
 const map = new Mindmap(mapPane, host);
 
@@ -437,6 +489,108 @@ async function ensurePlace(): Promise<boolean> {
 }
 
 /**
+ * 画像をディスクへ置いて、そのノードの中身として足す（Image のブロック）。
+ * **貼り付け・ドロップ・お絵描きが通る唯一の道** — WebP への変換も名前の
+ * 確認も画像フォルダの結び付けも、`assets.saveToDisk` が 1 か所で持つ。
+ */
+async function attachImage(id: number, blob: Blob): Promise<void> {
+  const gen = docGen;
+  if (!(await ensurePlace())) return;
+  const rel = await assets.saveToDisk(blob);
+  // 置いているあいだに文書が入れ替わった（世代）／ノードが消えている（id）ことがある
+  if (rel === null || gen !== docGen || !core.isNode(doc, id)) return;
+  apply(
+    { kind: "addBlock", at: { kind: "in", node: id }, content: { kind: "image", alt: "", src: rel, title: "" } },
+    false,
+  );
+}
+
+/** お絵描きの窓が開いているか。二重に開かせない */
+let drawingOpen = false;
+
+/** Shift+D。窓を開いて描いてもらい、確定した絵を保存して足す */
+function draw(id: number): void {
+  if (drawingOpen) return;
+  drawingOpen = true;
+  void showDrawing()
+    .then((blob) => (blob === null ? undefined : attachImage(id, blob)))
+    .catch((error: unknown) => {
+      console.error("drawing failed:", error);
+      failed("Couldn't add the drawing");
+    })
+    .finally(() => {
+      drawingOpen = false;
+      mapPane.focus();
+    });
+}
+
+/**
+ * クリップボードを貼る（Mod+V）。画像はテキストより優先し、選んでいる
+ * ノード（anchor）へ足す。字は `decidePaste` の判定で振り分ける — 骨格
+ * （見出し・項目）があるかは core に読ませ、TS では `#` を見ない。
+ */
+function paste(): void {
+  const anchor = selection.anchor;
+  const gen = docGen;
+  void (async () => {
+    // クリップボードに画像があれば、テキストより優先する。
+    // try で囲うのは**クリップボードを読むところだけ** — 画像を置く処理まで
+    // 囲うと、フォルダ選択の失敗が「クリップボードが読めなかった」と
+    // 同じ扱いになり、黙ってテキストの道へ落ちてしまう
+    let img: Blob | null = null;
+    try {
+      if ("read" in navigator.clipboard) {
+        for (const item of await navigator.clipboard.read()) {
+          const t = item.types.find((x) => x.startsWith("image/"));
+          if (t) {
+            img = await item.getType(t);
+            break;
+          }
+        }
+      }
+    } catch {
+      /* clipboard.read が無い／断られた → 字の道へ */
+    }
+    if (gen !== docGen) return;
+    if (img !== null) {
+      if (anchor === null) {
+        failed("Select a node to paste an image into");
+        return;
+      }
+      await attachImage(anchor, img);
+      return;
+    }
+    const clip = await navigator.clipboard.readText();
+    if (gen !== docGen) return;
+    const hasSkeleton = (md: string): boolean => core.survey(md, [], []).view.trees.length > 0;
+    const action = decidePaste(clip, hasSkeleton);
+    switch (action.kind) {
+      case "noop":
+        return;
+      case "link":
+        if (anchor === null) {
+          failed("Select a node to paste a link into");
+          return;
+        }
+        apply(
+          { kind: "addBlock", at: { kind: "in", node: anchor }, content: { kind: "link", text: "", href: action.url, title: "" } },
+          false,
+        );
+        return;
+      case "labels":
+        apply({ kind: "addNode", at: { kind: "in", node: anchor ?? core.DOC_ID, side: null }, labels: action.labels }, false);
+        return;
+      case "md":
+        apply({ kind: "graft", at: { kind: "in", node: anchor ?? core.DOC_ID, side: null }, md: action.md }, false);
+        return;
+    }
+  })().catch((error: unknown) => {
+    console.error("paste failed:", error);
+    failed("Couldn't paste");
+  });
+}
+
+/**
  * 画像フォルダの状態。**言葉は宣言と許可の 2 つだけ**（app/assets.ts の冒頭が
  * 名付けたもの）。許可が無いときは宣言のパスを出す — どこを指していて届いて
  * いないのかが見えないと、直しようがない。
@@ -576,6 +730,20 @@ window.addEventListener("beforeunload", (event) => {
   if (text === savedText) return;
   event.preventDefault();
   event.returnValue = "";
+});
+
+// ---------- ドラッグ & ドロップ（振り分けは app/dnd.ts） ----------
+
+initDrop({
+  markDrop: (at) => map.markFileDrop(at),
+  failed,
+  async openMarkdown(file) {
+    if (!(await confirmDiscard())) return;
+    applyDoc(await io.openHandle(file));
+  },
+  async addImages(files, node) {
+    for (const file of files) await attachImage(node, await file.getFile());
+  },
 });
 
 // ---------- ペイン / 書き出し / テーマ / キー（実装は app/ 配下） ----------

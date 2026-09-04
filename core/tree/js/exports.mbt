@@ -54,10 +54,10 @@ pub fn mmm_unbuild_sig(md : String) -> String {
 /// 壊れた JSON は ts の側のバグなので、静かに断らず投げる。
 #export_name("mmmSurvey")
 pub fn mmm_survey(md : String, edits : String, marks : String) -> String {
-  let edits : Array[@tree.Edit] = try @json.from_json(@json.parse(edits)) catch {
+  let edits : Array[@tree.Edit] = @json.from_json(@json.parse(edits)) catch {
     e => abort("mmmSurvey: edits の JSON が読めない — \{e}")
   }
-  let marks : Array[@tree.Mark] = try @json.from_json(@json.parse(marks)) catch {
+  let marks : Array[@tree.Mark] = @json.from_json(@json.parse(marks)) catch {
     e => abort("mmmSurvey: marks の JSON が読めない — \{e}")
   }
   let (doc, spots) = @tree.survey(md)
@@ -67,9 +67,11 @@ pub fn mmm_survey(md : String, edits : String, marks : String) -> String {
     // Trail? のまま並べると、MoonBit の ToJson は Some を配列 1 つに包んでしまい
     // （builtin の Option::to_json）、ts の Trail | null と形が揃わない。
     // ここで当たり/外れを素の object / null に均す
-    trails: @tree.follow(spots, edits, marks).map(t => match t {
-      Some(x) => ToJson::to_json(x)
-      None => Json::null()
+    trails: @tree.follow(spots, edits, marks).map(t => {
+      match t {
+        Some(x) => ToJson::to_json(x)
+        None => Json::null()
+      }
     }),
   }
   ToJson::to_json(out).stringify()
@@ -90,7 +92,7 @@ priv struct Survey {
 /// （`raise` にすると JS 側が Result を受け取ってしまう）。
 #export_name("mmmEdit")
 pub fn mmm_edit(md : String, op : String) -> String {
-  let op : @op.Op = try @json.from_json(@json.parse(op)) catch {
+  let op : @op.Op = @json.from_json(@json.parse(op)) catch {
     e => abort("mmmEdit: op の JSON が読めない — \{e}")
   }
   @edit.edit(md, op).to_json().stringify()

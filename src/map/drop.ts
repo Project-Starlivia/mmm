@@ -1,0 +1,233 @@
+// ドラッグしたものをどこへ落とすかの決定。DOM も Mindmap も知らない純粋な層。
+//
+// マップでいちばん込み入った判断で、しかも「惜しい」が最も嫌われる場所
+// （右に置いたのに兄弟になる、近くの子の帯に吸われて狙った子と違う所に落ちる）。
+// だから見た目を塗る仕事から切り離して、ここだけを単体で試せるようにしてある。
+
+import type * as core from "../coreApi.ts";
+import { type Pt, centerOf, dirOf } from "./geometry.ts";
+import { type Box, type Layout, GAP } from "./layout.ts";
+
+/**
+ * ノード相手の落とし先（内部の刻み）。
+ * - `0` = target の子にする
+ * - `1` = target の直前へ挿入 / `2` = 直後へ挿入
+ */
+interface DropTarget {
+  id: number;
+  pos: 0 | 1 | 2;
+}
+
+/**
+ * 落とし先。**2 つだけ**:
+ * - `node` … 0 = 子の末尾 / 1 = 直前 / 2 = 直後
+ * - `side` … 根の脇。その側の末尾へ
+ */
+export type Drop = { kind: "node"; id: number; pos: 0 | 1 | 2 } | { kind: "side"; root: number; left: boolean };
+
+/** 判定に要るものすべて。世界座標で話す。 */
+export interface DropScene {
+  /** ポインタの位置 */
+  at: Pt;
+  layout: Layout;
+  /** いま掴んでいる部分木。落とし先から外す */
+  dragging: Set<number>;
+}
+
+const SLOP = 16; // 箱の左右へのはみ出しをどこまで箱の内と見るか
+const BAND = 40; // 前後への挿入を狙える帯の広さ
+const OPEN = BAND * 5; // 開いている側では同じ帯をここまで広げる
+const REACH = GAP.x * 4 + 16; // 「子にする」外側ゾーンを成長軸方向にどこまで伸ばすか
+// 子を優先するのは**親と子の列のあいだの通路**まで。次の列に入ったら、そこは
+// その列の住人（前後への挿入）のもの。通路より広く取っていたころは、列 N の
+// ノードが列 N+1 の兄弟挿入を横取りし、「下の兄弟にしたいのに隣の枝の子になる」
+// が起きていた（`f` の下の空きを、隣に並ぶ `b` が丸ごと持っていく）
+const NEAR = GAP.x;
+const SLACK = 18; // 外側ゾーンが兄弟軸方向に箱からはみ出してよい量
+
+/**
+ * 箱の中心から見たポインタの位置と、箱の半分の大きさ。
+ * `du` は**その枝が伸びる向き**を正とする（左の枝では左が正）ので、
+ * 外側ゾーンの式を左右で書き分けなくてよい。
+ */
+function local(at: Pt, b: Box) {
+  const c = centerOf(b);
+  return {
+    du: (at.x - c.x) * dirOf(b.parent?.side ?? "Right"),
+    dv: at.y - c.y,
+    hu: b.w / 2,
+    hv: b.h / 2,
+  };
+}
+
+/**
+ * 列の上端 / 下端のノードと、その「開いている側」。
+ *
+ * 兄弟は縦に積まれるので、上端の**上**と下端の**下**には競う相手がそもそも
+ * 居ない。そこは帯を広げても何も奪わない。同じ親でも左右で別の列になるので、
+ * 端は (親, 側) ごとに数える。
+ *
+ * 上下は文書順ではなく**箱の y** で決める（見た目の端がそのまま端になる）。
+ * 掴んでいるノードも数に入れる — ドラッグ中もその箱は元の場所に描かれた
+ * ままなので、見た目の上下端は動かない。
+ */
+function openEnds(scene: DropScene): { up: Set<number>; down: Set<number> } {
+  const first = new Map<string, Box>();
+  const last = new Map<string, Box>();
+  for (const id of scene.layout.order) {
+    const b = scene.layout.boxes.get(id);
+    if (!b || b.parent === null) continue; // 根に兄弟は無い
+    const key = `${b.parent.id},${b.parent.side}`;
+    const f = first.get(key);
+    if (!f || b.y < f.y) first.set(key, b);
+    const l = last.get(key);
+    if (!l || b.y + b.h > l.y + l.h) last.set(key, b);
+  }
+  return {
+    up: new Set([...first.values()].map((b) => b.node.id)),
+    down: new Set([...last.values()].map((b) => b.node.id)),
+  };
+}
+
+/**
+ * 通路（親の外側ゾーン）の縦の位置から、その親の子のどの隣かを決める。
+ * 子が 1 つも無ければ `null`（= 「最初の子にする」に落ちる）。
+ *
+ * 子は縦に積まれるので、いちばん近い子の上半分/下半分で手前/後ろが決まる。
+ * これは箱の帯（前後への挿入）とまったく同じ読み方で、場所が通路に変わる
+ * だけ — 通路と子の列で意味が変わらないので、指した高さがそのまま着地点。
+ */
+function slotAmongKids(scene: DropScene, parent: number): DropTarget | null {
+  let best = Infinity;
+  let hit: DropTarget | null = null;
+  for (const id of scene.layout.order) {
+    if (scene.dragging.has(id)) continue;
+    const b = scene.layout.boxes.get(id);
+    if (!b || b.parent?.id !== parent) continue;
+    const c = centerOf(b);
+    const d = Math.abs(scene.at.y - c.y);
+    if (d < best) {
+      best = d;
+      hit = { id, pos: scene.at.y < c.y ? 1 : 2 };
+    }
+  }
+  return hit;
+}
+
+/**
+ * 列の上端より上 / 下端より下の空白。**誰も取らなかったときだけ**拾う
+ * 最後の受け皿なので、外側ゾーン（子にする）も帯も奪わない。
+ *
+ * 横は帯と同じ「その列に居ること」（`hu + SLOP`）のまま。縦だけを `OPEN` まで
+ * 広げる。無制限にしないのは、**横に外す以外のキャンセルの手を残す**ため —
+ * 列の x に収まったまま上下にいくら離してもどこかへ落ちてしまう、では
+ * ドラッグを諦める手が横だけになる。
+ */
+function findOpenEnd(scene: DropScene): DropTarget | null {
+  const ends = openEnds(scene);
+  let best = Infinity;
+  let hit: DropTarget | null = null;
+  for (const id of scene.layout.order) {
+    if (scene.dragging.has(id)) continue;
+    const b = scene.layout.boxes.get(id);
+    if (!b) continue;
+    const { du, dv, hu, hv } = local(scene.at, b);
+    if (Math.abs(du) > hu + SLOP) continue;
+    const over = Math.abs(dv) - hv;
+    if (over <= 0 || over > OPEN) continue;
+    const up = dv < 0;
+    if (!(up ? ends.up : ends.down).has(id)) continue;
+    if (over < best) {
+      best = over;
+      hit = { id, pos: up ? 1 : 2 };
+    }
+  }
+  return hit;
+}
+
+/**
+ * どこへ落とすか。優先順は 4 段:
+ *   1. 箱の中
+ *   2. 前後への挿入（箱の上下の帯）
+ *   3. 外側ゾーン（REACH まで）… 近い側は NEAR まで帯より強い
+ *   4. 列の上端の上 / 下端の下（OPEN まで）… 誰も取らなかった空白
+ *
+ * 近くを子に振らないと、次の列の子の帯に吸われて「右に置いたのに兄弟になる」
+ * が起きる。逆に遠くまで子を優先させると前後への挿入がほぼ出せなくなるので、
+ * そこは前後に譲る。
+ */
+export function resolveDrop(scene: DropScene): Drop | null {
+  // ポインタがその箱の中心より左か。**側を決めるのはここだけ**
+  const sideOf = (b: Box): boolean => scene.at.x < centerOf(b).x;
+
+  // 帯は隣の兄弟と重なるので、最初に見つかった相手ではなく「いちばん近い」
+  // 相手を選ぶ。文書順で決めていたころは、親が違う子スタックの境目で
+  // どちらに倒れるかが実質その場の運になっていた。
+  let target: DropTarget | null = null;
+  let best = Infinity;
+  for (const id of scene.layout.order) {
+    if (scene.dragging.has(id)) continue;
+    const b = scene.layout.boxes.get(id);
+    if (!b) continue;
+    const { du, dv, hu, hv } = local(scene.at, b);
+    if (Math.abs(du) > hu + SLOP || Math.abs(dv) > hv + BAND) continue;
+    // 箱の中なら 0。外に出た分だけ距離が増える（兄弟軸のほうを重く見る）
+    const dist = Math.max(0, Math.abs(du) - hu) + Math.max(0, Math.abs(dv) - hv) * 2;
+    // 根に兄弟は無い。上に落ちたものはすべて子になる
+    const pos: 0 | 1 | 2 = b.parent === null ? 0 : dv < -hv * 0.4 ? 1 : dv > hv * 0.4 ? 2 : 0;
+    if (dist < best) {
+      best = dist;
+      target = { id, pos };
+    }
+  }
+
+  // 外側ゾーン: 箱の外、成長軸の方向へ少し出たところも「子にする」
+  let outTarget: DropTarget | null = null;
+  let bestOut = Infinity;
+  let outU = Infinity; // 選んだ相手の、箱の外縁からの距離
+  for (const id of scene.layout.order) {
+    if (scene.dragging.has(id)) continue;
+    const b = scene.layout.boxes.get(id);
+    if (!b) continue;
+    const { du, dv, hu, hv } = local(scene.at, b);
+    // 根は両方向に伸びる木の付け根なので、成長軸の判定を絶対値で見る
+    // （`local` の du は dirOf で片側だけ正にしてあるので、根では素のままだと右側しか拾えない）
+    const isRoot = b.parent === null;
+    const growOffset = isRoot ? Math.abs(du) : du;
+    if (growOffset <= hu || growOffset > hu + REACH || Math.abs(dv) > hv + SLACK) continue;
+    const d = growOffset - hu + Math.max(0, Math.abs(dv) - hv) * 2;
+    if (d < bestOut) {
+      bestOut = d;
+      outU = growOffset - hu;
+      // 既に子がいるなら、通路の**縦の位置**で「どの子の隣か」まで決める。
+      // 通路は子の列そのものではないが、縦は子の列とそのまま同じ意味を持つ
+      // （子は縦に積まれるので）。ここを一律「末尾に足す」に潰していたころは、
+      // 通路のどこを指しても印が最後の子の下に 1 点で出て、指した場所と
+      // 着地点が対応しなかった。根は側の話が乗るので触らない
+      outTarget = (isRoot ? null : slotAmongKids(scene, id)) ?? { id, pos: 0 };
+    }
+  }
+  // 外側ゾーンの**近い側は帯より強い**（右に置いたのに兄弟になる、を防ぐ）。
+  // 遠い側は「誰も取らない空間の受け皿」なので、帯が居れば譲る。
+  if (outTarget && best > 0 && (outU <= NEAR || !target)) target = outTarget;
+
+  // 誰も取らなかった空白は、開いている側の上下端が受ける
+  if (!target) target = findOpenEnd(scene);
+
+  // 木の根が相手の「子にする」は、**どちら側か**まで決まって初めて意味を持つ。
+  // ポインタが根の中心のどちら側にあるかで振り分ける（素のドラッグでの左右）
+  const asDrop = (t: DropTarget): Drop => {
+    if (t.pos !== 0) return { kind: "node", id: t.id, pos: t.pos };
+    const b = scene.layout.boxes.get(t.id);
+    if (b && b.parent !== null) return { kind: "node", id: t.id, pos: 0 };
+    return { kind: "side", root: t.id, left: b ? sideOf(b) : false };
+  };
+  return target ? asDrop(target) : null;
+}
+
+/** 落とし先を Op に。側は根のものなので In(root, side) で言う */
+export function dropOp(drop: Drop, ids: number[]): core.Op {
+  if (drop.kind === "side") return { kind: "moveNode", ids, at: { kind: "in", node: drop.root, side: drop.left ? "Left" : "Right" } };
+  if (drop.pos === 0) return { kind: "moveNode", ids, at: { kind: "in", node: drop.id, side: null } };
+  return { kind: "moveNode", ids, at: { kind: drop.pos === 1 ? "before" : "after", node: drop.id } };
+}

@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { decode, decodeSurvey, edit, edited, encode, survey } from "../src/coreApi.ts";
+import { type View, decode, decodeSurvey, edit, edited, encode, isNode, survey } from "../src/coreApi.ts";
 
 test("None の鍵は無い → null。Implicit は label が null", () => {
   const v = decode({ trees: [{ node: { id: 2, blocks: [], children: [] }, sides: [] }] });
@@ -141,6 +141,10 @@ test("Op は core の enum の形になる — kind が構築子名、null の�
     encode({ kind: "setBlock", id: 3, content: { kind: "svg", markup: "<svg/>" } }),
     ["SetBlock", { id: 3, content: ["Svg", "<svg/>"] }],
   );
+  assert.deepEqual(
+    encode({ kind: "setBlock", id: 3, content: { kind: "opaque", text: "x\n" } }),
+    ["SetBlock", { id: 3, content: ["Opaque", "x\n"] }],
+  );
 });
 
 test("Edited — focus の無い鍵は null", () => {
@@ -161,4 +165,26 @@ test("edit は core を往復する — 編集を当てれば名前が替わり�
 
 test("edit — 同じ名前への Rename は edits が空でも focus は在る（apply が断りと見分ける契約）", () => {
   assert.deepEqual(edit("# a\n", { kind: "rename", id: 2, label: "a" }), { edits: [], focus: 2 });
+});
+
+test("isNode — 根も子孫もノード、中身の id と知らない id は違う", () => {
+  const v: View = {
+    frontmatter: null,
+    trees: [
+      {
+        node: {
+          id: 2,
+          label: "r",
+          fold: null,
+          blocks: [{ id: 3, content: { kind: "thematicBreak" } }],
+          children: [{ id: 4, label: "a", fold: null, blocks: [], children: [] }],
+        },
+        sides: ["Right"],
+      },
+    ],
+  };
+  assert.equal(isNode(v, 2), true);
+  assert.equal(isNode(v, 4), true);
+  assert.equal(isNode(v, 3), false);
+  assert.equal(isNode(v, 9), false);
 });

@@ -33,7 +33,9 @@ export type Content =
   | { kind: "svg"; markup: string }
   | { kind: "thematicBreak" }
   /** `<details>`。open / summary / body は GitHub が描くのと同じ読み取り。text は原文 */
-  | { kind: "details"; text: string; open: boolean; summary: string | null; body: string };
+  | { kind: "details"; text: string; open: boolean; summary: string | null; body: string }
+  /** 読み解かない原文。View には来ない — その場編集が原文をそのまま書き戻すときに送る */
+  | { kind: "opaque"; text: string };
 
 export interface Node {
   id: number;
@@ -54,6 +56,13 @@ export interface Tree {
 export interface View {
   frontmatter: string | null;
   trees: Tree[];
+}
+
+/** id がノードのものか（中身の id なら false）。木を辿って確かめる —
+ *  ノードと中身は同じ通し番号を分け合うので、種類は木の形からしか読めない */
+export function isNode(view: View, id: number): boolean {
+  const under = (n: Node): boolean => n.id === id || n.children.some(under);
+  return view.trees.some((t) => under(t.node));
 }
 
 /** 地番。ノードが md のどこに書かれているか。label はラベルの頭（Implicit と文書の散文は null） */
@@ -293,6 +302,7 @@ export function encode(v: Tagged): unknown {
   const { kind, ...rest } = v;
   const tag = kind.charAt(0).toUpperCase() + kind.slice(1);
   if (kind === "svg" && "markup" in v) return [tag, v.markup];
+  if (kind === "opaque" && "text" in v) return [tag, v.text];
   const fields: Record<string, unknown> = {};
   for (const [k, x] of Object.entries(rest)) {
     if (x === null) continue;

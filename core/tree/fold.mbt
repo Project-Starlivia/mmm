@@ -18,16 +18,17 @@ priv enum Piece {
   Folded(@markdown.Block, fold~ : Fold, at~ : @markdown.Span)
   /// 綴りとして読めなかった領域。原文のまま中身になる。open / summary / body は
   /// GitHub が描くのと同じ読み取り（最初の開きと、その直後の名前と、閉じまでの間）。
-  /// `to` は原文での尻（地番になる）
+  /// `from`・`to` は原文での範囲（地番になる）
   Capsule(
     text~ : String,
     open~ : Bool,
     summary~ : String?,
     body~ : String,
+    from~ : Int,
     to~ : Int
   )
   /// mdAst がブロックとして返さないもの（リンクの定義行）。原文のまま中身になる
-  Text(String, to~ : Int)
+  Text(String, from~ : Int, to~ : Int)
 }
 
 ///|
@@ -310,6 +311,7 @@ fn capsule(
     open~,
     summary~,
     body=strip(md, inner, spots[tail].tag.from),
+    from~,
     to=upto,
   )
 }
@@ -596,6 +598,7 @@ fn pieces(
         out.push(
           Text(
             carve(md, defs[d].from, defs[d].to),
+            from=defs[d].from,
             to=eol_after(md, defs[d].to),
           ),
         )
