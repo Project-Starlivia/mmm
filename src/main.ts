@@ -185,11 +185,13 @@ function setSelection(sel: Selection, reveal: boolean): void {
  */
 function apply(op: core.Op, edit: boolean): void {
   const r = core.edit(text, op);
-  if (r.edits.length === 0) {
+  // core は断りを「編集なし・focus なし」で言う。編集が無くても focus が在るのは、
+  // 何も変わらなかった操作（同じ名前への Rename など）で、しらせは出さない
+  if (r.focus === null && r.edits.length === 0) {
     failed("Couldn't do that here");
     return;
   }
-  editor.apply(r.edits); // → sync
+  if (r.edits.length > 0) editor.apply(r.edits); // → sync
   if (r.focus === null) return;
   // 同じノードに留まる操作（ラベルを打つ）で md を寄せ直さない
   setSelection({ ids: [r.focus], anchor: r.focus }, r.focus !== selection.anchor);

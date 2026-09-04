@@ -158,3 +158,7 @@ test("edit は core を往復する — 編集を当てれば名前が替わり�
   assert.equal(r.focus, 2);
   assert.deepEqual(edit("# a\n", { kind: "rename", id: 9, label: "b" }), { edits: [], focus: null });
 });
+
+test("edit — 同じ名前への Rename は edits が空でも focus は在る（apply が断りと見分ける契約）", () => {
+  assert.deepEqual(edit("# a\n", { kind: "rename", id: 2, label: "a" }), { edits: [], focus: 2 });
+});
