@@ -10,20 +10,34 @@ import { bare, cardRows } from "../src/map/cards.ts";
 /** id は分類に関係ないので、ここでは 1 で揃える */
 const block = (content: core.Content): core.Block => ({ id: 1, content });
 
-test("Block の種類がカードの種類になり、水平線と Details は落ちる", () => {
+test("Block の種類がカードの種類になる。並びは Block のまま", () => {
   const rows = cardRows([
     block({ kind: "image", alt: "", src: "./p.png", title: "" }),
     block({ kind: "thematicBreak" }),
     block({ kind: "link", text: "t", href: "https://x.example/a", title: "" }),
     block({ kind: "code", info: "js", text: "1\n" }),
-    block({ kind: "details", text: "<details>x</details>" }),
+    block({ kind: "details", text: "<details>x</details>", open: false, summary: null, body: "x" }),
     block({ kind: "svg", markup: "<svg/>" }),
   ]);
   assert.deepEqual(rows, [
     { kind: "img", path: "p.png", name: "p.png" },
+    { kind: "rule" },
     { kind: "link", title: "t", url: "https://x.example/a" },
     { kind: "code", lang: "js", lines: ["1"] },
+    { kind: "details", open: false, summary: null, lines: ["x"] },
     { kind: "svg", markup: "<svg/>" },
+  ]);
+});
+
+test("details は open と summary をそのまま持ち、中身はコードと同じ割り方", () => {
+  const d = (open: boolean, summary: string | null, body: string) =>
+    cardRows([block({ kind: "details", text: "", open, summary, body })]);
+  assert.deepEqual(d(true, "s", "a\n\nb\n"), [
+    { kind: "details", open: true, summary: "s", lines: ["a", "", "b"] },
+  ]);
+  assert.deepEqual(d(false, null, ""), [{ kind: "details", open: false, summary: null, lines: [""] }]);
+  assert.deepEqual(d(false, null, "1\n2\n3\n4\n5\n6\n7"), [
+    { kind: "details", open: false, summary: null, lines: ["1", "2", "3", "4", "5", "…"] },
   ]);
 });
 

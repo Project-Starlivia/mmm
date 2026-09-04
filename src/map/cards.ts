@@ -2,8 +2,7 @@
 // 寸法（metrics）も DOM も知らない。
 //
 // md の読みは core が済ませている。ここが見るのは core が「これは画像・リンク・
-// コード・SVG だ」と言った Block だけで、原文はもう無い。
-// 水平線と Details はカードにしない（Details は spec「今は隠すだけ」）。
+// コード・SVG・水平線・details だ」と言った Block だけで、原文はもう無い。
 
 import type * as core from "../coreApi.ts";
 
@@ -12,7 +11,12 @@ export type CardRow =
   | { kind: "link"; title: string; url: string }
   | { kind: "img"; path: string; name: string }
   | { kind: "svg"; markup: string }
-  | { kind: "code"; lang: string; lines: string[] };
+  | { kind: "code"; lang: string; lines: string[] }
+  /** 装飾の水平線。書かれた場所にそのまま 1 本の線 */
+  | { kind: "rule" }
+  /** `<details>`。GitHub と同じく、閉じていれば summary（無ければ Details）だけ、
+   *  開いていれば中身の字も。開閉は md の `open` に従う（map だけの状態は持たない） */
+  | { kind: "details"; open: boolean; summary: string | null; lines: string[] };
 
 /**
  * 先頭の `./` を落とした形。`./x` と `x` は同じ場所を指すので、比べる前に
@@ -49,8 +53,11 @@ function imageCard(src: string): CardRow | null {
   return { kind: "img", path, name };
 }
 
-/** 行に割る。core の text は末尾に改行を持つので 1 つ剥がす。タブは 2 幅 */
-function codeCard(info: string, text: string): CardRow {
+/**
+ * 字を行に割る。末尾の改行は行にならない。タブは 2 幅。CODE_MAX_LINES を超えたら
+ * 最後の行を `…` にし、空なら 1 行（場所は取る）。コードも details の中身も同じ割り方
+ */
+function linesOf(text: string): string[] {
   const body =
     text === ""
       ? []
@@ -58,13 +65,11 @@ function codeCard(info: string, text: string): CardRow {
           .replace(/\n$/, "")
           .split("\n")
           .map((l) => l.replace(/\t/g, "  "));
-  const lines =
-    body.length > CODE_MAX_LINES
-      ? [...body.slice(0, CODE_MAX_LINES - 1), "…"]
-      : body.length > 0
-        ? body
-        : [""];
-  return { kind: "code", lang: info, lines };
+  return body.length > CODE_MAX_LINES
+    ? [...body.slice(0, CODE_MAX_LINES - 1), "…"]
+    : body.length > 0
+      ? body
+      : [""];
 }
 
 function cardOf(b: core.Content): CardRow | null {
@@ -73,13 +78,14 @@ function cardOf(b: core.Content): CardRow | null {
       return imageCard(b.src);
     case "link":
       return linkCard(b.text, b.href);
-    case "code":
-      return codeCard(b.info, b.text);
     case "svg":
       return { kind: "svg", markup: b.markup };
+    case "code":
+      return { kind: "code", lang: b.info, lines: linesOf(b.text) };
     case "thematicBreak":
+      return { kind: "rule" };
     case "details":
-      return null;
+      return { kind: "details", open: b.open, summary: b.summary, lines: linesOf(b.body) };
   }
 }
 

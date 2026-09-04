@@ -118,7 +118,15 @@ test "Opaque だけが落ちる。並びも id も保つ" {
     { id: 6, content: @tree.Code(info="js", text="1\n") },
     { id: 7, content: @tree.Svg("<svg/>") },
     { id: 8, content: @tree.ThematicBreak },
-    { id: 9, content: @tree.Details("<details>x</details>") },
+    {
+      id: 9,
+      content: @tree.Details(
+        text="<details>x</details>",
+        open=false,
+        summary=None,
+        body="x",
+      ),
+    },
   ]
   json_inspect(project(doc([root(heading(2, "a", body~))])), content={
     "trees": [
@@ -138,7 +146,13 @@ test "Opaque だけが落ちる。並びも id も保つ" {
             { "id": 6, "content": ["Code", { "info": "js", "text": "1\n" }] },
             { "id": 7, "content": ["Svg", "<svg/>"] },
             { "id": 8, "content": "ThematicBreak" },
-            { "id": 9, "content": ["Details", "<details>x</details>"] },
+            {
+              "id": 9,
+              "content": [
+                "Details",
+                { "text": "<details>x</details>", "open": false, "body": "x" },
+              ],
+            },
           ],
           "children": [],
         },

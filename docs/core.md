@@ -23,7 +23,8 @@ Eol   = Lf | Crlf
 Block   { id, content: Content }            // 中身 1 枚。id はノードと同じ列
 Content = Image | Link | Code | Svg         // 解釈の包みは無い
         | ThematicBreak                     // 境界にならなかった水平線
-        | Details(text)                     // <details>。領域の原文
+        | Details(text, open, summary, body) // <details>。text は領域の原文で、書き戻しはこれだけ。
+                                            // 残りは GitHub が描くのと同じ読み取り（導出はしない）
         | Opaque(text)                      // 読み解かない原文
 ```
 

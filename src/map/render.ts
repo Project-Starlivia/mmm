@@ -48,6 +48,9 @@ interface NodeShape {
   hint: string | null;
 }
 
+const sameLines = (a: string[], b: string[]): boolean =>
+  a.length === b.length && a.every((l, i) => l === b[i]);
+
 /** カード 1 枚が、描き直しを要するほど変わったか */
 function sameRow(a: CardRow, b: CardRow): boolean {
   if (a.kind === "link" && b.kind === "link") {
@@ -56,11 +59,11 @@ function sameRow(a: CardRow, b: CardRow): boolean {
   if (a.kind === "svg" && b.kind === "svg") return a.markup === b.markup;
   if (a.kind === "img" && b.kind === "img") return a.path === b.path;
   if (a.kind === "code" && b.kind === "code") {
-    return (
-      a.lang === b.lang &&
-      a.lines.length === b.lines.length &&
-      a.lines.every((l, i) => l === b.lines[i])
-    );
+    return a.lang === b.lang && sameLines(a.lines, b.lines);
+  }
+  if (a.kind === "rule" && b.kind === "rule") return true;
+  if (a.kind === "details" && b.kind === "details") {
+    return a.open === b.open && a.summary === b.summary && sameLines(a.lines, b.lines);
   }
   return false;
 }

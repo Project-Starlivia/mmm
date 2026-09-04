@@ -169,7 +169,9 @@ export function cardRows(blocks: Block[]): CardRow[];   // 見るのは content�
 - `image` は相対パス（scheme 無し。1 文字はドライブ）のときだけ img。外部の画像は出さない
 - `link` は `http(s)` のときだけ。題が空ならホスト名
 - `code` は行に割り、6 行を超えたら `…`。`svg` はそのまま
-- `thematicBreak` / `details` はカードにしない（Details は spec「今は隠すだけ」）
+- `thematicBreak` は細い線の行、`details` は GitHub と同じ見え方（summary か `Details`、
+  `open` なら中身の字）。開閉は md の `open` に従う（追記: 2026-09-04、最初は出さない
+  つもりだったが、書いてあるのに何も出ないのは読めないので出すことにした）
 - TS 側の md 読み（`parseLink` / `parseImage` / フェンス走査 / `linkLine` /
   `imageDest`）は消える。`bare` だけ残す（画像の鍵）
 - カードは表示専用。pick / その場編集 / 移動 / 削除は無い
