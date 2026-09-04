@@ -10,8 +10,9 @@
     <header>
       <h1>mmm lab</h1>
       <p>
-        md を打つと <b>mdAst</b> と <b>mmmTree</b>、そして書き戻した <b>md</b> が出る。
+        md を打つと <b>mdAst</b>・<b>mmmTree</b>・<b>View</b> と、書き戻した <b>md</b> が出る。
         mdAst が変なら読みの問題、mdAst が正しくて mmmTree が変なら build の問題、
+        mmmTree が正しくて View が変なら project の問題、
         木は正しいのに戻した mdAst が変なら unbuild の問題。
       </p>
     </header>
@@ -32,6 +33,9 @@
 
         <label>mmmTree<span>JSON</span></label>
         <pre id="json" class="grow"></pre>
+
+        <label>View<span>map が見る木。mmmTree から削っただけ</span></label>
+        <pre id="view" class="grow"></pre>
       </section>
 
       <section class="pane">

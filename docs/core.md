@@ -44,7 +44,26 @@ check が見るもの — id 一意 / Implicit は子を持つ / `sides` と根�
 畳みの名前が `<summary>` に書ける。**`open` と名前が畳みのときだけ在ることは
 型が殺す**（`fold : Fold?` に括ってあるので、畳みでなければ持ちようがない）。
 
-`project(Doc)` が左右に振り分けた木を作り、JSON で ts へ渡す。
+### View — map が見る木
+
+`project(Doc)`（`view/`）が Doc から**削るだけ**で作り、JSON で ts へ渡す。
+足すものは無い。
+
+```
+Tree { node: Node, sides: [Side] }          // 側は Root と同じ。根の子と並走
+Node { id, label: String?, fold: Fold?, blocks: [Block], children: [Node] }
+```
+
+- **ノードの種類は無い。** Doc が 3 種に分けている理由は全部 md の書き方の
+  制約で、描く側には 1 つも要らない
+- **Implicit は `label` が無い。** 空の見出し（`## `）は `Some("")` なので
+  型で区別が付く。旗も種類も要らない
+- **`blocks` は body から Opaque を落としたもの。** core が「読み解かない」と
+  裁定したものだけが map に届かない。何がカードかは描く側の分類のまま
+- 書き戻すためだけの欄（frontmatter・eol・散文の body）は無い
+- **id は Doc のまま。** parse は文書順に振るので、上に見出しを足すと下の id が
+  ずれる。前回の木と突き合わせて id を保つ段（reconcile）は project の次に置く。
+  それが入った瞬間から「id は文書順」ではなくなるので、順序を id に読ませない
 
 ## パイプライン
 
