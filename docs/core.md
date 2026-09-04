@@ -47,8 +47,18 @@ Content = Image | Link | Code | Svg         // 解釈の包みは無い
 （深さで型が変わると走査も操作も割れる）。長さが揃うことは型では言えない。
 
 check が見るもの — id 一意（ノードも中身も） / Implicit は子を持つ / `sides` と根の子の長さが揃う /
-畳みの名前が `<summary>` に書ける。**`open` と名前が畳みのときだけ在ることは
+畳みの名前が `<summary>` に書ける / **md に書けない並びが無い**。**`open` と名前が畳みのときだけ在ることは
 型が殺す**（`fold : Fold?` に括ってあるので、畳みでなければ持ちようがない）。
+
+md に書けない並びは 4 つ。読みが前後の行から意味を決めるので、木としては組めても
+書いて読み直すと別の木になる。
+- 中身の尻の水平線に骨格が続く（`BorderBreak`）— 境界（側の変わり目）に読まれる
+- 見出し（綴られた・綴られない）に境界なしで続く項目・Implicit（`Swallowed`）—
+  項目はその見出しの子に読まれ、Implicit の飛びはその見出しの深さから測られる。
+  側が変わる所には `---` が書かれるので飲み込まれない
+- 項目の根の子に Left（`ListSide`）— 項目の中の `---` は中身なので側を書けない
+- Implicit の直下の項目（`GappedItem`）— 項目は相対記法で深さが飛ばないので、
+  飛びを綴れない（書くと Implicit が消え、項目は 1 つ浅く読まれる）
 
 ### View — map が見る木
 
@@ -82,6 +92,8 @@ TS では必ず持ち主を付けて `core.View` / `core.Node` と書く（`impo
 読み   md ──mizchi/markdown──> mdAst ──build──> Doc + 地番 ──project──> View
 書き   Doc ──unbuild──> mdAst ──mizchi/markdown──> 正規形の md
 反映   md + 前の Doc + 地番 + 後の Doc ──reflect──> 編集リスト ──> CodeMirror
+操作   Doc ──apply(op)──> Doc
+境界   md + Op ──edit──> 編集リスト + focus        // survey → apply → reflect（edit/）
 ```
 
 **サイクルは 1 本**。md が変わったら必ず 読み → project → 描画。無限ループしないのは
@@ -253,7 +265,8 @@ Done = { doc, focus: Int? }       // 操作後の木と、そこで選ぶべき 
   書けなければ名無しで畳む）。Implicit は畳めない
 - **比例性** — 操作の影響は、選んだ部分木とその親の中に収まる
 - **文字列は常に md として解釈される。** ラベル専用のエスケープや拒否は作らない
-- **apply の結果は check を通る。** 通らなければ操作のバグ
+- **apply は check を通る木しか返さない。** md に書けない並び（上の 4 つ）は、
+  操作ごとに規則を写さず、組んだ結果を check に通して `None` で断る。規則は check の 1 つ
 - 新しい id は文書に無い番号（最大 + 1）。既存の id は振り直さない（反映が前後を
   id の等しさで突き合わせる）。undo は core に無い — 反映が純粋関数なので
   CodeMirror のもの
@@ -267,6 +280,34 @@ Done = { doc, focus: Int? }       // 操作後の木と、そこで選ぶべき 
 `body`（中身の列）がその上に乗る。席を「親と添字」に読み替えるのはこの中だけで、
 Op も ts も数えない。行き先は 4 つ(roots / 見出しの子 / 項目の子 / 中身)で、
 **これより増え始めたら設計を疑う。**
+
+## 境界 — edit/
+
+`edit(md, op) -> Edited { edits, focus }` が操作と反映を繋ぐ唯一の場所。
+core はここでも状態を持たず、操作 1 回ごとに md を読み直す。
+
+```
+(before, spans) = survey(md)
+done            = apply(before, op)            // None なら edits は空、focus も無い
+edits           = reflect(md, before, spans, done.doc)
+focus           = number(done.doc, done.focus) // 読み直したときの id
+```
+
+**focus は読み直した木の id。** 操作は新しいノードに max+1 を振るが、読みは文書順に
+振り直すので、そのままでは指せない。`number(doc, id)`（build.mbt）が読みと同じ
+振り方（文書の中身 → 根ごとに ノード → その中身 → 子）で番号を先に言う。反映の
+検証（形の一致）が通る限り、これが読み直しの id と一致する。
+
+**結合の法則は law_wbtest.mbt が総当たりで回す** — 見本 × 全 id × Op の作り方
+（op の check の法則と同じ）で、「編集を当てて読み直せば apply の後の木と形が
+一致し、読み替えた focus は同じ部分木を指す。できない操作は編集も focus も無い」。
+これが操作 × 反映の結合そのもので、UI を通さずに固定できる。
+md に書けない並び（check）と、項目の中の 2 つ目の列の深さは、この法則が見つけた。
+
+**browser への出口は `core/tree/js` の `mmmEdit(md, opJson) -> json`** 1 つ。
+`Op` と `Content` を JSON から起こす（FromJson）のはここで、形は ToJson と同じ
+（`["Rename", {id, label}]`。`None` の鍵は無い）。ts 側は `coreApi.ts` の
+`edit(md, op)` で、`kind` を構築子名に読み替えるのはそこ 1 か所。
 
 ## 決まっていないこと
 
@@ -283,8 +324,6 @@ Op も ts も数えない。行き先は 4 つ(roots / 見出しの子 / 項目�
   もう読まれない。開いたときにどう案内するか
 - **Reform（モード）と綴りの変換。** 開いたときの自動判定も core の読み関数として
   一緒に足す。変換が入ったら `MoveNode` の「見出しを項目の下へ」の `None` を開ける
-- **境界。** `edit(md, op) -> { edits, focus }` は反映が入ってから。
-  `survey → apply → reflect` を繋ぎ、focus は後の Doc を文書順に振り直して読み替える
 - **fold の `open` の見せ方**と、`Shift+H` が 2 状態を巡回するか 3 状態か
 - **`Interpose(id, target)`**（Shift+ドラッグ）。道具は Wrap と同じ
 - **`Comment(ids)`**。断片に依存し、入口も未決

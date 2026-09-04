@@ -4,7 +4,18 @@
 // 途中で失敗しても元の doc は変わらない（道具が純粋なので）。
 
 ///|
+/// **md に書ける木しか返さない。** 何が書けないかは check が 1 つで言う
+/// （骨格の直前の水平線・見出しに飲み込まれる項目・項目の根の側）ので、
+/// 操作ごとに規則を写さず、組んだ結果を check に通して断る。
 pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
+  match attempt(doc, op) {
+    Some(d) if @tree.check(d.doc).is_empty() => Some(d)
+    _ => None
+  }
+}
+
+///|
+fn attempt(doc : @tree.Doc, op : Op) -> Done? {
   match op {
     Rename(id~, label~) => rename(doc, id, label)
     Fold(id~, open~) => fold(doc, id, open)
@@ -285,9 +296,12 @@ fn flip(doc : @tree.Doc, id : Int) -> Done? {
       let taken = []
       guard take(doc, [id], taken) is Some(rest) else { return None }
       let mut wrapped = taken[0]
-      for _ in 0..<(depth - 2) {
-        wrapped = @tree.ImplicitNode({ id: next, children: [wrapped] })
-        next = next + 1
+      // 項目は相対記法で深さを持たないので、飛びを綴れない。直に深さ 2 へ
+      if !(wrapped is ListNode(_)) {
+        for _ in 0..<(depth - 2) {
+          wrapped = @tree.ImplicitNode({ id: next, children: [wrapped] })
+          next = next + 1
+        }
       }
       let root_id = id_of(r.node)
       // 根の Implicit は引き出す相手しか持たないことがある。掃除で消えた根は、

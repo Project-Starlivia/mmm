@@ -408,3 +408,39 @@ test "setext の見出しは境界の先でも深さ 2" {
     ],
   })
 }
+
+///|
+/// 手で組んだ木の id は文書順でないことがある（操作が足したノードは max+1）。
+/// 読み直せば文書順に振り直されるので、その番号を先に言えるようにする。
+test "number — 文書順に振り直したときの番号。中身も同じ列、先頭に足せば後ろがずれる" {
+  fn leaf(id : Int, label : String) -> Node {
+    HeadingNode({ id, label, fold: None, body: [], children: [] })
+  }
+
+  let d : Doc = {
+    frontmatter: None,
+    eol: Lf,
+    body: [{ id: 2, content: ThematicBreak }],
+    roots: [
+      { node: leaf(999, "n"), sides: [] },
+      {
+        node: HeadingNode({
+          id: 3,
+          label: "r",
+          fold: None,
+          body: [{ id: 4, content: ThematicBreak }],
+          children: [leaf(5, "a"), leaf(998, "m")],
+        }),
+        sides: [Right, Right],
+      },
+    ],
+  }
+  assert_eq(number(d, doc_id), Some(doc_id))
+  assert_eq(number(d, 2), Some(2))
+  assert_eq(number(d, 999), Some(3))
+  assert_eq(number(d, 3), Some(4))
+  assert_eq(number(d, 4), Some(5))
+  assert_eq(number(d, 5), Some(6))
+  assert_eq(number(d, 998), Some(7))
+  assert_eq(number(d, 8), None)
+}

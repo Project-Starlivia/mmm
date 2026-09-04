@@ -89,7 +89,7 @@ pub(all) enum Sign {
 pub(all) enum Side {
   Right
   Left
-} derive(Eq, Debug, ToJson)
+} derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 /// 原文の改行の流儀。保存して書き戻す。
@@ -124,4 +124,4 @@ pub(all) enum Content {
   Details(text~ : String, open~ : Bool, summary~ : String?, body~ : String)
   /// 読み解かない原文。コメントもここ
   Opaque(String)
-} derive(Eq, Debug, ToJson)
+} derive(Eq, Debug, ToJson, FromJson)

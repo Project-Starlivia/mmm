@@ -82,3 +82,16 @@ priv struct Survey {
   spots : Map[Int, @tree.Spot]
   trails : Array[Json]
 } derive(ToJson)
+
+///|
+/// 操作を md に映す。op は `@op.Op` の JSON（ToJson の形そのまま）。
+/// 返るのは編集列と、編集を当てて読み直した木での focus。
+/// 壊れた JSON は ts の側のバグなので、静かに断らず投げる
+/// （`raise` にすると JS 側が Result を受け取ってしまう）。
+#export_name("mmmEdit")
+pub fn mmm_edit(md : String, op : String) -> String {
+  let op : @op.Op = try @json.from_json(@json.parse(op)) catch {
+    e => abort("mmmEdit: op の JSON が読めない — \{e}")
+  }
+  @edit.edit(md, op).to_json().stringify()
+}

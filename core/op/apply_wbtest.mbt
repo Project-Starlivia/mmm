@@ -425,8 +425,9 @@ test "MoveNode で根の間へ行けば新しい根、根を子にすれば側�
 
 ///|
 test "MoveNode は綴りを保つ。項目は見出しの下に置け、見出しは項目の下に置けない" {
+  // 見出しの直後の項目は境界（側の変わり目）が無いと飲み込まれる
   let d = doc([
-    root(h(2, "r", children=[h(3, "a"), item(4, "b")]), sides=[Right, Right]),
+    root(h(2, "r", children=[h(3, "a"), item(4, "b")]), sides=[Right, Left]),
   ])
   assert_eq(
     run(d, MoveNode(ids=[4], at=NodePlace::In(node=3, side=None))),
@@ -443,11 +444,12 @@ test "MoveNode は綴りを保つ。項目は見出しの下に置け、見出�
     run(d, MoveNode(ids=[3], at=NodePlace::In(node=4, side=None))),
     None,
   )
+  // 見出しは項目の後ろに置ける（項目の枠は見出しの親になれず、落ちる）。側は隣のもの
   assert_eq(
-    run(d, MoveNode(ids=[3], at=NodePlace::Before(node=4))),
+    run(d, MoveNode(ids=[3], at=NodePlace::After(node=4))),
     Some({
       doc: doc([
-        root(h(2, "r", children=[h(3, "a"), item(4, "b")]), sides=[Right, Right]),
+        root(h(2, "r", children=[item(4, "b"), h(3, "a")]), sides=[Left, Left]),
       ]),
       focus: Some(3),
     }),
@@ -483,7 +485,7 @@ test "FlipSide の 3 段: 根は鏡像、根の子は 1 つ、深いものは反
         h(3, "a", children=[h(4, "x", children=[h(5, "y")])]),
         h(6, "b"),
       ]),
-      sides=[Right, Left],
+      sides=[Right, Right],
     ),
   ])
   assert_eq(
@@ -495,7 +497,7 @@ test "FlipSide の 3 段: 根は鏡像、根の子は 1 つ、深いものは反
             h(3, "a", children=[h(4, "x", children=[h(5, "y")])]),
             h(6, "b"),
           ]),
-          sides=[Left, Right],
+          sides=[Left, Left],
         ),
       ]),
       focus: Some(2),
@@ -510,13 +512,14 @@ test "FlipSide の 3 段: 根は鏡像、根の子は 1 つ、深いものは反
             h(3, "a", children=[h(4, "x", children=[h(5, "y")])]),
             h(6, "b"),
           ]),
-          sides=[Right, Right],
+          sides=[Right, Left],
         ),
       ]),
       focus: Some(6),
     }),
   )
-  // y は深さ 4。反対側（Left）の末尾へ、Implicit 2 枚で深さを保つ
+  // y は深さ 4。反対側（Left）の末尾へ、Implicit 2 枚で深さを保つ。
+  // 直前の b と側が変わるので境界が書かれ、Implicit は b に飲み込まれない
   assert_eq(
     run(d, FlipSide(id=5)),
     Some({
@@ -527,12 +530,50 @@ test "FlipSide の 3 段: 根は鏡像、根の子は 1 つ、深いものは反
             h(6, "b"),
             gap(8, [gap(7, [h(5, "y")])]),
           ]),
-          sides=[Right, Left, Left],
+          sides=[Right, Right, Left],
         ),
       ]),
       focus: Some(5),
     }),
   )
+}
+
+///|
+/// 項目は相対記法で深さを持たないので、Implicit で包まず直に深さ 2 へ。
+test "FlipSide の深い項目は Implicit で包まず引き出す" {
+  let d = doc([
+    root(h(2, "r", children=[item(3, "i", children=[li(4, "j")])]), sides=[
+      Right,
+    ]),
+  ])
+  assert_eq(
+    run(d, FlipSide(id=4)),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[item(3, "i"), item(4, "j")]), sides=[
+          Right,
+          Left,
+        ]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+}
+
+///|
+/// 深いノードを引き出した先が、直前の兄弟と同じ側なら境界が無く、
+/// Implicit はその兄弟に飲み込まれる（check が言う）。
+test "FlipSide の深いノードは、引き出す先に境界が無ければ None" {
+  let d = doc([
+    root(
+      h(2, "r", children=[
+        h(3, "a", children=[h(4, "x", children=[h(5, "y")])]),
+        h(6, "b"),
+      ]),
+      sides=[Right, Left],
+    ),
+  ])
+  assert_eq(run(d, FlipSide(id=5)), None)
 }
 
 ///|
@@ -740,19 +781,21 @@ test "Graft は空・知らない id・項目の下に見出し、に None" {
 /// 代表的な木に、代表的な Op を総当たりで当て、Some ならその結果が
 /// check を通ることを見る。落ちた Op と破れを並べる。
 test "apply の結果は check を通る" {
+  // 見出しの直後の項目・Implicit は飲み込まれるので、項目を先に置く（check が言う）
   let base = doc([
+    root(item(11, "e"), sides=[]),
     root(
       h(2, "r", body=[pic(3)], children=[
         h(4, "a", children=[
-          gap(5, [h(6, "x")]),
           item(7, "b", children=[li(8, "c")]),
+          gap(5, [h(6, "x")]),
         ]),
         h(9, "d", body=[code(10)]),
       ]),
       sides=[Right, Left],
     ),
-    root(item(11, "e"), sides=[]),
   ])
+  json_inspect(@tree.check(base), content=[])
   let ids = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
   let ops : Array[Op] = []
   for id in ids {
@@ -789,6 +832,6 @@ test "apply の結果は check を通る" {
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="371")
+  inspect(some, content="293")
   json_inspect(bad, content=[])
 }

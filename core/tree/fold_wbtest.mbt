@@ -2198,3 +2198,41 @@ test "中身の Details は open と summary と中身を読む" {
     },
   )
 }
+
+///|
+/// 項目の中の畳みの後ろに兄弟の項目が続いても、兄弟は部分木の外なので畳みは立つ
+/// （見出しの下の「項目の畳みも領域の後ろを見る」と同じ理屈）。
+test "項目の中の畳みは、兄弟の項目が続いても立つ" {
+  json_inspect(
+    parse(
+      "- a\n\n  <details>\n  <summary>b</summary>\n\n  - b\n\n  </details>\n\n  - c\n",
+    ),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "ListNode",
+            {
+              "id": 2,
+              "label": "a",
+              "body": [],
+              "children": [
+                {
+                  "id": 3,
+                  "label": "b",
+                  "fold": { "open": false, "summary": "b" },
+                  "body": [],
+                  "children": [],
+                },
+                { "id": 4, "label": "c", "body": [], "children": [] },
+              ],
+            },
+          ],
+          "sides": ["Right", "Right"],
+        },
+      ],
+    },
+  )
+}

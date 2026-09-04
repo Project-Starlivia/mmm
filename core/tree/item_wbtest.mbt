@@ -469,3 +469,35 @@ test "境界のあとの兄弟項目は同じ深さに並ぶ" {
     ],
   })
 }
+
+///|
+/// **項目の深さは持ち主の 1 つ下。** 同じ項目の中身に列が 2 つあれば
+/// （間に中身が挟まれば列は割れる）、2 つ目は前の列の子ではなく兄弟。
+test "項目の中の 2 つ目の列は前の列の兄弟" {
+  json_inspect(parse("- a\n\n  - b\n\n  text\n\n  - c\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "a",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "b",
+                "body": [{ "id": 4, "content": ["Opaque", "text"] }],
+                "children": [],
+              },
+              { "id": 5, "label": "c", "body": [], "children": [] },
+            ],
+          },
+        ],
+        "sides": ["Right", "Right"],
+      },
+    ],
+  })
+}

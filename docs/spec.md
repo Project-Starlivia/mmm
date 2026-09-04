@@ -29,9 +29,12 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
   op/           操作。apply(doc, op) が Doc を Doc にする。席は隣の id で言う
                 （NodePlace / BlockPlace）。道具（splice / append / body）が
                 型の異種性を幽閉する。決めは core.md「操作」
+  edit/         境界。edit(md, op) が survey → apply → reflect を繋ぎ、編集列と
+                読み直した木での focus を返す。law_wbtest.mbt が操作 × 反映の結合を
+                総当たりで固定する。決めは core.md「境界」
 src/    TypeScript — UI。**描いて、選ぶ。** 操作は次の段から（git に在る）
   coreApi.ts   core の出口と入口。JSON の形を整える唯一の場所（survey が View・地番・
-               目印の行き先を 1 度に受ける）。TS では必ず `core.View` と書く
+               目印の行き先を 1 度に受け、edit が Op を送る）。TS では必ず `core.View` と書く
   caret.ts     md のカーソルがどのノードに掛かっているか（最も深いもの。区間の重なりだけ）
   editor.ts    Markdown 側(CodeMirror 6、履歴も CodeMirror。編集列とカーソルを外へ出し、
                地図の選択を薄塗りで受ける。フェンスの中は map/highlight.ts と同じ言語表で色を付ける)
