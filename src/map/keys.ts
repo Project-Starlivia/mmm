@@ -4,7 +4,7 @@
 
 import * as core from "../coreApi.ts";
 import type { Layout } from "./layout.ts";
-import { NONE, type Selection, all, arrow, extend, isArrowKey } from "./select.ts";
+import { NONE, type Selection, all, arrow, extend, isArrowKey, neighbor, nextSibling, parentOf, prevSibling } from "./select.ts";
 
 /** 押されたキー。mod は Ctrl / Cmd のどちらか */
 export interface Key {
@@ -16,13 +16,18 @@ export interface Key {
 
 /** 何をするか */
 export type Intent =
-  /** 操作を md に映す。edit なら focus をそのまま編集開始 */
-  | { kind: "op"; op: core.Op; edit: boolean }
+  /** 操作を md に映す。edit なら focus をそのまま編集開始。keep は消した後に
+   *  選び直す隣 — 編集の前に選んでおけば、目印がそれを追いかける */
+  | { kind: "op"; op: core.Op; edit: boolean; keep?: number }
   /** その場編集に入る。seed は最初の字（空のノードで打ち始めたとき） */
   | { kind: "edit"; id: number; seed: string | null }
   | { kind: "select"; sel: Selection; reveal: boolean }
   /** 選択（無ければ根）を画面の中心へ */
-  | { kind: "center" };
+  | { kind: "center" }
+  /** クリップボードの URL をリンクカードにして題を打つ / 空のコードを足して打つ / 描いて貼る（Task 4・5 が実行） */
+  | { kind: "link"; id: number }
+  | { kind: "code"; id: number }
+  | { kind: "draw"; id: number };
 
 const op = (o: core.Op): Intent => ({ kind: "op", op: o, edit: true });
 
@@ -44,10 +49,18 @@ const solo = (sel: Selection): number | null =>
  * - Tab / Shift+Tab だけは複数選んでいると段下げ・上げ（次の段）に化けるので、いまは拾わない
  */
 export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
-  if (k.alt) return null;
+  // Alt が意味を持つのは Alt+↑↓（並べ替え）だけ。それ以外の Alt の組は拾わない。
+  // ここで先に他のキーだけ弾く — Alt+↑↓ 自身の判断は後ろの専用の行に任せる
+  // （Alt を真っ先に全部捨てると、並べ替えが書けなくなる）
+  if (k.alt && k.key !== "ArrowUp" && k.key !== "ArrowDown") return null;
   const anchor = sel.anchor;
   const label = anchor === null ? null : (L.boxes.get(anchor)?.node.label ?? null);
   const blank = label === "";
+  if (k.shift && !k.mod && !k.alt && (k.key === "L" || k.key === "C" || k.key === "D")) {
+    const id = solo(sel);
+    if (id === null) return null;
+    return k.key === "L" ? { kind: "link", id } : k.key === "C" ? { kind: "code", id } : { kind: "draw", id };
+  }
   if (k.key === "Enter") {
     if (L.order.length === 0) return add({ kind: "in", node: core.DOC_ID, side: null });
     if (anchor === null) return null;
@@ -58,8 +71,44 @@ export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
   }
   if (k.key === "Tab" && !k.mod) {
     const id = solo(sel);
-    if (id === null) return null;
-    return k.shift ? op({ kind: "wrap", id, label: "" }) : add({ kind: "in", node: id, side: null });
+    if (id !== null) {
+      return k.shift ? op({ kind: "wrap", id, label: "" }) : add({ kind: "in", node: id, side: null });
+    }
+    if (sel.ids.length < 2) return null;
+    const first = sel.ids[0];
+    if (k.shift) {
+      const p = parentOf(L, first);
+      return p === null ? null : { kind: "op", op: { kind: "moveNode", ids: sel.ids, at: { kind: "after", node: p } }, edit: false };
+    }
+    const prev = prevSibling(L, first);
+    return prev === null
+      ? null
+      : { kind: "op", op: { kind: "moveNode", ids: sel.ids, at: { kind: "in", node: prev, side: null } }, edit: false };
+  }
+  if ((k.key === "Delete" || k.key === "Backspace") && !k.mod) {
+    if (sel.ids.length === 0) return null;
+    const keep = neighbor(L, sel.ids);
+    const o: Intent = { kind: "op", op: { kind: "delete", ids: sel.ids }, edit: false };
+    return keep === null ? o : { ...o, keep };
+  }
+  if (k.alt && (k.key === "ArrowUp" || k.key === "ArrowDown") && !k.mod) {
+    if (sel.ids.length === 0) return null;
+    const first = sel.ids[0];
+    const last = sel.ids[sel.ids.length - 1];
+    const at: core.NodePlace | null =
+      k.key === "ArrowUp"
+        ? ((p) => (p === null ? null : { kind: "before" as const, node: p }))(prevSibling(L, first))
+        : ((n) => (n === null ? null : { kind: "after" as const, node: n }))(nextSibling(L, last));
+    return at === null ? null : { kind: "op", op: { kind: "moveNode", ids: sel.ids, at }, edit: false };
+  }
+  if (k.alt) return null;
+  if (k.key === "H" && k.shift && !k.mod) {
+    if (anchor === null) return null;
+    const node = L.boxes.get(anchor)?.node ?? null;
+    if (node === null || node.label === null) return null;
+    return node.fold !== null
+      ? { kind: "op", op: { kind: "unfold", id: anchor }, edit: false }
+      : { kind: "op", op: { kind: "fold", id: anchor, open: false }, edit: false };
   }
   if (k.key === "Escape") return { kind: "select", sel: NONE, reveal: false };
   if (k.key === "Home" && !k.mod) return { kind: "center" };

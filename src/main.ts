@@ -182,8 +182,13 @@ function setSelection(sel: Selection, reveal: boolean): void {
  * 操作 1 回 = CodeMirror の 1 トランザクションで、undo は CodeMirror のもの。
  * 操作の直後は core の focus が選択を決める（新しいノードには目印が無い）。
  * できない操作は core が空の編集列で言う。いまは雑に、しらせを出すだけ
+ *
+ * `keep` は消す前に選んでおきたい隣の id（keys.ts の `neighbor`）。編集の
+ * 前に選択へ据えておけば、その目印が編集列をまたいで消した後の id まで
+ * 追いかける（段 1 の目印の仕組みに乗るだけで、ここでは何も特別しない）
  */
-function apply(op: core.Op, edit: boolean): void {
+function apply(op: core.Op, edit: boolean, keep: number | null = null): void {
+  if (keep !== null) setSelection({ ids: [keep], anchor: keep }, false);
   const r = core.edit(text, op);
   // core は断りを「編集なし・focus なし」で言う。編集が無くても focus が在るのは、
   // 何も変わらなかった操作（同じ名前への Rename など）で、しらせは出さない

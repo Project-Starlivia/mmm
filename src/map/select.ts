@@ -114,3 +114,52 @@ export function extend(sel: Selection, next: number): Selection {
   }
   return { ids: sorted([...sel.ids, next]), anchor: next };
 }
+
+/** 親の id。根なら null */
+export const parentOf = (L: Layout, id: number): number | null => L.boxes.get(id)?.parent?.id ?? null;
+
+/** 同じ親の子（根なら根どうし）を文書順に */
+const siblingsOf = (L: Layout, id: number): number[] => {
+  const p = parentOf(L, id);
+  return L.order.filter((x) => parentOf(L, x) === p);
+};
+
+export function prevSibling(L: Layout, id: number): number | null {
+  const s = siblingsOf(L, id);
+  const i = s.indexOf(id);
+  return i > 0 ? s[i - 1] : null;
+}
+
+export function nextSibling(L: Layout, id: number): number | null {
+  const s = siblingsOf(L, id);
+  const i = s.indexOf(id);
+  return i >= 0 && i < s.length - 1 ? s[i + 1] : null;
+}
+
+/** id の祖先に ids のどれかが居るか（= 一緒に消える） */
+function under(L: Layout, id: number, ids: Set<number>): boolean {
+  let cur: number | null = id;
+  while (cur !== null) {
+    if (ids.has(cur)) return true;
+    cur = parentOf(L, cur);
+  }
+  return false;
+}
+
+/**
+ * 消した後に選ぶ隣。消す並びの次の見えているノード、無ければ前、無ければ先頭の親。
+ * 消える部分木（選んだものの子孫）は隣に数えない。無ければ null
+ */
+export function neighbor(L: Layout, ids: number[]): number | null {
+  const gone = new Set(ids);
+  const stays = L.order.filter((x) => !under(L, x, gone));
+  const first = L.order.findIndex((x) => gone.has(x));
+  const last = L.order.length - 1 - [...L.order].reverse().findIndex((x) => gone.has(x));
+  if (first === -1) return null;
+  const after = L.order.slice(last + 1).find((x) => stays.includes(x));
+  if (after !== undefined) return after;
+  const before = L.order.slice(0, first).reverse().find((x) => stays.includes(x));
+  if (before !== undefined) return before;
+  const p = parentOf(L, L.order[first]);
+  return p !== null && stays.includes(p) ? p : null;
+}

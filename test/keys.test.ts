@@ -89,9 +89,13 @@ test("空のノードで字を打てば、その字から編集。名前があ�
   assert.equal(keyed(L, one(4), k("x", { mod: true })), null);
 });
 
-test("複数選んでいるときの Tab / Shift+Tab は何もしない（段下げは次の段）", () => {
+test("複数選んでいるときの Tab / Shift+Tab は段 2 で拾うようになった（本段）。先頭に前の兄弟が無ければ Tab は拾わない", () => {
   assert.equal(keyed(L, { ids: [3, 4], anchor: 4 }, k("Tab")), null);
-  assert.equal(keyed(L, { ids: [3, 4], anchor: 4 }, k("Tab", { shift: true })), null);
+  assert.deepEqual(keyed(L, { ids: [3, 4], anchor: 4 }, k("Tab", { shift: true })), {
+    kind: "op",
+    op: { kind: "moveNode", ids: [3, 4], at: { kind: "after", node: 2 } },
+    edit: false,
+  });
   assert.equal(keyed(L, NONE, k("Tab")), null);
 });
 
@@ -128,4 +132,82 @@ test("段 1 のキーはそのまま — 矢印は select、Shift+矢印は伸�
 test("拾わないキーは null（ブラウザに渡す）", () => {
   assert.equal(keyed(L, one(3), k("F5")), null);
   assert.equal(keyed(L, one(3), k("Enter", { alt: true })), null);
+});
+
+test("Delete は選択を消し、隣を keep する", () => {
+  assert.deepEqual(keyed(L, one(3), k("Delete")), {
+    kind: "op",
+    op: { kind: "delete", ids: [3] },
+    edit: false,
+    keep: 4,
+  });
+  assert.deepEqual(keyed(L, { ids: [3, 4], anchor: 4 }, k("Backspace")), {
+    kind: "op",
+    op: { kind: "delete", ids: [3, 4] },
+    edit: false,
+    keep: 2,
+  });
+  assert.equal(keyed(L, NONE, k("Delete")), null);
+});
+
+test("Alt+↑↓ は塊を前の兄弟の前 / 次の兄弟の後ろへ。端では拾わない", () => {
+  assert.deepEqual(keyed(L, one(4), k("ArrowUp", { alt: true })), {
+    kind: "op",
+    op: { kind: "moveNode", ids: [4], at: { kind: "before", node: 3 } },
+    edit: false,
+  });
+  assert.deepEqual(keyed(L, one(3), k("ArrowDown", { alt: true })), {
+    kind: "op",
+    op: { kind: "moveNode", ids: [3], at: { kind: "after", node: 4 } },
+    edit: false,
+  });
+  assert.equal(keyed(L, one(3), k("ArrowUp", { alt: true })), null);
+  assert.equal(keyed(L, one(4), k("ArrowDown", { alt: true })), null);
+});
+
+test("複数選択の Tab は先頭の前の兄弟の子へ、Shift+Tab は先頭の親の後ろへ", () => {
+  const M: Layout = layoutMap(
+    [tree(node(2, "r", [node(3, "a"), node(4, "b", [node(5, "c"), node(6, "d")])]), ["Right", "Right"])],
+    size,
+  );
+  assert.deepEqual(keyed(M, { ids: [5, 6], anchor: 6 }, k("Tab", { shift: true })), {
+    kind: "op",
+    op: { kind: "moveNode", ids: [5, 6], at: { kind: "after", node: 4 } },
+    edit: false,
+  });
+  assert.deepEqual(keyed(M, { ids: [4, 6], anchor: 6 }, k("Tab")), {
+    kind: "op",
+    op: { kind: "moveNode", ids: [4, 6], at: { kind: "in", node: 3, side: null } },
+    edit: false,
+  });
+  // 先頭 a(3) に前の兄弟は無い / 根の親は無い
+  assert.equal(keyed(M, { ids: [3, 4], anchor: 4 }, k("Tab")), null);
+  assert.equal(keyed(M, { ids: [2, 3], anchor: 3 }, k("Tab", { shift: true })), null);
+});
+
+test("Shift+H は畳む / 畳みを外す。Implicit と無選択は拾わない", () => {
+  const F: Layout = layoutMap(
+    [
+      tree(
+        node(2, "r", [
+          { id: 3, label: "a", fold: { open: false, summary: "a" }, blocks: [], children: [] },
+          node(4, null, [node(5, "x")]),
+        ]),
+        ["Right", "Right"],
+      ),
+    ],
+    size,
+  );
+  assert.deepEqual(keyed(F, one(2), k("H", { shift: true })), { kind: "op", op: { kind: "fold", id: 2, open: false }, edit: false });
+  assert.deepEqual(keyed(F, one(3), k("H", { shift: true })), { kind: "op", op: { kind: "unfold", id: 3 }, edit: false });
+  assert.equal(keyed(F, one(4), k("H", { shift: true })), null);
+  assert.equal(keyed(F, NONE, k("H", { shift: true })), null);
+});
+
+test("Shift+L / Shift+C / Shift+D は 1 つ選んでいるときだけ拾う", () => {
+  assert.deepEqual(keyed(L, one(3), k("L", { shift: true })), { kind: "link", id: 3 });
+  assert.deepEqual(keyed(L, one(3), k("C", { shift: true })), { kind: "code", id: 3 });
+  assert.deepEqual(keyed(L, one(3), k("D", { shift: true })), { kind: "draw", id: 3 });
+  assert.equal(keyed(L, { ids: [3, 4], anchor: 4 }, k("L", { shift: true })), null);
+  assert.equal(keyed(L, NONE, k("L", { shift: true })), null);
 });

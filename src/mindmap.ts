@@ -1,13 +1,14 @@
 // マップのペイン。core の View を layout で箱にし、render で SVG に写す。
 //
 // 持っているのは視点（Camera）と、それを動かす入力（ホイール・ドラッグ・
-// ピンチ・クリック・矩形・矢印）と、画面外の根を指す針だけ。**選択の値は
-// 持たない** — 入力を map/select.ts の値にして host へ渡し、返ってきた
-// Selection を塗るだけ。値そのものは main.ts が持つ。あるのは選択、その場
-// 編集、Enter / Tab の新規。消す・動かす・カードは次の段。
+// ピンチ・クリック・矩形・矢印・右クリック・長押し）と、画面外の根を指す針
+// だけ。**選択の値は持たない** — 入力を map/select.ts の値にして host へ渡し、
+// 返ってきた Selection を塗るだけ。値そのものは main.ts が持つ。あるのは
+// 選択、その場編集、消す・並べ替え・畳み・側の操作。カードは次の段。
 
 import type * as core from "./coreApi.ts";
 import { type Camera, type Pane, centerOn, fitToPane, panBy, panToShow, pinch, toWorld, zoomAt } from "./map/camera.ts";
+import { type Entry, contextItems } from "./map/context.ts";
 import { unionRect } from "./map/geometry.ts";
 import { Fingers } from "./map/gesture.ts";
 import { indicatorFor, isVisible } from "./map/indicator.ts";
@@ -15,6 +16,7 @@ import { type Intent, keyed } from "./map/keys.ts";
 import { LabelEditor } from "./map/label.ts";
 import { type Layout, layoutMap, rootBox } from "./map/layout.ts";
 import { labelOf, nodeSize } from "./map/metrics.ts";
+import { ContextMenu, type MenuEntry } from "./map/menu.ts";
 import { MapRenderer } from "./map/render.ts";
 import { NONE, type Selection, click, hit, rubber } from "./map/select.ts";
 import { svgEl } from "./map/svg.ts";
@@ -36,14 +38,17 @@ export interface MapHost {
   selection(): Selection;
   /** 地図で選び直した。reveal は md 側をその頭へスクロールするか */
   setSelection(sel: Selection, reveal: boolean): void;
-  /** 操作を md に映す。edit なら、映した後の focus をそのまま編集開始 */
-  apply(op: core.Op, edit: boolean): void;
+  /** 操作を md に映す。edit なら、映した後の focus をそのまま編集開始。
+   *  keep は消す前に選んでおきたい隣の id（keys.ts の Intent の keep） */
+  apply(op: core.Op, edit: boolean, keep?: number): void;
 }
 
 /** 全体を収めるときの余白（画面 px） */
 const FIT_MARGIN = 60;
 /** 矢印で辿るとき、選んだ箱が縁から離れている距離（画面 px） */
 const SHOW_MARGIN = 40;
+/** 長押しが右クリックメニューに化けるまでの間（ms） */
+const HOLD_MS = 500;
 
 /** その出来事の的が `selector` に当てはまる要素（かその中）なら、それを返す */
 function targetIn(e: Event, selector: string): Element | null {
@@ -76,6 +81,14 @@ export class Mindmap {
   /** Space を押している間、左ドラッグはパン */
   private spaceHeld = false;
   private label: LabelEditor;
+  /** 右クリック（と長押し）のメニュー */
+  private menu = new ContextMenu();
+  /** 長押しの待ち時計。無ければ待っていない */
+  private hold: ReturnType<typeof setTimeout> | null = null;
+  /** 長押しを起こした指の押した場所。動かせば捨てる */
+  private holdAt: { x: number; y: number } | null = null;
+  /** 直前に開いたメニューが長押しから来たか。続く contextmenu を握り潰すため */
+  private menuOpenedByHold = false;
 
   constructor(pane: HTMLElement, host: MapHost) {
     this.pane = pane;
@@ -117,6 +130,7 @@ export class Mindmap {
     this.bindWheel();
     this.bindPointer();
     this.bindClick();
+    this.bindContextMenu();
     this.bindKeys();
     this.applyCamera();
     // a fitView requested while the pane had no size runs once it gets one
@@ -351,6 +365,16 @@ export class Mindmap {
       if (e.pointerType === "touch") {
         // 指は離したときに選ぶ（なぞったら選ばない）
         this.tapped = id === null ? null : { id, x: e.clientX, y: e.clientY };
+        // 長押しは右クリックの代わり。動かさずに HOLD_MS 待てばメニューを開く
+        this.holdAt = { x: e.clientX, y: e.clientY };
+        this.hold = setTimeout(() => {
+          const at = this.holdAt;
+          this.dropHold();
+          if (!at) return;
+          this.tapped = null;
+          this.menuOpenedByHold = true;
+          this.openMenu(at.x, at.y);
+        }, HOLD_MS);
         return;
       }
       if (id !== null) {
@@ -378,6 +402,9 @@ export class Mindmap {
       if (this.tapped && Math.hypot(e.clientX - this.tapped.x, e.clientY - this.tapped.y) > 8) {
         this.tapped = null;
       }
+      if (this.holdAt && Math.hypot(e.clientX - this.holdAt.x, e.clientY - this.holdAt.y) > 8) {
+        this.dropHold();
+      }
       if (this.rubberStart) {
         const p = this.local(e.clientX, e.clientY);
         const x = Math.min(this.rubberStart.x, p.x);
@@ -398,6 +425,7 @@ export class Mindmap {
       });
     });
     const end = (e: PointerEvent): void => {
+      this.dropHold();
       // 選ぶのは離したとき（pointerup）だけ。cancel は取り消しなので選ばずに捨てる
       if (this.tapped && e.type === "pointerup") {
         this.host.setSelection(click(this.host.selection(), this.tapped.id, "none", this.layout.order), true);
@@ -462,11 +490,59 @@ export class Mindmap {
     });
   }
 
+  /** 長押しの待ち時計を止める。次に押すまで、待っていたことを覚えておかない */
+  private dropHold(): void {
+    if (this.hold !== null) clearTimeout(this.hold);
+    this.hold = null;
+    this.holdAt = null;
+  }
+
+  /** その画面の点でメニューを開く。箱の外なら閉じるだけ。触った箱がまだ選ばれて
+   *  いなければ、それ 1 つに選び直してから並びを組む — 右クリックは選ぶ動作も兼ねる */
+  private openMenu(x: number, y: number): void {
+    const id = this.nodeAt(x, y);
+    if (id === null) {
+      this.menu.hide();
+      return;
+    }
+    const sel = this.host.selection();
+    if (!sel.ids.includes(id)) this.host.setSelection({ ids: [id], anchor: id }, false);
+    this.menu.show(x, y, this.toEntries(contextItems(this.layout, this.host.selection())));
+  }
+
+  /** context.ts の Entry を、menu.ts が描ける形に写す。押せば act へ渡すだけで、意味はここに増やさない */
+  private toEntries(es: Entry[]): MenuEntry[] {
+    return es.map((e) => (e === "sep" ? "sep" : this.entryOf(e)));
+  }
+
+  private entryOf(it: Exclude<Entry, "sep">): MenuEntry {
+    const disabled = it.intent === null ? (it.why ?? true) : false;
+    const run = (): void => {
+      if (it.intent) this.act(it.intent);
+    };
+    const items = it.items?.map((i) => this.entryOf(i));
+    return items ? { label: it.label, key: it.key, mark: it.mark, disabled, items, run } : { label: it.label, key: it.key, mark: it.mark, disabled, run };
+  }
+
+  /** 右クリック。触った箱が選ばれていなければそれへ選び直してから開く。長押しが
+   *  開いた直後の（触った指が上げるときに走る）contextmenu は握り潰す — 二重に開かせない */
+  private bindContextMenu(): void {
+    this.pane.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      if (this.menuOpenedByHold) {
+        this.menuOpenedByHold = false;
+        return;
+      }
+      this.dropHold();
+      this.openMenu(e.clientX, e.clientY);
+    });
+  }
+
   /** keys.ts が言った「何をするか」を実行する。意味はあちらが持ち、ここは配線だけ */
   private act(intent: Intent): void {
     switch (intent.kind) {
       case "op":
-        this.host.apply(intent.op, intent.edit);
+        this.host.apply(intent.op, intent.edit, intent.keep);
         return;
       case "edit":
         this.beginEdit(intent.id, intent.seed);
@@ -478,6 +554,11 @@ export class Mindmap {
         return;
       case "center":
         this.centerOnTarget();
+        return;
+      case "link":
+      case "code":
+      case "draw":
+        // Task 4・5 が埋める
         return;
     }
   }
