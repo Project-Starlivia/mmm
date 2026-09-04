@@ -39,6 +39,9 @@ test("Add は押せば子、開けば 4 つ", () => {
   const add = row(contextItems(L, { ids: [3], anchor: 3 }), "Add");
   assert.deepEqual(add.intent, { kind: "op", op: { kind: "addNode", at: { kind: "in", node: 3, side: null }, labels: [""] }, edit: true });
   assert.deepEqual(add.items?.map((i) => i.label), ["Child", "Below", "Above", "Parent"]);
+  // 名前の無いノードでも Below は「足す」（Enter のように「埋める」へ化けない）
+  const blank = row(contextItems(L, { ids: [4], anchor: 4 }), "Add").items?.find((i) => i.label === "Below");
+  assert.deepEqual(blank?.intent, { kind: "op", op: { kind: "addNode", at: { kind: "after", node: 4 }, labels: [""] }, edit: true });
 });
 
 test("複数選択では宛先が 1 つの行が沈む。Delete は沈まない", () => {

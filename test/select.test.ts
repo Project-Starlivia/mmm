@@ -100,4 +100,5 @@ test("消した後の隣 — 次、無ければ前、無ければ親。消える
   assert.equal(neighbor(L, [4]), 3);
   assert.equal(neighbor(L, [2, 3]), 1);
   assert.equal(neighbor(L, [1]), null);
+  assert.equal(neighbor(L, [2, 4]), 3); // 飛び飛びでも、残る 3 が最初の次
 });

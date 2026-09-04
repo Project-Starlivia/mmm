@@ -4,7 +4,7 @@
 
 import * as core from "../coreApi.ts";
 import type { Layout } from "./layout.ts";
-import { NONE, type Selection, all, arrow, extend, isArrowKey, neighbor, nextSibling, parentOf, prevSibling } from "./select.ts";
+import { NONE, type Selection, all, arrow, extend, isArrowKey, neighbor, nextSibling, parentOf, prevSibling, solo } from "./select.ts";
 
 /** 押されたキー。mod は Ctrl / Cmd のどちらか */
 export interface Key {
@@ -33,10 +33,6 @@ const op = (o: core.Op): Intent => ({ kind: "op", op: o, edit: true });
 
 /** 空のラベルで足す。読めば label "" になり、そのまま打ち始める */
 const add = (at: core.NodePlace): Intent => op({ kind: "addNode", at, labels: [""] });
-
-/** ちょうど 1 つ選んでいる id。宛先が 1 つに決まる操作はこれを見る */
-const solo = (sel: Selection): number | null =>
-  sel.ids.length === 1 && sel.anchor !== null ? sel.anchor : null;
 
 /**
  * キー 1 回ぶん。null は拾わない（ブラウザに渡す）。
@@ -95,11 +91,13 @@ export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
     if (sel.ids.length === 0) return null;
     const first = sel.ids[0];
     const last = sel.ids[sel.ids.length - 1];
-    const at: core.NodePlace | null =
-      k.key === "ArrowUp"
-        ? ((p) => (p === null ? null : { kind: "before" as const, node: p }))(prevSibling(L, first))
-        : ((n) => (n === null ? null : { kind: "after" as const, node: n }))(nextSibling(L, last));
-    return at === null ? null : { kind: "op", op: { kind: "moveNode", ids: sel.ids, at }, edit: false };
+    const move = (at: core.NodePlace): Intent => ({ kind: "op", op: { kind: "moveNode", ids: sel.ids, at }, edit: false });
+    if (k.key === "ArrowUp") {
+      const p = prevSibling(L, first);
+      return p === null ? null : move({ kind: "before", node: p });
+    }
+    const n = nextSibling(L, last);
+    return n === null ? null : move({ kind: "after", node: n });
   }
   if (k.alt) return null;
   if (k.key === "H" && k.shift && !k.mod) {

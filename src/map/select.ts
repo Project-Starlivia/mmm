@@ -152,14 +152,17 @@ function under(L: Layout, id: number, ids: Set<number>): boolean {
  */
 export function neighbor(L: Layout, ids: number[]): number | null {
   const gone = new Set(ids);
-  const stays = L.order.filter((x) => !under(L, x, gone));
   const first = L.order.findIndex((x) => gone.has(x));
-  const last = L.order.length - 1 - [...L.order].reverse().findIndex((x) => gone.has(x));
   if (first === -1) return null;
-  const after = L.order.slice(last + 1).find((x) => stays.includes(x));
+  const stays = (x: number): boolean => !under(L, x, gone);
+  const after = L.order.slice(first + 1).find(stays);
   if (after !== undefined) return after;
-  const before = L.order.slice(0, first).reverse().find((x) => stays.includes(x));
+  const before = L.order.slice(0, first).reverse().find(stays);
   if (before !== undefined) return before;
   const p = parentOf(L, L.order[first]);
-  return p !== null && stays.includes(p) ? p : null;
+  return p !== null && stays(p) ? p : null;
 }
+
+/** ちょうど 1 つ選んでいる id。宛先が 1 つに決まる操作はこれを見る */
+export const solo = (sel: Selection): number | null =>
+  sel.ids.length === 1 && sel.anchor !== null ? sel.anchor : null;
