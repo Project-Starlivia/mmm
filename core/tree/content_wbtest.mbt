@@ -14,7 +14,7 @@ test "散文はノードの中身になる" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Opaque", "hello"]],
+            "body": [{ "id": 3, "content": ["Opaque", "hello"] }],
             "children": [],
           },
         ],
@@ -36,7 +36,10 @@ test "中身は文書順に並ぶ" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Opaque", "hello"], ["Opaque", "world"]],
+            "body": [
+              { "id": 3, "content": ["Opaque", "hello"] },
+              { "id": 4, "content": ["Opaque", "world"] },
+            ],
             "children": [],
           },
         ],
@@ -58,14 +61,14 @@ test "中身は深さで振り分けられる" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Opaque", "x"]],
+            "body": [{ "id": 3, "content": ["Opaque", "x"] }],
             "children": [
               [
                 "HeadingNode",
                 {
-                  "id": 3,
+                  "id": 4,
                   "label": "b",
-                  "body": [["Opaque", "y"]],
+                  "body": [{ "id": 5, "content": ["Opaque", "y"] }],
                   "children": [],
                 },
               ],
@@ -82,12 +85,12 @@ test "中身は深さで振り分けられる" {
 test "最初の骨格より前の散文は文書のもの" {
   json_inspect(parse("intro\n\n# a\n"), content={
     "eol": "Lf",
-    "body": [["Opaque", "intro"]],
+    "body": [{ "id": 2, "content": ["Opaque", "intro"] }],
     "roots": [
       {
         "node": [
           "HeadingNode",
-          { "id": 2, "label": "a", "body": [], "children": [] },
+          { "id": 3, "label": "a", "body": [], "children": [] },
         ],
         "sides": [],
       },
@@ -107,7 +110,15 @@ test "画像" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Image", { "alt": "alt", "src": "x.png", "title": "" }]],
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Image",
+                  { "alt": "alt", "src": "x.png", "title": "" },
+                ],
+              },
+            ],
             "children": [],
           },
         ],
@@ -130,7 +141,13 @@ test "リンク" {
             "id": 2,
             "label": "a",
             "body": [
-              ["Link", { "text": "text", "href": "https://e.com", "title": "" }],
+              {
+                "id": 3,
+                "content": [
+                  "Link",
+                  { "text": "text", "href": "https://e.com", "title": "" },
+                ],
+              },
             ],
             "children": [],
           },
@@ -153,7 +170,7 @@ test "混ざった段落は切り分けない" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Opaque", "see ![alt](x.png)"]],
+            "body": [{ "id": 3, "content": ["Opaque", "see ![alt](x.png)"] }],
             "children": [],
           },
         ],
@@ -175,7 +192,12 @@ test "フェンスのコード" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Code", { "info": "js", "text": "let x = 1\n" }]],
+            "body": [
+              {
+                "id": 3,
+                "content": ["Code", { "info": "js", "text": "let x = 1\n" }],
+              },
+            ],
             "children": [],
           },
         ],
@@ -197,7 +219,9 @@ test "インデントコードも読む（書くのはフェンス）" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Code", { "info": "", "text": "code\n" }]],
+            "body": [
+              { "id": 3, "content": ["Code", { "info": "", "text": "code\n" }] },
+            ],
             "children": [],
           },
         ],
@@ -219,7 +243,7 @@ test "SVG" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Svg", "<svg><rect/></svg>\n"]],
+            "body": [{ "id": 3, "content": ["Svg", "<svg><rect/></svg>\n"] }],
             "children": [],
           },
         ],
@@ -238,7 +262,12 @@ test "飾りの水平線は Rule" {
       {
         "node": [
           "HeadingNode",
-          { "id": 2, "label": "a", "body": ["ThematicBreak"], "children": [] },
+          {
+            "id": 2,
+            "label": "a",
+            "body": [{ "id": 3, "content": "ThematicBreak" }],
+            "children": [],
+          },
         ],
         "sides": [],
       },
@@ -258,7 +287,7 @@ test "引用と表は原文のまま" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Opaque", "> quote"]],
+            "body": [{ "id": 3, "content": ["Opaque", "> quote"] }],
             "children": [],
           },
         ],
@@ -280,7 +309,7 @@ test "項目にも中身が付く" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Opaque", "hello"]],
+            "body": [{ "id": 3, "content": ["Opaque", "hello"] }],
             "children": [],
           },
         ],
@@ -306,10 +335,10 @@ test "項目の中の切り出しは列 0 に揃う" {
             "id": 2,
             "label": "a",
             "body": [
-              [
-                "Details",
-                { "id": 3, "text": "<details>\n\n## h\n\n</details>" },
-              ],
+              {
+                "id": 3,
+                "content": ["Details", "<details>\n\n## h\n\n</details>"],
+              },
             ],
             "children": [],
           },
@@ -341,10 +370,10 @@ test "入れ子の項目でも列 0 に揃う" {
                   "id": 3,
                   "label": "b",
                   "body": [
-                    [
-                      "Details",
-                      { "id": 4, "text": "<details>\n\n## h\n\n</details>" },
-                    ],
+                    {
+                      "id": 4,
+                      "content": ["Details", "<details>\n\n## h\n\n</details>"],
+                    },
                   ],
                   "children": [],
                 },
@@ -371,7 +400,7 @@ test "項目の中の Opaque も列 0 に揃う" {
           {
             "id": 2,
             "label": "a",
-            "body": [["Opaque", "<!-- x\ny -->"]],
+            "body": [{ "id": 3, "content": ["Opaque", "<!-- x\ny -->"] }],
             "children": [],
           },
         ],
@@ -397,13 +426,12 @@ test "CRLF は切り出しの中でも保たれる" {
               "id": 2,
               "label": "r",
               "body": [
-                [
-                  "Details",
-                  {
-                    "id": 3,
-                    "text": "<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>",
-                  },
-                ],
+                {
+                  "id": 3,
+                  "content": [
+                    "Details", "<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>",
+                  ],
+                },
               ],
               "children": [],
             },
@@ -431,11 +459,11 @@ test "リンクの定義行は位置ごと残る" {
           {
             "id": 2,
             "label": "r",
-            "body": [["Opaque", "[a]: b \"c\""]],
+            "body": [{ "id": 3, "content": ["Opaque", "[a]: b \"c\""] }],
             "children": [
               [
                 "HeadingNode",
-                { "id": 3, "label": "h", "body": [], "children": [] },
+                { "id": 4, "label": "h", "body": [], "children": [] },
               ],
             ],
           },
@@ -465,7 +493,7 @@ test "定義行が文末にあっても残る" {
                 {
                   "id": 3,
                   "label": "h",
-                  "body": [["Opaque", "[a]: b"]],
+                  "body": [{ "id": 4, "content": ["Opaque", "[a]: b"] }],
                   "children": [],
                 },
               ],
@@ -492,8 +520,17 @@ test "画像とリンクのタイトルは残る" {
             "id": 2,
             "label": "r",
             "body": [
-              ["Image", { "alt": "a", "src": "b.png", "title": "t1" }],
-              ["Link", { "text": "c", "href": "d", "title": "t2" }],
+              {
+                "id": 3,
+                "content": [
+                  "Image",
+                  { "alt": "a", "src": "b.png", "title": "t1" },
+                ],
+              },
+              {
+                "id": 4,
+                "content": ["Link", { "text": "c", "href": "d", "title": "t2" }],
+              },
             ],
             "children": [],
           },
@@ -518,7 +555,10 @@ test "数式とディレクティブの閉じは残る" {
           {
             "id": 2,
             "label": "r",
-            "body": [["Opaque", "$$\nx\n$$"], ["Opaque", ":::note\ny\n:::"]],
+            "body": [
+              { "id": 3, "content": ["Opaque", "$$\nx\n$$"] },
+              { "id": 4, "content": ["Opaque", ":::note\ny\n:::"] },
+            ],
             "children": [],
           },
         ],
@@ -548,7 +588,7 @@ test "項目の中の定義行は項目の中に残る" {
               {
                 "id": 3,
                 "label": "b",
-                "body": [["Opaque", "[q]: /r"]],
+                "body": [{ "id": 4, "content": ["Opaque", "[q]: /r"] }],
                 "children": [],
               },
             ],
@@ -577,13 +617,12 @@ test "原文のまま持つ領域の中の定義行は重ねない" {
               "id": 2,
               "label": "r",
               "body": [
-                [
-                  "Details",
-                  {
-                    "id": 3,
-                    "text": "<details>\njunk\n\n[q]: /r\n\n## a\n\n</details>",
-                  },
-                ],
+                {
+                  "id": 3,
+                  "content": [
+                    "Details", "<details>\njunk\n\n[q]: /r\n\n## a\n\n</details>",
+                  ],
+                },
               ],
               "children": [],
             },
@@ -611,13 +650,12 @@ test "開きとノードの間の定義行があれば中身" {
             "id": 2,
             "label": "r",
             "body": [
-              [
-                "Details",
-                {
-                  "id": 3,
-                  "text": "<details>\n\n[q]: /r\n\n## a\n\n</details>",
-                },
-              ],
+              {
+                "id": 3,
+                "content": [
+                  "Details", "<details>\n\n[q]: /r\n\n## a\n\n</details>",
+                ],
+              },
             ],
             "children": [],
           },
@@ -649,13 +687,16 @@ test "定義行は保留中の水平線を飾りに落とす" {
                 {
                   "id": 3,
                   "label": "a",
-                  "body": ["ThematicBreak", ["Opaque", "[q]: /r"]],
+                  "body": [
+                    { "id": 4, "content": "ThematicBreak" },
+                    { "id": 5, "content": ["Opaque", "[q]: /r"] },
+                  ],
                   "children": [],
                 },
               ],
               [
                 "HeadingNode",
-                { "id": 4, "label": "b", "body": [], "children": [] },
+                { "id": 6, "label": "b", "body": [], "children": [] },
               ],
             ],
           },
