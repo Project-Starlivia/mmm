@@ -17,6 +17,57 @@ feat/tree で作り直した core（読み → Doc → View）を、`src/` の m
   id は文書順の位置なので、上に 1 つ足せば以降が作り直されるだけ。正しさは壊れない
   （docs/core.md「id は読みのサイクルを越えて持たない」）
 
+### 層
+
+「何を入力に何を出すか」と「どの語彙で話すか」で切る。
+
+```
+md ──parse──> Doc ──project──> View          core: 意味。語彙は Tree / Node / Side / Fold / Block
+                                 │
+                            coreApi.view       境界: JSON の形を整えるだけ。語彙は core のまま
+                                 │
+      ┌──── cards ────┐   Block → CardRow      分類: 何をカードとして見せるか。寸法も DOM も知らない
+      │               │
+      └─── metrics ───┘   label + CardRow → w/h   寸法: フォント計測を知る唯一の場所
+                                 │
+                              layout           配置: View + 寸法 → Box。畳みの埋没もここ
+                                 │
+                       render + drawCard        描画: Box → SVG の差分。画像 URL は関数で外から受ける
+                                 │
+                              camera            視点: world ↔ screen。木を知らない
+```
+
+横から刺さるのは **assets**（frontmatter → フォルダ → path → URL。render には `imageUrl`
+として渡すだけ）と **shell**（editor / file / theme / panes / export / share。
+サイクル `text → view → layout → render` を回す本人）。
+
+**語彙の規則**
+
+- **core の語（View / Tree / Node / Side / Fold / Block）は読むだけ。書き換えも言い換えも
+  しない。** Box が `node` を持つのは参照であって再符号化ではない
+- **TS では必ず持ち主を付けて `core.View` / `core.Node` と書く。** `import * as core from
+  "./coreApi.ts"`（型だけなら `import type * as core`）。裸の `View` はフロントに出ない
+  （フロントの view は画面を意味する。`Node` は DOM のグローバル型とも衝突する）。
+  MoonBit の `@view.Tree` と同じ形
+- **map の語（CardRow / Box / Edge / Camera）は cards / layout から先にしか出ない。**
+  core は「カード」も「箱」も知らない
+- **見せ方の裁定は 1 か所ずつ**: fold → layout（埋める）、Block → cards（カードにするか）、
+  Implicit → 裁定なし（`label` が null なら字が無いだけ。metrics と render は
+  `label ?? ""` で読む）、`sides` → layout の zip 1 か所、`Side` → 符号は geometry の
+  `dirOf` 1 か所
+- **id を鍵にするのは Map だけ**（layout の boxes、render のキャッシュ）
+
+**改名**
+
+- `src/map/view.ts` の `View { k, tx, ty }` → **`Camera`**、ファイルは `map/camera.ts`。
+  world を画面へ写す変換（位置と倍率）で、graphics の viewport（見えている矩形）は
+  `Pane` のほう。core の View と同名では mindmap で両方を import できない
+- `app/panes.ts` の `project` → core の `project` と被る。改名候補（この段では触らない）
+
+**寸法を metrics に寄せる**: `rowH` / `cardInset` / `cardBleed` / `IMG_MIN_W` /
+`CODE_LINE` / `CODE_PAD` は cards.ts から metrics.ts へ。cards は分類だけを持つ。
+drawCard は metrics を見る。
+
 ### core: View に frontmatter を足す
 
 画像フォルダの宣言 `image-folder:` は frontmatter にあり、画像カードの解決に要る。
@@ -56,6 +107,8 @@ export interface Tree { node: Node; sides: Side[] }
 export interface View { frontmatter: string | null; trees: Tree[] }
 export function view(md: string): View;   // mmmViewJson を読む唯一の場所
 ```
+
+使う側は `import * as core` で `core.View` / `core.view(md)` と書く。
 
 MoonBit の ToJson は `Option` の None を鍵ごと落とし、enum を `["Image", {…}]` /
 `"ThematicBreak"` の形で出す。**その形を整えるのはここ 1 か所**で、以降の TS は
@@ -132,7 +185,7 @@ export function cardRows(blocks: Block[]): CardRow[];
 - `assets` — フォルダの接続と `imageUrl`。`retarget`（宣言の引っ越し）と
   `attachImage`（貼り付け）は操作なので落とす。`head.ts` は `imageFolder(frontmatter)`
   だけになる
-- map の純粋層: geometry / view / edge / metrics / drawCard / render / highlight /
+- map の純粋層: geometry / camera（← view）/ edge / metrics / drawCard / render / highlight /
   svg / toSvg / indicator / gesture
 - mindmap: pan・zoom・pinch・fitView・根へ寄せる・画面外の針（的は根）・書き出し
 
@@ -160,7 +213,8 @@ feat/render（`.worktrees/feat/render`、feat/tree から）に 1 段 1 コミ�
 最後に 1 PR で feat/tree に squash。
 
 1. core: `View` に frontmatter、`project_wbtest` を直す。scripts を戻す
-2. `coreApi.ts`（JSON の整形）と `cards.ts`（Block → CardRow）。単体テスト
+2. `coreApi.ts`（JSON の整形）と `cards.ts`（Block → CardRow）、寸法を metrics へ。単体テスト。
+   `map/view.ts` → `map/camera.ts`
 3. `layout.ts` を木に。単体テスト（sides の zip・畳みの埋没・複数の木・Implicit が
    空の箱になる・`parent` の側の継承）
 4. `metrics` / `render` / `toSvg` を Box に付け替え
