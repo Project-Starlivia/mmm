@@ -30,7 +30,7 @@ fn splice(
         roots.push({ node: y, sides: sides_for(y, r) })
       }
     } else {
-      match reroot(s, r) {
+      match rebuild_root(s, r) {
         Some(x) => roots.push(x)
         None => ()
       }
@@ -57,14 +57,22 @@ fn sides_for(y : @tree.Node, old : @tree.Root) -> Array[@tree.Side] {
 
 ///|
 /// 根 1 本。子の列と sides を並走して組み直す。Implicit の子が尽きたら None。
-fn reroot(s : Splice, r : @tree.Root) -> @tree.Root? {
+fn rebuild_root(s : Splice, r : @tree.Root) -> @tree.Root? {
   match r.node {
     HeadingNode(h) => {
-      let (children, sides) = wing(s, h.children, r.sides)
+      let (children, sides) = rebuild_root_heading_children(
+        s,
+        h.children,
+        r.sides,
+      )
       Some({ node: HeadingNode({ ..h, children, }), sides })
     }
     ImplicitNode(g) => {
-      let (children, sides) = wing(s, g.children, r.sides)
+      let (children, sides) = rebuild_root_heading_children(
+        s,
+        g.children,
+        r.sides,
+      )
       if children.is_empty() {
         None
       } else {
@@ -72,15 +80,15 @@ fn reroot(s : Splice, r : @tree.Root) -> @tree.Root? {
       }
     }
     ListNode(l) => {
-      let (children, sides) = wing_items(s, l.children, r.sides)
+      let (children, sides) = rebuild_root_item_children(s, l.children, r.sides)
       Some({ node: ListNode({ ..l, children, }), sides })
     }
   }
 }
 
 ///|
-/// 根の子の列。席なら、その側を返された数だけ複製する。
-fn wing(
+/// 根が見出し（か Implicit）のときの子の列。席なら、その側を返された数だけ複製する。
+fn rebuild_root_heading_children(
   s : Splice,
   xs : Array[@tree.Node],
   sides : Array[@tree.Side],
@@ -96,7 +104,7 @@ fn wing(
         out_sides.push(side)
       }
     } else {
-      match rebuild(s, x) {
+      match rebuild_node(s, x) {
         Some(y) => {
           out.push(y)
           out_sides.push(side)
@@ -110,7 +118,7 @@ fn wing(
 
 ///|
 /// 項目が根のときの子の列。
-fn wing_items(
+fn rebuild_root_item_children(
   s : Splice,
   xs : Array[@tree.ListNode],
   sides : Array[@tree.Side],
@@ -131,7 +139,7 @@ fn wing_items(
         }
       }
     } else {
-      out.push(relist(s, x))
+      out.push(rebuild_item(s, x))
       out_sides.push(side)
     }
   }
@@ -140,12 +148,15 @@ fn wing_items(
 
 ///|
 /// ノード 1 つ。子の列を組み直し、Implicit の子が尽きたら None。
-fn rebuild(s : Splice, x : @tree.Node) -> @tree.Node? {
+fn rebuild_node(s : Splice, x : @tree.Node) -> @tree.Node? {
   match x {
-    HeadingNode(h) => Some(HeadingNode({ ..h, children: nodes(s, h.children) }))
-    ListNode(l) => Some(ListNode(relist(s, l)))
+    HeadingNode(h) =>
+      Some(
+        HeadingNode({ ..h, children: rebuild_heading_children(s, h.children) }),
+      )
+    ListNode(l) => Some(ListNode(rebuild_item(s, l)))
     ImplicitNode(g) => {
-      let children = nodes(s, g.children)
+      let children = rebuild_heading_children(s, g.children)
       if children.is_empty() {
         None
       } else {
@@ -157,7 +168,10 @@ fn rebuild(s : Splice, x : @tree.Node) -> @tree.Node? {
 
 ///|
 /// 見出し・Implicit の子の列。何でも来る。
-fn nodes(s : Splice, xs : Array[@tree.Node]) -> Array[@tree.Node] {
+fn rebuild_heading_children(
+  s : Splice,
+  xs : Array[@tree.Node],
+) -> Array[@tree.Node] {
   let out = []
   for x in xs {
     if id_of(x) == s.id {
@@ -166,7 +180,7 @@ fn nodes(s : Splice, xs : Array[@tree.Node]) -> Array[@tree.Node] {
         out.push(y)
       }
     } else {
-      match rebuild(s, x) {
+      match rebuild_node(s, x) {
         Some(y) => out.push(y)
         None => ()
       }
@@ -177,13 +191,16 @@ fn nodes(s : Splice, xs : Array[@tree.Node]) -> Array[@tree.Node] {
 
 ///|
 /// 項目 1 つ。子の列を組み直す。
-fn relist(s : Splice, l : @tree.ListNode) -> @tree.ListNode {
-  { ..l, children: items(s, l.children) }
+fn rebuild_item(s : Splice, l : @tree.ListNode) -> @tree.ListNode {
+  { ..l, children: rebuild_item_children(s, l.children) }
 }
 
 ///|
 /// 項目の子の列。項目しか置けない（型が強いる）。
-fn items(s : Splice, xs : Array[@tree.ListNode]) -> Array[@tree.ListNode] {
+fn rebuild_item_children(
+  s : Splice,
+  xs : Array[@tree.ListNode],
+) -> Array[@tree.ListNode] {
   let out = []
   for x in xs {
     if x.id == s.id {
@@ -195,7 +212,7 @@ fn items(s : Splice, xs : Array[@tree.ListNode]) -> Array[@tree.ListNode] {
         }
       }
     } else {
-      out.push(relist(s, x))
+      out.push(rebuild_item(s, x))
     }
   }
   out
