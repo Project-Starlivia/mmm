@@ -32,7 +32,7 @@ priv enum Piece {
 
 ///|
 /// 畳みの綴り 1 つ。
-priv enum Mark {
+priv enum Spelling {
   Open(open~ : Bool)
   Name(String)
   Close
@@ -41,7 +41,7 @@ priv enum Mark {
 ///|
 /// 木からこの綴りを書き戻したときの文字。**mmm が書ける形はこれだけ。**
 /// 「塊が記法だけで出来ているか」の判定は、すべてこの 1 行との比較に還元される。
-fn spelling(m : Mark) -> String {
+fn spelling(m : Spelling) -> String {
   match m {
     Open(open=false) => "<details>"
     Open(open=true) => "<details open>"
@@ -54,7 +54,7 @@ fn spelling(m : Mark) -> String {
 /// 原文に見つけた綴り 1 つ。位置は**原文のバイト**でだけ持つ
 /// （塊の html 文字列の添字は字下げでずれるので、座標には使わない）。
 priv struct Tag {
-  mark : Mark
+  mark : Spelling
   from : Int
   to : Int
   /// 原文がそのまま `spelling(mark)` か。違えば触らずに書き戻せないので畳めない

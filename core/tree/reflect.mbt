@@ -15,7 +15,7 @@ pub(all) struct Edit {
   from : Int
   to : Int
   insert : String
-} derive(Eq, Debug, ToJson)
+} derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 /// 後の木を映す編集列。from 順で、範囲は重ならない
