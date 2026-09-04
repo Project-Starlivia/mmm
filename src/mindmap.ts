@@ -52,6 +52,10 @@ export interface MapHost {
    *  （ノードのときだけ — 中身の focus はカードとして選ぶ）。keep は消す前に
    *  選んでおきたい隣の id（keys.ts の Intent の keep）。返り値は映した focus */
   apply(op: core.Op, edit: boolean, keep?: number): number | null;
+  /** クリップボードを貼る（Mod+V）。宛先は選択の anchor、無ければ文書 */
+  paste(): void;
+  /** そのノードへ描いて貼る（Shift+D）。窓を開いて、確定した絵を保存する */
+  draw(id: number): void;
 }
 
 /** 全体を収めるときの余白（画面 px） */
@@ -675,6 +679,23 @@ export class Mindmap {
     this.dropLine.setAttribute("visibility", "hidden");
   }
 
+  /**
+   * ファイルのドラッグ中、その画面の点に落ちる先を予告する（app/dnd.ts）。
+   * `null` は予告を消す合図。当たった先のノードの id（無ければ null）を返す —
+   * ドラッグ中はノードの部分木を弾く理由が無いので、`resolveDrop` は使わず
+   * `nodeAt` だけで決める。
+   */
+  markFileDrop(at: { x: number; y: number } | null): number | null {
+    if (at === null) {
+      this.clearDropMark();
+      return null;
+    }
+    const id = this.nodeAt(at.x, at.y);
+    this.clearDropMark();
+    if (id !== null) this.markDropParent(id);
+    return id;
+  }
+
   /** ドラッグを終える。Op を投げるかどうかは呼び出し側が先に決めておく */
   private endDrag(): void {
     if (this.dragging) {
@@ -807,7 +828,10 @@ export class Mindmap {
         this.addCode(intent.id);
         return;
       case "draw":
-        // Task 5 が埋める
+        this.host.draw(intent.id);
+        return;
+      case "paste":
+        this.host.paste();
         return;
     }
   }

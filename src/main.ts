@@ -25,6 +25,9 @@ import { ask, askText, askYesNo } from "./app/ask.ts";
 import { blocked, failed } from "./app/notice.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
+import { decidePaste } from "./app/paste.ts";
+import { initDrop } from "./app/dnd.ts";
+import { showDrawing } from "./app/draw.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 import { openOnClick } from "./map/menu.ts";
 
@@ -263,6 +266,8 @@ const host: MapHost = {
     return s ? text.slice(s.from, s.to) : "";
   },
   apply,
+  paste,
+  draw,
 };
 const map = new Mindmap(mapPane, host);
 
@@ -483,6 +488,102 @@ async function ensurePlace(): Promise<boolean> {
 }
 
 /**
+ * 画像をディスクへ置いて、そのノードの中身として足す（Image のブロック）。
+ * **貼り付け・ドロップ・お絵描きが通る唯一の道** — WebP への変換も名前の
+ * 確認も画像フォルダの結び付けも、`assets.saveToDisk` が 1 か所で持つ。
+ */
+async function attachImage(id: number, blob: Blob): Promise<void> {
+  if (!(await ensurePlace())) return;
+  const rel = await assets.saveToDisk(blob);
+  // 置いているあいだに文書が入れ替わった／ノードが消えていることがある
+  if (rel === null || !core.isNode(doc, id)) return;
+  apply(
+    { kind: "addBlock", at: { kind: "in", node: id }, content: { kind: "image", alt: "", src: rel, title: "" } },
+    false,
+  );
+}
+
+/** お絵描きの窓が開いているか。二重に開かせない */
+let drawingOpen = false;
+
+/** Shift+D。窓を開いて描いてもらい、確定した絵を保存して足す */
+function draw(id: number): void {
+  if (drawingOpen) return;
+  drawingOpen = true;
+  void showDrawing()
+    .then((blob) => (blob === null ? undefined : attachImage(id, blob)))
+    .catch((error: unknown) => {
+      console.error("drawing failed:", error);
+      failed("Couldn't add the drawing");
+    })
+    .finally(() => {
+      drawingOpen = false;
+      mapPane.focus();
+    });
+}
+
+/**
+ * クリップボードを貼る（Mod+V）。画像はテキストより優先し、選んでいる
+ * ノード（anchor）へ足す。字は `decidePaste` の判定で振り分ける — 骨格
+ * （見出し・項目）があるかは core に読ませ、TS では `#` を見ない。
+ */
+function paste(): void {
+  const anchor = selection.anchor;
+  void (async () => {
+    // クリップボードに画像があれば、テキストより優先する。
+    // try で囲うのは**クリップボードを読むところだけ** — 画像を置く処理まで
+    // 囲うと、フォルダ選択の失敗が「クリップボードが読めなかった」と
+    // 同じ扱いになり、黙ってテキストの道へ落ちてしまう
+    let img: Blob | null = null;
+    if (anchor !== null) {
+      try {
+        if ("read" in navigator.clipboard) {
+          for (const item of await navigator.clipboard.read()) {
+            const t = item.types.find((x) => x.startsWith("image/"));
+            if (t) {
+              img = await item.getType(t);
+              break;
+            }
+          }
+        }
+      } catch {
+        /* clipboard.read が無い／断られた → 字の道へ */
+      }
+    }
+    if (img !== null && anchor !== null) {
+      await attachImage(anchor, img);
+      return;
+    }
+    const clip = await navigator.clipboard.readText();
+    const hasSkeleton = (md: string): boolean => core.survey(md, [], []).view.trees.length > 0;
+    const action = decidePaste(clip, hasSkeleton);
+    switch (action.kind) {
+      case "noop":
+        return;
+      case "link":
+        if (anchor === null) {
+          failed("Select a node to paste a link into");
+          return;
+        }
+        apply(
+          { kind: "addBlock", at: { kind: "in", node: anchor }, content: { kind: "link", text: "", href: action.url, title: "" } },
+          false,
+        );
+        return;
+      case "labels":
+        apply({ kind: "addNode", at: { kind: "in", node: anchor ?? core.DOC_ID, side: null }, labels: action.labels }, false);
+        return;
+      case "md":
+        apply({ kind: "graft", at: { kind: "in", node: anchor ?? core.DOC_ID, side: null }, md: action.md }, false);
+        return;
+    }
+  })().catch((error: unknown) => {
+    console.error("paste failed:", error);
+    failed("Couldn't paste");
+  });
+}
+
+/**
  * 画像フォルダの状態。**言葉は宣言と許可の 2 つだけ**（app/assets.ts の冒頭が
  * 名付けたもの）。許可が無いときは宣言のパスを出す — どこを指していて届いて
  * いないのかが見えないと、直しようがない。
@@ -622,6 +723,20 @@ window.addEventListener("beforeunload", (event) => {
   if (text === savedText) return;
   event.preventDefault();
   event.returnValue = "";
+});
+
+// ---------- ドラッグ & ドロップ（振り分けは app/dnd.ts） ----------
+
+initDrop({
+  markDrop: (at) => map.markFileDrop(at),
+  failed,
+  async openMarkdown(file) {
+    if (!(await confirmDiscard())) return;
+    applyDoc(await io.openHandle(file));
+  },
+  async addImages(files, node) {
+    for (const file of files) await attachImage(node, await file.getFile());
+  },
 });
 
 // ---------- ペイン / 書き出し / テーマ / キー（実装は app/ 配下） ----------

@@ -217,6 +217,15 @@ test("Shift+L / Shift+C / Shift+D は 1 つ選んでいるときだけ拾う", (
   assert.equal(keyed(L, NONE, k("L", { shift: true })), null);
 });
 
+test("Mod+V は貼り付け。anchor が無くても拾う", () => {
+  assert.deepEqual(keyed(L, one(3), k("v", { mod: true })), { kind: "paste" });
+  assert.deepEqual(keyed(L, NONE, k("v", { mod: true })), { kind: "paste" });
+  // 大文字でも同じ（key 自体は大文字で来ることがある）
+  assert.deepEqual(keyed(L, NONE, k("V", { mod: true })), { kind: "paste" });
+  // Shift+Mod+V は別の意味に空けておく（貼り付けとして拾わない）
+  assert.equal(keyed(L, one(3), k("v", { mod: true, shift: true })), null);
+});
+
 // ---- keyedCard — カードを選んでいるときの表 ----
 // r(2) に blocks [{ id: 3, thematicBreak }, { id: 4, code }]。持ち主は 2、隣は 3 と 4。
 const C: Layout = layoutMap(

@@ -28,10 +28,12 @@ export type Intent =
   | { kind: "pick"; id: number | null }
   /** カードをその場で直す */
   | { kind: "editCard"; id: number }
-  /** クリップボードの URL をリンクカードにして題を打つ / 空のコードを足して打つ / 描いて貼る（mindmap.ts の act が実行。draw は Task 5） */
+  /** クリップボードの URL をリンクカードにして題を打つ / 空のコードを足して打つ / 描いて貼る（mindmap.ts の act が実行） */
   | { kind: "link"; id: number }
   | { kind: "code"; id: number }
-  | { kind: "draw"; id: number };
+  | { kind: "draw"; id: number }
+  /** クリップボードを貼る。anchor があればそこへ、無ければ文書へ（main.ts の act が実行） */
+  | { kind: "paste" };
 
 const op = (o: core.Op): Intent => ({ kind: "op", op: o, edit: true });
 
@@ -53,6 +55,8 @@ export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
   // ここで先に他のキーだけ弾く — Alt+↑↓ 自身の判断は後ろの専用の行に任せる
   // （Alt を真っ先に全部捨てると、並べ替えが書けなくなる）
   if (k.alt && k.key !== "ArrowUp" && k.key !== "ArrowDown") return null;
+  // anchor が無くても拾う（貼る先が無ければ文書へ）。anchor 頼みの行より先に置く
+  if (k.mod && !k.alt && !k.shift && k.key.toLowerCase() === "v") return { kind: "paste" };
   const anchor = sel.anchor;
   const label = anchor === null ? null : (L.boxes.get(anchor)?.node.label ?? null);
   const blank = label === "";
