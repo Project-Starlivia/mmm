@@ -123,6 +123,7 @@ interface Box {
   node: Node;             // View のノードそのまま。label / fold / blocks はここから読む
   parent: Edge | null;    // 根は null。側は「親との繋がり」の性質
   buried: number;         // 畳んで埋もれた子孫の数（全部の子孫。種類で除かない）
+  fan: number;            // 親の辺の上での付け根のずらし(px)。兄弟と出口が重ならないように。幾何
   x: number; y: number; w: number; h: number;
   rows: CardRow[];        // node.blocks から組んだもの。寸法に要るので持つ
 }
@@ -183,8 +184,9 @@ export function cardRows(blocks: Block[]): CardRow[];
   `map/menu.ts`（export の出し方メニューの器）
 - `export` — 全体だけ（枝の選択が無い）。SVG / WebP / PNG コピー / SVG コピー
 - `assets` — フォルダの接続と `imageUrl`。`retarget`（宣言の引っ越し）と
-  `attachImage`（貼り付け）は操作なので落とす。`head.ts` は `imageFolder(frontmatter)`
-  だけになる
+  `attachImage`（貼り付け）と**宣言の書き込み**（`settle` / `saveToDisk`）は操作なので
+  落とす。宣言が無い文書は `./`（md と同じ場所）として読み、指したフォルダが宣言と
+  食い違っても直さない。`head.ts` は `imageFolder(frontmatter)` だけになる
 - map の純粋層: geometry / camera（← view）/ edge / metrics / drawCard / render / highlight /
   svg / toSvg / indicator / gesture
 - mindmap: pan・zoom・pinch・fitView・根へ寄せる・画面外の針（的は根）・書き出し
