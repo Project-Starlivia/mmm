@@ -3,7 +3,7 @@
 //   法則 — 編集を当てて読み直せば、後の木と形が一致する（id は見ない）
 //   比例性 — ラベルを変えただけなら、編集はそのノードの地番の中に 1 つ
 //
-// 文書の見本 × 全ノード × 変え方（trial.mbt の morph）で回す。
+// 文書の見本 × 全ノード × 変え方（ラベル・削除・子を足す）で回す。
 // 形の一致は検証が全文へ落として保つので、ここが見ているのは
 // **落ちずに済む所で落ちていないか**と、落ちる所で壊れていないか。
 
@@ -15,6 +15,123 @@ let corpus : Array[String] = [
   "# a\n\n### x\n\n# b", "- a\n\n  text\n\n  - b\n- c\n", "# r\n\n- i\n  - j\n\n## a\n",
   "hello\n\n- a\n- b\n",
 ]
+
+///|
+/// 変え方。
+enum Change {
+  /// ラベルの尻に `!` を足す
+  Relabel
+  /// ノードを部分木ごと消す
+  Delete
+  /// 子を 1 つ足す（項目の子は項目）
+  Adopt
+}
+
+///|
+/// id のノードを how で変えた木。
+fn changed(doc : Doc, id : Int, how : Change) -> Doc {
+  morph(doc, id, x => {
+    match how {
+      Relabel =>
+        Some(
+          match x {
+            HeadingNode(h) => HeadingNode({ ..h, label: h.label + "!" })
+            ListNode(l) => ListNode({ ..l, label: l.label + "!" })
+            other => other
+          },
+        )
+      Delete => None
+      Adopt =>
+        Some(with_children(x, children_of(x) + [newborn(x is ListNode(_))]))
+    }
+  })
+}
+
+///|
+/// 新しいノード（id は読みが振る番号と被らない）。項目の子は項目。
+fn newborn(item : Bool) -> Node {
+  if item {
+    ListNode({ id: 999, label: "new", fold: None, body: [], children: [] })
+  } else {
+    HeadingNode({ id: 999, label: "new", fold: None, body: [], children: [] })
+  }
+}
+
+///|
+/// 木の全ノードの id（文書順）。
+fn all_ids(doc : Doc) -> Array[Int] {
+  let out = []
+  fn go(x : Node) {
+    out.push(id_of(x))
+    for k in children_of(x) {
+      go(k)
+    }
+  }
+
+  for r in doc.roots {
+    go(r.node)
+  }
+  out
+}
+
+///|
+/// id のノードを f で置き換えた Doc。None なら消す。根の側は子と並走を保ち、
+/// 子を失った Implicit は在り得ない（check が言う）ので一緒に消える。
+fn morph(doc : Doc, id : Int, f : (Node) -> Node?) -> Doc {
+  let roots = []
+  for r in doc.roots {
+    if id_of(r.node) == id {
+      match f(r.node) {
+        Some(n) => roots.push(({ node: n, sides: fit(r.sides, n) } : Root))
+        None => ()
+      }
+    } else {
+      let (kids, sides) = morph_kids(children_of(r.node), r.sides, id, f)
+      if r.node is ImplicitNode(_) && kids.is_empty() {
+        continue
+      }
+      roots.push(({ node: with_children(r.node, kids), sides } : Root))
+    }
+  }
+  { ..doc, roots, }
+}
+
+///|
+fn morph_kids(
+  kids : Array[Node],
+  sides : Array[Side],
+  id : Int,
+  f : (Node) -> Node?,
+) -> (Array[Node], Array[Side]) {
+  let out = []
+  let out_sides = []
+  for i, k in kids {
+    let side = if i < sides.length() { sides[i] } else { Right }
+    if id_of(k) == id {
+      match f(k) {
+        Some(n) => {
+          out.push(n)
+          out_sides.push(side)
+        }
+        None => ()
+      }
+    } else {
+      let (kk, _) = morph_kids(children_of(k), [], id, f)
+      if k is ImplicitNode(_) && kk.is_empty() {
+        continue
+      }
+      out.push(with_children(k, kk))
+      out_sides.push(side)
+    }
+  }
+  (out, out_sides)
+}
+
+///|
+fn fit(sides : Array[Side], node : Node) -> Array[Side] {
+  let n = children_of(node).length()
+  Array::makei(n, i => if i < sides.length() { sides[i] } else { Right })
+}
 
 ///|
 /// 法則 — 当てて読み直せば後の木と形が一致する。編集は from 順で重ならない。

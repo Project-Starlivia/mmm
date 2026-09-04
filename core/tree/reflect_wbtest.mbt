@@ -443,12 +443,15 @@ test "項目のラベルだけなら、子の字下げは残る" {
   json_inspect(reflect(md, before, spans, after), content=[
     { "from": 0, "to": 4, "insert": "- A\n" },
   ])
-  inspect(apply(md, reflect(md, before, spans, after)), content=(
-    #|- A
-    #|  - b
-    #|- c
-    #|
-  ))
+  inspect(
+    apply(md, reflect(md, before, spans, after)),
+    content=(
+      #|- A
+      #|  - b
+      #|- c
+      #|
+    ),
+  )
 }
 
 ///|
