@@ -24,6 +24,9 @@ core/   MoonBit — 文書モデル。**いま作り直している最中**で�
                 build_wbtest.mbt 以降が「この md はこう読まれる」、
                 unbuild_wbtest.mbt が「この木はこう書かれる」を固定する
   view/         map が見る木。project が Doc から削るだけで作る
+  op/           操作。apply(doc, op) が Doc を Doc にする。席は隣の id で言う
+                （NodePlace / BlockPlace）。道具（splice / append / body）が
+                型の異種性を幽閉する。決めは core.md「操作」
 src/    TypeScript — UI。**core が揃うまで触らない。** 繋ぎ先(旧 coreApi.ts)は
         消してあるので、いまはコンパイルできない
   editor.ts    Markdown 側(CodeMirror 6、履歴はコアに委譲。フェンスの
