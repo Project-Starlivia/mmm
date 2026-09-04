@@ -46,3 +46,16 @@ pub fn mmm_serialize(md : String) -> String {
 pub fn mmm_unbuild_sig(md : String) -> String {
   @tree.ast_sig(@tree.unbuild(@tree.parse(md)))
 }
+
+///|
+/// 操作を md に映す。op は `@op.Op` の JSON（ToJson の形そのまま）。
+/// 返るのは編集列と、編集を当てて読み直した木での focus。
+/// 壊れた JSON は ts の側のバグなので、静かに断らず投げる
+/// （`raise` にすると JS 側が Result を受け取ってしまう）。
+#export_name("mmmEdit")
+pub fn mmm_edit(md : String, op : String) -> String {
+  let op : @op.Op = try @json.from_json(@json.parse(op)) catch {
+    e => abort("mmmEdit: op の JSON が読めない — \{e}")
+  }
+  @edit.edit(md, op).to_json().stringify()
+}

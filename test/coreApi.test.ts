@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { decode } from "../src/coreApi.ts";
+import { decode, edit, edited, encode } from "../src/coreApi.ts";
 
 test("None の鍵は無い → null。Implicit は label が null", () => {
   const v = decode({ trees: [{ node: { id: 2, blocks: [], children: [] }, sides: [] }] });
@@ -92,4 +92,40 @@ test("知らない形は黙って通さない", () => {
     () => decode({ trees: [{ node: { id: 1, blocks: [], children: [] }, sides: ["Up"] }] }),
     /側でない/,
   );
+});
+
+test("Op は core の enum の形になる — kind が構築子名、null の鍵は落ち、鍵が無ければ裸の名前", () => {
+  assert.deepEqual(encode({ kind: "rename", id: 2, label: "b" }), ["Rename", { id: 2, label: "b" }]);
+  assert.deepEqual(
+    encode({ kind: "addNode", at: { kind: "in", node: 2, side: null }, labels: ["n"] }),
+    ["AddNode", { at: ["In", { node: 2 }], labels: ["n"] }],
+  );
+  assert.deepEqual(
+    encode({ kind: "moveNode", ids: [3], at: { kind: "in", node: 2, side: "Left" } }),
+    ["MoveNode", { ids: [3], at: ["In", { node: 2, side: "Left" }] }],
+  );
+  assert.deepEqual(
+    encode({ kind: "addBlock", at: { kind: "in", node: 2 }, content: { kind: "thematicBreak" } }),
+    ["AddBlock", { at: ["In", { node: 2 }], content: "ThematicBreak" }],
+  );
+  assert.deepEqual(
+    encode({ kind: "setBlock", id: 3, content: { kind: "svg", markup: "<svg/>" } }),
+    ["SetBlock", { id: 3, content: ["Svg", "<svg/>"] }],
+  );
+});
+
+test("Edited — focus の無い鍵は null", () => {
+  assert.deepEqual(edited({ edits: [{ from: 0, to: 1, insert: "x" }] }), {
+    edits: [{ from: 0, to: 1, insert: "x" }],
+    focus: null,
+  });
+});
+
+test("edit は core を往復する — 編集を当てれば名前が替わり、focus はそのノード", () => {
+  const r = edit("# a\n", { kind: "rename", id: 2, label: "b" });
+  let md = "# a\n";
+  for (const e of [...r.edits].reverse()) md = md.slice(0, e.from) + e.insert + md.slice(e.to);
+  assert.equal(md, "# b\n");
+  assert.equal(r.focus, 2);
+  assert.deepEqual(edit("# a\n", { kind: "rename", id: 9, label: "b" }), { edits: [], focus: null });
 });
