@@ -33,6 +33,8 @@ export interface MapHost {
   selection(): Selection;
   /** 地図で選び直した。reveal は md 側をその頭へスクロールするか */
   setSelection(sel: Selection, reveal: boolean): void;
+  /** 操作を md に映す。edit なら、映した後の focus をそのまま編集開始 */
+  apply(op: core.Op, edit: boolean): void;
 }
 
 /** 全体を収めるときの余白（画面 px） */
@@ -194,6 +196,12 @@ export class Mindmap {
   /** 選択の塗り直し。レイアウトは見直さない */
   refreshSelection(): void {
     this.renderer.paintSelection(new Set(this.host.selection().ids));
+  }
+
+  /** その場編集に入る。seed は最初の字 */
+  beginEdit(id: number, seed: string | null): void {
+    void id;
+    void seed;
   }
 
   /**

@@ -177,6 +177,25 @@ function setSelection(sel: Selection, reveal: boolean): void {
   }
 }
 
+/**
+ * 操作を md に映す。**操作の入口はここ 1 本** — 地図は md に触らない。
+ * 操作 1 回 = CodeMirror の 1 トランザクションで、undo は CodeMirror のもの。
+ * 操作の直後は core の focus が選択を決める（新しいノードには目印が無い）。
+ * できない操作は core が空の編集列で言う。いまは雑に、しらせを出すだけ
+ */
+function apply(op: core.Op, edit: boolean): void {
+  const r = core.edit(text, op);
+  if (r.edits.length === 0) {
+    failed("Couldn't do that here");
+    return;
+  }
+  editor.apply(r.edits); // → sync
+  if (r.focus === null) return;
+  // 同じノードに留まる操作（ラベルを打つ）で md を寄せ直さない
+  setSelection({ ids: [r.focus], anchor: r.focus }, r.focus !== selection.anchor);
+  if (edit) map.beginEdit(r.focus, null);
+}
+
 /** md のカーソルが動いた。掛かるノードに輪を出す（地図は動かさない） */
 function onCaret(ranges: Range[]): void {
   map.showCaret(caretIds(doc, spots, ranges));
@@ -194,6 +213,7 @@ const host: MapHost = {
     })(),
   selection: () => selection,
   setSelection,
+  apply,
 };
 const map = new Mindmap(mapPane, host);
 

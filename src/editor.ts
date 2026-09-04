@@ -129,6 +129,11 @@ export class MdEditor {
     this.onCaret(this.caret());
   }
 
+  /** 操作の編集列を 1 トランザクションで当てる。undo は 1 手になる。sync はこの中で走る */
+  apply(edits: core.Edit[]): void {
+    this.view.dispatch({ changes: edits });
+  }
+
   /** 地図で選んでいる範囲を、こちらの行にも映す */
   highlight(ranges: Range[]): void {
     this.view.dispatch({ effects: setHighlights.of(ranges) });
