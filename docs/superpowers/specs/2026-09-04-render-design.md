@@ -126,7 +126,8 @@ export function cardRows(blocks: Block[]): CardRow[];
 - `editor.ts` — 打鍵 → `view(text)` → 描画の 1 本。`applySets`（差分適用）と
   `highlight`（カーソル同期）は外す
 - file I/O 一式: `io` / `handles` / recent / `name`（最初の根のラベル）/ dirty / favicon
-- `theme` / `panes` / `paneTool` / `hint` / `share`（URL ハッシュ）/ `persist` / `logo` / `icons`
+- `theme` / `panes` / `paneTool` / `hint` / `share`（URL ハッシュ）/ `persist` / `logo` / `icons` /
+  `map/menu.ts`（export の出し方メニューの器）
 - `export` — 全体だけ（枝の選択が無い）。SVG / WebP / PNG コピー / SVG コピー
 - `assets` — フォルダの接続と `imageUrl`。`retarget`（宣言の引っ越し）と
   `attachImage`（貼り付け）は操作なので落とす。`head.ts` は `imageFolder(frontmatter)`
@@ -138,8 +139,8 @@ export function cardRows(blocks: Block[]): CardRow[];
 **落とす**（git に残る）
 
 - `edits.ts` / `caret.ts` / `map/drop.ts` / `map/navigate.ts` / `map/overlay.ts` /
-  `map/pick.ts` / `map/addButtons.ts` / `map/radialMenu.ts` / `map/menu.ts`（export の
-  出し方メニューが使うなら残す）/ `app/form.ts` / `app/paste.ts` / `app/dnd.ts` /
+  `map/pick.ts` / `map/addButtons.ts` / `map/radialMenu.ts` / `app/form.ts` /
+  `app/paste.ts` / `app/dnd.ts` /
   `app/draw.ts` / `app/shortcuts.ts` のうち操作のキー
 - `test/edits.test.ts` / `test/addButtons.test.ts`
 - style.css の対応する塊（選択・ドラッグ・落とし先・入力欄・メニュー・継ぎ目）
