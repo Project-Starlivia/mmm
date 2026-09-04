@@ -1,6 +1,6 @@
 // core の出口。**JSON の形を整えるだけ** — 意味は 1 つも足さない。
 //
-// 使う側は `import * as core` で `core.View` / `core.view(md)` と書く。
+// 使う側は `import * as core` で `core.View` / `core.survey(md, edits, marks)` と書く。
 // フロントでは view は画面を意味し、`Node` は DOM のグローバル型と衝突するので、
 // 裸の名前を出さない（MoonBit 側の `@view.Tree` と同じ形）。
 //
@@ -56,9 +56,6 @@ export interface View {
   trees: Tree[];
 }
 
-/** md を core に読ませ、map が見る木を受け取る。読みのサイクルの入口 */
-export const view = (md: string): View => decode(JSON.parse(mbt.mmmViewJson(md)));
-
 /** 地番。ノードが md のどこに書かれているか。label はラベルの頭（Implicit と文書の散文は null） */
 export interface Spot {
   from: number;
@@ -95,10 +92,14 @@ export interface Survey {
 
 /**
  * md を core に読ませ、View と地番と、前の目印の行き先を 1 度に受け取る。
- * 読みのサイクルの入口はこちら。`view(md)` は lab と試験のために残す
+ * 読みのサイクルの唯一の入口
  */
-export const survey = (md: string, edits: Edit[], marks: Mark[]): Survey =>
-  decodeSurvey(JSON.parse(mbt.mmmSurvey(md, JSON.stringify(edits), JSON.stringify(marks))));
+export const survey = (md: string, edits: Edit[], marks: Mark[]): Survey => {
+  const r = decodeSurvey(JSON.parse(mbt.mmmSurvey(md, JSON.stringify(edits), JSON.stringify(marks))));
+  // follow は marks を 1:1 で写す。揃わなければ core と ts の対応が壊れている
+  if (r.trails.length !== marks.length) bad("trails が marks と揃わない");
+  return r;
+};
 
 // ---- JSON の形を確かめながら整える ----
 
@@ -226,7 +227,7 @@ const trail = (v: unknown): Trail | null => {
 export function decodeSurvey(json: unknown): Survey {
   const o = record(json);
   const spots = new Map<number, Spot>();
-  for (const [k, v] of Object.entries(record(field(o, "spots", record)))) {
+  for (const [k, v] of Object.entries(field(o, "spots", record))) {
     const id = Number(k);
     if (!Number.isInteger(id)) bad(`spots の鍵 ${k}`);
     spots.set(id, spot(v));

@@ -64,8 +64,9 @@ export type ArrowKey = "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight";
 export const isArrowKey = (key: string): key is ArrowKey =>
   key === "ArrowUp" || key === "ArrowDown" || key === "ArrowLeft" || key === "ArrowRight";
 
-/** 根からの深さ。Layout は持たないので親を辿って数える */
-export function depthOf(L: Layout, id: number): number {
+/** 根からの深さ。Layout は持たないので親を辿って数える。この module の中でしか使わない。
+ *  未知の id は根と同じ 0（`arrow` は先に `L.boxes.get(anchor)` で弾くので届かない） */
+function depthOf(L: Layout, id: number): number {
   let d = 0;
   let b = L.boxes.get(id);
   while (b && b.parent) {

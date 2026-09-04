@@ -31,17 +31,16 @@ pub fn follow(
   marks.map(m => {
     match carry(edits, m) {
       Some(mark) => {
-        let mut hit : Int? = None
+        let mut hit : (Int, Spot)? = None
         for id, s in spots {
           if s.label == Some(mark.label) {
-            hit = Some(id)
+            hit = Some((id, s))
+            break
           }
         }
         match hit {
-          Some(id) => {
-            let s = spots.get(id).unwrap()
+          Some((id, s)) =>
             Some({ mark: { from: s.from, label: mark.label }, id: Some(id) })
-          }
           None => Some({ mark, id: None })
         }
       }
@@ -85,7 +84,7 @@ fn carry(edits : Array[Edit], m : Mark) -> Mark? {
 /// 元の位置 pos が、編集 1 つでどれだけずれるか。手前の編集ぶんずれる。
 /// **ちょうどその位置への挿入は動かさない**（挿入の前に留まる — ラベルの頭に字を
 /// 足せば、その字がラベルの先頭）。その位置で終わる消去はずらす（`##` を 1 つ消せば
-/// ラベルは 1 つ手前）。消去の内側なら消去の頭へ。
+/// ラベルは 1 つ手前）。消去の内側なら置き換えた字の尻へ。
 fn delta(pos : Int, e : Edit) -> Int {
   let grown = e.insert.length() - (e.to - e.from)
   if e.to < pos || (e.to == pos && e.to > e.from) {

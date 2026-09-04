@@ -156,6 +156,9 @@ export class Mindmap {
       imageHint: this.host.imageHint(),
     });
     this.renderer.paintSelection(new Set(this.host.selection().ids));
+    // 前サイクルの caretIds で輪を塗り直す。無害なのは、editor.ts の同じ
+    // updateListener の中で onChange の直後に必ず onCaret が続き、今の輪へ
+    // 即座に上書きされるから
     this.showCaret(this.caretIds);
     this.updateIndicator();
   }
@@ -278,10 +281,10 @@ export class Mindmap {
   }
 
   /**
-   * ドラッグはどこからでもパン。**指は 1 本でも 2 本でも台帳に載せる** —
-   * 載らなかった指の pointermove が「1 本ぶん」の流れへ落ちると、別の指の
-   * 始点との差で地図が跳ぶ。capture で取るのは、リンクの ↗ が pointerdown を
-   * 止めるため。
+   * 背景の左ドラッグは矩形選択、パンは中クリック / Space+ドラッグ / 指の 1 本。
+   * **指は 1 本でも 2 本でも台帳に載せる** — 載らなかった指の pointermove が
+   * 「1 本ぶん」の流れへ落ちると、別の指の始点との差で地図が跳ぶ。capture で
+   * 取るのは、リンクの ↗ が pointerdown を止めるため。
    */
   private bindPointer(): void {
     const pane = this.pane;
