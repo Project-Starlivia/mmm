@@ -91,7 +91,7 @@ test("空のノードで字を打てば、その字から編集。名前があ�
   assert.deepEqual(keyed(L, one(4), k("X", { shift: true })), { kind: "edit", id: 4, seed: "X" });
   assert.equal(keyed(L, one(3), k("x")), null);
   assert.equal(keyed(L, one(4), k(" ")), null);
-  assert.equal(keyed(L, one(4), k("x", { mod: true })), null);
+  assert.equal(keyed(L, one(4), k("q", { mod: true })), null);
 });
 
 test("複数選んでいるときの Tab / Shift+Tab は段 2 で拾うようになった（本段）。先頭に前の兄弟が無ければ Tab は拾わない", () => {
@@ -153,6 +153,19 @@ test("Delete は選択を消し、隣を keep する", () => {
     keep: 2,
   });
   assert.equal(keyed(L, NONE, k("Delete")), null);
+});
+
+test("Mod+C は写す。Mod+X は写してから Delete と同じ消し方", () => {
+  assert.deepEqual(keyed(L, { ids: [3, 4], anchor: 4 }, k("c", { mod: true })), { kind: "copy", cut: null });
+  assert.deepEqual(keyed(L, one(3), k("x", { mod: true })), {
+    kind: "copy",
+    cut: { kind: "op", op: { kind: "delete", ids: [3] }, edit: false, keep: 4 },
+  });
+  // 何も選んでいなければ拾わない（ブラウザに渡す）
+  assert.equal(keyed(L, NONE, k("c", { mod: true })), null);
+  assert.equal(keyed(L, NONE, k("x", { mod: true })), null);
+  // Shift の組は別の意味に空けておく
+  assert.equal(keyed(L, one(3), k("C", { mod: true, shift: true })), null);
 });
 
 test("Alt+↑↓ は塊を前の兄弟の前 / 次の兄弟の後ろへ。端では拾わない", () => {
@@ -286,6 +299,14 @@ test("keyedCard: Alt+↑↓ は前後のカードの前後へ並べ替え。端�
 test("keyedCard: Mod+Enter はその場編集。Escape は外す", () => {
   assert.deepEqual(keyedCard(C, 3, k("Enter", { mod: true })), { kind: "editCard", id: 3 });
   assert.deepEqual(keyedCard(C, 3, k("Escape")), { kind: "pick", id: null });
+});
+
+test("keyedCard: Mod+C は写す。Mod+X は写してからそのカードを消す", () => {
+  assert.deepEqual(keyedCard(C, 3, k("c", { mod: true })), { kind: "copy", cut: null });
+  assert.deepEqual(keyedCard(C, 4, k("x", { mod: true })), {
+    kind: "copy",
+    cut: { kind: "op", op: { kind: "delete", ids: [4] }, edit: false },
+  });
 });
 
 test("keyedCard: どのノードの blocks にも居なければ null", () => {
