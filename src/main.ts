@@ -7,8 +7,10 @@
 
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import * as core from "./coreApi.ts";
+import { caretIds, type Range } from "./caret.ts";
 import { MdEditor } from "./editor.ts";
 import { Mindmap, type MapHost } from "./mindmap.ts";
+import { NONE, type Selection } from "./map/select.ts";
 import { handles } from "./app/handles.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
@@ -67,6 +69,15 @@ const elLogo = el("logo", SVGSVGElement);
 /** いまの本文と、core がそれを読んだ木。打鍵のたびに組で差し替える */
 let text = "";
 let doc: core.View = { frontmatter: null, trees: [] };
+/** いまの地番。カーソルの輪・md 側の薄塗り・選択の持ち越しが読む */
+let spots = new Map<number, core.Spot>();
+/** 何を選んでいるか。地図はこれを塗るだけで、自分では持たない */
+let selection: Selection = NONE;
+/**
+ * 幽霊 — 前のサイクルで当たらなかった目印。捨てずに持ち越す（`## n## a` の
+ * 途中のサイクルで捨てると、Enter で戻れない）。地図で選び直したら消える
+ */
+let ghosts: core.Mark[] = [];
 /**
  * loadText を呼ぶたびに進む世代番号。
  *
@@ -93,12 +104,47 @@ const declaredFolder = (): string | null => {
 /**
  * 本文が変わった。**ここが読みのサイクルの唯一の入口** — 打鍵も、開くも、
  * 新規も、リンクで開くも、全部ここを通って同じ順で映る。
+ *
+ * 選択は id でなく目印（前の地番）で持ち越す。id は読みのサイクルを越えて
+ * 持たないので、core に「この目印はいまどれか」を訊く（`follow`）。
  */
-function sync(next: string): void {
+function sync(next: string, edits: core.Edit[]): void {
   const wasEmpty = doc.trees.length === 0;
+  // 目印と、その持ち主（幽霊は null）。Implicit は行が無いので捨てる
+  const marks: core.Mark[] = [];
+  const owners: (number | null)[] = [];
+  for (const id of selection.ids) {
+    const s = spots.get(id);
+    if (s && s.label !== null) {
+      marks.push({ from: s.from, label: s.label });
+      owners.push(id);
+    }
+  }
+  for (const g of ghosts) {
+    marks.push(g);
+    owners.push(null);
+  }
+  const r = core.survey(next, edits, marks);
   text = next;
-  doc = core.view(text);
+  doc = r.view;
+  spots = r.spots;
+  const ids: number[] = [];
+  const kept: core.Mark[] = [];
+  let anchor: number | null = null;
+  r.trails.forEach((t, i) => {
+    if (!t) return;
+    if (t.id === null) {
+      kept.push(t.mark);
+      return;
+    }
+    ids.push(t.id);
+    if (owners[i] === selection.anchor) anchor = t.id;
+  });
+  ids.sort((a, b) => a - b);
+  selection = { ids, anchor: anchor ?? (ids.length ? ids[ids.length - 1] : null) };
+  ghosts = kept;
   map.render();
+  editor.highlight(selectedRanges());
   // 白紙の言い出し。**出る理由は 1 つ**（まだ木が無い）で、マップ側も
   // render() の中で同じことを見ている
   editor.showHint(doc.trees.length === 0);
@@ -109,7 +155,31 @@ function sync(next: string): void {
   if (wasEmpty && doc.trees.length > 0) map.fitView();
 }
 
-const editor = new MdEditor(mdPane, sync);
+/** 選んでいるノードの md 側の範囲（子孫込み） */
+const selectedRanges = (): Range[] =>
+  selection.ids.flatMap((id) => {
+    const s = spots.get(id);
+    return s ? [{ from: s.from, to: s.to }] : [];
+  });
+
+/** 地図で選び直した。幽霊は要らなくなる */
+function setSelection(sel: Selection, reveal: boolean): void {
+  selection = sel;
+  ghosts = [];
+  map.refreshSelection();
+  editor.highlight(selectedRanges());
+  if (reveal && sel.anchor !== null) {
+    const s = spots.get(sel.anchor);
+    if (s) editor.reveal(s.from);
+  }
+}
+
+/** md のカーソルが動いた。掛かるノードに輪を出す（地図は動かさない） */
+function onCaret(ranges: Range[]): void {
+  map.showCaret(caretIds(doc, spots, ranges));
+}
+
+const editor = new MdEditor(mdPane, sync, onCaret);
 
 const host: MapHost = {
   doc: () => doc,
@@ -119,6 +189,8 @@ const host: MapHost = {
     void (async () => {
       if (await ensurePlace()) await assets.connect();
     })(),
+  selection: () => selection,
+  setSelection,
 };
 const map = new Mindmap(mapPane, host);
 
