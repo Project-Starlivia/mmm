@@ -65,6 +65,7 @@ pub fn build(
     top: deep,
     own: deep,
     dry: false,
+    owner: 0,
   }
   for piece in pieces(md, ast.children, b.defs, 0) {
     lay(b, piece, 0)
@@ -168,6 +169,9 @@ priv struct Build {
   mut own : Int
   /// 深さを測るだけの空打ちか。畳みを見ないので、項目の中も読み解かない
   dry : Bool
+  /// いま中身を読んでいる項目の深さ。**入れ子の列はその 1 つ下に座る** —
+  /// stack の高さで測ると、前の列の項目が積まれたままなので次の列がその子になる
+  mut owner : Int
 }
 
 ///|
@@ -210,6 +214,7 @@ fn depths(
     top: deep,
     own: deep,
     dry: true,
+    owner: 0,
   }
   let out = Array::make(blocks.length(), { top: deep, own: deep })
   for i, block in blocks {
@@ -317,7 +322,7 @@ fn items_take(
   // 数えてしまい、間に綴られていない項目が生える（項目は相対記法なので
   // 飛びは存在しない）。列に入る前に 1 度だけ測る — 中で測ると前の兄弟を
   // 積んだぶんずれる
-  let mut level = if nest == 0 { spine(b) + 1 } else { b.stack.length() + 1 }
+  let mut level = if nest == 0 { spine(b) + 1 } else { b.owner + 1 }
   for it in items {
     // **ラベルは項目の 1 行目。** 途中の段落を引き上げると、その文字が
     // ラベルと中身の両方になる（切り出しはブロックの範囲でやるので、抜いたはずの
@@ -345,9 +350,12 @@ fn items_take(
     } else {
       pieces(b.md, rest, defs_in(b.defs, from, it.span.to), nest + 1)
     }
+    let outer = b.owner
+    b.owner = level
     for c in inner {
       lay(b, c, nest + 1)
     }
+    b.owner = outer
   }
 }
 
