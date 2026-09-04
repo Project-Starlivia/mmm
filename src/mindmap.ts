@@ -458,5 +458,12 @@ export class Mindmap {
         if (!this.panning) this.pane.style.cursor = "";
       }
     });
+    // Space を押したままペインの外へフォーカスが抜けると keyup が来ない。
+    // 持ったままになるとカーソルが grab に貼り付き、背景の左ドラッグが
+    // ずっと矩形選択でなくパンになる
+    this.pane.addEventListener("focusout", () => {
+      this.spaceHeld = false;
+      if (!this.panning) this.pane.style.cursor = "";
+    });
   }
 }
