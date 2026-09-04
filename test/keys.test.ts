@@ -240,18 +240,16 @@ const C: Layout = layoutMap(
   size,
 );
 
-test("keyedCard: Delete / Backspace はそのカードを消し、持ち主を keep する", () => {
+test("keyedCard: Delete / Backspace はそのカードを消す（持ち主を選ぶのは core の focus）", () => {
   assert.deepEqual(keyedCard(C, 3, k("Delete")), {
     kind: "op",
     op: { kind: "delete", ids: [3] },
     edit: false,
-    keep: 2,
   });
   assert.deepEqual(keyedCard(C, 4, k("Backspace")), {
     kind: "op",
     op: { kind: "delete", ids: [4] },
     edit: false,
-    keep: 2,
   });
 });
 

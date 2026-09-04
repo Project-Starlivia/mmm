@@ -130,14 +130,19 @@ test "Delete は部分木ごと。根の子なら side も、Implicit の掃除�
 }
 
 ///|
-test "Delete は中身も 1 枚ずつ。根も Root ごと" {
+test "Delete は中身も 1 枚ずつ（持ち主が focus）。根も Root ごと" {
   let d = doc([root(h(2, "r", body=[pic(3), code(4)])), root(h(5, "s"))])
   assert_eq(
     run(d, Delete(ids=[3])),
     Some({
       doc: doc([root(h(2, "r", body=[code(4)])), root(h(5, "s"))]),
-      focus: None,
+      focus: Some(2),
     }),
+  )
+  // 持ち主ごと消せば focus は無い
+  assert_eq(
+    run(d, Delete(ids=[2, 3])),
+    Some({ doc: doc([root(h(5, "s"))]), focus: None }),
   )
   assert_eq(
     run(d, Delete(ids=[5])),

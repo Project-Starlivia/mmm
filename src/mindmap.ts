@@ -704,9 +704,7 @@ export class Mindmap {
     this.pane.addEventListener("click", (e) => {
       const kill = targetIn(e, "[data-kill]")?.getAttribute("data-kill");
       if (kill !== null && kill !== undefined) {
-        const id = Number(kill);
-        const owner = ownerOf(this.layout, id)?.box.node.id;
-        this.host.apply({ kind: "delete", ids: [id] }, false, owner);
+        this.host.apply({ kind: "delete", ids: [Number(kill)] }, false);
         return;
       }
       if (targetIn(e, ".img-connect")) {

@@ -144,7 +144,8 @@ export function keyedCard(L: Layout, picked: number, k: Key): Intent | null {
   const blocks = owner.blocks;
   const index = o.index;
   if ((k.key === "Delete" || k.key === "Backspace") && !k.mod) {
-    return { kind: "op", op: { kind: "delete", ids: [picked] }, edit: false, keep: owner.id };
+    // 消した後に持ち主を選ぶのは core の focus（持ち主ごと書き直されるので目印は追えない）
+    return { kind: "op", op: { kind: "delete", ids: [picked] }, edit: false };
   }
   if ((k.key === "ArrowDown" || k.key === "ArrowUp") && !k.mod && !k.alt) {
     const next = k.key === "ArrowDown" ? blocks[index + 1] : blocks[index - 1];
