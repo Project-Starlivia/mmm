@@ -59,6 +59,47 @@ export interface View {
 /** md を core に読ませ、map が見る木を受け取る。読みのサイクルの入口 */
 export const view = (md: string): View => decode(JSON.parse(mbt.mmmViewJson(md)));
 
+/** 地番。ノードが md のどこに書かれているか。label はラベルの頭（Implicit と文書の散文は null） */
+export interface Spot {
+  from: number;
+  label: number | null;
+  to: number;
+}
+
+/** 編集 1 つ。CodeMirror の changes と同じ形（前の座標、from 順、重ならない） */
+export interface Edit {
+  from: number;
+  to: number;
+  insert: string;
+}
+
+/** 前のサイクルの目印。選択を md の打鍵をまたいで持ち越すためのもの */
+export interface Mark {
+  from: number;
+  label: number;
+}
+
+/** 写した目印と、いま当たるノード。当たらなくても目印は生きている */
+export interface Trail {
+  mark: Mark;
+  id: number | null;
+}
+
+/** 打鍵 1 回ぶんの読み */
+export interface Survey {
+  view: View;
+  spots: Map<number, Spot>;
+  /** marks と同じ並び。null は死んだ目印 */
+  trails: (Trail | null)[];
+}
+
+/**
+ * md を core に読ませ、View と地番と、前の目印の行き先を 1 度に受け取る。
+ * 読みのサイクルの入口はこちら。`view(md)` は lab と試験のために残す
+ */
+export const survey = (md: string, edits: Edit[], marks: Mark[]): Survey =>
+  decodeSurvey(JSON.parse(mbt.mmmSurvey(md, JSON.stringify(edits), JSON.stringify(marks))));
+
 // ---- JSON の形を確かめながら整える ----
 
 const bad = (what: string): never => {
@@ -162,5 +203,37 @@ export function decode(json: unknown): View {
   return {
     frontmatter: option(o, "frontmatter", str),
     trees: field(o, "trees", (t) => list(t, tree)),
+  };
+}
+
+const spot = (v: unknown): Spot => {
+  const o = record(v);
+  return { from: field(o, "from", num), label: option(o, "label", num), to: field(o, "to", num) };
+};
+
+const mark = (v: unknown): Mark => {
+  const o = record(v);
+  return { from: field(o, "from", num), label: field(o, "label", num) };
+};
+
+const trail = (v: unknown): Trail | null => {
+  if (v === null) return null;
+  const o = record(v);
+  return { mark: field(o, "mark", mark), id: option(o, "id", num) };
+};
+
+/** core の JSON（`mmmSurvey` の出力）を Survey にする。Map の鍵は文字列で来る */
+export function decodeSurvey(json: unknown): Survey {
+  const o = record(json);
+  const spots = new Map<number, Spot>();
+  for (const [k, v] of Object.entries(record(field(o, "spots", record)))) {
+    const id = Number(k);
+    if (!Number.isInteger(id)) bad(`spots の鍵 ${k}`);
+    spots.set(id, spot(v));
+  }
+  return {
+    view: decode(field(o, "view", (v) => v)),
+    spots,
+    trails: field(o, "trails", (t) => list(t, trail)),
   };
 }

@@ -46,3 +46,39 @@ pub fn mmm_serialize(md : String) -> String {
 pub fn mmm_unbuild_sig(md : String) -> String {
   @tree.ast_sig(@tree.unbuild(@tree.parse(md)))
 }
+
+///|
+/// 打鍵 1 回ぶんの読み。View と地番と、前のサイクルの目印がいまどのノードかを
+/// **1 度の parse で**返す（読みは打鍵ごとに 1 回に保つ）。edits は反映の Edit の形
+/// （前の座標、from 順）、marks は前のサイクルの地番から ts が抜いた目印。
+/// 壊れた JSON は ts の側のバグなので、静かに断らず投げる。
+#export_name("mmmSurvey")
+pub fn mmm_survey(md : String, edits : String, marks : String) -> String {
+  let edits : Array[@tree.Edit] = try @json.from_json(@json.parse(edits)) catch {
+    e => abort("mmmSurvey: edits の JSON が読めない — \{e}")
+  }
+  let marks : Array[@tree.Mark] = try @json.from_json(@json.parse(marks)) catch {
+    e => abort("mmmSurvey: marks の JSON が読めない — \{e}")
+  }
+  let (doc, spots) = @tree.survey(md)
+  let out : Survey = {
+    view: @view.project(doc),
+    spots,
+    // Trail? のまま並べると、MoonBit の ToJson は Some を配列 1 つに包んでしまい
+    // （builtin の Option::to_json）、ts の Trail | null と形が揃わない。
+    // ここで当たり/外れを素の object / null に均す
+    trails: @tree.follow(spots, edits, marks).map(t => match t {
+      Some(x) => ToJson::to_json(x)
+      None => Json::null()
+    }),
+  }
+  ToJson::to_json(out).stringify()
+}
+
+///|
+/// mmmSurvey の返り値の形。JSON にするためだけの器
+priv struct Survey {
+  view : @view.View
+  spots : Map[Int, @tree.Spot]
+  trails : Array[Json]
+} derive(ToJson)
