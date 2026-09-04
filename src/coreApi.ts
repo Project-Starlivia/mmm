@@ -164,3 +164,77 @@ export function decode(json: unknown): View {
     trees: field(o, "trees", (t) => list(t, tree)),
   };
 }
+
+// ---- 操作を core へ送る ----
+//
+// 席は隣の id で言う（添字は無い）。`in` は列の末尾で、side は node が根のときだけ意味を持つ。
+
+export type NodePlace =
+  | { kind: "before"; node: number }
+  | { kind: "after"; node: number }
+  | { kind: "in"; node: number; side: Side | null };
+
+export type BlockPlace =
+  | { kind: "before"; block: number }
+  | { kind: "after"; block: number }
+  | { kind: "in"; node: number };
+
+/** 操作 1 つ。core の `Op` と同じ形（構築子名が kind） */
+export type Op =
+  | { kind: "addNode"; at: NodePlace; labels: string[] }
+  | { kind: "addBlock"; at: BlockPlace; content: Content }
+  | { kind: "rename"; id: number; label: string }
+  | { kind: "setBlock"; id: number; content: Content }
+  | { kind: "moveNode"; ids: number[]; at: NodePlace }
+  | { kind: "moveBlock"; ids: number[]; at: BlockPlace }
+  | { kind: "delete"; ids: number[] }
+  | { kind: "wrap"; id: number; label: string }
+  | { kind: "flipSide"; id: number }
+  | { kind: "fold"; id: number; open: boolean }
+  | { kind: "unfold"; id: number }
+  | { kind: "graft"; at: NodePlace; md: string };
+
+/** 編集 1 つ。CodeMirror の changes と同じ形 */
+export interface Edit {
+  from: number;
+  to: number;
+  insert: string;
+}
+
+/** 操作を md に映した結果。focus は編集を当てて読み直した木での id（消した後は null） */
+export interface Edited {
+  edits: Edit[];
+  focus: number | null;
+}
+
+/** 操作を md に映す。できない操作は edits が空で focus も null */
+export const edit = (md: string, op: Op): Edited =>
+  edited(JSON.parse(mbt.mmmEdit(md, JSON.stringify(encode(op)))));
+
+/**
+ * core の enum の形にする（MoonBit の ToJson / FromJson と同じ）:
+ * kind は構築子名（頭を大文字）、残りの鍵はラベル付き引数、null の鍵は落とす、
+ * 鍵が無ければ裸の名前。`Svg(String)` だけラベルが無いので位置で渡す。
+ */
+export function encode(v: { kind: string }): unknown {
+  const { kind, ...rest } = v;
+  const tag = kind.charAt(0).toUpperCase() + kind.slice(1);
+  if (kind === "svg" && "markup" in v) return [tag, v.markup];
+  const fields: Record<string, unknown> = {};
+  for (const [k, x] of Object.entries(rest)) {
+    if (x === null) continue;
+    fields[k] = isRecord(x) && typeof x["kind"] === "string" ? encode({ ...x, kind: x["kind"] }) : x;
+  }
+  return Object.keys(fields).length === 0 ? tag : [tag, fields];
+}
+
+const editOne = (v: unknown): Edit => {
+  const o = record(v);
+  return { from: field(o, "from", num), to: field(o, "to", num), insert: field(o, "insert", str) };
+};
+
+/** core の JSON（`mmmEdit` の出力）を Edited にする */
+export function edited(json: unknown): Edited {
+  const o = record(json);
+  return { edits: field(o, "edits", (e) => list(e, editOne)), focus: option(o, "focus", num) };
+}

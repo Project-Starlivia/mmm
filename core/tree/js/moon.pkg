@@ -1,6 +1,9 @@
 pkgtype(kind: "foreign_library")
 
 import {
+  "moonbitlang/core/json",
   "mmm-app/core/tree",
   "mmm-app/core/view",
+  "mmm-app/core/op",
+  "mmm-app/core/edit",
 }
