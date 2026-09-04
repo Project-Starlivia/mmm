@@ -207,10 +207,10 @@ export class Mindmap {
   private followCard(): void {
     // 持ち主が畳まれて箱を失えば外す — 見えないカードを選んだままにしない
     const picked = this.host.picked();
-    const rect = picked === null ? null : this.cardRectOf(picked);
-    if (picked !== null && rect === null) this.host.setPicked(null);
-    if (picked === null || rect === null) this.pick.hide();
-    else this.pick.show(picked, rect);
+    const at = picked === null ? null : this.cardRectOf(picked);
+    if (picked !== null && at === null) this.host.setPicked(null);
+    if (picked === null || at === null) this.pick.hide();
+    else this.pick.show(picked, at);
     const editing = this.card.editing();
     if (editing === null) return;
     const rect = this.cardRectOf(editing);
