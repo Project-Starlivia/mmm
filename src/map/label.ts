@@ -117,6 +117,7 @@ export class LabelEditor {
     st.fontSize = `${p.fontSize}px`;
     st.paddingLeft = `${p.padding}px`;
     st.paddingRight = `${p.padding}px`;
+    st.borderWidth = `${LABEL_BORDER}px`;
   }
 
   /** 閉じる。書くものは無い（もう書いてある）。二重に閉じても何も起きない */

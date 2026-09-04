@@ -720,7 +720,10 @@ html, body {
   display: none;
   box-sizing: border-box;
   font-family: var(--font);
-  border: 2px solid var(--accent);
+  /* 太さは map/label.ts の LABEL_BORDER が place() で入れる。labelPlacement()
+     の寸法計算がその値を前提にしているので、太さの源はここではなくあちら */
+  border-style: solid;
+  border-color: var(--accent);
   border-radius: 10px;
   background: var(--node-bg);
   color: var(--ink);
