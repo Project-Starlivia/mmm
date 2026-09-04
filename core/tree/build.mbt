@@ -22,6 +22,8 @@ priv struct Frame {
   mut to : Int
   /// ラベルの頭（マーカーの後ろ）。飛び（Gap）は行を持たないので -1
   label : Int
+  /// 中身（body）と並走する地番。chart が番号と付き合わせて spans に写す
+  body_at : Array[Spot]
 }
 
 ///|
@@ -66,9 +68,11 @@ pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
     forest: [],
     stack: [],
     body: [],
+    body_at: [],
     body_to: 0,
     side: Right,
     pend: false,
+    pend_from: 0,
     pend_to: 0,
     fold_at: None,
     top: deep,
@@ -102,6 +106,9 @@ pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
     } else {
       from
     },
+  }
+  for i, at in b.body_at {
+    spans[b.body[i].id] = at
   }
   for f in forest {
     chart(f, spans)
@@ -167,6 +174,13 @@ fn chart(f : Frame, spans : Map[Int, Spot]) -> Unit {
     },
     to: f.to,
   }
+  match f.skel {
+    Line(body~, ..) =>
+      for i, at in f.body_at {
+        spans[body[i].id] = at
+      }
+    Gap => ()
+  }
 }
 
 ///|
@@ -184,12 +198,16 @@ priv struct Build {
   stack : Array[Frame]
   /// 最初の骨格より前の散文
   body : Array[Block]
+  /// その散文と並走する地番
+  body_at : Array[Spot]
   /// その散文の尻（地番）
   mut body_to : Int
   /// 次の子の側。木が変わるたびに右へ戻る
   mut side : Side
   /// 行き先待ちの水平線が有るか。**本数に意味は無い**ので Bool で持つ
   mut pend : Bool
+  /// その水平線の頭。飾りに落ちたとき地番に入れる
+  mut pend_from : Int
   /// その水平線の尻。飾りに落ちたとき地番に入れる
   mut pend_to : Int
   /// いま積む骨格が畳まれているなら、その `<details>` 〜 `</details>` の範囲
@@ -237,9 +255,11 @@ fn depths(
     forest: [],
     stack: [],
     body: [],
+    body_at: [],
     body_to: 0,
     side: Right,
     pend: false,
+    pend_from: 0,
     pend_to: 0,
     fold_at: None,
     top: deep,
@@ -278,14 +298,14 @@ fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
       take(b, block, nest, fold=Some(fold))
       b.fold_at = None
     }
-    Capsule(text~, open~, summary~, body~, to~) => {
+    Capsule(text~, open~, summary~, body~, from~, to~) => {
       // 中身が来たので、保留中の水平線は境界になれない
       spill(b)
-      fill(b, Details(text~, open~, summary~, body~), to~)
+      fill(b, Details(text~, open~, summary~, body~), from~, to~)
     }
-    Text(text, to~) => {
+    Text(text, from~, to~) => {
       spill(b)
-      fill(b, Opaque(text), to~)
+      fill(b, Opaque(text), from~, to~)
     }
   }
 }
@@ -302,7 +322,7 @@ fn take(
     // **単調性 — 項目の子孫は項目。** 項目の領土に書かれた見出しは骨格に
     // ならず、原文のまま中身になる（列 0 へ出れば項目が閉じて木が変わる）
     Heading(span~, ..) if nest > 0 =>
-      fill(b, Opaque(verbatim(b.md, block)), to=span.to)
+      fill(b, Opaque(verbatim(b.md, block)), from=span.from, to=span.to)
     Heading(level~, style~, children~, span~, ..) =>
       put(
         b,
@@ -321,11 +341,13 @@ fn take(
     // 区切りは**根の領土の隙間**でだけ側の変わり目になる。項目の中は中身なので
     // 保留せずその場に置く（保留すると、置く前に項目の枠が閉じられたとき
     // 帰る場所が無くなって文書へ落ちる）
-    ThematicBreak(span~, ..) if nest > 0 => fill(b, ThematicBreak, to=span.to)
+    ThematicBreak(span~, ..) if nest > 0 =>
+      fill(b, ThematicBreak, from=span.from, to=span.to)
     // 記法(`---` `***` `___`)も本数も差別しない。意味は常に「隣を区切る」で、
     // 行き先は**直後のブロックが何か**で決まる。ここでは保留するだけ
     ThematicBreak(span~, ..) => {
       b.pend = true
+      b.pend_from = span.from
       b.pend_to = span.to
     }
     _ =>
@@ -334,7 +356,7 @@ fn take(
           // 中身が来た時点で、保留中の水平線は境界になれない
           spill(b)
           let s = block_span(block)
-          fill(b, c, to=closing(b.md, block, s.to))
+          fill(b, c, from=s.from, to=closing(b.md, block, s.to))
         }
         None => ()
       }
@@ -470,6 +492,7 @@ fn put(
       from: -1,
       to: -1,
       label: -1,
+      body_at: [],
     }
     sink(b)
     seat(b, gap)
@@ -488,6 +511,7 @@ fn put(
     from: at.from,
     to: at.to,
     label,
+    body_at: [],
   }
   sink(b)
   // **そのブロック自身のノードは、最初に座る綴られた枠。** 手前の穴埋めは足場、
@@ -541,7 +565,7 @@ fn flipped(s : Side) -> Side {
 fn spill(b : Build) -> Unit {
   if b.pend {
     b.pend = false
-    fill(b, ThematicBreak, to=b.pend_to)
+    fill(b, ThematicBreak, from=b.pend_from, to=b.pend_to)
   }
 }
 

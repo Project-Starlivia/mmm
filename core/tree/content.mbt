@@ -7,11 +7,13 @@
 ///|
 /// 中身を、いま積んでいるノードに足す。骨格がまだ無ければ文書の散文になる。
 /// id は割り付けの直前に文書順で振るので、ここでは 0 を置く。
-/// `to` はその中身の原文での尻で、持ち主の地番がそこまで伸びる。
-fn fill(b : Build, content : Content, to~ : Int) -> Unit {
+/// `from`・`to` はその中身の原文での範囲で、`to` は持ち主の地番もそこまで伸ばす。
+fn fill(b : Build, content : Content, from~ : Int, to~ : Int) -> Unit {
   let block : Block = { id: 0, content }
+  let at : Spot = { from, label: None, to }
   if b.stack.is_empty() {
     b.body.push(block)
+    b.body_at.push(at)
     if to > b.body_to {
       b.body_to = to
     }
@@ -19,7 +21,10 @@ fn fill(b : Build, content : Content, to~ : Int) -> Unit {
   }
   let f = b.stack[b.stack.length() - 1]
   match f.skel {
-    Line(body~, ..) => body.push(block)
+    Line(body~, ..) => {
+      body.push(block)
+      f.body_at.push(at)
+    }
     // 飛びは綴りが無いので中身も持てない。put は必ず実体を最後に積むので、
     // ここに来ることは無い
     Gap => ()

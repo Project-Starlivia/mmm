@@ -141,6 +141,10 @@ test("Op は core の enum の形になる — kind が構築子名、null の�
     encode({ kind: "setBlock", id: 3, content: { kind: "svg", markup: "<svg/>" } }),
     ["SetBlock", { id: 3, content: ["Svg", "<svg/>"] }],
   );
+  assert.deepEqual(
+    encode({ kind: "setBlock", id: 3, content: { kind: "opaque", text: "x\n" } }),
+    ["SetBlock", { id: 3, content: ["Opaque", "x\n"] }],
+  );
 });
 
 test("Edited — focus の無い鍵は null", () => {
