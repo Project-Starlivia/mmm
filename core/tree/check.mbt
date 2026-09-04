@@ -31,9 +31,7 @@ pub fn check(doc : Doc) -> Array[Flaw] {
 
   fn blocks(bs : Array[Block]) -> Unit {
     for x in bs {
-      if x is Details(id=i, ..) {
-        id(i)
-      }
+      id(x.id)
     }
   }
 

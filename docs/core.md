@@ -20,11 +20,16 @@ ImplicitNode { id, children: [Node] }       // 記法を持たない
 
 Side  = Right | Left
 Eol   = Lf | Crlf
-Block = Image | Link | Code | Svg           // 中身 1 枚。包みは無い
-      | ThematicBreak                       // 境界にならなかった水平線
-      | Details(id, text)                   // <details>。領域の原文
-      | Opaque(text)                        // 読み解かない原文
+Block   { id, content: Content }            // 中身 1 枚。id はノードと同じ列
+Content = Image | Link | Code | Svg         // 解釈の包みは無い
+        | ThematicBreak                     // 境界にならなかった水平線
+        | Details(text)                     // <details>。領域の原文
+        | Opaque(text)                      // 読み解かない原文
 ```
+
+**id はノードにも中身にも、1 つの列で振る。** 中身がノードと同じ番号を
+持つので、引き当てる・選ぶ・動かすが型の上で割れない。「解釈できた /
+できなかった」を Result で包むことはせず、Opaque という名前が担う。
 
 **型が言うのは「あり得ない形」だけ**で、仕様を満たすのは実装の仕事。
 型の上で作れるものは何でも許容し、細かい充足はテストが受け持つ。
@@ -40,7 +45,7 @@ Block = Image | Link | Code | Svg           // 中身 1 枚。包みは無い
 `children` を全部の深さで `[Node]` に保つため、側は組にせず並走させる
 （深さで型が変わると走査も操作も割れる）。長さが揃うことは型では言えない。
 
-check が見るもの — id 一意 / Implicit は子を持つ / `sides` と根の子の長さが揃う /
+check が見るもの — id 一意（ノードも中身も） / Implicit は子を持つ / `sides` と根の子の長さが揃う /
 畳みの名前が `<summary>` に書ける。**`open` と名前が畳みのときだけ在ることは
 型が殺す**（`fold : Fold?` に括ってあるので、畳みでなければ持ちようがない）。
 
@@ -66,8 +71,9 @@ TS では必ず持ち主を付けて `core.View` / `core.Node` と書く（`impo
   裁定したものだけが map に届かない。何がカードかは描く側の分類のまま
 - 書き戻すためだけの欄（eol・散文の body）は無い。**frontmatter だけは残す** —
   画像フォルダの宣言がそこに書かれていて、描くのに要る
-- **id は Doc のまま。** parse は文書順に振るので、上に見出しを足すと下の id が
-  ずれる。順序を id に読ませない（下の「id は読みのサイクルを越えて持たない」）
+- **id は Doc のまま。** 読みが文書順に振った通し番号で、Opaque にも振ってある
+  ので、落としても残りの番号は動かない（View の添字を body の添字へ読み替える
+  段は要らない）。順序を id に読ませない（下の「id は読みのサイクルを越えて持たない」）
 
 ## パイプライン
 

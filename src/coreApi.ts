@@ -19,14 +19,20 @@ export interface Fold {
   summary: string | null;
 }
 
-/** ノードにぶら下がる中身 1 枚。カードかどうかは map/cards.ts の分類 */
-export type Block =
+/** ノードにぶら下がる中身 1 枚。id はノードと同じ列（文書順の通し番号） */
+export interface Block {
+  id: number;
+  content: Content;
+}
+
+/** 中身そのもの。カードかどうかは map/cards.ts の分類 */
+export type Content =
   | { kind: "image"; alt: string; src: string; title: string }
   | { kind: "link"; text: string; href: string; title: string }
   | { kind: "code"; info: string; text: string }
   | { kind: "svg"; markup: string }
   | { kind: "thematicBreak" }
-  | { kind: "details"; id: number; text: string };
+  | { kind: "details"; text: string };
 
 export interface Node {
   id: number;
@@ -84,9 +90,9 @@ const fold = (v: unknown): Fold => {
 };
 
 /** enum は `"Tag"`（中身なし）か `["Tag", 中身]` */
-function block(v: unknown): Block {
+function content(v: unknown): Content {
   if (v === "ThematicBreak") return { kind: "thematicBreak" };
-  if (!Array.isArray(v) || v.length !== 2) return bad("Block の形でない");
+  if (!Array.isArray(v) || v.length !== 2) return bad("Content の形でない");
   const [tag, body] = v;
   switch (tag) {
     case "Image": {
@@ -113,14 +119,17 @@ function block(v: unknown): Block {
     }
     case "Svg":
       return { kind: "svg", markup: str(body) };
-    case "Details": {
-      const o = record(body);
-      return { kind: "details", id: field(o, "id", num), text: field(o, "text", str) };
-    }
+    case "Details":
+      return { kind: "details", text: str(body) };
     default:
-      return bad(`知らない Block ${String(tag)}`);
+      return bad(`知らない Content ${String(tag)}`);
   }
 }
+
+const block = (v: unknown): Block => {
+  const o = record(v);
+  return { id: field(o, "id", num), content: field(o, "content", content) };
+};
 
 function node(v: unknown): Node {
   const o = record(v);

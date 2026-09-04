@@ -47,12 +47,7 @@ fn cast_item(l : @tree.ListNode) -> Node {
 }
 
 ///|
-/// 読み解いたものだけ。
+/// 読み解いたものだけ。id は Doc のままなので、落ちた分で番号はずれない。
 fn read(body : Array[@tree.Block]) -> Array[@tree.Block] {
-  body.filter(b => {
-    match b {
-      Opaque(_) => false
-      _ => true
-    }
-  })
+  body.filter(b => !(b.content is Opaque(_)))
 }

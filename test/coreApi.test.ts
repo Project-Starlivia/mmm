@@ -21,12 +21,12 @@ test("Block は enum の形から kind に整う", () => {
           id: 2,
           label: "a",
           blocks: [
-            ["Image", { alt: "", src: "p.png", title: "" }],
-            ["Link", { text: "t", href: "u", title: "" }],
-            ["Code", { info: "js", text: "1\n" }],
-            ["Svg", "<svg/>"],
-            "ThematicBreak",
-            ["Details", { id: 3, text: "<details>x</details>" }],
+            { id: 3, content: ["Image", { alt: "", src: "p.png", title: "" }] },
+            { id: 5, content: ["Link", { text: "t", href: "u", title: "" }] },
+            { id: 6, content: ["Code", { info: "js", text: "1\n" }] },
+            { id: 7, content: ["Svg", "<svg/>"] },
+            { id: 8, content: "ThematicBreak" },
+            { id: 9, content: ["Details", "<details>x</details>"] },
           ],
           children: [],
         },
@@ -35,8 +35,13 @@ test("Block は enum の形から kind に整う", () => {
     ],
   });
   assert.deepEqual(
-    v.trees[0].node.blocks.map((b) => b.kind),
+    v.trees[0].node.blocks.map((b) => b.content.kind),
     ["image", "link", "code", "svg", "thematicBreak", "details"],
+  );
+  // id はノードと同じ列。Opaque が落ちたぶん（4）は飛んだまま
+  assert.deepEqual(
+    v.trees[0].node.blocks.map((b) => b.id),
+    [3, 5, 6, 7, 8, 9],
   );
 });
 
@@ -66,9 +71,11 @@ test("知らない形は黙って通さない", () => {
   assert.throws(
     () =>
       decode({
-        trees: [{ node: { id: 1, blocks: [["Opaque", "x"]], children: [] }, sides: [] }],
+        trees: [
+          { node: { id: 1, blocks: [{ id: 2, content: ["Opaque", "x"] }], children: [] }, sides: [] },
+        ],
       }),
-    /知らない Block/,
+    /知らない Content/,
   );
   assert.throws(
     () => decode({ trees: [{ node: { id: 1, blocks: [], children: [] }, sides: ["Up"] }] }),

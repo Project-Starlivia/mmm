@@ -67,7 +67,7 @@ function codeCard(info: string, text: string): CardRow {
   return { kind: "code", lang: info, lines };
 }
 
-function cardOf(b: core.Block): CardRow | null {
+function cardOf(b: core.Content): CardRow | null {
   switch (b.kind) {
     case "image":
       return imageCard(b.src);
@@ -83,11 +83,11 @@ function cardOf(b: core.Block): CardRow | null {
   }
 }
 
-/** ノード 1 つぶんのカード行。並びは Block のまま */
+/** ノード 1 つぶんのカード行。並びは Block のまま。id は今は使わない（選ぶ段で使う） */
 export function cardRows(blocks: core.Block[]): CardRow[] {
   const out: CardRow[] = [];
   for (const b of blocks) {
-    const row = cardOf(b);
+    const row = cardOf(b.content);
     if (row !== null) out.push(row);
   }
   return out;

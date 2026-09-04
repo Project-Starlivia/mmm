@@ -99,10 +99,18 @@ pub(all) enum Eol {
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// ノードにぶら下がる中身 1 枚。**包みは作らない** —
+/// ノードにぶら下がる中身 1 枚。**id はノードと同じ列**（文書順の通し番号）。
+/// ノードも中身も同じ番号で引き当てるので、操作も選択も型が割れない。
+pub(all) struct Block {
+  id : Int
+  content : Content
+} derive(Eq, Debug, ToJson)
+
+///|
+/// 中身そのもの。**解釈の包みは作らない** —
 /// 「解釈できた / できなかった」は Opaque という名前が担う。
 /// カードかどうかは描画側の分類で、core は意味だけを持つ。
-pub(all) enum Block {
+pub(all) enum Content {
   Image(alt~ : String, src~ : String, title~ : String)
   Link(text~ : String, href~ : String, title~ : String)
   Code(info~ : String, text~ : String)
@@ -111,7 +119,7 @@ pub(all) enum Block {
   ThematicBreak
   /// `<details>`。**中を読み解かない** — 触っていない畳みが正規形に落ちるのを
   /// 防ぐため、領域を原文のまま持つ。表示名は覗いて導出する
-  Details(id~ : Int, text~ : String)
+  Details(String)
   /// 読み解かない原文。コメントもここ
   Opaque(String)
 } derive(Eq, Debug, ToJson)

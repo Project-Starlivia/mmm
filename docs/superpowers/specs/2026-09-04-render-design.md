@@ -89,13 +89,14 @@ pub fn project(doc : Doc) -> View
 ```ts
 export type Side = "Right" | "Left";
 export interface Fold { open: boolean; summary: string | null }
-export type Block =
+export interface Block { id: number; content: Content }   // id はノードと同じ列（#29）
+export type Content =
   | { kind: "image"; alt: string; src: string; title: string }
   | { kind: "link"; text: string; href: string; title: string }
   | { kind: "code"; info: string; text: string }
   | { kind: "svg"; markup: string }
   | { kind: "thematicBreak" }
-  | { kind: "details"; id: number; text: string };
+  | { kind: "details"; text: string };
 export interface Node {
   id: number;
   label: string | null;      // Implicit は null。空の見出しは ""
@@ -162,7 +163,7 @@ export type CardRow =
   | { kind: "img";  path: string; name: string }
   | { kind: "svg";  markup: string }
   | { kind: "code"; lang: string; lines: string[] };
-export function cardRows(blocks: Block[]): CardRow[];
+export function cardRows(blocks: Block[]): CardRow[];   // 見るのは content。id は選ぶ段で使う
 ```
 
 - `image` は相対パス（scheme 無し。1 文字はドライブ）のときだけ img。外部の画像は出さない
