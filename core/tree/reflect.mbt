@@ -4,9 +4,10 @@
 // 後の Doc が誰にどう作られたか（操作・undo のスナップショット）は知らない。
 //
 // 前後の木を id で突き合わせ、変わったノード（dirty）の地番を断片で置き換える。
-// 入れ子は一番上だけ（範囲が重ならない）。出来た文章を読み直して後の木と
-// 形が一致しなければ全文を正規形に落とす — **正しさはこの検証が持つ**ので、
-// 比較がどれだけ雑でも壊れない。決めは docs/core.md「反映」。
+// 子の増減は容器を書かず、消えた子の範囲を消し、増えた子を隣に差す。
+// 出来た文章を読み直して後の木と形が一致しなければ全文を正規形に落とす —
+// **正しさはこの検証が持つ**ので、比較がどれだけ雑でも壊れない。
+// 決めは docs/core.md「反映」。
 
 ///|
 /// 編集 1 つ。from..to を insert に置き換える（CodeMirror の changes と同じ形）。
@@ -17,7 +18,8 @@ pub(all) struct Edit {
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// 後の木を映す編集列。from 順で、範囲は重ならない。
+/// 後の木を映す編集列。from 順で、範囲は重ならない
+/// （同じ位置の差し込みと置き換えは、差し込みが先）。
 pub fn reflect(
   md : String,
   before : Doc,
@@ -53,8 +55,8 @@ priv struct Reflect {
 }
 
 ///|
-/// 触った所だけの編集列。文書ぜんぶに関わる変化（frontmatter・改行・根の増減）は
-/// 断片では書けないので None — 全文へ落ちる。
+/// 触った所だけの編集列。断片で書けない変化（frontmatter・改行・根の並べ替え）
+/// は None — 全文へ落ちる。
 fn plan(
   md : String,
   before : Doc,
@@ -64,9 +66,6 @@ fn plan(
   guard before.frontmatter == after.frontmatter && before.eol == after.eol else {
     return None
   }
-  guard ids(before.roots.map(r => r.node)) == ids(after.roots.map(r => r.node)) else {
-    return None
-  }
   let r : Reflect = { md, spans, eol: before.eol, old: Map([]), out: [] }
   for root in before.roots {
     index(r.old, root.node)
@@ -74,29 +73,141 @@ fn plan(
   if before.body != after.body {
     r.out.push(edit(r, doc_id, prose(after.body, r.eol)))
   }
-  for i, root in after.roots {
-    // 側は根のもの。変われば根が丸ごと
-    if before.roots[i].sides != root.sides {
-      replace(r, root.node, 1, root.sides)
-    } else {
-      walk(r, root.node, 1, root.sides)
+  // 側は根のもの。変われば根が丸ごと（子の増減で長さが変わるだけ — 全部 Right — は同じ）
+  let olds = Map::from_array(before.roots.map(x => (id_of(x.node), x.sides)))
+  let sides = Map::from_array(after.roots.map(x => (id_of(x.node), x.sides)))
+  for x in after.roots {
+    match olds.get(id_of(x.node)) {
+      Some(was) if !(was == x.sides || (plain(was) && plain(x.sides))) =>
+        r.old.remove(id_of(x.node))
+      _ => ()
     }
   }
-  r.out.sort_by((a, b) => a.from - b.from)
+  guard kids(
+    r,
+    spans.get(doc_id).unwrap().to,
+    0,
+    before.roots.map(x => x.node),
+    after.roots.map(x => x.node),
+    1,
+    sides,
+  ) else {
+    return None
+  }
+  r.out.sort_by((a, b) => {
+    if a.from != b.from {
+      a.from - b.from
+    } else {
+      a.to - b.to
+    }
+  })
   Some(r.out)
 }
 
 ///|
-/// 前の木の同じ id と比べ、違えばそこで書く。同じなら子へ降りる
-/// （子の id 列も同じなので、番号で組になる）。
+fn plain(sides : Array[Side]) -> Bool {
+  sides.iter().all(s => s is Right)
+}
+
+///|
+/// 前の木の同じ id と比べ、違えばそこで書く。同じなら子へ降りる。
 fn walk(r : Reflect, x : Node, depth : Int, sides : Array[Side]) -> Unit {
   match r.old.get(id_of(x)) {
-    Some(old) if same(old, x) =>
-      for k in children_of(x) {
-        walk(r, k, depth + 1, [])
+    Some(old) if same(old, x) => {
+      let s = r.spans.get(id_of(x)).unwrap()
+      let mine = children_of(x)
+      // 項目の子は容器の中身の桁（マーカーの 2 つ右）に居る
+      let col = match x {
+        ListNode(_) => column(r.md, s.from) + 2
+        _ => 0
       }
+      // 畳みは `</details>` が子の後ろに在るので、子の出し入れは容器ごと
+      if folded(x) && ids(children_of(old)) != ids(mine) {
+        replace(r, x, depth, sides)
+      } else if !kids(r, s.to, col, children_of(old), mine, depth + 1, Map([])) {
+        replace(r, x, depth, sides)
+      }
+    }
     _ => replace(r, x, depth, sides)
   }
+}
+
+///|
+/// 子列の差分。残った子は組にして降り、消えた子は範囲ごと消し、増えた子は
+/// 次に残る子の手前か、最後に残る子の後ろか、容器の尻（`end`・桁 `col`）に差す。
+/// 残った子の順が変わっていれば false — 並べ替えは容器ごと書く。
+fn kids(
+  r : Reflect,
+  end : Int,
+  col : Int,
+  olds : Array[Node],
+  news : Array[Node],
+  depth : Int,
+  sides : Map[Int, Array[Side]],
+) -> Bool {
+  let was = Map::from_array(olds.map(x => (id_of(x), x)))
+  let now = Map::from_array(news.map(x => (id_of(x), x)))
+  let stay = news.filter(x => was.contains(id_of(x)))
+  guard ids(olds.filter(x => now.contains(id_of(x)))) == ids(stay) else {
+    return false
+  }
+  for x in olds {
+    if !now.contains(id_of(x)) {
+      let s = r.spans.get(id_of(x)).unwrap()
+      // 容器の字下げも道連れ。残すと次の行に 2 重に掛かる
+      r.out.push({ from: s.from - column(r.md, s.from), to: s.to, insert: "" })
+    }
+  }
+  // 増えた子は、次に残る子までまとめて 1 つの差し込みにする
+  let pend = StringBuilder::new()
+  for x in news {
+    let id = id_of(x)
+    if was.contains(id) {
+      let s = r.spans.get(id).unwrap()
+      if !pend.is_empty() {
+        // 残る子のマーカーの手前。差した後ろにその子の字下げを戻す
+        let c = column(r.md, s.from)
+        r.out.push(insert(r, s.from, indent(pend.to_string(), c) + pad(c)))
+        pend.reset()
+      }
+      walk(r, x, depth, sides.get(id).unwrap_or([]))
+    } else {
+      pend.write_string(fragment(x, depth, sides.get(id).unwrap_or([]), r.eol))
+    }
+  }
+  if !pend.is_empty() {
+    // 最後に残った子の後ろ。残らなければ消えた子の桁で容器の尻へ
+    let (pos, c) = match stay.last() {
+      Some(x) => {
+        let s = r.spans.get(id_of(x)).unwrap()
+        (s.to, column(r.md, s.from))
+      }
+      None =>
+        match olds.get(0) {
+          Some(o) => (end, column(r.md, r.spans.get(id_of(o)).unwrap().from))
+          None => (end, col)
+        }
+    }
+    r.out.push(insert(r, pos, pad(c) + indent(pend.to_string(), c)))
+  }
+  true
+}
+
+///|
+fn pad(n : Int) -> String {
+  String::make(n, ' ')
+}
+
+///|
+/// 位置 pos に text を差す編集。行の途中（改行の無い末尾）なら改行してから。
+/// 行頭の字下げの後ろは行頭と同じ（項目のマーカーの手前がそこ）。
+fn insert(r : Reflect, pos : Int, text : String) -> Edit {
+  let text = if skip_blank(r.md, pos - column(r.md, pos), pos) < pos {
+    "\n" + text
+  } else {
+    text
+  }
+  { from: pos, to: pos, insert: text }
 }
 
 ///|
@@ -120,7 +231,7 @@ fn indent(text : String, n : Int) -> String {
   if n == 0 {
     return text
   }
-  let pad = String::make(n, ' ')
+  let pad = pad(n)
   let out = StringBuilder::new()
   let mut head = false
   for c in text {
@@ -134,20 +245,14 @@ fn indent(text : String, n : Int) -> String {
 }
 
 ///|
-/// ノード自身が同じか — ラベル・中身・畳み・子の id 列。子の中は見ない。
+/// ノード自身が同じか — 種類・ラベル・中身・畳み。子は見ない。
 fn same(a : Node, b : Node) -> Bool {
   match (a, b) {
     (HeadingNode(p), HeadingNode(q)) =>
-      p.label == q.label &&
-      p.fold == q.fold &&
-      p.body == q.body &&
-      ids(p.children) == ids(q.children)
+      p.label == q.label && p.fold == q.fold && p.body == q.body
     (ListNode(p), ListNode(q)) =>
-      p.label == q.label &&
-      p.fold == q.fold &&
-      p.body == q.body &&
-      p.children.map(c => c.id) == q.children.map(c => c.id)
-    (ImplicitNode(p), ImplicitNode(q)) => ids(p.children) == ids(q.children)
+      p.label == q.label && p.fold == q.fold && p.body == q.body
+    (ImplicitNode(_), ImplicitNode(_)) => true
     _ => false
   }
 }
@@ -166,6 +271,15 @@ fn id_of(x : Node) -> Int {
     HeadingNode(h) => h.id
     ListNode(l) => l.id
     ImplicitNode(g) => g.id
+  }
+}
+
+///|
+fn folded(x : Node) -> Bool {
+  match x {
+    HeadingNode(h) => h.fold is Some(_)
+    ListNode(l) => l.fold is Some(_)
+    ImplicitNode(_) => false
   }
 }
 

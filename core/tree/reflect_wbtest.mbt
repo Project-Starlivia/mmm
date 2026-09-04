@@ -8,7 +8,16 @@
 fn change(doc : Doc, root : Int, path : Array[Int], f : (Node) -> Node) -> Doc {
   let roots = doc.roots.copy()
   let r = roots[root]
-  roots[root] = { node: rewrite(r.node, path, 0, f), sides: r.sides }
+  let node = rewrite(r.node, path, 0, f)
+  // 側は根の子と並走する。増えたぶんは Right
+  let sides = Array::makei(children_of(node).length(), i => {
+    if i < r.sides.length() {
+      r.sides[i]
+    } else {
+      Right
+    }
+  })
+  roots[root] = { node, sides }
   { ..doc, roots, }
 }
 
@@ -123,13 +132,187 @@ test "深い所の変化は上を触らない" {
 }
 
 ///|
-/// 段 5（子列の差分）までは、子が増えれば親が丸ごと
-test "子を増やせば親の地番" {
+test "最初の子は親の尻に差す" {
   let md = "# r\n\n## a\n\n## b\n"
   let (before, spans) = survey(md)
   let after = change(before, 0, [0], adopt(fresh("c")))
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 5, "to": 10, "insert": "## a\n\n### c\n" },
+    { "from": 10, "to": 10, "insert": "### c\n" },
+  ])
+}
+
+///|
+test "増えた子は最後に残る子の後ろ" {
+  let md = "# r\n\n## a\n\n### x\n\n## b\n"
+  let (before, spans) = survey(md)
+  let after = change(before, 0, [0], adopt(fresh("y")))
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 17, "to": 17, "insert": "### y\n" },
+  ])
+}
+
+///|
+test "頭に差せば次に残る子の手前" {
+  let md = "# r\n\n## a\n\n## b\n"
+  let (before, spans) = survey(md)
+  let after = change(before, 0, [], x => {
+    match x {
+      HeadingNode(h) =>
+        HeadingNode({ ..h, children: [fresh("c")] + h.children })
+      other => other
+    }
+  })
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 5, "to": 5, "insert": "## c\n" },
+  ])
+}
+
+///|
+test "消えた子は範囲ごと消える" {
+  let md = "# r\n\n## a\n\n## b\n"
+  let (before, spans) = survey(md)
+  let after = change(before, 0, [], x => {
+    match x {
+      HeadingNode(h) => HeadingNode({ ..h, children: [h.children[0]] })
+      other => other
+    }
+  })
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 11, "to": 16, "insert": "" },
+  ])
+}
+
+///|
+test "並べ替えは容器ごと" {
+  let md = "# r\n\n## a\n\n## b\n"
+  let (before, spans) = survey(md)
+  let after = change(before, 0, [], x => {
+    match x {
+      HeadingNode(h) => HeadingNode({ ..h, children: h.children.rev() })
+      other => other
+    }
+  })
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 0, "to": 16, "insert": "# r\n\n## b\n\n## a\n" },
+  ])
+}
+
+///|
+test "子を総取り替えすれば、消して同じ桁に差す" {
+  let md = "- a\n  - b\n- c\n"
+  let (before, spans) = survey(md)
+  let z : Node = ListNode({
+    id: 99,
+    label: "z",
+    fold: None,
+    body: [],
+    children: [],
+  })
+  let after = change(change(before, 0, [], orphan), 0, [], adopt(z))
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 4, "to": 10, "insert": "" },
+    { "from": 10, "to": 10, "insert": "  - z\n" },
+  ])
+  inspect(
+    apply(md, reflect(md, before, spans, after)),
+    content=(
+      #|- a
+      #|  - z
+      #|- c
+      #|
+    ),
+  )
+}
+
+///|
+test "入れ子の項目の手前に差せば、後ろに字下げを戻す" {
+  let md = "- a\n  - b\n- c\n"
+  let (before, spans) = survey(md)
+  let z : Node = ListNode({
+    id: 99,
+    label: "z",
+    fold: None,
+    body: [],
+    children: [],
+  })
+  let after = change(before, 0, [], x => {
+    match x {
+      ListNode(l) =>
+        match z {
+          ListNode(c) => ListNode({ ..l, children: [c] + l.children })
+          _ => abort("項目")
+        }
+      other => other
+    }
+  })
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 6, "to": 6, "insert": "- z\n  " },
+  ])
+  inspect(
+    apply(md, reflect(md, before, spans, after)),
+    content=(
+      #|- a
+      #|  - z
+      #|  - b
+      #|- c
+      #|
+    ),
+  )
+}
+
+///|
+test "入れ子の項目が消えれば字下げも道連れ" {
+  let md = "- a\n  - b\n  - d\n- c\n"
+  let (before, spans) = survey(md)
+  let after = change(before, 0, [], x => {
+    match x {
+      ListNode(l) => ListNode({ ..l, children: [l.children[1]] })
+      other => other
+    }
+  })
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 4, "to": 10, "insert": "" },
+  ])
+}
+
+///|
+test "側の在る根に子を足せば根が丸ごと" {
+  let md = "# r\n\n## a\n\n---\n\n## b\n"
+  let (before, spans) = survey(md)
+  let roots = before.roots.copy()
+  let r = roots[0]
+  roots[0] = { node: adopt(fresh("c"))(r.node), sides: r.sides + [Right] }
+  let after : Doc = { ..before, roots, }
+  json_inspect(reflect(md, before, spans, after), content=[
+    {
+      "from": 0,
+      "to": 21,
+      "insert": "# r\n\n## a\n\n***\n\n## b\n\n***\n\n## c\n",
+    },
+  ])
+}
+
+///|
+test "畳みの中の子の出し入れは容器ごと" {
+  let md = "# r\n\n<details>\n\n## a\n\n</details>\n"
+  let (before, spans) = survey(md)
+  let after = change(before, 0, [0], adopt(fresh("c")))
+  json_inspect(reflect(md, before, spans, after), content=[
+    {
+      "from": 5,
+      "to": 33,
+      "insert": "<details>\n\n## a\n\n### c\n\n</details>\n",
+    },
+  ])
+}
+
+///|
+test "改行の無い末尾に差すときは改行してから" {
+  let md = "# a"
+  let (before, spans) = survey(md)
+  let after = change(before, 0, [], adopt(fresh("b")))
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 3, "to": 3, "insert": "\n## b\n" },
   ])
 }
 
@@ -155,13 +338,13 @@ test "枝の移動は元と先の 2 箇所" {
   }
   let after = change(change(before, 0, [0], orphan), 0, [1], adopt(x))
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 5, "to": 17, "insert": "## a\n" },
-    { "from": 18, "to": 23, "insert": "## b\n\n### x\n" },
+    { "from": 11, "to": 17, "insert": "" },
+    { "from": 23, "to": 23, "insert": "### x\n" },
   ])
 }
 
 ///|
-test "入れ子の項目は容器の桁に揃える" {
+test "入れ子の項目の子は、容器の中身の桁に差す" {
   let md = "- a\n  - b\n- c\n"
   let (before, spans) = survey(md)
   let d : Node = ListNode({
@@ -173,7 +356,7 @@ test "入れ子の項目は容器の桁に揃える" {
   })
   let after = change(before, 0, [0], adopt(d))
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 6, "to": 10, "insert": "- b\n    - d\n" },
+    { "from": 10, "to": 10, "insert": "    - d\n" },
   ])
   inspect(
     apply(md, reflect(md, before, spans, after)),
@@ -198,8 +381,7 @@ test "散文" {
 }
 
 ///|
-/// 段 5 までは、根の増減は全文
-test "根が増えれば全文" {
+test "根も同じ — 増えれば隣に差す" {
   let md = "# a\n"
   let (before, spans) = survey(md)
   let after : Doc = {
@@ -207,7 +389,27 @@ test "根が増えれば全文" {
     roots: before.roots + [{ node: fresh("b"), sides: [] }],
   }
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 0, "to": 4, "insert": "# a\n\n# b\n" },
+    { "from": 4, "to": 4, "insert": "# b\n" },
+  ])
+}
+
+///|
+test "根が消えれば範囲ごと消える" {
+  let md = "# a\n\n# b\n"
+  let (before, spans) = survey(md)
+  let after : Doc = { ..before, roots: [before.roots[0]] }
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 5, "to": 9, "insert": "" },
+  ])
+}
+
+///|
+test "根が無い文書に最初の根を差す" {
+  let md = "hello\n"
+  let (before, spans) = survey(md)
+  let after : Doc = { ..before, roots: [{ node: fresh("b"), sides: [] }] }
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 6, "to": 6, "insert": "# b\n" },
   ])
 }
 
