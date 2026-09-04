@@ -1,5 +1,10 @@
 // マップの座標系。DOM を知らない数学だけの層。
 
+import type * as core from "../coreApi.ts";
+
+/** 側 → 伸びる向き（右 = 1 / 左 = -1）。**側を符号にするのはここだけ** */
+export const dirOf = (side: core.Side): 1 | -1 => (side === "Left" ? -1 : 1);
+
 export interface Pt {
   x: number;
   y: number;
