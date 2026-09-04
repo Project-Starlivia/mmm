@@ -99,9 +99,9 @@ fn verbatim(md : String, block : @markdown.Block) -> String {
 }
 
 ///|
-/// 閉じのフェンスまで含めた終わり。`$$` / `:::` / コードの span は閉じの行を
-/// 含まないので、原文のまま持つと閉じが落ち、地番で切り出すと閉じが残る。
-/// コードのフェンスは開きの字（`` ` `` か `~`）で閉じる
+/// 閉じのフェンスまで含めた終わり（他の塊と同じく改行込み）。`$` / `:::` /
+/// コードの span は閉じの行を含まないので、原文のまま持つと閉じが落ち、地番で
+/// 切り出すと閉じが残る。コードのフェンスは開きの字（`` ` `` か `~`）で閉じる
 fn closing(md : String, block : @markdown.Block, to : Int) -> Int {
   let fence : UInt16 = match block {
     MathBlock(..) => '$'
@@ -129,8 +129,16 @@ fn closing(md : String, block : @markdown.Block, to : Int) -> Int {
   while i < md.length() && (md[i] == ' ' || md[i] == '\t') {
     i = i + 1
   }
-  if i >= md.length() || md[i] == '\n' || md[i] == '\r' {
+  if i >= md.length() {
     i
+  } else if md[i] == '\n' {
+    i + 1
+  } else if md[i] == '\r' {
+    if i + 1 < md.length() && md[i + 1] == '\n' {
+      i + 2
+    } else {
+      i + 1
+    }
   } else {
     to
   }
