@@ -51,6 +51,8 @@ export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
     if (k.mod) return id === null ? null : { kind: "edit", id, seed: null };
     if (sel.anchor === null) return null;
     if (k.shift) return add({ kind: "before", node: sel.anchor });
+    // `id !== null` は TS の絞り込みのためだけ（blank が真なら id は必ず非 null — label を
+    // 引いたのは id が非 null のときだけなので）
     if (blank && id !== null) return { kind: "edit", id, seed: null };
     return add({ kind: "after", node: sel.anchor });
   }

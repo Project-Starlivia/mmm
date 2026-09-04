@@ -48,6 +48,9 @@ export function labelPlacement(b: Box, cam: Camera, textWidth: number): Placemen
 /** 入力欄の器。開く / 打つたびに rename / 閉じる。値の意味は持たない */
 export class LabelEditor {
   private input: HTMLInputElement;
+  /** 読みのサイクルを越えて id を持つ唯一の場所。Rename は木の形を変えず
+   *  番号を振り直さないので安全。形を変える操作が編集中に走ることは無い
+   *  （欄が開いている間は keydown が地図へ届かない） */
   private id: number | null = null;
   private composing = false;
   private readonly pane: HTMLElement;
@@ -90,7 +93,9 @@ export class LabelEditor {
     this.input.addEventListener("blur", () => this.close());
   }
 
-  editing = (): number | null => this.id;
+  editing(): number | null {
+    return this.id;
+  }
 
   /** 開く。カーソルは末尾（全選択しない）。seed があればそれが最初の字 */
   open(id: number, b: Box, cam: Camera, label: string, seed: string | null): void {
@@ -123,7 +128,8 @@ export class LabelEditor {
   /** 閉じる。書くものは無い（もう書いてある）。二重に閉じても何も起きない */
   close(): void {
     if (this.id === null) return;
-    // 変換中に抜けた（Esc / Enter）なら、未確定ぶんを取りこぼさない
+    // 変換中にフォーカスが抜けたなら、未確定ぶんを取りこぼさない
+    // （keydown は isComposing で早期リターンするので、ここに来るのは blur だけ）
     if (this.composing) {
       this.composing = false;
       this.write();

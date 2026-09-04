@@ -141,10 +141,18 @@ export class Mindmap {
   private setCamera(c: Camera): void {
     this.camera = c;
     this.applyCamera();
-    const editing = this.label.editing();
-    const b = editing === null ? undefined : this.layout.boxes.get(editing);
-    if (b) this.label.place(b, this.camera);
+    this.followLabel();
     this.updateIndicator();
+  }
+
+  /** 編集中の欄を箱に追従させる。書くたび・視点を動かすたびに呼ぶ。
+   *  箱が消えていれば（畳まれて埋もれた）閉じる */
+  private followLabel(): void {
+    const editing = this.label.editing();
+    if (editing === null) return;
+    const b = this.layout.boxes.get(editing);
+    if (b) this.label.place(b, this.camera);
+    else this.label.close();
   }
 
   private applyCamera(): void {
@@ -171,12 +179,7 @@ export class Mindmap {
     // updateListener の中で onChange の直後に必ず onCaret が続き、今の輪へ
     // 即座に上書きされるから
     this.showCaret(this.caretIds);
-    const editing = this.label.editing();
-    if (editing !== null) {
-      const b = this.layout.boxes.get(editing);
-      if (b) this.label.place(b, this.camera);
-      else this.label.close();
-    }
+    this.followLabel();
     this.updateIndicator();
   }
 
@@ -495,7 +498,11 @@ export class Mindmap {
         mod: e.ctrlKey || e.metaKey,
         alt: e.altKey,
       });
-      if (intent === null) return;
+      if (intent === null) {
+        // 段 3 が段下げに使う。今は拾わないが、地図から焦点を逃がさない
+        if (e.key === "Tab") e.preventDefault();
+        return;
+      }
       e.preventDefault();
       this.act(intent);
     });

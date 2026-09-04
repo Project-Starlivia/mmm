@@ -95,8 +95,10 @@ Intent = { kind: "op", op: Op, edit: boolean }   // apply して、edit なら f
        | { kind: "select", sel: Selection, reveal: boolean }
        | { kind: "center" }
 
-keyed(view, layout, sel, key: { key, shift, mod, alt }) -> Intent | null
+keyed(layout, sel, key: { key, shift, mod, alt }) -> Intent | null
 ```
+
+ラベルは Layout の Box が持つので View は要らない。
 
 `null` は「拾わない」（ブラウザに渡す）。段 3 以降のキーはここに行を足すだけ。
 
@@ -119,7 +121,7 @@ keyed(view, layout, sel, key: { key, shift, mod, alt }) -> Intent | null
 
 ```
 src/main.ts            apply(op, edit?)。selection の上書きと map.beginEdit の呼び出し
-src/map/keys.ts        keyed(view, layout, sel, key) -> Intent | null（純粋）
+src/map/keys.ts        keyed(layout, sel, key) -> Intent | null（純粋）
 src/map/label.ts       LabelEditor — <input> の器。開く / 打つたびに host.rename / 閉じる / 追従
 src/mindmap.ts         keydown → keyed → host.act(intent)。ダブルクリック → edit。段 1 の
                        キー処理は keys.ts へ移す
