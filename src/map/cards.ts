@@ -86,8 +86,7 @@ function cardOf(b: core.Content): CardRow | null {
       return { kind: "rule" };
     case "details":
       return { kind: "details", open: b.open, summary: b.summary, lines: linesOf(b.body) };
-    // View には来ない（core survey が読み解けなかったものは Opaque を出さず、
-    // そのまま原文の details/文字として運ぶ）。ts から送る側でだけ使う形
+    // View には来ない（core/view の project が Opaque を落とす）。ts から送る側でだけ使う形
     case "opaque":
       return null;
   }
