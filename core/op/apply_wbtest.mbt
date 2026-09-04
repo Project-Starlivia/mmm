@@ -517,3 +517,114 @@ test "FlipSide は中身と知らない id に None" {
   assert_eq(run(d, FlipSide(id=3)), None)
   assert_eq(run(d, FlipSide(id=9)), None)
 }
+
+///|
+test "AddBlock は隣の前後と body の末尾" {
+  let d = doc([
+    root(h(2, "r", body=[pic(3)], children=[h(4, "a")]), sides=[Right]),
+  ])
+  let c : @tree.Content = Code(info="", text="x")
+  assert_eq(
+    run(d, AddBlock(at=BlockPlace::After(block=3), content=c)),
+    Some({
+      doc: doc([
+        root(h(2, "r", body=[pic(3), code(5)], children=[h(4, "a")]), sides=[
+          Right,
+        ]),
+      ]),
+      focus: Some(5),
+    }),
+  )
+  assert_eq(
+    run(d, AddBlock(at=BlockPlace::Before(block=3), content=c)),
+    Some({
+      doc: doc([
+        root(h(2, "r", body=[code(5), pic(3)], children=[h(4, "a")]), sides=[
+          Right,
+        ]),
+      ]),
+      focus: Some(5),
+    }),
+  )
+  assert_eq(
+    run(d, AddBlock(at=BlockPlace::In(node=4), content=c)),
+    Some({
+      doc: doc([
+        root(h(2, "r", body=[pic(3)], children=[h(4, "a", body=[code(5)])]), sides=[
+          Right,
+        ]),
+      ]),
+      focus: Some(5),
+    }),
+  )
+  assert_eq(
+    run(d, AddBlock(at=BlockPlace::In(node=@tree.doc_id), content=c)),
+    Some({
+      doc: doc(
+        [root(h(2, "r", body=[pic(3)], children=[h(4, "a")]), sides=[Right])],
+        body=[code(5)],
+      ),
+      focus: Some(5),
+    }),
+  )
+}
+
+///|
+test "AddBlock は Implicit・ノードの id・知らない id に None" {
+  let d = doc([root(h(2, "r", children=[gap(3, [h(4, "x")])]), sides=[Right])])
+  let c : @tree.Content = Code(info="", text="x")
+  assert_eq(run(d, AddBlock(at=BlockPlace::In(node=3), content=c)), None)
+  assert_eq(run(d, AddBlock(at=BlockPlace::After(block=4), content=c)), None)
+  assert_eq(run(d, AddBlock(at=BlockPlace::After(block=9), content=c)), None)
+}
+
+///|
+test "SetBlock は中身を替え、id は保つ" {
+  let d = doc([root(h(2, "r", body=[pic(3)]))])
+  assert_eq(
+    run(d, SetBlock(id=3, content=Code(info="", text="x"))),
+    Some({ doc: doc([root(h(2, "r", body=[code(3)]))]), focus: Some(3) }),
+  )
+  assert_eq(run(d, SetBlock(id=2, content=Code(info="", text="x"))), None)
+}
+
+///|
+test "MoveBlock は文書順を保って抜き、隣の前後や別のノードの末尾に差す" {
+  let d = doc([
+    root(h(2, "r", body=[pic(3), code(4), pic(5)], children=[h(6, "a")]), sides=[
+      Right,
+    ]),
+  ])
+  assert_eq(
+    run(d, MoveBlock(ids=[5, 3], at=BlockPlace::After(block=4))),
+    Some({
+      doc: doc([
+        root(h(2, "r", body=[code(4), pic(3), pic(5)], children=[h(6, "a")]), sides=[
+          Right,
+        ]),
+      ]),
+      focus: Some(3),
+    }),
+  )
+  assert_eq(
+    run(d, MoveBlock(ids=[4], at=BlockPlace::In(node=6))),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", body=[pic(3), pic(5)], children=[h(6, "a", body=[code(4)])]),
+          sides=[Right],
+        ),
+      ]),
+      focus: Some(4),
+    }),
+  )
+}
+
+///|
+test "MoveBlock は空・ノード混じり・知らない id・自分の隣へ、に None" {
+  let d = doc([root(h(2, "r", body=[pic(3), code(4)]))])
+  assert_eq(run(d, MoveBlock(ids=[], at=BlockPlace::After(block=4))), None)
+  assert_eq(run(d, MoveBlock(ids=[2], at=BlockPlace::After(block=4))), None)
+  assert_eq(run(d, MoveBlock(ids=[9], at=BlockPlace::After(block=4))), None)
+  assert_eq(run(d, MoveBlock(ids=[3], at=BlockPlace::Before(block=3))), None)
+}

@@ -14,6 +14,9 @@ pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
     Wrap(id~, label~) => wrap(doc, id, label)
     Move(ids~, at~) => move_nodes(doc, ids, at)
     FlipSide(id~) => flip(doc, id)
+    AddBlock(at~, content~) => add_block(doc, at, content)
+    SetBlock(id~, content~) => set_block(doc, id, content)
+    MoveBlock(ids~, at~) => move_block(doc, ids, at)
     _ => None
   }
 }
@@ -279,5 +282,112 @@ fn flip(doc : @tree.Doc, id : Int) -> Done? {
       }
       done(append(rest, node=id_of(r.node), side~, [wrapped]), Some(id))
     }
+  }
+}
+
+///|
+/// 中身の列の中に差す。Before / After は隣の id で、In は末尾。
+fn put(
+  bs : Array[@tree.Block],
+  at : BlockPlace,
+  more : Array[@tree.Block],
+) -> Array[@tree.Block] {
+  match at {
+    In(..) => [..bs, ..more]
+    Before(block~) => {
+      let out = []
+      for b in bs {
+        if b.id == block {
+          out.push_iter(more.iter())
+        }
+        out.push(b)
+      }
+      out
+    }
+    After(block~) => {
+      let out = []
+      for b in bs {
+        out.push(b)
+        if b.id == block {
+          out.push_iter(more.iter())
+        }
+      }
+      out
+    }
+  }
+}
+
+///|
+/// 席の持ち主。Before / After は隣の持ち主、In はそのノード。
+fn holder(doc : @tree.Doc, at : BlockPlace) -> Int? {
+  match at {
+    Before(block~) => owner(doc, block~)
+    After(block~) => owner(doc, block~)
+    In(node~) => Some(node)
+  }
+}
+
+///|
+fn add_block(
+  doc : @tree.Doc,
+  at : BlockPlace,
+  content : @tree.Content,
+) -> Done? {
+  guard holder(doc, at) is Some(o) else { return None }
+  let b : @tree.Block = { id: fresh(doc), content }
+  done(body(doc, node=o, bs => put(bs, at, [b])), Some(b.id))
+}
+
+///|
+fn set_block(doc : @tree.Doc, id : Int, content : @tree.Content) -> Done? {
+  guard owner(doc, block=id) is Some(o) else { return None }
+  done(
+    body(doc, node=o, bs => {
+      bs.map(b => if b.id == id { { id, content } } else { b })
+    }),
+    Some(id),
+  )
+}
+
+///|
+/// 中身を動かす。文書順を保って持ち主ごとに抜き、席に差す。
+fn move_block(doc : @tree.Doc, ids : Array[Int], at : BlockPlace) -> Done? {
+  guard !ids.is_empty() else { return None }
+  for id in ids {
+    guard owner(doc, block=id) is Some(_) else { return None }
+  }
+  let picked = pick(doc, ids)
+  guard !picked.contains(anchor_block(at)) else { return None }
+  let taken = []
+  let mut cur = doc
+  for id in picked {
+    guard owner(cur, block=id) is Some(o) else { return None }
+    let pulled = body(cur, node=o, fn(bs) {
+      let out = []
+      for b in bs {
+        if b.id == id {
+          taken.push(b)
+        } else {
+          out.push(b)
+        }
+      }
+      out
+    })
+    match pulled {
+      Some(d) => cur = d
+      None => return None
+    }
+  }
+  guard holder(cur, at) is Some(o) else { return None }
+  done(body(cur, node=o, bs => put(bs, at, taken)), Some(picked[0]))
+}
+
+///|
+/// 席が指している id。
+fn anchor_block(at : BlockPlace) -> Int {
+  match at {
+    Before(block~) => block
+    After(block~) => block
+    In(node~) => node
   }
 }
