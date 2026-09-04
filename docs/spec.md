@@ -18,8 +18,12 @@ core が揃ったら戻す）
 core/   MoonBit — 文書モデル。**いま作り直している最中**で、旧 core は
         消してある(意味は下の「文書モデル」、内部は core.md)。
         アプリは繋ぎ先を失っているので、揃うまで組み上がらない。
-  tree/         新しい core。md.mbt が読みの入口、md_wbtest.mbt が
-                「この md はこう読まれる」を指紋で固定したもの
+  tree/         新しい core。md.mbt が md との境界（read / serialize）、
+                build.mbt が mdAst → 木、unbuild.mbt が木 → mdAst。
+                md_wbtest.mbt がライブラリの読みを指紋で固定し、
+                build_wbtest.mbt 以降が「この md はこう読まれる」、
+                unbuild_wbtest.mbt が「この木はこう書かれる」を固定する
+  view/         map が見る木。project が Doc から削るだけで作る
 src/    TypeScript — UI。**core が揃うまで触らない。** 繋ぎ先(旧 coreApi.ts)は
         消してあるので、いまはコンパイルできない
   editor.ts    Markdown 側(CodeMirror 6、履歴はコアに委譲。フェンスの

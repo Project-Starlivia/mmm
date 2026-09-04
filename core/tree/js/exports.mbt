@@ -1,7 +1,7 @@
 // mmmTree を browser から見るための薄い層。**中身は持たない**（持つと、
 // 試験できる本体と、試験できないここで規則が二重になる）。
 //
-// どの段で壊れたかを切り分けるために、mdAst と mmmTree を並べて出す。
+// どの段で壊れたかを切り分けるために、mdAst・mmmTree・View を並べて出す。
 
 ///|
 /// md をライブラリがどう読んだか（ブロックの種類と原文の範囲）。
@@ -19,9 +19,30 @@ pub fn mmm_tree_json(md : String) -> String {
 }
 
 ///|
+/// map が見る木。mmmTree から削っただけのもの。
+#export_name("mmmViewJson")
+pub fn mmm_view_json(md : String) -> String {
+  @view.project(@tree.parse(md)).to_json().stringify()
+}
+
+///|
 /// 型で言えない不変条件の破れ。**parse の出力は必ず空**になるはずで、
 /// 空でなければ読みのバグ。
 #export_name("mmmCheck")
 pub fn mmm_check(md : String) -> String {
   @tree.check(@tree.parse(md)).to_json().stringify()
+}
+
+///|
+/// 木を書き戻した正規形の md。
+#export_name("mmmSerialize")
+pub fn mmm_serialize(md : String) -> String {
+  @tree.serialize(@tree.parse(md))
+}
+
+///|
+/// 木を戻した mdAst の指紋。読みの指紋と並べて、どちらの段で形が変わったかを見る。
+#export_name("mmmUnbuildSig")
+pub fn mmm_unbuild_sig(md : String) -> String {
+  @tree.ast_sig(@tree.unbuild(@tree.parse(md)))
 }
