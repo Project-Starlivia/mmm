@@ -298,11 +298,13 @@ fn ids(xs : Array[Node]) -> Array[Int] {
 }
 
 ///|
-/// id を消した木。読みは id を振り直し、後の木の新しいノードは別の id を
-/// 持つので、形を比べるときは id を見ない。
+/// 木の形。id と改行を消したもの — 読みは id を振り直し、後の木の新しい
+/// ノードは別の id を持つ。改行は原文から推し量るもので、空になった文書には
+/// 流儀が無い。
 pub fn shape(doc : Doc) -> Doc {
   {
     ..doc,
+    eol: Lf,
     body: faceless(doc.body),
     roots: doc.roots.map(r => { node: faceless_node(r.node), sides: r.sides }),
   }
