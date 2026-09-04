@@ -195,16 +195,6 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック
-  inspect(
-    some,
-    content=(
-      #|552
-    ),
-  )
-  inspect(
-    bad.join("\n"),
-    content=(
-      #|3 ["FlipSide",{"id":4}]: 形が違う
-    ),
-  )
+  inspect(some, content="552")
+  json_inspect(bad, content=[])
 }

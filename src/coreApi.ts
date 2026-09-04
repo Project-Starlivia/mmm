@@ -216,7 +216,10 @@ export const edit = (md: string, op: Op): Edited =>
  * kind は構築子名（頭を大文字）、残りの鍵はラベル付き引数、null の鍵は落とす、
  * 鍵が無ければ裸の名前。`Svg(String)` だけラベルが無いので位置で渡す。
  */
-export function encode(v: { kind: string }): unknown {
+/** core の enum を表す形。kind と、ラベル付き引数 */
+type Tagged = { kind: string } & Record<string, unknown>;
+
+export function encode(v: Tagged): unknown {
   const { kind, ...rest } = v;
   const tag = kind.charAt(0).toUpperCase() + kind.slice(1);
   if (kind === "svg" && "markup" in v) return [tag, v.markup];

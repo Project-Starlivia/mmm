@@ -54,9 +54,8 @@ pub fn mmm_unbuild_sig(md : String) -> String {
 /// （`raise` にすると JS 側が Result を受け取ってしまう）。
 #export_name("mmmEdit")
 pub fn mmm_edit(md : String, op : String) -> String {
-  let parsed : Result[@op.Op, Error] = try? @json.from_json(@json.parse(op))
-  match parsed {
-    Ok(op) => @edit.edit(md, op).to_json().stringify()
-    Err(e) => abort("mmmEdit: op の JSON が読めない — \{e}")
+  let op : @op.Op = try @json.from_json(@json.parse(op)) catch {
+    e => abort("mmmEdit: op の JSON が読めない — \{e}")
   }
+  @edit.edit(md, op).to_json().stringify()
 }
