@@ -76,7 +76,7 @@ pub fn build(
   // 文書の中身は最初の見出し・項目より前にあるので、先に振る
   number_blocks(b.body, next)
   for f in forest {
-    number(f, next)
+    number_frame(f, next)
   }
   let spans : Map[Int, @markdown.Span] = Map([])
   // 文書の散文は frontmatter の尻から。中身が無ければ空の範囲
@@ -607,7 +607,7 @@ priv struct Counter {
 ///|
 /// 番号を文書順に振る。形を割り付ける前に済ませるので、割り付けが
 /// 順序を動かしても番号は動かない。
-fn number(f : Frame, next : Counter) -> Unit {
+fn number_frame(f : Frame, next : Counter) -> Unit {
   f.id = next.val
   next.val = f.id + 1
   // 中身は子より前に書かれているので、先に振る
@@ -616,8 +616,64 @@ fn number(f : Frame, next : Counter) -> Unit {
     Gap => ()
   }
   for k in f.kids {
-    number(k, next)
+    number_frame(k, next)
   }
+}
+
+///|
+/// id のノード・中身が、文書順に振り直されたら得る番号。読みと同じ振り方
+/// （文書の中身 → 根ごとに ノード → その中身 → 子）なので、木を書き戻して
+/// 読み直したときの id を先に言える。操作の後の focus を読み替えるのに使う。
+/// 無い id は None。
+pub fn number(doc : Doc, id : Int) -> Int? {
+  if id == doc_id {
+    return Some(doc_id)
+  }
+  let next = { val: doc_id + 1 }
+  fn blocks(body : Array[Block]) -> Int? {
+    for b in body {
+      if b.id == id {
+        return Some(next.val)
+      }
+      next.val = next.val + 1
+    }
+    None
+  }
+
+  fn node(x : Node) -> Int? {
+    if id_of(x) == id {
+      return Some(next.val)
+    }
+    next.val = next.val + 1
+    let body = match x {
+      HeadingNode(h) => h.body
+      ListNode(l) => l.body
+      ImplicitNode(_) => []
+    }
+    match blocks(body) {
+      Some(n) => return Some(n)
+      None => ()
+    }
+    for k in children_of(x) {
+      match node(k) {
+        Some(n) => return Some(n)
+        None => ()
+      }
+    }
+    None
+  }
+
+  match blocks(doc.body) {
+    Some(n) => return Some(n)
+    None => ()
+  }
+  for r in doc.roots {
+    match node(r.node) {
+      Some(n) => return Some(n)
+      None => ()
+    }
+  }
+  None
 }
 
 ///|
