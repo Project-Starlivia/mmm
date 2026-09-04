@@ -1,0 +1,5 @@
+pkgtype(kind: "library")
+
+import {
+  "mmm-app/core/tree",
+}
