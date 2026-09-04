@@ -24,6 +24,9 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 「木がこう違えば md はここだけ変わる」を固定する
   view/         map が見る木。project が Doc から削るだけで作る
                 （`View { frontmatter, trees }`。frontmatter は画像フォルダの宣言のため）
+  op/           操作。apply(doc, op) が Doc を Doc にする。席は隣の id で言う
+                （NodePlace / BlockPlace）。道具（splice / append / body）が
+                型の異種性を幽閉する。決めは core.md「操作」
 src/    TypeScript — UI。**描くだけ。** 選択・操作は操作の API が揃うまで無い（git に在る）
   coreApi.ts   core の出口。JSON の形を整える唯一の場所。TS では必ず `core.View` と書く
   editor.ts    Markdown 側(CodeMirror 6、履歴も CodeMirror。フェンスの中は
