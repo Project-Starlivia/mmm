@@ -9,6 +9,7 @@
 import type * as core from "./coreApi.ts";
 import { type Camera, type Pane, centerOn, fitToPane, panBy, panToShow, pinch, toWorld, zoomAt } from "./map/camera.ts";
 import { type Entry, contextItems } from "./map/context.ts";
+import { type Drop, dropOp, resolveDrop } from "./map/drop.ts";
 import { unionRect } from "./map/geometry.ts";
 import { Fingers } from "./map/gesture.ts";
 import { indicatorFor, isVisible } from "./map/indicator.ts";
@@ -89,6 +90,16 @@ export class Mindmap {
   private holdAt: { x: number; y: number } | null = null;
   /** 直前に開いたメニューが長押しから来たか。続く contextmenu を握り潰すため */
   private menuOpenedByHold = false;
+  /** マウスで掴んだ候補。slop を越えたら startDrag へ化ける */
+  private dragCand: { id: number; x: number; y: number } | null = null;
+  /** 動かしているノード。ids は選んだ全部（文書順）、subtree はその子孫込み（落とし先から外す） */
+  private dragging: { ids: number[]; subtree: Set<number> } | null = null;
+  /** 今の落とし先の予告。無ければ離しても何もしない */
+  private drop: Drop | null = null;
+  /** 予告で drop-parent を付けている箱の id。次の予告や後片付けで外す */
+  private dropParentId: number | null = null;
+  /** 兄弟へ挿入する予告の線。world に浮かぶ */
+  private dropLine: SVGLineElement;
 
   constructor(pane: HTMLElement, host: MapHost) {
     this.pane = pane;
@@ -97,7 +108,8 @@ export class Mindmap {
     const svg = svgEl("svg", { id: "map-svg" });
     this.world = svgEl("g");
     this.caretLayer = svgEl("g");
-    this.world.append(this.renderer.edgeLayer, this.renderer.nodeLayer, this.caretLayer);
+    this.dropLine = svgEl("line", { id: "drop-line", visibility: "hidden" });
+    this.world.append(this.renderer.edgeLayer, this.renderer.nodeLayer, this.caretLayer, this.dropLine);
     svg.append(this.world);
     pane.append(svg);
 
@@ -380,6 +392,8 @@ export class Mindmap {
       if (id !== null) {
         const mod = e.shiftKey ? "shift" : e.ctrlKey || e.metaKey ? "mod" : "none";
         this.host.setSelection(click(this.host.selection(), id, mod, this.layout.order), true);
+        this.dragCand = { id, x: e.clientX, y: e.clientY };
+        pane.setPointerCapture(e.pointerId);
         e.preventDefault();
         return;
       }
@@ -400,10 +414,20 @@ export class Mindmap {
         if (this.fingers.pinching) return;
       }
       if (this.tapped && Math.hypot(e.clientX - this.tapped.x, e.clientY - this.tapped.y) > 8) {
+        // 長押しが先にメニューを開いていれば tapped はもう null（下まで来ない）
+        this.startDrag(this.tapped.id, e.clientX, e.clientY);
         this.tapped = null;
       }
       if (this.holdAt && Math.hypot(e.clientX - this.holdAt.x, e.clientY - this.holdAt.y) > 8) {
         this.dropHold();
+      }
+      if (this.dragCand && Math.hypot(e.clientX - this.dragCand.x, e.clientY - this.dragCand.y) > 8) {
+        this.startDrag(this.dragCand.id, e.clientX, e.clientY);
+        this.dragCand = null;
+      }
+      if (this.dragging) {
+        this.updateDrop(e.clientX, e.clientY);
+        return;
       }
       if (this.rubberStart) {
         const p = this.local(e.clientX, e.clientY);
@@ -426,18 +450,25 @@ export class Mindmap {
     });
     const end = (e: PointerEvent): void => {
       this.dropHold();
-      // 選ぶのは離したとき（pointerup）だけ。cancel は取り消しなので選ばずに捨てる
-      if (this.tapped && e.type === "pointerup") {
-        this.host.setSelection(click(this.host.selection(), this.tapped.id, "none", this.layout.order), true);
-      }
-      this.tapped = null;
-      if (this.rubberStart) {
-        const dragged =
-          this.rubber.style.display === "block" &&
-          (parseFloat(this.rubber.style.width) > 3 || parseFloat(this.rubber.style.height) > 3);
-        this.rubber.style.display = "none";
-        this.rubberStart = null;
-        if (!dragged) this.host.setSelection(NONE, false);
+      if (this.dragging) {
+        // cancel は取り消しなので、印だけ消して Op は投げない
+        if (this.drop && e.type === "pointerup") this.host.apply(dropOp(this.drop, this.dragging.ids), false);
+        this.endDrag();
+      } else {
+        this.dragCand = null;
+        // 選ぶのは離したとき（pointerup）だけ。cancel は取り消しなので選ばずに捨てる
+        if (this.tapped && e.type === "pointerup") {
+          this.host.setSelection(click(this.host.selection(), this.tapped.id, "none", this.layout.order), true);
+        }
+        this.tapped = null;
+        if (this.rubberStart) {
+          const dragged =
+            this.rubber.style.display === "block" &&
+            (parseFloat(this.rubber.style.width) > 3 || parseFloat(this.rubber.style.height) > 3);
+          this.rubber.style.display = "none";
+          this.rubberStart = null;
+          if (!dragged) this.host.setSelection(NONE, false);
+        }
       }
       if (e.pointerType === "touch") {
         this.liftFinger(e.pointerId);
@@ -466,6 +497,84 @@ export class Mindmap {
         oy: this.camera.ty,
       };
     }
+  }
+
+  /**
+   * 掴んで動かし始める。掴んだのが選択の中ならその全部（文書順）、外なら
+   * 単独で選び直してそれ。落とし先から外す部分木は、選んだもの自身とその子孫。
+   */
+  private startDrag(id: number, clientX: number, clientY: number): void {
+    let sel = this.host.selection();
+    if (!sel.ids.includes(id)) {
+      sel = { ids: [id], anchor: id };
+      this.host.setSelection(sel, false);
+    }
+    // layout.order は親が子より先（layoutMap の文書順）なので、前から 1 回
+    // なめれば「親が部分木に居るか」だけで子の判定が決まる
+    const subtree = new Set(sel.ids);
+    for (const nid of this.layout.order) {
+      const p = this.layout.boxes.get(nid)?.parent ?? null;
+      if (p && subtree.has(p.id)) subtree.add(nid);
+    }
+    this.dragging = { ids: sel.ids, subtree };
+    for (const nid of sel.ids) this.renderer.nodeEl(nid)?.classList.add("dragging");
+    this.updateDrop(clientX, clientY);
+  }
+
+  /** ポインタの今の場所から落とし先を計算し直し、予告を塗り直す */
+  private updateDrop(clientX: number, clientY: number): void {
+    if (!this.dragging) return;
+    const p = this.local(clientX, clientY);
+    const at = toWorld(this.camera, p.x, p.y);
+    this.drop = resolveDrop({ at, layout: this.layout, dragging: this.dragging.subtree });
+    this.paintDrop();
+  }
+
+  /** 落とし先の印を今の this.drop に合わせる。前の印は消してから塗り直す */
+  private paintDrop(): void {
+    this.clearDropMark();
+    const d = this.drop;
+    if (!d) return;
+    if (d.kind === "side") {
+      this.markDropParent(d.root);
+      return;
+    }
+    if (d.pos === 0) {
+      this.markDropParent(d.id);
+      return;
+    }
+    const b = this.layout.boxes.get(d.id);
+    if (!b) return;
+    const y = d.pos === 1 ? b.y : b.y + b.h;
+    this.dropLine.setAttribute("x1", String(b.x));
+    this.dropLine.setAttribute("x2", String(b.x + b.w));
+    this.dropLine.setAttribute("y1", String(y));
+    this.dropLine.setAttribute("y2", String(y));
+    this.dropLine.setAttribute("visibility", "visible");
+  }
+
+  private markDropParent(id: number): void {
+    this.renderer.nodeEl(id)?.classList.add("drop-parent");
+    this.dropParentId = id;
+  }
+
+  /** 予告の印（drop-parent と drop-line）を消す */
+  private clearDropMark(): void {
+    if (this.dropParentId !== null) {
+      this.renderer.nodeEl(this.dropParentId)?.classList.remove("drop-parent");
+      this.dropParentId = null;
+    }
+    this.dropLine.setAttribute("visibility", "hidden");
+  }
+
+  /** ドラッグを終える。Op を投げるかどうかは呼び出し側が先に決めておく */
+  private endDrag(): void {
+    if (this.dragging) {
+      for (const id of this.dragging.ids) this.renderer.nodeEl(id)?.classList.remove("dragging");
+    }
+    this.dragging = null;
+    this.drop = null;
+    this.clearDropMark();
   }
 
   /** リンクの ↗ と、読めていない画像の「繋ぐ」の字 */
@@ -567,6 +676,11 @@ export class Mindmap {
   private bindKeys(): void {
     this.pane.addEventListener("keydown", (e) => {
       if (e.isComposing || e.keyCode === 229) return;
+      if (this.dragging && e.key === "Escape") {
+        this.endDrag();
+        e.preventDefault();
+        return;
+      }
       if (e.key === " ") {
         this.spaceHeld = true;
         this.pane.style.cursor = "grab";

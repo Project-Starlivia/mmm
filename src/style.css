@@ -596,6 +596,10 @@ html, body {
   }
   &.root rect.box { stroke-width: 2; stroke: var(--node-border-strong); }
 
+  /* ---- ドラッグ（付けるのは mindmap.ts）---- */
+  &.dragging { opacity: 0.35; }
+  &.drop-parent rect.box { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; }
+
   /* ---- 選択（付けるのは map/render.ts の paintSelection）---- */
   &.selected rect.box {
     stroke: var(--accent);
@@ -693,7 +697,7 @@ html, body {
 }
 
 /* ========== 二つをまたぐ印 ==========
-   矩形選択の面と、md のカーソルが掛かるノードの内側の輪。
+   矩形選択の面、md のカーソルが掛かるノードの内側の輪、ドラッグの落とし先の線。
    輪の濃さはここだけが持つ — `--accent-soft` は面を塗るための薄さで、
    2px の線に当てると消える。内側に居る以上は選択と紛れようがない。 */
 #rubber {
@@ -710,6 +714,15 @@ html, body {
   stroke-width: 2;
   rx: 5px;
   /* 印は乗っているだけ。掴めると、下のノードを選べなくなる */
+  pointer-events: none;
+}
+
+/* 兄弟へ挿入する予告（付けるのは mindmap.ts）。visibility で消す —
+   display だと SVG の attribute と CSS の入り乱れが増える */
+#drop-line {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
   pointer-events: none;
 }
 
