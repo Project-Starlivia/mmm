@@ -281,7 +281,7 @@ fn read_spell(md : String, b : @markdown.Block) -> Spell {
 
 ///|
 /// 綴り 1 つと、それが在った塊。
-priv struct Spot {
+priv struct Found {
   tag : Tag
   block : Int
 }
@@ -292,7 +292,7 @@ priv struct Spot {
 /// 原文。**読み解かない裁定は変えない**（body は切り出すだけで、意味は付けない）。
 fn capsule(
   md : String,
-  spots : Array[Spot],
+  spots : Array[Found],
   head : Int,
   tail : Int,
   from : Int,
@@ -331,7 +331,7 @@ fn strip(md : String, from : Int, to : Int) -> String {
 
 ///|
 /// 開きと閉じの対。相手の居ないタグは対にならず、ただの文字のまま残る。
-fn pairs(spots : Array[Spot]) -> Array[(Int, Int)] {
+fn pairs(spots : Array[Found]) -> Array[(Int, Int)] {
   let stack = []
   let out = []
   for k, s in spots {
@@ -651,7 +651,7 @@ fn folds(
   depth : Array[Depth],
   gone : Array[Bool],
   ahead : Array[Bool],
-  spots : Array[Spot],
+  spots : Array[Found],
   o : Int,
   c : Int,
 ) -> Bool {

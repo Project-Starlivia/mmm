@@ -23,7 +23,7 @@ pub(all) struct Edit {
 pub fn reflect(
   md : String,
   before : Doc,
-  spans : Map[Int, @markdown.Span],
+  spans : Map[Int, Spot],
   after : Doc,
 ) -> Array[Edit] {
   match plan(md, before, spans, after) {
@@ -47,7 +47,7 @@ pub fn apply(md : String, edits : Array[Edit]) -> String {
 /// 比較の途中。
 priv struct Reflect {
   md : String
-  spans : Map[Int, @markdown.Span]
+  spans : Map[Int, Spot]
   eol : Eol
   /// 前の木のノードを id で引く
   old : Map[Int, Node]
@@ -60,7 +60,7 @@ priv struct Reflect {
 fn plan(
   md : String,
   before : Doc,
-  spans : Map[Int, @markdown.Span],
+  spans : Map[Int, Spot],
   after : Doc,
 ) -> Array[Edit]? {
   guard before.frontmatter == after.frontmatter && before.eol == after.eol else {
