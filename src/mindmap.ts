@@ -87,7 +87,7 @@ export class Mindmap {
   /** 矩形選択の面（画面 px）。始点は pane の左上から */
   private rubber: HTMLDivElement;
   private rubberStart: { x: number; y: number } | null = null;
-  /** 指で押したノード。動かさずに離せば選ぶ */
+  /** 押したまま離すのを待つノード（指、または選んでいる箱をマウスで）。動かさずに離せば選ぶ */
   private tapped: { id: number; x: number; y: number } | null = null;
   /** Space を押している間、左ドラッグはパン */
   private spaceHeld = false;
@@ -493,8 +493,14 @@ export class Mindmap {
       }
       if (id !== null) {
         const mod = e.shiftKey ? "shift" : e.ctrlKey || e.metaKey ? "mod" : "none";
-        this.host.setSelection(click(this.host.selection(), id, mod, this.layout.order), true);
-        this.dragCand = { id, x: e.clientX, y: e.clientY };
+        // 選んでいる箱をそのまま押したなら、1 つに畳むのは離したとき（指と同じ）。
+        // 押した瞬間に畳むと、複数選択を掴んで動かす手が無くなる
+        if (mod === "none" && this.host.selection().ids.includes(id)) {
+          this.tapped = { id, x: e.clientX, y: e.clientY };
+        } else {
+          this.host.setSelection(click(this.host.selection(), id, mod, this.layout.order), true);
+          this.dragCand = { id, x: e.clientX, y: e.clientY };
+        }
         pane.setPointerCapture(e.pointerId);
         e.preventDefault();
         return;
