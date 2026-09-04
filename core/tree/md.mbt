@@ -1,4 +1,5 @@
-// md を読む段。読みの正義は CommonMark で、実装は mizchi/markdown が持つ。
+// md との境界。読み書きの正義は CommonMark で、実装は mizchi/markdown が持つ。
+// ライブラリに触るのはこのファイルだけ — 差し替えがここに閉じる。
 //
 // 自前で書かないのは、ブロック規則を手で写すと間違いを照合する相手が
 // 居なくなるから。旧 core はそれで往復を壊していた（字下げ行を段落と読み、
@@ -9,9 +10,21 @@
 // 生の出力では +49KB だが、到達しないコードは rollup が落とす。
 
 ///|
-/// mdAst。ここを通すことで、パーサの差し替えがこの 1 ファイルに閉じる。
+/// md → mdAst。
 pub fn read(md : String) -> @markdown.Document {
   @markdown.parse(md).document
+}
+
+///|
+/// 木 → 正規形の md。mdAst に戻す（unbuild.mbt）のが我々の仕事で、
+/// 綴り（字下げ・フェンス・空行・エスケープ）はライブラリの仕事。
+/// ライブラリは LF で書くので、CRLF の文書は最後に揃える。
+pub fn serialize(doc : Doc) -> String {
+  let md = @markdown.serialize(unbuild(doc))
+  match doc.eol {
+    Lf => md
+    Crlf => md.replace_all(old="\n", new="\r\n")
+  }
 }
 
 ///|
@@ -36,14 +49,24 @@ fn dump(b : @markdown.Block) -> String {
 }
 
 ///|
+/// 範囲。組んだ mdAst（unbuild）は位置を持たないので、空なら何も付けない。
 fn at(s : @markdown.Span) -> String {
-  "[\{s.from},\{s.to}]"
+  if s.from == 0 && s.to == 0 {
+    ""
+  } else {
+    "[\{s.from},\{s.to}]"
+  }
+}
+
+///|
+/// md を読んだ mdAst の指紋。
+pub fn md_ast_sig(md : String) -> String {
+  ast_sig(read(md))
 }
 
 ///|
 /// mdAst ぜんぶの指紋。frontmatter が在れば頭に付く。
-pub fn md_ast_sig(md : String) -> String {
-  let doc = read(md)
+pub fn ast_sig(doc : @markdown.Document) -> String {
   let sb = StringBuilder::new()
   match doc.frontmatter {
     Some(f) => sb.write_string("Front\{at(f.span)} ")
