@@ -3,5 +3,3 @@ pkgtype(kind: "library")
 import {
   "mmm-app/core/tree",
 }
-
-warnings = "-35"

@@ -12,7 +12,7 @@ pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
     Delete(ids~) => delete(doc, ids)
     Add(at~, labels~) => add(doc, at, labels)
     Wrap(id~, label~) => wrap(doc, id, label)
-    Move(ids~, at~) => move(doc, ids, at)
+    Move(ids~, at~) => move_nodes(doc, ids, at)
     FlipSide(id~) => flip(doc, id)
     _ => None
   }
@@ -221,7 +221,7 @@ fn place(
 
 ///|
 /// 動かす。文書順を保って抜き、席に差す。側は行き先が決め、綴りは保つ。
-fn move(doc : @tree.Doc, ids : Array[Int], at : NodePlace) -> Done? {
+fn move_nodes(doc : @tree.Doc, ids : Array[Int], at : NodePlace) -> Done? {
   guard !ids.is_empty() else { return None }
   for id in ids {
     guard find(doc, id) is Some(_) else { return None }
