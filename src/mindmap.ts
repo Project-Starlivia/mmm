@@ -3,7 +3,8 @@
 // 持っているのは視点（Camera）と、それを動かす入力（ホイール・ドラッグ・
 // ピンチ・クリック・矩形・矢印）と、画面外の根を指す針だけ。**選択の値は
 // 持たない** — 入力を map/select.ts の値にして host へ渡し、返ってきた
-// Selection を塗るだけ。値そのものは main.ts が持つ。編集などの操作はまだ無い
+// Selection を塗るだけ。値そのものは main.ts が持つ。あるのは選択、その場
+// 編集、Enter / Tab の新規。消す・動かす・カードは次の段。
 
 import type * as core from "./coreApi.ts";
 import { type Camera, type Pane, centerOn, fitToPane, panBy, panToShow, pinch, toWorld, zoomAt } from "./map/camera.ts";
