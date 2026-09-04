@@ -99,13 +99,21 @@ fn verbatim(md : String, block : @markdown.Block) -> String {
 }
 
 ///|
-/// 閉じのフェンスまで含めた終わり。`$$` と `:::` の span は閉じの行を含まない
-/// ので、原文のまま持つと閉じが落ちる（フェンスのコードは `Block::Code` として
-/// 綴りごと持つので、こちらは要らない）。
+/// 閉じのフェンスまで含めた終わり。`$$` / `:::` / コードの span は閉じの行を
+/// 含まないので、原文のまま持つと閉じが落ち、地番で切り出すと閉じが残る。
+/// コードのフェンスは開きの字（`` ` `` か `~`）で閉じる
 fn closing(md : String, block : @markdown.Block, to : Int) -> Int {
   let fence : UInt16 = match block {
     MathBlock(..) => '$'
     Directive(..) => ':'
+    FencedCode(span~, ..) => {
+      let mut j = span.from
+      while j < md.length() && md[j] == ' ' {
+        j = j + 1
+      }
+      guard j < md.length() else { return to }
+      md[j]
+    }
     _ => return to
   }
   // 次の行が閉じのフェンスだけなら、その行の終わりまで
