@@ -4,7 +4,18 @@
 // 途中で失敗しても元の doc は変わらない（道具が純粋なので）。
 
 ///|
+/// **md に書ける木しか返さない。** 何が書けないかは check が 1 つで言う
+/// （骨格の直前の水平線・見出しに飲み込まれる項目・項目の根の側）ので、
+/// 操作ごとに規則を写さず、組んだ結果を check に通して断る。
 pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
+  match attempt(doc, op) {
+    Some(d) if @tree.check(d.doc).is_empty() => Some(d)
+    _ => None
+  }
+}
+
+///|
+fn attempt(doc : @tree.Doc, op : Op) -> Done? {
   match op {
     Rename(id~, label~) => rename(doc, id, label)
     Fold(id~, open~) => fold(doc, id, open)
