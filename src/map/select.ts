@@ -105,6 +105,9 @@ export function arrow(L: Layout, anchor: number | null, key: ArrowKey): number |
 
 /** Shift+矢印。行き先を足す。行き先が既に選ばれていれば、いま居た側を外して縮める */
 export function extend(sel: Selection, next: number): Selection {
+  // arrow は深さが 1 つしか無い列や、子の無いノードから回った先で anchor
+  // 自身を返すことがある。そのまま外すと anchor が選択から消えてしまう
+  if (next === sel.anchor) return sel;
   if (sel.ids.includes(next) && sel.ids.length > 1 && sel.anchor !== null) {
     return { ids: sel.ids.filter((x) => x !== sel.anchor), anchor: next };
   }

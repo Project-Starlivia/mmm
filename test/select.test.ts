@@ -76,6 +76,10 @@ test("Shift+矢印 — 行き先を足す。既に選んでいれば、いま居
   assert.deepEqual(extend(two, 2), { ids: [2], anchor: 2 });
 });
 
+test("Shift+矢印 — 行き先が anchor 自身なら何もしない（同じ深さが 1 つだけ・回った先）", () => {
+  assert.deepEqual(extend({ ids: [1, 2], anchor: 1 }, 1), { ids: [1, 2], anchor: 1 });
+});
+
 test("全部", () => {
   assert.deepEqual(all(L), { ids: [1, 2, 3, 4], anchor: 4 });
 });
