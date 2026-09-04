@@ -3,7 +3,7 @@
 // 決めは docs/superpowers/specs/2026-09-04-label-design.md と shortcuts.md「Mindmap」。
 
 import * as core from "../coreApi.ts";
-import type { Layout } from "./layout.ts";
+import { type Layout, ownerOf } from "./layout.ts";
 import { NONE, type Selection, all, arrow, extend, isArrowKey, neighbor, nextSibling, parentOf, prevSibling, solo } from "./select.ts";
 
 /** 押されたキー。mod は Ctrl / Cmd のどちらか */
@@ -138,16 +138,11 @@ export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
  * （箱が無い = 畳まれて埋もれた）null。
  */
 export function keyedCard(L: Layout, picked: number, k: Key): Intent | null {
-  let owner: core.Node | null = null;
-  for (const b of L.boxes.values()) {
-    if (b.node.blocks.some((x) => x.id === picked)) {
-      owner = b.node;
-      break;
-    }
-  }
-  if (owner === null) return null;
+  const o = ownerOf(L, picked);
+  if (o === null) return null;
+  const owner = o.box.node;
   const blocks = owner.blocks;
-  const index = blocks.findIndex((x) => x.id === picked);
+  const index = o.index;
   if ((k.key === "Delete" || k.key === "Backspace") && !k.mod) {
     return { kind: "op", op: { kind: "delete", ids: [picked] }, edit: false, keep: owner.id };
   }

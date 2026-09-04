@@ -21,23 +21,21 @@ export const CARD_PAD = 5;
 export const CARD_FONT_PX = 11;
 
 /**
- * カードの入力欄を、カードに**ぴったり**重ねる。`box-sizing: border-box`
- * なので、文字は left + border + padding から始まる — それが `rect` の原点
- * （倍率込み）と一致するよう、left/top はその分だけ外へずらす。中身が rect
- * より大きければ、その分だけ下と右へ伸びる（打っている途中で文字が隠れると
- * 何を書いているか分からなくなる）。
+ * カードの入力欄を、カードの矩形に重ねる。枠は `rect` の上に置き、余白は内側
+ * （labelPlacement と同じ）— 外へ育てると隣の行に被る。中身が rect より
+ * 大きければ、その分だけ下と右へ伸びる（打っている途中で文字が隠れると
+ * 何を書いているか分からなくなる）。枠の分を足しておかないと最終行が削れる。
  */
 export function cardPlacement(rect: Rect, cam: Camera, text: { lines: number; widest: number }): Placement {
-  const wWorld = Math.max(rect.w, text.widest);
-  const hWorld = Math.max(rect.h, text.lines * CODE_LINE);
-  const padding = CARD_PAD * cam.k;
+  const wWorld = Math.max(rect.w, text.widest + CARD_PAD * 2);
+  const hWorld = Math.max(rect.h, text.lines * CODE_LINE + CARD_PAD * 2);
   return {
-    left: rect.x * cam.k + cam.tx - CARD_BORDER - padding,
-    top: rect.y * cam.k + cam.ty - CARD_BORDER - padding,
-    width: wWorld * cam.k + CARD_BORDER * 2 + padding * 2,
-    height: hWorld * cam.k + CARD_BORDER * 2 + padding * 2,
+    left: rect.x * cam.k + cam.tx,
+    top: rect.y * cam.k + cam.ty,
+    width: wWorld * cam.k + CARD_BORDER * 2,
+    height: hWorld * cam.k + CARD_BORDER * 2,
     fontSize: CARD_FONT_PX * cam.k,
-    padding,
+    padding: CARD_PAD * cam.k,
   };
 }
 

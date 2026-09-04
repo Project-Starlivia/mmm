@@ -79,6 +79,15 @@ export function cardRect(b: Box, index: number): Rect | null {
   };
 }
 
+/** その中身（ブロック id）を持つ箱と、その行の番号。畳まれて箱が無ければ null */
+export function ownerOf(L: Layout, block: number): { box: Box; index: number } | null {
+  for (const box of L.boxes.values()) {
+    const index = box.node.blocks.findIndex((x) => x.id === block);
+    if (index !== -1) return { box, index };
+  }
+  return null;
+}
+
 /** 最初の木の根。無ければ null（空文書） */
 export function rootBox(L: Layout): Box | null {
   for (const id of L.order) {

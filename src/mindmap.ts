@@ -16,7 +16,7 @@ import { Fingers } from "./map/gesture.ts";
 import { indicatorFor, isVisible } from "./map/indicator.ts";
 import { type Intent, type Key, keyed, keyedCard } from "./map/keys.ts";
 import { LabelEditor } from "./map/label.ts";
-import { type Box, type Layout, cardRect, layoutMap, rootBox } from "./map/layout.ts";
+import { type Layout, cardRect, layoutMap, ownerOf, rootBox } from "./map/layout.ts";
 import { labelOf, nodeSize } from "./map/metrics.ts";
 import { ContextMenu, type MenuEntry } from "./map/menu.ts";
 import { CardPick } from "./map/pick.ts";
@@ -215,19 +215,10 @@ export class Mindmap {
     else this.card.close();
   }
 
-  /** 中身の id から、持ち主の箱とその中での番号（何枚目か） */
-  private blockOwner(id: number): { box: Box; index: number } | null {
-    for (const b of this.layout.boxes.values()) {
-      const index = b.node.blocks.findIndex((x) => x.id === id);
-      if (index !== -1) return { box: b, index };
-    }
-    return null;
-  }
-
   /** カードの置かれている場所（world 座標）。積み方は数えない —
    *  cardRect が描画と共通の唯一の出所で、ここは箱の位置ぶん動かすだけ */
   private cardRectOf(id: number): Rect | null {
-    const o = this.blockOwner(id);
+    const o = ownerOf(this.layout, id);
     if (!o) return null;
     const r = cardRect(o.box, o.index);
     return r === null ? null : { ...r, x: o.box.x + r.x, y: o.box.y + r.y };
@@ -462,7 +453,7 @@ export class Mindmap {
       true,
     );
     pane.addEventListener("pointerdown", (e) => {
-      if (targetIn(e, ".link-open, .img-connect, .pane-tool, #node-editor")) return;
+      if (targetIn(e, ".link-open, .img-connect, .pane-tool, #node-editor, #card-editor")) return;
       if (e.pointerType === "touch" && this.fingers.pinching) return;
       if (e.button !== 0 && e.button !== 1) return;
       pane.focus();
@@ -712,7 +703,7 @@ export class Mindmap {
       const kill = targetIn(e, "[data-kill]")?.getAttribute("data-kill");
       if (kill !== null && kill !== undefined) {
         const id = Number(kill);
-        const owner = this.blockOwner(id)?.box.node.id;
+        const owner = ownerOf(this.layout, id)?.box.node.id;
         this.host.apply({ kind: "delete", ids: [id] }, false, owner);
         return;
       }
