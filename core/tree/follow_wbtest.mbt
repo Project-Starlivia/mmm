@@ -97,3 +97,33 @@ test "目印が無ければ何も返らない。編集が無ければそのま�
   assert_eq(followed("# a\n", [], []), [])
   assert_eq(followed("# a\n", [], [2]), [Some(2)])
 }
+
+///|
+/// 編集列に消去と挿入が並ぶ。写す差分は元の位置に対して合算する
+/// （写した位置と元座標の編集を比べると、消去の後ろの挿入を取りこぼす）。
+test "消去の後ろの挿入も数える" {
+  // r=2 a=3 b=4 c=5。a の行を消し、b の後ろに XX を足す。c は 4 になり、ラベルは 20 → 16
+  assert_eq(
+    followed(
+      "# r\n\n## a\n\n## b\n\n## c\n",
+      [{ from: 5, to: 11, insert: "" }, { from: 15, to: 15, insert: "XX" }],
+      [5],
+    ),
+    [Some(4)],
+  )
+}
+
+///|
+/// 隣り合う消去が合わせてマーカーを消せば死ぬ。`followed` は「死んだ」（Trail 自体
+/// が None）と「亡霊」（Trail はあるが id が None）を id だけでは見分けられないので、
+/// ここは `follow` を直に呼んで Trail のレベルで確かめる。
+test "繋がった消去でマーカーが消えれば死ぬ" {
+  let md = "# r\n\n## a\n"
+  let m = mark_at(md, 3)
+  let edits : Array[Edit] = [
+    { from: 5, to: 6, insert: "" },
+    { from: 6, to: 8, insert: "" },
+  ]
+  let (_, spots) = survey(apply(md, edits))
+  assert_eq(follow(spots, edits, [m]), [None])
+}

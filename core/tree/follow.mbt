@@ -51,38 +51,45 @@ pub fn follow(
 }
 
 ///|
-/// 目印を編集列で写す。編集は前の座標で from 順、重ならない。
+/// 目印を編集列で写す。編集は前の座標で from 順、重ならないので、**元の位置に
+/// 対する差分を合算**する（写した位置と元座標の編集を比べると、消去の後ろの挿入を
+/// 取りこぼす）。マーカー `[from, label)` は隣り合う消去が合わせて消すこともあるので、
+/// 消えた範囲を繋いで測る。
 fn carry(edits : Array[Edit], m : Mark) -> Mark? {
-  let mut from = m.from
-  let mut label = m.label
+  let mut reach = m.from
+  let mut d_from = 0
+  let mut d_label = 0
   for e in edits {
     let deleting = e.to > e.from
-    // マーカーが丸ごと消えた
-    if deleting && e.from <= m.from && e.to >= m.label {
+    // マーカーが丸ごと消えた（消去が繋がって from から label まで届く）
+    if deleting && e.from <= reach && e.to > reach {
+      reach = e.to
+    }
+    if reach >= m.label {
       return None
     }
     // ラベルの頭が消去の内側
     if e.from < m.label && m.label < e.to {
       return None
     }
-    from = shift(from, e)
-    label = shift(label, e)
+    d_from = d_from + delta(m.from, e)
+    d_label = d_label + delta(m.label, e)
   }
-  Some({ from, label })
+  Some({ from: m.from + d_from, label: m.label + d_label })
 }
 
 ///|
-/// 位置 1 つを編集 1 つで写す。手前の編集ぶんずれる。**ちょうどその位置への挿入は
-/// 動かさない**（挿入の前に留まる — ラベルの頭に字を足せば、その字がラベルの先頭）。
-/// その位置で終わる消去はずらす（`##` を 1 つ消せばラベルは 1 つ手前）。
-/// 消去の内側なら消去の頭へ。
-fn shift(pos : Int, e : Edit) -> Int {
+/// 元の位置 pos が、編集 1 つでどれだけずれるか。手前の編集ぶんずれる。
+/// **ちょうどその位置への挿入は動かさない**（挿入の前に留まる — ラベルの頭に字を
+/// 足せば、その字がラベルの先頭）。その位置で終わる消去はずらす（`##` を 1 つ消せば
+/// ラベルは 1 つ手前）。消去の内側なら消去の頭へ。
+fn delta(pos : Int, e : Edit) -> Int {
   let grown = e.insert.length() - (e.to - e.from)
   if e.to < pos || (e.to == pos && e.to > e.from) {
-    pos + grown
+    grown
   } else if e.from < pos && pos < e.to {
-    e.from + e.insert.length()
+    e.from + e.insert.length() - pos
   } else {
-    pos
+    0
   }
 }
