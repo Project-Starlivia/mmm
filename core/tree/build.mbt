@@ -356,7 +356,7 @@ fn take(
           // 中身が来た時点で、保留中の水平線は境界になれない
           spill(b)
           let s = block_span(block)
-          fill(b, c, from=s.from, to=closing(b.md, block, s.to))
+          fill(b, c, from=s.from, to=s.to)
         }
         None => ()
       }

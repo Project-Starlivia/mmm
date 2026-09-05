@@ -15,7 +15,7 @@ test "probe: $$ と ::: のブロック種" {
   let a = read("# r\n\n$$\nx\n$$\n").children.map(kind)
   let b = read("# r\n\n:::note\nx\n:::\n").children.map(kind)
   json_inspect([a, b], content=[
-    ["other", "other", "MathBlock5,10"],
-    ["other", "other", "Directive5,15"],
+    ["other", "other", "MathBlock5,13"],
+    ["other", "other", "Directive5,19"],
   ])
 }

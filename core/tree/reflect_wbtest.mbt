@@ -286,7 +286,7 @@ test "側の在る根に子を足せば根が丸ごと" {
     {
       "from": 0,
       "to": 21,
-      "insert": "# r\n\n## a\n\n***\n\n## b\n\n***\n\n## c\n",
+      "insert": "# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n",
     },
   ])
 }
@@ -323,7 +323,7 @@ test "側が変われば根が丸ごと" {
   roots[0] = { node: roots[0].node, sides: [Right, Left] }
   let after : Doc = { ..before, roots, }
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 0, "to": 16, "insert": "# r\n\n## a\n\n***\n\n## b\n" },
+    { "from": 0, "to": 16, "insert": "# r\n\n## a\n\n---\n\n## b\n" },
   ])
 }
 

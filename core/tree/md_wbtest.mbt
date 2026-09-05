@@ -97,3 +97,121 @@ test "インラインの span は中身に対する相対" {
     ),
   )
 }
+
+///|
+/// 方言 — ライブラリの生の指紋と、mmm が揃えた後の指紋を並べる。ライブラリの版が
+/// 上がって生の指紋が変われば、ここで気付く。
+
+///|
+test "方言 — フェンス付きの塊の尻は閉じの行の改行まで（生は閉じの手前で止まる）" {
+  let md = "# a\n\n```js\nx\n```\n\n$$\ny\n$$\n\n:::note\nz\n:::\n"
+  inspect(
+    raw_ast_sig(md),
+    content=(
+      #|H1Atx[0,4] Blank1[4,5] Fence(js)[5,13] Blank1[13,18] Math[18,23] Blank1[23,27] Directive(note)[27,37]
+    ),
+  )
+  inspect(
+    md_ast_sig(md),
+    content=(
+      #|H1Atx[0,4] Blank1[4,5] Fence(js)[5,17] Blank1[13,18] Math[18,26] Blank1[23,27] Directive(note)[27,41]
+    ),
+  )
+}
+
+///|
+test "方言 — CRLF でも、項目の中でも、閉じが無ければそのまま" {
+  inspect(
+    raw_ast_sig("# a\r\n\r\n```\r\nx\r\n```\r\n"),
+    content=(
+      #|H1Atx[0,5] Blank1[5,7] Fence()[7,15]
+    ),
+  )
+  inspect(
+    md_ast_sig("# a\r\n\r\n```\r\nx\r\n```\r\n"),
+    content=(
+      #|H1Atx[0,5] Blank1[5,7] Fence()[7,20]
+    ),
+  )
+  inspect(
+    md_ast_sig("```\nx\n"),
+    content=(
+      #|Fence()[0,6]
+    ),
+  )
+  // 項目の中のフェンスは項目の指紋に畳まれるので、地番で見る
+  inspect(
+    spans_sig("- a\n  ```js\n  1\n  ```\n"),
+    content=(
+      #|1[0,-,0] 2[0,2,22] 3[6,-,22]
+    ),
+  )
+}
+
+///|
+test "方言 — 定義行の尻は改行込み（生は改行の手前で止まる）" {
+  let md = "# a\n\n[q]: /r\n\n## b\n"
+  inspect(
+    raw_ast_sig(md),
+    content=(
+      #|H1Atx[0,4] Blank1[4,5] Blank1[13,14] H2Atx[14,19] Def[5,12]
+    ),
+  )
+  inspect(
+    md_ast_sig(md),
+    content=(
+      #|H1Atx[0,4] Blank1[4,5] Blank1[13,14] H2Atx[14,19] Def[5,13]
+    ),
+  )
+}
+
+///|
+test "綴り — 区切り線は ---（ライブラリは *** と書く）。コードの中の *** は触らない" {
+  let d = parse("# r\n\n## a\n\n***\n\n## b\n\n***\n\n```\n***\n```\n")
+  inspect(
+    serialize(d),
+    content=(
+      #|# r
+      #|
+      #|## a
+      #|
+      #|---
+      #|
+      #|## b
+      #|
+      #|---
+      #|
+      #|```
+      #|***
+      #|```
+      #|
+    ),
+  )
+  let l = parse("- a\n\n  ***\n\n  - b\n")
+  inspect(
+    serialize(l),
+    content=(
+      #|- a
+      #|
+      #|  ---
+      #|
+      #|  - b
+      #|
+    ),
+  )
+}
+
+///|
+test "綴り — frontmatter と本文の間は空行 1 つ" {
+  inspect(
+    serialize(parse("---\nk: v\n---\n# a\n")),
+    content=(
+      #|---
+      #|k: v
+      #|---
+      #|
+      #|# a
+      #|
+    ),
+  )
+}

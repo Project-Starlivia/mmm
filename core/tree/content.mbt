@@ -95,45 +95,7 @@ fn inline_text(
 /// ブロックが原文で占めている綴りそのもの。
 fn verbatim(md : String, block : @markdown.Block) -> String {
   let s = block_span(block)
-  carve(md, s.from, closing(md, block, s.to))
-}
-
-///|
-/// 閉じのフェンスまで含めた終わり（他の塊と同じく改行込み）。`$` / `:::` /
-/// コードの span は閉じの行を含まないので、原文のまま持つと閉じが落ち、地番で
-/// 切り出すと閉じが残る。コードのフェンスは開きの字（`` ` `` か `~`）で閉じる
-fn closing(md : String, block : @markdown.Block, to : Int) -> Int {
-  let fence : UInt16 = match block {
-    MathBlock(..) => '$'
-    Directive(..) => ':'
-    FencedCode(span~, ..) => {
-      let mut j = span.from
-      while j < md.length() && md[j] == ' ' {
-        j = j + 1
-      }
-      guard j < md.length() else { return to }
-      md[j]
-    }
-    _ => return to
-  }
-  // 次の行が閉じのフェンスだけなら、その行の終わりまで
-  let mut i = to
-  while i < md.length() && (md[i] == '\n' || md[i] == '\r' || md[i] == ' ') {
-    i = i + 1
-  }
-  let from = i
-  while i < md.length() && md[i] == fence {
-    i = i + 1
-  }
-  guard i - from >= 2 else { return to }
-  while i < md.length() && (md[i] == ' ' || md[i] == '\t') {
-    i = i + 1
-  }
-  if i >= md.length() || md[i] == '\n' || md[i] == '\r' {
-    line_end(md, i)
-  } else {
-    to
-  }
+  carve(md, s.from, s.to)
 }
 
 ///|
