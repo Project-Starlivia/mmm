@@ -1,9 +1,9 @@
 // 見失った対象を、控えめな針で指す。DOM を知らない計算だけの層。
 //
-// 指す先（`indicatorTarget`）・出すか（`isLost`）・置く場所（`indicatorFor`）
+// 見失っているか（`isLost`）・指す先（`nearest`）・置く場所（`indicatorFor`）
 // の 3 つを別々に持つ。理由が違うものを 1 つの決めに畳まない。
 
-import { type Rect, unionRect } from "./geometry.ts";
+import type { Rect } from "./geometry.ts";
 import type { Pane, Camera } from "./camera.ts";
 
 export interface Indicator {
@@ -28,21 +28,31 @@ export function isVisible(box: Rect, cam: Camera, pane: Pane): boolean {
   return s.x < pane.width && s.x + s.w > 0 && s.y < pane.height && s.y + s.h > 0;
 }
 
-/** 針が指す先。選択の外接箱、選択が無ければ根。空の文書なら null */
-export function indicatorTarget(selection: Iterable<Rect>, root: Rect | null): Rect | null {
-  return unionRect(selection) ?? root;
+/** その箱たちを見失っているか。1 つでも見えていれば迷っていない */
+export function isLost(boxes: Iterable<Rect>, cam: Camera, pane: Pane): boolean {
+  for (const b of boxes) if (isVisible(b, cam, pane)) return false;
+  return true;
 }
 
 /**
- * その先を見失っているか。針を出すのはこのときだけ。
+ * 画面の中心にいちばん近い箱。1 つも無ければ null。
  *
- * 指す先が画面に被っていれば、指す方角が無い — 只中に居るのだから迷っていない。
- * 目印（選択があれば選択そのもの、無ければ文書のどれか）が見えているときも同じ。
+ * 近さは箱の中心で測る — 針の向きも中心で決めるので、物差しは 1 つで足りる。
  */
-export function isLost(target: Rect, landmarks: Iterable<Rect>, cam: Camera, pane: Pane): boolean {
-  if (isVisible(target, cam, pane)) return false;
-  for (const b of landmarks) if (isVisible(b, cam, pane)) return false;
-  return true;
+export function nearest(boxes: Iterable<Rect>, cam: Camera, pane: Pane): Rect | null {
+  const cx = pane.width / 2;
+  const cy = pane.height / 2;
+  let best: Rect | null = null;
+  let least = Infinity;
+  for (const b of boxes) {
+    const s = toScreen(b, cam);
+    const d = (s.x + s.w / 2 - cx) ** 2 + (s.y + s.h / 2 - cy) ** 2;
+    if (d < least) {
+      least = d;
+      best = b;
+    }
+  }
+  return best;
 }
 
 /**

@@ -13,7 +13,7 @@ import { type Entry, contextItems } from "./map/context.ts";
 import { type Drop, dropOp, resolveDrop } from "./map/drop.ts";
 import { type Rect, unionRect } from "./map/geometry.ts";
 import { Fingers } from "./map/gesture.ts";
-import { indicatorFor, indicatorTarget, isLost } from "./map/indicator.ts";
+import { indicatorFor, isLost, nearest } from "./map/indicator.ts";
 import { type Intent, type Key, keyed, keyedCard } from "./map/keys.ts";
 import { LabelEditor } from "./map/label.ts";
 import { type Layout, cardRect, layoutMap, ownerOf, rootBox } from "./map/layout.ts";
@@ -395,11 +395,16 @@ export class Mindmap {
   /** 見失った選択（無ければ根）を控えめな針で指す。決めは indicator.ts が持つ */
   private updateIndicator(): void {
     const pane = this.paneSize();
-    const selection = this.selectedBoxes();
-    const target = indicatorTarget(selection, rootBox(this.layout));
-    // 目印は、選択があれば選択の話。無ければ文書の話
-    const landmarks = selection.length > 0 ? selection : this.layout.boxes.values();
-    if (!target || !isLost(target, landmarks, this.camera, pane)) {
+    const sel = this.selectedBoxes();
+    // 見失ったかは、選択があれば選択の話。無ければ文書の話
+    const watched = sel.length > 0 ? sel : [...this.layout.boxes.values()];
+    // 指す先は、選択ならいちばん近いやつ。無ければ根 — 帰る場所は 1 つでいい
+    const target = !isLost(watched, this.camera, pane)
+      ? null
+      : sel.length > 0
+        ? nearest(sel, this.camera, pane)
+        : rootBox(this.layout);
+    if (!target) {
       this.indicatorEl.style.display = "none";
       return;
     }

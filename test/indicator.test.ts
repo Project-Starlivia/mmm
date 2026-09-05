@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Rect } from "../src/map/geometry.ts";
-import { indicatorFor, indicatorTarget, isLost, isVisible } from "../src/map/indicator.ts";
+import { indicatorFor, isLost, isVisible, nearest } from "../src/map/indicator.ts";
 
 const PANE = { width: 800, height: 600 };
 const V = { k: 1, tx: 0, ty: 0 };
@@ -52,45 +52,38 @@ test("パン・ズームしても world 上の位置関係で向きが決まる"
   assert.ok(ind.angle > 0 && ind.angle < 90);
 });
 
+// ---------- 見失っているか ----------
+
+test("どれも見えていなければ、見失っている", () => {
+  assert.ok(isLost([box(5000, 300), box(-5000, 0)], V, PANE));
+});
+
+test("1 つでも見えていれば、見失っていない", () => {
+  assert.ok(!isLost([box(-5000, 0), box(100, 100)], V, PANE));
+});
+
+test("1 つも無ければ、見失っている（指す先が無いので針は出ない）", () => {
+  assert.ok(isLost([], V, PANE));
+  assert.equal(nearest([], V, PANE), null);
+});
+
 // ---------- 指す先 ----------
 
-test("選択を指す", () => {
-  const sel = box(5000, 300);
-  assert.deepEqual(indicatorTarget([sel], box(0, 0)), sel);
+test("画面の中心にいちばん近いものを指す", () => {
+  const far = box(5000, 300);
+  const near = box(1000, 300);
+  assert.deepEqual(nearest([far, near], V, PANE), near);
 });
 
-test("選択が複数なら、その外接箱を指す", () => {
-  const a = box(5000, 300);
-  const b = box(5300, 500);
-  assert.deepEqual(indicatorTarget([a, b], a), { x: 5000, y: 300, w: 400, h: 260 });
+test("画面を左右から挟んでいても、近いほうを指す", () => {
+  const left = box(-300, 270); // 箱の中心は -250 — ペイン中心(400)から 650
+  const right = box(900, 270); // 箱の中心は 950 — 550
+  assert.deepEqual(nearest([left, right], V, PANE), right);
 });
 
-test("選択が無ければ根を指す", () => {
-  const root = box(-5000, 0);
-  assert.deepEqual(indicatorTarget([], root), root);
-});
-
-test("空の文書には指す先が無い", () => {
-  assert.equal(indicatorTarget([], null), null);
-});
-
-// ---------- 出すか ----------
-
-test("指す先も目印も見えなければ、見失っている", () => {
-  const away = box(5000, 300);
-  assert.ok(isLost(away, [away], V, PANE));
-});
-
-test("目印が 1 つでも見えていれば、見失っていない", () => {
-  const away = box(-5000, 0);
-  const here = box(100, 100);
-  assert.ok(!isLost(away, [away, here], V, PANE));
-});
-
-test("指す先が画面に被っていれば、方角が無いので見失っていない", () => {
-  // 左右に 1 つずつ選び、どちらも画面外 — 外接箱は画面ごと包む
-  const left = box(-300, 270);
-  const right = box(1000, 270);
-  const target = indicatorTarget([left, right], left);
-  assert.ok(target && !isLost(target, [left, right], V, PANE));
+test("近さは今の視点で測る（パン・ズームで入れ替わる）", () => {
+  const a = box(0, 0);
+  const b = box(1000, 0);
+  assert.deepEqual(nearest([a, b], V, PANE), a);
+  assert.deepEqual(nearest([a, b], { k: 1, tx: -1000, ty: 0 }, PANE), b);
 });
