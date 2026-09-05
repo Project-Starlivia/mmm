@@ -36,7 +36,7 @@ node での実測。
 
 | パッケージ | 使っている |
 |---|---|
-| state | `EditorState` / `Compartment`（テーマ）/ `StateField` + `StateEffect`（薄塗り）/ `ChangeSet.compose`（操作の編集列の合成） |
+| state | `EditorState` / `Compartment`（テーマ）/ `StateField` + `StateEffect`（薄塗り、および tree / anchors / holder / choice（src/state.ts））/ `ChangeSet.compose`（操作の編集列の合成） |
 | view | `EditorView` / `lineNumbers` / `lineWrapping` / `Decoration.mark` / `updateListener` / `scrollIntoView` / `contentAttributes`（aria-placeholder）/ `keymap` |
 | commands | `history` / `undo` / `redo` / `defaultKeymap` / `historyKeymap` / `indentWithTab` |
 | language | `syntaxHighlighting` / `defaultHighlightStyle`（色付けだけ。md の読みは core） |
@@ -111,9 +111,9 @@ node での実測。
 
 ## 齟齬
 
-- spec.md「二つをまたぐ印」は `Alt+クリック` の複数カーソルを前提に書いているが、
+- spec.md「選択の持ち主」は `Alt+クリック` の複数カーソルを前提に書いているが、
   `allowMultipleSelections` と `drawSelection` が入っていない（issue #66）
-- CodeMirror を選んだ理由がリポジトリに無い（v1 の 2026-08-08、git 導入より前。issue #67）
+- CodeMirror を選んだ理由は docs/design.md「なぜ CodeMirror 6 か」に在る
 
 ## 出典
 
