@@ -15,6 +15,17 @@ export interface Selection {
 
 export const NONE: Selection = { ids: [], anchor: null };
 
+/** 何を選んでいるか — ノードの並びか、カード 1 枚か。片方だけ（spec.md「C カード」） */
+export type Choice = { kind: "nodes"; sel: Selection } | { kind: "card"; id: number };
+
+export const NOTHING: Choice = { kind: "nodes", sel: NONE };
+
+/** ノードの選択として見る。カードを選んでいれば空 */
+export const nodesOf = (c: Choice): Selection => (c.kind === "nodes" ? c.sel : NONE);
+
+/** カードの選択として見る。ノードを選んでいれば null */
+export const cardOf = (c: Choice): number | null => (c.kind === "card" ? c.id : null);
+
 export type Modifier = "none" | "shift" | "mod";
 
 const sorted = (ids: Iterable<number>): number[] => [...new Set(ids)].sort((a, b) => a - b);
