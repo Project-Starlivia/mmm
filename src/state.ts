@@ -11,7 +11,7 @@
 
 import { type EditorState, type Extension, StateEffect, StateField, type Transaction } from "@codemirror/state";
 import * as core from "./coreApi.ts";
-import { type Anchors, type Caret, type Holder, derive } from "./caret.ts";
+import { type Anchors, type Caret, type Holder, type Range, derive } from "./caret.ts";
 import type { Choice } from "./map/select.ts";
 
 /** core が読んだ木と地番。doc が変わったときだけ読み直す */
@@ -68,13 +68,44 @@ const derived = (s: EditorState): Choice => {
   return derive(t.view, t.spots, s.field(holder), caretOf(s), s.field(anchors));
 };
 
-/** 選択。持ち主が決める（caret.ts の derive） */
+/** 同じものを選んでいるか */
+const sameChoice = (a: Choice, b: Choice): boolean => {
+  if (a.kind === "nodes" && b.kind === "nodes") {
+    return (
+      a.sel.anchor === b.sel.anchor &&
+      a.sel.ids.length === b.sel.ids.length &&
+      a.sel.ids.every((id, i) => id === b.sel.ids[i])
+    );
+  }
+  return a.kind === "card" && b.kind === "card" && a.id === b.id;
+};
+
+/** 選択。持ち主が決める（caret.ts の derive）。同じものを選んだままなら**前の値のまま** —
+ *  下の段は値が変わったかを identity 1 つで見分けられる */
 export const choice = StateField.define<Choice>({
   create: derived,
-  update: (_, tr) => derived(tr.state),
+  update(v, tr) {
+    const next = derived(tr.state);
+    return sameChoice(v, next) ? v : next;
+  },
 });
 
 export const fields: Extension = [tree, holder, anchors, choice];
+
+/**
+ * md 側で薄く塗る範囲。**地図が持つ間だけ**（md が持つ間はカーソルそのものが在る）。
+ * ノードは地番そのもの（子孫込み）、カードは中身の原文。無い地番は落とす
+ */
+export function highlightRanges(s: EditorState): Range[] {
+  if (s.field(holder) !== "map") return [];
+  const { spots } = s.field(tree);
+  const span = (id: number): Range[] => {
+    const spot = spots.get(id);
+    return spot ? [{ from: spot.from, to: spot.to }] : [];
+  };
+  const c = s.field(choice);
+  return c.kind === "card" ? span(c.id) : c.sel.ids.flatMap(span);
+}
 
 /** focus の id をその木の地番で位置に。ノードならラベルの頭、中身なら原文の頭。無ければ null */
 export function anchorsOf(t: core.Survey, id: number | null): Anchors {

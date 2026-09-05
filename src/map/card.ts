@@ -51,7 +51,7 @@ export class CardEditor {
   private opened = "";
   private id: number | null = null;
   /** 最後に place() へ渡された rect / cam。中身だけが変わった打鍵の再配置に使う
-   *  （書くのは閉じるときだけなので、打つたびに sync が地図を描き直すことはない） */
+   *  （書くのは閉じるときだけなので、打つたびに CodeMirror の更新が地図を描き直すことはない） */
   private lastRect: Rect | null = null;
   private lastCam: Camera | null = null;
   private readonly pane: HTMLElement;

@@ -10,7 +10,7 @@
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import type { EditorState } from "@codemirror/state";
 import * as core from "./coreApi.ts";
-import type { Range } from "./caret.ts";
+import type { Anchors, Holder } from "./caret.ts";
 import * as st from "./state.ts";
 import { MdEditor } from "./editor.ts";
 import { Mindmap, type MapHost } from "./mindmap.ts";
@@ -82,6 +82,9 @@ const spots = (): Map<number, core.Spot> => state().field(st.tree).spots;
 const choice = (): Choice => state().field(st.choice);
 const selection = (): Selection => nodesOf(choice());
 const picked = (): number | null => cardOf(choice());
+const holder = (): Holder => state().field(st.holder);
+/** 選択（id）をいまの木の地番で位置に。CodeMirror へ渡すのはこの形 */
+const anchorsFor = (c: Choice): Anchors => st.anchorsFor(state().field(st.tree), c);
 
 /**
  * loadText を呼ぶたびに進む世代番号。
@@ -126,32 +129,12 @@ function onUpdate(s: EditorState, prev: EditorState | null): void {
   } else {
     map.refreshSelection();
   }
-  // md 側の薄塗りは地図が持つ間だけ（md が持つ間はカーソルそのものが在る）
-  editor.highlight(s.field(st.holder) === "map" ? currentHighlight() : []);
 }
 
-/** 選んでいるノードの md 側の範囲（子孫込み） */
-const selectedRanges = (): Range[] =>
-  selection().ids.flatMap((id) => {
-    const s = spots().get(id);
-    return s ? [{ from: s.from, to: s.to }] : [];
-  });
-
-/** 選んでいるカードの中身の md 側の範囲 */
-const pickedRange = (id: number): Range[] => {
-  const s = spots().get(id);
-  return s ? [{ from: s.from, to: s.to }] : [];
-};
-
-/** いま塗るべき範囲。カードを選んでいればその中身、そうでなければノードの並び */
-const currentHighlight = (): Range[] => {
-  const card = picked();
-  return card !== null ? pickedRange(card) : selectedRanges();
-};
-
-/** 地図で選び直した。id を位置に写して CodeMirror に置く（onUpdate が塗る）。reveal は md 側を anchor の頭へスクロールするか */
+/** 地図で選び直した。id を位置に写して CodeMirror に置く（md 側の薄塗りは field が引き直す）。
+ *  reveal は md 側を anchor の頭へスクロールするか */
 function choose(next: Choice, reveal: boolean): void {
-  editor.select(st.anchorsFor(state().field(st.tree), next));
+  editor.select(anchorsFor(next));
   const anchor = nodesOf(next).anchor;
   if (reveal && anchor !== null) {
     const s = spots().get(anchor);
@@ -165,7 +148,7 @@ const setPicked = (id: number | null): void => choose(id === null ? NOTHING : { 
 
 /**
  * 持ち主の操作を md に映す。**選択を書く入口はここ 1 本** — 地図は md に触らない。
- * 操作 1 回 = CodeMirror の 1 トランザクション（編集列 + focus の effect）で、undo は
+ * 操作 1 回 = CodeMirror への 1 回の dispatch（編集列 + focus の effect）で、undo は
  * CodeMirror のもの。focus は anchors が後の木で位置に写す（state.ts）。
  * できない操作は core が空の編集列で言う。いまは雑に、しらせを出すだけ。
  *
@@ -183,7 +166,8 @@ function apply(op: core.Op, edit: boolean): number | null {
   const before = selection().anchor;
   editor.apply([r.edits], r.focus);
   if (r.focus === null) return null;
-  // 別のノードへ移ったときだけ md を寄せる（同じノードに留まる操作で手元を揺らさない）
+  // 別のノードへ移ったときだけ md を寄せる（同じノードに留まる操作で手元を揺らさない）。
+  // 寄せは編集とは別の、スクロールだけのトランザクション — undo の 1 手には入らない
   if (r.focus !== before) {
     const s = spots().get(r.focus);
     if (s) editor.reveal(s.from);
@@ -219,7 +203,7 @@ const host: MapHost = {
     void (async () => {
       if (await ensurePlace()) await assets.connect();
     })(),
-  holder: () => state().field(st.holder),
+  holder,
   selection,
   setSelection,
   picked,
@@ -241,10 +225,10 @@ const map = new Mindmap(mapPane, host);
 // 瞬間のカーソルのノードを位置にして引き継ぐ。map → md は捨てる（md のカーソルは
 // 動かさない）。窓・メニュー・帯へ抜けても変わらない — 2 つのペインの focusin だけを見る
 mdPane.addEventListener("focusin", () => {
-  if (state().field(st.holder) !== "md") editor.hold("md", null);
+  if (holder() !== "md") editor.hold("md", null);
 });
 mapPane.addEventListener("focusin", () => {
-  if (state().field(st.holder) !== "map") editor.hold("map", st.anchorsFor(state().field(st.tree), choice()));
+  if (holder() !== "map") editor.hold("map", anchorsFor(choice()));
 });
 
 /**
