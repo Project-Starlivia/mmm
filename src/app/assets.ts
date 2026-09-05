@@ -11,6 +11,7 @@
 // md への操作なので `deps.declare` に渡す（main.ts）。
 
 import { type Field, type Part, ask } from "./ask.ts";
+import { ASKS } from "./asks.ts";
 import { handles } from "./handles.ts";
 import type { Failed } from "./notice.ts";
 import { io } from "./io.ts";
@@ -510,7 +511,7 @@ export function initAssets(deps: {
       const shape: Part[] = ["![](", folder ?? declaredPath(), name, ".webp)"];
       let out: string[] | null;
       try {
-        out = await ask({ title: "Name this image", ok: "Save", parts: shape, preview: shot });
+        out = await ask(ASKS.imageName(shape, shot));
       } finally {
         URL.revokeObjectURL(shot);
       }
