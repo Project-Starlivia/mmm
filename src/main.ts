@@ -81,17 +81,6 @@ let choice: Choice = NOTHING;
 const selection = (): Selection => nodesOf(choice);
 const picked = (): number | null => cardOf(choice);
 
-/** 持ち越す目印と、それが anchor だったか。幽霊（当たらなかった目印）も同じ形で運ぶ */
-interface Carried {
-  mark: core.Mark;
-  anchor: boolean;
-}
-
-/**
- * 幽霊 — 前のサイクルで当たらなかった目印。捨てずに持ち越す（`## n## a` の
- * 途中のサイクルで捨てると、Enter で戻れない）。地図で選び直したら消える
- */
-let ghosts: Carried[] = [];
 /**
  * loadText を呼ぶたびに進む世代番号。
  *
@@ -119,55 +108,28 @@ const declaredFolder = (): string | null => {
  * 本文が変わった。**ここが読みのサイクルの唯一の入口** — 打鍵も、開くも、
  * 新規も、リンクで開くも、全部ここを通って同じ順で映る。
  *
- * 選択は id でなく目印（前の地番）で持ち越す。id は読みのサイクルを越えて
- * 持たないので、core に「この目印はいまどれか」を訊く（`follow`）。
+ * つなぎ: 選択の id は番号のまま持ち、無くなった番号だけ落とす（Task 7 で
+ * state.ts の field に置き換わる）
  */
-function sync(next: string, edits: core.Edit[]): void {
+function sync(next: string, _edits: core.Edit[]): void {
   const wasEmpty = doc.roots.length === 0;
-  // 目印と、それが anchor か。Implicit は行が無いので捨てる
-  const carried: Carried[] = [];
-  const was = selection();
-  for (const id of was.ids) {
-    const s = spots.get(id);
-    if (s && s.label !== null) {
-      carried.push({ mark: { from: s.from, label: s.label }, anchor: id === was.anchor });
-    }
-  }
-  for (const g of ghosts) carried.push(g);
-  const r = core.survey(next, edits, carried.map((c) => c.mark));
+  const r = core.survey(next);
   text = next;
   doc = r.view;
   spots = r.spots;
-  const ids: number[] = [];
-  const kept: Carried[] = [];
-  let anchor: number | null = null;
-  r.trails.forEach((t, i) => {
-    if (!t) return;
-    if (t.id === null) {
-      kept.push({ mark: t.mark, anchor: carried[i].anchor });
-      return;
-    }
-    ids.push(t.id);
-    if (carried[i].anchor) anchor = t.id;
-  });
-  ids.sort((a, b) => a - b);
-  ghosts = kept;
-  // 中身の id はノードの目印を持たないので、マークでは追いかけない — 消えて
-  // いれば外すだけ（構造を変える操作で番号が振り直されることは受け入れる）
+  const was = selection();
+  const ids = was.ids.filter((id) => spots.has(id));
   const card = picked();
   choice =
     card !== null && spots.has(card)
       ? { kind: "card", id: card }
-      : { kind: "nodes", sel: { ids, anchor: anchor ?? (ids.length ? ids[ids.length - 1] : null) } };
+      : { kind: "nodes", sel: { ids, anchor: was.anchor !== null && ids.includes(was.anchor) ? was.anchor : (ids.at(-1) ?? null) } };
   map.render();
   editor.highlight(currentHighlight());
-  // 白紙の言い出し。**出る理由は 1 つ**（まだ木が無い）で、マップ側も
-  // render() の中で同じことを見ている
   editor.showHint(doc.roots.length === 0);
   updateDirty();
   showName();
   exportApi.refresh();
-  // 何も無いところに最初の木が生まれた瞬間だけ、真ん中へ寄せる
   if (wasEmpty && doc.roots.length > 0) map.fitView();
 }
 
@@ -190,10 +152,9 @@ const currentHighlight = (): Range[] => {
   return card !== null ? pickedRange(card) : selectedRanges();
 };
 
-/** 地図で選び直した。幽霊は要らなくなる。reveal は md 側を anchor の頭へスクロールするか */
+/** 地図で選び直した。reveal は md 側を anchor の頭へスクロールするか */
 function choose(next: Choice, reveal: boolean): void {
   choice = next;
-  ghosts = [];
   map.refreshSelection();
   editor.highlight(currentHighlight());
   const anchor = selection().anchor;
@@ -607,7 +568,7 @@ function paste(): void {
     }
     const clip = await navigator.clipboard.readText();
     if (gen !== docGen) return;
-    const hasSkeleton = (md: string): boolean => core.survey(md, [], []).view.roots.length > 0;
+    const hasSkeleton = (md: string): boolean => core.survey(md).view.roots.length > 0;
     const action = decidePaste(clip, hasSkeleton);
     switch (action.kind) {
       case "noop":

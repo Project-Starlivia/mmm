@@ -94,33 +94,19 @@ test("知らない形は黙って通さない", () => {
   );
 });
 
-test("survey の JSON — spots の鍵は数になり、label の無い鍵は null、trails の null はそのまま", () => {
+test("survey の JSON — spots の鍵は数になり、label の無い鍵は null", () => {
   const s = decodeSurvey({
     view: { roots: [] },
     spots: { "1": { from: 0, to: 0 }, "2": { from: 0, label: 2, to: 4 } },
-    trails: [null, { mark: { from: 0, label: 2 } }, { mark: { from: 0, label: 2 }, id: 2 }],
   });
   assert.deepEqual(s.spots.get(1), { from: 0, label: null, to: 0 });
   assert.deepEqual(s.spots.get(2), { from: 0, label: 2, to: 4 });
-  assert.deepEqual(s.trails, [
-    null,
-    { mark: { from: 0, label: 2 }, id: null },
-    { mark: { from: 0, label: 2 }, id: 2 },
-  ]);
 });
 
-test("survey は core を往復する — 上にノードを足しても目印は同じノードを指す", () => {
-  const first = survey("# r\n\n## a\n", [], []);
-  assert.equal(first.view.roots.length, 1);
-  assert.deepEqual(first.spots.get(3), { from: 5, label: 8, to: 10 });
-  const s = first.spots.get(3);
-  if (!s || s.label === null) throw new Error("a の地番が無い");
-  const next = survey(
-    "# r\n\n## n\n\n## a\n",
-    [{ from: 5, to: 5, insert: "## n\n\n" }],
-    [{ from: s.from, label: s.label }],
-  );
-  assert.deepEqual(next.trails, [{ mark: { from: 11, label: 14 }, id: 4 }]);
+test("survey は core を往復する — View と地番", () => {
+  const s = survey("# r\n\n## a\n");
+  assert.equal(s.view.roots.length, 1);
+  assert.deepEqual(s.spots.get(3), { from: 5, label: 8, to: 10 });
 });
 
 test("Op は core の enum の形になる — kind が構築子名、null の鍵は落ち、鍵が無ければ裸の名前", () => {
