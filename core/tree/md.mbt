@@ -20,7 +20,13 @@ pub fn read(md : String) -> @markdown.Document {
 /// 綴り（字下げ・フェンス・空行・エスケープ）はライブラリの仕事。
 /// ライブラリは LF で書くので、CRLF の文書は最後に揃える。
 pub fn serialize(doc : Doc) -> String {
-  write(unbuild(doc), doc.eol)
+  let body = write(unbuild({ ..doc, frontmatter: None }), doc.eol)
+  match doc.frontmatter {
+    None => body
+    // 封筒と本文の間は空行 1 つ。読みは封筒の後ろの空行を落とすので、書く側で置く
+    // （置かないと、反映の base が「頭の要素に隙間は無い」と言って原文の空行を消す）
+    Some(raw) => newline("---\n" + raw + "---\n\n", doc.eol) + body
+  }
 }
 
 ///|
@@ -42,7 +48,12 @@ pub fn prose(body : Array[Block], eol : Eol) -> String {
 
 ///|
 fn write(ast : @markdown.Document, eol : Eol) -> String {
-  let md = @markdown.serialize(ast)
+  newline(@markdown.serialize(ast), eol)
+}
+
+///|
+/// LF で組んだ字を、文書の改行の流儀に。
+fn newline(md : String, eol : Eol) -> String {
   match eol {
     Lf => md
     Crlf => md.replace_all(old="\n", new="\r\n")

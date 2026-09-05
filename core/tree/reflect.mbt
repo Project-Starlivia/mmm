@@ -80,6 +80,10 @@ fn plan(
   guard before.frontmatter == after.frontmatter && before.eol == after.eol else {
     return None
   }
+  // 木だけで分かる落ちは先に（正規形を書いて読み直す前に）
+  let olds_n = before.roots.map(x => x.node)
+  let news_n = after.roots.map(x => x.node)
+  guard aligned(ids(olds_n), ids(news_n)) else { return None }
   guard gaps_of(before) is Some(base) && gaps_of(after) is Some(theirs) else {
     return None
   }
@@ -108,9 +112,6 @@ fn plan(
       _ => ()
     }
   }
-  let olds_n = before.roots.map(x => x.node)
-  let news_n = after.roots.map(x => x.node)
-  guard aligned(ids(olds_n), ids(news_n)) else { return None }
   kids(r, spans.get(doc_id).unwrap().to, 0, olds_n, news_n, 1, sides)
   Some(settle(r))
 }
@@ -147,6 +148,19 @@ fn elements(doc : Doc) -> Array[Int] {
 }
 
 ///|
+/// 部分木の最初の要素。Implicit を下って最初の行を持つノード
+fn head_element(x : Node) -> Int? {
+  match x {
+    ImplicitNode(g) =>
+      match g.children.get(0) {
+        Some(k) => head_element(k)
+        None => None
+      }
+    _ => Some(id_of(x))
+  }
+}
+
+///|
 /// ours の隙間 — 地番を持つものごとに、手前に続く空行の頭。Implicit の範囲の頭は
 /// 最初の子の頭なので、Implicit の隙間はその子の隙間。
 fn gaps_in(md : String, spans : Map[Int, Spot]) -> Map[Int, Int] {
@@ -176,8 +190,7 @@ fn gaps_of(doc : Doc) -> Map[Int, Bool]? {
   fn implicit(x : Node) {
     match x {
       ImplicitNode(g) => {
-        match
-          elements({ ..doc, body: [], roots: [{ node: x, sides: [] }] }).get(0) {
+        match head_element(x) {
           Some(first) => out[g.id] = out.get(first).unwrap_or(true)
           None => ()
         }
@@ -274,17 +287,32 @@ priv struct Seq {
 ///|
 /// 列の差分。子の列と中身の列で共用する。
 ///
-/// - 消える並び（連続して消える物は 1 つ）は、先頭の手前の隙間から最後の尻まで消す
+/// 列の頭の境目（列の手前の隙間）は要素でなく**列のもの** — 頭の要素が消えても、
+/// 頭に要素が増えても、境目の字は原文のまま残る。頭より後ろの隙間は要素のもの。
+///
+/// - 消える並び（連続して消える物は 1 つ）は、手前の隙間から最後の尻まで消す。
+///   列の頭の並びで後ろに残る物が居れば、境目を残してその物の行頭まで消す
+///   （theirs がその物を文書の頭と言うなら、境目ごと）
 /// - 残る物には降りる。手前の隙間が base と theirs で違えば（文書の頭になった /
-///   頭でなくなった、列が詰まった / 空いた）、隙間だけ書き換える
-/// - 増える並びは、次に残る物の隙間の頭か、前に残る物の尻か、消えた並びの頭か、
-///   容器の自分の尻に差す。1 つずつ theirs の隙間を連れてくる
+///   頭でなくなった、列が詰まった / 空いた）、隙間だけ書き換える。列の頭で消し差しが
+///   あった物は境目を引き継いでいるので触らない
+/// - 増える並びは、次に残る物の隙間の頭か、前に残る物の尻か、容器の自分の尻に差し、
+///   1 つずつ theirs の隙間を連れてくる。列の頭に差すなら境目の後ろに置き、隙間は
+///   次に残る物との間に付ける
 fn diff(r : Reflect, q : Seq) -> Unit {
   let now = Map::from_array(q.news.map(id => (id, ())))
   let was = Map::from_array(q.olds.map(id => (id, ())))
+  let at = (id : Int) => r.spans.get(id).unwrap()
+  let gap_text = (id : Int) => if (q.gap)(id) { eol(r) } else { "" }
+  // 列の頭に新しい物が来るか（頭の並びを消すとき、境目を残すかに要る）
+  let head_born = q.news.get(0) is Some(id) && !was.contains(id)
+  // 境目を引き継いだ物（隙間の書き換えを飛ばす）
+  let mut inherited : Int? = None
   let mut i = 0
+  let mut kept_before = false
   while i < q.olds.length() {
     if now.contains(q.olds[i]) {
+      kept_before = true
       i = i + 1
       continue
     }
@@ -292,53 +320,102 @@ fn diff(r : Reflect, q : Seq) -> Unit {
     while i < q.olds.length() && !now.contains(q.olds[i]) {
       i = i + 1
     }
-    r.out.push({
-      from: r.gap.get(q.olds[start]).unwrap(),
-      to: r.spans.get(q.olds[i - 1]).unwrap().to,
-      insert: "",
-    })
+    let first = q.olds[start]
+    let last = at(q.olds[i - 1]).to
+    let head = !kept_before
+    let edge = if head && i < q.olds.length() {
+      let next = q.olds[i]
+      inherited = Some(next)
+      (
+        if r.theirs.get(next).unwrap_or(true) {
+          line_start(r.md, at(first).from)
+        } else {
+          r.gap.get(first).unwrap()
+        },
+        line_start(r.md, at(next).from),
+      )
+    } else if head && head_born {
+      (line_start(r.md, at(first).from), last)
+    } else {
+      (r.gap.get(first).unwrap(), last)
+    }
+    r.out.push({ from: edge.0, to: edge.1, insert: "" })
   }
-  let piece = (id : Int) => {
-    (if (q.gap)(id) { eol(r) } else { "" }) +
-    pad(q.col) +
-    indent((q.make)(id), q.col)
-  }
-  let pend : Array[String] = []
+  let body = (id : Int) => pad(q.col) + indent((q.make)(id), q.col)
+  let pend : Array[Int] = []
   let mut kept : Int? = None
   for id in q.news {
     if was.contains(id) {
       if !pend.is_empty() {
-        let at = r.gap.get(id).unwrap()
-        r.out.push({ from: at, to: at, insert: pend.join("") })
+        if kept is None {
+          // 列の頭。境目の後ろに置き、隙間は次に残る物との間に
+          let text = pend
+            .mapi((k, x) => (if k == 0 { "" } else { gap_text(x) }) + body(x))
+            .join("") +
+            gap_text(id)
+          let pos = line_start(r.md, at(id).from)
+          r.out.push({ from: pos, to: pos, insert: text })
+          inherited = Some(id)
+        } else {
+          let pos = r.gap.get(id).unwrap()
+          r.out.push({
+            from: pos,
+            to: pos,
+            insert: pend.map(x => gap_text(x) + body(x)).join(""),
+          })
+        }
         pend.clear()
       }
-      let s = r.spans.get(id).unwrap()
-      let had = r.base.get(id).unwrap_or(false)
-      let has = r.theirs.get(id).unwrap_or(had)
-      if had != has {
-        r.out.push({
-          from: r.gap.get(id).unwrap(),
-          to: line_start(r.md, s.from),
-          insert: if has {
-            eol(r)
-          } else {
-            ""
-          },
-        })
+      if inherited != Some(id) {
+        let had = r.base.get(id).unwrap_or(false)
+        let has = r.theirs.get(id).unwrap_or(had)
+        if had != has {
+          r.out.push({
+            from: r.gap.get(id).unwrap(),
+            to: line_start(r.md, at(id).from),
+            insert: if has {
+              eol(r)
+            } else {
+              ""
+            },
+          })
+        }
       }
       (q.keep)(id)
       kept = Some(id)
     } else {
-      pend.push(piece(id))
+      pend.push(id)
     }
   }
   if !pend.is_empty() {
-    let at = match (kept, q.olds.get(0)) {
-      (Some(k), _) => r.spans.get(k).unwrap().to
-      (None, Some(first)) => r.gap.get(first).unwrap()
-      (None, None) => q.own
+    match (kept, q.olds.get(0)) {
+      (Some(k), _) => {
+        let pos = at(k).to
+        r.out.push({
+          from: pos,
+          to: pos,
+          insert: pend.map(x => gap_text(x) + body(x)).join(""),
+        })
+      }
+      // 列ごと消えて生まれ直す。境目は残してあるので頭の隙間は要らない
+      (None, Some(first)) => {
+        let pos = line_start(r.md, at(first).from)
+        r.out.push({
+          from: pos,
+          to: pos,
+          insert: pend
+          .mapi((k, x) => (if k == 0 { "" } else { gap_text(x) }) + body(x))
+          .join(""),
+        })
+      }
+      // 元から空の列。境目は無いので theirs の隙間から
+      (None, None) =>
+        r.out.push({
+          from: q.own,
+          to: q.own,
+          insert: pend.map(x => gap_text(x) + body(x)).join(""),
+        })
     }
-    r.out.push({ from: at, to: at, insert: pend.join("") })
   }
 }
 
@@ -451,19 +528,10 @@ fn eol(r : Reflect) -> String {
 }
 
 ///|
-/// 前の木のノードの、自分の尻 — 最後の中身の尻、中身が無ければ行の尻。
-/// 元から子の無い容器に差すときだけ使う（子が居れば先頭の子の隙間の頭に差す）。
-/// Implicit は必ず子を持つのでここへは来ないが、範囲の頭を返しておく。
+/// 前の木のノードの、自分の尻。元から子の無い容器に差すときだけ使い、そのとき
+/// 地番の尻は自分の尻そのもの（setext の 2 行目も含む）。
 fn own_end(r : Reflect, old : Node) -> Int {
-  let s = r.spans.get(id_of(old)).unwrap()
-  match old {
-    ImplicitNode(_) => s.from
-    _ =>
-      match body_of(old).last() {
-        Some(b) => r.spans.get(b.id).unwrap().to
-        None => line_end(r.md, s.from)
-      }
-  }
+  r.spans.get(id_of(old)).unwrap().to
 }
 
 ///|
@@ -487,9 +555,9 @@ fn pad(n : Int) -> String {
 }
 
 ///|
-/// 編集列を整える。from 順（同じ位置は出た順）に並べ、隣り合う編集は 1 つに繋ぎ、
-/// 行の途中（改行の無い末尾）に字を書く編集は改行から始める。
-/// 繋いでから見るので、消した後に何が残るかで決まる。
+/// 編集列を整える。from 順（同じ from なら幅の狭い順 — 差し込みが置き換えより先、
+/// 同じなら出た順）に並べ、隣り合う編集は 1 つに繋ぎ、行の途中（改行の無い末尾）に
+/// 字を書く編集は改行から始める。繋いでから見るので、消した後に何が残るかで決まる。
 fn settle(r : Reflect) -> Array[Edit] {
   let order = Array::makei(r.out.length(), i => i)
   order.sort_by((a, b) => {

@@ -163,7 +163,7 @@ test "頭に差せば次に残る子の手前" {
     }
   })
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 4, "to": 4, "insert": "\n## c\n" },
+    { "from": 5, "to": 5, "insert": "## c\n\n" },
   ])
 }
 
@@ -673,5 +673,73 @@ test "Implicit の手前の隙間 — CRLF でも、空白だけの空行でも 
     s2,
     change(b2, 0, [0], x => with_children(x, [fresh("w")])),
   )
-  inspect(apply(spaced, e2), content="# a\n\n### w\n\n## b\n")
+  // 列の頭の境目は原文のまま（空白だけの行も 1 つの空行として残る）
+  inspect(apply(spaced, e2), content="# a\n  \n### w\n\n## b\n")
+}
+
+///|
+test "列の頭の境目は列のもの — 頭を消しても差しても、境目の字は残る" {
+  let tight = "# r\n- a\n- b\n"
+  let (b1, s1) = survey(tight)
+  let kids1 = children_of(b1.roots[0].node)
+  let cut = reflect(
+    tight,
+    b1,
+    s1,
+    change(b1, 0, [], x => with_children(x, [kids1[1]])),
+  )
+  inspect(apply(tight, cut), content="# r\n- b\n")
+  let item = ListNode({ id: 99, label: "z", fold: None, body: [], children: [] })
+  let born = reflect(
+    tight,
+    b1,
+    s1,
+    change(b1, 0, [], x => with_children(x, [item] + kids1)),
+  )
+  inspect(apply(tight, born), content="# r\n- z\n- a\n- b\n")
+  let loose = "# r\n\n- a\n- b\n- c\n"
+  let (b2, s2) = survey(loose)
+  let kids2 = children_of(b2.roots[0].node)
+  let e2 = reflect(
+    loose,
+    b2,
+    s2,
+    change(b2, 0, [], x => with_children(x, kids2[1:].to_owned())),
+  )
+  inspect(apply(loose, e2), content="# r\n\n- b\n- c\n")
+}
+
+///|
+test "封筒の直後の空行は、頭の要素を触っても消えない" {
+  let md = "---\nk: v\n---\n\n# a\n\n# b\n"
+  let (before, spans) = survey(md)
+  let less : Doc = { ..before, roots: [before.roots[1]] }
+  inspect(
+    apply(md, reflect(md, before, spans, less)),
+    content="---\nk: v\n---\n\n# b\n",
+  )
+  let prose : Doc = { ..before, body: blocks([Opaque("x")]) }
+  inspect(
+    apply(md, reflect(md, before, spans, prose)),
+    content="---\nk: v\n---\n\nx\n\n# a\n\n# b\n",
+  )
+  let said = "---\nk: v\n---\n\nhello\n\n# a\n"
+  let (b2, s2) = survey(said)
+  inspect(
+    apply(said, reflect(said, b2, s2, { ..b2, body: [] })),
+    content="---\nk: v\n---\n\n# a\n",
+  )
+}
+
+///|
+test "setext の見出しに子を足しても、下線の中に差さない" {
+  let md = "a\n===\n"
+  let (before, spans) = survey(md)
+  let edits = reflect(
+    md,
+    before,
+    spans,
+    change(before, 0, [], adopt(fresh("c"))),
+  )
+  json_inspect(edits, content=[{ "from": 6, "to": 6, "insert": "\n## c\n" }])
 }

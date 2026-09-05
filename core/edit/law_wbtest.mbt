@@ -197,9 +197,9 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
       }
     }
   }
+  json_inspect(bad, content=[])
   // 全部 None に潰れる退化を落とすための下限チェック
   inspect(some, content="894")
-  json_inspect(bad, content=[])
 }
 
 ///|
@@ -351,9 +351,9 @@ test "法則 — 目印の生存。中身だけを変えれば、持ち主のラ
       }
     }
   }
+  json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
   inspect(seen, content="132")
-  json_inspect(bad, content=[])
 }
 
 ///|
@@ -383,9 +383,9 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
       }
     }
   }
+  json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
   inspect(n, content="863")
-  json_inspect(bad, content=[])
 }
 
 ///|
