@@ -87,6 +87,7 @@ lab/    見るための道具（`pnpm run lab`）。index.html は md がどう�
         唯一の源で、見た目はここに 1 つも無い（src の builder と style.css のまま出す）
 docs/   記録 — spec.md はこのファイル、core.md は文書モデルの内部
         （型・パイプライン・道具の決め。spec.md は意味だけを持つ）、
+        look.md は見た目の決め（尺・字・角・沈み。style.css の数字の地図）、
         shortcuts.md はキーの一覧
         （なぜそのキーかは spec.md 側）、web.md は Web へ戻した理由と段取り、
         origin.md は最初の企画メモ、freedom.md は「自由な Mindmap」との
