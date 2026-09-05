@@ -73,7 +73,7 @@ const elLogo = el("logo", SVGSVGElement);
 
 /** いまの本文と、core がそれを読んだ木。打鍵のたびに組で差し替える */
 let text = "";
-let doc: core.View = { frontmatter: null, trees: [] };
+let doc: core.View = { frontmatter: null, roots: [] };
 /** いまの地番。カーソルの輪・md 側の薄塗り・選択の持ち越しが読む */
 let spots = new Map<number, core.Spot>();
 /** 何を選んでいるか（ノードの並びかカード 1 枚か）。地図はこれを塗るだけで、自分では持たない */
@@ -123,7 +123,7 @@ const declaredFolder = (): string | null => {
  * 持たないので、core に「この目印はいまどれか」を訊く（`follow`）。
  */
 function sync(next: string, edits: core.Edit[]): void {
-  const wasEmpty = doc.trees.length === 0;
+  const wasEmpty = doc.roots.length === 0;
   // 目印と、それが anchor か。Implicit は行が無いので捨てる
   const carried: Carried[] = [];
   const was = selection();
@@ -163,12 +163,12 @@ function sync(next: string, edits: core.Edit[]): void {
   editor.highlight(currentHighlight());
   // 白紙の言い出し。**出る理由は 1 つ**（まだ木が無い）で、マップ側も
   // render() の中で同じことを見ている
-  editor.showHint(doc.trees.length === 0);
+  editor.showHint(doc.roots.length === 0);
   updateDirty();
   showName();
   exportApi.refresh();
   // 何も無いところに最初の木が生まれた瞬間だけ、真ん中へ寄せる
-  if (wasEmpty && doc.trees.length > 0) map.fitView();
+  if (wasEmpty && doc.roots.length > 0) map.fitView();
 }
 
 /** 選んでいるノードの md 側の範囲（子孫込み） */
@@ -293,7 +293,7 @@ const docName = (): string => savedName ?? `${deriveName(doc)}.md`;
  * タブは名前を持つ文書のときだけ名乗る（`filename.md - mmm`）。
  */
 function showName(): void {
-  const name = savedName ?? (doc.trees.length ? docName() : null);
+  const name = savedName ?? (doc.roots.length ? docName() : null);
   const title = name === null ? "mmm" : `${name} - mmm`;
   // 打鍵のたびに呼ばれるので、変わっていないなら DOM に触らない
   if (document.title !== title) document.title = title;
@@ -589,7 +589,7 @@ function paste(): void {
     }
     const clip = await navigator.clipboard.readText();
     if (gen !== docGen) return;
-    const hasSkeleton = (md: string): boolean => core.survey(md, [], []).view.trees.length > 0;
+    const hasSkeleton = (md: string): boolean => core.survey(md, [], []).view.roots.length > 0;
     const action = decidePaste(clip, hasSkeleton);
     switch (action.kind) {
       case "noop":
@@ -788,7 +788,7 @@ const exportApi = initExport({
   name: docName,
   failed,
   blocked,
-  empty: () => doc.trees.length === 0,
+  empty: () => doc.roots.length === 0,
   button: el("export", HTMLButtonElement),
   wayButton: el("export-way", HTMLButtonElement),
 });

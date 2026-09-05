@@ -19,11 +19,11 @@ const node = (id: number, label: string, children: core.Node[] = []): core.Node 
   children,
 });
 
-const tree = (n: core.Node, sides: core.Side[] = []): core.Tree => ({ node: n, sides });
+const root = (n: core.Node, sides: core.Side[] = []): core.Root => ({ node: n, sides });
 
 /** r(1) → a(2), b(3) → c(4)。b は左の枝 */
 const L: Layout = layoutMap(
-  [tree(node(1, "r", [node(2, "a"), node(3, "b", [node(4, "c")])]), ["Right", "Left"])],
+  [root(node(1, "r", [node(2, "a"), node(3, "b", [node(4, "c")])]), ["Right", "Left"])],
   size,
 );
 

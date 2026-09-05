@@ -65,7 +65,7 @@ export function toFileName(label: string): string {
  * 並ぶ）。Implicit（label 無し）は空と同じ。整形して何も残らなければ empty。
  */
 export function deriveName(view: core.View): string {
-  const first = view.trees[0];
+  const first = view.roots[0];
   if (!first) return EMPTY_NAME;
   return toFileName(first.node.label ?? "") || EMPTY_NAME;
 }

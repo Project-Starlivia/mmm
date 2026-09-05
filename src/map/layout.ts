@@ -108,7 +108,7 @@ function descendants(n: core.Node): number {
 
 const SIDES: readonly core.Side[] = ["Right", "Left"];
 
-export function layoutMap(trees: core.Tree[], sizeOf: SizeOf): Layout {
+export function layoutMap(roots: core.Root[], sizeOf: SizeOf): Layout {
   const boxes = new Map<number, Box>();
   const order: number[] = [];
 
@@ -231,7 +231,7 @@ export function layoutMap(trees: core.Tree[], sizeOf: SizeOf): Layout {
   };
 
   /** 根の子を側ごとに分ける。**sides を読むのはここだけ。** 足りなければ右 */
-  const splitSides = (t: core.Tree): Record<core.Side, core.Node[]> => {
+  const splitSides = (t: core.Root): Record<core.Side, core.Node[]> => {
     const out: Record<core.Side, core.Node[]> = { Right: [], Left: [] };
     kidsOf(t.node).forEach((k, i) => out[t.sides[i] ?? "Right"].push(k));
     return out;
@@ -246,7 +246,7 @@ export function layoutMap(trees: core.Tree[], sizeOf: SizeOf): Layout {
    * まとめてずらす。
    */
   const placeTree = (
-    t: core.Tree,
+    t: core.Root,
     top: number,
   ): { top: number; bottom: number; shift: (dy: number) => void } => {
     const root = t.node;
@@ -316,7 +316,7 @@ export function layoutMap(trees: core.Tree[], sizeOf: SizeOf): Layout {
   };
 
   let top = 0;
-  for (const t of trees) {
+  for (const t of roots) {
     const put = placeTree(t, top);
     // 上へはみ出したぶんは押し下げて、頼んだ位置から始まるようにする
     const up = Math.max(0, top - put.top);

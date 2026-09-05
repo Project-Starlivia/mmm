@@ -19,6 +19,6 @@ export function copyText(md: string, view: core.View, spots: Map<number, core.Sp
     }
     for (const c of n.children) walk(c);
   };
-  for (const t of view.trees) walk(t.node);
+  for (const t of view.roots) walk(t.node);
   return parts.length === 0 ? "" : `${parts.join("\n\n")}\n`;
 }

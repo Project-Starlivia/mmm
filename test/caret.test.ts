@@ -15,9 +15,9 @@ const node = (id: number, label: string | null, children: core.Node[] = []): cor
   children,
 });
 
-const view = (...trees: core.Node[]): core.View => ({
+const view = (...roots: core.Node[]): core.View => ({
   frontmatter: null,
-  trees: trees.map((n) => ({ node: n, sides: n.children.map(() => "Right" as const) })),
+  roots: roots.map((n) => ({ node: n, sides: n.children.map(() => "Right" as const) })),
 });
 
 const spots = (rows: [number, number, number | null, number][]): Map<number, core.Spot> =>

@@ -8,7 +8,7 @@
 pub fn project(doc : @tree.Doc) -> View {
   {
     frontmatter: doc.frontmatter,
-    trees: doc.roots.map(r => { node: cast(r.node), sides: r.sides }),
+    roots: doc.roots.map(r => { node: cast(r.node), sides: r.sides }),
   }
 }
 

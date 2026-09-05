@@ -25,7 +25,7 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 「この木はこう書かれる」、merge_wbtest.mbt が
                 「木がこう違えば md はここだけ変わる」を固定する
   view/         map が見る木。project が Doc から削るだけで作る
-                （`View { frontmatter, trees }`。frontmatter は画像フォルダの宣言のため）
+                （`View { frontmatter, roots }`。frontmatter は画像フォルダの宣言のため）
   op/           操作。apply(doc, op) が Doc を Doc にする。席は隣の id で言う
                 （NodePlace / BlockPlace）。道具（splice / append / body）が
                 型の異種性を幽閉する。決めは core.md「操作」

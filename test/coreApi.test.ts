@@ -7,15 +7,15 @@ import assert from "node:assert/strict";
 import { type View, decode, decodeSurvey, edit, edited, encode, isNode, survey } from "../src/coreApi.ts";
 
 test("None の鍵は無い → null。Implicit は label が null", () => {
-  const v = decode({ trees: [{ node: { id: 2, blocks: [], children: [] }, sides: [] }] });
+  const v = decode({ roots: [{ node: { id: 2, blocks: [], children: [] }, sides: [] }] });
   assert.equal(v.frontmatter, null);
-  assert.equal(v.trees[0].node.label, null);
-  assert.equal(v.trees[0].node.fold, null);
+  assert.equal(v.roots[0].node.label, null);
+  assert.equal(v.roots[0].node.fold, null);
 });
 
 test("Block は enum の形から kind に整う", () => {
   const v = decode({
-    trees: [
+    roots: [
       {
         node: {
           id: 2,
@@ -38,15 +38,15 @@ test("Block は enum の形から kind に整う", () => {
     ],
   });
   assert.deepEqual(
-    v.trees[0].node.blocks.map((b) => b.content.kind),
+    v.roots[0].node.blocks.map((b) => b.content.kind),
     ["image", "link", "code", "svg", "thematicBreak", "details"],
   );
   // id はノードと同じ列。Opaque が落ちたぶん（4）は飛んだまま
   assert.deepEqual(
-    v.trees[0].node.blocks.map((b) => b.id),
+    v.roots[0].node.blocks.map((b) => b.id),
     [3, 5, 6, 7, 8, 9],
   );
-  const last = v.trees[0].node.blocks[5].content;
+  const last = v.roots[0].node.blocks[5].content;
   assert.deepEqual(last, {
     kind: "details",
     text: "<details>x</details>",
@@ -59,7 +59,7 @@ test("Block は enum の形から kind に整う", () => {
 test("frontmatter・fold・sides・空のラベルは値のまま通る", () => {
   const v = decode({
     frontmatter: "k: v\n",
-    trees: [
+    roots: [
       {
         node: {
           id: 2,
@@ -73,30 +73,30 @@ test("frontmatter・fold・sides・空のラベルは値のまま通る", () => 
     ],
   });
   assert.equal(v.frontmatter, "k: v\n");
-  assert.deepEqual(v.trees[0].node.fold, { open: true, summary: "r" });
-  assert.deepEqual(v.trees[0].sides, ["Left"]);
-  assert.equal(v.trees[0].node.children[0].label, "");
+  assert.deepEqual(v.roots[0].node.fold, { open: true, summary: "r" });
+  assert.deepEqual(v.roots[0].sides, ["Left"]);
+  assert.equal(v.roots[0].node.children[0].label, "");
 });
 
 test("知らない形は黙って通さない", () => {
   assert.throws(
     () =>
       decode({
-        trees: [
+        roots: [
           { node: { id: 1, blocks: [{ id: 2, content: ["Opaque", "x"] }], children: [] }, sides: [] },
         ],
       }),
     /知らない Content/,
   );
   assert.throws(
-    () => decode({ trees: [{ node: { id: 1, blocks: [], children: [] }, sides: ["Up"] }] }),
+    () => decode({ roots: [{ node: { id: 1, blocks: [], children: [] }, sides: ["Up"] }] }),
     /側でない/,
   );
 });
 
 test("survey の JSON — spots の鍵は数になり、label の無い鍵は null、trails の null はそのまま", () => {
   const s = decodeSurvey({
-    view: { trees: [] },
+    view: { roots: [] },
     spots: { "1": { from: 0, to: 0 }, "2": { from: 0, label: 2, to: 4 } },
     trails: [null, { mark: { from: 0, label: 2 } }, { mark: { from: 0, label: 2 }, id: 2 }],
   });
@@ -111,7 +111,7 @@ test("survey の JSON — spots の鍵は数になり、label の無い鍵は nu
 
 test("survey は core を往復する — 上にノードを足しても目印は同じノードを指す", () => {
   const first = survey("# r\n\n## a\n", [], []);
-  assert.equal(first.view.trees.length, 1);
+  assert.equal(first.view.roots.length, 1);
   assert.deepEqual(first.spots.get(3), { from: 5, label: 8, to: 10 });
   const s = first.spots.get(3);
   if (!s || s.label === null) throw new Error("a の地番が無い");
@@ -170,7 +170,7 @@ test("edit — 同じ名前への Rename は edits が空でも focus は在る�
 test("isNode — 根も子孫もノード、中身の id と知らない id は違う", () => {
   const v: View = {
     frontmatter: null,
-    trees: [
+    roots: [
       {
         node: {
           id: 2,

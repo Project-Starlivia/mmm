@@ -65,7 +65,7 @@ pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
   let b : Build = {
     md,
     defs: ast.definitions.map(d => d.span),
-    forest: [],
+    roots: [],
     stack: [],
     body: [],
     body_at: [],
@@ -86,10 +86,10 @@ pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
   // 行き先の見出し・項目が来ないまま終わった水平線は、その場の中身に落ちる
   spill(b)
   let next = { val: doc_id + 1 }
-  let forest = b.forest
+  let roots = b.roots
   // 文書の中身は最初の見出し・項目より前にあるので、先に振る
   number_blocks(b.body, next)
-  for f in forest {
+  for f in roots {
     number_frame(f, next)
   }
   let spans : Map[Int, Spot] = Map([])
@@ -110,7 +110,7 @@ pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
   for i, at in b.body_at {
     spans[b.body[i].id] = at
   }
-  for f in forest {
+  for f in roots {
     chart(f, spans)
   }
   let doc : Doc = {
@@ -121,7 +121,7 @@ pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
       Lf
     },
     body: b.body,
-    roots: forest.map(to_root),
+    roots: roots.map(to_root),
   }
   (doc, spans)
 }
@@ -194,7 +194,7 @@ priv struct Build {
   md : String
   /// 文書ぜんぶのリンクの定義行。項目の中を読み解くときに切り出して渡す
   defs : Array[@markdown.Span]
-  forest : Array[Frame]
+  roots : Array[Frame]
   stack : Array[Frame]
   /// 最初の骨格より前の散文
   body : Array[Block]
@@ -252,7 +252,7 @@ fn depths(
   let b : Build = {
     md,
     defs: [],
-    forest: [],
+    roots: [],
     stack: [],
     body: [],
     body_at: [],
@@ -537,7 +537,7 @@ fn sink(b : Build) -> Unit {
 /// **側を持つのは深さ 2 の枠だけ**（根の子）。
 fn seat(b : Build, f : Frame) -> Unit {
   if b.stack.is_empty() {
-    b.forest.push(f)
+    b.roots.push(f)
     return
   }
   if b.stack.length() == 1 {

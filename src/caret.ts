@@ -34,6 +34,6 @@ export function caretIds(view: View, spots: Map<number, Spot>, ranges: Range[]):
     }
     for (const k of n.children) walk(k);
   };
-  for (const t of view.trees) walk(t.node);
+  for (const t of view.roots) walk(t.node);
   return out;
 }

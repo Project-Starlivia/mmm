@@ -25,10 +25,10 @@ const node = (
   children,
 });
 
-const tree = (n: core.Node, sides: core.Side[] = []): core.Tree => ({ node: n, sides });
+const root = (n: core.Node, sides: core.Side[] = []): core.Root => ({ node: n, sides });
 
 /** r(2) → a(3), 空(4)。空は label "" */
-const L: Layout = layoutMap([tree(node(2, "r", [node(3, "a"), node(4, "")]), ["Right", "Right"])], size);
+const L: Layout = layoutMap([root(node(2, "r", [node(3, "a"), node(4, "")]), ["Right", "Right"])], size);
 const empty: Layout = layoutMap([], size);
 
 const k = (key: string, mods: Partial<Key> = {}): Key => ({ key, shift: false, mod: false, alt: false, ...mods });
@@ -185,7 +185,7 @@ test("Alt+↑↓ は塊を前の兄弟の前 / 次の兄弟の後ろへ。端で
 
 test("複数選択の Tab は先頭の前の兄弟の子へ、Shift+Tab は先頭の親の後ろへ", () => {
   const M: Layout = layoutMap(
-    [tree(node(2, "r", [node(3, "a"), node(4, "b", [node(5, "c"), node(6, "d")])]), ["Right", "Right"])],
+    [root(node(2, "r", [node(3, "a"), node(4, "b", [node(5, "c"), node(6, "d")])]), ["Right", "Right"])],
     size,
   );
   assert.deepEqual(keyed(M, { ids: [5, 6], anchor: 6 }, k("Tab", { shift: true })), {
@@ -206,7 +206,7 @@ test("複数選択の Tab は先頭の前の兄弟の子へ、Shift+Tab は先�
 test("Shift+H は畳む / 畳みを外す。Implicit と無選択は拾わない", () => {
   const F: Layout = layoutMap(
     [
-      tree(
+      root(
         node(2, "r", [
           { id: 3, label: "a", fold: { open: false, summary: "a" }, blocks: [], children: [] },
           node(4, null, [node(5, "x")]),
@@ -243,7 +243,7 @@ test("Mod+V は貼り付け。anchor が無くても拾う", () => {
 // r(2) に blocks [{ id: 3, thematicBreak }, { id: 4, code }]。持ち主は 2、隣は 3 と 4。
 const C: Layout = layoutMap(
   [
-    tree(
+    root(
       node(2, "r", [], [
         { id: 3, content: { kind: "thematicBreak" } },
         { id: 4, content: { kind: "code", info: "", text: "x" } },

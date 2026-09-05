@@ -17,7 +17,7 @@ const node = (
   fold: core.Fold | null = null,
 ): core.Node => ({ id, label, fold, blocks: [], children });
 
-const tree = (n: core.Node, sides: core.Side[] = []): core.Tree => ({ node: n, sides });
+const root = (n: core.Node, sides: core.Side[] = []): core.Root => ({ node: n, sides });
 
 const box = (L: Layout, id: number) => {
   const b = L.boxes.get(id);
@@ -26,7 +26,7 @@ const box = (L: Layout, id: number) => {
 };
 
 test("根は x = 0 で親を持たず、子は右へ GAP.x 離れて親に繋がる", () => {
-  const L = layoutMap([tree(node(1, "r", [node(2, "a")]))], size);
+  const L = layoutMap([root(node(1, "r", [node(2, "a")]))], size);
   assert.equal(box(L, 1).x, 0);
   assert.equal(box(L, 1).parent, null);
   assert.equal(box(L, 2).x, 100 + GAP.x);
@@ -34,7 +34,7 @@ test("根は x = 0 で親を持たず、子は右へ GAP.x 離れて親に繋が
 });
 
 test("親は第 1 子と最終子の中心の中点に立つ", () => {
-  const L = layoutMap([tree(node(1, "r", [node(2, "a"), node(3, "b"), node(4, "c")]))], size);
+  const L = layoutMap([root(node(1, "r", [node(2, "a"), node(3, "b"), node(4, "c")]))], size);
   // 子の中心は 15, 55, 95（高さ 30 + 隙間 10）。中点 55 → 上端 40
   assert.equal(box(L, 1).y, 40);
   assert.equal(box(L, 2).y, 0);
@@ -43,7 +43,7 @@ test("親は第 1 子と最終子の中心の中点に立つ", () => {
 
 test("側は根の子が sides から受け、孫は親から継ぐ", () => {
   const L = layoutMap(
-    [tree(node(1, "r", [node(2, "a"), node(3, "b", [node(4, "c")])]), ["Right", "Left"])],
+    [root(node(1, "r", [node(2, "a"), node(3, "b", [node(4, "c")])]), ["Right", "Left"])],
     size,
   );
   assert.equal(box(L, 3).x, -GAP.x - 100);
@@ -53,14 +53,14 @@ test("側は根の子が sides から受け、孫は親から継ぐ", () => {
 });
 
 test("sides が足りなければ右", () => {
-  const L = layoutMap([tree(node(1, "r", [node(2, "a"), node(3, "b")]), ["Left"])], size);
+  const L = layoutMap([root(node(1, "r", [node(2, "a"), node(3, "b")]), ["Left"])], size);
   assert.equal(box(L, 2).parent?.side, "Left");
   assert.equal(box(L, 3).parent?.side, "Right");
 });
 
 test("畳んだノードの下は置かず、埋もれた子孫の数だけ残る", () => {
   const folded = node(2, "a", [node(3, "b", [node(4, "c")])], { open: false, summary: null });
-  const L = layoutMap([tree(node(1, "r", [folded]))], size);
+  const L = layoutMap([root(node(1, "r", [folded]))], size);
   assert.deepEqual(L.order, [1, 2]);
   assert.equal(L.boxes.has(3), false);
   assert.equal(box(L, 2).buried, 2);
@@ -68,12 +68,12 @@ test("畳んだノードの下は置かず、埋もれた子孫の数だけ残�
 });
 
 test("順は文書順（親が先、子はその後）", () => {
-  const L = layoutMap([tree(node(1, "r", [node(2, "a", [node(3, "x")]), node(4, "b")]))], size);
+  const L = layoutMap([root(node(1, "r", [node(2, "a", [node(3, "x")]), node(4, "b")]))], size);
   assert.deepEqual(L.order, [1, 2, 3, 4]);
 });
 
 test("木は縦に積まれ、隙間は GAP.root", () => {
-  const L = layoutMap([tree(node(1, "a")), tree(node(2, "b"))], size);
+  const L = layoutMap([root(node(1, "a")), root(node(2, "b"))], size);
   assert.equal(box(L, 1).y, 0);
   assert.equal(box(L, 2).y, 30 + GAP.root);
   assert.equal(rootBox(L)?.node.id, 1);
@@ -85,12 +85,12 @@ test("Implicit は label が null のまま sizeOf に渡る", () => {
     seen.push(n.label);
     return { w: 100, h: 30 };
   };
-  layoutMap([tree(node(1, "r", [node(2, null, [node(3, "x")])]))], spy);
+  layoutMap([root(node(1, "r", [node(2, null, [node(3, "x")])]))], spy);
   assert.ok(seen.includes(null));
 });
 
 test("線は親の育つ辺から出て、子の親を向いた辺へ入る", () => {
-  const L = layoutMap([tree(node(1, "r", [node(2, "a"), node(3, "b")]), ["Right", "Left"])], size);
+  const L = layoutMap([root(node(1, "r", [node(2, "a"), node(3, "b")]), ["Right", "Left"])], size);
   const right = edgeEnds(L, 2);
   const left = edgeEnds(L, 3);
   assert.ok(right && left);
