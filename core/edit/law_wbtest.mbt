@@ -3,6 +3,7 @@
 //   法則 — edit の編集を md に当てて読み直せば、apply の後の木と形が一致する
 //   focus — 読み替えた focus は、後の木で focus だったのと同じ部分木を指す
 //   できない操作 — 編集も focus も無い
+//   目印の生存 — 中身だけを変える操作の後、持ち主のラベルの目印は同じノードに着く
 //
 // 見本 × 全 id × Op の作り方で回す。Op の作り方は op の check の法則と同じ。
 
@@ -196,5 +197,157 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
   }
   // 全部 None に潰れる退化を落とすための下限チェック
   inspect(some, content="552")
+  json_inspect(bad, content=[])
+}
+
+///|
+/// その中身の持ち主。ノードの id なら None
+fn owner_of(doc : @tree.Doc, block : Int) -> Int? {
+  let found : Ref[Int?] = { val: None }
+  fn blocks(owner : Int, bs : Array[@tree.Block]) {
+    for b in bs {
+      if b.id == block {
+        found.val = Some(owner)
+      }
+    }
+  }
+
+  fn list(l : @tree.ListNode) {
+    blocks(l.id, l.body)
+    for k in l.children {
+      list(k)
+    }
+  }
+
+  fn node(x : @tree.Node) {
+    match x {
+      HeadingNode(h) => {
+        blocks(h.id, h.body)
+        for k in h.children {
+          node(k)
+        }
+      }
+      ListNode(l) => list(l)
+      ImplicitNode(g) =>
+        for k in g.children {
+          node(k)
+        }
+    }
+  }
+
+  blocks(@tree.doc_id, doc.body)
+  for r in doc.roots {
+    node(r.node)
+  }
+  found.val
+}
+
+///|
+/// 畳まれた部分木の中に居るか（自分も含む）
+fn under_fold(doc : @tree.Doc, id : Int) -> Bool {
+  fn go(x : @tree.Node, fold : Bool) -> Bool {
+    let (here, mine, kids) = match x {
+      HeadingNode(h) => (fold || h.fold is Some(_), h.id, h.children)
+      ListNode(l) =>
+        (
+          fold || l.fold is Some(_),
+          l.id,
+          l.children.map(c => @tree.ListNode(c)),
+        )
+      ImplicitNode(g) => (fold, g.id, g.children)
+    }
+    if mine == id {
+      return here
+    }
+    for k in kids {
+      if go(k, here) {
+        return true
+      }
+    }
+    false
+  }
+
+  for r in doc.roots {
+    if go(r.node, false) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// 中身だけを変える操作で、目印を置いておきたい持ち主のノード。
+fn owners_of(doc : @tree.Doc, op : @op.Op) -> Array[Int] {
+  let out : Array[Int] = []
+  let push = (o : Int?) => {
+    match o {
+      Some(id) => if id != @tree.doc_id { out.push(id) }
+      None => ()
+    }
+  }
+  match op {
+    AddBlock(at=In(node~), ..) => push(Some(node))
+    AddBlock(at=Before(block~), ..) | AddBlock(at=After(block~), ..) =>
+      push(owner_of(doc, block))
+    SetBlock(id~, ..) => push(owner_of(doc, id))
+    MoveBlock(ids~, at~) => {
+      for id in ids {
+        push(owner_of(doc, id))
+      }
+      match at {
+        In(node~) => push(Some(node))
+        Before(block~) | After(block~) => push(owner_of(doc, block))
+      }
+    }
+    Delete(ids~) =>
+      for id in ids {
+        push(owner_of(doc, id))
+      }
+    _ => ()
+  }
+  out
+}
+
+///|
+test "法則 — 目印の生存。中身だけを変えれば、持ち主のラベルの目印は同じノードに着く" {
+  let bad : Array[String] = []
+  let mut seen = 0
+  for i, md in corpus {
+    let (before, spots) = @tree.survey(md)
+    for op in ops_for(ids(before)) {
+      let owners = owners_of(before, op)
+      if owners.is_empty() {
+        continue
+      }
+      guard @op.apply(before, op) is Some(done) else { continue }
+      let what = "\{i} \{op.to_json().stringify()}"
+      let r = edit(md, op)
+      let marks : Array[@tree.Mark] = []
+      let expect : Array[Int?] = []
+      for o in owners {
+        // 畳みの中は丸ごと書かれる。持ち主ごと消えるなら着く先は無い
+        guard spots.get(o) is Some(s) && s.label is Some(label) else {
+          continue
+        }
+        if under_fold(before, o) {
+          continue
+        }
+        marks.push({ from: s.from, label })
+        expect.push(@tree.number(done.doc, o))
+      }
+      seen = seen + marks.length()
+      // 目印は編集列で写し、編集を当てた md の地番で誰かを決める（mmmSurvey と同じ）
+      let (_, later) = @tree.survey(@tree.apply(md, r.edits))
+      for k, t in @tree.follow(later, r.edits, marks) {
+        let got = t.bind(x => x.id)
+        if got != expect[k] {
+          bad.push(
+            "\{what}: 目印 \{k} が \{expect[k]} でなく \{got} に着く",
+          )
+        }
+      }
+    }
+  }
+  inspect(seen > 100, content="true")
   json_inspect(bad, content=[])
 }

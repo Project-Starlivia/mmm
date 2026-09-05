@@ -3,8 +3,10 @@
 // 受け取るのは原文・前の Doc とその地番・後の Doc の 4 つで、返すのは編集列だけ。
 // 後の Doc が誰にどう作られたか（操作・undo のスナップショット）は知らない。
 //
-// 前後の木を id で突き合わせ、変わったノード（dirty）の地番を断片で置き換える。
-// 子の増減は容器を書かず、消えた子の範囲を消し、増えた子を隣に差す。
+// 前後の木を id で突き合わせ、ノード 1 つを行（ラベル）・中身・子の 3 つの列に
+// 分けて、それぞれ変わった所だけを書く。列の差分は子も中身も同じ 1 つ（`diff`）で、
+// 消えた並びは隙間ごと消し、増えた並びは容器が兄弟の間に使っている隙間を挟んで差す。
+// 行が同じなら行には触らない — そこに選択の目印が在る（follow.mbt）。
 // 出来た文章を読み直して後の木と形が一致しなければ全文を正規形に落とす —
 // **正しさはこの検証が持つ**ので、比較がどれだけ雑でも壊れない。
 // 決めは docs/core.md「反映」。
@@ -70,9 +72,8 @@ fn plan(
   for root in before.roots {
     index(r.old, root.node)
   }
-  if before.body != after.body {
-    r.out.push(edit(r, doc_id, prose(after.body, r.eol)))
-  }
+  // 文書の散文。容器の自分の尻は散文の頭（frontmatter の尻）
+  body(r, before.body, after.body, spans.get(doc_id).unwrap().from, 0)
   // 側は根のもの。変われば根が丸ごと（子の増減で長さが変わるだけ — 全部 Right — は同じ）
   let olds = Map::from_array(before.roots.map(x => (id_of(x.node), x.sides)))
   let sides = Map::from_array(after.roots.map(x => (id_of(x.node), x.sides)))
@@ -85,7 +86,7 @@ fn plan(
   }
   let olds_n = before.roots.map(x => x.node)
   let news_n = after.roots.map(x => x.node)
-  guard aligned(olds_n, news_n) else { return None }
+  guard aligned(ids(olds_n), ids(news_n)) else { return None }
   kids(r, spans.get(doc_id).unwrap().to, 0, olds_n, news_n, 1, sides)
   r.out.sort_by((a, b) => {
     if a.from != b.from {
@@ -104,112 +105,314 @@ fn plain(sides : Array[Side]) -> Bool {
 
 ///|
 /// 前の木の同じ id と比べる。種類・畳み・子の並びが変わっていれば部分木ごと書く。
-/// そうでなければ、自分（行と中身）が違うときだけ自分の範囲を書き、子は子列の差分に任せる。
+/// そうでなければ、行（ラベル）・中身・子の 3 つの列をそれぞれ差分にする —
+/// 行が同じなら行には触らない（そこに選択の目印が在る）。
 fn walk(r : Reflect, x : Node, depth : Int, sides : Array[Side]) -> Unit {
   match r.old.get(id_of(x)) {
     // 畳みは `<details>` が部分木を包むので、自分か子列が変わればそこから丸ごと
     Some(old) if kind(old) == kind(x) &&
-      aligned(children_of(old), children_of(x)) &&
+      aligned(ids(children_of(old)), ids(children_of(x))) &&
       (
         !(folded(old) || folded(x)) ||
         (same(old, x) && ids(children_of(old)) == ids(children_of(x)))
       ) => {
       let s = r.spans.get(id_of(x)).unwrap()
-      let mine = children_of(x)
-      if !same(old, x) {
-        // 自分の行と中身だけ。最初の子の行頭まで（項目の子の字下げは残す）
-        let head = match mine.get(0) {
-          Some(k) if r.old.contains(id_of(k)) => {
-            let ks = r.spans.get(id_of(k)).unwrap()
-            ks.from - column(r.md, ks.from)
-          }
-          _ => s.to
-        }
-        let alone = with_children(x, [])
+      let item = x is ListNode(_)
+      // Implicit は行を持たない（範囲は子の和）
+      if !(x is ImplicitNode(_)) && !same_line(old, x) {
         r.out.push({
           from: s.from,
-          to: head,
+          to: line_end(r.md, s.from),
           insert: indent(
-            fragment(alone, depth, [], r.eol),
+            fragment(with_children(with_body(x, []), []), depth, [], r.eol),
             column(r.md, s.from),
           ),
         })
       }
-      // 項目の子は容器の中身の桁（マーカーの 2 つ右）に居る
-      let col = match x {
-        ListNode(_) => column(r.md, s.from) + 2
-        _ => 0
+      // 項目の中身と子は容器の中身の桁（マーカーの 2 つ右）に居る
+      let col = if item { column(r.md, s.from) + 2 } else { 0 }
+      if !(x is ImplicitNode(_)) {
+        body(r, body_of(old), body_of(x), line_end(r.md, s.from), col)
       }
-      kids(r, s.to, col, children_of(old), mine, depth + 1, Map([]))
+      let own = own_end(r, old)
+      kids(r, own, col, children_of(old), children_of(x), depth + 1, Map([]))
     }
     _ => replace(r, x, depth, sides)
   }
 }
 
 ///|
-/// 残る子の順が前後で同じか。違えば並べ替えで、容器ごと書く。
-fn aligned(olds : Array[Node], news : Array[Node]) -> Bool {
-  let was = Map::from_array(olds.map(x => (id_of(x), x)))
-  let now = Map::from_array(news.map(x => (id_of(x), x)))
-  ids(olds.filter(x => now.contains(id_of(x)))) ==
-  ids(news.filter(x => was.contains(id_of(x))))
+/// 残る物の順が前後で同じか。違えば並べ替えで、容器（列）ごと書く。
+fn aligned(olds : Array[Int], news : Array[Int]) -> Bool {
+  let now = Map::from_array(news.map(id => (id, ())))
+  let was = Map::from_array(olds.map(id => (id, ())))
+  olds.filter(id => now.contains(id)) == news.filter(id => was.contains(id))
 }
 
 ///|
-/// 子列の差分。残った子は組にして降り、消えた子は範囲ごと消し、増えた子は
-/// 次に残る子の手前か、最後に残る子の後ろか、容器の尻（`end`・桁 `col`）に差す。
-/// 残った子の順は同じ（`aligned`）が前提。
+/// 列の差分の相手。容器の自分の尻（列が空なら消す起点であり差す位置）、
+/// 列の桁、兄弟の間の隙間。
+priv struct Slot {
+  own : Int
+  col : Int
+  sep : String
+}
+
+///|
+/// 列の差分。子の列と中身の列で共用する。
+/// 残った物は `keep` に任せ、消えた並びは隙間ごと消し、増えた並びは隙間を挟んで差す。
+///
+/// 消える並び（連続して消える物は 1 つの並び）は、次に残る物が居ればその頭まで、
+/// 居なければ前に残る物の尻から、前も居なければ容器の自分の尻から消す —
+/// 隙間は必ずどちらかに道連れになり、残った物の間の隙間だけが残る。
+/// 増える並びは、次に残る物の手前なら `断片 ⋯ + sep`、そうでなければ `sep + 断片 ⋯`。
+fn diff(
+  r : Reflect,
+  slot : Slot,
+  olds : Array[Int],
+  news : Array[Int],
+  keep : (Int) -> Unit,
+  make : (Int) -> String,
+) -> Unit {
+  let now = Map::from_array(news.map(id => (id, ())))
+  let was = Map::from_array(olds.map(id => (id, ())))
+  let at = (id : Int) => r.spans.get(id).unwrap()
+  let mut i = 0
+  let mut prev : Int? = None
+  // 文書の頭（own が 0）では前に何も無いので、隙間は後ろに付く。
+  // 消えた並びの尻（隙間込み）を控え、差すときに何かが続くかを見る
+  let mut edge = slot.own
+  while i < olds.length() {
+    if now.contains(olds[i]) {
+      prev = Some(at(olds[i]).to)
+      i = i + 1
+      continue
+    }
+    let start = i
+    while i < olds.length() && !now.contains(olds[i]) {
+      i = i + 1
+    }
+    let last = at(olds[i - 1]).to
+    let (from, to) = if i < olds.length() {
+      (
+        line_start(r.md, at(olds[start]).from),
+        line_start(r.md, at(olds[i]).from),
+      )
+    } else {
+      match prev {
+        Some(p) => (p, last)
+        // 文書の頭から消すなら、後ろの隙間も道連れ（頭に空行を残さない）
+        None =>
+          (
+            slot.own,
+            if slot.own == 0 {
+              skip_newlines(r.md, last)
+            } else {
+              last
+            },
+          )
+      }
+    }
+    if prev is None && i >= olds.length() {
+      edge = to
+    }
+    r.out.push({ from, to, insert: "" })
+  }
+  let pend : Array[String] = []
+  let mut kept : Int? = None
+  for id in news {
+    if was.contains(id) {
+      if !pend.is_empty() {
+        // 残る物のマーカーの手前。差した後ろにその物の字下げを戻す
+        let s = at(id)
+        let c = column(r.md, s.from)
+        r.out.push(
+          insert(r, s.from, indent(join(pend, slot.sep), c) + slot.sep + pad(c)),
+        )
+        pend.clear()
+      }
+      keep(id)
+      kept = Some(id)
+    } else {
+      pend.push(make(id))
+    }
+  }
+  if !pend.is_empty() {
+    // 最後に残った物の後ろ。残らなければ容器の自分の尻
+    let pos = match kept {
+      Some(id) => at(id).to
+      None => slot.own
+    }
+    let text = indent(join(pend, slot.sep), slot.col)
+    if kept is None && slot.own == 0 {
+      // 文書の頭。何かが続くときだけ、その手前に隙間を置く
+      let follows = skip_newlines(r.md, edge) < r.md.length()
+      r.out.push(insert(r, pos, text + (if follows { slot.sep } else { "" })))
+    } else {
+      r.out.push(insert(r, pos, slot.sep + pad(slot.col) + text))
+    }
+  }
+}
+
+///|
+fn join(parts : Array[String], sep : String) -> String {
+  parts.join(sep)
+}
+
+///|
+/// 子列の差分。残った子には降りる。
 fn kids(
   r : Reflect,
-  end : Int,
+  own : Int,
   col : Int,
   olds : Array[Node],
   news : Array[Node],
   depth : Int,
   sides : Map[Int, Array[Side]],
 ) -> Unit {
-  let was = Map::from_array(olds.map(x => (id_of(x), x)))
   let now = Map::from_array(news.map(x => (id_of(x), x)))
-  let stay = news.filter(x => was.contains(id_of(x)))
-  for x in olds {
-    if !now.contains(id_of(x)) {
-      let s = r.spans.get(id_of(x)).unwrap()
-      // 容器の字下げも道連れ。残すと次の行に 2 重に掛かる
-      r.out.push({ from: s.from - column(r.md, s.from), to: s.to, insert: "" })
-    }
+  let item = match news.get(0) {
+    Some(ListNode(_)) => true
+    _ => false
   }
-  // 増えた子は、次に残る子までまとめて 1 つの差し込みにする
-  let pend = StringBuilder::new()
-  for x in news {
-    let id = id_of(x)
-    if was.contains(id) {
-      let s = r.spans.get(id).unwrap()
-      if !pend.is_empty() {
-        // 残る子のマーカーの手前。差した後ろにその子の字下げを戻す
-        let c = column(r.md, s.from)
-        r.out.push(insert(r, s.from, indent(pend.to_string(), c) + pad(c)))
-        pend.reset()
-      }
-      walk(r, x, depth, sides.get(id).unwrap_or([]))
+  let slot : Slot = { own, col, sep: sep(r, item, ids(olds)) }
+  diff(
+    r,
+    slot,
+    ids(olds),
+    ids(news),
+    id => walk(r, now.get(id).unwrap(), depth, sides.get(id).unwrap_or([])),
+    id => {
+      fragment(now.get(id).unwrap(), depth, sides.get(id).unwrap_or([]), r.eol)
+    },
+  )
+}
+
+///|
+/// 中身の列の差分。内容だけ変わった中身はその範囲を置き換える。
+/// 並びが変われば列ごと（容器の自分の尻から最後の中身の尻まで）。
+/// 中身の間は常に空行 1 つ — 項目の中でも、段落がラベルの続きに読まれないように
+/// （書き手が項目の中身をそう書くのと同じ）。
+fn body(
+  r : Reflect,
+  olds : Array[Block],
+  news : Array[Block],
+  own : Int,
+  col : Int,
+) -> Unit {
+  if olds == news {
+    return
+  }
+  let was = Map::from_array(olds.map(b => (b.id, b)))
+  let now = Map::from_array(news.map(b => (b.id, b)))
+  let old_ids = olds.map(b => b.id)
+  let new_ids = news.map(b => b.id)
+  let slot : Slot = { own, col, sep: eol(r) }
+  if !aligned(old_ids, new_ids) {
+    let to = match olds.last() {
+      Some(b) => r.spans.get(b.id).unwrap().to
+      None => own
+    }
+    let text = if news.is_empty() {
+      ""
     } else {
-      pend.write_string(fragment(x, depth, sides.get(id).unwrap_or([]), r.eol))
+      slot.sep + pad(col) + indent(prose(news, r.eol), col)
     }
+    r.out.push({ from: own, to, insert: text })
+    return
   }
-  if !pend.is_empty() {
-    // 最後に残った子の後ろ。残らなければ消えた子の桁で容器の尻へ
-    let (pos, c) = match stay.last() {
-      Some(x) => {
-        let s = r.spans.get(id_of(x)).unwrap()
-        (s.to, column(r.md, s.from))
+  diff(
+    r,
+    slot,
+    old_ids,
+    new_ids,
+    id => {
+      let b = now.get(id).unwrap()
+      if was.get(id).unwrap().content != b.content {
+        let s = r.spans.get(id).unwrap()
+        r.out.push({
+          from: s.from,
+          to: s.to,
+          insert: indent(prose([b], r.eol), column(r.md, s.from)),
+        })
       }
-      None =>
-        match olds.get(0) {
-          Some(o) => (end, column(r.md, r.spans.get(id_of(o)).unwrap().from))
-          None => (end, col)
-        }
+    },
+    id => prose([now.get(id).unwrap()], r.eol),
+  )
+}
+
+///|
+/// 兄弟の間の隙間。容器に元から 2 つ以上居ればその間を写し、居なければ
+/// 項目の列は詰め、見出しと文書の直下は空行 1 つ。
+fn sep(r : Reflect, item : Bool, olds : Array[Int]) -> String {
+  let eol = eol(r)
+  if olds.length() >= 2 {
+    let a = r.spans.get(olds[0]).unwrap()
+    let b = r.spans.get(olds[1]).unwrap()
+    return if slice(r.md, a.to, line_start(r.md, b.from)).contains("\n") {
+      eol
+    } else {
+      ""
     }
-    r.out.push(insert(r, pos, pad(c) + indent(pend.to_string(), c)))
   }
+  if item {
+    ""
+  } else {
+    eol
+  }
+}
+
+///|
+fn eol(r : Reflect) -> String {
+  match r.eol {
+    Lf => "\n"
+    Crlf => "\r\n"
+  }
+}
+
+///|
+/// 容器の自分の尻 — 最後の中身の尻、中身が無ければ行の尻。Implicit は行を持たない
+/// ので最初の子の頭（範囲の頭）。
+fn own_end(r : Reflect, x : Node) -> Int {
+  let s = r.spans.get(id_of(x)).unwrap()
+  match x {
+    ImplicitNode(_) => s.from
+    _ =>
+      match body_of(x).last() {
+        Some(b) => r.spans.get(b.id).unwrap().to
+        None => line_end(r.md, s.from)
+      }
+  }
+}
+
+///|
+/// その位置の行の頭。
+fn line_start(md : String, at : Int) -> Int {
+  at - column(md, at)
+}
+
+///|
+/// その位置の行の尻（改行の次）。末尾に改行が無ければ文書の尻。
+fn line_end(md : String, at : Int) -> Int {
+  let mut i = at
+  while i < md.length() && md[i] != '\n' {
+    i = i + 1
+  }
+  if i < md.length() {
+    i + 1
+  } else {
+    i
+  }
+}
+
+///|
+/// 改行だけを読み飛ばした位置。
+fn skip_newlines(md : String, at : Int) -> Int {
+  let mut i = at
+  while i < md.length() && (md[i] == '\n' || md[i] == '\r') {
+    i = i + 1
+  }
+  i
 }
 
 ///|
@@ -261,6 +464,35 @@ fn indent(text : String, n : Int) -> String {
     head = c == '\n'
   }
   out.to_string()
+}
+
+///|
+/// 行が同じか — ラベルと畳み。中身と子は見ない。
+fn same_line(a : Node, b : Node) -> Bool {
+  match (a, b) {
+    (HeadingNode(p), HeadingNode(q)) => p.label == q.label && p.fold == q.fold
+    (ListNode(p), ListNode(q)) => p.label == q.label && p.fold == q.fold
+    (ImplicitNode(_), ImplicitNode(_)) => true
+    _ => false
+  }
+}
+
+///|
+fn body_of(x : Node) -> Array[Block] {
+  match x {
+    HeadingNode(h) => h.body
+    ListNode(l) => l.body
+    ImplicitNode(_) => []
+  }
+}
+
+///|
+fn with_body(x : Node, body : Array[Block]) -> Node {
+  match x {
+    HeadingNode(h) => HeadingNode({ ..h, body, })
+    ListNode(l) => ListNode({ ..l, body, })
+    ImplicitNode(_) => x
+  }
 }
 
 ///|

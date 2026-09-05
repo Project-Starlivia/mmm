@@ -2,6 +2,8 @@
 //
 //   法則 — 編集を当てて読み直せば、後の木と形が一致する（id は見ない）
 //   比例性 — ラベルを変えただけなら、編集はそのノードの地番の中に 1 つ
+//   行の不可侵 — 行（ラベル・畳み・種類）が同じノードの行は、どの編集の範囲にも入らない
+//   隙間の保存 — 編集を当てた md に、元に無かった連続空行は無い
 //
 // 文書の見本 × 全ノード × 変え方（ラベル・削除・子を足す）で回す。
 // 形の一致は検証が全文へ落として保つので、ここが見ているのは
@@ -25,7 +27,13 @@ enum Change {
   Delete
   /// 子を 1 つ足す（項目の子は項目）
   Adopt
-}
+  /// 中身を 1 枚足す
+  AddBlock
+  /// 最後の中身を消す
+  DropBlock
+  /// 最初の中身を置き換える
+  SetBlock
+} derive(Show)
 
 ///|
 /// id のノードを how で変えた木。
@@ -43,8 +51,103 @@ fn changed(doc : Doc, id : Int, how : Change) -> Doc {
       Delete => None
       Adopt =>
         Some(with_children(x, children_of(x) + [newborn(x is ListNode(_))]))
+      AddBlock =>
+        Some(with_body(x, body_of(x) + [{ id: 999, content: ThematicBreak }]))
+      DropBlock =>
+        if body_of(x).is_empty() {
+          Some(x)
+        } else {
+          Some(with_body(x, body_of(x)[0:body_of(x).length() - 1].to_owned()))
+        }
+      SetBlock =>
+        Some(
+          with_body(
+            x,
+            body_of(x).mapi((i, b) => {
+              if i == 0 {
+                { id: b.id, content: Opaque("changed") }
+              } else {
+                b
+              }
+            }),
+          ),
+        )
     }
   })
+}
+
+///|
+/// 畳まれた部分木の中に居るか（自分も含む）。畳みは `<details>` が包むので丸ごと書かれる
+fn under_fold(doc : Doc, id : Int) -> Bool {
+  fn go(x : Node, fold : Bool) -> Bool {
+    let here = fold || folded(x)
+    if id_of(x) == id {
+      return here
+    }
+    for k in children_of(x) {
+      if go(k, here) {
+        return true
+      }
+    }
+    false
+  }
+
+  for r in doc.roots {
+    if go(r.node, false) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// 全文へ落ちた編集列か。
+fn whole(md : String, edits : Array[Edit]) -> Bool {
+  edits.length() == 1 && edits[0].from == 0 && edits[0].to == md.length()
+}
+
+///|
+/// 行の不可侵と隙間の保存。全部の変え方で回すので、ここで 1 度に見る。
+fn grain(
+  md : String,
+  before : Doc,
+  spans : Map[Int, Spot],
+  after : Doc,
+  edits : Array[Edit],
+  what : String,
+) -> Unit raise {
+  let out = apply(md, edits)
+  let flat = (s : String) => s.replace_all(old="\r\n", new="\n")
+  if !flat(md).contains("\n\n\n") && flat(out).contains("\n\n\n") {
+    fail("\{what}: 連続空行が生まれた\n--- md\n\{md}\n--- out\n\{out}")
+  }
+  if whole(md, edits) {
+    return
+  }
+  let news : Map[Int, Node] = Map([])
+  for r in after.roots {
+    index(news, r.node)
+  }
+  for id in all_ids(before) {
+    guard news.get(id) is Some(x) else { continue }
+    let old = spans.get(id).unwrap()
+    guard !(x is ImplicitNode(_)) && under_fold(before, id) == false else {
+      continue
+    }
+    let olds : Map[Int, Node] = Map([])
+    for r in before.roots {
+      index(olds, r.node)
+    }
+    guard same_line(olds.get(id).unwrap(), x) else { continue }
+    let line_to = line_end(md, old.from)
+    for e in edits {
+      if e.from < line_to && e.to > old.from {
+        fail(
+          "\{what}: 同じ行 \{id} [\{old.from},\{line_to}) に編集 \{e.to_json().stringify()} が掛かる\n--- md\n\{md}",
+        )
+      }
+    }
+  }
 }
 
 ///|
@@ -217,6 +320,25 @@ test "法則 — 根を足す・消す" {
     if !before.roots.is_empty() {
       let less : Doc = { ..before, roots: before.roots[1:].to_owned() }
       ignore(law(md, before, spans, less, "drop root of \{md}"))
+    }
+  }
+}
+
+///|
+test "法則 — 行の不可侵と隙間の保存。全ノード × 全部の変え方" {
+  for md in corpus {
+    let (before, spans) = survey(md)
+    for id in all_ids(before) {
+      for how in [Relabel, Delete, Adopt, AddBlock, DropBlock, SetBlock] {
+        let after = changed(before, id, how)
+        // 書けない木（根の中身の `---` が側の変わり目に化けるなど）は check が断る
+        if after == before || !check(after).is_empty() {
+          continue
+        }
+        let what = "\{how} \{id} in \{md}"
+        let edits = law(md, before, spans, after, what)
+        grain(md, before, spans, after, edits, what)
+      }
     }
   }
 }

@@ -117,7 +117,7 @@ test "中身を足せば、そのノードの地番" {
     }
   })
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 5, "to": 10, "insert": "## a\n\nx\n" },
+    { "from": 10, "to": 10, "insert": "\nx\n" },
   ])
 }
 
@@ -137,7 +137,7 @@ test "最初の子は親の尻に差す" {
   let (before, spans) = survey(md)
   let after = change(before, 0, [0], adopt(fresh("c")))
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 10, "to": 10, "insert": "### c\n" },
+    { "from": 10, "to": 10, "insert": "\n### c\n" },
   ])
 }
 
@@ -147,7 +147,7 @@ test "増えた子は最後に残る子の後ろ" {
   let (before, spans) = survey(md)
   let after = change(before, 0, [0], adopt(fresh("y")))
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 17, "to": 17, "insert": "### y\n" },
+    { "from": 17, "to": 17, "insert": "\n### y\n" },
   ])
 }
 
@@ -163,7 +163,7 @@ test "頭に差せば次に残る子の手前" {
     }
   })
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 5, "to": 5, "insert": "## c\n" },
+    { "from": 5, "to": 5, "insert": "## c\n\n" },
   ])
 }
 
@@ -178,7 +178,7 @@ test "消えた子は範囲ごと消える" {
     }
   })
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 11, "to": 16, "insert": "" },
+    { "from": 10, "to": 16, "insert": "" },
   ])
 }
 
@@ -210,8 +210,8 @@ test "子を総取り替えすれば、消して同じ桁に差す" {
   })
   let after = change(change(before, 0, [], orphan), 0, [], adopt(z))
   json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 4, "to": 4, "insert": "  - z\n" },
     { "from": 4, "to": 10, "insert": "" },
-    { "from": 10, "to": 10, "insert": "  - z\n" },
   ])
   inspect(
     apply(md, reflect(md, before, spans, after)),
@@ -312,7 +312,7 @@ test "改行の無い末尾に差すときは改行してから" {
   let (before, spans) = survey(md)
   let after = change(before, 0, [], adopt(fresh("b")))
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 3, "to": 3, "insert": "\n## b\n" },
+    { "from": 3, "to": 3, "insert": "\n\n## b\n" },
   ])
 }
 
@@ -338,8 +338,8 @@ test "枝の移動は元と先の 2 箇所" {
   }
   let after = change(change(before, 0, [0], orphan), 0, [1], adopt(x))
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 11, "to": 17, "insert": "" },
-    { "from": 23, "to": 23, "insert": "### x\n" },
+    { "from": 10, "to": 17, "insert": "" },
+    { "from": 23, "to": 23, "insert": "\n### x\n" },
   ])
 }
 
@@ -376,7 +376,8 @@ test "散文" {
   let (before, spans) = survey(md)
   let after : Doc = { ..before, body: blocks([Opaque("bye")]) }
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 0, "to": 6, "insert": "bye\n" },
+    { "from": 0, "to": 0, "insert": "bye\n\n" },
+    { "from": 0, "to": 7, "insert": "" },
   ])
 }
 
@@ -389,7 +390,7 @@ test "根も同じ — 増えれば隣に差す" {
     roots: before.roots + [{ node: fresh("b"), sides: [] }],
   }
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 4, "to": 4, "insert": "# b\n" },
+    { "from": 4, "to": 4, "insert": "\n# b\n" },
   ])
 }
 
@@ -399,7 +400,7 @@ test "根が消えれば範囲ごと消える" {
   let (before, spans) = survey(md)
   let after : Doc = { ..before, roots: [before.roots[0]] }
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 5, "to": 9, "insert": "" },
+    { "from": 4, "to": 9, "insert": "" },
   ])
 }
 
@@ -409,7 +410,7 @@ test "根が無い文書に最初の根を差す" {
   let (before, spans) = survey(md)
   let after : Doc = { ..before, roots: [{ node: fresh("b"), sides: [] }] }
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 6, "to": 6, "insert": "# b\n" },
+    { "from": 6, "to": 6, "insert": "\n# b\n" },
   ])
 }
 
@@ -431,7 +432,7 @@ test "ラベルだけなら自分の行だけ。子は触らない" {
   let (before, spans) = survey(md)
   let after = change(before, 0, [], relabel("R"))
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 0, "to": 5, "insert": "# R\n" },
+    { "from": 0, "to": 4, "insert": "# R\n" },
   ])
 }
 
@@ -465,7 +466,143 @@ test "自分も子も変われば、自分の行と子列の差分" {
     adopt(fresh("c")),
   )
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 0, "to": 5, "insert": "# R\n" },
-    { "from": 16, "to": 16, "insert": "## c\n" },
+    { "from": 0, "to": 4, "insert": "# R\n" },
+    { "from": 16, "to": 16, "insert": "\n## c\n" },
   ])
+}
+
+///|
+/// 中身の列も子の列と同じ差分。行（ラベル）には触らない — そこに目印が在る。
+fn rebody(body : Array[Block]) -> (Node) -> Node {
+  x => {
+    match x {
+      HeadingNode(h) => HeadingNode({ ..h, body, })
+      ListNode(l) => ListNode({ ..l, body, })
+      other => other
+    }
+  }
+}
+
+///|
+test "中身を 1 枚足せば、行は触らず行の尻へ隙間を挟んで差す" {
+  let md = "# r\n\n## a\n\n## b\n"
+  let (before, spans) = survey(md)
+  let after = change(before, 0, [0], rebody(blocks([Opaque("x")])))
+  let edits = reflect(md, before, spans, after)
+  json_inspect(edits, content=[{ "from": 10, "to": 10, "insert": "\nx\n" }])
+  inspect(apply(md, edits), content="# r\n\n## a\n\nx\n\n## b\n")
+}
+
+///|
+test "中身を 1 枚消せば、その範囲と隙間だけ" {
+  let md = "# r\n\n## a\n\nhello\n\n## b\n"
+  let (before, spans) = survey(md)
+  let after = change(before, 0, [0], rebody([]))
+  let edits = reflect(md, before, spans, after)
+  json_inspect(edits, content=[{ "from": 10, "to": 17, "insert": "" }])
+  inspect(apply(md, edits), content="# r\n\n## a\n\n## b\n")
+}
+
+///|
+test "中身を置き換えれば、その範囲だけ" {
+  let md = "# r\n\n## a\n\nhello\n\n## b\n"
+  let (before, spans) = survey(md)
+  let a = children_of(before.roots[0].node)[0]
+  let after = change(
+    before,
+    0,
+    [0],
+    rebody([{ id: body_of(a)[0].id, content: Opaque("bye") }]),
+  )
+  json_inspect(reflect(md, before, spans, after), content=[
+    { "from": 11, "to": 17, "insert": "bye\n" },
+  ])
+}
+
+///|
+test "消える子は後ろの隙間を道連れ。最後なら前の隙間" {
+  let md = "# r\n\n## a\n\n## b\n\n## c\n"
+  let (before, spans) = survey(md)
+  let drop = (i : Int) => {
+    change(before, 0, [], x => {
+      match x {
+        HeadingNode(h) => {
+          let kids = h.children.copy()
+          let _ = kids.remove(i)
+          HeadingNode({ ..h, children: kids })
+        }
+        other => other
+      }
+    })
+  }
+  let mid = reflect(md, before, spans, drop(1))
+  json_inspect(mid, content=[{ "from": 11, "to": 17, "insert": "" }])
+  inspect(apply(md, mid), content="# r\n\n## a\n\n## c\n")
+  let last = reflect(md, before, spans, drop(2))
+  json_inspect(last, content=[{ "from": 16, "to": 22, "insert": "" }])
+  inspect(apply(md, last), content="# r\n\n## a\n\n## b\n")
+}
+
+///|
+test "増える子は隙間を挟む — 兄弟の後ろにも、空の親にも" {
+  let md = "# r\n\n## a\n"
+  let (before, spans) = survey(md)
+  let after = change(before, 0, [], adopt(fresh("c")))
+  let edits = reflect(md, before, spans, after)
+  json_inspect(edits, content=[{ "from": 10, "to": 10, "insert": "\n## c\n" }])
+  inspect(apply(md, edits), content="# r\n\n## a\n\n## c\n")
+  let solo = "# r\n"
+  let (b2, s2) = survey(solo)
+  let e2 = reflect(solo, b2, s2, change(b2, 0, [], adopt(fresh("c"))))
+  json_inspect(e2, content=[{ "from": 4, "to": 4, "insert": "\n## c\n" }])
+}
+
+///|
+test "詰まった項目の列は詰まったまま" {
+  let md = "- a\n- b\n"
+  let (before, spans) = survey(md)
+  let kid = ListNode({ id: 99, label: "c", fold: None, body: [], children: [] })
+  let grown = reflect(md, before, spans, change(before, 0, [], adopt(kid)))
+  json_inspect(grown, content=[{ "from": 4, "to": 4, "insert": "  - c\n" }])
+  inspect(apply(md, grown), content="- a\n  - c\n- b\n")
+  let after : Doc = { ..before, roots: [before.roots[0]] }
+  let cut = reflect(md, before, spans, after)
+  json_inspect(cut, content=[{ "from": 4, "to": 8, "insert": "" }])
+}
+
+///|
+test "枝の移動は隙間ごと — 元は消え、先には隙間を挟んで差す" {
+  let md = "# r\n\n## a\n\nhello\n\n## b\n\n## c\n"
+  let (before, spans) = survey(md)
+  let r = before.roots[0].node
+  let kids = children_of(r)
+  let after = change(before, 0, [], x => {
+    with_children(x, [with_children(kids[0], [kids[1], kids[2]])])
+  })
+  let edits = reflect(md, before, spans, after)
+  json_inspect(edits, content=[
+    { "from": 17, "to": 17, "insert": "\n### b\n\n### c\n" },
+    { "from": 17, "to": 29, "insert": "" },
+  ])
+  inspect(apply(md, edits), content="# r\n\n## a\n\nhello\n\n### b\n\n### c\n")
+}
+
+///|
+test "文書の頭の散文 — 隙間は後ろに付く" {
+  let md = "hello\n\n# a\n"
+  let (before, spans) = survey(md)
+  let swapped = reflect(md, before, spans, {
+    ..before,
+    body: blocks([Opaque("bye")]),
+  })
+  inspect(apply(md, swapped), content="bye\n\n# a\n")
+  let gone = reflect(md, before, spans, { ..before, body: [] })
+  inspect(apply(md, gone), content="# a\n")
+  let bare = "# a\n"
+  let (b2, s2) = survey(bare)
+  let born = reflect(bare, b2, s2, { ..b2, body: blocks([Opaque("bye")]) })
+  inspect(apply(bare, born), content="bye\n\n# a\n")
+  let (b3, s3) = survey("")
+  let first = reflect("", b3, s3, { ..b3, body: blocks([Opaque("bye")]) })
+  inspect(apply("", first), content="bye\n")
 }
