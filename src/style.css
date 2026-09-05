@@ -618,7 +618,7 @@ html, body {
   &.root rect.box { stroke-width: 2; stroke: var(--node-border-strong); }
 
   /* ---- ドラッグ（付けるのは mindmap.ts）---- */
-  &.dragging { opacity: 0.35; }
+  &.dragging { opacity: 0.4; }
   &.drop-parent rect.box { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; }
 
   /* ---- 選択（付けるのは map/render.ts の paintSelection）---- */
@@ -710,7 +710,7 @@ html, body {
 
   /* 畳んだノード（core の Fold） */
   &.folded {
-    opacity: 0.45;
+    opacity: 0.4;
 
     /* 畳んだノードは小さく丸めて、別のものだと分かるようにする */
     & rect.box { rx: 4px; stroke-dasharray: 4 3; }
@@ -947,19 +947,22 @@ html, body {
 
   &::backdrop { background: var(--veil); }
 
+  /* **段の間は、後ろに来るものが自分の上の距離を言う**（form に gap を
+     持たせて負の margin で戻す形をやめた）。題と補足は 1 つの塊（4）、
+     塊の間は 12、理由は欄のすぐ下（8） */
   & form {
     display: flex;
     flex-direction: column;
-    gap: 12px;
     padding: 16px;
     min-width: 300px;
   }
   & .title { margin: 0; font-size: 13px; }
   /* 補足。**題で足りるなら書かない**ので、要るときだけ場所を取る */
-  & .note { margin: -8px 0 0; font-size: 11px; color: var(--ink-dim); }
+  & .note { margin: 4px 0 0; font-size: 11px; color: var(--ink-dim); }
   /* 何の話をしているかを見せる絵。字より先に置く — 名前を聞かれている
      相手が、読む前に分かる。**元の縦横比のまま**、高さだけで抑える */
   & .shot {
+    margin-top: 12px;
     align-self: center;
     max-width: 100%;
     max-height: 160px;
@@ -970,6 +973,7 @@ html, body {
   /* 字と欄の並び。**書かれる行の形そのまま**なので、字は本文と同じ幅の
      字体で置く（`![](` と `./pics/` が md の中と同じ姿になる）*/
   & .parts {
+    margin-top: 12px;
     display: flex;
     align-items: center;
     gap: 2px;
@@ -993,14 +997,15 @@ html, body {
   }
   /* 進めない理由。**直す字のすぐ下**に出す（離すと目が往復する）。
      行そのものを出し入れするので、要らないうちは高さも取らない */
-  & .bad { margin: -4px 0 0; font-size: 11px; color: var(--ink-dim); }
+  & .bad { margin: 8px 0 0; font-size: 11px; color: var(--ink-dim); }
 
   /* 断りは左、進むは右。押し間違えたときに軽いほうへ落ちる並び */
-  & .row { display: flex; justify-content: flex-end; gap: 8px; }
+  & .row { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
+  /* 背丈はメニューの行・しらせ・欄と同じ（同じ 13px の字は同じ高さ） */
   & button {
     font: inherit;
     font-size: 13px;
-    padding: 4px 12px;
+    padding: 6px 12px;
     border: 1px solid var(--line);
     border-radius: 6px;
     background: var(--bg);
