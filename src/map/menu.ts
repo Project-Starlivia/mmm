@@ -141,7 +141,7 @@ export class ContextMenu {
   private openers = new Map<HTMLElement, () => void>();
 
   constructor() {
-    this.el.className = "ctx-menu";
+    this.el.className = "menu";
     this.el.style.display = "none";
     this.el.setAttribute("role", "menu");
     this.el.tabIndex = -1;
@@ -267,7 +267,7 @@ export class ContextMenu {
         continue;
       }
       const row = document.createElement("div");
-      row.className = "item" + (it.disabled ? " disabled" : "");
+      row.className = "item";
       row.setAttribute("role", "menuitem");
       // 矢印キーで辿れる。触っても効かない行だけが機能しないので、
       // トップレベルには常に参加させる（見えるが効かない、が Tab と同じ形）

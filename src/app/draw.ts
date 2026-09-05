@@ -15,6 +15,7 @@
 // くる。紙の上で読める色と、3 段の太さだけを出す。
 
 import { icon } from "../icons.ts";
+import { accent } from "./theme.ts";
 
 /** 世界ではなくキャンバスの中の座標（CSS ピクセル） */
 interface Pt {
@@ -40,22 +41,6 @@ const MAX_DPR = 2;
  * 先頭が既定。
  */
 const PALETTE = ["#111111", "#d92d20", "#1570ef", "#0f9d58", "#e07000"] as const;
-
-/**
- * アクセントカラーも 1 本の筆にする。**綴りは持たない** — ロゴと同じ
- * `--accent` を引くので、色を変えれば筆も変わる。
- *
- * 引いた値は**名乗らせず確かめる**。6 桁の hex でなければ既定へ落とさず、
- * その筆を出さない（読めない色を黙って別の色にすり替えない）。
- * 並びの**末尾**に置くのは、既定にすると淡いアクセントカラーのときに
- * 紙の上で消えるため — 選べば使えるが、黙って選ばれてはいない。
- */
-function accentInk(): string | null {
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue("--accent")
-    .trim();
-  return /^#[0-9a-f]{6}$/i.test(value) ? value : null;
-}
 
 /**
  * 太さは細・中・太の 3 段。**その段が何 px になるかはインクが決める** —
@@ -117,15 +102,15 @@ function inkFace(value: Ink): HTMLButtonElement {
   const b = document.createElement("button");
   b.type = "button";
   if (value.kind === "eraser") {
-    b.className = "draw-ink draw-eraser";
+    b.className = "ink eraser";
     b.title = "Eraser";
     b.setAttribute("aria-label", "Eraser");
     b.append(icon("eraser"));
     return b;
   }
-  b.className = "draw-ink";
+  b.className = "ink";
   // 色そのものは道具の持ち物。CSS には形だけを置く
-  b.style.setProperty("--ink-swatch", value.color);
+  b.style.setProperty("--swatch", value.color);
   b.title = value.color;
   b.setAttribute("aria-label", `Color ${value.color}`);
   return b;
@@ -139,7 +124,7 @@ function inkFace(value: Ink): HTMLButtonElement {
 function nibFace(): HTMLButtonElement {
   const b = document.createElement("button");
   b.type = "button";
-  b.className = "draw-nib";
+  b.className = "nib";
   return b;
 }
 
@@ -153,17 +138,21 @@ function nibFace(): HTMLButtonElement {
  */
 export function showDrawing(): Promise<Blob | null> {
   return new Promise((resolve) => {
-    const overlay = document.createElement("div");
-    overlay.className = "popup-overlay";
-    // Esc / Mod+Enter は overlay の keydown で拾う。フォーカスが外へ逃げると
-    // 二度と拾えなくなるので、overlay 自身をフォーカス可能にしておく
-    overlay.tabIndex = -1;
-
-    const panel = document.createElement("div");
-    panel.className = "popup";
-    const title = document.createElement("div");
-    title.className = "popup-title";
+    // 器はたずね（app/ask.ts）と同じ `<dialog class="ask">`。焦点の閉じ込め・
+    // Esc・後ろの幕はブラウザが持つので、ここでは書かない。描く道具と紙
+    // だけが `.draw` として中に載る
+    const dlg = document.createElement("dialog");
+    dlg.className = "ask";
+    const form = document.createElement("form");
+    form.method = "dialog";
+    const title = document.createElement("p");
+    title.className = "title";
     title.textContent = "Draw";
+    const note = document.createElement("p");
+    note.className = "note";
+    note.textContent = "Mod+Enter to insert, Esc to discard";
+    const body = document.createElement("div");
+    body.className = "draw";
 
     // ---- 道具立て ----
     //
@@ -172,8 +161,12 @@ export function showDrawing(): Promise<Blob | null> {
     // 選ぶものと、描いたものを取り消すものは種類が違う。
     //
     // 筆の並びは**窓を開くたびに組む** — アクセントカラーはその間に変わりうる。
-    const accent = accentInk();
-    const palette = accent === null ? PALETTE : [...PALETTE, accent];
+    // アクセントカラーも 1 本の筆にする（綴りは持たず、ロゴと同じ `--accent` を
+    // 読む。読めなければその筆を出さない）。並びの**末尾**に置くのは、既定に
+    // すると淡いアクセントカラーのときに紙の上で消えるため — 選べば使えるが、
+    // 黙って選ばれてはいない
+    const brush = accent();
+    const palette = brush === null ? PALETTE : [...PALETTE, brush];
     const inkList: readonly Ink[] = [
       ...palette.map((color): Ink => ({ kind: "pen", color })),
       { kind: "eraser" },
@@ -183,7 +176,7 @@ export function showDrawing(): Promise<Blob | null> {
     let step = DEFAULT_STEP;
 
     const bar = document.createElement("div");
-    bar.className = "draw-tools";
+    bar.className = "tools";
 
     const nibButtons = picker(PEN_NIBS, nibFace, DEFAULT_STEP, (_, i) => {
       step = i;
@@ -199,7 +192,7 @@ export function showDrawing(): Promise<Blob | null> {
     };
 
     const inks = document.createElement("div");
-    inks.className = "draw-inks";
+    inks.className = "inks";
     inks.append(
       ...picker(inkList, inkFace, 0, (value) => {
         ink = value;
@@ -208,7 +201,7 @@ export function showDrawing(): Promise<Blob | null> {
     );
 
     const nibs = document.createElement("div");
-    nibs.className = "draw-nibs";
+    nibs.className = "nibs";
     nibs.append(...nibButtons);
     syncNibs();
 
@@ -216,7 +209,7 @@ export function showDrawing(): Promise<Blob | null> {
     undo.title = "Mod+Z";
     const clear = button("Clear");
     const actions = document.createElement("div");
-    actions.className = "group draw-actions";
+    actions.className = "group";
     actions.append(undo, clear);
 
     bar.append(inks, nibs, actions);
@@ -224,10 +217,10 @@ export function showDrawing(): Promise<Blob | null> {
     // ---- 紙 ----
     const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
     const canvas = document.createElement("canvas");
-    canvas.className = "draw-paper";
+    canvas.className = "paper";
     canvas.width = WIDTH * dpr;
     canvas.height = HEIGHT * dpr;
-    // 出来上がる絵は常に WIDTH×HEIGHT。表示だけは窓に入る大きさまで縮む
+    // 絵の比は常に WIDTH:HEIGHT（画素は dpr 倍）。表示だけは窓に入る大きさまで縮む
     // （CSS の max-width。高さは canvas 自身の比から決まる）
     canvas.style.width = `${WIDTH}px`;
     const ctx = canvas.getContext("2d");
@@ -321,35 +314,35 @@ export function showDrawing(): Promise<Blob | null> {
     });
 
     // ---- 確定 / 破棄 ----
-    const foot = document.createElement("div");
-    foot.className = "popup-foot";
-    const hint = document.createElement("span");
-    hint.className = "popup-hint";
-    hint.textContent = "Mod+Enter to insert / Esc to discard";
-    const btnCancel = button("Cancel");
-    const btnOk = button("Insert");
-    btnOk.className = "primary";
-    foot.append(hint, btnCancel, btnOk);
+    // 断りは左、進むは右（たずねと同じ並び）。進む側だけが色を持つ
+    const row = document.createElement("div");
+    row.className = "row";
+    const cancel = button("Cancel");
+    const go = button("Insert");
+    go.className = "go";
+    row.append(cancel, go);
 
-    let done = false;
-    const close = (blob: Blob | null): void => {
-      if (done) return; // toBlob を待つ間に Esc を押されても二重に閉じない
-      done = true;
-      overlay.remove();
-      resolve(blob);
-    };
+    // 閉じ方は `<dialog>` の 1 つ — Esc も Cancel も `close()` で、進んだとき
+    // だけ `"ok"` を添える。toBlob を待つ間に Esc を押されても close は
+    // 1 度しか起きないので、二重に返らない
+    let picture: Blob | null = null;
     const commit = (): void => {
       // WebP が作れない環境では PNG へ落ちる（type が空になる）
-      canvas.toBlob((blob) => close(blob), "image/webp", 0.92);
+      canvas.toBlob(
+        (blob) => {
+          picture = blob;
+          dlg.close("ok");
+        },
+        "image/webp",
+        0.92,
+      );
     };
-    btnCancel.addEventListener("click", () => close(null));
-    btnOk.addEventListener("click", commit);
-    overlay.addEventListener("keydown", (e) => {
-      e.stopPropagation(); // マップと全体のショートカットへ流さない
-      if (e.key === "Escape") {
-        e.preventDefault();
-        close(null);
-      } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    cancel.addEventListener("click", () => dlg.close());
+    go.addEventListener("click", commit);
+    // Esc は dialog が持つ。全体のショートカット（app/shortcuts.ts）は窓の中では
+    // 黙るので、ここで拾うのは窓だけのキー
+    dlg.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         commit();
       } else if ((e.key === "z" || e.key === "Z") && (e.ctrlKey || e.metaKey)) {
@@ -357,10 +350,15 @@ export function showDrawing(): Promise<Blob | null> {
         undoOne();
       }
     });
+    dlg.addEventListener("close", () => {
+      dlg.remove();
+      resolve(dlg.returnValue === "ok" ? picture : null);
+    });
 
-    panel.append(title, bar, canvas, foot);
-    overlay.append(panel);
-    document.body.append(overlay);
-    overlay.focus();
+    body.append(bar, canvas);
+    form.append(title, note, body, row);
+    dlg.append(form);
+    document.body.append(dlg);
+    dlg.showModal();
   });
 }

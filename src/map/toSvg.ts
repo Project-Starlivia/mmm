@@ -21,10 +21,8 @@ const WM_BAND = 22;
 export async function mapToSvg(args: {
   /** 収める範囲。写すノードの箱をそのまま渡す */
   boxes: Iterable<Rect>;
-  /** 写す親子の線。枝の外へ出ていくものは呼ぶ側が外しておく */
+  /** 写す親子の線 */
   edges: Iterable<SVGPathElement>;
-  /** 枝ではないが写したい線（グループの継ぎ目）。全体の書き出しのときだけ */
-  marks?: Iterable<SVGElement>;
   /** 写すノード */
   nodes: Iterable<SVGGElement>;
   /** 透かしの色（--ink-dim）・書体（--font）をここから読む */
@@ -48,17 +46,13 @@ export async function mapToSvg(args: {
   const h = Math.ceil(y1 - y0 + M * 2 + WM_BAND);
   // Iterable は 1 度しか回せないことがあるので、先に確定させる
   const edgeEls = [...args.edges];
-  const markEls = [...(args.marks ?? [])];
   const nodeEls = [...args.nodes];
   // いまの操作の状態（選択・ドロップの印）は書き出さない。
-  // **計算済みスタイルは元の要素から読む**ので、写す前に画面側から外す
+  // **計算済みスタイルは元の要素から読む**ので、写す前に画面側から外す。
+  // 印を付ける操作はいま無いが、外す仕組みは書き出しの性質なので残す —
+  // 戻したとき、直す場所が 1 つで済む
   const stripped: Array<{ el: Element; cls: string }> = [];
-  const TRANSIENT = [
-    "selected",
-    "drop-parent",
-    "drop-edge",
-    "dragging",
-  ];
+  const TRANSIENT = ["selected", "drop-parent", "dragging"];
   for (const root of [...edgeEls, ...nodeEls]) {
     for (const el of [root, ...root.querySelectorAll(`.${TRANSIENT.join(",.")}`)]) {
       if (!TRANSIENT.some((c) => el.classList.contains(c))) continue;
@@ -94,13 +88,7 @@ export async function mapToSvg(args: {
       inline(orig.children[i], copy.children[i]);
     }
   };
-  // カードの選択枠と × は、ノードの中ではなく world に浮かぶ別の印なので、
-  // 呼ぶ側が渡してくるエッジ / ノードには最初から入っていない
-  // 継ぎ目は親子の線と同じ「そのまま写す」経路（PROPS の焼き込み）を通す。
-  // 意味は違っても、扱い方は edges 側と同じなので同じ器に入れる。
-  // 画面では edgeLayer → seamLayer の順に重ねて継ぎ目を線の上に出すので、
-  // ここも同じ順（先に置いたものが下）で揃える
-  for (const orig of [...edgeEls, ...markEls]) {
+  for (const orig of edgeEls) {
     const copy = orig.cloneNode(true);
     if (!(copy instanceof SVGElement)) return null;
     inline(orig, copy);

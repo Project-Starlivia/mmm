@@ -1,174 +1,323 @@
-// Typed wrapper around the MoonBit core (compiled to ESM).
-// Every mutating call returns a Snapshot; `editSets` are the text edits the
-// call applied, in order, each set's offsets relative to the text before it.
+// core の出口。**JSON の形を整えるだけ** — 意味は 1 つも足さない。
+//
+// 使う側は `import * as core` で `core.View` / `core.survey(md, edits, marks)` と書く。
+// フロントでは view は画面を意味し、`Node` は DOM のグローバル型と衝突するので、
+// 裸の名前を出さない（MoonBit 側の `@view.Root` と同じ形）。
+//
+// MoonBit の ToJson は Option の None を鍵ごと落とし、enum を `["Image", {…}]` /
+// `"ThematicBreak"` の形で出す。その形を整えるのはここ 1 か所。信頼境界も
+// ここだけ — 型は名乗らせず確かめる。
 
-import * as mbt from "../core/_build/js/release/build/js/js.js";
+import * as mbt from "../core/_build/js/release/build/tree/js/js.js";
 
-export interface EditOp {
+export type Side = "Right" | "Left";
+
+/** 畳み。在ること自体が「畳まれている」 */
+export interface Fold {
+  open: boolean;
+  /** `<summary>` の中身。行が無ければ null */
+  summary: string | null;
+}
+
+/** ノードにぶら下がる中身 1 枚。id はノードと同じ列（文書順の通し番号） */
+export interface Block {
+  id: number;
+  content: Content;
+}
+
+/** 中身そのもの。カードかどうかは map/cards.ts の分類 */
+export type Content =
+  | { kind: "image"; alt: string; src: string; title: string }
+  | { kind: "link"; text: string; href: string; title: string }
+  | { kind: "code"; info: string; text: string }
+  | { kind: "svg"; markup: string }
+  | { kind: "thematicBreak" }
+  /** `<details>`。open / summary / body は GitHub が描くのと同じ読み取り。text は原文 */
+  | { kind: "details"; text: string; open: boolean; summary: string | null; body: string }
+  /** 読み解かない原文。View には来ない — その場編集が原文をそのまま書き戻すときに送る */
+  | { kind: "opaque"; text: string };
+
+export interface Node {
+  id: number;
+  /** Implicit（綴られなかった見出し）は null。空の見出しは "" */
+  label: string | null;
+  fold: Fold | null;
+  /** 中身のうち、core が読み解いたもの。Opaque は来ない */
+  blocks: Block[];
+  children: Node[];
+}
+
+/** 根 1 つ。側は根の子と並走する（`sides[i]` が `node.children[i]` の側） */
+export interface Root {
+  node: Node;
+  sides: Side[];
+}
+
+export interface View {
+  frontmatter: string | null;
+  roots: Root[];
+}
+
+/** id がノードのものか（中身の id なら false）。木を辿って確かめる —
+ *  ノードと中身は同じ通し番号を分け合うので、種類は木の形からしか読めない */
+export function isNode(view: View, id: number): boolean {
+  const under = (n: Node): boolean => n.id === id || n.children.some(under);
+  return view.roots.some((t) => under(t.node));
+}
+
+/** 地番。ノードが md のどこに書かれているか。label はラベルの頭（Implicit と文書の散文は null） */
+export interface Spot {
+  from: number;
+  label: number | null;
+  to: number;
+}
+
+/** 編集 1 つ。CodeMirror の changes と同じ形（前の座標、from 順、重ならない） */
+export interface Edit {
   from: number;
   to: number;
   insert: string;
 }
 
-/**
- * ノードは、テキストの一区間 `[from, to)` に付けた名前でしかない。
- * 削除・コピー・移動・折り畳みはすべてこの区間に対する編集になる。
- */
-export interface NodeInfo {
-  id: number;
-  /** テキストに書かれている `#` の数 */
-  depth: number;
-  parent: number;
-  /** 区間の始まり = 見出し行の行頭 */
+/** 前のサイクルの目印。選択を md の打鍵をまたいで持ち越すためのもの */
+export interface Mark {
   from: number;
-  /** 見出し行の行末（改行の手前）。ラベルを書き換える範囲 */
-  headEnd: number;
-  /** 区間の終わり = 部分木の終わり */
-  to: number;
-  /** 本文の始まり = 見出し行の改行の直後 */
-  contentStart: number;
-  /** 本文の終わり（次の見出し・部分木の終わり・区切り行の境界のうち
-   *  いちばん手前）。**この規則はコアだけが持つ**（core/doc.mbt）。
-   *  末尾へ追記する位置・カード行を切り出す境界は、ここを読むだけで
-   *  常に一致する — TS 側で再導出しない */
-  contentEnd: number;
-  hasContent: boolean;
-  hidden: boolean;
-  /** その枝が属するグループ（木ごとに 0 始まり。境界を 1 つ越えるたび +1） */
-  group: number;
-  /** ルートの反対側（左）へ伸びる枝か。**枝の中では一定**（core が導出済み） */
-  left: boolean;
-  label: string;
+  label: number;
+}
+
+/** 写した目印と、いま当たるノード。当たらなくても目印は生きている */
+export interface Trail {
+  mark: Mark;
+  id: number | null;
+}
+
+/** 打鍵 1 回ぶんの読み */
+export interface Survey {
+  view: View;
+  spots: Map<number, Spot>;
+  /** marks と同じ並び。null は死んだ目印 */
+  trails: (Trail | null)[];
 }
 
 /**
- * フェンスで囲まれたコードブロックの一区間。
- * **どこからどこまでがフェンスかを決めるのはコアだけ**（core/parser.mbt）。
- * 同じ規則を UI 側で書き直すと、`” ```js copy ”` のような情報文字列で
- * 静かに食い違う。
+ * md を core に読ませ、View と地番と、前の目印の行き先を 1 度に受け取る。
+ * 読みのサイクルの唯一の入口
  */
-export interface FenceSpan {
-  /** 開きフェンス行の行頭 */
-  from: number;
-  /** 閉じフェンス行の行末（閉じていなければ文書末） */
-  to: number;
-  /** 中身の最初の行頭 */
-  bodyFrom: number;
-  /** 中身の最後の行末。中身が無ければ bodyFrom より手前 */
-  bodyTo: number;
-  /** 開きフェンスの後ろ（言語名など） */
-  info: string;
-}
-
-/**
- * 文書の頭（YAML frontmatter）の一区間。
- * **どこからどこまでが頭かを決めるのはコアだけ**（core/parser.mbt）— この
- * 境界の内側は走査されないので、`tags:` 配下の `- a` がノードになるか
- * どうかがここで決まる。中身の綴りは解釈しない。
- */
-export interface HeadSpan {
-  /** 開き `---` 行の行頭 */
-  from: number;
-  /** 閉じ `---` 行の行末（改行の手前） */
-  to: number;
-  /** 中身の最初の行頭 */
-  bodyFrom: number;
-  /** 中身の最後の行末。中身が無ければ bodyFrom より手前 */
-  bodyTo: number;
-}
-
-export interface Snapshot {
-  rev: number;
-  focus: number;
-  canUndo: boolean;
-  canRedo: boolean;
-  /** 書き方のモード = 深さ n 以上をリストで書く（0 は全部見出し）。
-   *  開いたときに検知され、あとは setListFrom でしか動かない */
-  listFrom: number;
-  editSets: EditOp[][];
-  nodes: NodeInfo[];
-  fences: FenceSpan[];
-  /** 文書の頭。無ければ null */
-  head: HeadSpan | null;
-}
-
-/**
- * いまの文書。テキスト・ノード・フェンスは**必ず同じ rev のものを組で**
- * 持ち回る — 片方だけ新しいオフセットで読むと、位置が黙ってずれる。
- */
-export interface DocView {
-  text: string;
-  nodes: NodeInfo[];
-  fences: FenceSpan[];
-  head: HeadSpan | null;
-}
-
-// The JSON contract (field names/shapes) is defined by core/api.mbt's
-// snapshot(); this cast is the single trust boundary.
-const snap = (s: string): Snapshot => JSON.parse(s);
-
-export const core = {
-  initDoc: (text: string): Snapshot => snap(mbt.initDoc(text)),
-  /** 書き方のモードを変える。テキストは触らない（揃えるのは reformat） */
-  setListFrom: (b: number): Snapshot => snap(mbt.setListFrom(b)),
-  /** 文書ぜんぶをいまのモードの正規形へ（構造行の接頭辞だけ）。undo 1 回 */
-  reformat: (tag = ""): Snapshot => snap(mbt.reformat(tag)),
-  /**
-   * そのノードの本文の末尾へ 1 行を追加する。**貼り付け・ドロップ・
-   * お絵描き・その場でのリンクが通る唯一の道**。リストの形で書かれた
-   * ノードなら、その項目の中身の列まで字下げする（TS 側で組むと、外の
-   * Markdown パーサがそこでリストを閉じ、続く兄弟が迷子になる）。
-   */
-  insertContent: (id: number, line: string, tag = ""): Snapshot =>
-    snap(mbt.insertContent(id, line, tag)),
-  /**
-   * 深さ `depth` の新しい構造行（見出しかリスト項目か）を、いまの文書の
-   * モードで 1 行ぶん書く。ラベルは正規化する。
-   */
-  formatLine: (depth: number, label: string): string =>
-    mbt.formatLine(depth, label),
-  getText: (): string => mbt.getText(),
-  replaceText: (from: number, to: number, insert: string, tag = ""): Snapshot =>
-    snap(mbt.replaceText(from, to, insert, tag)),
-  addChild: (id: number, tag = ""): Snapshot => snap(mbt.addChild(id, tag)),
-  addSibling: (id: number, tag = ""): Snapshot => snap(mbt.addSibling(id, tag)),
-  addSiblingBefore: (id: number, tag = ""): Snapshot =>
-    snap(mbt.addSiblingBefore(id, tag)),
-  addParent: (id: number, tag = ""): Snapshot => snap(mbt.addParent(id, tag)),
-  addRoot: (tag = ""): Snapshot => snap(mbt.addRoot(tag)),
-  renameNode: (id: number, label: string, tag = ""): Snapshot =>
-    snap(mbt.renameNode(id, label, tag)),
-  deleteNodes: (ids: number[]): Snapshot => snap(mbt.deleteNodes(ids)),
-  indentNodes: (ids: number[]): Snapshot => snap(mbt.indentNodes(ids)),
-  outdentNodes: (ids: number[]): Snapshot => snap(mbt.outdentNodes(ids)),
-  /** pos: 0 = target の子にする / 1 = target の直前へ挿入 / 2 = target の直後へ挿入 */
-  moveNodes: (ids: number[], target: number, pos: 0 | 1 | 2): Snapshot =>
-    snap(mbt.moveNodes(ids, target, pos)),
-  /** A→B の線への割り込み: ids を B の直前へ動かしてから B を 1 段下げる */
-  moveAsParent: (ids: number[], target: number): Snapshot =>
-    snap(mbt.moveAsParent(ids, target)),
-  /** cross ならグループの壁を越える（Mod+Alt+↑↓） */
-  reorderNode: (id: number, dir: -1 | 1, cross = false): Snapshot =>
-    snap(mbt.reorderNode(id, dir, cross)),
-  /** そのノードの属するグループを、丸ごとルートの反対側へ */
-  flipSide: (id: number): Snapshot => snap(mbt.flipSide(id)),
-  /** ルート脇へ落とした: その側の末尾へ（要るときだけ切り替えの `---` を書く） */
-  moveSideEnd: (ids: number[], root: number, left: boolean): Snapshot =>
-    snap(mbt.moveSideEnd(ids, root, left)),
-  /** Mod+ドロップ: 選んだ枝を target の直前/直後へ新しいグループとして置く */
-  moveNewGroup: (
-    ids: number[],
-    target: number,
-    before: boolean,
-    left: boolean,
-  ): Snapshot => snap(mbt.moveNewGroup(ids, target, before, left)),
-  toggleHidden: (id: number): Snapshot => snap(mbt.toggleHidden(id)),
-  undo: (): Snapshot => snap(mbt.undo()),
-  redo: (): Snapshot => snap(mbt.redo()),
-  selectionText: (ids: number[]): string => mbt.selectionText(ids),
-  /** 断片に（フェンスの外の）見出しがあるか。いまの文書には触らない */
-  hasHeadings: (text: string): boolean => mbt.hasHeadings(text),
-  /** 断片のいちばん浅い見出しが targetDepth になるようずらす */
-  relevelText: (text: string, targetDepth: number): string =>
-    mbt.relevelText(text, targetDepth),
+export const survey = (md: string, edits: Edit[], marks: Mark[]): Survey => {
+  const r = decodeSurvey(JSON.parse(mbt.mmmSurvey(md, JSON.stringify(edits), JSON.stringify(marks))));
+  // follow は marks を 1:1 で写す。揃わなければ core と ts の対応が壊れている
+  if (r.trails.length !== marks.length) bad("trails が marks と揃わない");
+  return r;
 };
+
+// ---- JSON の形を確かめながら整える ----
+
+const bad = (what: string): never => {
+  throw new Error(`core の JSON: ${what}`);
+};
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+const record = (v: unknown): Record<string, unknown> => (isRecord(v) ? v : bad("構造体でない"));
+const str = (v: unknown): string => (typeof v === "string" ? v : bad("文字列でない"));
+const num = (v: unknown): number => (typeof v === "number" ? v : bad("数でない"));
+const bool = (v: unknown): boolean => (typeof v === "boolean" ? v : bad("真偽でない"));
+const list = <T>(v: unknown, read: (x: unknown) => T): T[] =>
+  Array.isArray(v) ? v.map(read) : bad("配列でない");
+
+/** 在るはずの鍵。無ければ壊れている */
+const field = <T>(o: Record<string, unknown>, key: string, read: (v: unknown) => T): T =>
+  key in o ? read(o[key]) : bad(`${key} が無い`);
+
+/** Option の鍵。None は鍵ごと落ちている */
+const option = <T>(o: Record<string, unknown>, key: string, read: (v: unknown) => T): T | null =>
+  key in o ? read(o[key]) : null;
+
+const side = (v: unknown): Side => (v === "Right" || v === "Left" ? v : bad("側でない"));
+
+const fold = (v: unknown): Fold => {
+  const o = record(v);
+  return { open: field(o, "open", bool), summary: option(o, "summary", str) };
+};
+
+/** enum は `"Tag"`（中身なし）か `["Tag", 中身]` */
+function content(v: unknown): Content {
+  if (v === "ThematicBreak") return { kind: "thematicBreak" };
+  if (!Array.isArray(v) || v.length !== 2) return bad("Content の形でない");
+  const [tag, body] = v;
+  switch (tag) {
+    case "Image": {
+      const o = record(body);
+      return {
+        kind: "image",
+        alt: field(o, "alt", str),
+        src: field(o, "src", str),
+        title: field(o, "title", str),
+      };
+    }
+    case "Link": {
+      const o = record(body);
+      return {
+        kind: "link",
+        text: field(o, "text", str),
+        href: field(o, "href", str),
+        title: field(o, "title", str),
+      };
+    }
+    case "Code": {
+      const o = record(body);
+      return { kind: "code", info: field(o, "info", str), text: field(o, "text", str) };
+    }
+    case "Svg":
+      return { kind: "svg", markup: str(body) };
+    case "Details": {
+      const o = record(body);
+      return {
+        kind: "details",
+        text: field(o, "text", str),
+        open: field(o, "open", bool),
+        summary: option(o, "summary", str),
+        body: field(o, "body", str),
+      };
+    }
+    default:
+      return bad(`知らない Content ${String(tag)}`);
+  }
+}
+
+const block = (v: unknown): Block => {
+  const o = record(v);
+  return { id: field(o, "id", num), content: field(o, "content", content) };
+};
+
+function node(v: unknown): Node {
+  const o = record(v);
+  return {
+    id: field(o, "id", num),
+    label: option(o, "label", str),
+    fold: option(o, "fold", fold),
+    blocks: field(o, "blocks", (b) => list(b, block)),
+    children: field(o, "children", (c) => list(c, node)),
+  };
+}
+
+const root = (v: unknown): Root => {
+  const o = record(v);
+  return { node: field(o, "node", node), sides: field(o, "sides", (s) => list(s, side)) };
+};
+
+/** core の JSON（`mmmViewJson` の出力）を View にする。試験はここを直接叩く */
+export function decode(json: unknown): View {
+  const o = record(json);
+  return {
+    frontmatter: option(o, "frontmatter", str),
+    roots: field(o, "roots", (r) => list(r, root)),
+  };
+}
+
+const spot = (v: unknown): Spot => {
+  const o = record(v);
+  return { from: field(o, "from", num), label: option(o, "label", num), to: field(o, "to", num) };
+};
+
+const mark = (v: unknown): Mark => {
+  const o = record(v);
+  return { from: field(o, "from", num), label: field(o, "label", num) };
+};
+
+const trail = (v: unknown): Trail | null => {
+  if (v === null) return null;
+  const o = record(v);
+  return { mark: field(o, "mark", mark), id: option(o, "id", num) };
+};
+
+/** core の JSON（`mmmSurvey` の出力）を Survey にする。Map の鍵は文字列で来る */
+export function decodeSurvey(json: unknown): Survey {
+  const o = record(json);
+  const spots = new Map<number, Spot>();
+  for (const [k, v] of Object.entries(field(o, "spots", record))) {
+    const id = Number(k);
+    if (!Number.isInteger(id)) bad(`spots の鍵 ${k}`);
+    spots.set(id, spot(v));
+  }
+  return {
+    view: decode(field(o, "view", (v) => v)),
+    spots,
+    trails: field(o, "trails", (t) => list(t, trail)),
+  };
+}
+
+// ---- 操作を core へ送る ----
+//
+// 席は隣の id で言う（添字は無い）。`in` は列の末尾で、side は node が根のときだけ意味を持つ。
+
+export type NodePlace =
+  | { kind: "before"; node: number }
+  | { kind: "after"; node: number }
+  | { kind: "in"; node: number; side: Side | null };
+
+export type BlockPlace =
+  | { kind: "before"; block: number }
+  | { kind: "after"; block: number }
+  | { kind: "in"; node: number };
+
+/** 操作 1 つ。core の `Op` と同じ形（構築子名が kind） */
+export type Op =
+  | { kind: "addNode"; at: NodePlace; labels: string[] }
+  | { kind: "addBlock"; at: BlockPlace; content: Content }
+  | { kind: "rename"; id: number; label: string }
+  | { kind: "setBlock"; id: number; content: Content }
+  | { kind: "moveNode"; ids: number[]; at: NodePlace }
+  | { kind: "moveBlock"; ids: number[]; at: BlockPlace }
+  | { kind: "delete"; ids: number[] }
+  | { kind: "wrap"; id: number; label: string }
+  | { kind: "flipSide"; id: number }
+  | { kind: "fold"; id: number; open: boolean }
+  | { kind: "unfold"; id: number }
+  | { kind: "graft"; at: NodePlace; md: string };
+
+/** 文書そのものの id。core の `doc_id` と同じ値で、`NodePlace.in` の node に置けば新しい根 */
+export const DOC_ID = 1;
+
+/** 操作を md に映した結果。focus は編集を当てて読み直した木での id（消した後は null） */
+export interface Edited {
+  edits: Edit[];
+  focus: number | null;
+}
+
+/** 操作を md に映す。できない操作は edits が空で focus も null */
+export const edit = (md: string, op: Op): Edited =>
+  edited(JSON.parse(mbt.mmmEdit(md, JSON.stringify(encode(op)))));
+
+/**
+ * core の enum の形にする（MoonBit の ToJson / FromJson と同じ）:
+ * kind は構築子名（頭を大文字）、残りの鍵はラベル付き引数、null の鍵は落とす、
+ * 鍵が無ければ裸の名前。`Svg(String)` だけラベルが無いので位置で渡す。
+ */
+/** core の enum を表す形。kind と、ラベル付き引数 */
+type Tagged = { kind: string } & Record<string, unknown>;
+
+export function encode(v: Tagged): unknown {
+  const { kind, ...rest } = v;
+  const tag = kind.charAt(0).toUpperCase() + kind.slice(1);
+  if (kind === "svg" && "markup" in v) return [tag, v.markup];
+  if (kind === "opaque" && "text" in v) return [tag, v.text];
+  const fields: Record<string, unknown> = {};
+  for (const [k, x] of Object.entries(rest)) {
+    if (x === null) continue;
+    fields[k] = isRecord(x) && typeof x["kind"] === "string" ? encode({ ...x, kind: x["kind"] }) : x;
+  }
+  return Object.keys(fields).length === 0 ? tag : [tag, fields];
+}
+
+const editOne = (v: unknown): Edit => {
+  const o = record(v);
+  return { from: field(o, "from", num), to: field(o, "to", num), insert: field(o, "insert", str) };
+};
+
+/** core の JSON（`mmmEdit` の出力）を Edited にする */
+export function edited(json: unknown): Edited {
+  const o = record(json);
+  return { edits: field(o, "edits", (e) => list(e, editOne)), focus: option(o, "focus", num) };
+}

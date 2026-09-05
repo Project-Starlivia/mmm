@@ -1,6 +1,6 @@
 // カード 1 行を SVG にする。
 //
-// `cards.ts` が**読み**（本文 → カード行。DOM を知らない）で、こちらが
+// `cards.ts` が**分類**（Block → カード行。DOM を知らない）で、こちらが
 // **見せ方**（カード行 → SVG）。種類ごとに形・クラス・埋め方が縦に並ぶので、
 // リンクカードを直したい人はこのファイルの `link` だけを見ればよい。
 //
@@ -8,10 +8,16 @@
 // 入力欄も同じ数を使う。
 
 import type { CardRow } from "./cards.ts";
-import { CODE_LINE, CODE_PAD } from "./cards.ts";
 import type { Rect } from "./geometry.ts";
 import { tokenize } from "./highlight.ts";
-import { ROW_NORMAL } from "./metrics.ts";
+import {
+  CODE_LINE,
+  DETAILS_INDENT,
+  DETAILS_NAME,
+  DETAILS_ROW,
+  CODE_PAD,
+  ROW_NORMAL,
+} from "./metrics.ts";
 import { svgEl } from "./svg.ts";
 
 /** カード 1 行を置く場所。 */
@@ -29,7 +35,7 @@ export interface CardSpot {
 /** 行と行のあいだの仕切り。種類によらず引く */
 function separator(at: CardSpot): SVGElement {
   return svgEl("line", {
-    class: "card-sep",
+    class: "sep",
     x1: ROW_NORMAL.padX - 4,
     y1: at.rowY,
     x2: at.boxW - ROW_NORMAL.padX + 4,
@@ -50,16 +56,16 @@ function link(r: Extract<CardRow, { kind: "link" }>, at: CardSpot): SVGElement[]
     height: h,
   });
   const title = svgEl("text", { class: "link-row", x, y: y + h / 2 });
-  title.textContent = r.link.title;
+  title.textContent = r.title;
   const tip = svgEl("title");
-  tip.textContent = r.link.url;
+  tip.textContent = r.url;
   const open = svgEl("text", {
     class: "link-open",
     // 枠の内側に収める。外へ出すと、選択の枠が本体より小さく見える
     x: x + w,
     y: y + h / 2,
     "text-anchor": "end",
-    "data-url": r.link.url,
+    "data-url": r.url,
   });
   open.textContent = "↗";
   return [hit, title, tip, open];
@@ -88,7 +94,7 @@ function inlineSvg(
 }
 
 function image(
-  r: Extract<CardRow, { kind: "img" }>,
+  r: Extract<CardRow, { kind: "image" }>,
   at: CardSpot,
   imageUrl: (path: string) => string | null,
   hint: string | null,
@@ -99,7 +105,7 @@ function image(
   // 飛ばないよう、同じ大きさの場所取りを置く
   const { x, y, w, h } = at.rect;
   const box = svgEl("rect", {
-    class: "img-ph",
+    class: "image-placeholder",
     "data-card": at.spot,
     x,
     y,
@@ -110,7 +116,7 @@ function image(
   // 場所取りが自分で言う。握っていないだけなら、ここが入口も兼ねる
   const mid = y + h / 2;
   const name = svgEl("text", {
-    class: "img-name",
+    class: "image-name",
     "data-card": at.spot,
     x: x + w / 2,
     y: hint === null ? mid : mid - 7,
@@ -121,7 +127,7 @@ function image(
   // 入口は**この字だけ**。場所取りそのものは選択のままにしておく
   // （2 つの意味を 1 つの当たり判定に乗せない）
   const link = svgEl("text", {
-    class: "img-connect",
+    class: "image-connect",
     "data-connect": "1",
     x: x + w / 2,
     y: mid + 8,
@@ -171,6 +177,47 @@ function code(
   return out;
 }
 
+/** 装飾の水平線。中身の幅いっぱいに 1 本 */
+function rule(at: CardSpot): SVGElement[] {
+  const { x, y, w, h } = at.rect;
+  return [
+    svgEl("line", {
+      class: "break",
+      "data-card": at.spot,
+      x1: x,
+      y1: y + h / 2,
+      x2: x + w,
+      y2: y + h / 2,
+    }),
+  ];
+}
+
+/**
+ * `<details>`。GitHub と同じ見え方 — 三角と summary（無ければ Details）、
+ * 開いていればその下に中身の字。開閉は md の `open` が決めるので、押しても動かない
+ */
+function details(r: Extract<CardRow, { kind: "details" }>, at: CardSpot): SVGElement[] {
+  const { x } = at.rect;
+  const rowMid = at.rowY + DETAILS_ROW / 2; // summary の行の中心
+  const mark = svgEl("text", { class: "details-mark", x, y: rowMid });
+  mark.textContent = r.open ? "▾" : "▸";
+  const name = svgEl("text", { class: "details-row", x: x + DETAILS_INDENT, y: rowMid });
+  name.textContent = r.summary ?? DETAILS_NAME;
+  const out: SVGElement[] = [mark, name];
+  if (!r.open) return out;
+  const top = at.rowY + DETAILS_ROW;
+  for (let i = 0; i < r.lines.length; i++) {
+    const line = svgEl("text", {
+      class: "details-line",
+      x: x + DETAILS_INDENT,
+      y: top + i * CODE_LINE + CODE_LINE / 2,
+    });
+    line.textContent = r.lines[i];
+    out.push(line);
+  }
+  return out;
+}
+
 /** カード 1 行ぶんの要素。仕切り線を含む、並べればよい形で返す */
 export function drawCard(
   r: CardRow,
@@ -183,8 +230,12 @@ export function drawCard(
       ? link(r, at)
       : r.kind === "svg"
         ? inlineSvg(r, at)
-        : r.kind === "img"
+        : r.kind === "image"
           ? image(r, at, imageUrl, imageHint)
-          : code(r, at);
+          : r.kind === "code"
+            ? code(r, at)
+            : r.kind === "break"
+              ? rule(at)
+              : details(r, at);
   return [separator(at), ...body];
 }

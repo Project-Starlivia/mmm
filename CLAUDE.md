@@ -49,3 +49,10 @@ PRのマージにはSquash Mergeを使用する。具体的な作業ログとは
 ### Conflict
 コンフリクト時は、Rebaseではなく対象ブランチへのMergeを使用する。Gitの履歴を変に捻じ曲げない。
 Claude CodeはRebaseを使用しがちなので許さないこと。
+
+# Github
+
+## Stacked Pull Requests
+大きな機能・変更に際し、さらに細かなブランチを作って進捗を管理する場合、Stacked PRを使用する。純粋に視認性が高いため。またこの仕組みに限りRebaseを許容する。
+
+https://docs.github.com/en/pull-requests/how-tos/stacked-pull-requests

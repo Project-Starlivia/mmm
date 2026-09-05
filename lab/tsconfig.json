@@ -1,0 +1,6 @@
+{
+  // ラボだけを見る。src/ は core が揃うまで繋ぎ先が無くて型検査を通らないので、
+  // ルートの設定（include: src）とは別に持つ。
+  "extends": "../tsconfig.json",
+  "include": ["."]
+}

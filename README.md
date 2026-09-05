@@ -5,7 +5,7 @@ from either side.
 
 The file itself is just a `.md`. The Mindmap is only another window onto it.
 
-For the full spec, see [docs/spec.md](docs/spec.md).
+For the full spec, see [docs/spec.md](docs/spec.md). For the shape of the design — which known patterns each part follows and the laws between stages — see [docs/design.md](docs/design.md).
 
 ([日本語版はこちら](README_JA.md))
 
@@ -15,9 +15,16 @@ Requires Node.js, pnpm, and the [MoonBit toolchain](https://www.moonbitlang.com/
 (`moon` on PATH).
 
     pnpm install
-    pnpm run dev        # builds the core, then starts vite (http://localhost:13131)
+    pnpm run lab        # builds the core, then opens the lab (http://localhost:13132)
 
-Production build: `pnpm run build`, then check with `pnpm run preview`.
+**The editor itself does not run right now.** The document model is being
+rebuilt (`core/tree`, see [docs/core.md](docs/core.md)) and `src/` still talks
+to the old one, which is gone. What runs today is the lab: type Markdown and
+it shows the mdAst and the mmm tree side by side, so you can tell which stage
+broke.
+
+    pnpm run test:core   # the reading rules
+    pnpm run check:core
 
 ## License
 

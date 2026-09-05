@@ -7,18 +7,15 @@ const IMAGE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 const MARKDOWN = /\.(md|markdown|txt)$/i;
 
 /** ドロップされたもののうち、ファイルのハンドルとして取れたもの */
-async function droppedFiles(
-  data: DataTransfer,
-): Promise<FileSystemFileHandle[]> {
-  const files: FileSystemFileHandle[] = [];
+async function droppedFiles(data: DataTransfer): Promise<FileSystemFileHandle[]> {
+  // 取り出しは**待つ前に全部**始める。最初の await で drop の出来事が終わり、
+  // 以後 items は空に見える（2 枚目からが消える）
+  const pending: Promise<FileSystemHandle | null>[] = [];
   for (const item of data.items) {
-    if (item.kind !== "file" || !item.getAsFileSystemHandle) continue;
-    const handle = await item.getAsFileSystemHandle();
-    // `kind === "file"` では TS は絞り込めない（union ではなく上位型なので）。
-    // 実物を確かめる
-    if (handle instanceof FileSystemFileHandle) files.push(handle);
+    if (item.kind === "file" && item.getAsFileSystemHandle) pending.push(item.getAsFileSystemHandle());
   }
-  return files;
+  // `kind === "file"` では TS は絞り込めない（union ではなく上位型なので）。実物を確かめる
+  return (await Promise.all(pending)).filter((h): h is FileSystemFileHandle => h instanceof FileSystemFileHandle);
 }
 
 export function initDrop(deps: {
@@ -26,8 +23,8 @@ export function initDrop(deps: {
   openMarkdown: (file: FileSystemFileHandle) => Promise<void>;
   /** 画像がノードの上に落ちた（ノードの外なら呼ばれない） */
   addImages: (files: FileSystemFileHandle[], node: number) => Promise<void>;
-  /** 着地点を予告する。`null` で消す。落ちる先のノード（無ければ -1）を返す */
-  markDrop: (at: { x: number; y: number } | null) => number;
+  /** 着地点を予告する。`null` で消す。落ちる先のノード（無ければ null）を返す */
+  markDrop: (at: { x: number; y: number } | null) => number | null;
   failed: (msg: string) => void;
 }): void {
   // **ドラッグしている間ずっと答えが見えている。** 落ちる先が決まっていれば
@@ -42,7 +39,7 @@ export function initDrop(deps: {
     const data = event.dataTransfer;
     const items = [...(data?.items ?? [])].filter((item) => item.kind === "file");
     if (items.length === 0) return;
-    const onNode = deps.markDrop({ x: event.clientX, y: event.clientY }) !== -1;
+    const onNode = deps.markDrop({ x: event.clientX, y: event.clientY }) !== null;
     const onlyImages = items.every((item) => item.type.startsWith("image/"));
     if (onlyImages && !onNode) {
       // **受けないと言う。** `preventDefault` を呼ばなければブラウザが既定の
@@ -76,7 +73,7 @@ export function initDrop(deps: {
       const images = files.filter((f) => IMAGE.test(f.name));
       // ノードの外へ落ちた絵は、そもそもここまで来ない（dragover が受けて
       // いない）。来るのは `.md` に混ざって落ちた分だけなので、黙って置かない
-      if (images.length === 0 || node === -1) return;
+      if (images.length === 0 || node === null) return;
       await deps.addImages(images, node);
     })().catch((error) => {
       console.error("drop failed:", error);

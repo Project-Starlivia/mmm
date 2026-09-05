@@ -1,40 +1,39 @@
-// md のカーソル（と選択）が、いまどのノードに掛かっているか。DOM も文書の
-// 意味も知らない、区間の重なりだけの層。
+// md のカーソル（と選択）が、いまどのノードに掛かっているか。DOM も文書の意味も
+// 知らない、区間の重なりだけの層。
 //
-// ノードは [from, to) の区間で、入れ子はそのまま区間の入れ子になる。区間は
-// コアが渡してくるものをそのまま読む — どこからどこまでが 1 ノードかを
-// ここで数え直さない。
+// 自身の文 = 地番の頭から最初の子の頭まで（中身は子より前に書かれる）。地番は
+// 入れ子なので、これで「最も深いノード」が出る。子孫まで含む `to` で見ると、
+// カーソル 1 つでも根までの祖先が全部光り、選択と見分けが付かない（spec.md
+// 「二つをまたぐ印」）。
 
-import type { NodeInfo } from "./coreApi.ts";
+import type { Node, Spot, View } from "./coreApi.ts";
 
-/** md 側のカーソル 1 つ、または選択 1 つぶん（`from === to` なら点）。 */
-export interface Span {
+/** md 側のカーソル 1 つ、または選択 1 つぶん（`from === to` なら点） */
+export interface Range {
   from: number;
   to: number;
 }
 
 /**
- * その範囲たちが掛かっているノードの id を、文書順で。無ければ空。
+ * その範囲たちが掛かるノードの id、文書順。無ければ空。
  *
- * 見るのは**そのノード自身の文** `[from, contentEnd)` — 見出しの行と、子に
- * 取られていない本文（あいだの空行も含む。コアの contentEnd は次のノードの
- * 直前まで伸びる）。**子孫まで含む `to` で見てはいけない**: 区間が入れ子に
- * なっているので、点 1 つでもルートまでの祖先が全部挙がり、マップの上では
- * 選ばれているのと見分けが付かなくなる。
- *
- * 自身の文は文書を隙間なく分けるので、これだけで「その位置に居るのは誰か」
- * が言えている。範囲でも複数カーソル（`Alt+クリック`）でも同じ 1 つの規則。
- *
- * **端は両側とも閉じて見る。** 区間そのものは半開だが、カーソルはその位置に
- * **立てる**（文字と文字の隙間に居る）。半開で読むと文書の末尾では文が
- * 閉じきっていて何も挙がらず、追記しているあいだじゅう印が出ない、という
- * いちばん困る形になる。裏返しとして、継ぎ目ちょうどでは両側が挙がる。
+ * **閉じ際は中と見なす。** 区間は半開だが、カーソルはその位置に立てる（文字と文字の
+ * 隙間に居る）。半開で読むと文書の末尾では何にも掛からず、追記しているあいだ印が
+ * 出ない。裏返しとして、継ぎ目ちょうどでは両側が挙がる。
+ * Implicit は行が無く自身の文が空なので、掛からない。
  */
-export function caretNodes(nodes: NodeInfo[], spans: readonly Span[]): number[] {
-  if (spans.length === 0) return [];
+export function caretIds(view: View, spots: Map<number, Spot>, ranges: Range[]): number[] {
+  if (ranges.length === 0) return [];
   const out: number[] = [];
-  for (const n of nodes) {
-    if (spans.some((s) => n.from <= s.to && n.contentEnd >= s.from)) out.push(n.id);
-  }
+  const walk = (n: Node): void => {
+    const s = spots.get(n.id);
+    if (s) {
+      const first = n.children.length > 0 ? spots.get(n.children[0].id) : undefined;
+      const own = first ? first.from : s.to;
+      if (own > s.from && ranges.some((r) => s.from <= r.to && own >= r.from)) out.push(n.id);
+    }
+    for (const k of n.children) walk(k);
+  };
+  for (const t of view.roots) walk(t.node);
   return out;
 }
