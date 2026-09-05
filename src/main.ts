@@ -15,7 +15,7 @@ import { type Choice, NOTHING, type Selection, cardOf, nodesOf } from "./map/sel
 import { handles } from "./app/handles.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
-import { imageFolder, normalizePath } from "./app/head.ts";
+import { imageFolder, normalizePath, retarget, setImageFolder } from "./app/head.ts";
 import { initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
 import { deriveName } from "./app/name.ts";
@@ -479,6 +479,24 @@ const assets = initAssets({
   failed,
   refresh: () => map.render(),
   declared: () => declaredFolder(),
+  declare: (value) => {
+    // 頭を書いただけでは本文は古い場所を指したまま。**宣言と本文は同じ 1 つの
+    // 引っ越し**なので、続けて映して 1 手（1 回の Undo）に畳む。初めての宣言
+    // （prev が無い）では本文は触らない — どこから動かすのか分からない
+    const next = normalizePath(value);
+    if (next === null) return; // 読めない綴り（空・絶対パス・URL）は欄が先に止めている
+    const prev = declaredFolder();
+    const sets: core.Edit[][] = [[setImageFolder(text, doc.frontmatter, next)]];
+    let md = core.splice(text, sets[0]);
+    if (prev !== null) {
+      for (const op of retarget(doc, prev, next)) {
+        const r = core.edit(md, op);
+        sets.push(r.edits);
+        md = core.splice(md, r.edits);
+      }
+    }
+    editor.apply(...sets); // → sync
+  },
 });
 
 /**

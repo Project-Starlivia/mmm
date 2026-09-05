@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assetTarget, imageType, mdPath, nameProblem } from "../src/app/assets.ts";
+import { assetTarget, folderFromDoc, folderProblem, imageType, mdPath, nameProblem } from "../src/app/assets.ts";
 
 // 保存したのに読み戻せなかったバグの回帰。
 // md に書くのは `./x`、カード側が持つのは `x`（cards.ts が `./` を剥がす）。
@@ -66,4 +66,32 @@ test("mdPath — md に書くのは ./ 付き。上へ出る道はそのまま",
   assert.equal(mdPath("x.webp"), "./x.webp");
   assert.equal(mdPath("./x.webp"), "./x.webp");
   assert.equal(mdPath("../x.webp"), "../x.webp");
+});
+
+test("folderFromDoc: resolve の断片（フォルダ → md）を、md から見たフォルダに読み替える", () => {
+  assert.equal(folderFromDoc(["a.md"]), "./");
+  assert.equal(folderFromDoc(["notes", "a.md"]), "../");
+  assert.equal(folderFromDoc(["a", "b", "c.md"]), "../../");
+  assert.equal(folderFromDoc([]), "./");
+});
+
+test("folderProblem: 末尾が選んだフォルダの実名と一致すれば通る", () => {
+  assert.equal(folderProblem("../pics/", "pics"), null);
+  assert.equal(folderProblem("../../pics", "pics"), null);
+  assert.equal(folderProblem("pics", "pics"), null);
+});
+
+test("folderProblem: 実名と違う・`./`・空・絶対パス・URL は止める", () => {
+  assert.equal(folderProblem("../images/", "pics"), "The folder you picked is named pics");
+  assert.equal(folderProblem("./", "pics"), "The folder you picked is named pics");
+  assert.equal(folderProblem("../", "pics"), "The folder you picked is named pics");
+  assert.equal(folderProblem("", "pics"), "Use a path relative to the .md");
+  assert.equal(folderProblem("/abs/pics", "pics"), "Use a path relative to the .md");
+  assert.equal(folderProblem("https://x/pics", "pics"), "Use a path relative to the .md");
+});
+
+test("folderProblem: 位置が計算できていれば実名は照合せず、相対パスであることだけ見る", () => {
+  assert.equal(folderProblem("./", null), null);
+  assert.equal(folderProblem("../../", null), null);
+  assert.equal(folderProblem("/abs/", null), "Use a path relative to the .md");
 });
