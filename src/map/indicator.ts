@@ -1,10 +1,9 @@
 // 画面外にある対象を、控えめな針で指す。DOM を知らない計算だけの層。
 //
-// 何を指すか（選択の外接箱 / 無ければルート）と、表示するかどうか（対象が
-// 画面内かではなく「選択のどれかが見えているか」「文書のどれかが見えて
-// いるか」）は呼び出し側が決める — ここは「指すとしたら画面のどこか」だけを持つ。
+// 何を指すか（`indicatorTarget`）と、指すとしたら画面のどこか
+// （`indicatorFor`）の 2 つを持つ。呼び出し側は箱を渡して置くだけ。
 
-import type { Rect } from "./geometry.ts";
+import { type Rect, unionRect } from "./geometry.ts";
 import type { Pane, Camera } from "./camera.ts";
 
 export interface Indicator {
@@ -27,6 +26,27 @@ const toScreen = (box: Rect, cam: Camera): Rect => ({
 export function isVisible(box: Rect, cam: Camera, pane: Pane): boolean {
   const s = toScreen(box, cam);
   return s.x < pane.width && s.x + s.w > 0 && s.y < pane.height && s.y + s.h > 0;
+}
+
+/**
+ * 針が指す箱。見失っていなければ null（＝出さない）。
+ *
+ * 指すのは選択の外接箱、選択が無ければ根。見失ったかの判定は対象そのものが
+ * 画面内かではない — 選択があるときは選択のどれか、無いときは文書のどれかが
+ * 見えていれば、その人は迷っていない。
+ */
+export function indicatorTarget(
+  boxes: { selection: Rect[]; all: Iterable<Rect>; root: Rect | null },
+  cam: Camera,
+  pane: Pane,
+): Rect | null {
+  const chosen = boxes.selection.length > 0;
+  const target = chosen ? unionRect(boxes.selection) : boxes.root;
+  if (!target) return null;
+  for (const b of chosen ? boxes.selection : boxes.all) {
+    if (isVisible(b, cam, pane)) return null;
+  }
+  return target;
 }
 
 /**
