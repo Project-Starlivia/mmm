@@ -6,7 +6,7 @@
 実体はただの `.md` ファイル。Mindmap は、その md を空間的に見るための
 もう一つの窓でしかない。
 
-詳しい仕様は [docs/spec.md](docs/spec.md)。
+詳しい仕様は [docs/spec.md](docs/spec.md)。設計の型（部品ごとの既知の型と、段の間の法則）は [docs/design.md](docs/design.md)。
 
 ([English README](README.md))
 
