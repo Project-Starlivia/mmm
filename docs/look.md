@@ -52,21 +52,25 @@ metrics.ts のまま。ここは見比べるための地図）。部品を横に
 
 ### 源（`:root` のトークン）
 
+**色は 3 つ**（地 `--bg`・字 `--ink`・強調 `--accent`）。灰はぜんぶ、地と字を
+どれだけ混ぜるか（`*-mix`）で導く。浮くもの（`--panel` / `--node-bg`）だけは
+地と `--lift`（暗い地では字の側、ライトでは白）の混ぜ具合。式は style.css の
+`:root, .light { … }` に 1 つ。動かすのは `/parts/` の「源と濃さ」。
+
 | 役 | 名 | dark | light |
 |---|---|---|---|
-| 地 | `--bg` | #15171c | #f3f4f6 |
-| 浮くものの面 | `--panel` | #1b1e24 | #ffffff |
-| 字 | `--ink` / `--ink-dim` | #dde2e9 / #828a96 | #1f2328 / #6b7280 |
-| 線 | `--line` | #2a2f38 | #e2e5ea |
-| 強調 | `--accent` | #5932ff（ロゴから変えられる） | 同 |
-| 強調の面 | `--accent-soft` | accent 20% | 同 |
-| 焦点の輪 | `--ring` | accent 32% | accent 12% |
+| 地 / 字 / 強調 | `--bg` / `--ink` / `--accent` | #15171c / #dde2e9 / #5932ff | #f3f4f6 / #1f2328 / 同 |
+| 浮く向き | `--lift` | 字 | 白 |
+| 浮くものの面 | `--panel-mix` / `--node-bg-mix` | 4% / 8% | 100% / 100% |
+| 沈む字 | `--ink-dim-mix` | 57% | 61% |
+| 線 / 地の点 | `--line-mix` / `--dot-mix` | 12% / 10% | 7% / 9% |
+| ノードの枠 | `--node-border-mix` / `--node-border-strong-mix` | 21% / 39% | 15% / 38% |
+| 枝の線 | `--edge-mix` | 31% | 26% |
+| 強調の面 / 焦点の輪 | `--accent-mix` / `--ring-mix` | 20% / 32% | 20% / 12% |
 | 強調の上の字 | `--on-accent` | #fff | 同 |
 | 影 / 幕 | `--shadow` / `--veil` | 0 8px 24px 45% / 45% | 12% / 25% |
-| ノードの箱 | `--node-bg` / `--node-border` / `--node-border-strong` | #232830 / #3b424d / #5d6673 | #fff / #cfd5dd / #9aa4b1 |
-| 枝の線 / 地の点 | `--edge` / `--dot` | #4d5563 / #262b33 | #b6bec9 / #dde1e7 |
 | 字体 | `--font` / `--mono` | Segoe UI 系 / JetBrains Mono 系 | 同 |
-| コードの色 | `--tok-*` 6 つ | | |
+| コードの色 | `--tok-*` 6 つ | 綴りのまま | 同 |
 
 隅からの距離 `--inset: 8px`（`.pane-tool`）、スクロールバーの実測 `--bar: 10px`。
 

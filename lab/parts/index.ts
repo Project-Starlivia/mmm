@@ -3,6 +3,7 @@
 
 import "../../src/style.css";
 import { PARTS } from "./parts.ts";
+import { mountTune } from "./tune.ts";
 
 /** 名乗らせず確かめる */
 function pick<T extends Element>(id: string, kind: new () => T): T {
@@ -12,6 +13,7 @@ function pick<T extends Element>(id: string, kind: new () => T): T {
 }
 
 const grid = pick("grid", HTMLElement);
+mountTune(pick("tune", HTMLDetailsElement));
 
 for (const p of PARTS) {
   const sec = document.createElement("section");
