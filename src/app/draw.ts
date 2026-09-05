@@ -13,6 +13,8 @@
 // **道具は選ばせるのではなく、絞って並べる。** OS のカラーピッカーと生の
 // スライダーは「何でも選べます」としか言っておらず、選ぶ手間だけを渡して
 // くる。出すのは黒とアクセントカラーと消しゴム、そして 3 段の太さだけ。
+// ピッカーは**主役にはしない**が、筆の丸をダブルクリックか右クリックすれば
+// 出て、その筆の色を差し替えられる — 並びは 2 本のまま、色だけ好きに。
 
 import { icon } from "../icons.ts";
 import { accent } from "./theme.ts";
@@ -112,9 +114,30 @@ function inkFace(value: Ink): HTMLButtonElement {
   }
   b.className = "ink";
   // 色そのものは道具の持ち物。CSS には形だけを置く
-  b.style.setProperty("--swatch", value.color);
-  b.title = value.color;
-  b.setAttribute("aria-label", `Color ${value.color}`);
+  const paint = (): void => {
+    b.style.setProperty("--swatch", value.color);
+    b.title = `${value.color} — double-click to change`;
+    b.setAttribute("aria-label", `Color ${value.color}`);
+  };
+  paint();
+  // 色の差し替え。ダブルクリックでも右クリックでも同じピッカー（見えない
+  // `<input type="color">` を押す。ロゴのアクセントカラーと同じ手）。
+  // 筆の値そのものを書き換えるので、選んでいる筆ならそのまま次の一手から効く
+  const pick = document.createElement("input");
+  pick.type = "color";
+  pick.hidden = true;
+  pick.addEventListener("input", () => {
+    value.color = pick.value;
+    paint();
+  });
+  const open = (e: Event): void => {
+    e.preventDefault();
+    pick.value = value.color;
+    pick.click();
+  };
+  b.addEventListener("dblclick", open);
+  b.addEventListener("contextmenu", open);
+  b.append(pick);
   return b;
 }
 
