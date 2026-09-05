@@ -735,3 +735,52 @@ test "定義行は保留中の水平線を飾りに落とす" {
     ],
   })
 }
+
+///|
+/// 素の URL の行と `<URL>` は、書き方が違うだけの同じリンク。
+/// **見える字が URL そのもの**なので `text` は URL になる。
+/// 開ける先だけ（`http(s)`）で、字が混ざれば Opaque。
+test "素の URL とオートリンク" {
+  fn body(md : String) -> Json {
+    match parse("# a\n\n" + md + "\n").roots[0].node {
+      HeadingNode(h) => h.body.map(b => b.content).to_json()
+      _ => "骨格が見出しでない".to_json()
+    }
+  }
+
+  json_inspect(
+    [
+      body("https://e.com/x"),
+      body("<https://e.com/x>"),
+      body("http://e.com"),
+      body("see https://e.com/x"),
+      body("https://e.com/x y"),
+      body("ftp://e.com/x"),
+      body("<mailto:a@e.com>"),
+    ],
+    content=[
+      [
+        [
+          "Link",
+          { "text": "https://e.com/x", "href": "https://e.com/x", "title": "" },
+        ],
+      ],
+      [
+        [
+          "Link",
+          { "text": "https://e.com/x", "href": "https://e.com/x", "title": "" },
+        ],
+      ],
+      [
+        [
+          "Link",
+          { "text": "http://e.com", "href": "http://e.com", "title": "" },
+        ],
+      ],
+      [["Opaque", "see https://e.com/x"]],
+      [["Opaque", "https://e.com/x y"]],
+      [["Opaque", "ftp://e.com/x"]],
+      [["Opaque", "<mailto:a@e.com>"]],
+    ],
+  )
+}
