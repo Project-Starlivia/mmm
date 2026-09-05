@@ -558,7 +558,7 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
-  width: 23px;
+  width: 24px;
   height: 10px;
   background: var(--accent);
   clip-path: polygon(0 50%, 38% 8%, 100% 50%, 38% 92%);
