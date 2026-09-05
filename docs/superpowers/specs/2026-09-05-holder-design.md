@@ -35,32 +35,52 @@ React / tree-sitter は**前後を比べる**（比べる前に位置を写す�
 地図が独自の選択を持つと決めた以上、持ち越すものが 1 つ要る。その最小が位置で、
 自作せず CodeMirror に預ける。
 
-## パイプライン
+## パイプライン — 導出は EditorState に乗せる
 
 ```
-入力                      状態（EditorState だけ）                   導出（1 トランザクション = 1 サイクル）
-──────────────────        ─────────────────────────────              ─────────────────────────────────────
-打鍵 ───────────────────→ doc                                        survey(doc) → View + spots
-undo / redo ────────────→ 履歴が doc と selection を戻す                        ↓
-地図の操作 → Op → edit ─→ 編集列を dispatch                          choice = derive(view, spots, holder, ranges, anchors)
-地図で選ぶ ─────────────→ anchors を effect で dispatch                          ↓ 箱のあるものだけ
-                          doc が変わるたび CodeMirror が                 layout → render / 輪 or 枠 / 薄塗り
-                          selection と anchors を写す
-フォーカスの移動 ───────→ holder（md | map）
+入力                      状態（EditorState だけ）                        導出（field。1 トランザクション = 1 サイクル）
+──────────────────        ─────────────────────────────                   ─────────────────────────────────────
+打鍵 ───────────────────→ doc                                             tree    = survey(doc)     docChanged のときだけ
+undo / redo ────────────→ 履歴が doc と selection を戻す                  anchors = 地図の選択の位置。changes で写る
+地図の操作 → Op → edit ─→ changes + focus の effect を 1 dispatch          holder  = md | map
+地図で選ぶ ─────────────→ anchors の effect を dispatch                    choice  = derive(tree, holder, selection, anchors)
+フォーカスの移動 ───────→ holder の effect を dispatch                              ↓
+                                                                          updateListener → map.render(state)   出口は 1 本
 ```
 
-**状態は 3 つ + 1 bit。** `doc`（真実）、`selection`（md のカーソル。CodeMirror のもの）、
-`anchors`（地図の選択の位置。StateField）、`holder`。main.ts の `doc` / `spots` / `choice` は
-サイクルの中で導いた値の置き場で、サイクルを越えて意味を持たない。
+CodeMirror が構文木を `syntaxTree(state)` の StateField で持つのと同じ位置に、core の答え
+（View + spots）を置く。`tree` の update が `docChanged` のとき core を呼ぶ。core（MoonBit）は
+CodeMirror を知らず、`survey(md)` / `edit(md, op)` のまま。map は `state` から自前の型で
+読むだけで `@codemirror/state` を import しない。
 
-core と render は選択を知らない。core は「md を読む・操作を md に映す」以外の入力を持たず
-（`survey(md)` に引数は無い）、render は「この集合を塗れ」以外を受けない。
+**状態は doc / selection / 履歴（今まで）+ tree / anchors / holder / choice（今回）。** main.ts の
+`text` / `doc` / `spots` / `choice` の写しと、`sync` / `onCaret` の 2 つの半サイクルは消える。
+
+**操作は 1 dispatch。** `dispatch({ changes: edits, effects: [focused.of(id)] })`。`anchors` の
+update は同じトランザクションの中で `tr.state.field(tree)`（後の木）を読めるので、focus の id
+をその場で位置に写す。field の依存はアクセス時に解ける（並べ順は関係ない。循環は投げる。
+`ai-docs/codemirror.md`）。
+
+**乗せる理由は拍。** 写す（`mapPos`）・undo と同じトランザクション・後の木と focus が同じ場所に
+揃う、の 3 つは doc と履歴が居る所でしか成り立たない。汎用の store を横に置くと 2 つの
+イベント系が並び、位置の写しは結局 CodeMirror から借りる。公式の System Guide も
+「ほぼ全ての場合、状態は editor-wide の update cycle に結び付けるのが良い」と言う。
+
+`@codemirror/state` は DOM 無しで動くので、field は node の試験でトランザクションを流して固定
+できる。
+
+境界は「core が意味・EditorState が状態と拍・map が見せ方」。core と render は選択を知らない。
 選択の規則は `derive` と `anchors` の 2 か所にしか無い。
 
 ## 型
 
 ```ts
-// editor.ts — CodeMirror の StateField。doc の変更で写される（mapPos, assoc = -1）
+// state.ts — StateField と effect。DOM を知らない
+tree    : StateField<{ view: View; spots: Map<number, Spot> }>   // docChanged で survey(doc)
+anchors : StateField<Anchors>                                     // changes で写る（mapPos, assoc = -1）
+holder  : StateField<Holder>                                      // effect で置く
+choice  : StateField<Choice>                                      // derive(tree, holder, selection, anchors)
+
 type Anchors =
   | { kind: "nodes"; at: number[]; anchor: number | null }   // ラベルの頭の位置。anchor は矢印・宛先の基点
   | { kind: "card"; at: number }                              // 中身の原文の頭
@@ -71,6 +91,9 @@ type Holder = "md" | "map";
 // caret.ts — 純関数。選択の規則はここだけ
 derive(view: View, spots: Map<number, Spot>, holder: Holder, ranges: Range[], anchors: Anchors): Choice
 ```
+
+effect は 3 つ: `setAnchors(Anchors)`（地図で選ぶ・引き継ぐ・捨てる）、`focused(id)`（操作。
+`anchors` が後の木で位置に写す）、`setHolder(Holder)`。
 
 `derive`:
 
@@ -116,11 +139,10 @@ dispatch する。Implicit は行が無いので入れない。以後は `anchor
 focus をどうするか。
 
 - `apply(op, edit)` — **持ち主が選択に対して行った操作**（地図のキー・メニュー・ドラッグ・
-  ラベル欄・カード欄・貼り付け・リンク・コード）。サイクル（parse 1 回）の後、返った focus
-  を新しい `spots` で位置に写し、`anchors` に dispatch（2 回目。parse は走らない）。focus が
-  ノードなら nodes、中身なら card。`edit` なら focus のその場編集を開く。編集も focus も
-  無い（できない操作）ときは `failed`（今と同じ）。編集は有るが focus が無い（最後の根を
-  消した）ときは `anchors` を null に
+  ラベル欄・カード欄・貼り付け・リンク・コード）。`changes` と `focused(id)` を 1 dispatch。
+  `anchors` の update が後の木で id を位置に写す — ノードなら nodes、中身なら card。`edit`
+  なら focus のその場編集を開く。編集も focus も無い（できない操作）ときは `failed`（今と
+  同じ）。編集は有るが focus が無い（最後の根を消した）ときは `anchors` を null に
 - `write(op)` — **それ以外の書き込み**（ファイルの投下、お絵描き、画像の貼り付け、宣言の
   書き換え）。md に映すだけで、選択には触らない。地図にフォーカスが無くても起きる操作が
   ここに来る
@@ -169,10 +191,12 @@ spec.md「二つをまたぐ印」の表はそのまま。意味だけ変わる�
 
 ## 増えるもの
 
-- editor.ts: `anchors` の StateField と effect、`ranges()`（いつでも）、更新の通知に
-  「anchors が変わった」を足す（doc が変わらなくても derive を走らせる）
+- state.ts（新設）: `tree` / `anchors` / `holder` / `choice` の StateField と 3 つの effect。
+  DOM を知らない。node で試験する
+- editor.ts: `state.ts` の field を extensions に載せ、`updateListener` 1 本で `state` を host へ
 - caret.ts: `derive`、`buried`、点の規則
-- main.ts: `holder`（focusin 2 本）、引き継ぎ、`choose` が位置に写して dispatch
+- main.ts: focusin 2 本で `setHolder` を dispatch（引き継ぎは `setAnchors` も）、`choose` が
+  位置に写して dispatch。`text` / `doc` / `spots` / `choice` の変数と `sync` / `onCaret` は消える
 - core `op/apply.mbt` の `delete`: 隣の focus。law_wbtest に「Delete の focus は消えていない
   兄弟か親で、埋もれていない」を足す
 - design.md「段の間の法則」に足す: **id の順 = 文書順**（select.ts の sort、`Layout.order`）、
@@ -186,7 +210,8 @@ core/op/apply.mbt            delete の focus（次の兄弟 → 前 → 親）
 core/edit/law_wbtest.mbt     目印の生存を外し、Delete の focus の法則を足す
 core/tree/js/exports.mbt     mmmSurvey(md)
 src/coreApi.ts               survey(md)。Mark / Trail / Survey.trails を外す
-src/editor.ts                anchors の StateField、ranges()、onUpdate
+src/state.ts                 tree / anchors / holder / choice の StateField と effect（新設）
+src/editor.ts                field を載せる。updateListener 1 本
 src/caret.ts                 caretIds（点の規則）、derive、buried
 src/map/select.ts            neighbor / under を外す
 src/map/keys.ts              Intent.keep を外す
@@ -202,6 +227,9 @@ docs/design.md, spec.md, core.md
 - `core/edit/law_wbtest.mbt` — Delete の focus は消えていない兄弟か親。目印の生存は消す
 - `test/caret.test.ts` — 点の規則（継ぎ目で始まる側 1 つ、末尾の閉じ際）、`derive` の表
   （holder × anchors の種類 × 埋もれ）、`buried`
+- `test/state.test.ts` — `EditorState` を node で作り、トランザクションを流す: 上に足しても
+  anchors が同じノードに着く、undo で戻る、`focused` が後の木で位置に写る、holder の切り替えで
+  choice が変わる、parse は docChanged の回数だけ
 - `test/keys.test.ts` / `test/select.test.ts` — keep / neighbor の行を消す
 - `test/coreApi.test.ts` — `survey(md)` の形
 - ブラウザは煙試験だけ: md で打つと輪が動く、地図へ移ると輪が枠になり md が薄塗りになる、
@@ -216,11 +244,17 @@ squash。#59（refactor/parts-anywhere）が mindmap.ts と style.css を触っ�
 
 1. core — `delete` の focus と法則、`follow` の撤去、`mmmSurvey(md)`
 2. ts 純粋層 — caret.ts（点の規則・`derive`・`buried`）、select.ts / keys.ts から keep 系を外す
-3. ts 配線 — editor.ts の anchors、main.ts の holder / 引き継ぎ / choose / apply、mindmap.ts
-4. docs — design.md / spec.md / core.md
+3. ts 状態 — state.ts（field と effect、node の試験）
+4. ts 配線 — editor.ts に載せる、main.ts の変数と半サイクルを畳む、apply / write、mindmap.ts
+5. docs — design.md / spec.md / core.md（境界の言い方に「EditorState が状態と拍」を足す）、
+   #67（CodeMirror を選んだ理由）
 
 ## 将来
 
+- `edit` は合流の検証で結果の md を既に parse しているので、`Edited` に view と spots を同梱
+  すれば `tree` の update は effect にそれが在れば parse を省ける（1 操作 4 回 → 3 回）
+- `Language.state` と同じく、`tree` の update の同期の仕事に上限を置いて残りを idle に回す手が
+  ある。遅くなったら
 - 全ノードのラベルの頭を同じ器（CodeMirror の位置）に置けば、前のサイクルの id と今の id の
   対応が同じ仕組みで取れる。render の差分（上に足すと以降が作り直される）を詰めるときの入口
 - 地図で選んだとき md のカーソルも動かす（アウトライン型に寄せる）と `anchors` も要らなくなる。
