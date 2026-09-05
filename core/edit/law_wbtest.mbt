@@ -4,7 +4,8 @@
 //   focus — 読み替えた focus は、後の木で focus だったのと同じ部分木を指す
 //   できない操作 — 編集も focus も無い
 //   目印の生存 — 中身だけを変える操作の後、持ち主のラベルの目印は同じノードに着く
-//   隙間の保存 — どの操作の後も、元に無かった連続空行と頭の空行は生まれない
+//   隙間の保存 — どの操作の後も、元に無かった連続空行と頭の空行は生まれない。
+//              足すだけの操作（AddNode / AddBlock / Graft）で空行の数は減らない
 //
 // 見本 × 全 id × Op の作り方で回す。Op の作り方は op の check の法則と同じ。
 
@@ -14,7 +15,8 @@ let corpus : Array[String] = [
   "intro\n\n# r\n\n## a\n\n---\n\n## b\n\n***\n\n## c\n", "---\nk: v\n---\n\n# a\n\n- i\n  - j\n\n# b\n",
   "# r\r\n\r\n## a\r\n\r\n### x\r\n", "# r\n\n<details open>\n<summary>s</summary>\n\n## a\n\nx\n\n</details>\n\n## b\n",
   "hello\n\n- a\n- b\n\n<!-- c -->\n", "# r\n\n## a\n\nhello", "# a\n\n#### deep\n\n## b\n",
-  "# a\r\n\r\n#### deep\r\n\r\n## b\r\n", "# a\n  \n#### deep\n\n## b\n",
+  "# a\r\n\r\n#### deep\r\n\r\n## b\r\n", "# a\n  \n#### deep\n\n## b\n", "# r\n\n- a\n- b\n",
+  "- x\n\n  y\n\n  - a\n  - b\n",
 ]
 
 ///|
@@ -199,7 +201,7 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
   }
   json_inspect(bad, content=[])
   // 全部 None に潰れる退化を落とすための下限チェック
-  inspect(some, content="894")
+  inspect(some, content="990")
 }
 
 ///|
@@ -353,7 +355,7 @@ test "法則 — 目印の生存。中身だけを変えれば、持ち主のラ
   }
   json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
-  inspect(seen, content="132")
+  inspect(seen, content="158")
 }
 
 ///|
@@ -369,6 +371,16 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
       }
       n = n + 1
       let out = @tree.apply(md, r.edits)
+      let keeps = match op {
+        // Wrap と Fold は部分木ごと正規形で書き直すので、そこでは正規形の空行の数になる
+        AddNode(..) | AddBlock(..) | Graft(..) => true
+        _ => false
+      }
+      if keeps && blank_lines(out) < blank_lines(md) {
+        bad.push(
+          "\{i} \{op.to_json().stringify()}: 空行が減った \{out.to_json().stringify()}",
+        )
+      }
       if blank_run(out) > blank_run(md) {
         bad.push(
           "\{i} \{op.to_json().stringify()}: 連続空行 \{out.to_json().stringify()}",
@@ -385,7 +397,7 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   }
   json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
-  inspect(n, content="863")
+  inspect(n, content="954")
 }
 
 ///|
@@ -405,4 +417,20 @@ fn blank_run(md : String) -> Int {
     }
   }
   best
+}
+
+///|
+/// 空行の数（空白だけの行も空行）
+fn blank_lines(md : String) -> Int {
+  let lines = md.replace_all(old="\r\n", new="\n").split("\n").collect()
+  let mut n = 0
+  for i, line in lines {
+    if i == lines.length() - 1 {
+      break
+    }
+    if line.trim(chars=" \t").is_empty() {
+      n = n + 1
+    }
+  }
+  n
 }

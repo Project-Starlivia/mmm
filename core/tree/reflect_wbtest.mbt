@@ -743,3 +743,49 @@ test "setext の見出しに子を足しても、下線の中に差さない" {
   )
   json_inspect(edits, content=[{ "from": 6, "to": 6, "insert": "\n## c\n" }])
 }
+
+///|
+test "空行の後に詰めて書いた列の頭を包んでも、その空行は残る" {
+  let md = "# r\n\n- a\n- b\n"
+  let (before, spans) = survey(md)
+  let kids = children_of(before.roots[0].node)
+  let w = ListNode({ id: 99, label: "w", fold: None, body: [], children: [] })
+  let wrapped = with_children(
+    ListNode({ id: 99, label: "w", fold: None, body: [], children: [] }),
+    [kids[0]],
+  )
+  ignore(w)
+  let after = change(before, 0, [], x => with_children(x, [wrapped, kids[1]]))
+  inspect(
+    apply(md, reflect(md, before, spans, after)),
+    content="# r\n\n- w\n  - a\n- b\n",
+  )
+  let loose = "# r\n\n- a\n\n- b\n"
+  let (b2, s2) = survey(loose)
+  let k2 = children_of(b2.roots[0].node)
+  let z = ListNode({ id: 98, label: "z", fold: None, body: [], children: [] })
+  inspect(
+    apply(
+      loose,
+      reflect(
+        loose,
+        b2,
+        s2,
+        change(b2, 0, [], x => with_children(x, [z, k2[1]])),
+      ),
+    ),
+    content="# r\n\n- z\n\n- b\n",
+  )
+}
+
+///|
+test "散文を消しながら根の頭に差しても、文書の頭に空行は生まれない" {
+  let md = "hello\n\n# a\n"
+  let (before, spans) = survey(md)
+  let after : Doc = {
+    ..before,
+    body: [],
+    roots: [{ node: fresh("z"), sides: [] }] + before.roots,
+  }
+  inspect(apply(md, reflect(md, before, spans, after)), content="# z\n\n# a\n")
+}

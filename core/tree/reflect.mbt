@@ -34,6 +34,9 @@ pub fn reflect(
   spans : Map[Int, Spot],
   after : Doc,
 ) -> Array[Edit] {
+  if before == after {
+    return []
+  }
   match plan(md, before, spans, after) {
     Some(edits) if shape(parse(apply(md, edits))) == shape(after) => edits
     _ => [{ from: 0, to: md.length(), insert: serialize(after) }]
@@ -148,7 +151,9 @@ fn elements(doc : Doc) -> Array[Int] {
 }
 
 ///|
-/// 部分木の最初の要素。Implicit を下って最初の行を持つノード
+/// 部分木の最初の要素。Implicit を下って最初の行を持つノード。子の無い Implicit は
+/// 在り得ない（check が言う）ので None は来ないが、来れば theirs の既定に落ちて
+/// 検証が全文へ落とす
 fn head_element(x : Node) -> Int? {
   match x {
     ImplicitNode(g) =>
@@ -305,7 +310,10 @@ fn diff(r : Reflect, q : Seq) -> Unit {
   let at = (id : Int) => r.spans.get(id).unwrap()
   let gap_text = (id : Int) => if (q.gap)(id) { eol(r) } else { "" }
   // 列の頭に新しい物が来るか（頭の並びを消すとき、境目を残すかに要る）
-  let head_born = q.news.get(0) is Some(id) && !was.contains(id)
+  // 列ごと消えるとき、生まれ直すなら境目を残す（全部消えたなら news の頭は必ず新しい）
+  let head_born = !q.news.is_empty()
+  // 文書の頭に来る要素（theirs が「手前に隙間は無い」と言う）。その手前の境目は消す
+  let headless = (id : Int) => !r.theirs.get(id).unwrap_or(true)
   // 境目を引き継いだ物（隙間の書き換えを飛ばす）
   let mut inherited : Int? = None
   let mut i = 0
@@ -323,14 +331,16 @@ fn diff(r : Reflect, q : Seq) -> Unit {
     let first = q.olds[start]
     let last = at(q.olds[i - 1]).to
     let head = !kept_before
-    let edge = if head && i < q.olds.length() {
+    let (from, to) = if head && i < q.olds.length() {
       let next = q.olds[i]
       inherited = Some(next)
+      // 後ろに残る物が後の列の頭で、しかも文書の頭なら境目ごと。そうでなければ境目は残す
+      let bare = q.news.get(0) == Some(next) && headless(next)
       (
-        if r.theirs.get(next).unwrap_or(true) {
-          line_start(r.md, at(first).from)
-        } else {
+        if bare {
           r.gap.get(first).unwrap()
+        } else {
+          line_start(r.md, at(first).from)
         },
         line_start(r.md, at(next).from),
       )
@@ -339,7 +349,7 @@ fn diff(r : Reflect, q : Seq) -> Unit {
     } else {
       (r.gap.get(first).unwrap(), last)
     }
-    r.out.push({ from: edge.0, to: edge.1, insert: "" })
+    r.out.push({ from, to, insert: "" })
   }
   let body = (id : Int) => pad(q.col) + indent((q.make)(id), q.col)
   let pend : Array[Int] = []
@@ -348,13 +358,22 @@ fn diff(r : Reflect, q : Seq) -> Unit {
     if was.contains(id) {
       if !pend.is_empty() {
         if kept is None {
-          // 列の頭。境目の後ろに置き、隙間は次に残る物との間に
+          // 列の頭。境目の後ろに置き、隙間は次に残る物との間に。
+          // 差す物が文書の頭なら（手前に何も残らない）、境目ごと置き換える
           let text = pend
             .mapi((k, x) => (if k == 0 { "" } else { gap_text(x) }) + body(x))
             .join("") +
             gap_text(id)
-          let pos = line_start(r.md, at(id).from)
-          r.out.push({ from: pos, to: pos, insert: text })
+          let pos = if headless(pend[0]) {
+            r.gap.get(id).unwrap()
+          } else {
+            line_start(r.md, at(id).from)
+          }
+          r.out.push({
+            from: pos,
+            to: line_start(r.md, at(id).from),
+            insert: text,
+          })
           inherited = Some(id)
         } else {
           let pos = r.gap.get(id).unwrap()
