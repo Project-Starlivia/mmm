@@ -112,13 +112,21 @@ dispatch する。Implicit は行が無いので入れない。以後は `anchor
 走らず、`derive` だけが走る。`reveal` は anchor の位置へ md をスクロールする（今と同じ。
 スクロールはカーソルではない）。
 
-**操作。** `edit(text, op)` の編集列を dispatch → サイクル（parse 1 回）→ 返った focus を
-新しい `spots` で位置に写し、`anchors` に dispatch（2 回目。parse は走らない）。focus が
-ノードなら nodes、中身なら card。`edit` なら focus のその場編集を開く。編集も focus も
-無い（できない操作）ときは `failed`（今と同じ）。編集は有るが focus が無い（最後の根を
-消した）ときは `anchors` を null に。holder が md のまま操作が来たら（ファイルの投下、
-帯からの宣言の書き換え）、`anchors` は書くが `derive` はカーソルから導くので効かない
-— 持ち主が md なら md が決める、で一貫させる。
+**操作。** 入口は 2 つ。どちらも `edit(text, op)` の編集列を dispatch するだけで、違いは
+focus をどうするか。
+
+- `apply(op, edit)` — **持ち主が選択に対して行った操作**（地図のキー・メニュー・ドラッグ・
+  ラベル欄・カード欄・貼り付け・リンク・コード）。サイクル（parse 1 回）の後、返った focus
+  を新しい `spots` で位置に写し、`anchors` に dispatch（2 回目。parse は走らない）。focus が
+  ノードなら nodes、中身なら card。`edit` なら focus のその場編集を開く。編集も focus も
+  無い（できない操作）ときは `failed`（今と同じ）。編集は有るが focus が無い（最後の根を
+  消した）ときは `anchors` を null に
+- `write(op)` — **それ以外の書き込み**（ファイルの投下、お絵描き、画像の貼り付け、宣言の
+  書き換え）。md に映すだけで、選択には触らない。地図にフォーカスが無くても起きる操作が
+  ここに来る
+
+**選択を書くのは持ち主の操作だけ**、がフロント全般の法則（design.md に載せる）。
+`declare` は既にこの形（`apply` を通さない）。`attachImage` を `write` に移す。
 
 **core の `delete` はノードを消しても focus を返す。** 消す並びの先頭（文書順）の
 **次の兄弟 → 前の兄弟 → 親**。消えるもの（ids とその子孫）は飛ばす。親が Implicit で
@@ -167,8 +175,9 @@ spec.md「二つをまたぐ印」の表はそのまま。意味だけ変わる�
 - main.ts: `holder`（focusin 2 本）、引き継ぎ、`choose` が位置に写して dispatch
 - core `op/apply.mbt` の `delete`: 隣の focus。law_wbtest に「Delete の focus は消えていない
   兄弟か親で、埋もれていない」を足す
-- design.md「段の間の法則」に所見 4 を足す: **id の順 = 文書順**（select.ts の sort、
-  `Layout.order`）、**中身は子より前に書かれる**（caret.ts の自身の文）
+- design.md「段の間の法則」に足す: **id の順 = 文書順**（select.ts の sort、`Layout.order`）、
+  **中身は子より前に書かれる**（caret.ts の自身の文）、**選択を書くのは持ち主の操作だけ**
+  （`apply` と `write` の線引き）
 
 ## 構成
 
@@ -182,7 +191,8 @@ src/caret.ts                 caretIds（点の規則）、derive、buried
 src/map/select.ts            neighbor / under を外す
 src/map/keys.ts              Intent.keep を外す
 src/mindmap.ts               apply の第 3 引数を外す。塗りは host の値をそのまま
-src/main.ts                  holder、引き継ぎ、choose → anchors、apply → focus → anchors
+src/main.ts                  holder、引き継ぎ、choose → anchors、apply → focus → anchors、
+                             write（attachImage / declare。選択に触らない）
 docs/design.md, spec.md, core.md
 ```
 
