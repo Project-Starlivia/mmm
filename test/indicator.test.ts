@@ -1,13 +1,17 @@
-// 画面外にある対象を指す針。位置と向きの算術だけを固定する。
+// 画面外にある対象を指す針。何を指すかの決めと、位置と向きの算術を固定する。
 //
 // 実行: pnpm test
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { indicatorFor, isVisible } from "../src/map/indicator.ts";
+import type { Rect } from "../src/map/geometry.ts";
+import { indicatorFor, isLost, isVisible, nearest } from "../src/map/indicator.ts";
 
 const PANE = { width: 800, height: 600 };
 const V = { k: 1, tx: 0, ty: 0 };
+
+/** その場所に置いた、ありふれた大きさの箱 */
+const box = (x: number, y: number): Rect => ({ x, y, w: 100, h: 60 });
 
 test("画面の中に少しでも重なっていれば見えている", () => {
   assert.ok(isVisible({ x: 0, y: 0, w: 10, h: 10 }, V, PANE));
@@ -46,4 +50,40 @@ test("パン・ズームしても world 上の位置関係で向きが決まる"
   const ind = indicatorFor({ x: 5000, y: 5000, w: 0, h: 0 }, zoomed, PANE);
   // 中心から見て右下方向のまま
   assert.ok(ind.angle > 0 && ind.angle < 90);
+});
+
+// ---------- 見失っているか ----------
+
+test("どれも見えていなければ、見失っている", () => {
+  assert.ok(isLost([box(5000, 300), box(-5000, 0)], V, PANE));
+});
+
+test("1 つでも見えていれば、見失っていない", () => {
+  assert.ok(!isLost([box(-5000, 0), box(100, 100)], V, PANE));
+});
+
+test("1 つも無ければ、見失っている（指す先が無いので針は出ない）", () => {
+  assert.ok(isLost([], V, PANE));
+  assert.equal(nearest([], V, PANE), null);
+});
+
+// ---------- 指す先 ----------
+
+test("画面の中心にいちばん近いものを指す", () => {
+  const far = box(5000, 300);
+  const near = box(1000, 300);
+  assert.deepEqual(nearest([far, near], V, PANE), near);
+});
+
+test("画面を左右から挟んでいても、近いほうを指す", () => {
+  const left = box(-300, 270); // 箱の中心は -250 — ペイン中心(400)から 650
+  const right = box(900, 270); // 箱の中心は 950 — 550
+  assert.deepEqual(nearest([left, right], V, PANE), right);
+});
+
+test("近さは今の視点で測る（パン・ズームで入れ替わる）", () => {
+  const a = box(0, 0);
+  const b = box(1000, 0);
+  assert.deepEqual(nearest([a, b], V, PANE), a);
+  assert.deepEqual(nearest([a, b], { k: 1, tx: -1000, ty: 0 }, PANE), b);
 });
