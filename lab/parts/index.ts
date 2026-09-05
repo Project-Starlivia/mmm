@@ -33,6 +33,10 @@ for (const p of PARTS) {
       cell.className = theme === "light" ? "cell light" : "cell";
       cell.style.height = `${p.height ?? DEFAULT_HEIGHT}px`;
       cell.title = `${p.name} / ${state} / ${theme}`;
+      // ホイールはページのもの。マップは自分のペインでホイールを捕まえて
+      // 視点を動かす（アプリでは正しい）が、一覧では 16 枠ぶんの地図の上で
+      // ページが止まってしまう。合成した wheel（indicator の状態）は通す
+      cell.addEventListener("wheel", (e) => e.isTrusted && e.stopPropagation(), { capture: true });
       cell.append(build());
       row.append(cell);
     }
