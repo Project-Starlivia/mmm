@@ -33,12 +33,33 @@ export type Intent =
   | { kind: "code"; id: number }
   | { kind: "draw"; id: number }
   /** クリップボードを貼る。anchor があればそこへ、無ければ文書へ（main.ts の act が実行） */
-  | { kind: "paste" };
+  | { kind: "paste" }
+  /** 選んでいるもの（カードならその原文、でなければ選択の部分木）をクリップボードへ写す。
+   *  cut は写せてから消すもの（Delete と同じ Intent）。写せなければ消さない */
+  | { kind: "copy"; cut: Intent | null };
 
 const op = (o: core.Op): Intent => ({ kind: "op", op: o, edit: true });
 
 /** 空のラベルで足す。読めば label "" になり、そのまま打ち始める */
 const add = (at: core.NodePlace): Intent => op({ kind: "addNode", at, labels: [""] });
+
+/** 選択を消して、隣を keep する（Delete と Mod+X が同じものを使う） */
+function remove(L: Layout, sel: Selection): Intent | null {
+  if (sel.ids.length === 0) return null;
+  const keep = neighbor(L, sel.ids);
+  const o: Intent = { kind: "op", op: { kind: "delete", ids: sel.ids }, edit: false };
+  return keep === null ? o : { ...o, keep };
+}
+
+/** Mod+C / Mod+X。写すものが無ければ null。cut は消すもの（無ければ Mod+X も拾わない） */
+function copied(k: Key, cut: () => Intent | null): Intent | null {
+  if (!k.mod || k.alt || k.shift) return null;
+  const key = k.key.toLowerCase();
+  if (key === "c") return { kind: "copy", cut: null };
+  if (key !== "x") return null;
+  const c = cut();
+  return c === null ? null : { kind: "copy", cut: c };
+}
 
 /**
  * キー 1 回ぶん。null は拾わない（ブラウザに渡す）。
@@ -57,6 +78,10 @@ export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
   if (k.alt && k.key !== "ArrowUp" && k.key !== "ArrowDown") return null;
   // anchor が無くても拾う（貼る先が無ければ文書へ）。anchor 頼みの行より先に置く
   if (k.mod && !k.alt && !k.shift && k.key.toLowerCase() === "v") return { kind: "paste" };
+  if (sel.ids.length > 0) {
+    const c = copied(k, () => remove(L, sel));
+    if (c !== null) return c;
+  }
   const anchor = sel.anchor;
   const label = anchor === null ? null : (L.boxes.get(anchor)?.node.label ?? null);
   const blank = label === "";
@@ -89,12 +114,7 @@ export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
       ? null
       : { kind: "op", op: { kind: "moveNode", ids: sel.ids, at: { kind: "in", node: prev, side: null } }, edit: false };
   }
-  if ((k.key === "Delete" || k.key === "Backspace") && !k.mod) {
-    if (sel.ids.length === 0) return null;
-    const keep = neighbor(L, sel.ids);
-    const o: Intent = { kind: "op", op: { kind: "delete", ids: sel.ids }, edit: false };
-    return keep === null ? o : { ...o, keep };
-  }
+  if ((k.key === "Delete" || k.key === "Backspace") && !k.mod) return remove(L, sel);
   if (k.alt && (k.key === "ArrowUp" || k.key === "ArrowDown") && !k.mod) {
     if (sel.ids.length === 0) return null;
     const first = sel.ids[0];
@@ -145,10 +165,11 @@ export function keyedCard(L: Layout, picked: number, k: Key): Intent | null {
   const owner = o.box.node;
   const blocks = owner.blocks;
   const index = o.index;
-  if ((k.key === "Delete" || k.key === "Backspace") && !k.mod) {
-    // 消した後に持ち主を選ぶのは core の focus（持ち主ごと書き直されるので目印は追えない）
-    return { kind: "op", op: { kind: "delete", ids: [picked] }, edit: false };
-  }
+  // 消した後に持ち主を選ぶのは core の focus（持ち主ごと書き直されるので目印は追えない）
+  const remove: Intent = { kind: "op", op: { kind: "delete", ids: [picked] }, edit: false };
+  if ((k.key === "Delete" || k.key === "Backspace") && !k.mod) return remove;
+  const c = copied(k, () => remove);
+  if (c !== null) return c;
   if ((k.key === "ArrowDown" || k.key === "ArrowUp") && !k.mod && !k.alt) {
     const next = k.key === "ArrowDown" ? blocks[index + 1] : blocks[index - 1];
     return next === undefined ? null : { kind: "pick", id: next.id };

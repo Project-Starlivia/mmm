@@ -25,6 +25,7 @@ import { ask, askText, askYesNo } from "./app/ask.ts";
 import { blocked, failed } from "./app/notice.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
+import { copyText } from "./app/copy.ts";
 import { decidePaste } from "./app/paste.ts";
 import { initDrop } from "./app/dnd.ts";
 import { showDrawing } from "./app/draw.ts";
@@ -268,6 +269,7 @@ const host: MapHost = {
   },
   apply,
   paste,
+  copy,
   draw,
 };
 const map = new Mindmap(mapPane, host);
@@ -527,6 +529,24 @@ function draw(id: number): void {
       drawingOpen = false;
       mapPane.focus();
     });
+}
+
+/**
+ * 選んでいるものをクリップボードへ写す（Mod+C / Mod+X）。カードを選んでいれば
+ * その原文、でなければ選択の部分木（`copyText`）。書けたかを返す — Cut は
+ * 書けてから消す（mindmap.ts の act）
+ */
+async function copy(): Promise<boolean> {
+  const clip = picked !== null ? host.blockText(picked) : copyText(text, doc, spots, selection.ids);
+  if (clip === "") return false;
+  try {
+    await navigator.clipboard.writeText(clip);
+    return true;
+  } catch (err) {
+    console.error("copy failed:", err);
+    failed("Couldn't copy");
+    return false;
+  }
 }
 
 /**

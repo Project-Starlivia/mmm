@@ -54,6 +54,9 @@ export interface MapHost {
   apply(op: core.Op, edit: boolean, keep?: number): number | null;
   /** クリップボードを貼る（Mod+V）。宛先は選択の anchor、無ければ文書 */
   paste(): void;
+  /** 選んでいるもの（カードならその原文、でなければ選択の部分木）をクリップボードへ
+   *  写す（Mod+C / Mod+X）。写せたか — 写せなければ Cut は消さない */
+  copy(): Promise<boolean>;
   /** そのノードへ描いて貼る（Shift+D）。窓を開いて、確定した絵を保存する */
   draw(id: number): void;
 }
@@ -832,6 +835,14 @@ export class Mindmap {
       case "paste":
         this.host.paste();
         return;
+      case "copy": {
+        // 消すのは写せてから。写せなければ（クリップボードが断った）何も失わない
+        const cut = intent.cut;
+        void this.host.copy().then((ok) => {
+          if (ok && cut !== null) this.act(cut);
+        });
+        return;
+      }
     }
   }
 
