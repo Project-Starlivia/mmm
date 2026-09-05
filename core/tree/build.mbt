@@ -52,7 +52,7 @@ pub(all) struct Spot {
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// md を木にし、地番（ノード id → 原文の範囲）も返す。反映が使う。
+/// md を木にし、地番（ノード id → 原文の範囲）も返す。合流が使う。
 pub fn survey(md : String) -> (Doc, Map[Int, Spot]) {
   build(md, read(md))
 }

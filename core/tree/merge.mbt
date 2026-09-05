@@ -87,7 +87,7 @@ fn plan(
   let olds_n = before.roots.map(x => x.node)
   let news_n = after.roots.map(x => x.node)
   guard aligned(ids(olds_n), ids(news_n)) else { return None }
-  guard gaps_of(before) is Some(base) && gaps_of(after) is Some(theirs) else {
+  guard canon_gaps(before) is Some(base) && canon_gaps(after) is Some(theirs) else {
     return None
   }
   let r : Merge = {
@@ -95,7 +95,7 @@ fn plan(
     spans,
     eol: before.eol,
     old: Map([]),
-    gap: gaps_in(md, spans),
+    gap: gaps(md, spans),
     base,
     theirs,
     out: [],
@@ -104,7 +104,7 @@ fn plan(
     index(r.old, root.node)
   }
   // 文書の散文。容器の自分の尻は散文の頭（frontmatter の尻）
-  body(r, before.body, after.body, spans.get(doc_id).unwrap().from, 0)
+  merge_body(r, before.body, after.body, spans.get(doc_id).unwrap().from, 0)
   // 側は根のもの。変われば根が丸ごと（子の増減で長さが変わるだけ — 全部 Right — は同じ）
   let olds = Map::from_array(before.roots.map(x => (id_of(x.node), x.sides)))
   let sides = Map::from_array(after.roots.map(x => (id_of(x.node), x.sides)))
@@ -115,7 +115,7 @@ fn plan(
       _ => ()
     }
   }
-  kids(r, spans.get(doc_id).unwrap().to, 0, olds_n, news_n, 1, sides)
+  merge_kids(r, spans.get(doc_id).unwrap().to, 0, olds_n, news_n, 1, sides)
   Some(settle(r))
 }
 
@@ -168,7 +168,7 @@ fn head_element(x : Node) -> Int? {
 ///|
 /// ours の隙間 — 地番を持つものごとに、手前に続く空行の頭。Implicit の範囲の頭は
 /// 最初の子の頭なので、Implicit の隙間はその子の隙間。
-fn gaps_in(md : String, spans : Map[Int, Spot]) -> Map[Int, Int] {
+fn gaps(md : String, spans : Map[Int, Spot]) -> Map[Int, Int] {
   let out : Map[Int, Int] = Map([])
   for id, s in spans {
     out[id] = blank_start(md, line_start(md, s.from))
@@ -179,7 +179,7 @@ fn gaps_in(md : String, spans : Map[Int, Spot]) -> Map[Int, Int] {
 ///|
 /// 正規形の隙間 — 木を正規形に書いて読み直し、要素ごとに手前に空行が有るかを見る。
 /// 要素は文書順に 1 対 1 で並ぶので、順に組にする。並ばなければ None（全文へ落ちる）。
-fn gaps_of(doc : Doc) -> Map[Int, Bool]? {
+fn canon_gaps(doc : Doc) -> Map[Int, Bool]? {
   let canon = serialize(doc)
   let (read, spans) = survey(canon)
   let mine = elements(doc)
@@ -220,7 +220,7 @@ fn gaps_of(doc : Doc) -> Map[Int, Bool]? {
 /// 前の木の同じ id と比べる。種類・畳み・子の並びが変わっていれば部分木ごと書く。
 /// そうでなければ、行（ラベル）・中身・子の 3 つの列をそれぞれ差分にする —
 /// 行が同じなら行には触らない（そこに選択の目印が在る）。
-fn walk(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
+fn merge_node(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
   match r.old.get(id_of(x)) {
     // 畳みは `<details>` が部分木を包むので、自分か子列が変わればそこから丸ごと
     Some(old) if kind(old) == kind(x) &&
@@ -247,10 +247,10 @@ fn walk(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
               ),
             })
           }
-          body(r, body_of(old), body_of(x), line_to, col)
+          merge_body(r, body_of(old), body_of(x), line_to, col)
         }
       }
-      kids(
+      merge_kids(
         r,
         own_end(r, old),
         col,
@@ -304,7 +304,7 @@ priv struct Seq {
 /// - 増える並びは、次に残る物の隙間の頭か、前に残る物の尻か、容器の自分の尻に差し、
 ///   1 つずつ theirs の隙間を連れてくる。列の頭に差すなら境目の後ろに置き、隙間は
 ///   次に残る物との間に付ける
-fn diff(r : Merge, q : Seq) -> Unit {
+fn merge_seq(r : Merge, q : Seq) -> Unit {
   let now = Map::from_array(q.news.map(id => (id, ())))
   let was = Map::from_array(q.olds.map(id => (id, ())))
   let at = (id : Int) => r.spans.get(id).unwrap()
@@ -441,7 +441,7 @@ fn diff(r : Merge, q : Seq) -> Unit {
 ///|
 /// 子列の差分。残った子には降りる。項目の列は ours の兄弟の流儀（詰まっているか）を
 /// 増える物にも写す — 正規形は流儀を知らないので、ここだけは ours が先。
-fn kids(
+fn merge_kids(
   r : Merge,
   own : Int,
   col : Int,
@@ -465,7 +465,7 @@ fn kids(
   } else {
     None
   }
-  diff(r, {
+  merge_seq(r, {
     olds: old_ids,
     news: ids(news),
     own,
@@ -477,7 +477,7 @@ fn kids(
       }
     },
     keep: id => {
-      walk(r, now.get(id).unwrap(), depth, sides.get(id).unwrap_or([]))
+      merge_node(r, now.get(id).unwrap(), depth, sides.get(id).unwrap_or([]))
     },
     make: id => {
       fragment(now.get(id).unwrap(), depth, sides.get(id).unwrap_or([]), r.eol)
@@ -488,7 +488,7 @@ fn kids(
 ///|
 /// 中身の列の差分。内容だけ変わった中身はその範囲を置き換える。
 /// 並びが変われば列ごと — 全部消して全部差す（同じ規則で隙間が付く）。
-fn body(
+fn merge_body(
   r : Merge,
   olds : Array[Block],
   news : Array[Block],
@@ -505,8 +505,8 @@ fn body(
   let make = (id : Int) => prose([now.get(id).unwrap()], r.eol)
   let gap = (id : Int) => r.theirs.get(id).unwrap_or(true)
   if !aligned(old_ids, new_ids) {
-    diff(r, { olds: old_ids, news: [], own, col, gap, keep: _ => (), make })
-    diff(r, {
+    merge_seq(r, { olds: old_ids, news: [], own, col, gap, keep: _ => (), make })
+    merge_seq(r, {
       olds: [],
       news: new_ids,
       own: r.gap.get(old_ids[0]).unwrap(),
@@ -517,7 +517,7 @@ fn body(
     })
     return
   }
-  diff(r, {
+  merge_seq(r, {
     olds: old_ids,
     news: new_ids,
     own,
@@ -616,13 +616,13 @@ fn mid_line(md : String, at : Int) -> Bool {
 ///|
 /// 部分木ごと断片にして、地番に差す。
 fn replace(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
-  r.out.push(edit(r, id_of(x), fragment(x, depth, sides, r.eol)))
+  r.out.push(rewrite(r, id_of(x), fragment(x, depth, sides, r.eol)))
 }
 
 ///|
 /// 地番 id の範囲を text で置き換える編集。項目の入れ子は列 0 で出るので、
 /// 容器の桁に揃える（1 行目はもう容器が字下げしている）。
-fn edit(r : Merge, id : Int, text : String) -> Edit {
+fn rewrite(r : Merge, id : Int, text : String) -> Edit {
   // 前の木に無い id はここへ来ない — 親の子 id 列が違うので親が書かれる
   let s = r.spans.get(id).unwrap()
   { from: s.from, to: s.to, insert: indent(text, column(r.md, s.from)) }

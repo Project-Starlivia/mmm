@@ -89,11 +89,11 @@ TS では必ず持ち主を付けて `core.View` / `core.Node` と書く（`impo
 ## パイプライン
 
 ```
-読み   md ──mizchi/markdown──> mdAst ──方言(mend)──> mdAst ──build──> Doc + 地番 ──project──> View
+読み   md ──mizchi/markdown──> mdAst ──方言(dialect)──> mdAst ──build──> Doc + 地番 ──project──> View
 書き   Doc ──unbuild──> mdAst ──mizchi/markdown──> 字 ──綴り(spell)──> 正規形の md
 合流   md + 前の Doc + 地番 + 後の Doc ──merge──> 編集リスト ──> CodeMirror
 操作   Doc ──apply(op)──> Doc
-境界   md + Op ──edit──> 編集リスト + focus        // survey → apply → reflect（edit/）
+境界   md + Op ──edit──> 編集リスト + focus        // survey → apply → merge（edit/）
 ```
 
 **サイクルは 1 本**。md が変わったら必ず 読み → project → 描画。無限ループしないのは
@@ -103,7 +103,7 @@ TS では必ず持ち主を付けて `core.View` / `core.Node` と書く（`impo
 
 ライブラリ（mizchi/markdown）に触るのは `md.mbt` だけ。読みも書きも「ライブラリ」と
 「方言」の直列で、ライブラリの癖を mmm の決めに揃えるのはここに閉じる。その先の
-build / content / fold / reflect は方言の mdAst だけを見る。
+build / content / fold / merge は方言の mdAst だけを見る。
 
 読み `dialect` — **塊の尻は行末の改行込み**:
 
@@ -157,7 +157,7 @@ span から、操作の後は操作の結果から）。UUID にしても読み�
 
 ### 合流 — merge.mbt
 
-`reflect(md, before, spans, after) -> [Edit]`。`Edit { from, to, insert }` は
+`merge(md, before, spans, after) -> [Edit]`。`Edit { from, to, insert }` は
 CodeMirror の changes と同じ形で、from 順・範囲は重ならない。
 
 形は**正規形を base にした 3-way merge**（recast と同じ）:
@@ -347,7 +347,7 @@ core はここでも状態を持たず、操作 1 回ごとに md を読み直�
 ```
 (before, spans) = survey(md)
 done            = apply(before, op)            // None なら edits は空、focus も無い
-edits           = reflect(md, before, spans, done.doc)
+edits           = merge(md, before, spans, done.doc)
 focus           = number(done.doc, done.focus) // 読み直したときの id
 ```
 
