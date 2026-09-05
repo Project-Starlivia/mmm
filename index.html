@@ -4,7 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>mmm</title>
-    <!-- favicon は theme.ts がアクセントカラー付きで差し込む（形の源は logo.ts） -->
+    <!-- 素の favicon は vite.config.ts がビルド時に logo.ts から吐く。
+         色と未保存の印は theme.ts が data URL で上書きする -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <!-- CSS は head で読む。JS 経由の注入だと当たるまでの一瞬 unstyled が
          見える（dev で顕著）。vite が dev では render-blocking で配り、
          build ではハッシュ付きに差し替える。 -->
