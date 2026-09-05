@@ -49,7 +49,8 @@ export function initTheme(args: {
   let faviconColor = base;
   let faviconDirty = false;
 
-  /** favicon は data URL なので、色も印も実値で埋める必要がある。 */
+  /** index.html の素の favicon（同じ logo.ts からビルド時に吐いたもの）を、
+   *  色と印の入った data URL で上書きする。実値で埋める必要がある */
   const applyFavicon = (): void => {
     const found = document.querySelector('link[rel="icon"]');
     // 型は名乗らせず確かめる。`<link rel=icon>` でないものが居たら作り直す
