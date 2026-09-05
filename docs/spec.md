@@ -203,7 +203,7 @@ Markdown の右上に書き方(# / n+ / -)。普段は沈めておいて、触�
 出し分け」)。
 
 **ノードが 1 つも無いあいだは、両方の真ん中に始め方が出る**
-(`app/hint.ts`。Markdown は `Write a # title to start`、Mindmap は
+(`app/hint.ts`。Markdown は `Write a # Title to start`、Mindmap は
 `Press Enter to start`)。出る条件は**ノードの数ひとつ**で、
 どちらも同じ — 片方だけ別の条件で消えると、同じ状態を見ているのに
 食い違って見える。器も 1 つ(`.pane-hint`)。
