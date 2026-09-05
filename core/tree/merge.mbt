@@ -115,7 +115,7 @@ fn plan(
       _ => ()
     }
   }
-  merge_kids(r, spans.get(doc_id).unwrap().to, 0, olds_n, news_n, 1, sides)
+  merge_children(r, spans.get(doc_id).unwrap().to, 0, olds_n, news_n, 1, sides)
   Some(settle(r))
 }
 
@@ -250,7 +250,7 @@ fn merge_node(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
           merge_body(r, body_of(old), body_of(x), line_to, col)
         }
       }
-      merge_kids(
+      merge_children(
         r,
         own_end(r, old),
         col,
@@ -441,7 +441,7 @@ fn merge_seq(r : Merge, q : Seq) -> Unit {
 ///|
 /// 子列の差分。残った子には降りる。項目の列は ours の兄弟の流儀（詰まっているか）を
 /// 増える物にも写す — 正規形は流儀を知らないので、ここだけは ours が先。
-fn merge_kids(
+fn merge_children(
   r : Merge,
   own : Int,
   col : Int,

@@ -87,7 +87,7 @@ fn dialect_blocks(
   for b in bs {
     let m = dialect_block(md, openers, b)
     let s = block_span(m)
-    if s.to <= reach {
+    if s.from < reach && s.to <= reach {
       continue
     }
     if s.to > reach {
@@ -298,13 +298,13 @@ pub fn serialize(doc : Doc) -> String {
   match doc.frontmatter {
     None => body
     // frontmatter と本文の間は空行 1 つ。読みは frontmatter の後ろの空行を落とすので、書く側で置く
-    // （置かないと、反映の base が「頭の要素に隙間は無い」と言って原文の空行を消す）
+    // （置かないと、合流の base が「頭の要素に隙間は無い」と言って原文の空行を消す）
     Some(raw) => newline("---\n" + raw + "---\n\n", doc.eol) + body
   }
 }
 
 ///|
-/// 部分木 1 つ → 正規形の md（断片）。反映が dirty の地番に差す。
+/// 部分木 1 つ → 正規形の md（断片）。合流が dirty の地番に差す。
 pub fn fragment(
   x : Node,
   depth : Int,
@@ -381,7 +381,7 @@ fn alone(md : String, at : Int) -> Bool {
   }
   let prev = line_start(md, head - 1)
   for k in prev..<(head - 1) {
-    if md[k] != ' ' && md[k] != '\t' && md[k] != '>' && md[k] != '\r' {
+    if md[k] != ' ' && md[k] != '\t' && md[k] != '>' {
       return false
     }
   }
