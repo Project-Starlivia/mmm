@@ -632,3 +632,27 @@ test "CRLF の文書の、改行の無い末尾に差すときも CRLF" {
   )
   inspect(apply(md, edits), content="# r\r\n\r\n## a\r\n\r\n## c\r\n")
 }
+
+///|
+test "Implicit の子を入れ替えても、その手前の隙間は 1 つのまま" {
+  let md = "# a\n\n#### deep\n\n## b\n"
+  let (before, spans) = survey(md)
+  // 深さ 3 の Implicit の中身（deep）を、新しい見出しに差し替える
+  let after = change(before, 0, [0], x => with_children(x, [fresh("w")]))
+  let edits = reflect(md, before, spans, after)
+  inspect(apply(md, edits), content="# a\n\n### w\n\n## b\n")
+}
+
+///|
+test "改行の無い末尾のノードを外へ出しても、空行は 1 つ" {
+  let md = "# r\n\n## a\n\nhello"
+  let (before, spans) = survey(md)
+  let r = before.roots[0].node
+  let a = children_of(r)[0]
+  let after : Doc = {
+    ..before,
+    roots: [{ node: with_children(r, []), sides: [] }, { node: a, sides: [] }],
+  }
+  let edits = reflect(md, before, spans, after)
+  inspect(apply(md, edits), content="# r\n\n# a\n\nhello\n")
+}

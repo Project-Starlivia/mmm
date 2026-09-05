@@ -95,7 +95,47 @@ fn plan(
       a.to - b.to
     }
   })
-  Some(r.out)
+  Some(joined(r))
+}
+
+///|
+/// 差し込みが行の途中（改行の無い末尾）に来るなら改行してから。**消えた後の字で見る** —
+/// 直前まで消す編集が続いていれば、行の途中かはその消し始めの位置で決まる
+/// （置き換えの後ろなら、断片は改行で終わるので途中ではない）。
+fn joined(r : Reflect) -> Array[Edit] {
+  // 直前の編集の尻と、そこから遡れる「消し始め」。消えた範囲が隣り合えば繋がる
+  let mut cut_to = -1
+  let mut cut_from = -1
+  let mut cut_wrote = false
+  r.out.map(e => {
+    let mid = if e.from == e.to {
+      if e.from == cut_to {
+        !cut_wrote && mid_line(r.md, cut_from)
+      } else {
+        mid_line(r.md, e.from)
+      }
+    } else {
+      false
+    }
+    if e.from < e.to {
+      if e.from != cut_to {
+        cut_from = e.from
+      }
+      cut_to = e.to
+      cut_wrote = e.insert != ""
+    }
+    if mid {
+      { ..e, insert: eol(r) + e.insert }
+    } else {
+      e
+    }
+  })
+}
+
+///|
+/// その位置が行の途中か（行頭の字下げの後ろは行頭と同じ — 項目のマーカーの手前がそこ）。
+fn mid_line(md : String, at : Int) -> Bool {
+  skip_blank(md, line_start(md, at), at) < at
 }
 
 ///|
@@ -229,7 +269,7 @@ fn diff(
         let s = at(id)
         let col = column(r.md, s.from)
         r.out.push(
-          insert(r, s.from, indent(pend.join(c.sep), col) + c.sep + pad(col)),
+          insert(s.from, indent(pend.join(c.sep), col) + c.sep + pad(col)),
         )
         pend.clear()
       }
@@ -241,14 +281,14 @@ fn diff(
   }
   if !pend.is_empty() {
     match kept {
-      Some(id) => r.out.push(insert(r, at(id).to, behind(c, pend)))
+      Some(id) => r.out.push(insert(at(id).to, behind(c, pend)))
       None => {
         // 空になった列（元の尻は最後に消えた物の尻）か、元から空の列
         let tail = match olds.last() {
           Some(id) => at(id).to
           None => c.own
         }
-        r.out.push(insert(r, c.own, first(r, c, pend, tail)))
+        r.out.push(insert(c.own, first(r, c, pend, tail)))
       }
     }
   }
@@ -331,7 +371,7 @@ fn body(
       Some(b) => r.spans.get(b.id).unwrap().to
       None => own
     }
-    r.out.push(insert(r, own, first(r, c, [prose(news, r.eol)], tail)))
+    r.out.push(insert(own, first(r, c, [prose(news, r.eol)], tail)))
     return
   }
   diff(
@@ -384,17 +424,38 @@ fn eol(r : Reflect) -> String {
 
 ///|
 /// 前の木のノードの、自分の尻 — 最後の中身の尻、中身が無ければ行の尻。
-/// Implicit は行を持たないので最初の子の頭（範囲の頭）。地番を引くので前の木のものに限る。
+/// Implicit は行を持たないので、最初の子の手前の空行の頭（隙間の手前 — 他のノードの
+/// 尻と同じく、隙間は自分の尻の後ろに在る）。地番を引くので前の木のものに限る。
 fn own_end(r : Reflect, old : Node) -> Int {
   let s = r.spans.get(id_of(old)).unwrap()
   match old {
-    ImplicitNode(_) => s.from
+    ImplicitNode(_) => blank_start(r.md, s.from)
     _ =>
       match body_of(old).last() {
         Some(b) => r.spans.get(b.id).unwrap().to
         None => line_end(r.md, s.from)
       }
   }
+}
+
+///|
+/// その位置の手前に続く空行の頭。空行が無ければその位置のまま。
+fn blank_start(md : String, at : Int) -> Int {
+  let mut p = at
+  while p > 0 {
+    let head = line_start(md, p - 1)
+    guard skip_blank(md, head, p - 1) == p - 1 &&
+      (md[p - 1] == '\n' || md[p - 1] == '\r') else {
+      break
+    }
+    // 1 行が改行だけ（CRLF なら \r\n）なら空行
+    let body = if p - 2 >= head && md[p - 2] == '\r' { p - 2 } else { p - 1 }
+    if body != head {
+      break
+    }
+    p = head
+  }
+  p
 }
 
 ///|
@@ -413,14 +474,8 @@ fn pad(n : Int) -> String {
 }
 
 ///|
-/// 位置 pos に text を差す編集。行の途中（改行の無い末尾）なら改行してから。
-/// 行頭の字下げの後ろは行頭と同じ（項目のマーカーの手前がそこ）。
-fn insert(r : Reflect, pos : Int, text : String) -> Edit {
-  let text = if skip_blank(r.md, line_start(r.md, pos), pos) < pos {
-    eol(r) + text
-  } else {
-    text
-  }
+/// 位置 pos に text を差す編集。行の途中なら改行してから — それは `joined` が最後に決める。
+fn insert(pos : Int, text : String) -> Edit {
   { from: pos, to: pos, insert: text }
 }
 

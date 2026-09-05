@@ -4,6 +4,7 @@
 //   focus — 読み替えた focus は、後の木で focus だったのと同じ部分木を指す
 //   できない操作 — 編集も focus も無い
 //   目印の生存 — 中身だけを変える操作の後、持ち主のラベルの目印は同じノードに着く
+//   隙間の保存 — どの操作の後も、元に無かった連続空行と頭の空行は生まれない
 //
 // 見本 × 全 id × Op の作り方で回す。Op の作り方は op の check の法則と同じ。
 
@@ -12,7 +13,7 @@ let corpus : Array[String] = [
   "# r\n\n## a\n\nhello\n\n#### x\n\n## b\n\n![p](p.png)\n", "- a\n  - b\n\n    ```js\n    1\n    ```\n\n  - c\n- d\n",
   "intro\n\n# r\n\n## a\n\n---\n\n## b\n\n***\n\n## c\n", "---\nk: v\n---\n\n# a\n\n- i\n  - j\n\n# b\n",
   "# r\r\n\r\n## a\r\n\r\n### x\r\n", "# r\n\n<details open>\n<summary>s</summary>\n\n## a\n\nx\n\n</details>\n\n## b\n",
-  "hello\n\n- a\n- b\n\n<!-- c -->\n",
+  "hello\n\n- a\n- b\n\n<!-- c -->\n", "# r\n\n## a\n\nhello", "# a\n\n#### deep\n\n## b\n",
 ]
 
 ///|
@@ -196,7 +197,7 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック
-  inspect(some, content="552")
+  inspect(some, content="688")
   json_inspect(bad, content=[])
 }
 
@@ -350,6 +351,34 @@ test "法則 — 目印の生存。中身だけを変えれば、持ち主のラ
     }
   }
   // 網の広さ。corpus か ops_for を触れば動く
-  inspect(seen, content="108")
+  inspect(seen, content="122")
+  json_inspect(bad, content=[])
+}
+
+///|
+test "法則 — 隙間の保存。どの操作の後も、元に無かった連続空行と頭の空行は生まれない" {
+  let bad : Array[String] = []
+  let flat = (s : String) => s.replace_all(old="\r\n", new="\n")
+  for i, md in corpus {
+    let before = @tree.parse(md)
+    for op in ops_for(ids(before)) {
+      let r = edit(md, op)
+      if r.edits.is_empty() {
+        continue
+      }
+      let out = flat(@tree.apply(md, r.edits))
+      let was = flat(md)
+      if !was.contains("\n\n\n") && out.contains("\n\n\n") {
+        bad.push(
+          "\{i} \{op.to_json().stringify()}: 連続空行 \{out.to_json().stringify()}",
+        )
+      }
+      if !was.has_prefix("\n") && out.has_prefix("\n") {
+        bad.push(
+          "\{i} \{op.to_json().stringify()}: 頭の空行 \{out.to_json().stringify()}",
+        )
+      }
+    }
+  }
   json_inspect(bad, content=[])
 }
