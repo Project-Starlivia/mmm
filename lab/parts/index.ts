@@ -22,12 +22,12 @@ for (const p of PARTS) {
   h.textContent = p.name;
   sec.append(h);
   for (const [state, build] of Object.entries(p.states)) {
-    const row = document.createElement("div");
-    row.className = "row";
+    const line = document.createElement("div");
+    line.className = "line";
     const label = document.createElement("span");
     label.className = "state";
     label.textContent = state;
-    row.append(label);
+    line.append(label);
     for (const theme of ["dark", "light"] as const) {
       const cell = document.createElement("div");
       cell.className = theme === "light" ? "cell light" : "cell";
@@ -38,9 +38,9 @@ for (const p of PARTS) {
       // ページが止まってしまう。合成した wheel（indicator の状態）は通す
       cell.addEventListener("wheel", (e) => e.isTrusted && e.stopPropagation(), { capture: true });
       cell.append(build());
-      row.append(cell);
+      line.append(cell);
     }
-    sec.append(row);
+    sec.append(line);
   }
   grid.append(sec);
 }

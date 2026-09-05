@@ -21,13 +21,15 @@
       body { padding: 16px 24px; }
       h1 { font-size: 15px; font-weight: normal; margin: 0 0 4px; }
       header p { margin: 0 0 24px; font-size: 12px; color: var(--ink-dim); }
-      section { margin-bottom: 28px; }
-      h2 { font-size: 13px; font-weight: normal; color: var(--ink-dim); margin: 0 0 8px; }
-      .row { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
-      .state { width: 8em; flex: none; font-size: 12px; color: var(--ink-dim); padding-top: 6px; }
+      /* 一覧の器は全部 #grid の下に閉じ込める。部品の class（`.row` など）と
+         名前がぶつかると、一覧の余白が本物に乗る */
+      #grid section { margin-bottom: 28px; }
+      #grid h2 { font-size: 13px; font-weight: normal; color: var(--ink-dim); margin: 0 0 8px; }
+      #grid .line { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+      #grid .state { width: 8em; flex: none; font-size: 12px; color: var(--ink-dim); padding-top: 6px; }
       /* 枠。**`contain: paint` で fixed の部品もこの中に収まる**（枠が
          containing block になる）。`position: relative` は absolute のため */
-      .cell {
+      #grid .cell {
         flex: 1;
         min-width: 0;
         position: relative;
