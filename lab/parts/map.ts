@@ -4,6 +4,8 @@
 
 import { type Node, type View, survey } from "../../src/coreApi.ts";
 import { type MapHost, Mindmap } from "../../src/mindmap.ts";
+import { type Layout, layoutMap } from "../../src/map/layout.ts";
+import { nodeSize } from "../../src/map/metrics.ts";
 import { NONE, type Selection } from "../../src/map/select.ts";
 import type { Part } from "./kind.ts";
 
@@ -98,8 +100,14 @@ function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
   return el;
 }
 
+/** 見本の木と、その配置。右クリックメニューの見本が選択を渡すのに使う */
+export function sample(): { view: View; L: Layout } {
+  const view = survey(MD, [], []).view;
+  return { view, L: layoutMap(view.roots, nodeSize) };
+}
+
 /** その名前のノード。無ければ例外（見本の md と食い違っている） */
-function named(view: View, label: string): Node {
+export function named(view: View, label: string): Node {
   const find = (n: Node): Node | null =>
     n.label === label ? n : (n.children.map(find).find((x) => x !== null) ?? null);
   const hit = view.roots.map((r) => find(r.node)).find((x) => x !== null);

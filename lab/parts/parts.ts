@@ -1,5 +1,7 @@
-// 部品 × 状態の表。**見本の値はここだけが持つ。** 見た目は 1 つも持たない —
-// 状態 1 つは「src の部品をどう呼ぶか」の 1 行で、それがそのまま読める形。
+// 部品 × 状態の表。**見本の値は src の表から引く** — 絵の名前（icons.ts）、
+// しらせの言葉（notice.ts）、言い出し（hint.ts）、たずね（asks.ts）、メニューの
+// 並び（context.ts / files.ts / more.ts / export.ts）。ここが持つのは「どの状態で
+// 呼ぶか」だけで、綴りも並びも持たない。
 //
 // テーマは部品の話ではないので、ここには無い（index.ts が枠に振る）。
 
@@ -7,10 +9,16 @@ import { ICONS, icon } from "../../src/icons.ts";
 import { BLOCKED, FAILED, notice } from "../../src/app/notice.ts";
 import { paneHint } from "../../src/app/hint.ts";
 import { type Ask, askForm } from "../../src/app/ask.ts";
-import { type MenuEntry, menu } from "../../src/map/menu.ts";
-import { drawBoard } from "../../src/app/draw.ts";
+import { ASKS } from "../../src/app/asks.ts";
+import { menu } from "../../src/map/menu.ts";
+import { contextItems, menuOf } from "../../src/map/context.ts";
+import { type Files, filesMenu } from "../../src/app/files.ts";
+import { moreMenu } from "../../src/app/more.ts";
+import { exportWays } from "../../src/app/export.ts";
+import { drawForm } from "../../src/app/draw.ts";
+import { NONE } from "../../src/map/select.ts";
 import type { Part } from "./kind.ts";
-import { MAP } from "./map.ts";
+import { MAP, named, sample } from "./map.ts";
 
 const nothing = (): void => {};
 
@@ -27,14 +35,15 @@ function shown(mark: Parameters<typeof notice>[0], msg: string, sorry: boolean):
   return el;
 }
 
-/** 開いたままのたずね。modal は top layer に出て枠に収まらないので `open` で置く */
-function asked(a: Ask): HTMLDialogElement {
+/** 開いたままの窓。modal は top layer に出て枠に収まらないので `open` で置く */
+function opened(form: HTMLFormElement): HTMLDialogElement {
   const dlg = document.createElement("dialog");
   dlg.className = "ask";
   dlg.open = true;
-  dlg.append(askForm(a, nothing).form);
+  dlg.append(form);
   return dlg;
 }
+const asked = (a: Ask): HTMLDialogElement => opened(askForm(a, nothing).form);
 
 /** 灰色の四角。画像の名前を聞くときの「その画像」の代わり */
 const SHOT =
@@ -43,12 +52,48 @@ const SHOT =
     '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="100"><rect width="160" height="100" fill="#888"/></svg>',
   );
 
-const MENU_PLAIN: MenuEntry[] = [
-  { label: "Add child", key: "Tab", run: nothing },
-  { label: "Add sibling", key: "Enter", run: nothing },
-  "sep",
-  { label: "Delete", key: "Del", run: nothing },
-];
+/** 右クリック。見本の木の、その名前のノードを選んでいるとき */
+function context(label: string | null): HTMLDivElement {
+  const { view, L } = sample();
+  const id = label === null ? null : named(view, label).id;
+  const sel = id === null ? NONE : { ids: [id], anchor: id };
+  return menu(menuOf(contextItems(L, sel), nothing));
+}
+
+const SAVED: Files = {
+  savedName: "notes.md",
+  recent: ["ideas.md", "todo.md"],
+  canOpen: true,
+  canSave: true,
+  canRename: true,
+  canChooseFolder: true,
+  folder: "pics",
+};
+const FILES_ACTS = {
+  newFile: nothing,
+  open: nothing,
+  openRecent: nothing,
+  save: nothing,
+  saveAs: nothing,
+  rename: nothing,
+  chooseFolder: nothing,
+};
+const MORE_ACTS = {
+  undo: nothing,
+  redo: nothing,
+  pickColor: nothing,
+  toggleTheme: nothing,
+  copyLink: () => Promise.resolve(true),
+  open: nothing,
+};
+/** 書き出しの並びが要るもの。出すもの以外は使われない */
+const exportDeps = (empty: boolean) => ({
+  map: { exportSvg: () => Promise.resolve(null) },
+  name: () => "notes.md",
+  failed: nothing,
+  blocked: nothing,
+  empty: () => empty,
+});
 
 export const PARTS: Part[] = [
   {
@@ -79,94 +124,59 @@ export const PARTS: Part[] = [
     name: "pane-hint",
     height: 160,
     states: {
-      md: () => paneHint("Write a ", "# heading", " to start"),
-      map: () => paneHint("Nothing to show yet — write a ", "# heading", ""),
+      md: () => paneHint("md"),
+      map: () => paneHint("map"),
     },
   },
   {
     name: "ask",
     height: 300,
     states: {
-      "yes-no": () => asked({ title: "Discard unsaved changes?", ok: "Discard", cancel: "Keep" }),
-      field: () => asked({ title: "Rename", ok: "Rename", parts: [{ value: "notes.md" }] }),
-      "text-field-text": () =>
-        asked({ title: "Image name", ok: "Insert", parts: ["![](", { value: "shot-1" }, ".webp)"] }),
-      preview: () =>
-        asked({
-          title: "Image name",
-          note: "Saved next to the .md",
-          ok: "Insert",
-          parts: ["![](", { value: "shot-1" }, ".webp)"],
-          preview: SHOT,
-        }),
-      invalid: () =>
-        asked({
-          title: "Rename",
-          ok: "Rename",
-          parts: [{ value: "a/b", check: (v) => (v.includes("/") ? "No slashes" : null) }],
-        }),
+      discard: () => asked(ASKS.discard),
+      place: () => asked(ASKS.place),
+      connect: () => asked(ASKS.connect("./pics/")),
+      rename: () => asked(ASKS.rename("notes.md")),
+      "image-name": () => asked(ASKS.imageName(["![](", "./pics/", { value: "2026-09-05-101500" }, ".webp)"], SHOT)),
+      "image-name-taken": () =>
+        asked(
+          ASKS.imageName(["![](", "./pics/", { value: "shot", check: () => "That name is taken" }, ".webp)"], SHOT),
+        ),
     },
   },
   {
     name: "menu",
-    height: 220,
+    height: 380,
     states: {
-      plain: () => menu(MENU_PLAIN),
-      mark: () =>
-        menu([
-          { label: "Recent", mark: "clock", run: nothing },
-          { label: "Shortcuts", mark: "keyboard", run: nothing },
-        ]),
-      note: () =>
-        menu([
-          { label: "Copy link", note: ["12 KB"], run: nothing },
-          {
-            label: "Copy link (slow)",
-            note: new Promise((r) => setTimeout(() => r(["12 KB", "gzip"]), 800)),
-            run: nothing,
-          },
-        ]),
-      disabled: () =>
-        menu([
-          { label: "Rename", disabled: true, run: nothing },
-          { label: "Save", disabled: "Save the .md first", run: nothing },
-          { label: "Close", run: nothing },
-        ]),
-      caption: () =>
-        menu([
-          { caption: "notes.md", mark: "file" },
-          { label: "Rename", run: nothing },
-          { label: "Save", run: nothing },
-          "sep",
-          { caption: "not saved yet" },
-        ]),
-      nested: () =>
-        menu([
-          { label: "Add", items: MENU_PLAIN, run: nothing },
-          { label: "Delete", run: nothing },
-        ]),
-      done: () => menu([{ label: "Copy", mark: "copy", done: () => Promise.resolve(true) }]),
+      "context-node": () => context("Left"),
+      "context-root": () => context("mmm"),
+      "context-folded": () => context("hidden"),
+      "context-none": () => context(null),
+      "files-saved": () => menu(filesMenu(SAVED, FILES_ACTS)),
+      "files-unsaved": () =>
+        menu(filesMenu({ ...SAVED, savedName: null, recent: [], folder: "no folder" }, FILES_ACTS)),
+      "files-no-access": () =>
+        menu(
+          filesMenu(
+            { ...SAVED, savedName: null, canOpen: false, canSave: false, canRename: false, canChooseFolder: false },
+            FILES_ACTS,
+          ),
+        ),
+      "more-dark": () => menu(moreMenu({ light: false, linkNote: Promise.resolve([]) }, MORE_ACTS)),
+      "more-light-noted": () =>
+        menu(
+          moreMenu(
+            { light: true, linkNote: Promise.resolve(["Images won't travel", "Long link — may be cut"]) },
+            MORE_ACTS,
+          ),
+        ),
+      "export-ways": () => menu(exportWays(exportDeps(false))),
+      "export-empty": () => menu(exportWays(exportDeps(true))),
     },
   },
   {
     name: "draw",
     height: 560,
-    states: {
-      board: () => {
-        // 窓ごと出す（`.draw` は窓の中に載るもの）。題と足元は showDrawing のものと同じ
-        const dlg = document.createElement("dialog");
-        dlg.className = "ask";
-        dlg.open = true;
-        const form = document.createElement("form");
-        form.method = "dialog";
-        const title = document.createElement("p");
-        title.className = "title";
-        title.textContent = "Draw";
-        form.append(title, drawBoard().el);
-        dlg.append(form);
-        return dlg;
-      },
-    },
+    states: { open: () => opened(drawForm({ cancel: nothing, insert: nothing }).form) },
   },
   MAP,
 ];
