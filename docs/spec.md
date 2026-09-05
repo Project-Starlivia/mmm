@@ -30,7 +30,7 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 （NodePlace / BlockPlace）。道具（splice / append / body）が
                 型の異種性を幽閉する。決めは core.md「操作」
   edit/         境界。edit(md, op) が survey → apply → reflect を繋ぎ、編集列と
-                読み直した木での focus を返す。law_wbtest.mbt が操作 × 反映の結合を
+                読み直した木での focus を返す。law_wbtest.mbt が操作 × 合流の結合を
                 総当たりで固定する。決めは core.md「境界」
 src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す・動かす・カードを扱う・
         貼る/落とす/描く。**

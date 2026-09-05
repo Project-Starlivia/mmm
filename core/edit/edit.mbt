@@ -3,7 +3,7 @@
 //
 //   (before, spans) = survey(md)
 //   done            = apply(before, op)           None なら編集は無い
-//   edits           = reflect(md, before, spans, done.doc)
+//   edits           = merge(md, before, spans, done.doc)
 //   focus           = done.focus を、読み直したときの番号に読み替える
 
 ///|
@@ -19,7 +19,7 @@ pub fn edit(md : String, op : @op.Op) -> Edited {
   let (before, spans) = @tree.survey(md)
   match @op.apply(before, op) {
     Some(done) => {
-      let edits = @tree.reflect(md, before, spans, done.doc)
+      let edits = @tree.merge(md, before, spans, done.doc)
       let focus = done.focus.bind(id => @tree.number(done.doc, id))
       { edits, focus }
     }

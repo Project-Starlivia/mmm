@@ -269,7 +269,7 @@ fn law(
   after : Doc,
   what : String,
 ) -> Array[Edit] raise {
-  let edits = reflect(md, before, spans, after)
+  let edits = merge(md, before, spans, after)
   let out = apply(md, edits)
   guard shape(parse(out)) == shape(after) else {
     fail("\{what}: 形が違う\n--- md\n\{md}\n--- out\n\{out}")

@@ -3,10 +3,10 @@
 //
 // 読みも書きも「ライブラリ」と「方言」の直列:
 //
-//   read(md)   = @markdown.parse(md) |> mend(md)      mdAst → mmm の方言の mdAst
+//   read(md)   = @markdown.parse(md) |> dialect(md)      mdAst → mmm の方言の mdAst
 //   write(ast) = @markdown.serialize(ast) |> spell     字 → mmm の綴り
 //
-// 方言はライブラリの癖を mmm の決めに揃える所で、build / content / fold / reflect は
+// 方言はライブラリの癖を mmm の決めに揃える所で、build / content / fold / merge は
 // 方言の mdAst だけを見る。癖の一覧は docs/core.md「方言」。
 //
 // 自前で書かないのは、ブロック規則を手で写すと間違いを照合する相手が
@@ -20,7 +20,7 @@
 ///|
 /// md → 方言の mdAst。
 pub fn read(md : String) -> @markdown.Document {
-  mend(md, @markdown.parse(md).document)
+  dialect(md, @markdown.parse(md).document)
 }
 
 ///|
@@ -30,7 +30,7 @@ pub fn read(md : String) -> @markdown.Document {
 /// 揃える。段落の span が中身の頭から始まること、インラインの span が段落の中身に
 /// 対する相対であることは、ライブラリの決めとしてそのまま使う。`Blank` は触らない
 /// （入れ子の項目の周りで範囲が壊れているので、隙間は原文の字で測る）。
-fn mend(md : String, doc : @markdown.Document) -> @markdown.Document {
+fn dialect(md : String, doc : @markdown.Document) -> @markdown.Document {
   // フェンス付きの塊の開きの行。閉じのフェンスを探すとき、別の塊の開きを閉じと見ないため
   // （閉じの無いフェンスが容器の尻で切れると、次の開きが閉じに見える）
   let openers : Set[Int] = Set([])
@@ -64,7 +64,7 @@ fn mend(md : String, doc : @markdown.Document) -> @markdown.Document {
   }
   {
     ..doc,
-    children: mend_blocks(md, openers, doc.children),
+    children: dialect_blocks(md, openers, doc.children),
     // ライブラリの定義行の span は、次も定義行なら改行込み・そうでなければ改行の手前で
     // 止まる。改行の手前なら改行まで、もう改行の次なら据え置き
     definitions: doc.definitions.map(d => {
@@ -77,7 +77,7 @@ fn mend(md : String, doc : @markdown.Document) -> @markdown.Document {
 ///|
 /// 塊の列の方言。伸ばした span に丸ごと飲まれた塊は落とす — 入れ子の `:::` の閉じを
 /// ライブラリが段落と読むと、外の span を閉じまで伸ばした後に同じ字が 2 度書かれる。
-fn mend_blocks(
+fn dialect_blocks(
   md : String,
   openers : Set[Int],
   bs : Array[@markdown.Block],
@@ -85,7 +85,7 @@ fn mend_blocks(
   let out : Array[@markdown.Block] = []
   let mut reach = -1
   for b in bs {
-    let m = mend_block(md, openers, b)
+    let m = dialect_block(md, openers, b)
     let s = block_span(m)
     if s.to <= reach {
       continue
@@ -100,12 +100,12 @@ fn mend_blocks(
 
 ///|
 /// 塊 1 つの方言。容器は中まで歩く。
-fn mend_block(
+fn dialect_block(
   md : String,
   openers : Set[Int],
   b : @markdown.Block,
 ) -> @markdown.Block {
-  let inner = (bs : Array[@markdown.Block]) => mend_blocks(md, openers, bs)
+  let inner = (bs : Array[@markdown.Block]) => dialect_blocks(md, openers, bs)
   let items = (xs : Array[@markdown.ListItem]) => {
     xs.map(it => { ..it, children: inner(it.children) })
   }
@@ -240,7 +240,7 @@ fn mend_block(
         trailing_trivia~,
       )
     Attributed(block~, attributes~, span~) =>
-      Attributed(block=mend_block(md, openers, block), attributes~, span~)
+      Attributed(block=dialect_block(md, openers, block), attributes~, span~)
     other => other
   }
 }

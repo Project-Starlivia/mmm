@@ -1,4 +1,4 @@
-// 反映 — 前後の木を比べ、変わった所だけを原文 md に映す。
+// 合流 — 前後の木を比べ、変わった所だけを原文 md に映す。
 //
 // 受け取るのは原文・前の Doc とその地番・後の Doc の 4 つで、返すのは編集列だけ。
 // 後の Doc が誰にどう作られたか（操作・undo のスナップショット）は知らない。
@@ -16,7 +16,7 @@
 // 書き換える。隙間そのものは原文の字で測る（空白だけの行 = 空行。読みと同じ）。
 // 出来た文章を読み直して後の木と形が一致しなければ全文を正規形に落とす —
 // **正しさはこの検証が持つ**ので、比較がどれだけ雑でも壊れない。
-// 決めは docs/core.md「反映」。
+// 決めは docs/core.md「合流」。
 
 ///|
 /// 編集 1 つ。from..to を insert に置き換える（CodeMirror の changes と同じ形）。
@@ -28,7 +28,7 @@ pub(all) struct Edit {
 
 ///|
 /// 後の木を映す編集列。from 順で、範囲は重ならない。
-pub fn reflect(
+pub fn merge(
   md : String,
   before : Doc,
   spans : Map[Int, Spot],
@@ -56,7 +56,7 @@ pub fn apply(md : String, edits : Array[Edit]) -> String {
 
 ///|
 /// 比較の途中。
-priv struct Reflect {
+priv struct Merge {
   md : String
   spans : Map[Int, Spot]
   eol : Eol
@@ -90,7 +90,7 @@ fn plan(
   guard gaps_of(before) is Some(base) && gaps_of(after) is Some(theirs) else {
     return None
   }
-  let r : Reflect = {
+  let r : Merge = {
     md,
     spans,
     eol: before.eol,
@@ -220,7 +220,7 @@ fn gaps_of(doc : Doc) -> Map[Int, Bool]? {
 /// 前の木の同じ id と比べる。種類・畳み・子の並びが変わっていれば部分木ごと書く。
 /// そうでなければ、行（ラベル）・中身・子の 3 つの列をそれぞれ差分にする —
 /// 行が同じなら行には触らない（そこに選択の目印が在る）。
-fn walk(r : Reflect, x : Node, depth : Int, sides : Array[Side]) -> Unit {
+fn walk(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
   match r.old.get(id_of(x)) {
     // 畳みは `<details>` が部分木を包むので、自分か子列が変わればそこから丸ごと
     Some(old) if kind(old) == kind(x) &&
@@ -304,7 +304,7 @@ priv struct Seq {
 /// - 増える並びは、次に残る物の隙間の頭か、前に残る物の尻か、容器の自分の尻に差し、
 ///   1 つずつ theirs の隙間を連れてくる。列の頭に差すなら境目の後ろに置き、隙間は
 ///   次に残る物との間に付ける
-fn diff(r : Reflect, q : Seq) -> Unit {
+fn diff(r : Merge, q : Seq) -> Unit {
   let now = Map::from_array(q.news.map(id => (id, ())))
   let was = Map::from_array(q.olds.map(id => (id, ())))
   let at = (id : Int) => r.spans.get(id).unwrap()
@@ -442,7 +442,7 @@ fn diff(r : Reflect, q : Seq) -> Unit {
 /// 子列の差分。残った子には降りる。項目の列は ours の兄弟の流儀（詰まっているか）を
 /// 増える物にも写す — 正規形は流儀を知らないので、ここだけは ours が先。
 fn kids(
-  r : Reflect,
+  r : Merge,
   own : Int,
   col : Int,
   olds : Array[Node],
@@ -489,7 +489,7 @@ fn kids(
 /// 中身の列の差分。内容だけ変わった中身はその範囲を置き換える。
 /// 並びが変われば列ごと — 全部消して全部差す（同じ規則で隙間が付く）。
 fn body(
-  r : Reflect,
+  r : Merge,
   olds : Array[Block],
   news : Array[Block],
   own : Int,
@@ -539,7 +539,7 @@ fn body(
 }
 
 ///|
-fn eol(r : Reflect) -> String {
+fn eol(r : Merge) -> String {
   match r.eol {
     Lf => "\n"
     Crlf => "\r\n"
@@ -549,7 +549,7 @@ fn eol(r : Reflect) -> String {
 ///|
 /// 前の木のノードの、自分の尻。元から子の無い容器に差すときだけ使い、そのとき
 /// 地番の尻は自分の尻そのもの（setext の 2 行目も含む）。
-fn own_end(r : Reflect, old : Node) -> Int {
+fn own_end(r : Merge, old : Node) -> Int {
   r.spans.get(id_of(old)).unwrap().to
 }
 
@@ -577,7 +577,7 @@ fn pad(n : Int) -> String {
 /// 編集列を整える。from 順（同じ from なら幅の狭い順 — 差し込みが置き換えより先、
 /// 同じなら出た順）に並べ、隣り合う編集は 1 つに繋ぎ、行の途中（改行の無い末尾）に
 /// 字を書く編集は改行から始める。繋いでから見るので、消した後に何が残るかで決まる。
-fn settle(r : Reflect) -> Array[Edit] {
+fn settle(r : Merge) -> Array[Edit] {
   let order = Array::makei(r.out.length(), i => i)
   order.sort_by((a, b) => {
     let (x, y) = (r.out[a], r.out[b])
@@ -615,14 +615,14 @@ fn mid_line(md : String, at : Int) -> Bool {
 
 ///|
 /// 部分木ごと断片にして、地番に差す。
-fn replace(r : Reflect, x : Node, depth : Int, sides : Array[Side]) -> Unit {
+fn replace(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
   r.out.push(edit(r, id_of(x), fragment(x, depth, sides, r.eol)))
 }
 
 ///|
 /// 地番 id の範囲を text で置き換える編集。項目の入れ子は列 0 で出るので、
 /// 容器の桁に揃える（1 行目はもう容器が字下げしている）。
-fn edit(r : Reflect, id : Int, text : String) -> Edit {
+fn edit(r : Merge, id : Int, text : String) -> Edit {
   // 前の木に無い id はここへ来ない — 親の子 id 列が違うので親が書かれる
   let s = r.spans.get(id).unwrap()
   { from: s.from, to: s.to, insert: indent(text, column(r.md, s.from)) }
