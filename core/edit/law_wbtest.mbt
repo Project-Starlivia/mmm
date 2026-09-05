@@ -363,6 +363,8 @@ test "法則 — Delete の focus は消えていない兄弟か祖先（中身�
           if !near {
             bad.push("\{what}: focus \{f} は兄弟でも祖先でもない")
           }
+          // under_fold は自分自身も数えるので、親に聞けば「埋もれている」だけが出る
+          // （focus 自身が畳まれているのは埋もれていない）
           match parent_of(done.doc, f) {
             Some(p) if p != @tree.doc_id && under_fold(done.doc, p) =>
               bad.push("\{what}: focus \{f} は埋もれている")

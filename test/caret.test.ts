@@ -124,3 +124,18 @@ test("derive — 地図が持つ間は位置から。点はラベルの頭、カ
     sel: { ids: [5], anchor: 5 },
   });
 });
+
+test("derive — 畳まれたノードのカードは選べない。開けば選べる", () => {
+  // a(3) の中身 code(4) が [10, 18)。a を畳むとカードの行が出ないので選べない
+  const card: core.Block = { id: 4, content: { kind: "code", info: "", text: "x" } };
+  const cardAt = spots([
+    [1, 0, null, 0],
+    [2, 0, 2, 18],
+    [3, 5, 8, 18],
+    [4, 10, null, 18],
+  ]);
+  const shut = view(node(2, "r", [node(3, "a", [], [card], folded)]));
+  const open = view(node(2, "r", [node(3, "a", [], [card])]));
+  assert.deepEqual(derive(shut, cardAt, "map", caret(1), { kind: "card", at: 10 }), NOTHING);
+  assert.deepEqual(derive(open, cardAt, "map", caret(1), { kind: "card", at: 10 }), { kind: "card", id: 4 });
+});

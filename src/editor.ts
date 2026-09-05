@@ -34,7 +34,7 @@ const LIGHT_EXT = [tweaks(false), syntaxHighlighting(defaultHighlightStyle)];
 
 /**
  * 地図で選んでいる範囲の薄塗り。実選択にするとカーソルを奪うので、装飾で塗る
- * （spec.md「二つをまたぐ印」）。**塗る範囲も文書から導く**（state.ts の
+ * （spec.md「選択の持ち主」）。**塗る範囲も文書から導く**（state.ts の
  * `highlightRanges`）— 外から塗らせる入口は無く、木・持ち主・選択が変われば
  * この field が自分で引き直す。点（幅ゼロ）は塗るものが無いので落とす
  */

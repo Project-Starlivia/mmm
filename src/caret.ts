@@ -85,11 +85,12 @@ export function buried(view: core.View): Set<number> {
   return out;
 }
 
-/** その位置を原文に含む中身の id。持ち主が埋もれていれば無い */
+/** その位置を原文に含む中身の id。持ち主が畳まれている・埋もれていれば無い —
+ *  どちらもカードの行を持たないので、選んでも地図に印の出しようがない */
 function blockAt(view: core.View, spots: Map<number, core.Spot>, p: number, gone: Set<number>): number | null {
   let found: number | null = null;
   const walk = (n: core.Node): void => {
-    if (!gone.has(n.id)) {
+    if (!gone.has(n.id) && n.fold === null) {
       for (const b of n.blocks) {
         const s = spots.get(b.id);
         if (s && s.from <= p && p < s.to) found = b.id;
