@@ -12,7 +12,9 @@
 //
 // **道具は選ばせるのではなく、絞って並べる。** OS のカラーピッカーと生の
 // スライダーは「何でも選べます」としか言っておらず、選ぶ手間だけを渡して
-// くる。紙の上で読める色と、3 段の太さだけを出す。
+// くる。出すのは黒とアクセントカラーと消しゴム、そして 3 段の太さだけ。
+// ピッカーは**主役にはしない**が、筆の丸をダブルクリックか右クリックすれば
+// 出て、その筆の色を差し替えられる — 並びは 2 本のまま、色だけ好きに。
 
 import { icon } from "../icons.ts";
 import { accent } from "./theme.ts";
@@ -35,12 +37,14 @@ const PAPER = "#ffffff";
 /** 拡大しても粗くならない範囲。上げすぎると重くなるだけ */
 const MAX_DPR = 2;
 
+/** 紙の上で字と同じに読める黒。既定の筆 */
+const BLACK = "#111111";
 /**
- * 出せる色。**紙の上で読める色だけ**を並べる — 選べるものを絞ること
- * そのものが道具の言い分で、「何色でもどうぞ」は言い分が無いのと同じ。
- * 先頭が既定。
+ * アクセントカラーが読めないときの筆。**style.css の `--accent` の既定と
+ * 同じ値**を写してある — 読めないのは style.css そのものが来ていないときで、
+ * そこで筆を 1 本減らすより、既定の色で出しておくほうが揃う。
  */
-const PALETTE = ["#111111", "#d92d20", "#1570ef", "#0f9d58", "#e07000"] as const;
+const DEFAULT_ACCENT = "#5932ff";
 
 /**
  * 太さは細・中・太の 3 段。**その段が何 px になるかはインクが決める** —
@@ -110,9 +114,33 @@ function inkFace(value: Ink): HTMLButtonElement {
   }
   b.className = "ink";
   // 色そのものは道具の持ち物。CSS には形だけを置く
-  b.style.setProperty("--swatch", value.color);
-  b.title = value.color;
-  b.setAttribute("aria-label", `Color ${value.color}`);
+  const paint = (): void => {
+    b.style.setProperty("--swatch", value.color);
+    b.title = `${value.color} — double-click to change`;
+    b.setAttribute("aria-label", `Color ${value.color}`);
+  };
+  paint();
+  // 色の差し替え。ダブルクリックでも右クリックでも同じピッカー（見えない
+  // `<input type="color">` を押す。ロゴのアクセントカラーと同じ手）。
+  // 筆の値そのものを書き換えるので、選んでいる筆ならそのまま次の一手から効く。
+  // **入力は丸に重ねて置く** — OS のピッカーは入力の箱の位置に出るので、
+  // 箱が無い（`hidden`）と窓の隅に出る。見た目と押下は丸のもの（`.pick`）
+  const pick = document.createElement("input");
+  pick.type = "color";
+  pick.className = "pick";
+  pick.tabIndex = -1;
+  pick.addEventListener("input", () => {
+    value.color = pick.value;
+    paint();
+  });
+  const open = (e: Event): void => {
+    e.preventDefault();
+    pick.value = value.color;
+    pick.click();
+  };
+  b.addEventListener("dblclick", open);
+  b.addEventListener("contextmenu", open);
+  b.append(pick);
   return b;
 }
 
@@ -153,13 +181,12 @@ export function drawBoard(): Board {
   //
   // 筆の並びは**窓を開くたびに組む** — アクセントカラーはその間に変わりうる。
   // アクセントカラーも 1 本の筆にする（綴りは持たず、ロゴと同じ `--accent` を
-  // 読む。読めなければその筆を出さない）。並びの**末尾**に置くのは、既定に
+  // 読む。読めなければ既定の色で出す）。黒の**後ろ**に置くのは、既定に
   // すると淡いアクセントカラーのときに紙の上で消えるため — 選べば使えるが、
   // 黙って選ばれてはいない
-  const brush = accent();
-  const palette = brush === null ? PALETTE : [...PALETTE, brush];
+  const pens = [BLACK, accent() ?? DEFAULT_ACCENT];
   const inkList: readonly Ink[] = [
-    ...palette.map((color): Ink => ({ kind: "pen", color })),
+    ...pens.map((color): Ink => ({ kind: "pen", color })),
     { kind: "eraser" },
   ];
 
