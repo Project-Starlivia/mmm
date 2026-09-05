@@ -1073,11 +1073,16 @@ html, body {
 
   /* インクの丸。色は draw.ts が `--swatch` で渡す（綴りは 1 か所） */
   & .ink {
+    position: relative; /* 色の入力（.pick）を重ねる座標系 */
     width: 22px;
     height: 22px;
     padding: 0;
     border-radius: 50%;
     background: var(--swatch);
+
+    /* 色の入力。丸に重ねて透明にし、押下は丸に任せる — OS のピッカーが
+       この箱の位置（= 丸の位置）に出るためだけに在る */
+    & .pick { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
     /* 暗い色でも器から浮くように、縁は薄く 1 本 */
     border: 1px solid var(--line);
     display: inline-flex;

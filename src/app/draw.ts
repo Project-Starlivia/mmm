@@ -122,10 +122,13 @@ function inkFace(value: Ink): HTMLButtonElement {
   paint();
   // 色の差し替え。ダブルクリックでも右クリックでも同じピッカー（見えない
   // `<input type="color">` を押す。ロゴのアクセントカラーと同じ手）。
-  // 筆の値そのものを書き換えるので、選んでいる筆ならそのまま次の一手から効く
+  // 筆の値そのものを書き換えるので、選んでいる筆ならそのまま次の一手から効く。
+  // **入力は丸に重ねて置く** — OS のピッカーは入力の箱の位置に出るので、
+  // 箱が無い（`hidden`）と窓の隅に出る。見た目と押下は丸のもの（`.pick`）
   const pick = document.createElement("input");
   pick.type = "color";
-  pick.hidden = true;
+  pick.className = "pick";
+  pick.tabIndex = -1;
   pick.addEventListener("input", () => {
     value.color = pick.value;
     paint();
