@@ -71,8 +71,39 @@ fn sole(
     Image(alt~, url~, title~, ..) => Some(Image(alt~, src=url, title~))
     Link(children~, url~, title~, ..) =>
       Some(Link(text=inline_text(md, span.from, children), href=url, title~))
+    // `<URL>`。ライブラリが URL だと言い切っている
+    Autolink(url~, ..) => bare(url)
+    // 素の URL の行。CommonMark ではただの字なので、URL かどうかはここが見る
+    Text(..) => bare(inline_text(md, span.from, children))
     _ => None
   }
+}
+
+///|
+/// 開ける先（`http(s)`）の URL ちょうど 1 つならリンク。**見える字が URL そのもの**
+/// なので text も URL になる。字が混ざる行や開けない scheme は None（疑わしきは Opaque）。
+///
+/// **読みは寛容に、書きは CommonMark に。** 素の URL は CommonMark ではただの字で、
+/// リンクとして描くのは GFM の方言。読む側はそれに合わせるが、正規形は `[URL](URL)`
+/// のまま — 素の URL を書き戻すと、他所ではリンクでなくなる。
+fn bare(text : String) -> Content? {
+  let scheme = if text.has_prefix("https://") {
+    8
+  } else if text.has_prefix("http://") {
+    7
+  } else {
+    return None
+  }
+  // scheme だけの字は行き先が無い
+  guard text.length() > scheme else { return None }
+  for i = scheme; i < text.length(); i = i + 1 {
+    let c = text[i]
+    // 空白が混ざれば URL 1 つの行ではない
+    if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+      return None
+    }
+  }
+  Some(Link(text~, href=text, title=""))
 }
 
 ///|
