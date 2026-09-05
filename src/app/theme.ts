@@ -70,7 +70,7 @@ export function initTheme(args: {
    * （`--accent-soft`）も輪（`--ring`）も style.css が色から作る。
    *
    * ここで `rgba(...)` を組んで置くと、それは要素のインラインスタイルなので
-   * `:root.light` の宣言に**必ず**勝ってしまう。ライト用に薄くしてあった
+   * `.light` の宣言に**必ず**勝ってしまう。ライト用に薄くしてあった
    * 宣言が一度も効かず、ライトでもダークの濃さのままになっていた。
    */
   const applyColor = (hex: string): void => {

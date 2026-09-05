@@ -51,27 +51,39 @@ function words(name: string, text: string): HTMLSpanElement {
   return el;
 }
 
+/**
+ * しらせ 1 つぶん。器（`.notice`）ごと組んで返す — **置くのは呼ぶ側**。
+ * アプリは下の `show` が body に 1 個だけ置き、並べて見る道具はどこにでも置く。
+ *
+ * 中身は 3 つ。**入れ物は、意味を持つか CSS で言えない境目があるときだけ置く。**
+ *
+ *   .icon  印（飾り。意味は role と字が持つので `aria-hidden`）
+ *   .lead  詫び（`blocked` では出さない）
+ *   .msg   何が起きなかったか
+ *
+ * 印と詫びを束ねる器は要らない — 伸びるのは `.msg` だけなので、文言が
+ * 折り返しても 2 つが離れることはない。束ねる器はそのために置いていた
+ */
+export function notice(mark: IconName, msg: string, sorry: boolean): HTMLDivElement {
+  const box = document.createElement("div");
+  box.className = "notice";
+  // HTML に「しらせ」のタグは無い。`<output>` は `role="status"` に落ちる
+  // ので、すぐ割り込む `alert` が要るこちらは div に role を載せる
+  box.setAttribute("role", "alert");
+  box.append(icon(mark));
+  if (sorry) box.append(words("lead", SORRY));
+  box.append(words("msg", msg));
+  return box;
+}
+
+/** body に 1 個。続けて呼べば中身が差し替わり、時計は打ち直す */
 function show(mark: IconName, msg: string, sorry: boolean): void {
-  if (!box) {
-    box = document.createElement("div");
-    box.id = "notice";
-    // HTML に「しらせ」のタグは無い。`<output>` は `role="status"` に落ちる
-    // ので、すぐ割り込む `alert` が要るこちらは div に role を載せる
-    box.setAttribute("role", "alert");
+  const next = notice(mark, msg, sorry);
+  if (box) box.replaceChildren(...next.childNodes);
+  else {
+    box = next;
     document.body.append(box);
   }
-  // **入れ物は、意味を持つか CSS で言えない境目があるときだけ置く。**
-  //
-  //   .icon  印（飾り。意味は role と字が持つので `aria-hidden`）
-  //   .lead  詫び（`blocked` では出さない）
-  //   .msg   何が起きなかったか
-  //
-  // 印と詫びを束ねる器は要らない — 伸びるのは `.msg` だけなので、文言が
-  // 折り返しても 2 つが離れることはない。束ねる器はそのために置いていた
-  const kids: Node[] = [icon(mark)];
-  if (sorry) kids.push(words("lead", SORRY));
-  kids.push(words("msg", msg));
-  box.replaceChildren(...kids);
   box.classList.add("on");
   if (timer !== -1) window.clearTimeout(timer);
   timer = window.setTimeout(() => {

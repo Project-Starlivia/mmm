@@ -43,17 +43,21 @@ export interface Ask {
   preview?: string;
 }
 
-/**
- * 器を組んで開き、**欄の値を並び順で**返す。断られたら null。
- * 開くたびに作る — 聞くのは操作のたびに 1 回きりで、使い回す得が無い。
- *
- * 返るのは `<dialog>` の `returnValue` 由来: 進んだときだけ `"ok"`。
- * Escape・背景・Cancel はすべて空文字（＝ 断り）に落ちる。
- */
-export function ask(a: Ask): Promise<string[] | null> {
-  const dlg = document.createElement("dialog");
-  dlg.className = "ask";
+/** 組んだ form と、欄の値を並び順で読む口 */
+export interface AskForm {
+  form: HTMLFormElement;
+  values: () => string[];
+}
 
+/**
+ * たずねの中身（form）を組む。**器に載せるのは呼ぶ側** — `ask` は `<dialog>` に
+ * 載せて `showModal` し、並べて見る道具は開いたまま置く。
+ *
+ * `cancel` は断る側のボタンが押されたときに呼ぶ（器を閉じる係は器が持つ）。
+ * 進む側は `method="dialog"` の送信そのもので、押したボタンの value（`"ok"`）が
+ * `returnValue` になる。
+ */
+export function askForm(a: Ask, cancel: () => void): AskForm {
   const form = document.createElement("form");
   form.method = "dialog"; // 送ると dialog が閉じ、押したボタンの value が returnValue
 
@@ -118,15 +122,15 @@ export function ask(a: Ask): Promise<string[] | null> {
 
   const row = document.createElement("div");
   row.className = "row";
-  const cancel = document.createElement("button");
-  cancel.type = "button"; // 送らない。閉じるだけ（returnValue は空のまま）
-  cancel.textContent = a.cancel ?? "Cancel";
-  cancel.addEventListener("click", () => dlg.close());
+  const no = document.createElement("button");
+  no.type = "button"; // 送らない。閉じるだけ（returnValue は空のまま）
+  no.textContent = a.cancel ?? "Cancel";
+  no.addEventListener("click", cancel);
   const go = document.createElement("button");
   go.className = "go";
   go.value = "ok";
   go.textContent = a.ok;
-  row.append(cancel, go);
+  row.append(no, go);
   form.append(row);
 
   // 打つそばから見直す。**進めない理由がある間は、進む道そのものを閉じる** —
@@ -148,18 +152,32 @@ export function ask(a: Ask): Promise<string[] | null> {
     review();
   }
 
+  return { form, values: () => inputs.map((i) => i.el.value) };
+}
+
+/**
+ * 器を組んで開き、**欄の値を並び順で**返す。断られたら null。
+ * 開くたびに作る — 聞くのは操作のたびに 1 回きりで、使い回す得が無い。
+ *
+ * 返るのは `<dialog>` の `returnValue` 由来: 進んだときだけ `"ok"`。
+ * Escape・背景・Cancel はすべて空文字（＝ 断り）に落ちる。
+ */
+export function ask(a: Ask): Promise<string[] | null> {
+  const dlg = document.createElement("dialog");
+  dlg.className = "ask";
+  const { form, values } = askForm(a, () => dlg.close());
   dlg.append(form);
   document.body.append(dlg);
   dlg.showModal();
   // 最初の欄を選んだ状態で開く（打ち直しがすぐ始められる）
-  inputs[0]?.el.select();
+  form.querySelector("input")?.select();
 
   return new Promise((resolve) => {
     dlg.addEventListener("close", () => {
       const ok = dlg.returnValue === "ok";
-      const values = inputs.map((i) => i.el.value);
+      const out = values();
       dlg.remove();
-      resolve(ok ? values : null);
+      resolve(ok ? out : null);
     });
   });
 }
