@@ -5,7 +5,7 @@
   // するときに、そのファイルの他の部分の型チェックが通るように要る。
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "lib": ["ES2022", "DOM", "DOM.AsyncIterable"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "DOM.AsyncIterable"],
     "types": ["node"],
     "allowImportingTsExtensions": true
   },

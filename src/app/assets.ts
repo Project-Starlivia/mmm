@@ -12,6 +12,7 @@
 
 import { type Field, type Part, ask } from "./ask.ts";
 import { handles } from "./handles.ts";
+import type { Failed } from "./notice.ts";
 import { io } from "./io.ts";
 import { bare } from "../map/cards.ts";
 import { normalizePath, under } from "./head.ts";
@@ -217,7 +218,7 @@ async function webp(blob: Blob): Promise<Blob> {
 
 export function initAssets(deps: {
   /** 果たせなかった */
-  failed: (msg: string) => void;
+  failed: (msg: Failed) => void;
   refresh: () => void;
   /** いま頭が言っている宣言（正規化済み）。無ければ null */
   declared: () => string | null;

@@ -4,7 +4,7 @@
 // テーマは部品の話ではないので、ここには無い（index.ts が枠に振る）。
 
 import { ICONS, icon } from "../../src/icons.ts";
-import { notice } from "../../src/app/notice.ts";
+import { BLOCKED, FAILED, notice } from "../../src/app/notice.ts";
 import { paneHint } from "../../src/app/hint.ts";
 import { type Ask, askForm } from "../../src/app/ask.ts";
 import { type MenuEntry, menu } from "../../src/map/menu.ts";
@@ -36,34 +36,6 @@ const SHOT =
   encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="100"><rect width="160" height="100" fill="#888"/></svg>',
   );
-
-/**
- * アプリが出すしらせの全部。綴りは呼び出し元のまま
- * （`grep -rn "failed(\|blocked(" src` で拾える。増えたらここにも足す）
- */
-const FAILED = [
-  "Couldn't save",
-  "Couldn't save the image",
-  "Couldn't open the file",
-  "Couldn't open the dropped file",
-  "Couldn't open the image folder",
-  "Couldn't create a new file",
-  "Couldn't rename the file",
-  "Couldn't export",
-  "Couldn't copy",
-  "Couldn't copy the link",
-  "Couldn't paste",
-  "Couldn't read that as a link",
-  "Couldn't add the drawing",
-  "Couldn't open that card",
-  "Couldn't start editing — the node is folded",
-  "Couldn't do that here",
-  "Select a node to paste an image into",
-  "Select a node to paste a link into",
-  "This browser cannot open or save files",
-];
-/** 次の一手が相手にあるもの。いまは書き出すものが無いときの Mod+E だけ */
-const BLOCKED = ["Nothing to export yet"];
 
 const MENU_PLAIN: MenuEntry[] = [
   { label: "Add child", key: "Tab", run: nothing },

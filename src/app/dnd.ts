@@ -3,6 +3,8 @@
 //
 // ここが知っているのは「何が落ちたか」までで、開く / 置くの中身は呼び出し側。
 
+import type { Failed } from "./notice.ts";
+
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 const MARKDOWN = /\.(md|markdown|txt)$/i;
 
@@ -25,7 +27,7 @@ export function initDrop(deps: {
   addImages: (files: FileSystemFileHandle[], node: number) => Promise<void>;
   /** 着地点を予告する。`null` で消す。落ちる先のノード（無ければ null）を返す */
   markDrop: (at: { x: number; y: number } | null) => number | null;
-  failed: (msg: string) => void;
+  failed: (msg: Failed) => void;
 }): void {
   // **ドラッグしている間ずっと答えが見えている。** 落ちる先が決まっていれば
   // その行に線を引き、置けないところではブラウザのカーソルがそう言う。

@@ -53,7 +53,8 @@ const NOTHING_TO_RENAME = "Save the .md first — nothing on disk to rename yet"
 const NO_RENAME_HERE = "This browser can't rename files";
 
 /** File System Access API が無いブラウザで、Files のできない行と
- *  ショートカットの両方がこの理由を言う。英語の文言はここ 1 か所だけ */
+ *  ショートカットの両方がこの理由を言う（しらせの綴りは notice.ts の
+ *  FAILED と揃う — 外れていれば型が止める） */
 const NO_FILE_ACCESS = "This browser cannot open or save files";
 
 /** 新しいタブで開く。`⋯` の外部リンクが通る唯一の道 */
