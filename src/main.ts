@@ -62,8 +62,8 @@ function openExternal(url: string): void {
 
 const mdPane = el("md-pane", HTMLElement);
 const mapPane = el("map-pane", HTMLElement);
-const btnFile = el("btn-file", HTMLButtonElement);
-const btnMore = el("btn-more", HTMLButtonElement);
+const elFiles = el("files", HTMLButtonElement);
+const elMore = el("more", HTMLButtonElement);
 const elFilename = el("filename", HTMLElement);
 const elDirty = el("dirty", HTMLElement);
 const elLogo = el("logo", SVGSVGElement);
@@ -298,10 +298,15 @@ function showName(): void {
   if (elFilename.textContent !== shown) elFilename.textContent = shown;
   // **押せるときだけ押せる顔をする。** 理由は Files の Rename の行と同じものを使う
   const why = !io.canRename() ? NO_RENAME_HERE : savedName === null ? NOTHING_TO_RENAME : "";
-  elFilename.classList.toggle("off", why !== "");
   elFilename.title = why === "" ? "Rename — click" : why;
-  if (why === "") elFilename.setAttribute("tabindex", "0");
-  else elFilename.removeAttribute("tabindex");
+  // 押せなさは `aria-disabled` の 1 つで言う（見た目も読み上げも同じ源）
+  if (why === "") {
+    elFilename.removeAttribute("aria-disabled");
+    elFilename.setAttribute("tabindex", "0");
+  } else {
+    elFilename.setAttribute("aria-disabled", "true");
+    elFilename.removeAttribute("tabindex");
+  }
 }
 
 /** 文書を丸ごと入れ替える。名乗りも、寄せも、ここから */
@@ -608,7 +613,7 @@ function folderCaption(): string {
 // 「この .md の画像がどこに居るか」は文書ぜんぶの設定で、新規 / 開く / 保存と
 // 同じ高さのもの。塊は 2 つ（.md と、その画像フォルダ）で、見出しが状態を
 // 言い、続く行がそれに対してできること。**絵が付くのは、押せるものだけ。**
-openOnClick(btnFile, () => {
+openOnClick(elFiles, () => {
   const canOpen = io.canOpen();
   const canSave = io.canSaveAs();
   return [
@@ -664,7 +669,7 @@ openOnClick(btnFile, () => {
 });
 
 // 低頻度だが消したくないものの受け皿。3 つの塊 — 戻す / 見た目 / 外に開く
-openOnClick(btnMore, () => [
+openOnClick(elMore, () => [
   { label: "Undo", key: "Mod+Z", mark: "undo-2", run: () => editor.undo() },
   { label: "Redo", key: "Mod+Shift+Z", mark: "redo-2", run: () => editor.redo() },
   "sep",
@@ -762,8 +767,8 @@ const exportApi = initExport({
   failed,
   blocked,
   empty: () => doc.trees.length === 0,
-  button: el("btn-export", HTMLButtonElement),
-  wayButton: el("btn-export-way", HTMLButtonElement),
+  button: el("export", HTMLButtonElement),
+  wayButton: el("export-way", HTMLButtonElement),
 });
 
 const theme = initTheme({ logo: elLogo, setEditorTheme: (dark) => editor.setTheme(dark) });

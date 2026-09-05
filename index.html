@@ -34,16 +34,16 @@
         <!-- 道具はまとめて右へ。左は「いま何を開いているか」だけにする。
              帯のボタンはみな枠を持たない字（ネイティブのメニューバーと
              同じ佇まい）で、Files と ⋯ は押すと下に開く -->
-        <button id="btn-file">Files</button>
+        <button id="files">Files</button>
         <!-- 書き出しだけは 1 つの操作の 2 面（出し方 / 選び直し）なので、
              枠を重ねて塊に見せる。中身の絵と文字は src/icons.ts から入れる -->
         <span class="group">
-          <button id="btn-export"></button>
-          <button id="btn-export-way" class="icon-only"></button>
+          <button id="export"></button>
+          <button id="export-way" class="icon-only"></button>
         </span>
         <!-- 絵に見える「⋯」は字そのもの（アクセシブルネームとしては
              「三点リーダー」を読み上げるだけで、意味を持たない） -->
-        <button id="btn-more" title="More" aria-label="More">⋯</button>
+        <button id="more" title="More" aria-label="More">⋯</button>
       </header>
       <main id="panes">
         <section id="md-pane"></section>

@@ -44,7 +44,8 @@ src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す�
                渡し、返った Intent を実行する。カードの選択とその場編集、ファイルの投下の
                予告。パン・ズーム・ピンチ・寄せ・針・書き出し)
   icons.ts     ボタンとメニューの絵の唯一の源(線で引く / currentColor)
-  style.css    全体のスタイル(部品ごとの塊。入れ子は CSS 自身の機能)
+  style.css    全体のスタイル(部品ごとの塊。入れ子は CSS 自身の機能。色・影・輪の数字は
+               `:root` のトークンだけが持ち、状態は `.selected` / `.on` / `aria-disabled` で言う)
   map/         その純粋層 — geometry(座標系。側 → 符号はここだけ) / camera(視点。
                world ↔ 画面) / edge(線の形) / cards(Block → カード行。分類だけ) /
                drawCard(カード 1 行 → SVG) / metrics(寸法の唯一の場所) /

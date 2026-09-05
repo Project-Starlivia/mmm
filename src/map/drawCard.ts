@@ -35,7 +35,7 @@ export interface CardSpot {
 /** 行と行のあいだの仕切り。種類によらず引く */
 function separator(at: CardSpot): SVGElement {
   return svgEl("line", {
-    class: "card-sep",
+    class: "sep",
     x1: ROW_NORMAL.padX - 4,
     y1: at.rowY,
     x2: at.boxW - ROW_NORMAL.padX + 4,
@@ -94,7 +94,7 @@ function inlineSvg(
 }
 
 function image(
-  r: Extract<CardRow, { kind: "img" }>,
+  r: Extract<CardRow, { kind: "image" }>,
   at: CardSpot,
   imageUrl: (path: string) => string | null,
   hint: string | null,
@@ -105,7 +105,7 @@ function image(
   // 飛ばないよう、同じ大きさの場所取りを置く
   const { x, y, w, h } = at.rect;
   const box = svgEl("rect", {
-    class: "img-ph",
+    class: "image-placeholder",
     "data-card": at.spot,
     x,
     y,
@@ -116,7 +116,7 @@ function image(
   // 場所取りが自分で言う。握っていないだけなら、ここが入口も兼ねる
   const mid = y + h / 2;
   const name = svgEl("text", {
-    class: "img-name",
+    class: "image-name",
     "data-card": at.spot,
     x: x + w / 2,
     y: hint === null ? mid : mid - 7,
@@ -127,7 +127,7 @@ function image(
   // 入口は**この字だけ**。場所取りそのものは選択のままにしておく
   // （2 つの意味を 1 つの当たり判定に乗せない）
   const link = svgEl("text", {
-    class: "img-connect",
+    class: "image-connect",
     "data-connect": "1",
     x: x + w / 2,
     y: mid + 8,
@@ -182,7 +182,7 @@ function rule(at: CardSpot): SVGElement[] {
   const { x, y, w, h } = at.rect;
   return [
     svgEl("line", {
-      class: "card-rule",
+      class: "break",
       "data-card": at.spot,
       x1: x,
       y1: y + h / 2,
@@ -230,11 +230,11 @@ export function drawCard(
       ? link(r, at)
       : r.kind === "svg"
         ? inlineSvg(r, at)
-        : r.kind === "img"
+        : r.kind === "image"
           ? image(r, at, imageUrl, imageHint)
           : r.kind === "code"
             ? code(r, at)
-            : r.kind === "rule"
+            : r.kind === "break"
               ? rule(at)
               : details(r, at);
   return [separator(at), ...body];
