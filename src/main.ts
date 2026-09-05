@@ -174,16 +174,12 @@ const setPicked = (id: number | null): void => choose(id === null ? NOTHING : { 
  * 操作の直後は core の focus が選択を決める（新しいノードには目印が無い）。
  * できない操作は core が空の編集列で言う。いまは雑に、しらせを出すだけ
  *
- * `keep` は消す前に選んでおきたい隣の id（keys.ts の `neighbor`）。編集の
- * 前に選択へ据えておけば、その目印が編集列をまたいで消した後の id まで
- * 追いかける（段 1 の目印の仕組みに乗るだけで、ここでは何も特別しない）
- *
  * focus はノードとも中身とも限らない（`AddBlock` / `SetBlock` / `MoveBlock` は
  * 中身の id を返す）。木を見て振り分ける — ノードなら選択して `edit` なら
  * その場編集、中身ならカードとして選ぶ（中身の編集はカードの入口からしか
  * 始まらない）。呼び出し側が続けられるよう focus を返す（Link / Code が使う）
  */
-function apply(op: core.Op, edit: boolean, keep: number | null = null): number | null {
+function apply(op: core.Op, edit: boolean): number | null {
   const r = core.edit(text, op);
   // core は断りを「編集なし・focus なし」で言う。編集が無くても focus が在るのは、
   // 何も変わらなかった操作（同じ名前への Rename など）で、しらせは出さない
@@ -191,8 +187,6 @@ function apply(op: core.Op, edit: boolean, keep: number | null = null): number |
     failed("Couldn't do that here");
     return null;
   }
-  // 断られた操作で選択を失わないよう、据えるのは通ってから
-  if (keep !== null) setSelection({ ids: [keep], anchor: keep }, false);
   if (r.edits.length > 0) editor.apply(r.edits); // → sync
   if (r.focus === null) return null;
   if (!core.isNode(doc, r.focus)) {

@@ -49,9 +49,8 @@ export interface MapHost {
   /** その中身の原文。地番で md から切り出す（無ければ空） */
   blockText(id: number): string;
   /** 操作を md に映す。edit なら、映した後の focus をそのまま編集開始
-   *  （ノードのときだけ — 中身の focus はカードとして選ぶ）。keep は消す前に
-   *  選んでおきたい隣の id（keys.ts の Intent の keep）。返り値は映した focus */
-  apply(op: core.Op, edit: boolean, keep?: number): number | null;
+   *  （ノードのときだけ — 中身の focus はカードとして選ぶ）。返り値は映した focus */
+  apply(op: core.Op, edit: boolean): number | null;
   /** クリップボードを貼る（Mod+V）。宛先は選択の anchor、無ければ文書 */
   paste(): void;
   /** 選んでいるもの（カードならその原文、でなければ選択の部分木）をクリップボードへ
@@ -817,7 +816,7 @@ export class Mindmap {
   private act(intent: Intent): void {
     switch (intent.kind) {
       case "op":
-        this.host.apply(intent.op, intent.edit, intent.keep);
+        this.host.apply(intent.op, intent.edit);
         return;
       case "edit":
         this.beginEdit(intent.id, intent.seed);

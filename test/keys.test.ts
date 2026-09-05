@@ -139,18 +139,16 @@ test("拾わないキーは null（ブラウザに渡す）", () => {
   assert.equal(keyed(L, one(3), k("Enter", { alt: true })), null);
 });
 
-test("Delete は選択を消し、隣を keep する", () => {
+test("Delete は選択を消す。隣を選ぶのは core の focus", () => {
   assert.deepEqual(keyed(L, one(3), k("Delete")), {
     kind: "op",
     op: { kind: "delete", ids: [3] },
     edit: false,
-    keep: 4,
   });
   assert.deepEqual(keyed(L, { ids: [3, 4], anchor: 4 }, k("Backspace")), {
     kind: "op",
     op: { kind: "delete", ids: [3, 4] },
     edit: false,
-    keep: 2,
   });
   assert.equal(keyed(L, NONE, k("Delete")), null);
 });
@@ -159,7 +157,7 @@ test("Mod+C は写す。Mod+X は写してから Delete と同じ消し方", () 
   assert.deepEqual(keyed(L, { ids: [3, 4], anchor: 4 }, k("c", { mod: true })), { kind: "copy", cut: null });
   assert.deepEqual(keyed(L, one(3), k("x", { mod: true })), {
     kind: "copy",
-    cut: { kind: "op", op: { kind: "delete", ids: [3] }, edit: false, keep: 4 },
+    cut: { kind: "op", op: { kind: "delete", ids: [3] }, edit: false },
   });
   // 何も選んでいなければ拾わない（ブラウザに渡す）
   assert.equal(keyed(L, NONE, k("c", { mod: true })), null);

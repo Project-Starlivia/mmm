@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type * as core from "../src/coreApi.ts";
 import { GAP, type Layout, type SizeOf, layoutMap } from "../src/map/layout.ts";
-import { NONE, all, arrow, click, extend, hit, neighbor, nextSibling, parentOf, prevSibling, rubber, NOTHING, cardOf, nodesOf } from "../src/map/select.ts";
+import { NONE, all, arrow, click, extend, hit, nextSibling, parentOf, prevSibling, rubber, NOTHING, cardOf, nodesOf } from "../src/map/select.ts";
 
 /** 全部 100 × 30 */
 const size: SizeOf = () => ({ w: 100, h: 30 });
@@ -92,15 +92,6 @@ test("兄弟と親 — 同じ親の文書順で前後。根の兄弟は根どう
   assert.equal(prevSibling(L, 2), null);
   assert.equal(nextSibling(L, 3), null);
   assert.equal(nextSibling(L, 4), null);
-});
-
-test("消した後の隣 — 次、無ければ前、無ければ親。消える部分木は隣に数えない", () => {
-  assert.equal(neighbor(L, [2]), 3);
-  assert.equal(neighbor(L, [3]), 2); // 3 の次は 4 だが 4 は消える部分木
-  assert.equal(neighbor(L, [4]), 3);
-  assert.equal(neighbor(L, [2, 3]), 1);
-  assert.equal(neighbor(L, [1]), null);
-  assert.equal(neighbor(L, [2, 4]), 3); // 飛び飛びでも、残る 3 が最初の次
 });
 
 test("選択は 1 つの値 — ノードの並びかカード 1 枚か。見方は片方が空", () => {
