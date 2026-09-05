@@ -3,10 +3,17 @@
 // 受け取るのは原文・前の Doc とその地番・後の Doc の 4 つで、返すのは編集列だけ。
 // 後の Doc が誰にどう作られたか（操作・undo のスナップショット）は知らない。
 //
-// 前後の木を id で突き合わせ、ノード 1 つを行（ラベル）・中身・子の 3 つの列に
-// 分けて、それぞれ変わった所だけを書く。列の差分は子も中身も同じ 1 つ（`diff`）で、
-// 消えた並びは隙間ごと消し、増えた並びは容器が兄弟の間に使っている隙間を挟んで差す。
-// 行が同じなら行には触らない — そこに選択の目印が在る（follow.mbt）。
+// 形は**正規形を base にした 3-way merge**（recast と同じ）:
+//
+//   ours   = 原文（ユーザーの流儀）   要素ごとに [手前の隙間, 本体] の範囲（地番）
+//   base   = 前の木の正規形            要素ごとに、手前に空行が有るか
+//   theirs = 後の木の正規形            同上
+//
+// base → theirs の差（操作の差）だけを ours に写す。base と ours の差（流儀の差）は
+// 写さないので、触っていない所の書き方は残る。要素はノードの行（ラベル）と中身 1 枚で、
+// 位置合わせは id。**要素は手前の隙間（空行）を持つ** — 消えるときは隙間ごと消え、
+// 増えるときは theirs の隙間を連れてきて、残る要素の隙間は theirs で変わったときだけ
+// 書き換える。隙間そのものは原文の字で測る（空白だけの行 = 空行。読みと同じ）。
 // 出来た文章を読み直して後の木と形が一致しなければ全文を正規形に落とす —
 // **正しさはこの検証が持つ**ので、比較がどれだけ雑でも壊れない。
 // 決めは docs/core.md「反映」。
@@ -20,8 +27,7 @@ pub(all) struct Edit {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
-/// 後の木を映す編集列。from 順で、範囲は重ならない
-/// （同じ位置の差し込みと置き換えは、差し込みが先）。
+/// 後の木を映す編集列。from 順で、範囲は重ならない。
 pub fn reflect(
   md : String,
   before : Doc,
@@ -53,6 +59,12 @@ priv struct Reflect {
   eol : Eol
   /// 前の木のノードを id で引く
   old : Map[Int, Node]
+  /// ours — 要素の手前の隙間の頭（空行が無ければ行頭）。前の木の id で引く
+  gap : Map[Int, Int]
+  /// base — 正規形（前）で手前に空行が有るか。前の木の id で引く
+  base : Map[Int, Bool]
+  /// theirs — 正規形（後）で手前に空行が有るか。後の木の id で引く
+  theirs : Map[Int, Bool]
   out : Array[Edit]
 }
 
@@ -68,7 +80,19 @@ fn plan(
   guard before.frontmatter == after.frontmatter && before.eol == after.eol else {
     return None
   }
-  let r : Reflect = { md, spans, eol: before.eol, old: Map([]), out: [] }
+  guard gaps_of(before) is Some(base) && gaps_of(after) is Some(theirs) else {
+    return None
+  }
+  let r : Reflect = {
+    md,
+    spans,
+    eol: before.eol,
+    old: Map([]),
+    gap: gaps_in(md, spans),
+    base,
+    theirs,
+    out: [],
+  }
   for root in before.roots {
     index(r.old, root.node)
   }
@@ -88,62 +112,90 @@ fn plan(
   let news_n = after.roots.map(x => x.node)
   guard aligned(ids(olds_n), ids(news_n)) else { return None }
   kids(r, spans.get(doc_id).unwrap().to, 0, olds_n, news_n, 1, sides)
-  r.out.sort_by((a, b) => {
-    if a.from != b.from {
-      a.from - b.from
-    } else {
-      a.to - b.to
-    }
-  })
-  Some(parted(r))
-}
-
-///|
-/// 差し込みを前の行から切り離す — 行の途中（改行の無い末尾）に来るなら改行してから。
-/// **消えた後の字で見る**: 直前まで消す編集が続いていれば、行の途中かはその消し始めの
-/// 位置で決まり、そこに字を書いていればその字の尻で決まる。
-fn parted(r : Reflect) -> Array[Edit] {
-  // 直前まで続く消しの、始めと尻と、そこに書いた字（消えた範囲が隣り合えば繋がる）
-  let mut cut_to = -1
-  let mut cut_from = -1
-  let mut wrote = ""
-  r.out.map(e => {
-    let mid = if e.from != e.to {
-      false
-    } else if e.from != cut_to {
-      mid_line(r.md, e.from)
-    } else if wrote != "" {
-      !wrote.has_suffix("\n")
-    } else {
-      mid_line(r.md, cut_from)
-    }
-    if e.from < e.to {
-      if e.from != cut_to {
-        cut_from = e.from
-        wrote = ""
-      }
-      cut_to = e.to
-      if e.insert != "" {
-        wrote = e.insert
-      }
-    }
-    if mid {
-      { ..e, insert: eol(r) + e.insert }
-    } else {
-      e
-    }
-  })
-}
-
-///|
-/// その位置が行の途中か（行頭の字下げの後ろは行頭と同じ — 項目のマーカーの手前がそこ）。
-fn mid_line(md : String, at : Int) -> Bool {
-  skip_blank(md, line_start(md, at), at) < at
+  Some(settle(r))
 }
 
 ///|
 fn plain(sides : Array[Side]) -> Bool {
   sides.iter().all(s => s is Right)
+}
+
+///|
+/// 要素（Implicit でないノードと中身）の id を文書順に。
+fn elements(doc : Doc) -> Array[Int] {
+  let out : Array[Int] = []
+  fn node(x : Node) {
+    match x {
+      ImplicitNode(_) => ()
+      _ => out.push(id_of(x))
+    }
+    for b in body_of(x) {
+      out.push(b.id)
+    }
+    for k in children_of(x) {
+      node(k)
+    }
+  }
+
+  for b in doc.body {
+    out.push(b.id)
+  }
+  for r in doc.roots {
+    node(r.node)
+  }
+  out
+}
+
+///|
+/// ours の隙間 — 地番を持つものごとに、手前に続く空行の頭。Implicit の範囲の頭は
+/// 最初の子の頭なので、Implicit の隙間はその子の隙間。
+fn gaps_in(md : String, spans : Map[Int, Spot]) -> Map[Int, Int] {
+  let out : Map[Int, Int] = Map([])
+  for id, s in spans {
+    out[id] = blank_start(md, line_start(md, s.from))
+  }
+  out
+}
+
+///|
+/// 正規形の隙間 — 木を正規形に書いて読み直し、要素ごとに手前に空行が有るかを見る。
+/// 要素は文書順に 1 対 1 で並ぶので、順に組にする。並ばなければ None（全文へ落ちる）。
+fn gaps_of(doc : Doc) -> Map[Int, Bool]? {
+  let canon = serialize(doc)
+  let (read, spans) = survey(canon)
+  let mine = elements(doc)
+  let theirs = elements(read)
+  guard mine.length() == theirs.length() else { return None }
+  let out : Map[Int, Bool] = Map([])
+  for i, id in mine {
+    let s = spans.get(theirs[i]).unwrap()
+    let head = line_start(canon, s.from)
+    out[id] = blank_start(canon, head) < head
+  }
+  // Implicit は行を持たないので、その隙間は最初の要素の隙間
+  fn implicit(x : Node) {
+    match x {
+      ImplicitNode(g) => {
+        match
+          elements({ ..doc, body: [], roots: [{ node: x, sides: [] }] }).get(0) {
+          Some(first) => out[g.id] = out.get(first).unwrap_or(true)
+          None => ()
+        }
+        for k in g.children {
+          implicit(k)
+        }
+      }
+      _ =>
+        for k in children_of(x) {
+          implicit(k)
+        }
+    }
+  }
+
+  for r in doc.roots {
+    implicit(r.node)
+  }
+  Some(out)
 }
 
 ///|
@@ -203,124 +255,96 @@ fn aligned(olds : Array[Int], news : Array[Int]) -> Bool {
 }
 
 ///|
-/// 列が納まる容器。列が空のとき消す起点であり差す位置（自分の尻）、列の桁、
-/// 兄弟の間の隙間、そして前に何も無いか（文書の頭 — 隙間は後ろにしか付けられない）。
-priv struct Container {
+/// 列 1 つの差分に要るもの。
+priv struct Seq {
+  olds : Array[Int]
+  news : Array[Int]
+  /// 元から空の列に差す位置 — 容器の自分の尻
   own : Int
+  /// 列の桁
   col : Int
-  sep : String
-  head : Bool
-}
-
-///|
-fn container(own : Int, col : Int, sep : String) -> Container {
-  { own, col, sep, head: own == 0 }
+  /// 増える物の手前に空行を置くか。theirs の答え（項目の列は ours の兄弟の流儀が先）
+  gap : (Int) -> Bool
+  /// 残る物に降りる
+  keep : (Int) -> Unit
+  /// 増える物の断片
+  make : (Int) -> String
 }
 
 ///|
 /// 列の差分。子の列と中身の列で共用する。
-/// 残った物は `keep` に任せ、消えた並びは隙間ごと消し、増えた並びは隙間を挟んで差す。
 ///
-/// 消える並び（連続して消える物は 1 つの並び）は、次に残る物が居ればその頭まで、
-/// 居なければ前に残る物の尻から、前も居なければ容器の自分の尻から消す —
-/// 隙間は必ずどちらかに道連れになり、残った物の間の隙間だけが残る。
-/// 増える並びは、次に残る物の手前なら `断片 ⋯ + sep`、そうでなければ `sep + 断片 ⋯`。
-fn diff(
-  r : Reflect,
-  c : Container,
-  olds : Array[Int],
-  news : Array[Int],
-  keep : (Int) -> Unit,
-  make : (Int) -> String,
-) -> Unit {
-  let now = Map::from_array(news.map(id => (id, ())))
-  let was = Map::from_array(olds.map(id => (id, ())))
-  let at = (id : Int) => r.spans.get(id).unwrap()
+/// - 消える並び（連続して消える物は 1 つ）は、先頭の手前の隙間から最後の尻まで消す
+/// - 残る物には降りる。手前の隙間が base と theirs で違えば（文書の頭になった /
+///   頭でなくなった、列が詰まった / 空いた）、隙間だけ書き換える
+/// - 増える並びは、次に残る物の隙間の頭か、前に残る物の尻か、消えた並びの頭か、
+///   容器の自分の尻に差す。1 つずつ theirs の隙間を連れてくる
+fn diff(r : Reflect, q : Seq) -> Unit {
+  let now = Map::from_array(q.news.map(id => (id, ())))
+  let was = Map::from_array(q.olds.map(id => (id, ())))
   let mut i = 0
-  let mut prev : Int? = None
-  while i < olds.length() {
-    if now.contains(olds[i]) {
-      prev = Some(at(olds[i]).to)
+  while i < q.olds.length() {
+    if now.contains(q.olds[i]) {
       i = i + 1
       continue
     }
     let start = i
-    while i < olds.length() && !now.contains(olds[i]) {
+    while i < q.olds.length() && !now.contains(q.olds[i]) {
       i = i + 1
     }
-    let last = at(olds[i - 1]).to
-    let (from, to) = if i < olds.length() {
-      (
-        line_start(r.md, at(olds[start]).from),
-        line_start(r.md, at(olds[i]).from),
-      )
-    } else {
-      match prev {
-        Some(p) => (p, last)
-        // 文書の頭から消すなら、後ろの隙間も道連れ（頭に空行を残さない）
-        None => (c.own, if c.head { skip_newlines(r.md, last) } else { last })
-      }
-    }
-    r.out.push({ from, to, insert: "" })
+    r.out.push({
+      from: r.gap.get(q.olds[start]).unwrap(),
+      to: r.spans.get(q.olds[i - 1]).unwrap().to,
+      insert: "",
+    })
+  }
+  let piece = (id : Int) => {
+    (if (q.gap)(id) { eol(r) } else { "" }) +
+    pad(q.col) +
+    indent((q.make)(id), q.col)
   }
   let pend : Array[String] = []
   let mut kept : Int? = None
-  for id in news {
+  for id in q.news {
     if was.contains(id) {
       if !pend.is_empty() {
-        // 残る物のマーカーの手前。差した後ろにその物の字下げを戻す
-        let s = at(id)
-        let col = column(r.md, s.from)
-        r.out.push(
-          insert(s.from, indent(pend.join(c.sep), col) + c.sep + pad(col)),
-        )
+        let at = r.gap.get(id).unwrap()
+        r.out.push({ from: at, to: at, insert: pend.join("") })
         pend.clear()
       }
-      keep(id)
+      let s = r.spans.get(id).unwrap()
+      let had = r.base.get(id).unwrap_or(false)
+      let has = r.theirs.get(id).unwrap_or(had)
+      if had != has {
+        r.out.push({
+          from: r.gap.get(id).unwrap(),
+          to: line_start(r.md, s.from),
+          insert: if has {
+            eol(r)
+          } else {
+            ""
+          },
+        })
+      }
+      (q.keep)(id)
       kept = Some(id)
     } else {
-      pend.push(make(id))
+      pend.push(piece(id))
     }
   }
   if !pend.is_empty() {
-    match kept {
-      Some(id) => r.out.push(insert(at(id).to, behind(c, pend)))
-      None => {
-        // 空になった列（元の尻は最後に消えた物の尻）か、元から空の列
-        let tail = match olds.last() {
-          Some(id) => at(id).to
-          None => c.own
-        }
-        r.out.push(insert(c.own, first(r, c, pend, tail)))
-      }
+    let at = match (kept, q.olds.get(0)) {
+      (Some(k), _) => r.spans.get(k).unwrap().to
+      (None, Some(first)) => r.gap.get(first).unwrap()
+      (None, None) => q.own
     }
+    r.out.push({ from: at, to: at, insert: pend.join("") })
   }
 }
 
 ///|
-/// 残る物の後ろに置く並び。隙間を挟んで、容器の桁に揃える
-fn behind(c : Container, parts : Array[String]) -> String {
-  c.sep + pad(c.col) + indent(parts.join(c.sep), c.col)
-}
-
-///|
-/// 空の容器に置く並び。文書の頭には前が無いので、隙間は後ろ — それも続きが有るときだけ
-/// （`tail` は列の尻。その先に字が無ければ文書の尻）。
-fn first(
-  r : Reflect,
-  c : Container,
-  parts : Array[String],
-  tail : Int,
-) -> String {
-  if !c.head {
-    return behind(c, parts)
-  }
-  let follows = skip_newlines(r.md, tail) < r.md.length()
-  indent(parts.join(c.sep), c.col) + (if follows { c.sep } else { "" })
-}
-
-///|
-/// 子列の差分。残った子には降りる。
+/// 子列の差分。残った子には降りる。項目の列は ours の兄弟の流儀（詰まっているか）を
+/// 増える物にも写す — 正規形は流儀を知らないので、ここだけは ours が先。
 fn kids(
   r : Reflect,
   own : Int,
@@ -331,27 +355,43 @@ fn kids(
   sides : Map[Int, Array[Side]],
 ) -> Unit {
   let now = Map::from_array(news.map(x => (id_of(x), x)))
-  let item = match news.get(0) {
-    Some(ListNode(_)) => true
-    _ => false
+  let item = news.get(0) is Some(ListNode(_))
+  let old_ids = ids(olds)
+  let style : Bool? = if item && old_ids.length() >= 2 {
+    // 2 つ目からの兄弟の隙間が、この列の流儀（先頭の隙間は列の手前のもの）
+    Some(
+      old_ids[1:]
+      .iter()
+      .any(id => {
+        r.gap.get(id).unwrap() < line_start(r.md, r.spans.get(id).unwrap().from)
+      }),
+    )
+  } else {
+    None
   }
-  diff(
-    r,
-    container(own, col, sep(r, item, ids(olds))),
-    ids(olds),
-    ids(news),
-    id => walk(r, now.get(id).unwrap(), depth, sides.get(id).unwrap_or([])),
-    id => {
+  diff(r, {
+    olds: old_ids,
+    news: ids(news),
+    own,
+    col,
+    gap: id => {
+      match style {
+        Some(loose) => loose
+        None => r.theirs.get(id).unwrap_or(true)
+      }
+    },
+    keep: id => {
+      walk(r, now.get(id).unwrap(), depth, sides.get(id).unwrap_or([]))
+    },
+    make: id => {
       fragment(now.get(id).unwrap(), depth, sides.get(id).unwrap_or([]), r.eol)
     },
-  )
+  })
 }
 
 ///|
 /// 中身の列の差分。内容だけ変わった中身はその範囲を置き換える。
 /// 並びが変われば列ごと — 全部消して全部差す（同じ規則で隙間が付く）。
-/// 中身の間は常に空行 1 つ — 項目の中でも、段落がラベルの続きに読まれないように
-/// （書き手が項目の中身をそう書くのと同じ）。
 fn body(
   r : Reflect,
   olds : Array[Block],
@@ -366,23 +406,28 @@ fn body(
   let now = Map::from_array(news.map(b => (b.id, b)))
   let old_ids = olds.map(b => b.id)
   let new_ids = news.map(b => b.id)
-  let c = container(own, col, eol(r))
   let make = (id : Int) => prose([now.get(id).unwrap()], r.eol)
+  let gap = (id : Int) => r.theirs.get(id).unwrap_or(true)
   if !aligned(old_ids, new_ids) {
-    diff(r, c, old_ids, [], _ => (), make)
-    let tail = match olds.last() {
-      Some(b) => r.spans.get(b.id).unwrap().to
-      None => own
-    }
-    r.out.push(insert(own, first(r, c, [prose(news, r.eol)], tail)))
+    diff(r, { olds: old_ids, news: [], own, col, gap, keep: _ => (), make })
+    diff(r, {
+      olds: [],
+      news: new_ids,
+      own: r.gap.get(old_ids[0]).unwrap(),
+      col,
+      gap,
+      keep: _ => (),
+      make,
+    })
     return
   }
-  diff(
-    r,
-    c,
-    old_ids,
-    new_ids,
-    id => {
+  diff(r, {
+    olds: old_ids,
+    news: new_ids,
+    own,
+    col,
+    gap,
+    keep: id => {
       let b = now.get(id).unwrap()
       if was.get(id).unwrap().content != b.content {
         let s = r.spans.get(id).unwrap()
@@ -394,27 +439,7 @@ fn body(
       }
     },
     make,
-  )
-}
-
-///|
-/// 兄弟の間の隙間。容器に元から 2 つ以上居ればその間を写し、居なければ
-/// 項目の列は詰め、見出しと文書の直下は空行 1 つ。
-fn sep(r : Reflect, item : Bool, olds : Array[Int]) -> String {
-  if olds.length() >= 2 {
-    let a = r.spans.get(olds[0]).unwrap()
-    let b = r.spans.get(olds[1]).unwrap()
-    return if slice(r.md, a.to, line_start(r.md, b.from)).contains("\n") {
-      eol(r)
-    } else {
-      ""
-    }
-  }
-  if item {
-    ""
-  } else {
-    eol(r)
-  }
+  })
 }
 
 ///|
@@ -427,12 +452,12 @@ fn eol(r : Reflect) -> String {
 
 ///|
 /// 前の木のノードの、自分の尻 — 最後の中身の尻、中身が無ければ行の尻。
-/// Implicit は行を持たないので、最初の子の手前の空行の頭（隙間の手前 — 他のノードの
-/// 尻と同じく、隙間は自分の尻の後ろに在る）。地番を引くので前の木のものに限る。
+/// 元から子の無い容器に差すときだけ使う（子が居れば先頭の子の隙間の頭に差す）。
+/// Implicit は必ず子を持つのでここへは来ないが、範囲の頭を返しておく。
 fn own_end(r : Reflect, old : Node) -> Int {
   let s = r.spans.get(id_of(old)).unwrap()
   match old {
-    ImplicitNode(_) => blank_start(r.md, s.from)
+    ImplicitNode(_) => s.from
     _ =>
       match body_of(old).last() {
         Some(b) => r.spans.get(b.id).unwrap().to
@@ -444,7 +469,7 @@ fn own_end(r : Reflect, old : Node) -> Int {
 ///|
 /// 行頭 `at` の手前に続く空行の頭。空行が無ければその位置のまま。
 /// 空行は「改行までが空白だけの行」— 読みが空行と見るのと同じ。改行は `\n`（CRLF の
-/// `\r` は行の中身ではない）。単独の `\r` はこのモジュールのどこにも無い。
+/// `\r` は行の中身ではない）。
 fn blank_start(md : String, at : Int) -> Int {
   let mut p = at
   while p > 0 && md[p - 1] == '\n' {
@@ -457,24 +482,48 @@ fn blank_start(md : String, at : Int) -> Int {
 }
 
 ///|
-/// 改行だけを読み飛ばした位置。
-fn skip_newlines(md : String, at : Int) -> Int {
-  let mut i = at
-  while i < md.length() && (md[i] == '\n' || md[i] == '\r') {
-    i = i + 1
-  }
-  i
-}
-
-///|
 fn pad(n : Int) -> String {
   String::make(n, ' ')
 }
 
 ///|
-/// 位置 pos に text を差す編集。行の途中なら改行してから — それは `joined` が最後に決める。
-fn insert(pos : Int, text : String) -> Edit {
-  { from: pos, to: pos, insert: text }
+/// 編集列を整える。from 順（同じ位置は出た順）に並べ、隣り合う編集は 1 つに繋ぎ、
+/// 行の途中（改行の無い末尾）に字を書く編集は改行から始める。
+/// 繋いでから見るので、消した後に何が残るかで決まる。
+fn settle(r : Reflect) -> Array[Edit] {
+  let order = Array::makei(r.out.length(), i => i)
+  order.sort_by((a, b) => {
+    let (x, y) = (r.out[a], r.out[b])
+    if x.from != y.from {
+      x.from - y.from
+    } else if x.to != y.to {
+      x.to - y.to
+    } else {
+      a - b
+    }
+  })
+  let out : Array[Edit] = []
+  for i in order {
+    let e = r.out[i]
+    match out.last() {
+      Some(p) if p.to == e.from =>
+        out[out.length() - 1] = { ..p, to: e.to, insert: p.insert + e.insert }
+      _ => out.push(e)
+    }
+  }
+  out.map(e => {
+    if e.insert != "" && mid_line(r.md, e.from) {
+      { ..e, insert: eol(r) + e.insert }
+    } else {
+      e
+    }
+  })
+}
+
+///|
+/// その位置が行の途中か（行頭の字下げの後ろは行頭と同じ — 項目のマーカーの手前がそこ）。
+fn mid_line(md : String, at : Int) -> Bool {
+  skip_blank(md, line_start(md, at), at) < at
 }
 
 ///|

@@ -163,7 +163,7 @@ test "頭に差せば次に残る子の手前" {
     }
   })
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 5, "to": 5, "insert": "## c\n\n" },
+    { "from": 4, "to": 4, "insert": "\n## c\n" },
   ])
 }
 
@@ -210,8 +210,7 @@ test "子を総取り替えすれば、消して同じ桁に差す" {
   })
   let after = change(change(before, 0, [], orphan), 0, [], adopt(z))
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 4, "to": 4, "insert": "  - z\n" },
-    { "from": 4, "to": 10, "insert": "" },
+    { "from": 4, "to": 10, "insert": "  - z\n" },
   ])
   inspect(
     apply(md, reflect(md, before, spans, after)),
@@ -246,7 +245,7 @@ test "入れ子の項目の手前に差せば、後ろに字下げを戻す" {
     }
   })
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 6, "to": 6, "insert": "- z\n  " },
+    { "from": 4, "to": 4, "insert": "  - z\n" },
   ])
   inspect(
     apply(md, reflect(md, before, spans, after)),
@@ -376,8 +375,7 @@ test "散文" {
   let (before, spans) = survey(md)
   let after : Doc = { ..before, body: blocks([Opaque("bye")]) }
   json_inspect(reflect(md, before, spans, after), content=[
-    { "from": 0, "to": 0, "insert": "bye\n\n" },
-    { "from": 0, "to": 7, "insert": "" },
+    { "from": 0, "to": 6, "insert": "bye\n" },
   ])
 }
 
@@ -520,7 +518,7 @@ test "中身を置き換えれば、その範囲だけ" {
 }
 
 ///|
-test "消える子は後ろの隙間を道連れ。最後なら前の隙間" {
+test "消える子は手前の隙間を道連れ" {
   let md = "# r\n\n## a\n\n## b\n\n## c\n"
   let (before, spans) = survey(md)
   let drop = (i : Int) => {
@@ -536,7 +534,7 @@ test "消える子は後ろの隙間を道連れ。最後なら前の隙間" {
     })
   }
   let mid = reflect(md, before, spans, drop(1))
-  json_inspect(mid, content=[{ "from": 11, "to": 17, "insert": "" }])
+  json_inspect(mid, content=[{ "from": 10, "to": 16, "insert": "" }])
   inspect(apply(md, mid), content="# r\n\n## a\n\n## c\n")
   let last = reflect(md, before, spans, drop(2))
   json_inspect(last, content=[{ "from": 16, "to": 22, "insert": "" }])
@@ -544,7 +542,7 @@ test "消える子は後ろの隙間を道連れ。最後なら前の隙間" {
 }
 
 ///|
-test "増える子は隙間を挟む — 兄弟の後ろにも、空の親にも" {
+test "増える子は正規形の隙間を連れてくる — 兄弟の後ろにも、空の親にも" {
   let md = "# r\n\n## a\n"
   let (before, spans) = survey(md)
   let after = change(before, 0, [], adopt(fresh("c")))
@@ -581,8 +579,7 @@ test "枝の移動は隙間ごと — 元は消え、先には隙間を挟んで
   })
   let edits = reflect(md, before, spans, after)
   json_inspect(edits, content=[
-    { "from": 17, "to": 17, "insert": "\n### b\n\n### c\n" },
-    { "from": 17, "to": 29, "insert": "" },
+    { "from": 17, "to": 29, "insert": "\n### b\n\n### c\n" },
   ])
   inspect(apply(md, edits), content="# r\n\n## a\n\nhello\n\n### b\n\n### c\n")
 }
