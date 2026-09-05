@@ -112,22 +112,53 @@ fn erase(doc : @tree.Doc, id : Int) -> @tree.Doc? {
 }
 
 ///|
+/// 消した後に選ぶ候補、近いほうから。中身なら持ち主とその祖先。ノードなら
+/// 次の兄弟たち → 前の兄弟たち（近い順）→ 祖先。消えるものは呼ぶ側が落とす。
+/// 兄弟と親は、消したノードが見えていれば見えている（畳まれるのは子孫）ので、
+/// 埋もれたノードには落ちない。
+fn heirs(doc : @tree.Doc, id : Int) -> Array[Int] {
+  let out : Array[Int] = []
+  if owner(doc, block=id) is None {
+    let sibs = siblings(doc, id)
+    match sibs.search(id) {
+      Some(i) => {
+        for k in (i + 1)..<sibs.length() {
+          out.push(sibs[k])
+        }
+        for k in 0..<i {
+          out.push(sibs[i - 1 - k])
+        }
+      }
+      None => ()
+    }
+  }
+  for a in ancestors(doc, id) {
+    out.push(a)
+  }
+  out
+}
+
+///|
 /// 選んだものを文書順に消す。知らない id が 1 つでもあれば None。
-/// 中身を消したら、その持ち主が focus（消した後に選ぶべきもの）。ノードを消した
-/// 後に選ぶものは無い — 隣を選ぶのは UI の仕事（目印で追う）
+/// focus は先頭（文書順）の消したものの隣 — 中身なら持ち主、ノードなら次の兄弟 →
+/// 前の兄弟 → 親。消えるものは飛ばす。何も残らなければ None（最後の根、文書の散文）。
+/// 「消した後に何を選ぶか」の答えはこの focus 1 本（ts は隣を決めない）。
 fn delete(doc : @tree.Doc, ids : Array[Int]) -> Done? {
   guard !ids.is_empty() && ids.all(id => has(doc, id)) else { return None }
+  let gone = pick(doc, ids)
+  let wants = heirs(doc, gone[0])
   let mut cur = doc
-  let mut focus = None
-  for id in pick(doc, ids) {
-    if owner(cur, block=id) is Some(o) {
-      focus = Some(o)
-    }
+  for id in gone {
     guard erase(cur, id) is Some(d) else { return None }
     cur = d
   }
-  // 持ち主ごと消えていれば、選ぶものは無い
-  Some({ doc: cur, focus: focus.filter(o => has(cur, o)) })
+  let mut focus = None
+  for w in wants {
+    if focus is None && has(cur, w) {
+      focus = Some(w)
+    }
+  }
+  Some({ doc: cur, focus })
 }
 
 ///|
