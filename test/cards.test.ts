@@ -20,8 +20,8 @@ test("Block の種類がカードの種類になる。並びは Block のまま"
     block({ kind: "svg", markup: "<svg/>" }),
   ]);
   assert.deepEqual(rows, [
-    { kind: "img", path: "p.png", name: "p.png" },
-    { kind: "rule" },
+    { kind: "image", path: "p.png", name: "p.png" },
+    { kind: "break" },
     { kind: "link", title: "t", url: "https://x.example/a" },
     { kind: "code", lang: "js", lines: ["1"] },
     { kind: "details", open: false, summary: null, lines: ["x"] },
@@ -51,10 +51,10 @@ test("リンクは http(s) だけ。題が無ければホスト名", () => {
 
 test("画像は相対パスだけ。./ は剥がし、名前は最後の要素", () => {
   assert.deepEqual(cardRows([block({ kind: "image", alt: "", src: "../pics/y.png", title: "" })]), [
-    { kind: "img", path: "../pics/y.png", name: "y.png" },
+    { kind: "image", path: "../pics/y.png", name: "y.png" },
   ]);
   assert.deepEqual(cardRows([block({ kind: "image", alt: "", src: "C:\\pics\\z.png", title: "" })]), [
-    { kind: "img", path: "C:\\pics\\z.png", name: "z.png" },
+    { kind: "image", path: "C:\\pics\\z.png", name: "z.png" },
   ]);
   assert.deepEqual(cardRows([block({ kind: "image", alt: "", src: "https://x/a.png", title: "" })]), []);
   assert.deepEqual(

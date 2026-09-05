@@ -29,10 +29,22 @@ const row = (es: Entry[], label: string) => {
   return e;
 };
 
-test("並び — Add / Rename / Hide / Flip side / Link / Code / Draw / Delete", () => {
+test("並び — Add / Rename / Hide / Flip side / Link / Code / Draw / Copy / Cut / Paste / Delete", () => {
   assert.deepEqual(labels(contextItems(L, { ids: [3], anchor: 3 })), [
-    "Add", "Rename", "—", "Show (unfold)", "Flip side", "—", "Link", "Code", "Draw", "—", "Delete",
+    "Add", "Rename", "—", "Show (unfold)", "Flip side", "—", "Link", "Code", "Draw", "—", "Copy", "Cut", "Paste", "—", "Delete",
   ]);
+});
+
+test("Copy / Cut はキーと同じ Intent。選んでいなければ沈み、Paste は沈まない", () => {
+  const es = contextItems(L, { ids: [3, 5], anchor: 5 });
+  assert.deepEqual(row(es, "Copy").intent, { kind: "copy", cut: null });
+  // Cut の消し方は Delete の行そのもの
+  assert.deepEqual(row(es, "Cut").intent, { kind: "copy", cut: row(es, "Delete").intent });
+  assert.deepEqual(row(es, "Paste").intent, { kind: "paste" });
+  const none = contextItems(L, { ids: [], anchor: null });
+  assert.equal(row(none, "Copy").intent, null);
+  assert.equal(row(none, "Cut").intent, null);
+  assert.deepEqual(row(none, "Paste").intent, { kind: "paste" });
 });
 
 test("Add は押せば子、開けば 4 つ", () => {

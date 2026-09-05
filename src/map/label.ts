@@ -60,7 +60,7 @@ export class LabelEditor {
     this.pane = pane;
     this.rename = rename;
     this.input = document.createElement("input");
-    this.input.id = "node-editor";
+    this.input.id = "label-editor";
     this.input.spellcheck = false;
     pane.append(this.input);
     this.input.addEventListener("compositionstart", () => {

@@ -57,11 +57,11 @@ function sameRow(a: CardRow, b: CardRow): boolean {
     return a.title === b.title && a.url === b.url;
   }
   if (a.kind === "svg" && b.kind === "svg") return a.markup === b.markup;
-  if (a.kind === "img" && b.kind === "img") return a.path === b.path;
+  if (a.kind === "image" && b.kind === "image") return a.path === b.path;
   if (a.kind === "code" && b.kind === "code") {
     return a.lang === b.lang && sameLines(a.lines, b.lines);
   }
-  if (a.kind === "rule" && b.kind === "rule") return true;
+  if (a.kind === "break" && b.kind === "break") return true;
   if (a.kind === "details" && b.kind === "details") {
     return a.open === b.open && a.summary === b.summary && sameLines(a.lines, b.lines);
   }
@@ -130,7 +130,7 @@ export class MapRenderer {
       label: n.fold !== null ? foldName(n) : labelOf(n),
       rows: b.rows,
       // 画像は「まだ読めていない」から「読めた」へ後から変わる
-      urls: b.rows.map((r) => (r.kind === "img" ? p.imageUrl(r.path) : null)),
+      urls: b.rows.map((r) => (r.kind === "image" ? p.imageUrl(r.path) : null)),
       hint: p.imageHint,
     };
   }
@@ -183,7 +183,7 @@ export class MapRenderer {
       }
       // **文書から決まるクラスだけ**を、1 つずつ付け外しする
       g.classList.toggle("root", b.parent === null);
-      g.classList.toggle("hidden-node", n.fold !== null);
+      g.classList.toggle("folded", n.fold !== null);
       const tf = `translate(${b.x} ${b.y})`;
       if (this.nodeTf.get(id) !== tf) {
         g.setAttribute("transform", tf);

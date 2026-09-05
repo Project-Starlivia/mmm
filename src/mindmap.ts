@@ -54,6 +54,9 @@ export interface MapHost {
   apply(op: core.Op, edit: boolean, keep?: number): number | null;
   /** クリップボードを貼る（Mod+V）。宛先は選択の anchor、無ければ文書 */
   paste(): void;
+  /** 選んでいるもの（カードならその原文、でなければ選択の部分木）をクリップボードへ
+   *  写す（Mod+C / Mod+X）。写せたか — 写せなければ Cut は消さない */
+  copy(): Promise<boolean>;
   /** そのノードへ描いて貼る（Shift+D）。窓を開いて、確定した絵を保存する */
   draw(id: number): void;
 }
@@ -458,7 +461,7 @@ export class Mindmap {
       true,
     );
     pane.addEventListener("pointerdown", (e) => {
-      if (targetIn(e, ".link-open, .img-connect, .pane-tool, #node-editor, #card-editor")) return;
+      if (targetIn(e, ".link-open, .image-connect, .pane-tool, #label-editor, #card-editor")) return;
       if (e.pointerType === "touch" && this.fingers.pinching) return;
       // 長押しの印は次の押下で用済み（contextmenu を合成しない環境で残らないように）
       this.menuOpenedByHold = false;
@@ -466,7 +469,7 @@ export class Mindmap {
       pane.focus();
       // カードと × の上の押下は、そのクリック（bindClick）のもの。ここで
       // ノードを選び直すと、pointerup が選択を作り直して picked を落とす
-      if (targetIn(e, "[data-card], [data-kill]")) return;
+      if (targetIn(e, "[data-card], [data-delete]")) return;
       const id = this.nodeAt(e.clientX, e.clientY);
       // パンは 3 つ入り口を持つ: 中クリック / Space+ドラッグ / 指で背景をなぞる。
       // 担当する手が違うので、どれか 1 つでは塞がる場面がある
@@ -707,12 +710,12 @@ export class Mindmap {
   /** リンクの ↗ と、読めていない画像の「繋ぐ」の字 */
   private bindClick(): void {
     this.pane.addEventListener("click", (e) => {
-      const kill = targetIn(e, "[data-kill]")?.getAttribute("data-kill");
-      if (kill !== null && kill !== undefined) {
-        this.host.apply({ kind: "delete", ids: [Number(kill)] }, false);
+      const del = targetIn(e, "[data-delete]")?.getAttribute("data-delete");
+      if (del !== null && del !== undefined) {
+        this.host.apply({ kind: "delete", ids: [Number(del)] }, false);
         return;
       }
-      if (targetIn(e, ".img-connect")) {
+      if (targetIn(e, ".image-connect")) {
         this.host.connectAssets();
         return;
       }
@@ -726,10 +729,10 @@ export class Mindmap {
       if (url) window.open(url, "_blank", "noopener,noreferrer");
     });
     this.renderer.nodeLayer.addEventListener("pointerdown", (e) => {
-      if (targetIn(e, ".link-open, .img-connect")) e.stopPropagation();
+      if (targetIn(e, ".link-open, .image-connect")) e.stopPropagation();
     });
     this.pane.addEventListener("dblclick", (e) => {
-      if (targetIn(e, ".link-open, .img-connect, #node-editor, #card-editor")) return;
+      if (targetIn(e, ".link-open, .image-connect, #label-editor, #card-editor")) return;
       const spot = targetIn(e, "[data-card]")?.getAttribute("data-card");
       if (spot !== null && spot !== undefined) {
         const id = this.blockAt(spot);
@@ -832,6 +835,14 @@ export class Mindmap {
       case "paste":
         this.host.paste();
         return;
+      case "copy": {
+        // 消すのは写せてから。写せなければ（クリップボードが断った）何も失わない
+        const cut = intent.cut;
+        void this.host.copy().then((ok) => {
+          if (ok && cut !== null) this.act(cut);
+        });
+        return;
+      }
     }
   }
 

@@ -45,7 +45,7 @@ export function cardPlacement(rect: Rect, cam: Camera, text: { lines: number; wi
  */
 export class CardEditor {
   private box: HTMLDivElement;
-  private ink: HTMLPreElement;
+  private highlight: HTMLPreElement;
   private textarea: HTMLTextAreaElement;
   /** 開いたときの値。閉じるとき、これと違えば書く（同じなら書かない） */
   private opened = "";
@@ -63,15 +63,15 @@ export class CardEditor {
     this.box = document.createElement("div");
     this.box.id = "card-editor";
     this.box.style.display = "none";
-    this.ink = document.createElement("pre");
-    this.ink.className = "card-ink";
+    this.highlight = document.createElement("pre");
+    this.highlight.className = "highlight";
     this.textarea = document.createElement("textarea");
     this.textarea.spellcheck = false;
-    this.box.append(this.ink, this.textarea);
+    this.box.append(this.highlight, this.textarea);
     pane.append(this.box);
 
     this.textarea.addEventListener("input", () => {
-      this.paintInk();
+      this.paintHighlight();
       if (this.lastRect && this.lastCam) this.place(this.lastRect, this.lastCam);
     });
     this.textarea.addEventListener("keydown", (e) => {
@@ -100,7 +100,7 @@ export class CardEditor {
     this.opened = text;
     this.textarea.value = text;
     this.box.style.display = "block";
-    this.paintInk();
+    this.paintHighlight();
     this.place(rect, cam);
     this.textarea.focus();
     const end = text.length;
@@ -129,17 +129,17 @@ export class CardEditor {
   }
 
   /** 色付き層を今の中身で塗り直す */
-  private paintInk(): void {
-    this.ink.replaceChildren();
+  private paintHighlight(): void {
+    this.highlight.replaceChildren();
     for (const line of tokenizeBlock(this.textarea.value)) {
       for (const t of line) {
         const span = document.createElement("span");
         if (t.cls !== "") span.className = t.cls;
         span.textContent = t.text;
-        this.ink.append(span);
+        this.highlight.append(span);
       }
       // 空行でも高さを持たせる（改行だけの行がある文書で行がずれる）
-      this.ink.append(document.createTextNode("\n"));
+      this.highlight.append(document.createTextNode("\n"));
     }
   }
 

@@ -74,6 +74,10 @@ export function contextItems(L: Layout, sel: Selection): Entry[] {
     { label: "Code", key: "Shift+C", mark: "code", ...one(id === null ? null : { kind: "code", id }) },
     { label: "Draw", key: "Shift+D", mark: "paintbrush", ...one(id === null ? null : { kind: "draw", id }) },
     "sep",
+    { label: "Copy", key: "Mod+C", mark: "copy", intent: press(L, sel, "c", false, true) },
+    { label: "Cut", key: "Mod+X", mark: "scissors", intent: press(L, sel, "x", false, true) },
+    { label: "Paste", key: "Mod+V", mark: "clipboard-paste", intent: press(L, sel, "v", false, true) },
+    "sep",
     { label: "Delete", key: "Del", mark: "trash-2", intent: press(L, sel, "Delete") },
   ];
 }

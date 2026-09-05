@@ -29,11 +29,11 @@ export const DETAILS_INDENT = 14; // ▸ のぶん、summary と中身の字を�
 
 /** カード行 1 つぶんの高さ */
 export const rowH = (r: CardRow): number =>
-  r.kind === "img" || r.kind === "svg"
+  r.kind === "image" || r.kind === "svg"
     ? IMG_ROW
     : r.kind === "code"
       ? r.lines.length * CODE_LINE + CODE_PAD * 2
-      : r.kind === "rule"
+      : r.kind === "break"
         ? RULE_ROW
         : r.kind === "details"
           ? DETAILS_ROW + (r.open ? r.lines.length * CODE_LINE + CODE_PAD : 0)
@@ -44,7 +44,7 @@ export const rowH = (r: CardRow): number =>
  * 同じ場所を指さないと 2px ずれる — 実際にずれた。数字を 2 か所に置かないための唯一の定義。
  */
 export const cardInset = (r: CardRow): number =>
-  r.kind === "code" ? 5 : r.kind === "link" || r.kind === "details" ? 4 : r.kind === "rule" ? 2 : 6;
+  r.kind === "code" ? 5 : r.kind === "link" || r.kind === "details" ? 4 : r.kind === "break" ? 2 : 6;
 
 /**
  * カード 1 行が、中身の箱から左右へはみ出す量。コードだけは背景をノードの
@@ -197,7 +197,7 @@ export function nodeSize(n: core.Node, rows: CardRow[], buried: number): { w: nu
   const label = displayLabel(labelOf(n));
   let w = measure(labelFont(ROW_NORMAL), label);
   for (const r of rows) {
-    if (r.kind === "img" || r.kind === "svg") {
+    if (r.kind === "image" || r.kind === "svg") {
       w = Math.max(w, IMG_MIN_W);
     } else if (r.kind === "code") {
       for (const ln of r.lines) {

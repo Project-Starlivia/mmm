@@ -4,48 +4,15 @@
 import { LS_COLOR, LS_THEME, load, store } from "./persist.ts";
 import { logoInner, logoSvg } from "./logo.ts";
 
-/** 既定のアクセントカラー。style.css の `--accent` の初期値と同じ。 */
-const DEFAULT_COLOR = "#5932ff";
-
-// favicon は**色と未保存の印**の 2 つで決まる。片方だけ変わっても描き直す
-// ので、両方をここが覚えておく（呼ぶ側に「前は何色だったか」を持たせない）
-let faviconColor = DEFAULT_COLOR;
-let faviconDirty = false;
-
-/** favicon は data URL なので、色も印も実値で埋める必要がある。 */
-function applyFavicon(): void {
-  const found = document.querySelector('link[rel="icon"]');
-  // 型は名乗らせず確かめる。`<link rel=icon>` でないものが居たら作り直す
-  let link: HTMLLinkElement;
-  if (found instanceof HTMLLinkElement) {
-    link = found;
-  } else {
-    link = document.createElement("link");
-    link.rel = "icon";
-    document.head.append(link);
-  }
-  const svg = logoSvg(faviconColor, faviconDirty);
-  link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
-
 /**
- * アクセントカラーを当てる。**置くのは色そのものだけ** — 薄い版
- * （`--accent-soft`）は style.css が色から作る。
- *
- * ここで `rgba(...)` を組んで置くと、それは要素のインラインスタイルなので
- * `:root.light` の宣言に**必ず**勝ってしまう。ライト用に薄くしてあった
- * 宣言が一度も効かず、ライトでもダークの濃さのままになっていた。
+ * いまのアクセントカラー。**綴りの源は style.css の `--accent` だけ**で、
+ * ここは読むだけ（既定色を TS にも書くと、同じ数字が 2 か所になる）。
+ * 読んだ値は名乗らせず確かめる — 6 桁の hex でなければ null。
+ * 筆にする側（app/draw.ts）も同じ 1 つを読む。
  */
-function applyColor(hex: string): void {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
-  if (!m) return;
-  const c = `#${m[1]}`;
-  // 置くのは `--accent` **だけ**。薄塗り（`--accent-soft`）は style.css が
-  // これを `color-mix` で導く — ここから両方置くと、濃さの決め手が 2 つになる
-  document.documentElement.style.setProperty("--accent", c);
-  faviconColor = c;
-  applyFavicon();
-  store(LS_COLOR, c);
+export function accent(): string | null {
+  const value = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  return /^#[0-9a-f]{6}$/i.test(value) ? value : null;
 }
 
 export type Theme = "light" | "dark";
@@ -67,10 +34,54 @@ export function initTheme(args: {
 } {
   const { logo } = args;
 
+  // 既定色は style.css のもの。読めないなら配線が壊れているので、黙って
+  // 別の色にすり替えない
+  const base = accent();
+  if (base === null) throw new Error("style.css の --accent が読めない");
+
   // ロゴの形の源は logo.ts ひとつ。topbar も favicon もここから作る
   // （静的ファイルに複製すると、以前のように片方だけ左右が反転していても
   // 誰も気づけない）。色は currentColor = --accent。
   logo.insertAdjacentHTML("beforeend", logoInner());
+
+  // favicon は**色と未保存の印**の 2 つで決まる。片方だけ変わっても描き直す
+  // ので、両方をここが覚えておく（呼ぶ側に「前は何色だったか」を持たせない）
+  let faviconColor = base;
+  let faviconDirty = false;
+
+  /** favicon は data URL なので、色も印も実値で埋める必要がある。 */
+  const applyFavicon = (): void => {
+    const found = document.querySelector('link[rel="icon"]');
+    // 型は名乗らせず確かめる。`<link rel=icon>` でないものが居たら作り直す
+    let link: HTMLLinkElement;
+    if (found instanceof HTMLLinkElement) {
+      link = found;
+    } else {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.append(link);
+    }
+    const svg = logoSvg(faviconColor, faviconDirty);
+    link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  };
+
+  /**
+   * アクセントカラーを当てる。**置くのは色そのものだけ** — 薄い版
+   * （`--accent-soft`）も輪（`--ring`）も style.css が色から作る。
+   *
+   * ここで `rgba(...)` を組んで置くと、それは要素のインラインスタイルなので
+   * `:root.light` の宣言に**必ず**勝ってしまう。ライト用に薄くしてあった
+   * 宣言が一度も効かず、ライトでもダークの濃さのままになっていた。
+   */
+  const applyColor = (hex: string): void => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+    if (!m) return;
+    const c = `#${m[1]}`;
+    document.documentElement.style.setProperty("--accent", c);
+    faviconColor = c;
+    applyFavicon();
+    store(LS_COLOR, c);
+  };
 
   // ---- アクセントカラー ----
   const colorInput = document.createElement("input");
@@ -87,10 +98,7 @@ export function initTheme(args: {
   document.body.append(colorInput);
   colorInput.addEventListener("input", () => applyColor(colorInput.value));
   const pickColor = (): void => {
-    const cur = getComputedStyle(document.documentElement)
-      .getPropertyValue("--accent")
-      .trim();
-    colorInput.value = /^#[0-9a-f]{6}$/i.test(cur) ? cur : DEFAULT_COLOR;
+    colorInput.value = accent() ?? base;
     colorInput.click();
   };
   logo.addEventListener("click", pickColor);
@@ -123,7 +131,7 @@ export function initTheme(args: {
     stored === "light" || stored === "dark" ? stored : null;
   const osLight = window.matchMedia?.("(prefers-color-scheme: light)").matches;
   applyTheme(saved ?? (osLight ? "light" : "dark"));
-  applyColor(load(LS_COLOR) ?? DEFAULT_COLOR);
+  applyColor(load(LS_COLOR) ?? base);
 
   const setDirty = (dirty: boolean): void => {
     // 変わっていないなら描き直さない。data URL の組み立てと favicon の

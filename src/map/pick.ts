@@ -16,19 +16,20 @@ const HIT_R = 7;
 export class CardPick {
   /** viewport（world 座標）に入れる。ノード層より上に置くこと */
   readonly el = svgEl("g", { id: "card-pick", visibility: "hidden" });
-  private frame = svgEl("rect", { class: "card-picked" });
-  private kill = svgEl("g", { class: "card-kill" });
+  private frame = svgEl("rect", { class: "frame" });
+  /** 角の ×。押せば Delete（操作と同じ名） */
+  private delete = svgEl("g", { class: "delete" });
   private circle = svgEl("circle", { r: HIT_R });
   private strokes = [svgEl("line"), svgEl("line")];
 
   constructor() {
-    this.kill.append(this.circle, ...this.strokes);
-    this.el.append(this.frame, this.kill);
+    this.delete.append(this.circle, ...this.strokes);
+    this.el.append(this.frame, this.delete);
   }
 
   /**
    * `rect` にぴったり被せる。`id` は × を押されたときに誰を消すかで、
-   * `data-kill` として出す（当たり判定は座標から辿るため）。
+   * `data-delete` として出す（当たり判定は座標から辿るため）。
    * `rect` が null なら隠す（畳まれた・範囲外）。
    */
   show(id: number, rect: Rect | null): void {
@@ -44,7 +45,7 @@ export class CardPick {
     // × は角そのものに載せる。枠線がボタンの中心を通る位置
     const cx = rect.x + rect.w;
     const cy = rect.y;
-    this.kill.setAttribute("data-kill", String(id));
+    this.delete.setAttribute("data-delete", String(id));
     this.circle.setAttribute("cx", String(cx));
     this.circle.setAttribute("cy", String(cy));
     // × は文字ではなく線で引く。字だと書体で中心も太さも揺れる
@@ -63,6 +64,6 @@ export class CardPick {
   hide(): void {
     this.el.setAttribute("visibility", "hidden");
     // 隠れていても当たり判定の印は残るので、消しておく
-    this.kill.removeAttribute("data-kill");
+    this.delete.removeAttribute("data-delete");
   }
 }

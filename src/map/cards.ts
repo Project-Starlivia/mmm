@@ -9,11 +9,11 @@ import type * as core from "../coreApi.ts";
 /** ラベルの下に積むカード 1 行 */
 export type CardRow =
   | { kind: "link"; title: string; url: string }
-  | { kind: "img"; path: string; name: string }
+  | { kind: "image"; path: string; name: string }
   | { kind: "svg"; markup: string }
   | { kind: "code"; lang: string; lines: string[] }
   /** 装飾の水平線。書かれた場所にそのまま 1 本の線 */
-  | { kind: "rule" }
+  | { kind: "break" }
   /** `<details>`。GitHub と同じく、閉じていれば summary（無ければ Details）だけ、
    *  開いていれば中身の字も。開閉は md の `open` に従う（map だけの状態は持たない） */
   | { kind: "details"; open: boolean; summary: string | null; lines: string[] };
@@ -50,7 +50,7 @@ function imageCard(src: string): CardRow | null {
   if (path === "") return null;
   // Windows のパスは `\` 区切りでも来る。split は必ず 1 つ以上返すが、型は言い切らない
   const name = path.split(/[\\/]/).pop() ?? path;
-  return { kind: "img", path, name };
+  return { kind: "image", path, name };
 }
 
 /**
@@ -83,7 +83,7 @@ function cardOf(b: core.Content): CardRow | null {
     case "code":
       return { kind: "code", lang: b.info, lines: linesOf(b.text) };
     case "thematicBreak":
-      return { kind: "rule" };
+      return { kind: "break" };
     case "details":
       return { kind: "details", open: b.open, summary: b.summary, lines: linesOf(b.body) };
     // View には来ない（core/view の project が Opaque を落とす）。ts から送る側でだけ使う形
