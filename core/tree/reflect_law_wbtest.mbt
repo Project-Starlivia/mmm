@@ -141,8 +141,8 @@ fn grain(
 ) -> Unit raise {
   let out = apply(md, edits)
   let flat = (s : String) => s.replace_all(old="\r\n", new="\n")
-  if !flat(md).contains("\n\n\n") && flat(out).contains("\n\n\n") {
-    fail("\{what}: 連続空行が生まれた\n--- md\n\{md}\n--- out\n\{out}")
+  if blank_run(out) > blank_run(md) {
+    fail("\{what}: 連続空行が増えた\n--- md\n\{md}\n--- out\n\{out}")
   }
   if !flat(md).has_prefix("\n") && flat(out).has_prefix("\n") {
     fail("\{what}: 頭に空行が生まれた\n--- out\n\{out}")
@@ -365,4 +365,23 @@ test "法則 — 行の不可侵と隙間の保存。全ノード × 全部の�
       }
     }
   }
+}
+
+///|
+/// 続く空行の最大数。空白だけの行も空行（読みが空行と見るのと同じ）
+fn blank_run(md : String) -> Int {
+  let lines = md.replace_all(old="\r\n", new="\n").split("\n").collect()
+  let mut best = 0
+  let mut run = 0
+  for i, line in lines {
+    // 末尾の改行の後ろは行ではない
+    if i == lines.length() - 1 {
+      break
+    }
+    run = if line.trim(chars=" \t").is_empty() { run + 1 } else { 0 }
+    if run > best {
+      best = run
+    }
+  }
+  best
 }

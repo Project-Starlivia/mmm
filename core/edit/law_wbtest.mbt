@@ -14,6 +14,7 @@ let corpus : Array[String] = [
   "intro\n\n# r\n\n## a\n\n---\n\n## b\n\n***\n\n## c\n", "---\nk: v\n---\n\n# a\n\n- i\n  - j\n\n# b\n",
   "# r\r\n\r\n## a\r\n\r\n### x\r\n", "# r\n\n<details open>\n<summary>s</summary>\n\n## a\n\nx\n\n</details>\n\n## b\n",
   "hello\n\n- a\n- b\n\n<!-- c -->\n", "# r\n\n## a\n\nhello", "# a\n\n#### deep\n\n## b\n",
+  "# a\r\n\r\n#### deep\r\n\r\n## b\r\n", "# a\n  \n#### deep\n\n## b\n",
 ]
 
 ///|
@@ -197,7 +198,7 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック
-  inspect(some, content="688")
+  inspect(some, content="894")
   json_inspect(bad, content=[])
 }
 
@@ -351,14 +352,14 @@ test "法則 — 目印の生存。中身だけを変えれば、持ち主のラ
     }
   }
   // 網の広さ。corpus か ops_for を触れば動く
-  inspect(seen, content="122")
+  inspect(seen, content="132")
   json_inspect(bad, content=[])
 }
 
 ///|
-test "法則 — 隙間の保存。どの操作の後も、元に無かった連続空行と頭の空行は生まれない" {
+test "法則 — 隙間の保存。どの操作の後も、続く空行は増えず、頭の空行は生まれない" {
   let bad : Array[String] = []
-  let flat = (s : String) => s.replace_all(old="\r\n", new="\n")
+  let mut n = 0
   for i, md in corpus {
     let before = @tree.parse(md)
     for op in ops_for(ids(before)) {
@@ -366,19 +367,42 @@ test "法則 — 隙間の保存。どの操作の後も、元に無かった連
       if r.edits.is_empty() {
         continue
       }
-      let out = flat(@tree.apply(md, r.edits))
-      let was = flat(md)
-      if !was.contains("\n\n\n") && out.contains("\n\n\n") {
+      n = n + 1
+      let out = @tree.apply(md, r.edits)
+      if blank_run(out) > blank_run(md) {
         bad.push(
           "\{i} \{op.to_json().stringify()}: 連続空行 \{out.to_json().stringify()}",
         )
       }
-      if !was.has_prefix("\n") && out.has_prefix("\n") {
+      if !md.has_prefix("\n") &&
+        !md.has_prefix("\r\n") &&
+        (out.has_prefix("\n") || out.has_prefix("\r\n")) {
         bad.push(
           "\{i} \{op.to_json().stringify()}: 頭の空行 \{out.to_json().stringify()}",
         )
       }
     }
   }
+  // 網の広さ。corpus か ops_for を触れば動く
+  inspect(n, content="863")
   json_inspect(bad, content=[])
+}
+
+///|
+/// 続く空行の最大数。空白だけの行も空行（読みが空行と見るのと同じ）
+fn blank_run(md : String) -> Int {
+  let lines = md.replace_all(old="\r\n", new="\n").split("\n").collect()
+  let mut best = 0
+  let mut run = 0
+  for i, line in lines {
+    // 末尾の改行の後ろは行ではない
+    if i == lines.length() - 1 {
+      break
+    }
+    run = if line.trim(chars=" \t").is_empty() { run + 1 } else { 0 }
+    if run > best {
+      best = run
+    }
+  }
+  best
 }

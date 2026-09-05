@@ -95,34 +95,37 @@ fn plan(
       a.to - b.to
     }
   })
-  Some(joined(r))
+  Some(parted(r))
 }
 
 ///|
-/// 差し込みが行の途中（改行の無い末尾）に来るなら改行してから。**消えた後の字で見る** —
-/// 直前まで消す編集が続いていれば、行の途中かはその消し始めの位置で決まる
-/// （置き換えの後ろなら、断片は改行で終わるので途中ではない）。
-fn joined(r : Reflect) -> Array[Edit] {
-  // 直前の編集の尻と、そこから遡れる「消し始め」。消えた範囲が隣り合えば繋がる
+/// 差し込みを前の行から切り離す — 行の途中（改行の無い末尾）に来るなら改行してから。
+/// **消えた後の字で見る**: 直前まで消す編集が続いていれば、行の途中かはその消し始めの
+/// 位置で決まり、そこに字を書いていればその字の尻で決まる。
+fn parted(r : Reflect) -> Array[Edit] {
+  // 直前まで続く消しの、始めと尻と、そこに書いた字（消えた範囲が隣り合えば繋がる）
   let mut cut_to = -1
   let mut cut_from = -1
-  let mut cut_wrote = false
+  let mut wrote = ""
   r.out.map(e => {
-    let mid = if e.from == e.to {
-      if e.from == cut_to {
-        !cut_wrote && mid_line(r.md, cut_from)
-      } else {
-        mid_line(r.md, e.from)
-      }
-    } else {
+    let mid = if e.from != e.to {
       false
+    } else if e.from != cut_to {
+      mid_line(r.md, e.from)
+    } else if wrote != "" {
+      !wrote.has_suffix("\n")
+    } else {
+      mid_line(r.md, cut_from)
     }
     if e.from < e.to {
       if e.from != cut_to {
         cut_from = e.from
+        wrote = ""
       }
       cut_to = e.to
-      cut_wrote = e.insert != ""
+      if e.insert != "" {
+        wrote = e.insert
+      }
     }
     if mid {
       { ..e, insert: eol(r) + e.insert }
@@ -439,20 +442,15 @@ fn own_end(r : Reflect, old : Node) -> Int {
 }
 
 ///|
-/// その位置の手前に続く空行の頭。空行が無ければその位置のまま。
+/// 行頭 `at` の手前に続く空行の頭。空行が無ければその位置のまま。
+/// 空行は「改行までが空白だけの行」— 読みが空行と見るのと同じ。改行は `\n`（CRLF の
+/// `\r` は行の中身ではない）。単独の `\r` はこのモジュールのどこにも無い。
 fn blank_start(md : String, at : Int) -> Int {
   let mut p = at
-  while p > 0 {
-    let head = line_start(md, p - 1)
-    guard skip_blank(md, head, p - 1) == p - 1 &&
-      (md[p - 1] == '\n' || md[p - 1] == '\r') else {
-      break
-    }
-    // 1 行が改行だけ（CRLF なら \r\n）なら空行
-    let body = if p - 2 >= head && md[p - 2] == '\r' { p - 2 } else { p - 1 }
-    if body != head {
-      break
-    }
+  while p > 0 && md[p - 1] == '\n' {
+    let nl = if p >= 2 && md[p - 2] == '\r' { p - 2 } else { p - 1 }
+    let head = line_start(md, nl)
+    guard skip_blank(md, head, nl) == nl else { break }
     p = head
   }
   p

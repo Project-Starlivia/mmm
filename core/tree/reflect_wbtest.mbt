@@ -656,3 +656,25 @@ test "改行の無い末尾のノードを外へ出しても、空行は 1 つ" 
   let edits = reflect(md, before, spans, after)
   inspect(apply(md, edits), content="# r\n\n# a\n\nhello\n")
 }
+
+///|
+test "Implicit の手前の隙間 — CRLF でも、空白だけの空行でも 1 つのまま" {
+  let crlf = "# a\r\n\r\n#### deep\r\n\r\n## b\r\n"
+  let (b1, s1) = survey(crlf)
+  let e1 = reflect(
+    crlf,
+    b1,
+    s1,
+    change(b1, 0, [0], x => with_children(x, [fresh("w")])),
+  )
+  inspect(apply(crlf, e1), content="# a\r\n\r\n### w\r\n\r\n## b\r\n")
+  let spaced = "# a\n  \n#### deep\n\n## b\n"
+  let (b2, s2) = survey(spaced)
+  let e2 = reflect(
+    spaced,
+    b2,
+    s2,
+    change(b2, 0, [0], x => with_children(x, [fresh("w")])),
+  )
+  inspect(apply(spaced, e2), content="# a\n\n### w\n\n## b\n")
+}
