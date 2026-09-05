@@ -76,11 +76,13 @@ src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す�
                draw(その場で描く窓) / io(File System Access API の窓口) /
                handles(ハンドルを IndexedDB に置く層) / logo(ロゴの唯一の源) /
                shortcuts(全体のキー) / export(Mindmap を外へ出す) /
-               paneTool(隅に浮く道具の器) / hint(白紙の言い出し) / notice / ask
+               paneTool(隅に浮く道具の器) / hint(白紙の言い出し) / notice /
+               ask(聞く器) / asks(聞くことの綴りの全部) /
+               files(帯の Files の行。文書と画像フォルダ) / more(帯の ⋯ の行)
 test/   検証 — core に触らない純粋層(camera / geometry / gesture / highlight /
-        indicator / panes / share / assets)と、core の出口(coreApi)・分類(cards)・
-        配置(layout)・select / caret / keys / label / context / drop / card / copy / paste。
-        tools/(負荷サンプル生成)、fixtures/(負荷サンプル)
+        indicator / panes / share / assets / metrics / head)と、core の出口(coreApi)・
+        分類(cards)・配置(layout)・select / caret / keys / label / context / drop /
+        card / copy / paste。tools/(負荷サンプル生成)、fixtures/(負荷サンプル)
 lab/    見るための道具（`pnpm run lab`）。index.html は md がどう読まれるか（mdAst /
         mmmTree / View と書き戻し）、parts/ は部品 × 状態 × テーマを 1 ページに
         並べたもの — 表 parts.ts（DOM の部品）と map.ts（本物の Mindmap を通す）が
@@ -89,10 +91,15 @@ docs/   記録 — spec.md はこのファイル、core.md は文書モデルの
         （型・パイプライン・道具の決め。spec.md は意味だけを持つ）、
         look.md は見た目の決め（尺・字・角・沈み。style.css の数字の地図）、
         shortcuts.md はキーの一覧
-        （なぜそのキーかは spec.md 側）、web.md は Web へ戻した理由と段取り、
+        （なぜそのキーかは spec.md 側）、design.md は設計の型（部品ごとに
+        既知の型と段の間の約束を 1 ページで）、web.md は Web へ戻した理由と段取り、
+        browsers.md はどのブラウザまで届くか（web.md の線の実測）、
         origin.md は最初の企画メモ、freedom.md は「自由な Mindmap」との
-        線引き（絵と画像の置き場所がそこから決まる）
-ai-docs/ 実測の控え — moonbit.md は MoonBit の癖。あてにしない前提の覚書
+        線引き（絵と画像の置き場所がそこから決まる）、
+        superpowers/ は段ごとの設計（specs/）と計画（plans/）の日付付きの記録
+        （コードのコメントが「決めは …」と指す先）
+ai-docs/ 実測の控え — moonbit.md は MoonBit の癖、sources.md は知見の在り処と
+        取り方。あてにしない前提の覚書
 ```
 
 ブラウザで動く。ファイルは **File System Access API** で 1 つずつ開き、
