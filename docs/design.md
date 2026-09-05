@@ -8,6 +8,7 @@
 | 部品 | やっていること | 既知の型 |
 |---|---|---|
 | md が真実、木は派生 | 打鍵 → parse → View → 描画。読みは書かない | LSP / IDE の「テキストが真実、AST は派生」 |
+| 方言（md.mbt） | ライブラリの mdAst を mmm の決めに揃える層。読みは `parse ∘ mend`、書きは `spell ∘ serialize`。癖を知るのはここだけ | 腐敗防止層（anti-corruption layer）。アダプタ |
 | Op → apply → check | 操作は値。木に当てるのは純粋関数。書けない木は check が断る | Command + 不変条件で弾く |
 | reflect | 正規形を base にした 3-way merge。base → theirs（操作の差）だけを ours（原文）に写し、流儀の差は写さない。要素は手前の隙間を持つ。最後に読み直して形を検証 | 3-way merge（git）。recast（変わっていないノードは元の原文を再利用）。React の keyed diff |
 | follow（目印） | ラベルの頭の位置を編集列で写し、同一性を保つ | エディタのマーカー（CodeMirror の `mapPos`、Emacs の marker） |

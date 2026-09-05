@@ -89,8 +89,8 @@ TS では必ず持ち主を付けて `core.View` / `core.Node` と書く（`impo
 ## パイプライン
 
 ```
-読み   md ──mizchi/markdown──> mdAst ──build──> Doc + 地番 ──project──> View
-書き   Doc ──unbuild──> mdAst ──mizchi/markdown──> 正規形の md
+読み   md ──mizchi/markdown──> mdAst ──方言(mend)──> mdAst ──build──> Doc + 地番 ──project──> View
+書き   Doc ──unbuild──> mdAst ──mizchi/markdown──> 字 ──綴り(spell)──> 正規形の md
 反映   md + 前の Doc + 地番 + 後の Doc ──reflect──> 編集リスト ──> CodeMirror
 操作   Doc ──apply(op)──> Doc
 境界   md + Op ──edit──> 編集リスト + focus        // survey → apply → reflect（edit/）
@@ -98,6 +98,28 @@ TS では必ず持ち主を付けて `core.View` / `core.Node` と書く（`impo
 
 **サイクルは 1 本**。md が変わったら必ず 読み → project → 描画。無限ループしないのは
 「**書くのは操作だけ。読みのサイクルは決して書かない**」から。
+
+### 方言 — md.mbt
+
+ライブラリ（mizchi/markdown）に触るのは `md.mbt` だけ。読みも書きも「ライブラリ」と
+「方言」の直列で、ライブラリの癖を mmm の決めに揃えるのはここに閉じる。その先の
+build / content / fold / reflect は方言の mdAst だけを見る。
+
+読み `mend` — **塊の尻は行末の改行込み**:
+
+- フェンス付きの塊（コード・`$`・`:::`）の span は閉じの行の改行まで（ライブラリは閉じの手前で止める）
+- 定義行（`[q]: /r`）の span は改行込み（ライブラリは改行の手前で止める）
+- 段落の span が中身の頭から始まる（項目のマーカーの後ろ）、インラインの span が段落の
+  中身に対する相対、はライブラリの決めとしてそのまま使う
+- `Blank` は使わない — 入れ子の項目の周りで範囲が壊れている。隙間は原文の字で測る（反映）
+
+書き `spell` — 書いた字を読み直して span で当てる（コードの中の同じ字は触らない）:
+
+- 区切り線は `---`（ライブラリは marker に関わらず `***` と書く）
+- frontmatter と本文の間は空行 1 つ（読みは後ろの空行を落とし、ライブラリは置かない）
+
+`md_wbtest.mbt` が癖ごとに「生の指紋 → 方言の指紋」を並べる。ライブラリの版が上がって
+生の指紋が変われば、そこで気付く。
 
 **反映は純粋な関数。** 受け取るのは原文 md・前の Doc とその地番・後の Doc の 4 つで、
 返すのは編集リストだけ。後の Doc が誰にどう作られたか(操作・undo のスナップショット)
@@ -246,8 +268,8 @@ Trail を一度に返す（parse は 1 回）。法則は follow_wbtest.mbt が 
 - **書きで我々が持つのは骨格だけ**（深さ → `#`、側の変わり目 → 水平線、畳み → `<details>`）。
   中身とラベルは md として読み直して mdAst に戻す。字下げ・フェンス長・空行・
   エスケープ・定義行の置き場はライブラリの serializer の仕事で、その正規化
-  （`_em_` → `*em*`、水平線は `***`、定義行は末尾へ、setext → ATX）は
-  **この段では素直に受ける**。補正するなら反映の段
+  （`_em_` → `*em*`、定義行は末尾へ、setext → ATX）は**この段では素直に受ける**。
+  mmm の綴りに直すもの（水平線は `---`）は `md.mbt` の方言
 - 往復(法則 1)・冪等(法則 2)は、両側の単体が揃ってからの別パス。
   反映の総当たりは reflect_law_wbtest.mbt
 
