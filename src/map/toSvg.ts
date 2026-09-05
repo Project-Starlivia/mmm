@@ -52,12 +52,7 @@ export async function mapToSvg(args: {
   // 印を付ける操作はいま無いが、外す仕組みは書き出しの性質なので残す —
   // 戻したとき、直す場所が 1 つで済む
   const stripped: Array<{ el: Element; cls: string }> = [];
-  const TRANSIENT = [
-    "selected",
-    "drop-parent",
-    "drop-edge",
-    "dragging",
-  ];
+  const TRANSIENT = ["selected", "drop-parent", "dragging"];
   for (const root of [...edgeEls, ...nodeEls]) {
     for (const el of [root, ...root.querySelectorAll(`.${TRANSIENT.join(",.")}`)]) {
       if (!TRANSIENT.some((c) => el.classList.contains(c))) continue;

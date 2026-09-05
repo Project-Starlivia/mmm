@@ -123,10 +123,8 @@ export function initPanes(args: {
     const v = project(want, list);
     paneVis = v;
     document.documentElement.classList.toggle("narrow", narrow.matches);
-    mdPane.classList.toggle("pane-off", !v.md);
-    mapPane.classList.toggle("pane-off", !v.map);
-    panesEl.classList.toggle("no-map", !v.map);
-    panesEl.classList.toggle("no-md", !v.md);
+    // 見え方は CSS へ 1 属性で降ろす（`#panes[data-show]`）。居場所と同じ 3 つ
+    panesEl.dataset.show = v.md && v.map ? "both" : v.md ? "md" : "map";
     // 端では、その先が無いので押せない
     const spot = spotOf(list, v);
     goLeft.disabled = spot <= 0;
@@ -166,11 +164,6 @@ export function initPanes(args: {
       args.focusEditor();
     }
   };
-
-  for (const pane of [mdPane, mapPane]) {
-    pane.addEventListener("focusin", () => pane.classList.add("pane-focused"));
-    pane.addEventListener("focusout", () => pane.classList.remove("pane-focused"));
-  }
 
   // ---- スプリッタ ----
   // 両方出ているときは幅を変えるだけ。開閉は境目の矢印と Alt+1 / Alt+2、

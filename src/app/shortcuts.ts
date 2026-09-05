@@ -16,6 +16,11 @@
 const inField = (e: KeyboardEvent): boolean =>
   e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
 
+/** 答えを待つ窓（`<dialog>`。たずね・お絵描き）の中か。窓が開いている間は
+ *  窓がキーを持つ — 文書の undo や保存が、窓の下で動いてはいけない */
+const inDialog = (e: KeyboardEvent): boolean =>
+  e.target instanceof Element && e.target.closest("dialog") !== null;
+
 export function initShortcuts(deps: {
   save: (asNew: boolean) => void;
   open: () => void;
@@ -34,6 +39,7 @@ export function initShortcuts(deps: {
     "keydown",
     (e) => {
       if (e.isComposing || e.keyCode === 229) return;
+      if (inDialog(e)) return;
       if (!(e.ctrlKey || e.metaKey)) return;
       const key = e.key.toLowerCase();
       if (key === "s") {
@@ -64,7 +70,7 @@ export function initShortcuts(deps: {
   window.addEventListener("keydown", (e) => {
     if (e.isComposing || e.keyCode === 229) return;
     if (!e.altKey || e.ctrlKey || e.metaKey) return;
-    if (inField(e)) return; // 欄の中では Alt+数字も欄自身に譲る
+    if (inField(e) || inDialog(e)) return; // 欄の中では Alt+数字も欄自身に譲る
     // 表から引くと値が `string` になり、`as` で締め直すことになる。
     // 2 つしか無いのだから、そのまま書けば型が分かる
     const pane = e.key === "1" ? "md" : e.key === "2" ? "map" : null;
