@@ -84,8 +84,13 @@ test/   検証 — core に触らない純粋層(camera / geometry / gesture / h
         indicator / panes / share / assets)と、core の出口(coreApi)・分類(cards)・
         配置(layout)・select / caret / keys / label / context / drop / card / copy / paste。
         tools/(負荷サンプル生成)、fixtures/(負荷サンプル)
+lab/    見るための道具（`pnpm run lab`）。index.html は md がどう読まれるか（mdAst /
+        mmmTree / View と書き戻し）、parts/ は部品 × 状態 × テーマを 1 ページに
+        並べたもの — 表 parts.ts（DOM の部品）と map.ts（本物の Mindmap を通す）が
+        唯一の源で、見た目はここに 1 つも無い（src の builder と style.css のまま出す）
 docs/   記録 — spec.md はこのファイル、core.md は文書モデルの内部
         （型・パイプライン・道具の決め。spec.md は意味だけを持つ）、
+        look.md は見た目の決め（尺・字・角・沈み。style.css の数字の地図）、
         shortcuts.md はキーの一覧
         （なぜそのキーかは spec.md 側）、web.md は Web へ戻した理由と段取り、
         origin.md は最初の企画メモ、freedom.md は「自由な Mindmap」との
@@ -111,10 +116,9 @@ pnpm run dev        # コアをビルドしてから vite（http://localhost:131
 - 本番ビルド: `pnpm run build` → `pnpm run preview` で確認
 - コア(`core/*.mbt`)を変更したら `pnpm run core` で JS を再生成
 - コアのテスト: `pnpm run test:core` / UI 側のテスト: `pnpm test`
-- 型チェックだけ: `pnpm run check`（src と test の両方）
-- 性能の物差し: `pnpm run perf`（追加の依存なし。規模ごとに init / 1 打鍵 /
-  カード抽出 / 全コピー / 全段下げを測る。`pnpm run perf -- fixtures` で
-  `test/fixtures/*.md` も）。負荷サンプルの作り直しは `pnpm run fixtures`
+- 型チェックだけ: `pnpm run check`（src・test・lab）
+- 部品の見た目を並べて見る: `pnpm run lab` → http://localhost:13132/parts/
+- 負荷サンプル（`test/fixtures/*.md`）の作り直し: `pnpm run fixtures`
 
 ### 配る
 
@@ -201,8 +205,8 @@ Markdown の右上に書き方(# / n+ / -)。普段は沈めておいて、触�
 出し分け」)。
 
 **ノードが 1 つも無いあいだは、両方の真ん中に始め方が出る**
-(`app/hint.ts`。Markdown は `Write a # heading to start`、Mindmap は
-`Press Enter to create the first node`)。出る条件は**ノードの数ひとつ**で、
+(`app/hint.ts`。Markdown は `Write a # Title to start`、Mindmap は
+`Press Enter to start`)。出る条件は**ノードの数ひとつ**で、
 どちらも同じ — 片方だけ別の条件で消えると、同じ状態を見ているのに
 食い違って見える。器も 1 つ(`.pane-hint`)。
 
@@ -221,7 +225,7 @@ Markdown の右上に書き方(# / n+ / -)。普段は沈めておいて、触�
 理由が入力欄のすぐ下に出る。ドラッグ中の絵は、落ちる行に線が出て、
 ノードの外ではブラウザのカーソルが受けないと言う。
 
-しらせ(`#notice`)に残るのは**やってみて初めて分かった失敗**だけになる。
+しらせ(`.notice`)に残るのは**やってみて初めて分かった失敗**だけになる。
 出るのがそれだけになったので、「しくじりかどうか」の分岐も持たない —
 役はいつも `alert`(読み上げにすぐ割り込む)で、頭にはいつも印が座る。
 
@@ -734,7 +738,7 @@ the declaration?` / [Update] [Keep as is])。Update なら頭を書き換え、�
 しない。`.md` を落としたときはその md を開く。
 
 ドラッグしているあいだ、**落ちる行に線が出る**(カードのドラッグと同じ
-`#drop-line`)。予告するのは「どこに入るか」だけで、入った後の姿ではない。
+`.drop-line`)。予告するのは「どこに入るか」だけで、入った後の姿ではない。
 絵かどうかは種類(MIME)で分かるので、`.md` が混ざっていればどこでも受ける。
 
 `https://` の画像は外部通信になるため表示しない。md 側の記述はただの相対パス

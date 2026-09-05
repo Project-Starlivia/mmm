@@ -36,6 +36,38 @@ const LINGER = 4000;
  */
 const SORRY = "Sorry...";
 
+/**
+ * 言葉の全部。**綴りはここ 1 つ** — 呼ぶ側はこの中の 1 つを渡す（外れていれば
+ * 型が止める）ので、足すときはまずここに書く。並べて見る道具もこれを読む。
+ * 名前を付けて引かないのは、呼び出し元で文言そのものが読める方が早いから。
+ */
+export const FAILED = [
+  "Couldn't save",
+  "Couldn't save the image",
+  "Couldn't open the file",
+  "Couldn't open the dropped file",
+  "Couldn't open the image folder",
+  "Couldn't create a new file",
+  "Couldn't rename the file",
+  "Couldn't export",
+  "Couldn't copy",
+  "Couldn't copy the link",
+  "Couldn't paste",
+  "Couldn't read that as a link",
+  "Couldn't add the drawing",
+  "Couldn't open that card",
+  "Couldn't start editing — the node is folded",
+  "Couldn't do that here",
+  "Select a node to paste an image into",
+  "Select a node to paste a link into",
+  "This browser cannot open or save files",
+] as const;
+export type Failed = (typeof FAILED)[number];
+
+/** 次の一手が相手にあるもの。いまは書き出すものが無いときの Mod+E だけ */
+export const BLOCKED = ["Nothing to export yet"] as const;
+export type Blocked = (typeof BLOCKED)[number];
+
 let box: HTMLDivElement | null = null;
 let timer = -1;
 
@@ -51,27 +83,39 @@ function words(name: string, text: string): HTMLSpanElement {
   return el;
 }
 
+/**
+ * しらせ 1 つぶん。器（`.notice`）ごと組んで返す — **置くのは呼ぶ側**。
+ * アプリは下の `show` が body に 1 個だけ置き、並べて見る道具はどこにでも置く。
+ *
+ * 中身は 3 つ。**入れ物は、意味を持つか CSS で言えない境目があるときだけ置く。**
+ *
+ *   .icon  印（飾り。意味は role と字が持つので `aria-hidden`）
+ *   .lead  詫び（`blocked` では出さない）
+ *   .msg   何が起きなかったか
+ *
+ * 印と詫びを束ねる器は要らない — 伸びるのは `.msg` だけなので、文言が
+ * 折り返しても 2 つが離れることはない。束ねる器はそのために置いていた
+ */
+export function notice(mark: IconName, msg: string, sorry: boolean): HTMLDivElement {
+  const box = document.createElement("div");
+  box.className = "notice";
+  // HTML に「しらせ」のタグは無い。`<output>` は `role="status"` に落ちる
+  // ので、すぐ割り込む `alert` が要るこちらは div に role を載せる
+  box.setAttribute("role", "alert");
+  box.append(icon(mark));
+  if (sorry) box.append(words("lead", SORRY));
+  box.append(words("msg", msg));
+  return box;
+}
+
+/** body に 1 個。続けて呼べば中身が差し替わり、時計は打ち直す */
 function show(mark: IconName, msg: string, sorry: boolean): void {
-  if (!box) {
-    box = document.createElement("div");
-    box.id = "notice";
-    // HTML に「しらせ」のタグは無い。`<output>` は `role="status"` に落ちる
-    // ので、すぐ割り込む `alert` が要るこちらは div に role を載せる
-    box.setAttribute("role", "alert");
+  const next = notice(mark, msg, sorry);
+  if (box) box.replaceChildren(...next.childNodes);
+  else {
+    box = next;
     document.body.append(box);
   }
-  // **入れ物は、意味を持つか CSS で言えない境目があるときだけ置く。**
-  //
-  //   .icon  印（飾り。意味は role と字が持つので `aria-hidden`）
-  //   .lead  詫び（`blocked` では出さない）
-  //   .msg   何が起きなかったか
-  //
-  // 印と詫びを束ねる器は要らない — 伸びるのは `.msg` だけなので、文言が
-  // 折り返しても 2 つが離れることはない。束ねる器はそのために置いていた
-  const kids: Node[] = [icon(mark)];
-  if (sorry) kids.push(words("lead", SORRY));
-  kids.push(words("msg", msg));
-  box.replaceChildren(...kids);
   box.classList.add("on");
   if (timer !== -1) window.clearTimeout(timer);
   timer = window.setTimeout(() => {
@@ -92,7 +136,7 @@ function show(mark: IconName, msg: string, sorry: boolean): void {
  * 置き場所を持たない文書に画像を収めると言ったのも、貼られた字をリンクとして
  * 読むと言ったのもこちらで、相手の不注意ではない。
  */
-export const failed = (msg: string): void => show("circle-alert", msg, true);
+export const failed = (msg: Failed): void => show("circle-alert", msg, true);
 
 /**
  * 先へ進めない。**次の一手はそちらにある。**
@@ -102,4 +146,4 @@ export const failed = (msg: string): void => show("circle-alert", msg, true);
  * あるのでキー（`Mod+E`）から来た人にしか出ない。触って読める言葉と
  * 同じものを出す。
  */
-export const blocked = (msg: string): void => show("triangle-alert", msg, false);
+export const blocked = (msg: Blocked): void => show("triangle-alert", msg, false);

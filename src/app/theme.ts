@@ -49,7 +49,8 @@ export function initTheme(args: {
   let faviconColor = base;
   let faviconDirty = false;
 
-  /** favicon は data URL なので、色も印も実値で埋める必要がある。 */
+  /** index.html の素の favicon（同じ logo.ts からビルド時に吐いたもの）を、
+   *  色と印の入った data URL で上書きする。実値で埋める必要がある */
   const applyFavicon = (): void => {
     const found = document.querySelector('link[rel="icon"]');
     // 型は名乗らせず確かめる。`<link rel=icon>` でないものが居たら作り直す
@@ -70,7 +71,7 @@ export function initTheme(args: {
    * （`--accent-soft`）も輪（`--ring`）も style.css が色から作る。
    *
    * ここで `rgba(...)` を組んで置くと、それは要素のインラインスタイルなので
-   * `:root.light` の宣言に**必ず**勝ってしまう。ライト用に薄くしてあった
+   * `.light` の宣言に**必ず**勝ってしまう。ライト用に薄くしてあった
    * 宣言が一度も効かず、ライトでもダークの濃さのままになっていた。
    */
   const applyColor = (hex: string): void => {

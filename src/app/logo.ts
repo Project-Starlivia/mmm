@@ -15,9 +15,12 @@ export function logoInner(fill = "currentColor"): string {
 /**
  * 単体で完結する SVG 文字列（favicon の data URL / アイコンの源）。
  *
- * `dirty` を立てると、右上に**未保存の印**が付く — 帯に出ている `●`
+ * `dirty` を立てると、右下に**未保存の印**が付く — 帯に出ている `●`
  * （`#dirty`）とまったく同じことを、タブの中で言う。ここが持つのは
  * 「ロゴがどう見えるか」だけで、いま未保存かどうかは呼ぶ側が知っている。
+ *
+ * 右下は**状態**の位置（同期やプレゼンスの印と同じ）。右上はバッジ＝
+ * 届いたものの件数を言う位置で、この印が言うのは件数ではない。
  *
  * 印は**器の色で縁取ってから**塗る。地は白とは限らず（ブラウザのタブは
  * 明るくも暗くもなる）、ロゴのステムに重なると輪郭が溶けるため。
@@ -27,8 +30,8 @@ export function logoSvg(fill: string, dirty = false): string {
   // 16px のタブで印の角が切れる。大きさは 16px 換算で印 4.7px・縁込み
   // 5.8px（アイコンのおよそ 1/3）で、**添えものに見える**ところに置く
   const mark = dirty
-    ? `<circle cx="118" cy="26" r="21" fill="none" stroke="#00000055" stroke-width="10"/>` +
-      `<circle cx="118" cy="26" r="21" fill="${fill}"/>`
+    ? `<circle cx="118" cy="118" r="21" fill="none" stroke="#00000055" stroke-width="10"/>` +
+      `<circle cx="118" cy="118" r="21" fill="${fill}"/>`
     : "";
   return (
     `<svg width="144" height="144" viewBox="0 0 144 144" fill="none" ` +

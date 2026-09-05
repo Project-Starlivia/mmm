@@ -6,6 +6,7 @@ import type { IconName } from "../icons.ts";
 import { type Intent, keyed } from "./keys.ts";
 import type { Layout } from "./layout.ts";
 import { type Selection, parentOf, solo } from "./select.ts";
+import type { MenuEntry } from "./menu.ts";
 
 export interface Item {
   label: string;
@@ -80,4 +81,22 @@ export function contextItems(L: Layout, sel: Selection): Entry[] {
     "sep",
     { label: "Delete", key: "Del", mark: "trash-2", intent: press(L, sel, "Delete") },
   ];
+}
+
+/**
+ * menu.ts が描ける形に写す。押せば `act` へ渡すだけで、意味はここに増やさない。
+ * 沈む行は `why` を押せない理由として持ち、無ければただ沈む
+ */
+export function menuOf(es: Entry[], act: (intent: Intent) => void): MenuEntry[] {
+  const one = (it: Item): MenuEntry => {
+    const disabled = it.intent === null ? (it.why ?? true) : false;
+    const run = (): void => {
+      if (it.intent) act(it.intent);
+    };
+    const items = it.items?.map(one);
+    return items
+      ? { label: it.label, key: it.key, mark: it.mark, disabled, items, run }
+      : { label: it.label, key: it.key, mark: it.mark, disabled, run };
+  };
+  return es.map((e) => (e === "sep" ? "sep" : one(e)));
 }

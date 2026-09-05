@@ -4,6 +4,9 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable", "DOM.AsyncIterable"],
+    // src はブラウザでしか動かない。空にしないと node_modules/@types が
+    // 丸ごと入り、process / Buffer を書いても検査が通る（test は node を名指す）
+    "types": [],
     "strict": true,
     "noUnusedLocals": true,
     "noFallthroughCasesInSwitch": true,

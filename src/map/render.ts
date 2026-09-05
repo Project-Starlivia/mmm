@@ -102,6 +102,8 @@ export class MapRenderer {
   private nodeTf = new Map<number, string>();
   private edgeD = new Map<number, string>();
   private domOrderSig = ""; // DOM の並び（= 重なり順）を直す判定用
+  /** 直前に paintSelection で塗った id。箱が無いものも残す（戻ったとき draw が塗る） */
+  private selected = new Set<number>();
 
   /** id を指定して要素を引く（書き出しに写すため） */
   nodeEl(id: number): SVGGElement | undefined {
@@ -112,9 +114,13 @@ export class MapRenderer {
     return this.edgeEls.get(id);
   }
 
-  /** 選ばれた箱に印を付ける。レイアウトを見直さない軽い塗り替え（値は main.ts のもの） */
+  /** 選ばれた箱に印を付ける。レイアウトを見直さない軽い塗り替え（値は main.ts のもの）。
+   *  触るのは前回と変わった箱だけ — 矩形選択は pointermove ごとに来るので、
+   *  全箱を toggle すると 5000 ノードで 1 回に 5000 回 DOM を触る */
   paintSelection(sel: Set<number>): void {
-    for (const [id, g] of this.nodeEls) g.classList.toggle("selected", sel.has(id));
+    for (const id of this.selected) if (!sel.has(id)) this.nodeEls.get(id)?.classList.remove("selected");
+    for (const id of sel) if (!this.selected.has(id)) this.nodeEls.get(id)?.classList.add("selected");
+    this.selected = sel;
   }
 
   private shapeOf(b: Box, p: Scene): NodeShape {
@@ -180,6 +186,8 @@ export class MapRenderer {
         this.nodeLayer.append(g);
         this.nodeEls.set(id, g);
         this.nodeShape.delete(id); // 新規なので必ず中身を作る
+        // 選んだまま消えて戻った箱（畳みを開いた等）。印は paintSelection の差分の外
+        if (this.selected.has(id)) g.classList.add("selected");
       }
       // **文書から決まるクラスだけ**を、1 つずつ付け外しする
       g.classList.toggle("root", b.parent === null);

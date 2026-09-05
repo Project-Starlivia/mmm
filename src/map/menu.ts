@@ -126,7 +126,164 @@ export function openOnClick(
   });
 }
 
-export class ContextMenu {
+/**
+ * 行が器へ返すもの。位置・開閉・焦点は器（`ContextMenu`）の持ち物で、行は
+ * 「入れ子を開いて」「選んだから閉じて」と言うだけ。
+ */
+export interface MenuHost {
+  /** 入れ子をその行の隣に開く */
+  openSub(row: HTMLElement, items: MenuEntry[]): void;
+  /** 開いている入れ子を閉じる（別の行へ移った） */
+  closeSub(): void;
+  /** 選んだので器ごと閉じる */
+  close(): void;
+}
+
+/**
+ * `.menu` の器に行を並べる。**中身だけ** — どこに出すか・いつ閉じるかは
+ * 持たない。返るのは、入れ子を持つ行の「開く」動作（ArrowRight とホバーの
+ * 両方がこれを引く。2 つの入口が同じ判断をばらばらに持たない）。
+ */
+export function fillMenu(el: HTMLElement, items: MenuEntry[], host: MenuHost): Map<HTMLElement, () => void> {
+  el.replaceChildren();
+  const openers = new Map<HTMLElement, () => void>();
+  // 空欄で頭出しを揃えるのは、**このメニューの中に絵を持つ行が 1 つでも
+  // あるとき**だけ。1 つも無いなら（Add の子など）揃える相手が無いので、
+  // 全部の行を左端まで詰める — 空欄ぶんの余白だけが浮いて見えていた
+  const anyMark = items.some((it) => it !== "sep" && !("caption" in it) && !!it.mark);
+  for (const it of items) {
+    if (it === "sep") {
+      el.append(document.createElement("hr"));
+      continue;
+    }
+    if ("caption" in it) {
+      const cap = document.createElement("div");
+      cap.className = "caption";
+      // 字は span に入れる — 長い名前を省略するのは字だけで、絵は縮めない
+      const text = document.createElement("span");
+      text.textContent = it.caption;
+      if (it.mark) cap.append(icon(it.mark));
+      cap.append(text);
+      el.append(cap);
+      continue;
+    }
+    const row = document.createElement("div");
+    row.className = "item";
+    row.setAttribute("role", "menuitem");
+    // 矢印キーで辿れる。触っても効かない行だけが機能しないので、
+    // トップレベルには常に参加させる（見えるが効かない、が Tab と同じ形）
+    row.tabIndex = -1;
+    // 理由を持つなら、触れば読める。押せない行は pointer-events を落として
+    // あるが、`title` は要素そのものに付くので hover では出る。
+    // アクセシブルネームも同じ理由を言う — hover できない読み上げでも
+    // 「なぜ」がその場で分かる
+    if (it.disabled) row.setAttribute("aria-disabled", "true");
+    if (typeof it.disabled === "string") {
+      row.title = it.disabled;
+      row.setAttribute("aria-label", `${it.label}, ${it.disabled}`);
+    }
+    // 絵の有る行と無い行で字の頭出しがずれないよう、無い行にも同じ幅の
+    // 空欄を置く（絵は行ごとの都合、字の頭は並びの都合 — 別の話）。
+    // ただし揃える相手（絵を持つ行）がこのメニューに 1 つも無ければ、
+    // 空欄そのものを置かない
+    if (it.mark) row.append(icon(it.mark));
+    else if (anyMark) row.append(emptyMark());
+    const label = document.createElement("span");
+    label.textContent = it.label;
+    row.append(label);
+    const nested = "items" in it;
+    if (nested) {
+      row.setAttribute("aria-haspopup", "menu");
+      row.setAttribute("aria-expanded", "false");
+    }
+    // 但し書きは**印だけ**を右端に出し、中身は触れば読める。
+    // **待たずに開いて、届いたら付ける** — 閉じた後に届いても、器ごと
+    // 捨てられているだけなので何も起きない
+    if (it.note !== undefined) {
+      const show = (texts: string[]): void => {
+        if (texts.length === 0) return;
+        // **印は 1 つ。** その行についての但し書きが何本あっても、
+        // 「この一手には気に留めることがある」という同じ 1 つの話なので、
+        // 印を数だけ並べると別々の物に見える。数は吹き出しの中で言う
+        const mark = icon("triangle-alert");
+        mark.classList.add("note");
+        // 印そのものが読み上げの対象になる。行の名前に但し書きを足すので
+        // はなく、印に名前を持たせる（label は label のまま）
+        mark.removeAttribute("aria-hidden");
+        mark.setAttribute("role", "img");
+        mark.setAttribute("aria-label", texts.join(". "));
+        // 吹き出しは自前。`title` はブラウザ任せで一拍待たされる
+        const tip = document.createElement("div");
+        tip.className = "tip";
+        for (const text of texts) {
+          const line = document.createElement("div");
+          line.textContent = text;
+          tip.append(line);
+        }
+        // `<span>` にしない — 行は「`.key` でも絵でもない `<span>` は
+        // 字だ」と見て `flex: 1` を当てるので、印の器が横幅を全部
+        // 持っていってしまう
+        const box = document.createElement("div");
+        box.className = "note-box";
+        box.append(mark, tip);
+        row.append(box);
+      };
+      if (Array.isArray(it.note)) show(it.note);
+      else void it.note.then(show);
+    }
+    // 押して走る行のキーと、開ける印は同居しうる（`Tab ▸`）
+    const hint = [it.key, nested ? "▸" : ""].filter(Boolean).join(" ");
+    if (hint) {
+      const key = document.createElement("span");
+      key.className = "key";
+      key.textContent = hint;
+      row.append(key);
+    }
+    // 「開く」判断は 1 か所。ホバーと ArrowRight の両方がこれを呼ぶ
+    if (nested && !it.disabled) openers.set(row, () => host.openSub(row, it.items));
+    // どの行へ移っても、開いていた子は閉じる。入れ子の行なら開き直す
+    row.addEventListener("pointerenter", () => {
+      host.closeSub();
+      openers.get(row)?.();
+    });
+    row.addEventListener("click", () => {
+      // **押せなさは、ここが持つ。** CSS の `pointer-events: none` で
+      // 止めていた頃は、同じ指定が hover まで殺していて理由が読めなかった
+      if (it.disabled) return;
+      // 走るものが無い入れ子は「開く」だけ。触るとすぐ閉じては選べない
+      if (nested && !it.run) {
+        host.openSub(row, it.items);
+        return;
+      }
+      // **`done` を持つ行は閉じない。** 済んだことはその場で絵が言うので、
+      // 閉じて別の場所に出すより近いし、続けてもう 1 つ選べる
+      const done = "done" in it ? it.done : undefined;
+      if (done) {
+        // 行の頭の絵だけを差し替える（`:scope >` が無いと、但し書きの
+        // 印まで拾いうる）。差し替えるたび引き直すので、そのつど探す
+        void nod(done(), (mark) => {
+          row.querySelector(":scope > .icon")?.replaceWith(icon(mark));
+        });
+        return;
+      }
+      host.close();
+      if ("run" in it) it.run?.();
+    });
+    el.append(row);
+  }
+  return openers;
+}
+
+/** 行だけのメニュー。位置も開閉も持たない — 並べて見るためのもの */
+export function menu(items: MenuEntry[]): HTMLDivElement {
+  const el = document.createElement("div");
+  el.className = "menu";
+  el.setAttribute("role", "menu");
+  fillMenu(el, items, { openSub() {}, closeSub() {}, close() {} });
+  return el;
+}
+
+export class ContextMenu implements MenuHost {
   private el = document.createElement("div");
   /** 開いている子メニュー。要るまで作らない（大半のメニューに入れ子は無い） */
   private sub: ContextMenu | null = null;
@@ -136,8 +293,7 @@ export class ContextMenu {
   private openerRow: HTMLElement | null = null;
   /** 開いたときに焦点があった要素。トップレベルだけが持つ — 閉じたら戻る先 */
   private opener: HTMLElement | null = null;
-  /** 入れ子を持つ行の「開く」動作。ArrowRight とホバーの両方がここから呼ぶ
-   *  （2 つの入口が同じ判断をばらばらに持たない） */
+  /** 入れ子を持つ行の「開く」動作（`fillMenu` が返す）。ArrowRight が引く */
   private openers = new Map<HTMLElement, () => void>();
 
   constructor() {
@@ -152,7 +308,7 @@ export class ContextMenu {
       if (!this.contains(e.target)) this.hide();
     });
     // トップレベルだけ、閉じたときに呼んだ場所へ焦点を戻す。子から選んで
-    // 閉じるときも同じ道を通る（hideAll → 一番上の hide(true)）
+    // 閉じるときも同じ道を通る（close → 一番上の hide(true)）
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") this.hide(!this.parent);
     });
@@ -244,132 +400,7 @@ export class ContextMenu {
   /** その座標に開く。画面外へはみ出すときは内側へ寄せる */
   show(x: number, y: number, items: MenuEntry[]): void {
     this.closeSub();
-    this.el.replaceChildren();
-    this.openers.clear();
-    // 空欄で頭出しを揃えるのは、**このメニューの中に絵を持つ行が 1 つでも
-    // あるとき**だけ。1 つも無いなら（Add の子など）揃える相手が無いので、
-    // 全部の行を左端まで詰める — 空欄ぶんの余白だけが浮いて見えていた
-    const anyMark = items.some((it) => it !== "sep" && !("caption" in it) && !!it.mark);
-    for (const it of items) {
-      if (it === "sep") {
-        this.el.append(document.createElement("hr"));
-        continue;
-      }
-      if ("caption" in it) {
-        const cap = document.createElement("div");
-        cap.className = "caption";
-        // 字は span に入れる — 長い名前を省略するのは字だけで、絵は縮めない
-        const text = document.createElement("span");
-        text.textContent = it.caption;
-        if (it.mark) cap.append(icon(it.mark));
-        cap.append(text);
-        this.el.append(cap);
-        continue;
-      }
-      const row = document.createElement("div");
-      row.className = "item";
-      row.setAttribute("role", "menuitem");
-      // 矢印キーで辿れる。触っても効かない行だけが機能しないので、
-      // トップレベルには常に参加させる（見えるが効かない、が Tab と同じ形）
-      row.tabIndex = -1;
-      // 理由を持つなら、触れば読める。押せない行は pointer-events を落として
-      // あるが、`title` は要素そのものに付くので hover では出る。
-      // アクセシブルネームも同じ理由を言う — hover できない読み上げでも
-      // 「なぜ」がその場で分かる
-      if (it.disabled) row.setAttribute("aria-disabled", "true");
-      if (typeof it.disabled === "string") {
-        row.title = it.disabled;
-        row.setAttribute("aria-label", `${it.label}, ${it.disabled}`);
-      }
-      // 絵の有る行と無い行で字の頭出しがずれないよう、無い行にも同じ幅の
-      // 空欄を置く（絵は行ごとの都合、字の頭は並びの都合 — 別の話）。
-      // ただし揃える相手（絵を持つ行）がこのメニューに 1 つも無ければ、
-      // 空欄そのものを置かない
-      if (it.mark) row.append(icon(it.mark));
-      else if (anyMark) row.append(emptyMark());
-      const label = document.createElement("span");
-      label.textContent = it.label;
-      row.append(label);
-      const nested = "items" in it;
-      if (nested) {
-        row.setAttribute("aria-haspopup", "menu");
-        row.setAttribute("aria-expanded", "false");
-      }
-      // 但し書きは**印だけ**を右端に出し、中身は触れば読める。
-      // **待たずに開いて、届いたら付ける** — 閉じた後に届いても、器ごと
-      // 捨てられているだけなので何も起きない
-      if (it.note !== undefined) {
-        const show = (texts: string[]): void => {
-          if (texts.length === 0) return;
-          // **印は 1 つ。** その行についての但し書きが何本あっても、
-          // 「この一手には気に留めることがある」という同じ 1 つの話なので、
-          // 印を数だけ並べると別々の物に見える。数は吹き出しの中で言う
-          const mark = icon("triangle-alert");
-          mark.classList.add("note");
-          // 印そのものが読み上げの対象になる。行の名前に但し書きを足すので
-          // はなく、印に名前を持たせる（label は label のまま）
-          mark.removeAttribute("aria-hidden");
-          mark.setAttribute("role", "img");
-          mark.setAttribute("aria-label", texts.join(". "));
-          // 吹き出しは自前。`title` はブラウザ任せで一拍待たされる
-          const tip = document.createElement("div");
-          tip.className = "tip";
-          for (const text of texts) {
-            const line = document.createElement("div");
-            line.textContent = text;
-            tip.append(line);
-          }
-          // `<span>` にしない — 行は「`.key` でも絵でもない `<span>` は
-          // 字だ」と見て `flex: 1` を当てるので、印の器が横幅を全部
-          // 持っていってしまう
-          const box = document.createElement("div");
-          box.className = "note-box";
-          box.append(mark, tip);
-          row.append(box);
-        };
-        if (Array.isArray(it.note)) show(it.note);
-        else void it.note.then(show);
-      }
-      // 押して走る行のキーと、開ける印は同居しうる（`Tab ▸`）
-      const hint = [it.key, nested ? "▸" : ""].filter(Boolean).join(" ");
-      if (hint) {
-        const key = document.createElement("span");
-        key.className = "key";
-        key.textContent = hint;
-        row.append(key);
-      }
-      // 「開く」判断は 1 か所。ホバーと ArrowRight の両方がこれを呼ぶ
-      if (nested && !it.disabled) this.openers.set(row, () => this.openSub(row, it.items));
-      // どの行へ移っても、開いていた子は閉じる。入れ子の行なら開き直す
-      row.addEventListener("pointerenter", () => {
-        this.closeSub();
-        this.openers.get(row)?.();
-      });
-      row.addEventListener("click", () => {
-        // **押せなさは、ここが持つ。** CSS の `pointer-events: none` で
-        // 止めていた頃は、同じ指定が hover まで殺していて理由が読めなかった
-        if (it.disabled) return;
-        // 走るものが無い入れ子は「開く」だけ。触るとすぐ閉じては選べない
-        if (nested && !it.run) {
-          this.openSub(row, it.items);
-          return;
-        }
-        // **`done` を持つ行は閉じない。** 済んだことはその場で絵が言うので、
-        // 閉じて別の場所に出すより近いし、続けてもう 1 つ選べる
-        const done = "done" in it ? it.done : undefined;
-        if (done) {
-          // 行の頭の絵だけを差し替える（`:scope >` が無いと、但し書きの
-          // 印まで拾いうる）。差し替えるたび引き直すので、そのつど探す
-          void nod(done(), (mark) => {
-            row.querySelector(":scope > .icon")?.replaceWith(icon(mark));
-          });
-          return;
-        }
-        this.hideAll();
-        if ("run" in it) it.run?.();
-      });
-      this.el.append(row);
-    }
+    this.openers = fillMenu(this.el, items, this);
     // 大きさは出してからでないと測れない
     this.el.style.display = "block";
     const w = this.el.offsetWidth;
@@ -380,7 +411,7 @@ export class ContextMenu {
 
   /**
    * `restoreFocus` はトップレベルが閉じるときだけ意味を持つ — 選んで閉じた
-   * とき（`hideAll`）と Escape で閉じたときは呼んだ場所へ戻り、外を押した・
+   * とき（`close`）と Escape で閉じたときは呼んだ場所へ戻り、外を押した・
    * 窓が背後へ回った・Tab で抜けたときは戻さない（戻すと、その操作を
    * わざわざやり直させることになる）。
    */
@@ -412,7 +443,7 @@ export class ContextMenu {
   }
 
   /** 親の行の右隣へ子を開く。器は使い回す（開くたびに作らない） */
-  private openSub(row: HTMLElement, items: MenuEntry[]): void {
+  openSub(row: HTMLElement, items: MenuEntry[]): void {
     if (!this.sub) {
       this.sub = new ContextMenu();
       this.sub.parent = this;
@@ -435,13 +466,13 @@ export class ContextMenu {
    * `restoreFocus` は `hide()` と同じ意味 — 選んで閉じるときは既定で戻す
    * （キー操作でも選んだ後は呼んだ場所へ）。
    */
-  private hideAll(restoreFocus = true): void {
+  close(restoreFocus = true): void {
     let top: ContextMenu = this;
     while (top.parent) top = top.parent;
     top.hide(restoreFocus);
   }
 
-  private closeSub(): void {
+  closeSub(): void {
     this.sub?.openerRow?.setAttribute("aria-expanded", "false");
     this.sub?.hide();
   }

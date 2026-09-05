@@ -10,6 +10,7 @@
 import { type MenuEntry, openOnClick } from "../map/menu.ts";
 import { type IconName, icon, label, nod } from "../icons.ts";
 import { LS_WAY, load, store } from "./persist.ts";
+import type { Blocked, Failed } from "./notice.ts";
 
 /**
  * ラスタの倍率。**選ばせない** — 書き出したものは画面で見えている通りで
@@ -23,9 +24,9 @@ export interface ExportDeps {
   /** ダウンロード名の元になる、いまのファイル名 */
   name: () => string;
   /** 果たせなかった */
-  failed: (msg: string) => void;
+  failed: (msg: Failed) => void;
   /** 出すものが無い。キーから来たときだけここへ落ちる */
-  blocked: (msg: string) => void;
+  blocked: (msg: Blocked) => void;
   /** マップに 1 つも枝が無いか。**押す前に分かるので、押す前に言う** */
   empty: () => boolean;
 }

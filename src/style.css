@@ -3,18 +3,35 @@
 
    ここに書かないもの: レイアウトが計算した数（TS が属性で入れる）。
    ここに書くもの: 状態で変わるだけの定数（角丸・色・破線など）。
-   色・影・輪の数字は `:root` のトークンだけが持ち、部品はそれを引く。 */
+   色・影・輪の数字は `:root` のトークンだけが持ち、部品はそれを引く。
+   id で塗るのは **1 個しか無い骨格**（#app / #topbar / #panes / #md-pane …）
+   だけ。何個も出しうる部品（しらせ・メニュー・印・その場編集・マップの器）は
+   class — 並べて見る道具（lab/parts）が同じ見た目を何個でも置けるように。 */
 
 /* ========== 色の源 ========== */
 
 :root {
   color-scheme: dark;
+  /* **色は 3 つ。** 地・字・強調。灰はぜんぶ地と字の混ぜ具合（下の `*-mix`）
+     で導く — 灰を 1 つずつ綴ると、地を変えたときに揃わなくなる。混ぜ具合は
+     lab/parts の「源と濃さ」で動かして、ここへ写す */
   --bg: #15171c;
-  --panel: #1b1e24;
   --ink: #dde2e9;
-  --ink-dim: #828a96;
-  --line: #2a2f38;
   --accent: #5932ff;
+  /* 浮くものが向かう色。暗い地では明るい方（= 字の側）、ライトでは白 */
+  --lift: var(--ink);
+  --panel-mix: 4%;
+  --node-bg-mix: 8%;
+  --ink-dim-mix: 57%;
+  --line-mix: 12%;
+  --node-border-mix: 21%;
+  --node-border-strong-mix: 39%;
+  --edge-mix: 31%;
+  --dot-mix: 10%;
+  /* フォーカス枠の濃さ。--accent-soft より濃いのは、地が --bg へ沈んだ分
+     そのままだと枠が薄まって見えるため。**色は --accent から導く** — 数字で
+     持っていた頃は、色を変えても輪だけが既定の紫のまま残っていた */
+  --ring-mix: 32%;
   /* 面を accent で薄く塗るときの濃さ。**この 1 行だけ**が決める — 下が
      透ける面（`--accent-soft`）も、ノードの箱のように地の上へ不透明に塗る面も
      同じ濃さになる。同じ選択を 2 つのペインで見せているのに、濃さが違う
@@ -23,23 +40,12 @@
      置くインラインに必ず負けていて一度も効いていなかった（誰も見たことの
      ない濃さだった）。アクセントカラーは `--accent` にだけ入る */
   --accent-mix: 20%;
-  --accent-soft: color-mix(in srgb, var(--accent) var(--accent-mix), transparent);
-  /* フォーカス枠だけの濃さ。--accent-soft と同じ色味だが、地が --bg へ
-     沈んだ分（旧 --panel より暗い）そのままだと枠が薄まって見えるので、
-     ここだけ底上げする。**色は --accent から導く** — 数字で持っていた頃は、
-     色を変えても輪だけが既定の紫のまま残っていた */
-  --ring: color-mix(in srgb, var(--accent) 32%, transparent);
   /* アクセントで塗った面の上に載る字と線 */
   --on-accent: #fff;
   /* 浮くもの（しらせ・メニュー・たずね）の影と、たずねの後ろの幕。
      テーマで濃さが変わる — ライトの地に暗い影をそのまま落とすと重い */
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   --veil: rgba(0, 0, 0, 0.45);
-  --node-bg: #232830;
-  --node-border: #3b424d;
-  --node-border-strong: #5d6673;
-  --edge: #4d5563;
-  --dot: #262b33;
   --font: "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
   /* コードの字。**綴りはここ 1 つ** — 測る側（map/metrics.ts）も同じものを見る */
   --mono: "JetBrains Mono", Consolas, "SF Mono", "Cascadia Code", Menlo, monospace;
@@ -52,27 +58,46 @@
   --tok-type: #e5c07b;
 }
 
-:root.light {
+/* ライト。**`:root` に限らない** — どの祖先に付けても、その下だけがライトに
+   なる（トークンは継承するので、器ごとに切り替えられる） */
+.light {
   color-scheme: light;
   --bg: #f3f4f6;
-  --panel: #ffffff;
   --ink: #1f2328;
-  --ink-dim: #6b7280;
-  --line: #e2e5ea;
-  --ring: color-mix(in srgb, var(--accent) 12%, transparent);
+  --lift: #fff;
+  --panel-mix: 100%;
+  --node-bg-mix: 100%;
+  --ink-dim-mix: 61%;
+  --line-mix: 7%;
+  --node-border-mix: 15%;
+  --node-border-strong-mix: 38%;
+  --edge-mix: 26%;
+  --dot-mix: 9%;
+  --ring-mix: 12%;
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   --veil: rgba(0, 0, 0, 0.25);
-  --node-bg: #ffffff;
-  --node-border: #cfd5dd;
-  --node-border-strong: #9aa4b1;
-  --edge: #b6bec9;
   --tok-keyword: #a626a4;
   --tok-string: #50a14f;
   --tok-number: #b76b01;
   --tok-comment: #9aa4b1;
   --tok-name: #4078f2;
   --tok-type: #986801;
-  --dot: #dde1e7;
+}
+
+/* 灰の導き方。**源（地・字・浮く向き）と濃さは上の 2 つが持ち、式はここ 1 つ。**
+   `:root` と `.light` の両方に書くのは、変数は宣言した要素で解決されるため —
+   `:root` にだけ書くと `.light` の下でも dark の地と字で混ざった値を継ぐ */
+:root, .light {
+  --panel: color-mix(in srgb, var(--bg), var(--lift) var(--panel-mix));
+  --node-bg: color-mix(in srgb, var(--bg), var(--lift) var(--node-bg-mix));
+  --ink-dim: color-mix(in srgb, var(--bg), var(--ink) var(--ink-dim-mix));
+  --line: color-mix(in srgb, var(--bg), var(--ink) var(--line-mix));
+  --node-border: color-mix(in srgb, var(--bg), var(--ink) var(--node-border-mix));
+  --node-border-strong: color-mix(in srgb, var(--bg), var(--ink) var(--node-border-strong-mix));
+  --edge: color-mix(in srgb, var(--bg), var(--ink) var(--edge-mix));
+  --dot: color-mix(in srgb, var(--bg), var(--ink) var(--dot-mix));
+  --ring: color-mix(in srgb, var(--accent) var(--ring-mix), transparent);
+  --accent-soft: color-mix(in srgb, var(--accent) var(--accent-mix), transparent);
 }
 
 /* ========== 土台 ========== */
@@ -258,7 +283,7 @@ html, body {
 
   &:hover { filter: brightness(1.25); }
 }
-/* **名乗りは名乗りだけ。** しくじりは #notice が自分の器で言う */
+/* **名乗りは名乗りだけ。** しくじりは .notice が自分の器で言う */
 /* 名乗り。押すと改名（Files の Rename と同じ操作）。**押せるときだけ
    押せる顔をする** — 保存していない文書には名前を変える相手がおらず、
    その環境が改名を持たないこともある（理由は title に出る） */
@@ -290,13 +315,13 @@ html, body {
 #panes[data-show="map"] #md-pane { display: none; }
 
 #splitter {
-  /* 幅はここ 1 つ。#pane-switch が片方表示で寄せる先（次のルール）も
+  /* 幅はここ 1 つ。.pane-switch が片方表示で寄せる先（次のルール）も
      同じ数を見る — 太さを変えたのに寄せ先だけ古いままになる、を防ぐ */
   --w: 5px;
   flex: none;
   width: var(--w);
   cursor: col-resize;
-  position: relative; /* 境目にくっつく開閉の矢印（#pane-switch）の座標系 */
+  position: relative; /* 境目にくっつく開閉の矢印（.pane-switch）の座標系 */
 
   /* 見える線はここだけが持つ。**ボタン（.pane-tool、z-index:10）より
      前に出す専用の層** — splitter 自身の地にすると、乗っているボタンが
@@ -360,7 +385,7 @@ html, body {
 }
 #panes[data-show="md"] #md-pane { flex: 1; }
 /* フォーカスの輪。#md-pane 自身は CodeMirror の背景に隠れて見えないので
-   .cm-editor に当てる(map 側の同じ印は #map-pane:focus-within が持つ)。
+   .cm-editor に当てる(map 側の同じ印は .map-pane:focus-within が持つ)。
    焦点が中に在るかは CSS 自身が知っているので、JS の旗は持たない */
 #md-pane:focus-within .cm-editor { box-shadow: inset 0 0 0 2px var(--ring); }
 
@@ -440,7 +465,7 @@ html, body {
    `‹ ›` を横に並べる。**向きは変えない** — 左はいつでも「分割線を左へ」、
    右はいつでも「右へ」で、端に着いたら押せなくなるだけ。分割線（5px）より
    広いので左右へはみ出すが、浮いている道具なので構わない */
-#pane-switch {
+.pane-switch {
   /* 丸みはここ 1 つ。**4 箇所（両方表示の外側 2 つ・独りぼっちの残り 2 つ）が
      同じ数を見る** — 太さを変えるたび 4 箇所を揃えて直すのは、直し忘れの
      たねになる */
@@ -473,7 +498,7 @@ html, body {
   }
   /* 端では相方が消え、独りになる（disabled は display:none）。それでも
      内側（分割線に接する側）は角のまま — 独りでも分割線とは今も隣接して
-     いる（#pane-switch の寄せ先が分割線の幅ぶんだけ離すよう直っている）
+     いる（.pane-switch の寄せ先が分割線の幅ぶんだけ離すよう直っている）
      ので、first-child / last-child の規則がそのまま正しい。特別扱いは
      要らない（以前ここに「独りなら四隅とも丸める」があったのは、
      分割線と重なっていた頃の名残） */
@@ -491,13 +516,13 @@ html, body {
    同じ数）。マップ側にはその帯が無いので、分割線の幅ぶんだけ離す
    （0 だと重なり、分割線の見える層（#splitter::after、z-index:11）が
    ボタンより前に出る分だけ見える面積を食う）*/
-#panes[data-show="md"] #pane-switch { left: auto; right: calc(var(--bar) + var(--inset)); transform: none; }
-#panes[data-show="map"] #pane-switch { left: var(--w); transform: none; }
+#panes[data-show="md"] .pane-switch { left: auto; right: calc(var(--bar) + var(--inset)); transform: none; }
+#panes[data-show="map"] .pane-switch { left: var(--w); transform: none; }
 
 /* 狭いときは、居場所が 2 つしか無い（`app/panes.ts` の `spotsFor`）。
    **分割線は線としての性質だけを落とす** — 動かせない境目を「掴めます」と
    いう顔で見せない。要素は 0 幅で残す: flex がそれを縁まで押し出すので、
-   `#pane-switch` は今までどおり同じ 1 か所に居られる（角と角に分けると、
+   `.pane-switch` は今までどおり同じ 1 か所に居られる（角と角に分けると、
    片方だけスクロールバー避けの分ずれて見える）。
    居場所が 2 つなら `button:disabled { display: none }` により、
    **画面に出る矢印は常に 1 本**になる */
@@ -516,15 +541,16 @@ html, body {
      木の書き方が入れ替わる — マップ側のどのボタンより取り返しが遠い。
      幅も 44px にする（3 つで 132px。いちばん狭い窓でも収まる） */
   .pane-tool button { min-height: 44px; min-width: 44px; }
-  #pane-switch button { width: 44px; height: 44px; }
-  #pane-switch button .icon { width: 16px; height: 16px; }
+  .pane-switch button { width: 44px; height: 44px; }
+  .pane-switch button .icon { width: 16px; height: 16px; }
 }
 
 /* ========== マップのペイン ========== */
 
-#map-pane {
-  flex: 1;
-  min-width: 200px;
+#map-pane { flex: 1; min-width: 200px; }
+
+/* マップの器そのもの。**何個でも立つ**（mindmap.ts が自分の pane に付ける） */
+.map-pane {
   position: relative;
   overflow: hidden;
   outline: none;
@@ -539,21 +565,21 @@ html, body {
 }
 
 /* 視点を選択(無ければルート)へ寄せる道具は**下**。見え方を変えるだけで
-   中身には触らないので、地図の上端（#map-indicator が縁を使う）を避けて
+   中身には触らないので、地図の上端（.map-indicator が縁を使う）を避けて
    沈む位置に居る */
-#map-center { bottom: var(--inset); }
+.map-center { bottom: var(--inset); }
 
-#map-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.map-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
 /* 画面外にある対象(選択、無ければルート)を指す控えめな針。コンパスの針の
    ように細長いひし形 1 つ。**出っぱなし**になるので中央には浮かせず、
    縁に貼って真ん中を塞がない(map/indicator.ts が位置と向きを計算する) */
-#map-indicator {
+.map-indicator {
   position: absolute;
   top: 0;
   left: 0;
-  width: 22px;
-  height: 11px;
+  width: 24px;
+  height: 10px;
   background: var(--accent);
   clip-path: polygon(0 50%, 38% 8%, 100% 50%, 38% 92%);
   opacity: 0.5;
@@ -612,7 +638,7 @@ html, body {
   &.root rect.box { stroke-width: 2; stroke: var(--node-border-strong); }
 
   /* ---- ドラッグ（付けるのは mindmap.ts）---- */
-  &.dragging { opacity: 0.35; }
+  &.dragging { opacity: 0.4; }
   &.drop-parent rect.box { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; }
 
   /* ---- 選択（付けるのは map/render.ts の paintSelection）---- */
@@ -704,7 +730,7 @@ html, body {
 
   /* 畳んだノード（core の Fold） */
   &.folded {
-    opacity: 0.45;
+    opacity: 0.4;
 
     /* 畳んだノードは小さく丸めて、別のものだと分かるようにする */
     & rect.box { rx: 4px; stroke-dasharray: 4 3; }
@@ -716,7 +742,7 @@ html, body {
 
 /* 枠と、その右上の ×。ノードの中ではなく world に浮かぶ 1 個の印
    （選ばれているカードは常に高々 1 枚なので） */
-#card-pick {
+.card-pick {
   & rect.frame {
     fill: none;
     stroke: var(--accent);
@@ -746,7 +772,7 @@ html, body {
    矩形選択の面、md のカーソルが掛かるノードの内側の輪、ドラッグの落とし先の線。
    輪の濃さはここだけが持つ — `--accent-soft` は面を塗るための薄さで、
    2px の線に当てると消える。内側に居る以上は選択と紛れようがない。 */
-#rubber {
+.rubber {
   position: absolute;
   border: 1px solid var(--accent);
   background: var(--accent-soft);
@@ -765,7 +791,7 @@ html, body {
 
 /* 兄弟へ挿入する予告（付けるのは mindmap.ts）。visibility で消す —
    display だと SVG の attribute と CSS の入り乱れが増える */
-#drop-line {
+.drop-line {
   stroke: var(--accent);
   stroke-width: 3;
   stroke-linecap: round;
@@ -774,7 +800,7 @@ html, body {
 
 /* ラベルのその場編集。位置と寸法は map/label.ts が world から計算して style に
    入れる（ズームに追従する）。ここに書くとラベルと入力欄で字の位置がずれる */
-#label-editor {
+.label-editor {
   position: absolute;
   display: none;
   box-sizing: border-box;
@@ -794,7 +820,7 @@ html, body {
    重ねる。字がずれないよう、font と padding と line-height は入れ物側で
    1 回だけ決めて両方に継がせる。寸法は map/card.ts の cardPlacement が
    唯一の定義（place() がズーム込みで書き込む） */
-#card-editor {
+.card-editor {
   position: absolute;
   display: none;
   box-sizing: border-box;
@@ -865,7 +891,7 @@ html, body {
 
 /* 答えを待たない。帯の下・中央に出て、勝手に消える。**押せない** —
    触れるものだと思わせない（消し方を覚えさせるほどの中身は載らない） */
-#notice {
+.notice {
   position: fixed;
   /* 帯の実測高さ(42px) + 8px の隙間。以前の 44px は帯とのあいだが 2px
      しか無く、詰まって見えていた */
@@ -941,19 +967,22 @@ html, body {
 
   &::backdrop { background: var(--veil); }
 
+  /* **段の間は、後ろに来るものが自分の上の距離を言う**（form に gap を
+     持たせて負の margin で戻す形をやめた）。題と補足は 1 つの塊（4）、
+     塊の間は 12、理由は欄のすぐ下（8） */
   & form {
     display: flex;
     flex-direction: column;
-    gap: 12px;
     padding: 16px;
     min-width: 300px;
   }
   & .title { margin: 0; font-size: 13px; }
   /* 補足。**題で足りるなら書かない**ので、要るときだけ場所を取る */
-  & .note { margin: -8px 0 0; font-size: 11px; color: var(--ink-dim); }
+  & .note { margin: 4px 0 0; font-size: 11px; color: var(--ink-dim); }
   /* 何の話をしているかを見せる絵。字より先に置く — 名前を聞かれている
      相手が、読む前に分かる。**元の縦横比のまま**、高さだけで抑える */
   & .shot {
+    margin-top: 12px;
     align-self: center;
     max-width: 100%;
     max-height: 160px;
@@ -964,6 +993,7 @@ html, body {
   /* 字と欄の並び。**書かれる行の形そのまま**なので、字は本文と同じ幅の
      字体で置く（`![](` と `./pics/` が md の中と同じ姿になる）*/
   & .parts {
+    margin-top: 12px;
     display: flex;
     align-items: center;
     gap: 2px;
@@ -987,14 +1017,15 @@ html, body {
   }
   /* 進めない理由。**直す字のすぐ下**に出す（離すと目が往復する）。
      行そのものを出し入れするので、要らないうちは高さも取らない */
-  & .bad { margin: -4px 0 0; font-size: 11px; color: var(--ink-dim); }
+  & .bad { margin: 8px 0 0; font-size: 11px; color: var(--ink-dim); }
 
   /* 断りは左、進むは右。押し間違えたときに軽いほうへ落ちる並び */
-  & .row { display: flex; justify-content: flex-end; gap: 8px; }
+  & .row { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
+  /* 背丈はメニューの行・しらせ・欄と同じ（同じ 13px の字は同じ高さ） */
   & button {
     font: inherit;
     font-size: 13px;
-    padding: 4px 12px;
+    padding: 6px 12px;
     border: 1px solid var(--line);
     border-radius: 6px;
     background: var(--bg);
@@ -1042,11 +1073,16 @@ html, body {
 
   /* インクの丸。色は draw.ts が `--swatch` で渡す（綴りは 1 か所） */
   & .ink {
+    position: relative; /* 色の入力（.pick）を重ねる座標系 */
     width: 22px;
     height: 22px;
     padding: 0;
     border-radius: 50%;
     background: var(--swatch);
+
+    /* 色の入力。丸に重ねて透明にし、押下は丸に任せる — OS のピッカーが
+       この箱の位置（= 丸の位置）に出るためだけに在る */
+    & .pick { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
     /* 暗い色でも器から浮くように、縁は薄く 1 本 */
     border: 1px solid var(--line);
     display: inline-flex;
@@ -1121,7 +1157,6 @@ html, body {
   border-radius: 10px;
   box-shadow: var(--shadow);
   padding: 4px;
-  display: none;
   user-select: none;
 
   & .item {

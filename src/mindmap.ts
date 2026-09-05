@@ -10,7 +10,7 @@ import type * as core from "./coreApi.ts";
 import type { Holder } from "./caret.ts";
 import { type Camera, type Pane, centerOn, fitToPane, panBy, panToShow, pinch, toWorld, zoomAt } from "./map/camera.ts";
 import { CardEditor } from "./map/card.ts";
-import { type Entry, contextItems } from "./map/context.ts";
+import { contextItems, menuOf } from "./map/context.ts";
 import { type Drop, dropOp, resolveDrop } from "./map/drop.ts";
 import { type Rect, unionRect } from "./map/geometry.ts";
 import { Fingers } from "./map/gesture.ts";
@@ -19,7 +19,7 @@ import { type Intent, type Key, keyed, keyedCard } from "./map/keys.ts";
 import { LabelEditor } from "./map/label.ts";
 import { type Layout, cardRect, layoutMap, ownerOf, rootBox } from "./map/layout.ts";
 import { labelOf, nodeSize } from "./map/metrics.ts";
-import { ContextMenu, type MenuEntry } from "./map/menu.ts";
+import { ContextMenu } from "./map/menu.ts";
 import { CardPick } from "./map/pick.ts";
 import { MapRenderer } from "./map/render.ts";
 import { NONE, type Selection, click, hit, rubber } from "./map/select.ts";
@@ -89,6 +89,11 @@ export class Mindmap {
   private fingers = new Fingers();
   private panning: { px: number; py: number; ox: number; oy: number } | null = null;
   private fitPending = false;
+  /** ペインの画面上の矩形。null なら次に読む。resize でしか変わらない（アプリは
+   *  スクロールしない）ので ResizeObserver が捨てる。毎イベント読み直すと、
+   *  直前に world へ書いた scale のぶん SVG 全体のレイアウトを同期で走らせる —
+   *  5000 ノードで 1 ホイール 30ms（読みだけで） */
+  private rect: DOMRect | null = null;
   /** カーソルの輪の層。world に浮かぶ別の印（ノードの子にすると、動くたびに中身が作り直される） */
   private caretLayer: SVGGElement;
   private caretRings: SVGRectElement[] = [];
@@ -125,17 +130,19 @@ export class Mindmap {
   constructor(pane: HTMLElement, host: MapHost) {
     this.pane = pane;
     this.host = host;
+    // この pane はマップの器になった。見た目（style.css の `.map-pane`）はここで付く
+    pane.classList.add("map-pane");
 
-    const svg = svgEl("svg", { id: "map-svg" });
+    const svg = svgEl("svg", { class: "map-svg" });
     this.world = svgEl("g");
     this.caretLayer = svgEl("g");
-    this.dropLine = svgEl("line", { id: "drop-line", visibility: "hidden" });
+    this.dropLine = svgEl("line", { class: "drop-line", visibility: "hidden" });
     this.world.append(this.renderer.edgeLayer, this.renderer.nodeLayer, this.pick.el, this.caretLayer, this.dropLine);
     svg.append(this.world);
     pane.append(svg);
 
     this.rubber = document.createElement("div");
-    this.rubber.id = "rubber";
+    this.rubber.className = "rubber";
     pane.append(this.rubber);
 
     this.label = new LabelEditor(pane, (id, label) => this.host.apply({ kind: "rename", id, label }, false));
@@ -144,12 +151,12 @@ export class Mindmap {
     );
 
     // md からの始め方は md ペイン自身が同じ器で言う（app/hint.ts）
-    this.hint = paneHint("Nothing to show yet — write a ", "# heading", "");
+    this.hint = paneHint("map");
     this.hint.style.display = "none";
     pane.append(this.hint);
 
     this.indicatorEl = document.createElement("div");
-    this.indicatorEl.id = "map-indicator";
+    this.indicatorEl.className = "map-indicator";
     this.indicatorEl.style.display = "none";
     pane.append(this.indicatorEl);
 
@@ -171,20 +178,25 @@ export class Mindmap {
     this.applyCamera();
     // a fitView requested while the pane had no size runs once it gets one
     new ResizeObserver(() => {
+      this.rect = null;
       if (this.fitPending) this.fitView();
     }).observe(pane);
   }
 
   // ---------- camera ----------
 
+  private paneRect(): DOMRect {
+    return (this.rect ??= this.pane.getBoundingClientRect());
+  }
+
   /** ペインの左上から測った画面 px（camera.ts が使う座標系） */
   private local(clientX: number, clientY: number): { x: number; y: number } {
-    const r = this.pane.getBoundingClientRect();
+    const r = this.paneRect();
     return { x: clientX - r.left, y: clientY - r.top };
   }
 
   private paneSize(): Pane {
-    const r = this.pane.getBoundingClientRect();
+    const r = this.paneRect();
     return { width: r.width, height: r.height };
   }
 
@@ -480,7 +492,7 @@ export class Mindmap {
       true,
     );
     pane.addEventListener("pointerdown", (e) => {
-      if (targetIn(e, ".link-open, .image-connect, .pane-tool, #label-editor, #card-editor")) return;
+      if (targetIn(e, ".link-open, .image-connect, .pane-tool, .label-editor, .card-editor")) return;
       if (e.pointerType === "touch" && this.fingers.pinching) return;
       // 長押しの印は次の押下で用済み（contextmenu を合成しない環境で残らないように）
       this.menuOpenedByHold = false;
@@ -621,7 +633,7 @@ export class Mindmap {
     if (!wasPinching) return;
     const solo = this.fingers.only();
     if (solo && !this.fingers.pinching) {
-      const r = this.pane.getBoundingClientRect();
+      const r = this.paneRect();
       this.panning = {
         px: solo.x + r.left,
         py: solo.y + r.top,
@@ -751,7 +763,7 @@ export class Mindmap {
       if (targetIn(e, ".link-open, .image-connect")) e.stopPropagation();
     });
     this.pane.addEventListener("dblclick", (e) => {
-      if (targetIn(e, ".link-open, .image-connect, #label-editor, #card-editor")) return;
+      if (targetIn(e, ".link-open, .image-connect, .label-editor, .card-editor")) return;
       const spot = targetIn(e, "[data-card]")?.getAttribute("data-card");
       if (spot !== null && spot !== undefined) {
         const id = this.blockAt(spot);
@@ -788,21 +800,7 @@ export class Mindmap {
     }
     const sel = this.host.selection();
     if (!sel.ids.includes(id)) this.host.setSelection({ ids: [id], anchor: id }, false);
-    this.menu.show(x, y, this.toEntries(contextItems(this.layout, this.host.selection())));
-  }
-
-  /** context.ts の Entry を、menu.ts が描ける形に写す。押せば act へ渡すだけで、意味はここに増やさない */
-  private toEntries(es: Entry[]): MenuEntry[] {
-    return es.map((e) => (e === "sep" ? "sep" : this.entryOf(e)));
-  }
-
-  private entryOf(it: Exclude<Entry, "sep">): MenuEntry {
-    const disabled = it.intent === null ? (it.why ?? true) : false;
-    const run = (): void => {
-      if (it.intent) this.act(it.intent);
-    };
-    const items = it.items?.map((i) => this.entryOf(i));
-    return items ? { label: it.label, key: it.key, mark: it.mark, disabled, items, run } : { label: it.label, key: it.key, mark: it.mark, disabled, run };
+    this.menu.show(x, y, menuOf(contextItems(this.layout, this.host.selection()), (i) => this.act(i)));
   }
 
   /** 右クリック。触った箱が選ばれていなければそれへ選び直してから開く。長押しが

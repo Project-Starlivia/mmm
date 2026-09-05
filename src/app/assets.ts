@@ -11,7 +11,9 @@
 // md への操作なので `deps.declare` に渡す（main.ts）。
 
 import { type Field, type Part, ask } from "./ask.ts";
+import { ASKS } from "./asks.ts";
 import { handles } from "./handles.ts";
+import type { Failed } from "./notice.ts";
 import { io } from "./io.ts";
 import { bare } from "../map/cards.ts";
 import { normalizePath, under } from "./head.ts";
@@ -217,7 +219,7 @@ async function webp(blob: Blob): Promise<Blob> {
 
 export function initAssets(deps: {
   /** 果たせなかった */
-  failed: (msg: string) => void;
+  failed: (msg: Failed) => void;
   refresh: () => void;
   /** いま頭が言っている宣言（正規化済み）。無ければ null */
   declared: () => string | null;
@@ -509,7 +511,7 @@ export function initAssets(deps: {
       const shape: Part[] = ["![](", folder ?? declaredPath(), name, ".webp)"];
       let out: string[] | null;
       try {
-        out = await ask({ title: "Name this image", ok: "Save", parts: shape, preview: shot });
+        out = await ask(ASKS.imageName(shape, shot));
       } finally {
         URL.revokeObjectURL(shot);
       }
