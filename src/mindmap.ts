@@ -87,6 +87,11 @@ export class Mindmap {
   private fingers = new Fingers();
   private panning: { px: number; py: number; ox: number; oy: number } | null = null;
   private fitPending = false;
+  /** ペインの画面上の矩形。null なら次に読む。resize でしか変わらない（アプリは
+   *  スクロールしない）ので ResizeObserver が捨てる。毎イベント読み直すと、
+   *  直前に world へ書いた scale のぶん SVG 全体のレイアウトを同期で走らせる —
+   *  5000 ノードで 1 ホイール 30ms（読みだけで） */
+  private rect: DOMRect | null = null;
   /** カーソルの輪の層。world に浮かぶ別の印（ノードの子にすると、動くたびに中身が作り直される） */
   private caretLayer: SVGGElement;
   private caretRings: SVGRectElement[] = [];
@@ -172,20 +177,25 @@ export class Mindmap {
     this.applyCamera();
     // a fitView requested while the pane had no size runs once it gets one
     new ResizeObserver(() => {
+      this.rect = null;
       if (this.fitPending) this.fitView();
     }).observe(pane);
   }
 
   // ---------- camera ----------
 
+  private paneRect(): DOMRect {
+    return (this.rect ??= this.pane.getBoundingClientRect());
+  }
+
   /** ペインの左上から測った画面 px（camera.ts が使う座標系） */
   private local(clientX: number, clientY: number): { x: number; y: number } {
-    const r = this.pane.getBoundingClientRect();
+    const r = this.paneRect();
     return { x: clientX - r.left, y: clientY - r.top };
   }
 
   private paneSize(): Pane {
-    const r = this.pane.getBoundingClientRect();
+    const r = this.paneRect();
     return { width: r.width, height: r.height };
   }
 
@@ -617,7 +627,7 @@ export class Mindmap {
     if (!wasPinching) return;
     const solo = this.fingers.only();
     if (solo && !this.fingers.pinching) {
-      const r = this.pane.getBoundingClientRect();
+      const r = this.paneRect();
       this.panning = {
         px: solo.x + r.left,
         py: solo.y + r.top,
