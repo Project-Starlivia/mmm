@@ -62,7 +62,8 @@ export const PARTS: Part[] = [
     height: 110,
     states: {
       failed: () => shown("circle-alert", "Couldn't save — the folder is gone", true),
-      blocked: () => shown("triangle-alert", "Save the .md first — nothing on disk to rename yet", false),
+      // アプリで blocked が出るのは 1 箇所（書き出すものが無いときの Mod+E）
+      blocked: () => shown("triangle-alert", "Nothing to export yet", false),
     },
   },
   {
