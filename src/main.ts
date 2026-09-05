@@ -538,7 +538,8 @@ function draw(id: number): void {
  * 書けてから消す（mindmap.ts の act）
  */
 async function copy(): Promise<boolean> {
-  const clip = picked !== null ? host.blockText(picked) : copyText(text, doc, spots, selection.ids);
+  const card = picked();
+  const clip = card !== null ? host.blockText(card) : copyText(text, doc, spots, selection().ids);
   if (clip === "") return false;
   try {
     await navigator.clipboard.writeText(clip);
