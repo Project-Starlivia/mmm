@@ -28,6 +28,18 @@ function current(theme: Theme): Values {
   return v;
 }
 
+/** 計算済みの色を hex に。color-mix の結果は `color(srgb r g b)` で返る */
+function hex(computed: string): string {
+  const m = /color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/.exec(computed) ?? /rgba?\((\d+), (\d+), (\d+)/.exec(computed);
+  if (!m) return computed;
+  const unit = computed.startsWith("color(");
+  const to = (x: string): string =>
+    Math.round(unit ? Number(x) * 255 : Number(x))
+      .toString(16)
+      .padStart(2, "0");
+  return `#${to(m[1] ?? "0")}${to(m[2] ?? "0")}${to(m[3] ?? "0")}`;
+}
+
 const css = (theme: Theme, v: Values): string => {
   const lines = [
     ...COLORS.map((c) => `  --${c}: ${v.color[c]};`),
@@ -46,33 +58,47 @@ export function mountTune(host: HTMLElement): void {
   out.style.cssText = "width:100%;font:11px var(--mono);background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px;box-sizing:border-box";
 
   const values: Record<Theme, Values> = { dark: current("dark"), light: current("light") };
+  /** 出来た色の hex を書き直すもの。効かせた後に全部呼ぶ */
+  const shows: (() => void)[] = [];
   const apply = (): void => {
     sheet.textContent = `${css("dark", values.dark)}\n${css("light", values.light)}`;
     out.value = sheet.textContent;
+    for (const show of shows) show();
   };
 
   const group = (theme: Theme): HTMLElement => {
     const box = document.createElement("fieldset");
-    box.style.cssText = "border:1px solid var(--line);border-radius:6px;padding:8px 12px;min-width:0;flex:1";
+    // 組そのものをそのテーマの中に置く。見本の色が var() でそのまま出る
+    box.className = theme === "light" ? "light" : "";
+    box.style.cssText =
+      "border:1px solid var(--line);border-radius:6px;padding:8px 12px;min-width:0;flex:1;background:var(--bg);color:var(--ink)";
     const legend = document.createElement("legend");
     legend.textContent = theme;
     legend.style.cssText = "font-size:12px;color:var(--ink-dim);padding:0 4px";
     box.append(legend);
     const v = values[theme];
-    const row = (name: string, input: HTMLInputElement, show: () => string): void => {
+    /** 1 行。`token` はその行で出来る色（`--panel` など）。見本と hex を右に置く */
+    const row = (name: string, input: HTMLInputElement, show: () => string, token: string): void => {
       const line = document.createElement("label");
       line.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12px;margin:4px 0";
       const key = document.createElement("span");
       key.style.cssText = "width:11em;color:var(--ink-dim)";
       key.textContent = name;
       const val = document.createElement("span");
-      val.style.cssText = "width:5em;font-family:var(--mono);font-size:11px";
+      val.style.cssText = "width:4em;font-family:var(--mono);font-size:11px";
       val.textContent = show();
+      const swatch = document.createElement("span");
+      swatch.style.cssText = `width:22px;height:16px;border-radius:4px;border:1px solid var(--line);background:var(${token})`;
+      const made = document.createElement("span");
+      made.style.cssText = "width:5em;font-family:var(--mono);font-size:11px;color:var(--ink-dim)";
+      shows.push(() => {
+        made.textContent = hex(getComputedStyle(swatch).backgroundColor);
+      });
       input.addEventListener("input", () => {
         val.textContent = show();
         apply();
       });
-      line.append(key, input, val);
+      line.append(key, input, val, swatch, made);
       box.append(line);
     };
     for (const c of COLORS) {
@@ -82,7 +108,7 @@ export function mountTune(host: HTMLElement): void {
       input.addEventListener("input", () => {
         v.color[c] = input.value;
       });
-      row(c, input, () => v.color[c]);
+      row(c, input, () => v.color[c], `--${c}`);
     }
     for (const m of MIXES) {
       const input = document.createElement("input");
@@ -95,7 +121,7 @@ export function mountTune(host: HTMLElement): void {
       input.addEventListener("input", () => {
         v.mix[m] = Number(input.value);
       });
-      row(`${m}-mix`, input, () => `${v.mix[m]}%`);
+      row(`${m}-mix`, input, () => `${v.mix[m]}%`, `--${m}`);
     }
     return box;
   };
