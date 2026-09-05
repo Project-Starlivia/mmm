@@ -1,14 +1,17 @@
 // 束ねる場所。文書の真実は md ペインの文字列で、マップはその写し。
-// サイクルは 1 本 — 打鍵 → core.survey(text, edits) → layout → render。読みは
-// 決して書かない。選択はここに値として在り、地図はそれを塗るだけ。
+// 文書から導けるもの（core の木・地図の選択の位置・持ち主・選択）は EditorState の
+// field（state.ts）に居て、1 トランザクションが 1 サイクル — `onUpdate` に 1 回届く。
+// ここには変数を置かない。読みは決して書かない。
 // ここに居るのは、そのサイクルと、保存とファイル I/O、帯のメニュー。
 //
-// **操作の入口は `apply` 1 本。** 地図のキー・メニュー・ドラッグ・カード・貼り付けは
-// すべて Op になってここを通る。
+// **操作の入口は 2 つ。** `apply`（持ち主の操作。focus を選ぶ）と `write`（それ以外の
+// 書き込み。選択に触らない）。選択を書くのは持ち主の操作だけ（design.md）。
 
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
+import type { EditorState } from "@codemirror/state";
 import * as core from "./coreApi.ts";
-import { caretIds, type Range } from "./caret.ts";
+import type { Range } from "./caret.ts";
+import * as st from "./state.ts";
 import { MdEditor } from "./editor.ts";
 import { Mindmap, type MapHost } from "./mindmap.ts";
 import { type Choice, NOTHING, type Selection, cardOf, nodesOf } from "./map/select.ts";
@@ -71,15 +74,14 @@ const elLogo = el("logo", SVGSVGElement);
 
 // ---------- app state ----------
 
-/** いまの本文と、core がそれを読んだ木。打鍵のたびに組で差し替える */
-let text = "";
-let doc: core.View = { frontmatter: null, roots: [] };
-/** いまの地番。カーソルの輪・md 側の薄塗り・選択の持ち越しが読む */
-let spots = new Map<number, core.Spot>();
-/** 何を選んでいるか（ノードの並びかカード 1 枚か）。地図はこれを塗るだけで、自分では持たない */
-let choice: Choice = NOTHING;
-const selection = (): Selection => nodesOf(choice);
-const picked = (): number | null => cardOf(choice);
+/** 読み口。値は全部 EditorState の field に居る */
+const state = (): EditorState => editor.state;
+const text = (): string => editor.text();
+const doc = (): core.View => state().field(st.tree).view;
+const spots = (): Map<number, core.Spot> => state().field(st.tree).spots;
+const choice = (): Choice => state().field(st.choice);
+const selection = (): Selection => nodesOf(choice());
+const picked = (): number | null => cardOf(choice());
 
 /**
  * loadText を呼ぶたびに進む世代番号。
@@ -98,51 +100,46 @@ let savedName: string | null = null;
 
 /** 頭が言っている画像フォルダ（正規化済み）。無ければ null */
 const declaredFolder = (): string | null => {
-  const raw = imageFolder(doc.frontmatter);
+  const raw = imageFolder(doc().frontmatter);
   return raw === null ? null : normalizePath(raw);
 };
 
 // ---------- サイクル ----------
 
 /**
- * 本文が変わった。**ここが読みのサイクルの唯一の入口** — 打鍵も、開くも、
- * 新規も、リンクで開くも、全部ここを通って同じ順で映る。
- *
- * つなぎ: 選択の id は番号のまま持ち、無くなった番号だけ落とす（Task 7 で
- * state.ts の field に置き換わる）
+ * 1 トランザクション = 1 サイクル。木が変わっていれば描き直し、そうでなければ塗り直し。
+ * **ここが読みのサイクルの唯一の出口** — 打鍵も、開くも、操作も、選び直しも、
+ * フォーカスの移動も、全部ここへ 1 回届く。prev が null なら文書を丸ごと入れ替えた
  */
-function sync(next: string, _edits: core.Edit[]): void {
-  const wasEmpty = doc.roots.length === 0;
-  const r = core.survey(next);
-  text = next;
-  doc = r.view;
-  spots = r.spots;
-  const was = selection();
-  const ids = was.ids.filter((id) => spots.has(id));
-  const card = picked();
-  choice =
-    card !== null && spots.has(card)
-      ? { kind: "card", id: card }
-      : { kind: "nodes", sel: { ids, anchor: was.anchor !== null && ids.includes(was.anchor) ? was.anchor : (ids.at(-1) ?? null) } };
-  map.render();
-  editor.highlight(currentHighlight());
-  editor.showHint(doc.roots.length === 0);
-  updateDirty();
-  showName();
-  exportApi.refresh();
-  if (wasEmpty && doc.roots.length > 0) map.fitView();
+function onUpdate(s: EditorState, prev: EditorState | null): void {
+  const t = s.field(st.tree);
+  if (prev === null || prev.field(st.tree) !== t) {
+    map.render();
+    // 白紙の言い出し。**出る理由は 1 つ**（まだ木が無い）で、マップ側も render() の中で同じことを見ている
+    editor.showHint(t.view.roots.length === 0);
+    updateDirty();
+    showName();
+    exportApi.refresh();
+    // 何も無いところに最初の木が生まれた瞬間だけ、真ん中へ寄せる
+    const wasEmpty = prev === null || prev.field(st.tree).view.roots.length === 0;
+    if (wasEmpty && t.view.roots.length > 0) map.fitView();
+  } else {
+    map.refreshSelection();
+  }
+  // md 側の薄塗りは地図が持つ間だけ（md が持つ間はカーソルそのものが在る）
+  editor.highlight(s.field(st.holder) === "map" ? currentHighlight() : []);
 }
 
 /** 選んでいるノードの md 側の範囲（子孫込み） */
 const selectedRanges = (): Range[] =>
   selection().ids.flatMap((id) => {
-    const s = spots.get(id);
+    const s = spots().get(id);
     return s ? [{ from: s.from, to: s.to }] : [];
   });
 
 /** 選んでいるカードの中身の md 側の範囲 */
 const pickedRange = (id: number): Range[] => {
-  const s = spots.get(id);
+  const s = spots().get(id);
   return s ? [{ from: s.from, to: s.to }] : [];
 };
 
@@ -152,14 +149,12 @@ const currentHighlight = (): Range[] => {
   return card !== null ? pickedRange(card) : selectedRanges();
 };
 
-/** 地図で選び直した。reveal は md 側を anchor の頭へスクロールするか */
+/** 地図で選び直した。id を位置に写して CodeMirror に置く（onUpdate が塗る）。reveal は md 側を anchor の頭へスクロールするか */
 function choose(next: Choice, reveal: boolean): void {
-  choice = next;
-  map.refreshSelection();
-  editor.highlight(currentHighlight());
-  const anchor = selection().anchor;
+  editor.select(st.anchorsFor(state().field(st.tree), next));
+  const anchor = nodesOf(next).anchor;
   if (reveal && anchor !== null) {
-    const s = spots.get(anchor);
+    const s = spots().get(anchor);
     if (s) editor.reveal(s.from);
   }
 }
@@ -169,59 +164,69 @@ const setSelection = (sel: Selection, reveal: boolean): void => choose({ kind: "
 const setPicked = (id: number | null): void => choose(id === null ? NOTHING : { kind: "card", id }, false);
 
 /**
- * 操作を md に映す。**操作の入口はここ 1 本** — 地図は md に触らない。
- * 操作 1 回 = CodeMirror の 1 トランザクションで、undo は CodeMirror のもの。
- * 操作の直後は core の focus が選択を決める（新しいノードには目印が無い）。
- * できない操作は core が空の編集列で言う。いまは雑に、しらせを出すだけ
+ * 持ち主の操作を md に映す。**選択を書く入口はここ 1 本** — 地図は md に触らない。
+ * 操作 1 回 = CodeMirror の 1 トランザクション（編集列 + focus の effect）で、undo は
+ * CodeMirror のもの。focus は anchors が後の木で位置に写す（state.ts）。
+ * できない操作は core が空の編集列で言う。いまは雑に、しらせを出すだけ。
  *
- * focus はノードとも中身とも限らない（`AddBlock` / `SetBlock` / `MoveBlock` は
- * 中身の id を返す）。木を見て振り分ける — ノードなら選択して `edit` なら
- * その場編集、中身ならカードとして選ぶ（中身の編集はカードの入口からしか
- * 始まらない）。呼び出し側が続けられるよう focus を返す（Link / Code が使う）
+ * focus はノードとも中身とも限らない。ノードで `edit` ならその場編集を開く。
+ * 呼び出し側が続けられるよう focus を返す（Link / Code が使う）
  */
 function apply(op: core.Op, edit: boolean): number | null {
-  const r = core.edit(text, op);
+  const r = core.edit(text(), op);
   // core は断りを「編集なし・focus なし」で言う。編集が無くても focus が在るのは、
   // 何も変わらなかった操作（同じ名前への Rename など）で、しらせは出さない
   if (r.focus === null && r.edits.length === 0) {
     failed("Couldn't do that here");
     return null;
   }
-  if (r.edits.length > 0) editor.apply(r.edits); // → sync
+  const before = selection().anchor;
+  editor.apply([r.edits], r.focus);
   if (r.focus === null) return null;
-  if (!core.isNode(doc, r.focus)) {
-    setPicked(r.focus);
-    return r.focus;
+  // 別のノードへ移ったときだけ md を寄せる（同じノードに留まる操作で手元を揺らさない）
+  if (r.focus !== before) {
+    const s = spots().get(r.focus);
+    if (s) editor.reveal(s.from);
   }
-  // 同じノードに留まる操作（ラベルを打つ）で md を寄せ直さない
-  setSelection({ ids: [r.focus], anchor: r.focus }, r.focus !== selection().anchor);
   // 畳まれて埋もれたノードには箱が無く、その場編集を開けない
-  if (edit && !map.beginEdit(r.focus, null)) failed("Couldn't start editing — the node is folded");
+  if (edit && core.isNode(doc(), r.focus) && !map.beginEdit(r.focus, null)) {
+    failed("Couldn't start editing — the node is folded");
+  }
   return r.focus;
 }
 
-/** md のカーソルが動いた。掛かるノードに輪を出す（地図は動かさない） */
-function onCaret(ranges: Range[]): void {
-  map.showCaret(caretIds(doc, spots, ranges));
+/**
+ * それ以外の書き込みを md に映す（ファイルの投下・お絵描き・画像の貼り付け）。
+ * **選択には触らない** — 地図にフォーカスが無くても起きる操作なので、持ち主が決めた
+ * 選択を横から書き換えない（design.md「選択を書くのは持ち主の操作だけ」）
+ */
+function write(op: core.Op): void {
+  const r = core.edit(text(), op);
+  if (r.edits.length === 0) {
+    if (r.focus === null) failed("Couldn't do that here");
+    return;
+  }
+  editor.apply([r.edits]);
 }
 
-const editor = new MdEditor(mdPane, sync, onCaret);
+const editor = new MdEditor(mdPane, onUpdate);
 
 const host: MapHost = {
-  doc: () => doc,
+  doc,
   imageUrl: (path) => assets.imageUrl(path),
   imageHint: () => (assets.readable() ? null : "click to connect"),
   connectAssets: () =>
     void (async () => {
       if (await ensurePlace()) await assets.connect();
     })(),
+  holder: () => state().field(st.holder),
   selection,
   setSelection,
   picked,
   setPicked,
   blockText: (id) => {
-    const s = spots.get(id);
-    return s ? text.slice(s.from, s.to) : "";
+    const s = spots().get(id);
+    return s ? text().slice(s.from, s.to) : "";
   },
   apply,
   paste,
@@ -230,25 +235,37 @@ const host: MapHost = {
 };
 const map = new Mindmap(mapPane, host);
 
+// ---------- 持ち主 ----------
+//
+// 選択は持っている側（フォーカスが最後に入ったペイン）が決める。md → map は、その
+// 瞬間のカーソルのノードを位置にして引き継ぐ。map → md は捨てる（md のカーソルは
+// 動かさない）。窓・メニュー・帯へ抜けても変わらない — 2 つのペインの focusin だけを見る
+mdPane.addEventListener("focusin", () => {
+  if (state().field(st.holder) !== "md") editor.hold("md", null);
+});
+mapPane.addEventListener("focusin", () => {
+  if (state().field(st.holder) !== "map") editor.hold("map", st.anchorsFor(state().field(st.tree), choice()));
+});
+
 /**
  * 未保存の印。**判定はここ 1 つ**で、帯の `●` とタブの favicon の両方が
  * 同じ答えを見る（別々に数えると、片方だけ古い状態のまま残る）。
  */
 function updateDirty(): void {
-  const dirty = text !== savedText;
+  const dirty = text() !== savedText;
   elDirty.hidden = !dirty;
   theme.setDirty(dirty);
 }
 
 /** いまの文書の名前。保存済みならそのファイル名、まだなら本文から導く */
-const docName = (): string => savedName ?? `${deriveName(doc)}.md`;
+const docName = (): string => savedName ?? `${deriveName(doc())}.md`;
 
 /**
  * 名乗りを出し直す。本文を打つそばからタイトルが変わる。
  * タブは名前を持つ文書のときだけ名乗る（`filename.md - mmm`）。
  */
 function showName(): void {
-  const name = savedName ?? (doc.roots.length ? docName() : null);
+  const name = savedName ?? (doc().roots.length ? docName() : null);
   const title = name === null ? "mmm" : `${name} - mmm`;
   // 打鍵のたびに呼ばれるので、変わっていないなら DOM に触らない
   if (document.title !== title) document.title = title;
@@ -272,7 +289,7 @@ function loadText(next: string, name: string | null): void {
   docGen++;
   savedName = name;
   assets.clear(); // image paths are relative to the (new) md
-  editor.setText(next); // → sync
+  editor.setText(next); // → onUpdate
   map.fitView();
   // 文書が入れ替わった。**Recent の並びもここで引き直す**
   void refreshRecent();
@@ -296,7 +313,7 @@ function applyDoc(opened: Doc): void {
  * その 1 回**になる。自動で繋ぎに行くことはできない。
  */
 async function offerConnect(): Promise<void> {
-  if (savedName === null || !hasImages(text)) return;
+  if (savedName === null || !hasImages(text())) return;
   // 許可を確かめるあいだに別の文書へ移っていたら、もうこの文書の話ではない
   const gen = docGen;
   if (await assets.connected()) return;
@@ -356,7 +373,7 @@ async function saveFile(asNew = false): Promise<void> {
         failed(NO_FILE_ACCESS);
         return;
       }
-      const saved = await io.saveAs(docName(), text);
+      const saved = await io.saveAs(docName(), text());
       if (!saved) return; // キャンセル
       savedName = saved.name; // ここで初めて名前が決まる
       showName();
@@ -366,9 +383,9 @@ async function saveFile(asNew = false): Promise<void> {
       void refreshRecent();
       void offerConnect();
     } else {
-      await io.save(text);
+      await io.save(text());
     }
-    savedText = text;
+    savedText = text();
     updateDirty();
   } catch (err) {
     // パスを見失っていたら別名保存へ（通常はここに来ない）
@@ -405,15 +422,15 @@ const linkOf = async (body: string): Promise<string> =>
  */
 async function linkNote(): Promise<string[]> {
   const notes: string[] = [];
-  if (hasImages(text)) notes.push("Images won't travel");
-  if ((await linkOf(text)).length > LINK_WARN_LENGTH) notes.push("Long link — may be cut");
+  if (hasImages(text())) notes.push("Images won't travel");
+  if ((await linkOf(text())).length > LINK_WARN_LENGTH) notes.push("Long link — may be cut");
   return notes;
 }
 
 /** いまの本文へのリンクをクリップボードへ。写せたことは押した行の絵が言う */
 async function copyLink(): Promise<boolean> {
   try {
-    await navigator.clipboard.writeText(await linkOf(text));
+    await navigator.clipboard.writeText(await linkOf(text()));
     return true;
   } catch (err) {
     console.error("copy link failed:", err);
@@ -423,7 +440,7 @@ async function copyLink(): Promise<boolean> {
 }
 
 async function confirmDiscard(): Promise<boolean> {
-  if (text === savedText) return true;
+  if (text() === savedText) return true;
   return askYesNo("Discard unsaved changes?", "Discard");
 }
 
@@ -441,16 +458,16 @@ const assets = initAssets({
     const next = normalizePath(value);
     if (next === null) return; // 読めない綴り（空・絶対パス・URL）は欄が先に止めている
     const prev = declaredFolder();
-    const sets: core.Edit[][] = [[setImageFolder(text, doc.frontmatter, next)]];
-    let md = core.splice(text, sets[0]);
+    const sets: core.Edit[][] = [[setImageFolder(text(), doc().frontmatter, next)]];
+    let md = core.splice(text(), sets[0]);
     if (prev !== null) {
-      for (const op of retarget(doc, prev, next)) {
+      for (const op of retarget(doc(), prev, next)) {
         const r = core.edit(md, op);
         sets.push(r.edits);
         md = core.splice(md, r.edits);
       }
     }
-    editor.apply(...sets); // → sync
+    editor.apply(sets);
   },
 });
 
@@ -479,11 +496,12 @@ async function attachImage(id: number, blob: Blob): Promise<void> {
   if (!(await ensurePlace())) return;
   const rel = await assets.saveToDisk(blob);
   // 置いているあいだに文書が入れ替わった（世代）／ノードが消えている（id）ことがある
-  if (rel === null || gen !== docGen || !core.isNode(doc, id)) return;
-  apply(
-    { kind: "addBlock", at: { kind: "in", node: id }, content: { kind: "image", alt: "", src: rel, title: "" } },
-    false,
-  );
+  if (rel === null || gen !== docGen || !core.isNode(doc(), id)) return;
+  write({
+    kind: "addBlock",
+    at: { kind: "in", node: id },
+    content: { kind: "image", alt: "", src: rel, title: "" },
+  });
 }
 
 /** お絵描きの窓が開いているか。二重に開かせない */
@@ -512,7 +530,7 @@ function draw(id: number): void {
  */
 async function copy(): Promise<boolean> {
   const card = picked();
-  const clip = card !== null ? host.blockText(card) : copyText(text, doc, spots, selection().ids);
+  const clip = card !== null ? host.blockText(card) : copyText(text(), doc(), spots(), selection().ids);
   if (clip === "") return false;
   try {
     await navigator.clipboard.writeText(clip);
@@ -727,7 +745,7 @@ elFilename.addEventListener("keydown", (e) => {
 });
 
 window.addEventListener("beforeunload", (event) => {
-  if (text === savedText) return;
+  if (text() === savedText) return;
   event.preventDefault();
   event.returnValue = "";
 });
@@ -761,7 +779,7 @@ const exportApi = initExport({
   name: docName,
   failed,
   blocked,
-  empty: () => doc.roots.length === 0,
+  empty: () => doc().roots.length === 0,
   button: el("export", HTMLButtonElement),
   wayButton: el("export-way", HTMLButtonElement),
 });
@@ -793,7 +811,7 @@ initShortcuts({
     // リンクで開いた。ハッシュはその場で消す — 文書の身元はあくまで
     // ファイルハンドル 1 つで、リンクは入口でしかない
     history.replaceState(null, "", location.pathname + location.search);
-    if (docGen === bootGen && text === "") loadText(shared, null);
+    if (docGen === bootGen && text() === "") loadText(shared, null);
   });
 }
 // フェンスの言語は後から読み込まれる。届いたら色を載せ直す

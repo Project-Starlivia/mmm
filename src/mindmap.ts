@@ -3,10 +3,11 @@
 // 持っているのは視点（Camera）と、それを動かす入力（ホイール・ドラッグ・
 // ピンチ・クリック・矩形・矢印・右クリック・長押し）と、見失った先を指す針
 // だけ。**選択の値は持たない** — 入力を map/select.ts の値にして host へ渡し、
-// 返ってきた Selection を塗るだけ。値そのものは main.ts が持つ。あるのは
+// host の値を塗るだけ。値は EditorState の field（state.ts）。あるのは
 // 選択、その場編集、消す・並べ替え・畳み・側の操作・カードの選択とその場編集。
 
 import type * as core from "./coreApi.ts";
+import type { Holder } from "./caret.ts";
 import { type Camera, type Pane, centerOn, fitToPane, panBy, panToShow, pinch, toWorld, zoomAt } from "./map/camera.ts";
 import { CardEditor } from "./map/card.ts";
 import { type Entry, contextItems } from "./map/context.ts";
@@ -38,11 +39,13 @@ export interface MapHost {
   imageHint(): string | null;
   /** その字が押された。画像フォルダを繋ぎ直す */
   connectAssets(): void;
-  /** いま選んでいるもの。値は main.ts が持つ */
+  /** 選択を持っている側。md なら輪（内側）、map なら枠（selected）で塗る */
+  holder(): Holder;
+  /** いま選んでいるもの */
   selection(): Selection;
   /** 地図で選び直した。reveal は md 側をその頭へスクロールするか */
   setSelection(sel: Selection, reveal: boolean): void;
-  /** 選んでいるカードの中身の id。値は main.ts が持つ */
+  /** 選んでいるカードの中身の id */
   picked(): number | null;
   /** カードを選び直した（null で外す） */
   setPicked(id: number | null): void;
@@ -89,7 +92,6 @@ export class Mindmap {
   /** カーソルの輪の層。world に浮かぶ別の印（ノードの子にすると、動くたびに中身が作り直される） */
   private caretLayer: SVGGElement;
   private caretRings: SVGRectElement[] = [];
-  private caretIds: number[] = [];
   /** 矩形選択の面（画面 px）。始点は pane の左上から */
   private rubber: HTMLDivElement;
   private rubberStart: { x: number; y: number } | null = null;
@@ -254,11 +256,7 @@ export class Mindmap {
       imageUrl: (path) => this.host.imageUrl(path),
       imageHint: this.host.imageHint(),
     });
-    this.renderer.paintSelection(new Set(this.host.selection().ids));
-    // 前サイクルの caretIds で輪を塗り直す。無害なのは、editor.ts の同じ
-    // updateListener の中で onChange の直後に必ず onCaret が続き、今の輪へ
-    // 即座に上書きされるから
-    this.showCaret(this.caretIds);
+    this.paintChoice();
     this.followLabel();
     this.followCard();
     this.updateIndicator();
@@ -298,7 +296,7 @@ export class Mindmap {
 
   /** 選択の塗り直し。レイアウトは見直さない */
   refreshSelection(): void {
-    this.renderer.paintSelection(new Set(this.host.selection().ids));
+    this.paintChoice();
     this.followCard();
     this.updateIndicator(); // 針は選択を指す — 視点が動かなくても指し直す
   }
@@ -358,12 +356,21 @@ export class Mindmap {
   }
 
   /**
-   * カーソルの輪を、掛かっているノードの**内側**へ重ねる。外から掴むのが選択、
-   * 中に居るのがカーソルで、形がそのまま意味になる。箱の無い（畳まれて埋もれた）
+   * 選択を塗る。md が持つ間は**輪**（箱の内側）、地図が持つ間は **selected**（枠）。
+   * 輪と枠は「誰が持っているか」の印（spec.md「選択の持ち主」）
+   */
+  private paintChoice(): void {
+    const ids = this.host.selection().ids;
+    const md = this.host.holder() === "md";
+    this.renderer.paintSelection(new Set(md ? [] : ids));
+    this.ring(md ? ids : []);
+  }
+
+  /**
+   * 輪を、掛かっているノードの**内側**へ重ねる。箱の無い（畳まれて埋もれた）
    * ノードには出さない。本数が変わったときだけ作り足す/捨てる
    */
-  showCaret(ids: number[]): void {
-    this.caretIds = ids;
+  private ring(ids: number[]): void {
     const boxes = ids.flatMap((id) => {
       const b = this.layout.boxes.get(id);
       return b ? [b] : [];

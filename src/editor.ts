@@ -1,6 +1,7 @@
 // Markdown のペイン。CodeMirror 6。**文書の真実はこの中の文字列**で、履歴も
-// CodeMirror が持つ。打鍵のたびに `onChange(text)` で全文を渡し、受け手が
-// core に読ませて map を描き直す（サイクルは 1 本。読みは決して書かない）。
+// CodeMirror が持つ。文書から導けるもの（core の木・地図の選択の位置・持ち主・選択）も
+// EditorState の field に居る（state.ts）。1 トランザクション = 1 サイクルで、
+// `onUpdate(state, prev)` が 1 回届く。読みは決して書かない。
 
 import { ChangeSet, Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, keymap, lineNumbers } from "@codemirror/view";
@@ -18,7 +19,8 @@ import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language"
 import { oneDarkHighlightStyle, oneDarkTheme } from "@codemirror/theme-one-dark";
 import { paneHint } from "./app/hint.ts";
 import type * as core from "./coreApi.ts";
-import type { Range } from "./caret.ts";
+import { type Anchors, type Holder, type Range } from "./caret.ts";
+import { fields, focused, setAnchors, setHolder } from "./state.ts";
 
 /**
  * CodeMirror へは **`dark` かどうかだけ**を渡す（自身の既定のスタイルが
@@ -33,18 +35,28 @@ const LIGHT_EXT = [tweaks(false), syntaxHighlighting(defaultHighlightStyle)];
 /** 地図で選んでいる範囲。実選択にするとカーソルを奪うので、装飾で塗る（spec.md「二つをまたぐ印」） */
 const setHighlights = StateEffect.define<Range[]>();
 const highlightMark = Decoration.mark({ class: "cm-mmm-selected" });
+/** 範囲を装飾に。点（幅ゼロ）は塗るものが無いので落とす */
+const marks = (ranges: Range[]): DecorationSet =>
+  Decoration.set(
+    ranges.filter((r) => r.to > r.from).map((r) => highlightMark.range(r.from, r.to)),
+    true,
+  );
+/** 2 つが同じ範囲を塗っているか。`RangeSet.eq` は塗りの中身を見るもので、位置の違いは出ない */
+const sameMarks = (a: DecorationSet, b: DecorationSet): boolean => {
+  const x = a.iter();
+  const y = b.iter();
+  while (x.value !== null || y.value !== null) {
+    if (x.value === null || y.value === null || x.from !== y.from || x.to !== y.to) return false;
+    x.next();
+    y.next();
+  }
+  return true;
+};
 const highlightField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update(deco, tr) {
     let next = deco.map(tr.changes);
-    for (const e of tr.effects) {
-      if (e.is(setHighlights)) {
-        next = Decoration.set(
-          e.value.filter((r) => r.to > r.from).map((r) => highlightMark.range(r.from, r.to)),
-          true,
-        );
-      }
-    }
+    for (const e of tr.effects) if (e.is(setHighlights)) next = marks(e.value);
     return next;
   },
   provide: (f) => EditorView.decorations.from(f),
@@ -56,27 +68,21 @@ export class MdEditor {
   private dark = true;
   /** まだノードが 1 つも無いときに出る言い出し。出す／引っ込めるを決めるのは main.ts */
   private hint: HTMLDivElement;
-  private onChange: (text: string, edits: core.Edit[]) => void;
-  private onCaret: (ranges: Range[]) => void;
+  private onUpdate: (state: EditorState, prev: EditorState | null) => void;
 
-  constructor(
-    parent: HTMLElement,
-    onChange: (text: string, edits: core.Edit[]) => void,
-    onCaret: (ranges: Range[]) => void,
-  ) {
-    this.onChange = onChange;
-    this.onCaret = onCaret;
+  constructor(parent: HTMLElement, onUpdate: (state: EditorState, prev: EditorState | null) => void) {
+    this.onUpdate = onUpdate;
     // 空のときの言い出し。**マップと同じ器**（app/hint.ts）を、同じように
     // ペインの真ん中へ浮かべる — CodeMirror の `placeholder` は 1 行目の
     // 頭に出るので、対のもう片方（マップの中央）と上下も寄せも揃わない。
     // 見えるのはこちらで、読み上げには下の `aria-placeholder` が答える
     this.hint = paneHint("Write a ", "# heading", " to start");
     parent.append(this.hint);
-    this.view = new EditorView({ parent, state: this.state("") });
+    this.view = new EditorView({ parent, state: this.create("") });
   }
 
   /** 文書 1 つぶんの状態。丸ごと入れ替えるときは履歴も一緒に捨てる（前の文書へ undo で戻らない） */
-  private state(doc: string): EditorState {
+  private create(doc: string): EditorState {
     return EditorState.create({
       doc,
       extensions: [
@@ -91,18 +97,9 @@ export class MdEditor {
         this.themeComp.of(this.dark ? DARK_EXT : LIGHT_EXT),
         EditorView.lineWrapping,
         keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+        fields,
         highlightField,
-        EditorView.updateListener.of((u) => {
-          if (u.docChanged) {
-            // 何がどう変わったかを、前の座標の編集列にして渡す。選択の持ち越しが使う
-            const edits: core.Edit[] = [];
-            u.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
-              edits.push({ from: fromA, to: toA, insert: inserted.toString() });
-            });
-            this.onChange(u.state.doc.toString(), edits);
-          }
-          if (u.docChanged || u.selectionSet || u.focusChanged) this.onCaret(this.caret());
-        }),
+        EditorView.updateListener.of((u) => this.onUpdate(u.state, u.startState)),
       ],
     });
   }
@@ -117,31 +114,47 @@ export class MdEditor {
   }
 
   /** 文書を丸ごと入れ替える（開く / 新規）。履歴も新しくなる。setState は listener を呼ばないので自分で言う。
-   *  編集列は全文の置き換え — 前の文書の目印は全部死ぬ */
+   *  前の文書の選択は field ごと新しくなる */
   setText(text: string): void {
-    const before = this.view.state.doc.length;
-    this.view.setState(this.state(text));
+    this.view.setState(this.create(text));
     // CodeMirror は内部を常に LF で持つので、真実は引数でなく doc（core.md「改行」）。
     // CRLF の文書を渡すと EditorState.create が \r\n?|\n で割って LF の行として
     // 保つので、以降 doc.toString() は引数と食い違う
-    const doc = this.view.state.doc.toString();
-    this.onChange(doc, [{ from: 0, to: before, insert: doc }]);
-    this.onCaret(this.caret());
+    this.onUpdate(this.view.state, null);
   }
 
   /**
-   * 操作の編集列を 1 トランザクションで当てる。undo は 1 手になる。sync はこの中で走る。
-   * 編集列を 2 つ以上渡せば**順に**当てる（後の列の座標は前の列を当てた後の md）—
-   * 続けて映した操作の組が 1 手になる
+   * 操作の編集列を 1 トランザクションで当てる。undo は 1 手になる。編集列を 2 つ以上
+   * 渡せば**順に**当てる（後の列の座標は前の列を当てた後の md）。`focus` を渡せば
+   * 同じトランザクションで `focused` の effect が乗り、anchors が後の木で位置に写す
+   * （持ち主の操作）。渡さなければ選択に触らない（それ以外の書き込み）
    */
-  apply(...sets: core.Edit[][]): void {
+  apply(sets: core.Edit[][], focus?: number | null): void {
     let changes = ChangeSet.empty(this.view.state.doc.length);
     for (const set of sets) changes = changes.compose(ChangeSet.of(set, changes.newLength));
-    this.view.dispatch({ changes });
+    this.view.dispatch({ changes, effects: focus === undefined ? [] : [focused.of(focus)] });
   }
 
-  /** 地図で選んでいる範囲を、こちらの行にも映す */
+  /** 地図で選び直した。位置は host が地番で写してから渡す */
+  select(a: Anchors): void {
+    this.view.dispatch({ effects: setAnchors.of(a) });
+  }
+
+  /** フォーカスがペインに入った。md → map なら引き継ぐ位置も一緒に */
+  hold(h: Holder, a?: Anchors): void {
+    this.view.dispatch({ effects: a === undefined ? [setHolder.of(h)] : [setHolder.of(h), setAnchors.of(a)] });
+  }
+
+  get state(): EditorState {
+    return this.view.state;
+  }
+
+  /**
+   * 地図で選んでいる範囲を、こちらの行にも映す。**変わらないなら投げない** —
+   * 塗り直すのは `onUpdate` の中で、投げればまた 1 サイクル回って戻ってくる
+   */
   highlight(ranges: Range[]): void {
+    if (sameMarks(this.view.state.field(highlightField), marks(ranges))) return;
     this.view.dispatch({ effects: setHighlights.of(ranges) });
   }
 
@@ -149,15 +162,6 @@ export class MdEditor {
   reveal(pos: number): void {
     if (pos < 0 || pos > this.view.state.doc.length) return;
     this.view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "center" }) });
-  }
-
-  /**
-   * いまのカーソルと選択の範囲（複数カーソルならその数だけ）。**このペインに
-   * フォーカスが無ければ空** — 「いまどこを書いているか」はここに居るあいだだけの事実
-   */
-  caret(): Range[] {
-    if (!this.view.hasFocus) return [];
-    return this.view.state.selection.ranges.map((r) => ({ from: r.from, to: r.to }));
   }
 
   undo(): void {
