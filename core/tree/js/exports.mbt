@@ -49,7 +49,7 @@ pub fn mmm_unbuild_sig(md : String) -> String {
 
 ///|
 /// 打鍵 1 回ぶんの読み。View と地番と、前のサイクルの目印がいまどのノードかを
-/// **1 度の parse で**返す（読みは打鍵ごとに 1 回に保つ）。edits は反映の Edit の形
+/// **1 度の parse で**返す（読みは打鍵ごとに 1 回に保つ）。edits は合流の Edit の形
 /// （前の座標、from 順）、marks は前のサイクルの地番から ts が抜いた目印。
 /// 壊れた JSON は ts の側のバグなので、静かに断らず投げる。
 #export_name("mmmSurvey")

@@ -594,12 +594,11 @@ fn pieces(
   fn flush(before : Int) -> Unit {
     while d < defs.length() && defs[d].from < before {
       if defs[d].from >= carried {
-        // 定義行の span だけ改行を含まない（塊は含む）ので、地番の尻は揃える
         out.push(
           Text(
             carve(md, defs[d].from, defs[d].to),
             from=defs[d].from,
-            to=eol_after(md, defs[d].to),
+            to=defs[d].to,
           ),
         )
       }
@@ -630,19 +629,6 @@ fn pieces(
   }
   flush(md.length() + 1)
   out
-}
-
-///|
-/// i に改行が在ればその次、無ければ i。
-fn eol_after(md : String, i : Int) -> Int {
-  let mut z = i
-  if z < md.length() && md[z] == '\r' {
-    z = z + 1
-  }
-  if z < md.length() && md[z] == '\n' {
-    z = z + 1
-  }
-  z
 }
 
 ///|

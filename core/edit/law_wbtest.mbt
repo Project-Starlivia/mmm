@@ -1,4 +1,4 @@
-// 操作と反映の結合を法則で固定する。
+// 操作と合流の結合を法則で固定する。
 //
 //   法則 — edit の編集を md に当てて読み直せば、apply の後の木と形が一致する
 //   focus — 読み替えた focus は、後の木で focus だったのと同じ部分木を指す
@@ -248,7 +248,7 @@ fn owner_of(doc : @tree.Doc, block : Int) -> Int? {
 
 ///|
 /// 畳まれた部分木の中に居るか（自分も含む）。tree の私有関数は見えないので、
-/// 項目の子は `@tree.ListNode` に包み直して歩く（reflect_law_wbtest.mbt にも同じものが在る）
+/// 項目の子は `@tree.ListNode` に包み直して歩く（merge_law_wbtest.mbt にも同じものが在る）
 fn under_fold(doc : @tree.Doc, id : Int) -> Bool {
   fn go(x : @tree.Node, fold : Bool) -> Bool {
     let (here, mine, kids) = match x {

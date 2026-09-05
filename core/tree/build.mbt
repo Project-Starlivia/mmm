@@ -52,7 +52,7 @@ pub(all) struct Spot {
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// md を木にし、地番（ノード id → 原文の範囲）も返す。反映が使う。
+/// md を木にし、地番（ノード id → 原文の範囲）も返す。合流が使う。
 pub fn survey(md : String) -> (Doc, Map[Int, Spot]) {
   build(md, read(md))
 }
@@ -356,7 +356,7 @@ fn take(
           // 中身が来た時点で、保留中の水平線は境界になれない
           spill(b)
           let s = block_span(block)
-          fill(b, c, from=s.from, to=closing(b.md, block, s.to))
+          fill(b, c, from=s.from, to=s.to)
         }
         None => ()
       }

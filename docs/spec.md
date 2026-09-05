@@ -17,20 +17,20 @@
 ```
 core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内部は core.md)
   tree/         md.mbt が md との境界（read / serialize / fragment）、build.mbt が
-                mdAst → 木と地番、unbuild.mbt が木 → mdAst、reflect.mbt が前後の木の
+                mdAst → 木と地番、unbuild.mbt が木 → mdAst、merge.mbt が前後の木の
                 差を原文 md への編集列にする。follow.mbt が「md がこう変わった。
                 前に選んでいたノードはいまどれか」を答える。md_wbtest.mbt が
                 ライブラリの読みを指紋で固定し、build_wbtest.mbt 以降が
                 「この md はこう読まれる」、unbuild_wbtest.mbt が
-                「この木はこう書かれる」、reflect_wbtest.mbt が
+                「この木はこう書かれる」、merge_wbtest.mbt が
                 「木がこう違えば md はここだけ変わる」を固定する
   view/         map が見る木。project が Doc から削るだけで作る
                 （`View { frontmatter, trees }`。frontmatter は画像フォルダの宣言のため）
   op/           操作。apply(doc, op) が Doc を Doc にする。席は隣の id で言う
                 （NodePlace / BlockPlace）。道具（splice / append / body）が
                 型の異種性を幽閉する。決めは core.md「操作」
-  edit/         境界。edit(md, op) が survey → apply → reflect を繋ぎ、編集列と
-                読み直した木での focus を返す。law_wbtest.mbt が操作 × 反映の結合を
+  edit/         境界。edit(md, op) が survey → apply → merge を繋ぎ、編集列と
+                読み直した木での focus を返す。law_wbtest.mbt が操作 × 合流の結合を
                 総当たりで固定する。決めは core.md「境界」
 src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す・動かす・カードを扱う・
         貼る/落とす/描く。**
