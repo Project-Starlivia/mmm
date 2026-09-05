@@ -64,6 +64,10 @@ test("focused は同じトランザクションの後の木で位置に写す。
   const cut = s.update({ changes: { from: 5, to: 11 }, effects: focused.of(3) }).state;
   assert.deepEqual(cut.field(anchors), { kind: "nodes", at: [8], anchor: 8 });
   assert.deepEqual(cut.field(choice), { kind: "nodes", sel: { ids: [3], anchor: 3 } });
+  // 古い木と新しい木で位置が違う例: a を伸ばすと b（id 4）の頭は 14 → 16。後の木でしか 16 は出ない
+  const grown = s.update({ changes: { from: 8, to: 9, insert: "aaa" }, effects: focused.of(4) }).state;
+  assert.deepEqual(grown.field(anchors), { kind: "nodes", at: [16], anchor: 16 });
+  assert.deepEqual(grown.field(choice), { kind: "nodes", sel: { ids: [4], anchor: 4 } });
   const none = cut.update({ effects: focused.of(null) }).state;
   assert.deepEqual(none.field(choice), NOTHING);
 });
