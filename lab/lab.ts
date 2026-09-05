@@ -23,7 +23,7 @@ const SAMPLES: [string, string][] = [
   ["区切り", "# r\n\n## a\n\n---\n\n## b\n"],
   ["飾りの線", "# r\n\n***\n\n## a\n"],
   ["畳み", "# r\n\n<details>\n\n## a\n\n</details>\n"],
-  ["封筒", "---\nk: v\n---\n\n# a\n"],
+  ["frontmatter", "---\nk: v\n---\n\n# a\n"],
   ["7 個以上の #", "###### f\n\n####### g\n"],
 ];
 

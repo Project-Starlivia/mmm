@@ -224,7 +224,7 @@ test "木は本数のまま" {
 }
 
 ///|
-test "封筒は通り、改行と散文は消える" {
+test "frontmatter は通り、改行と散文は消える" {
   let d : @tree.Doc = {
     frontmatter: Some("k: v\n"),
     eol: Crlf,

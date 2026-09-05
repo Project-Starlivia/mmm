@@ -710,7 +710,7 @@ test "列の頭の境目は列のもの — 頭を消しても差しても、境
 }
 
 ///|
-test "封筒の直後の空行は、頭の要素を触っても消えない" {
+test "frontmatter の直後の空行は、頭の要素を触っても消えない" {
   let md = "---\nk: v\n---\n\n# a\n\n# b\n"
   let (before, spans) = survey(md)
   let less : Doc = { ..before, roots: [before.roots[1]] }

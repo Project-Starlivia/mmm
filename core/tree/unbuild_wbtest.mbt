@@ -534,7 +534,7 @@ test "コードの中に ``` があれば外を長くする" {
 
 ///|
 /// ライブラリは閉じの `---` の直後に空行を置かない。読みは同じなので受ける。
-test "封筒は頭に。本文との間は空行 1 つ" {
+test "frontmatter は頭に。本文との間は空行 1 つ" {
   inspect(
     serialize(doc([root(h("a"))], frontmatter=Some("k: v\n"))),
     content=(

@@ -23,7 +23,7 @@ pub fn serialize(doc : Doc) -> String {
   let body = write(unbuild({ ..doc, frontmatter: None }), doc.eol)
   match doc.frontmatter {
     None => body
-    // 封筒と本文の間は空行 1 つ。読みは封筒の後ろの空行を落とすので、書く側で置く
+    // frontmatter と本文の間は空行 1 つ。読みは frontmatter の後ろの空行を落とすので、書く側で置く
     // （置かないと、反映の base が「頭の要素に隙間は無い」と言って原文の空行を消す）
     Some(raw) => newline("---\n" + raw + "---\n\n", doc.eol) + body
   }
