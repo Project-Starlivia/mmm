@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Rect } from "../src/map/geometry.ts";
-import { indicatorFor, indicatorTarget, isVisible } from "../src/map/indicator.ts";
+import { indicatorFor, indicatorTarget, isLost, isVisible } from "../src/map/indicator.ts";
 
 const PANE = { width: 800, height: 600 };
 const V = { k: 1, tx: 0, ty: 0 };
@@ -52,39 +52,45 @@ test("パン・ズームしても world 上の位置関係で向きが決まる"
   assert.ok(ind.angle > 0 && ind.angle < 90);
 });
 
-test("選択が画面外なら、他が見えていても選択を指す", () => {
-  const here = box(100, 100);
+// ---------- 指す先 ----------
+
+test("選択を指す", () => {
   const sel = box(5000, 300);
-  const target = indicatorTarget({ selection: [sel], all: [here, sel], root: here }, V, PANE);
-  assert.deepEqual(target, sel);
+  assert.deepEqual(indicatorTarget([sel], box(0, 0)), sel);
 });
 
 test("選択が複数なら、その外接箱を指す", () => {
   const a = box(5000, 300);
   const b = box(5300, 500);
-  const target = indicatorTarget({ selection: [a, b], all: [a, b], root: a }, V, PANE);
-  assert.deepEqual(target, { x: 5000, y: 300, w: 400, h: 260 });
-});
-
-test("選択のどれかが見えていれば指さない", () => {
-  const seen = box(100, 100);
-  const away = box(5000, 300);
-  assert.equal(indicatorTarget({ selection: [seen, away], all: [seen, away], root: seen }, V, PANE), null);
+  assert.deepEqual(indicatorTarget([a, b], a), { x: 5000, y: 300, w: 400, h: 260 });
 });
 
 test("選択が無ければ根を指す", () => {
   const root = box(-5000, 0);
-  const child = box(-4800, 0);
-  const target = indicatorTarget({ selection: [], all: [root, child], root }, V, PANE);
-  assert.deepEqual(target, root);
+  assert.deepEqual(indicatorTarget([], root), root);
 });
 
-test("選択が無いときは、根が画面外でも文書のどれかが見えていれば指さない", () => {
-  const root = box(-5000, 0);
+test("空の文書には指す先が無い", () => {
+  assert.equal(indicatorTarget([], null), null);
+});
+
+// ---------- 出すか ----------
+
+test("指す先も目印も見えなければ、見失っている", () => {
+  const away = box(5000, 300);
+  assert.ok(isLost(away, [away], V, PANE));
+});
+
+test("目印が 1 つでも見えていれば、見失っていない", () => {
+  const away = box(-5000, 0);
   const here = box(100, 100);
-  assert.equal(indicatorTarget({ selection: [], all: [root, here], root }, V, PANE), null);
+  assert.ok(!isLost(away, [away, here], V, PANE));
 });
 
-test("空の文書では指さない", () => {
-  assert.equal(indicatorTarget({ selection: [], all: [], root: null }, V, PANE), null);
+test("指す先が画面に被っていれば、方角が無いので見失っていない", () => {
+  // 左右に 1 つずつ選び、どちらも画面外 — 外接箱は画面ごと包む
+  const left = box(-300, 270);
+  const right = box(1000, 270);
+  const target = indicatorTarget([left, right], left);
+  assert.ok(target && !isLost(target, [left, right], V, PANE));
 });

@@ -13,7 +13,7 @@ import { type Entry, contextItems } from "./map/context.ts";
 import { type Drop, dropOp, resolveDrop } from "./map/drop.ts";
 import { type Rect, unionRect } from "./map/geometry.ts";
 import { Fingers } from "./map/gesture.ts";
-import { indicatorFor, indicatorTarget } from "./map/indicator.ts";
+import { indicatorFor, indicatorTarget, isLost } from "./map/indicator.ts";
 import { type Intent, type Key, keyed, keyedCard } from "./map/keys.ts";
 import { LabelEditor } from "./map/label.ts";
 import { type Layout, cardRect, layoutMap, ownerOf, rootBox } from "./map/layout.ts";
@@ -392,15 +392,14 @@ export class Mindmap {
     return hit(this.layout, w.x, w.y);
   }
 
-  /** 見失った選択（無ければ根）を控えめな針で指す。何を指すかは indicator.ts が決める */
+  /** 見失った選択（無ければ根）を控えめな針で指す。決めは indicator.ts が持つ */
   private updateIndicator(): void {
     const pane = this.paneSize();
-    const target = indicatorTarget(
-      { selection: this.selectedBoxes(), all: this.layout.boxes.values(), root: rootBox(this.layout) },
-      this.camera,
-      pane,
-    );
-    if (!target) {
+    const selection = this.selectedBoxes();
+    const target = indicatorTarget(selection, rootBox(this.layout));
+    // 目印は、選択があれば選択の話。無ければ文書の話
+    const landmarks = selection.length > 0 ? selection : this.layout.boxes.values();
+    if (!target || !isLost(target, landmarks, this.camera, pane)) {
       this.indicatorEl.style.display = "none";
       return;
     }

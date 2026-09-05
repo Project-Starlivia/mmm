@@ -1,7 +1,7 @@
-// 画面外にある対象を、控えめな針で指す。DOM を知らない計算だけの層。
+// 見失った対象を、控えめな針で指す。DOM を知らない計算だけの層。
 //
-// 何を指すか（`indicatorTarget`）と、指すとしたら画面のどこか
-// （`indicatorFor`）の 2 つを持つ。呼び出し側は箱を渡して置くだけ。
+// 指す先（`indicatorTarget`）・出すか（`isLost`）・置く場所（`indicatorFor`）
+// の 3 つを別々に持つ。理由が違うものを 1 つの決めに畳まない。
 
 import { type Rect, unionRect } from "./geometry.ts";
 import type { Pane, Camera } from "./camera.ts";
@@ -28,25 +28,21 @@ export function isVisible(box: Rect, cam: Camera, pane: Pane): boolean {
   return s.x < pane.width && s.x + s.w > 0 && s.y < pane.height && s.y + s.h > 0;
 }
 
+/** 針が指す先。選択の外接箱、選択が無ければ根。空の文書なら null */
+export function indicatorTarget(selection: Iterable<Rect>, root: Rect | null): Rect | null {
+  return unionRect(selection) ?? root;
+}
+
 /**
- * 針が指す箱。見失っていなければ null（＝出さない）。
+ * その先を見失っているか。針を出すのはこのときだけ。
  *
- * 指すのは選択の外接箱、選択が無ければ根。見失ったかの判定は対象そのものが
- * 画面内かではない — 選択があるときは選択のどれか、無いときは文書のどれかが
- * 見えていれば、その人は迷っていない。
+ * 指す先が画面に被っていれば、指す方角が無い — 只中に居るのだから迷っていない。
+ * 目印（選択があれば選択そのもの、無ければ文書のどれか）が見えているときも同じ。
  */
-export function indicatorTarget(
-  boxes: { selection: Rect[]; all: Iterable<Rect>; root: Rect | null },
-  cam: Camera,
-  pane: Pane,
-): Rect | null {
-  const chosen = boxes.selection.length > 0;
-  const target = chosen ? unionRect(boxes.selection) : boxes.root;
-  if (!target) return null;
-  for (const b of chosen ? boxes.selection : boxes.all) {
-    if (isVisible(b, cam, pane)) return null;
-  }
-  return target;
+export function isLost(target: Rect, landmarks: Iterable<Rect>, cam: Camera, pane: Pane): boolean {
+  if (isVisible(target, cam, pane)) return false;
+  for (const b of landmarks) if (isVisible(b, cam, pane)) return false;
+  return true;
 }
 
 /**
