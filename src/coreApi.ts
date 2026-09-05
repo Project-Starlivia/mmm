@@ -2,7 +2,7 @@
 //
 // 使う側は `import * as core` で `core.View` / `core.survey(md, edits, marks)` と書く。
 // フロントでは view は画面を意味し、`Node` は DOM のグローバル型と衝突するので、
-// 裸の名前を出さない（MoonBit 側の `@view.Tree` と同じ形）。
+// 裸の名前を出さない（MoonBit 側の `@view.Root` と同じ形）。
 //
 // MoonBit の ToJson は Option の None を鍵ごと落とし、enum を `["Image", {…}]` /
 // `"ThematicBreak"` の形で出す。その形を整えるのはここ 1 か所。信頼境界も
@@ -47,22 +47,22 @@ export interface Node {
   children: Node[];
 }
 
-/** 木 1 本。側は根の子と並走する（`sides[i]` が `node.children[i]` の側） */
-export interface Tree {
+/** 根 1 つ。側は根の子と並走する（`sides[i]` が `node.children[i]` の側） */
+export interface Root {
   node: Node;
   sides: Side[];
 }
 
 export interface View {
   frontmatter: string | null;
-  trees: Tree[];
+  roots: Root[];
 }
 
 /** id がノードのものか（中身の id なら false）。木を辿って確かめる —
  *  ノードと中身は同じ通し番号を分け合うので、種類は木の形からしか読めない */
 export function isNode(view: View, id: number): boolean {
   const under = (n: Node): boolean => n.id === id || n.children.some(under);
-  return view.trees.some((t) => under(t.node));
+  return view.roots.some((t) => under(t.node));
 }
 
 /** 地番。ノードが md のどこに書かれているか。label はラベルの頭（Implicit と文書の散文は null） */
@@ -202,7 +202,7 @@ function node(v: unknown): Node {
   };
 }
 
-const tree = (v: unknown): Tree => {
+const root = (v: unknown): Root => {
   const o = record(v);
   return { node: field(o, "node", node), sides: field(o, "sides", (s) => list(s, side)) };
 };
@@ -212,7 +212,7 @@ export function decode(json: unknown): View {
   const o = record(json);
   return {
     frontmatter: option(o, "frontmatter", str),
-    trees: field(o, "trees", (t) => list(t, tree)),
+    roots: field(o, "roots", (r) => list(r, root)),
   };
 }
 

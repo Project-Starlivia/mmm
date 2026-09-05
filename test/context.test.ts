@@ -16,9 +16,9 @@ const node = (id: number, label: string | null, children: core.Node[] = [], fold
   blocks: [],
   children,
 });
-const tree = (n: core.Node, sides: core.Side[] = []): core.Tree => ({ node: n, sides });
+const root = (n: core.Node, sides: core.Side[] = []): core.Root => ({ node: n, sides });
 const L: Layout = layoutMap(
-  [tree(node(2, "r", [node(3, "a", [], { open: false, summary: "a" }), node(4, null, [node(5, "x")])]), ["Right", "Right"])],
+  [root(node(2, "r", [node(3, "a", [], { open: false, summary: "a" }), node(4, null, [node(5, "x")])]), ["Right", "Right"])],
   size,
 );
 

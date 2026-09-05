@@ -66,8 +66,8 @@ md に書けない並びは 4 つ。読みが前後の行から意味を決め�
 足すものは無い。
 
 ```
-View { frontmatter: String?, trees: [Tree] }
-Tree { node: Node, sides: [Side] }          // 側は Root と同じ。根の子と並走
+View { frontmatter: String?, roots: [Root] }
+Root { node: Node, sides: [Side] }          // 側は Doc の Root と同じ。根の子と並走
 Node { id, label: String?, fold: Fold?, blocks: [Block], children: [Node] }
 ```
 

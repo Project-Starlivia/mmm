@@ -248,8 +248,8 @@ export class Mindmap {
 
   render(): void {
     const doc = this.host.doc();
-    this.hint.style.display = doc.trees.length === 0 ? "flex" : "none";
-    this.layout = layoutMap(doc.trees, nodeSize);
+    this.hint.style.display = doc.roots.length === 0 ? "flex" : "none";
+    this.layout = layoutMap(doc.roots, nodeSize);
     this.renderer.draw({
       layout: this.layout,
       imageUrl: (path) => this.host.imageUrl(path),

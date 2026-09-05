@@ -44,7 +44,7 @@ fn implicit(id : Int, children : Array[@tree.Node]) -> @tree.Node {
 ///|
 test "見出し 1 つが木 1 本になる" {
   json_inspect(project(doc([root(heading(2, "a"))])), content={
-    "trees": [
+    "roots": [
       {
         "node": { "id": 2, "label": "a", "blocks": [], "children": [] },
         "sides": [],
@@ -57,7 +57,7 @@ test "見出し 1 つが木 1 本になる" {
 test "Implicit はラベルの無いノードになる" {
   let r = heading(2, "r", children=[implicit(3, [heading(4, "x")])])
   json_inspect(project(doc([root(r, sides=[Right])])), content={
-    "trees": [
+    "roots": [
       {
         "node": {
           "id": 2,
@@ -82,7 +82,7 @@ test "Implicit はラベルの無いノードになる" {
 ///|
 test "空のラベルは Implicit と区別が付く" {
   json_inspect(project(doc([root(heading(2, ""))])), content={
-    "trees": [
+    "roots": [
       {
         "node": { "id": 2, "label": "", "blocks": [], "children": [] },
         "sides": [],
@@ -95,7 +95,7 @@ test "空のラベルは Implicit と区別が付く" {
 test "項目も子の項目も同じノードになる" {
   let a = @tree.ListNode(item(2, "a", children=[item(3, "b")]))
   json_inspect(project(doc([root(a)])), content={
-    "trees": [
+    "roots": [
       {
         "node": {
           "id": 2,
@@ -129,7 +129,7 @@ test "Opaque だけが落ちる。並びも id も保つ" {
     },
   ]
   json_inspect(project(doc([root(heading(2, "a", body~))])), content={
-    "trees": [
+    "roots": [
       {
         "node": {
           "id": 2,
@@ -166,7 +166,7 @@ test "Opaque だけが落ちる。並びも id も保つ" {
 test "畳みはそのまま通る" {
   let a = heading(2, "a", fold=Some({ open: true, summary: Some("a") }))
   json_inspect(project(doc([root(a)])), content={
-    "trees": [
+    "roots": [
       {
         "node": {
           "id": 2,
@@ -189,7 +189,7 @@ test "側は根の子と並んで通る" {
     heading(5, "c"),
   ])
   json_inspect(project(doc([root(r, sides=[Right, Left, Left])])), content={
-    "trees": [
+    "roots": [
       {
         "node": {
           "id": 2,
@@ -210,7 +210,7 @@ test "側は根の子と並んで通る" {
 ///|
 test "木は本数のまま" {
   json_inspect(project(doc([root(heading(2, "a")), root(heading(3, "b"))])), content={
-    "trees": [
+    "roots": [
       {
         "node": { "id": 2, "label": "a", "blocks": [], "children": [] },
         "sides": [],
@@ -236,7 +236,7 @@ test "frontmatter は通り、改行と散文は消える" {
   }
   json_inspect(project(d), content={
     "frontmatter": "k: v\n",
-    "trees": [
+    "roots": [
       {
         "node": { "id": 4, "label": "a", "blocks": [], "children": [] },
         "sides": [],

@@ -20,10 +20,10 @@ const node = (id: number, label: string | null, children: core.Node[] = []): cor
   children,
 });
 
-const tree = (n: core.Node, sides: core.Side[] = []): core.Tree => ({ node: n, sides });
+const root = (n: core.Node, sides: core.Side[] = []): core.Root => ({ node: n, sides });
 
 /** r(1) → a(2), b(3)。両方右側 */
-const L: Layout = layoutMap([tree(node(1, "r", [node(2, "a"), node(3, "b")]), ["Right", "Right"])], size);
+const L: Layout = layoutMap([root(node(1, "r", [node(2, "a"), node(3, "b")]), ["Right", "Right"])], size);
 
 const box = (id: number): Box => {
   const b = L.boxes.get(id);

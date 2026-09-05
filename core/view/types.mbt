@@ -5,8 +5,8 @@
 // struct に潰し、Implicit は「ラベルが無い」で言う。
 
 ///|
-/// 木 1 本。側は Doc の Root と同じく根の子と並走する。
-pub(all) struct Tree {
+/// 根 1 つ。側は Doc の Root と同じく根の子と並走する。
+pub(all) struct Root {
   node : Node
   sides : Array[@tree.Side]
 } derive(Eq, Debug, ToJson)
@@ -29,5 +29,5 @@ pub(all) struct Node {
 /// やめるだけで、足すものは無い
 pub(all) struct View {
   frontmatter : String?
-  trees : Array[Tree]
+  roots : Array[Root]
 } derive(Eq, Debug, ToJson)
