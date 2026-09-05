@@ -15,7 +15,7 @@ const HIT_R = 7;
 
 export class CardPick {
   /** viewport（world 座標）に入れる。ノード層より上に置くこと */
-  readonly el = svgEl("g", { id: "card-pick", visibility: "hidden" });
+  readonly el = svgEl("g", { class: "card-pick", visibility: "hidden" });
   private frame = svgEl("rect", { class: "frame" });
   /** 角の ×。押せば Delete（操作と同じ名） */
   private delete = svgEl("g", { class: "delete" });

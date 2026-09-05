@@ -124,17 +124,19 @@ export class Mindmap {
   constructor(pane: HTMLElement, host: MapHost) {
     this.pane = pane;
     this.host = host;
+    // この pane はマップの器になった。見た目（style.css の `.map-pane`）はここで付く
+    pane.classList.add("map-pane");
 
-    const svg = svgEl("svg", { id: "map-svg" });
+    const svg = svgEl("svg", { class: "map-svg" });
     this.world = svgEl("g");
     this.caretLayer = svgEl("g");
-    this.dropLine = svgEl("line", { id: "drop-line", visibility: "hidden" });
+    this.dropLine = svgEl("line", { class: "drop-line", visibility: "hidden" });
     this.world.append(this.renderer.edgeLayer, this.renderer.nodeLayer, this.pick.el, this.caretLayer, this.dropLine);
     svg.append(this.world);
     pane.append(svg);
 
     this.rubber = document.createElement("div");
-    this.rubber.id = "rubber";
+    this.rubber.className = "rubber";
     pane.append(this.rubber);
 
     this.label = new LabelEditor(pane, (id, label) => this.host.apply({ kind: "rename", id, label }, false));
@@ -148,7 +150,7 @@ export class Mindmap {
     pane.append(this.hint);
 
     this.indicatorEl = document.createElement("div");
-    this.indicatorEl.id = "map-indicator";
+    this.indicatorEl.className = "map-indicator";
     this.indicatorEl.style.display = "none";
     pane.append(this.indicatorEl);
 
@@ -461,7 +463,7 @@ export class Mindmap {
       true,
     );
     pane.addEventListener("pointerdown", (e) => {
-      if (targetIn(e, ".link-open, .image-connect, .pane-tool, #label-editor, #card-editor")) return;
+      if (targetIn(e, ".link-open, .image-connect, .pane-tool, .label-editor, .card-editor")) return;
       if (e.pointerType === "touch" && this.fingers.pinching) return;
       // 長押しの印は次の押下で用済み（contextmenu を合成しない環境で残らないように）
       this.menuOpenedByHold = false;
@@ -732,7 +734,7 @@ export class Mindmap {
       if (targetIn(e, ".link-open, .image-connect")) e.stopPropagation();
     });
     this.pane.addEventListener("dblclick", (e) => {
-      if (targetIn(e, ".link-open, .image-connect, #label-editor, #card-editor")) return;
+      if (targetIn(e, ".link-open, .image-connect, .label-editor, .card-editor")) return;
       const spot = targetIn(e, "[data-card]")?.getAttribute("data-card");
       if (spot !== null && spot !== undefined) {
         const id = this.blockAt(spot);

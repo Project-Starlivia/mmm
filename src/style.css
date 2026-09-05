@@ -3,7 +3,10 @@
 
    ここに書かないもの: レイアウトが計算した数（TS が属性で入れる）。
    ここに書くもの: 状態で変わるだけの定数（角丸・色・破線など）。
-   色・影・輪の数字は `:root` のトークンだけが持ち、部品はそれを引く。 */
+   色・影・輪の数字は `:root` のトークンだけが持ち、部品はそれを引く。
+   id で塗るのは **1 個しか無い骨格**（#app / #topbar / #panes / #md-pane …）
+   だけ。何個も出しうる部品（しらせ・メニュー・印・その場編集・マップの器）は
+   class — 並べて見る道具（lab/parts）が同じ見た目を何個でも置けるように。 */
 
 /* ========== 色の源 ========== */
 
@@ -52,7 +55,9 @@
   --tok-type: #e5c07b;
 }
 
-:root.light {
+/* ライト。**`:root` に限らない** — どの祖先に付けても、その下だけがライトに
+   なる（トークンは継承するので、器ごとに切り替えられる） */
+.light {
   color-scheme: light;
   --bg: #f3f4f6;
   --panel: #ffffff;
@@ -258,7 +263,7 @@ html, body {
 
   &:hover { filter: brightness(1.25); }
 }
-/* **名乗りは名乗りだけ。** しくじりは #notice が自分の器で言う */
+/* **名乗りは名乗りだけ。** しくじりは .notice が自分の器で言う */
 /* 名乗り。押すと改名（Files の Rename と同じ操作）。**押せるときだけ
    押せる顔をする** — 保存していない文書には名前を変える相手がおらず、
    その環境が改名を持たないこともある（理由は title に出る） */
@@ -290,13 +295,13 @@ html, body {
 #panes[data-show="map"] #md-pane { display: none; }
 
 #splitter {
-  /* 幅はここ 1 つ。#pane-switch が片方表示で寄せる先（次のルール）も
+  /* 幅はここ 1 つ。.pane-switch が片方表示で寄せる先（次のルール）も
      同じ数を見る — 太さを変えたのに寄せ先だけ古いままになる、を防ぐ */
   --w: 5px;
   flex: none;
   width: var(--w);
   cursor: col-resize;
-  position: relative; /* 境目にくっつく開閉の矢印（#pane-switch）の座標系 */
+  position: relative; /* 境目にくっつく開閉の矢印（.pane-switch）の座標系 */
 
   /* 見える線はここだけが持つ。**ボタン（.pane-tool、z-index:10）より
      前に出す専用の層** — splitter 自身の地にすると、乗っているボタンが
@@ -360,7 +365,7 @@ html, body {
 }
 #panes[data-show="md"] #md-pane { flex: 1; }
 /* フォーカスの輪。#md-pane 自身は CodeMirror の背景に隠れて見えないので
-   .cm-editor に当てる(map 側の同じ印は #map-pane:focus-within が持つ)。
+   .cm-editor に当てる(map 側の同じ印は .map-pane:focus-within が持つ)。
    焦点が中に在るかは CSS 自身が知っているので、JS の旗は持たない */
 #md-pane:focus-within .cm-editor { box-shadow: inset 0 0 0 2px var(--ring); }
 
@@ -440,7 +445,7 @@ html, body {
    `‹ ›` を横に並べる。**向きは変えない** — 左はいつでも「分割線を左へ」、
    右はいつでも「右へ」で、端に着いたら押せなくなるだけ。分割線（5px）より
    広いので左右へはみ出すが、浮いている道具なので構わない */
-#pane-switch {
+.pane-switch {
   /* 丸みはここ 1 つ。**4 箇所（両方表示の外側 2 つ・独りぼっちの残り 2 つ）が
      同じ数を見る** — 太さを変えるたび 4 箇所を揃えて直すのは、直し忘れの
      たねになる */
@@ -473,7 +478,7 @@ html, body {
   }
   /* 端では相方が消え、独りになる（disabled は display:none）。それでも
      内側（分割線に接する側）は角のまま — 独りでも分割線とは今も隣接して
-     いる（#pane-switch の寄せ先が分割線の幅ぶんだけ離すよう直っている）
+     いる（.pane-switch の寄せ先が分割線の幅ぶんだけ離すよう直っている）
      ので、first-child / last-child の規則がそのまま正しい。特別扱いは
      要らない（以前ここに「独りなら四隅とも丸める」があったのは、
      分割線と重なっていた頃の名残） */
@@ -491,13 +496,13 @@ html, body {
    同じ数）。マップ側にはその帯が無いので、分割線の幅ぶんだけ離す
    （0 だと重なり、分割線の見える層（#splitter::after、z-index:11）が
    ボタンより前に出る分だけ見える面積を食う）*/
-#panes[data-show="md"] #pane-switch { left: auto; right: calc(var(--bar) + var(--inset)); transform: none; }
-#panes[data-show="map"] #pane-switch { left: var(--w); transform: none; }
+#panes[data-show="md"] .pane-switch { left: auto; right: calc(var(--bar) + var(--inset)); transform: none; }
+#panes[data-show="map"] .pane-switch { left: var(--w); transform: none; }
 
 /* 狭いときは、居場所が 2 つしか無い（`app/panes.ts` の `spotsFor`）。
    **分割線は線としての性質だけを落とす** — 動かせない境目を「掴めます」と
    いう顔で見せない。要素は 0 幅で残す: flex がそれを縁まで押し出すので、
-   `#pane-switch` は今までどおり同じ 1 か所に居られる（角と角に分けると、
+   `.pane-switch` は今までどおり同じ 1 か所に居られる（角と角に分けると、
    片方だけスクロールバー避けの分ずれて見える）。
    居場所が 2 つなら `button:disabled { display: none }` により、
    **画面に出る矢印は常に 1 本**になる */
@@ -516,15 +521,16 @@ html, body {
      木の書き方が入れ替わる — マップ側のどのボタンより取り返しが遠い。
      幅も 44px にする（3 つで 132px。いちばん狭い窓でも収まる） */
   .pane-tool button { min-height: 44px; min-width: 44px; }
-  #pane-switch button { width: 44px; height: 44px; }
-  #pane-switch button .icon { width: 16px; height: 16px; }
+  .pane-switch button { width: 44px; height: 44px; }
+  .pane-switch button .icon { width: 16px; height: 16px; }
 }
 
 /* ========== マップのペイン ========== */
 
-#map-pane {
-  flex: 1;
-  min-width: 200px;
+#map-pane { flex: 1; min-width: 200px; }
+
+/* マップの器そのもの。**何個でも立つ**（mindmap.ts が自分の pane に付ける） */
+.map-pane {
   position: relative;
   overflow: hidden;
   outline: none;
@@ -539,16 +545,16 @@ html, body {
 }
 
 /* 視点を選択(無ければルート)へ寄せる道具は**下**。見え方を変えるだけで
-   中身には触らないので、地図の上端（#map-indicator が縁を使う）を避けて
+   中身には触らないので、地図の上端（.map-indicator が縁を使う）を避けて
    沈む位置に居る */
-#map-center { bottom: var(--inset); }
+.map-center { bottom: var(--inset); }
 
-#map-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.map-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
 /* 画面外にある対象(選択、無ければルート)を指す控えめな針。コンパスの針の
    ように細長いひし形 1 つ。**出っぱなし**になるので中央には浮かせず、
    縁に貼って真ん中を塞がない(map/indicator.ts が位置と向きを計算する) */
-#map-indicator {
+.map-indicator {
   position: absolute;
   top: 0;
   left: 0;
@@ -716,7 +722,7 @@ html, body {
 
 /* 枠と、その右上の ×。ノードの中ではなく world に浮かぶ 1 個の印
    （選ばれているカードは常に高々 1 枚なので） */
-#card-pick {
+.card-pick {
   & rect.frame {
     fill: none;
     stroke: var(--accent);
@@ -746,7 +752,7 @@ html, body {
    矩形選択の面、md のカーソルが掛かるノードの内側の輪、ドラッグの落とし先の線。
    輪の濃さはここだけが持つ — `--accent-soft` は面を塗るための薄さで、
    2px の線に当てると消える。内側に居る以上は選択と紛れようがない。 */
-#rubber {
+.rubber {
   position: absolute;
   border: 1px solid var(--accent);
   background: var(--accent-soft);
@@ -765,7 +771,7 @@ html, body {
 
 /* 兄弟へ挿入する予告（付けるのは mindmap.ts）。visibility で消す —
    display だと SVG の attribute と CSS の入り乱れが増える */
-#drop-line {
+.drop-line {
   stroke: var(--accent);
   stroke-width: 3;
   stroke-linecap: round;
@@ -774,7 +780,7 @@ html, body {
 
 /* ラベルのその場編集。位置と寸法は map/label.ts が world から計算して style に
    入れる（ズームに追従する）。ここに書くとラベルと入力欄で字の位置がずれる */
-#label-editor {
+.label-editor {
   position: absolute;
   display: none;
   box-sizing: border-box;
@@ -794,7 +800,7 @@ html, body {
    重ねる。字がずれないよう、font と padding と line-height は入れ物側で
    1 回だけ決めて両方に継がせる。寸法は map/card.ts の cardPlacement が
    唯一の定義（place() がズーム込みで書き込む） */
-#card-editor {
+.card-editor {
   position: absolute;
   display: none;
   box-sizing: border-box;
@@ -865,7 +871,7 @@ html, body {
 
 /* 答えを待たない。帯の下・中央に出て、勝手に消える。**押せない** —
    触れるものだと思わせない（消し方を覚えさせるほどの中身は載らない） */
-#notice {
+.notice {
   position: fixed;
   /* 帯の実測高さ(42px) + 8px の隙間。以前の 44px は帯とのあいだが 2px
      しか無く、詰まって見えていた */
@@ -1121,7 +1127,6 @@ html, body {
   border-radius: 10px;
   box-shadow: var(--shadow);
   padding: 4px;
-  display: none;
   user-select: none;
 
   & .item {

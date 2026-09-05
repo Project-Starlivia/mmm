@@ -5,10 +5,9 @@
 // ポインタを捕まえるので、抜けると pointerup がペインへ行き、**ボタンの
 // click がそもそも起きない**（マップ側のボタンが押せなかったのはこれ）。
 
-export function paneTool(id: string): HTMLDivElement {
+export function paneTool(name: string): HTMLDivElement {
   const box = document.createElement("div");
-  box.id = id;
-  box.className = "pane-tool";
+  box.className = `pane-tool ${name}`;
   box.addEventListener("pointerdown", (e) => e.stopPropagation());
   return box;
 }

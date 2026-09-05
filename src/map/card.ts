@@ -61,7 +61,7 @@ export class CardEditor {
     this.pane = pane;
     this.commit = commit;
     this.box = document.createElement("div");
-    this.box.id = "card-editor";
+    this.box.className = "card-editor";
     this.box.style.display = "none";
     this.highlight = document.createElement("pre");
     this.highlight.className = "highlight";
