@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mmm parts</title>
+    <!-- 本物と同じ字。style.css は index.ts が import する -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap"
+    />
+    <style>
+      /* 敷き詰めるためだけの CSS。部品の見た目はここに無い（枠の中は本物）。
+         色は style.css のトークンを借りる */
+      /* アプリの土台は body を固定してペインの中でスクロールさせる。ここは
+         ページそのものが伸びる。style.css は index.ts の import で後から入るので、
+         `:root` で詳細度を上げて勝つ */
+      :root, :root body { height: auto; overflow: auto; }
+      body { padding: 16px 24px; }
+      h1 { font-size: 15px; font-weight: normal; margin: 0 0 4px; }
+      header p { margin: 0 0 24px; font-size: 12px; color: var(--ink-dim); }
+      /* 一覧の器は全部 #grid の下に閉じ込める。部品の class（`.row` など）と
+         名前がぶつかると、一覧の余白が本物に乗る */
+      #grid section { margin-bottom: 28px; }
+      #grid h2 { font-size: 13px; font-weight: normal; color: var(--ink-dim); margin: 0 0 8px; }
+      #grid .line { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+      #grid .state { width: 8em; flex: none; font-size: 12px; color: var(--ink-dim); padding-top: 6px; }
+      /* 枠。**`contain: paint` で fixed の部品もこの中に収まる**（枠が
+         containing block になる）。`position: relative` は absolute のため */
+      #grid .cell {
+        flex: 1;
+        min-width: 0;
+        position: relative;
+        contain: paint;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--ink);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>mmm parts</h1>
+      <p>部品 × 状態を、左が dark・右が light で並べる。枠の中は本物（src の builder と style.css のまま）。</p>
+    </header>
+    <!-- 源と濃さ。style.css の 3 色と灰の混ぜ具合を動かして、決まったら写す -->
+    <details id="tune" style="margin-bottom: 24px">
+      <summary style="font-size: 13px; cursor: pointer">源と濃さ</summary>
+    </details>
+    <main id="grid"></main>
+    <script type="module" src="./index.ts"></script>
+  </body>
+</html>

@@ -70,7 +70,7 @@ export class MdEditor {
     // ペインの真ん中へ浮かべる — CodeMirror の `placeholder` は 1 行目の
     // 頭に出るので、対のもう片方（マップの中央）と上下も寄せも揃わない。
     // 見えるのはこちらで、読み上げには下の `aria-placeholder` が答える
-    this.hint = paneHint("Write a ", "# heading", " to start");
+    this.hint = paneHint("md");
     parent.append(this.hint);
     this.view = new EditorView({ parent, state: this.state("") });
   }
@@ -83,7 +83,7 @@ export class MdEditor {
         lineNumbers(),
         history(),
         // 見た目は上の `.pane-hint` が持つので、ここは読み上げにだけ答える
-        EditorView.contentAttributes.of({ "aria-placeholder": "Write a # heading to start" }),
+        EditorView.contentAttributes.of({ "aria-placeholder": "Write a # Title to start" }),
         // フェンスの中も言語で色を付ける。言語一覧はマップのコードカードと
         // 同じものを渡す — 同じフェンスが 2 つの窓で違う色になると、
         // 食い違ったときに理由が説明できない。読み込みは CodeMirror が持つ

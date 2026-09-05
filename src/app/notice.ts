@@ -36,6 +36,38 @@ const LINGER = 4000;
  */
 const SORRY = "Sorry...";
 
+/**
+ * 言葉の全部。**綴りはここ 1 つ** — 呼ぶ側はこの中の 1 つを渡す（外れていれば
+ * 型が止める）ので、足すときはまずここに書く。並べて見る道具もこれを読む。
+ * 名前を付けて引かないのは、呼び出し元で文言そのものが読める方が早いから。
+ */
+export const FAILED = [
+  "Couldn't save",
+  "Couldn't save the image",
+  "Couldn't open the file",
+  "Couldn't open the dropped file",
+  "Couldn't open the image folder",
+  "Couldn't create a new file",
+  "Couldn't rename the file",
+  "Couldn't export",
+  "Couldn't copy",
+  "Couldn't copy the link",
+  "Couldn't paste",
+  "Couldn't read that as a link",
+  "Couldn't add the drawing",
+  "Couldn't open that card",
+  "Couldn't start editing — the node is folded",
+  "Couldn't do that here",
+  "Select a node to paste an image into",
+  "Select a node to paste a link into",
+  "This browser cannot open or save files",
+] as const;
+export type Failed = (typeof FAILED)[number];
+
+/** 次の一手が相手にあるもの。いまは書き出すものが無いときの Mod+E だけ */
+export const BLOCKED = ["Nothing to export yet"] as const;
+export type Blocked = (typeof BLOCKED)[number];
+
 let box: HTMLDivElement | null = null;
 let timer = -1;
 
@@ -104,7 +136,7 @@ function show(mark: IconName, msg: string, sorry: boolean): void {
  * 置き場所を持たない文書に画像を収めると言ったのも、貼られた字をリンクとして
  * 読むと言ったのもこちらで、相手の不注意ではない。
  */
-export const failed = (msg: string): void => show("circle-alert", msg, true);
+export const failed = (msg: Failed): void => show("circle-alert", msg, true);
 
 /**
  * 先へ進めない。**次の一手はそちらにある。**
@@ -114,4 +146,4 @@ export const failed = (msg: string): void => show("circle-alert", msg, true);
  * あるのでキー（`Mod+E`）から来た人にしか出ない。触って読める言葉と
  * 同じものを出す。
  */
-export const blocked = (msg: string): void => show("triangle-alert", msg, false);
+export const blocked = (msg: Blocked): void => show("triangle-alert", msg, false);

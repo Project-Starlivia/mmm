@@ -15,14 +15,24 @@
 // マップの空だから** — 見出しの無い本文を打っている間も、まだ地図は無い。
 
 /**
- * ペインの真ん中に浮かべる言い出し。`act` はその一手そのもの
- * （`Enter` / `# heading`）で、**そこだけが明るくなる**。
+ * 言い出しの綴り。**2 つで 1 つ**なので、字もここに並べて持つ — 片方だけ
+ * 別の場所で変わると、対が崩れる。真ん中がその一手そのもの
+ */
+const HINTS = {
+  md: ["Write a ", "# Title", " to start"],
+  map: ["Press ", "Enter", " to start"],
+} as const;
+
+/**
+ * ペインの真ん中に浮かべる言い出し。真ん中の一手（`# Title` / `Enter`）だけが
+ * **明るくなる**。
  *
  * 太字にはしない — このアプリに太字は実質無く、沈む（`--ink-dim`）と
  * 立つ（`--ink`）の明るさの差が、hover でもフォーカスでも使っている
  * ただ 1 つの強調の軸。ヒント 2 つのために軸を増やさない。
  */
-export function paneHint(before: string, act: string, after: string): HTMLDivElement {
+export function paneHint(pane: keyof typeof HINTS): HTMLDivElement {
+  const [before, act, after] = HINTS[pane];
   const box = document.createElement("div");
   box.className = "pane-hint";
   // 見えているものは飾りで、読み上げには別の道がある

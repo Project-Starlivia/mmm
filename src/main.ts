@@ -21,7 +21,10 @@ import { initPanes } from "./app/panes.ts";
 import { deriveName } from "./app/name.ts";
 import { initTheme } from "./app/theme.ts";
 import { sweep } from "./app/persist.ts";
-import { ask, askText, askYesNo } from "./app/ask.ts";
+import { ask } from "./app/ask.ts";
+import { ASKS } from "./app/asks.ts";
+import { NOTHING_TO_RENAME, NO_FILE_ACCESS, NO_RENAME_HERE, filesMenu } from "./app/files.ts";
+import { moreMenu } from "./app/more.ts";
 import { blocked, failed } from "./app/notice.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
@@ -42,19 +45,6 @@ function el<T extends Element>(id: string, kind: abstract new () => T): T {
   if (found instanceof kind) return found;
   throw new Error(`#${id} が ${kind.name} ではない`);
 }
-
-/** リポジトリの行き先。ここ 1 か所 */
-const REPO = "https://github.com/Project-Starlivia/mmm";
-
-/** 改名する相手そのものがディスクに無い（保存したらもう改名する必要が無いので、駅にならない） */
-const NOTHING_TO_RENAME = "Save the .md first — nothing on disk to rename yet";
-
-/** その環境が改名を持たない。どのブラウザが、とは言わない（名指しは移り変わる） */
-const NO_RENAME_HERE = "This browser can't rename files";
-
-/** File System Access API が無いブラウザで、Files のできない行と
- *  ショートカットの両方がこの理由を言う。英語の文言はここ 1 か所だけ */
-const NO_FILE_ACCESS = "This browser cannot open or save files";
 
 /** 新しいタブで開く。`⋯` の外部リンクが通る唯一の道 */
 function openExternal(url: string): void {
@@ -347,12 +337,7 @@ async function offerConnect(): Promise<void> {
   if (await assets.connected()) return;
   if (gen !== docGen) return;
   const where = declaredFolder() ?? "./";
-  const go = await ask({
-    title: "Connect the image folder?",
-    note: `Images here point to ${where}.`,
-    ok: "Connect…",
-    cancel: "Not now",
-  });
+  const go = await ask(ASKS.connect(where));
   // 箱を読んでいるあいだに移っていることもある。**繋ぐ直前にもう一度見る**
   if (go !== null && gen === docGen) await assets.connect();
 }
@@ -376,8 +361,8 @@ async function openFile(): Promise<void> {
 /** いま開いているファイル**そのもの**の名前を変える。本文の見出しから導く名前とは別の話 */
 async function renameFile(): Promise<void> {
   if (savedName === null) return;
-  const typed = await askText("New file name", savedName, "Rename");
-  if (typed === null) return;
+  const typed = (await ask(ASKS.rename(savedName)))?.[0];
+  if (typed === undefined) return;
   const name = typed.trim();
   if (name === "" || name === savedName) return;
   try {
@@ -469,7 +454,7 @@ async function copyLink(): Promise<boolean> {
 
 async function confirmDiscard(): Promise<boolean> {
   if (text === savedText) return true;
-  return askYesNo("Discard unsaved changes?", "Discard");
+  return (await ask(ASKS.discard)) !== null;
 }
 
 // ---------- 画像（ローカルファースト） ----------
@@ -505,11 +490,7 @@ const assets = initAssets({
  */
 async function ensurePlace(): Promise<boolean> {
   if (savedName !== null) return true;
-  const go = await askYesNo(
-    "Images need a place on disk. Save the .md, then pick a folder.",
-    "Save the .md…",
-  );
-  if (!go) return false;
+  if ((await ask(ASKS.place)) === null) return false;
   await saveFile(true);
   return savedName !== null;
 }
@@ -649,88 +630,49 @@ function folderCaption(): string {
 
 // ---------- 帯のメニュー ----------
 
-// 文書に何かする道は Files にまとめる。**画像フォルダもここ** —
-// 「この .md の画像がどこに居るか」は文書ぜんぶの設定で、新規 / 開く / 保存と
-// 同じ高さのもの。塊は 2 つ（.md と、その画像フォルダ）で、見出しが状態を
-// 言い、続く行がそれに対してできること。**絵が付くのは、押せるものだけ。**
-openOnClick(elFiles, () => {
-  const canOpen = io.canOpen();
-  const canSave = io.canSaveAs();
-  return [
-    { caption: savedName ?? "not saved yet" },
-    { label: "New", key: "Mod+Alt+N", mark: "file-plus", run: () => void newFile() },
+// 並びは app/files.ts と app/more.ts の表。ここは状態を写して、押されたら走らせる
+openOnClick(elFiles, () =>
+  filesMenu(
     {
-      label: "Open",
-      key: "Mod+O",
-      mark: "folder-open",
-      run: () => void openFile(),
-      disabled: !canOpen && NO_FILE_ACCESS,
+      savedName,
+      recent: recent.map((file) => file.name),
+      canOpen: io.canOpen(),
+      canSave: io.canSaveAs(),
+      canRename: io.canRename(),
+      canChooseFolder: assets.canChooseFolder(),
+      folder: folderCaption(),
     },
     {
-      // 覚えている文書。**選ぶのは人**（起動時に勝手に開き直すのはやめた）
-      label: "Recent",
-      mark: "clock",
-      items: recent.map((file) => ({ label: file.name, run: () => openKnown(file) })),
-      disabled: recent.length === 0 && "Nothing opened yet",
-    },
-    {
-      label: "Save",
-      key: "Mod+S",
-      mark: "save",
-      run: () => void saveFile(),
-      disabled: !canSave && NO_FILE_ACCESS,
-    },
-    // 「as」は Save と同じ操作の別名なので、絵は主の行にだけ付ける
-    {
-      label: "Save as",
-      key: "Mod+Shift+S",
-      run: () => void saveFile(true),
-      disabled: !canSave && NO_FILE_ACCESS,
-    },
-    {
-      label: "Rename",
-      mark: "pencil",
-      run: () => void renameFile(),
-      disabled: !io.canRename() ? NO_RENAME_HERE : savedName === null && NOTHING_TO_RENAME,
-    },
-    { caption: folderCaption() },
-    {
-      // **保存していないことでは沈めない。** 押した先で保存まで案内する（駅）。
-      // 沈むのは、この環境がフォルダを選べないときだけ
-      label: "Choose folder",
-      mark: "folder",
-      run: () =>
+      newFile: () => void newFile(),
+      open: () => void openFile(),
+      openRecent: (i) => {
+        const file = recent[i];
+        if (file) openKnown(file);
+      },
+      save: () => void saveFile(),
+      saveAs: () => void saveFile(true),
+      rename: () => void renameFile(),
+      chooseFolder: () =>
         void (async () => {
           if (await ensurePlace()) await assets.chooseFolder();
         })(),
-      disabled: !assets.canChooseFolder() && NO_FILE_ACCESS,
     },
-  ];
-});
+  ),
+);
 
-// 低頻度だが消したくないものの受け皿。3 つの塊 — 戻す / 見た目 / 外に開く
-openOnClick(elMore, () => [
-  { label: "Undo", key: "Mod+Z", mark: "undo-2", run: () => editor.undo() },
-  { label: "Redo", key: "Mod+Shift+Z", mark: "redo-2", run: () => editor.redo() },
-  "sep",
-  { label: "Accent color", mark: "palette", run: () => theme.pickColor() },
-  {
-    // 絵は「押すと何になるか」（切り替えた先）を言う。字と同じ向き
-    label: theme.isLight() ? "Dark theme" : "Light theme",
-    mark: theme.isLight() ? "moon" : "sun",
-    run: () => theme.toggle(),
-  },
-  "sep",
-  // 但し書きは待たずに開いて、届いたら埋まる（測るのに gzip が要る）
-  { label: "Copy link", mark: "link", note: linkNote(), done: copyLink },
-  "sep",
-  {
-    label: "Shortcuts",
-    mark: "keyboard",
-    run: () => openExternal(`${REPO}/blob/main/docs/shortcuts.md`),
-  },
-  { label: "GitHub", mark: "mark-github", run: () => openExternal(REPO) },
-]);
+openOnClick(elMore, () =>
+  moreMenu(
+    { light: theme.isLight(), linkNote: linkNote() },
+    {
+      undo: () => editor.undo(),
+      redo: () => editor.redo(),
+      pickColor: () => theme.pickColor(),
+      toggleTheme: () => theme.toggle(),
+      copyLink,
+      open: openExternal,
+    },
+  ),
+);
 
 /**
  * 覚えている文書。**Files の `Recent` に並ぶのがこれ**。メニューは同期で

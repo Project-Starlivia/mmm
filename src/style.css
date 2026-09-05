@@ -12,12 +12,26 @@
 
 :root {
   color-scheme: dark;
+  /* **色は 3 つ。** 地・字・強調。灰はぜんぶ地と字の混ぜ具合（下の `*-mix`）
+     で導く — 灰を 1 つずつ綴ると、地を変えたときに揃わなくなる。混ぜ具合は
+     lab/parts の「源と濃さ」で動かして、ここへ写す */
   --bg: #15171c;
-  --panel: #1b1e24;
   --ink: #dde2e9;
-  --ink-dim: #828a96;
-  --line: #2a2f38;
   --accent: #5932ff;
+  /* 浮くものが向かう色。暗い地では明るい方（= 字の側）、ライトでは白 */
+  --lift: var(--ink);
+  --panel-mix: 4%;
+  --node-bg-mix: 8%;
+  --ink-dim-mix: 57%;
+  --line-mix: 12%;
+  --node-border-mix: 21%;
+  --node-border-strong-mix: 39%;
+  --edge-mix: 31%;
+  --dot-mix: 10%;
+  /* フォーカス枠の濃さ。--accent-soft より濃いのは、地が --bg へ沈んだ分
+     そのままだと枠が薄まって見えるため。**色は --accent から導く** — 数字で
+     持っていた頃は、色を変えても輪だけが既定の紫のまま残っていた */
+  --ring-mix: 32%;
   /* 面を accent で薄く塗るときの濃さ。**この 1 行だけ**が決める — 下が
      透ける面（`--accent-soft`）も、ノードの箱のように地の上へ不透明に塗る面も
      同じ濃さになる。同じ選択を 2 つのペインで見せているのに、濃さが違う
@@ -26,23 +40,12 @@
      置くインラインに必ず負けていて一度も効いていなかった（誰も見たことの
      ない濃さだった）。アクセントカラーは `--accent` にだけ入る */
   --accent-mix: 20%;
-  --accent-soft: color-mix(in srgb, var(--accent) var(--accent-mix), transparent);
-  /* フォーカス枠だけの濃さ。--accent-soft と同じ色味だが、地が --bg へ
-     沈んだ分（旧 --panel より暗い）そのままだと枠が薄まって見えるので、
-     ここだけ底上げする。**色は --accent から導く** — 数字で持っていた頃は、
-     色を変えても輪だけが既定の紫のまま残っていた */
-  --ring: color-mix(in srgb, var(--accent) 32%, transparent);
   /* アクセントで塗った面の上に載る字と線 */
   --on-accent: #fff;
   /* 浮くもの（しらせ・メニュー・たずね）の影と、たずねの後ろの幕。
      テーマで濃さが変わる — ライトの地に暗い影をそのまま落とすと重い */
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   --veil: rgba(0, 0, 0, 0.45);
-  --node-bg: #232830;
-  --node-border: #3b424d;
-  --node-border-strong: #5d6673;
-  --edge: #4d5563;
-  --dot: #262b33;
   --font: "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
   /* コードの字。**綴りはここ 1 つ** — 測る側（map/metrics.ts）も同じものを見る */
   --mono: "JetBrains Mono", Consolas, "SF Mono", "Cascadia Code", Menlo, monospace;
@@ -60,24 +63,41 @@
 .light {
   color-scheme: light;
   --bg: #f3f4f6;
-  --panel: #ffffff;
   --ink: #1f2328;
-  --ink-dim: #6b7280;
-  --line: #e2e5ea;
-  --ring: color-mix(in srgb, var(--accent) 12%, transparent);
+  --lift: #fff;
+  --panel-mix: 100%;
+  --node-bg-mix: 100%;
+  --ink-dim-mix: 61%;
+  --line-mix: 7%;
+  --node-border-mix: 15%;
+  --node-border-strong-mix: 38%;
+  --edge-mix: 26%;
+  --dot-mix: 9%;
+  --ring-mix: 12%;
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   --veil: rgba(0, 0, 0, 0.25);
-  --node-bg: #ffffff;
-  --node-border: #cfd5dd;
-  --node-border-strong: #9aa4b1;
-  --edge: #b6bec9;
   --tok-keyword: #a626a4;
   --tok-string: #50a14f;
   --tok-number: #b76b01;
   --tok-comment: #9aa4b1;
   --tok-name: #4078f2;
   --tok-type: #986801;
-  --dot: #dde1e7;
+}
+
+/* 灰の導き方。**源（地・字・浮く向き）と濃さは上の 2 つが持ち、式はここ 1 つ。**
+   `:root` と `.light` の両方に書くのは、変数は宣言した要素で解決されるため —
+   `:root` にだけ書くと `.light` の下でも dark の地と字で混ざった値を継ぐ */
+:root, .light {
+  --panel: color-mix(in srgb, var(--bg), var(--lift) var(--panel-mix));
+  --node-bg: color-mix(in srgb, var(--bg), var(--lift) var(--node-bg-mix));
+  --ink-dim: color-mix(in srgb, var(--bg), var(--ink) var(--ink-dim-mix));
+  --line: color-mix(in srgb, var(--bg), var(--ink) var(--line-mix));
+  --node-border: color-mix(in srgb, var(--bg), var(--ink) var(--node-border-mix));
+  --node-border-strong: color-mix(in srgb, var(--bg), var(--ink) var(--node-border-strong-mix));
+  --edge: color-mix(in srgb, var(--bg), var(--ink) var(--edge-mix));
+  --dot: color-mix(in srgb, var(--bg), var(--ink) var(--dot-mix));
+  --ring: color-mix(in srgb, var(--accent) var(--ring-mix), transparent);
+  --accent-soft: color-mix(in srgb, var(--accent) var(--accent-mix), transparent);
 }
 
 /* ========== 土台 ========== */
@@ -558,8 +578,8 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
-  width: 22px;
-  height: 11px;
+  width: 24px;
+  height: 10px;
   background: var(--accent);
   clip-path: polygon(0 50%, 38% 8%, 100% 50%, 38% 92%);
   opacity: 0.5;
@@ -618,7 +638,7 @@ html, body {
   &.root rect.box { stroke-width: 2; stroke: var(--node-border-strong); }
 
   /* ---- ドラッグ（付けるのは mindmap.ts）---- */
-  &.dragging { opacity: 0.35; }
+  &.dragging { opacity: 0.4; }
   &.drop-parent rect.box { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; }
 
   /* ---- 選択（付けるのは map/render.ts の paintSelection）---- */
@@ -710,7 +730,7 @@ html, body {
 
   /* 畳んだノード（core の Fold） */
   &.folded {
-    opacity: 0.45;
+    opacity: 0.4;
 
     /* 畳んだノードは小さく丸めて、別のものだと分かるようにする */
     & rect.box { rx: 4px; stroke-dasharray: 4 3; }
@@ -947,19 +967,22 @@ html, body {
 
   &::backdrop { background: var(--veil); }
 
+  /* **段の間は、後ろに来るものが自分の上の距離を言う**（form に gap を
+     持たせて負の margin で戻す形をやめた）。題と補足は 1 つの塊（4）、
+     塊の間は 12、理由は欄のすぐ下（8） */
   & form {
     display: flex;
     flex-direction: column;
-    gap: 12px;
     padding: 16px;
     min-width: 300px;
   }
   & .title { margin: 0; font-size: 13px; }
   /* 補足。**題で足りるなら書かない**ので、要るときだけ場所を取る */
-  & .note { margin: -8px 0 0; font-size: 11px; color: var(--ink-dim); }
+  & .note { margin: 4px 0 0; font-size: 11px; color: var(--ink-dim); }
   /* 何の話をしているかを見せる絵。字より先に置く — 名前を聞かれている
      相手が、読む前に分かる。**元の縦横比のまま**、高さだけで抑える */
   & .shot {
+    margin-top: 12px;
     align-self: center;
     max-width: 100%;
     max-height: 160px;
@@ -970,6 +993,7 @@ html, body {
   /* 字と欄の並び。**書かれる行の形そのまま**なので、字は本文と同じ幅の
      字体で置く（`![](` と `./pics/` が md の中と同じ姿になる）*/
   & .parts {
+    margin-top: 12px;
     display: flex;
     align-items: center;
     gap: 2px;
@@ -993,14 +1017,15 @@ html, body {
   }
   /* 進めない理由。**直す字のすぐ下**に出す（離すと目が往復する）。
      行そのものを出し入れするので、要らないうちは高さも取らない */
-  & .bad { margin: -4px 0 0; font-size: 11px; color: var(--ink-dim); }
+  & .bad { margin: 8px 0 0; font-size: 11px; color: var(--ink-dim); }
 
   /* 断りは左、進むは右。押し間違えたときに軽いほうへ落ちる並び */
-  & .row { display: flex; justify-content: flex-end; gap: 8px; }
+  & .row { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
+  /* 背丈はメニューの行・しらせ・欄と同じ（同じ 13px の字は同じ高さ） */
   & button {
     font: inherit;
     font-size: 13px;
-    padding: 4px 12px;
+    padding: 6px 12px;
     border: 1px solid var(--line);
     border-radius: 6px;
     background: var(--bg);

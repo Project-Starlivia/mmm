@@ -181,19 +181,3 @@ export function ask(a: Ask): Promise<string[] | null> {
     });
   });
 }
-
-/** 字を聞く。断られたら null（`window.prompt` と同じ約束） */
-export async function askText(
-  title: string,
-  value: string,
-  ok = "OK",
-  check?: (value: string) => string | null,
-): Promise<string | null> {
-  const out = await ask({ title, ok, parts: [{ value, check }] });
-  return out === null ? null : (out[0] ?? null);
-}
-
-/** はい / いいえ を聞く。`window.confirm` と同じ約束 */
-export async function askYesNo(title: string, ok = "OK"): Promise<boolean> {
-  return (await ask({ title, ok })) !== null;
-}

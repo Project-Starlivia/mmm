@@ -312,6 +312,37 @@ export function drawBoard(): Board {
   };
 }
 
+/** 窓に載せる form。題・道具と紙・足元のボタン。`insert` には絵の約束を渡す */
+export function drawForm(on: { cancel(): void; insert(picture: Promise<Blob | null>): void }): {
+  form: HTMLFormElement;
+  undo(): void;
+  insert(): void;
+} {
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const title = document.createElement("p");
+  title.className = "title";
+  title.textContent = "Draw";
+  const note = document.createElement("p");
+  note.className = "note";
+  note.textContent = "Mod+Enter to insert, Esc to discard";
+  const board = drawBoard();
+
+  // 断りは左、進むは右（たずねと同じ並び）。進む側だけが色を持つ
+  const row = document.createElement("div");
+  row.className = "row";
+  const cancel = button("Cancel");
+  const go = button("Insert");
+  go.className = "go";
+  row.append(cancel, go);
+  const insert = (): void => on.insert(board.picture());
+  cancel.addEventListener("click", () => on.cancel());
+  go.addEventListener("click", insert);
+
+  form.append(title, note, board.el, row);
+  return { form, undo: board.undo, insert };
+}
+
 /**
  * 描いてもらって、その絵を返す。キャンセルなら null。
  *
@@ -323,57 +354,36 @@ export function drawBoard(): Board {
 export function showDrawing(): Promise<Blob | null> {
   return new Promise((resolve) => {
     // 器はたずね（app/ask.ts）と同じ `<dialog class="ask">`。焦点の閉じ込め・
-    // Esc・後ろの幕はブラウザが持つので、ここでは書かない。描く道具と紙
-    // だけが `.draw` として中に載る
+    // Esc・後ろの幕はブラウザが持つので、ここでは書かない
     const dlg = document.createElement("dialog");
     dlg.className = "ask";
-    const form = document.createElement("form");
-    form.method = "dialog";
-    const title = document.createElement("p");
-    title.className = "title";
-    title.textContent = "Draw";
-    const note = document.createElement("p");
-    note.className = "note";
-    note.textContent = "Mod+Enter to insert, Esc to discard";
-    const board = drawBoard();
-
-    // 断りは左、進むは右（たずねと同じ並び）。進む側だけが色を持つ
-    const row = document.createElement("div");
-    row.className = "row";
-    const cancel = button("Cancel");
-    const go = button("Insert");
-    go.className = "go";
-    row.append(cancel, go);
-
     // 閉じ方は `<dialog>` の 1 つ — Esc も Cancel も `close()` で、進んだとき
     // だけ `"ok"` を添える。絵を待つ間に Esc を押されても close は
     // 1 度しか起きないので、二重に返らない
     let picture: Blob | null = null;
-    const commit = (): void => {
-      void board.picture().then((blob) => {
-        picture = blob;
-        dlg.close("ok");
-      });
-    };
-    cancel.addEventListener("click", () => dlg.close());
-    go.addEventListener("click", commit);
+    const { form, undo, insert } = drawForm({
+      cancel: () => dlg.close(),
+      insert: (p) =>
+        void p.then((blob) => {
+          picture = blob;
+          dlg.close("ok");
+        }),
+    });
     // Esc は dialog が持つ。全体のショートカット（app/shortcuts.ts）は窓の中では
     // 黙るので、ここで拾うのは窓だけのキー
     dlg.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        commit();
+        insert();
       } else if ((e.key === "z" || e.key === "Z") && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        board.undo();
+        undo();
       }
     });
     dlg.addEventListener("close", () => {
       dlg.remove();
       resolve(dlg.returnValue === "ok" ? picture : null);
     });
-
-    form.append(title, note, board.el, row);
     dlg.append(form);
     document.body.append(dlg);
     dlg.showModal();

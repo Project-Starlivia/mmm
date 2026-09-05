@@ -9,7 +9,7 @@
 import type * as core from "./coreApi.ts";
 import { type Camera, type Pane, centerOn, fitToPane, panBy, panToShow, pinch, toWorld, zoomAt } from "./map/camera.ts";
 import { CardEditor } from "./map/card.ts";
-import { type Entry, contextItems } from "./map/context.ts";
+import { contextItems, menuOf } from "./map/context.ts";
 import { type Drop, dropOp, resolveDrop } from "./map/drop.ts";
 import { type Rect, unionRect } from "./map/geometry.ts";
 import { Fingers } from "./map/gesture.ts";
@@ -18,7 +18,7 @@ import { type Intent, type Key, keyed, keyedCard } from "./map/keys.ts";
 import { LabelEditor } from "./map/label.ts";
 import { type Layout, cardRect, layoutMap, ownerOf, rootBox } from "./map/layout.ts";
 import { labelOf, nodeSize } from "./map/metrics.ts";
-import { ContextMenu, type MenuEntry } from "./map/menu.ts";
+import { ContextMenu } from "./map/menu.ts";
 import { CardPick } from "./map/pick.ts";
 import { MapRenderer } from "./map/render.ts";
 import { NONE, type Selection, click, hit, rubber } from "./map/select.ts";
@@ -150,7 +150,7 @@ export class Mindmap {
     );
 
     // md からの始め方は md ペイン自身が同じ器で言う（app/hint.ts）
-    this.hint = paneHint("Nothing to show yet — write a ", "# heading", "");
+    this.hint = paneHint("map");
     this.hint.style.display = "none";
     pane.append(this.hint);
 
@@ -794,21 +794,7 @@ export class Mindmap {
     }
     const sel = this.host.selection();
     if (!sel.ids.includes(id)) this.host.setSelection({ ids: [id], anchor: id }, false);
-    this.menu.show(x, y, this.toEntries(contextItems(this.layout, this.host.selection())));
-  }
-
-  /** context.ts の Entry を、menu.ts が描ける形に写す。押せば act へ渡すだけで、意味はここに増やさない */
-  private toEntries(es: Entry[]): MenuEntry[] {
-    return es.map((e) => (e === "sep" ? "sep" : this.entryOf(e)));
-  }
-
-  private entryOf(it: Exclude<Entry, "sep">): MenuEntry {
-    const disabled = it.intent === null ? (it.why ?? true) : false;
-    const run = (): void => {
-      if (it.intent) this.act(it.intent);
-    };
-    const items = it.items?.map((i) => this.entryOf(i));
-    return items ? { label: it.label, key: it.key, mark: it.mark, disabled, items, run } : { label: it.label, key: it.key, mark: it.mark, disabled, run };
+    this.menu.show(x, y, menuOf(contextItems(this.layout, this.host.selection()), (i) => this.act(i)));
   }
 
   /** 右クリック。触った箱が選ばれていなければそれへ選び直してから開く。長押しが

@@ -1,7 +1,7 @@
 # 設計の型
 
 部品ごとに「何をしているか」「どの既知の型か」「段の間で何を約束するか」を 1 ページで言う。
-設計を監督するための地図。細部は [spec.md](spec.md)（UI）と [core.md](core.md)（core）。
+設計を監督するための地図。細部は [spec.md](spec.md)（UI）と [core.md](core.md)（core）、見た目の数字は [look.md](look.md)。
 
 ## 部品と型
 
