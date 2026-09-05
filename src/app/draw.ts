@@ -128,6 +128,190 @@ function nibFace(): HTMLButtonElement {
   return b;
 }
 
+/** 描く道具と紙。`.draw` の中身そのもので、窓（`showDrawing`）はこれを載せる */
+export interface Board {
+  el: HTMLDivElement;
+  /** 最後の一手を戻す（Mod+Z） */
+  undo: () => void;
+  /** いまの絵。WebP が作れない環境では PNG へ落ちる（type が空になる） */
+  picture: () => Promise<Blob | null>;
+}
+
+/**
+ * 道具と紙を組む。**置くのは呼ぶ側** — アプリは窓に載せ、並べて見る道具は
+ * そのまま置く。
+ */
+export function drawBoard(): Board {
+  const body = document.createElement("div");
+  body.className = "draw";
+
+  // ---- 道具立て ----
+  //
+  // 並びは 3 つの塊 — **何で描くか**（インク）と**どのくらいで**（太さ）を
+  // 左に置き、**やり直すもの**（Undo / Clear）だけを右へ離す。描くために
+  // 選ぶものと、描いたものを取り消すものは種類が違う。
+  //
+  // 筆の並びは**窓を開くたびに組む** — アクセントカラーはその間に変わりうる。
+  // アクセントカラーも 1 本の筆にする（綴りは持たず、ロゴと同じ `--accent` を
+  // 読む。読めなければその筆を出さない）。並びの**末尾**に置くのは、既定に
+  // すると淡いアクセントカラーのときに紙の上で消えるため — 選べば使えるが、
+  // 黙って選ばれてはいない
+  const brush = accent();
+  const palette = brush === null ? PALETTE : [...PALETTE, brush];
+  const inkList: readonly Ink[] = [
+    ...palette.map((color): Ink => ({ kind: "pen", color })),
+    { kind: "eraser" },
+  ];
+
+  let ink: Ink = inkList[0];
+  let step = DEFAULT_STEP;
+
+  const bar = document.createElement("div");
+  bar.className = "tools";
+
+  const nibButtons = picker(PEN_NIBS, nibFace, DEFAULT_STEP, (_, i) => {
+    step = i;
+  });
+  /** ボタンの点を、いま選んでいるインクの太さに合わせる */
+  const syncNibs = (): void => {
+    const table = nibsOf(ink);
+    nibButtons.forEach((b, i) => {
+      b.style.setProperty("--nib", `${table[i]}px`);
+      b.title = `${table[i]}px`;
+      b.setAttribute("aria-label", `${table[i]}px`);
+    });
+  };
+
+  const inks = document.createElement("div");
+  inks.className = "inks";
+  inks.append(
+    ...picker(inkList, inkFace, 0, (value) => {
+      ink = value;
+      syncNibs();
+    }),
+  );
+
+  const nibs = document.createElement("div");
+  nibs.className = "nibs";
+  nibs.append(...nibButtons);
+  syncNibs();
+
+  const undo = button("Undo");
+  undo.title = "Mod+Z";
+  const clear = button("Clear");
+  const actions = document.createElement("div");
+  actions.className = "group";
+  actions.append(undo, clear);
+
+  bar.append(inks, nibs, actions);
+
+  // ---- 紙 ----
+  const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+  const canvas = document.createElement("canvas");
+  canvas.className = "paper";
+  canvas.width = WIDTH * dpr;
+  canvas.height = HEIGHT * dpr;
+  // 絵の比は常に WIDTH:HEIGHT（画素は dpr 倍）。表示だけは窓に入る大きさまで縮む
+  // （CSS の max-width。高さは canvas 自身の比から決まる）
+  canvas.style.width = `${WIDTH}px`;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("お絵描きの 2d コンテキストを作れない");
+  ctx.scale(dpr, dpr);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  const strokes: Stroke[] = [];
+
+  /** 1 手ぶんを紙に載せる */
+  const paint = (s: Stroke): void => {
+    if (s.kind === "clear") {
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      return;
+    }
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = s.width;
+    ctx.beginPath();
+    // 1 点だけの手（点を打っただけ）も見えるように、同じ点へ引く
+    const [head, ...rest] = s.points;
+    ctx.moveTo(head.x, head.y);
+    if (rest.length === 0) ctx.lineTo(head.x, head.y);
+    for (const p of rest) ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  };
+
+  /** 並びの通りに引き直す（取り消しと、消しゴムの後始末） */
+  const repaint = (): void => {
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    for (const s of strokes) paint(s);
+  };
+  repaint();
+
+  // ---- 描く ----
+  let drawing: Extract<Stroke, { kind: "line" }> | null = null;
+  /** 画面の点を紙の座標へ。**表示が縮んでいても紙の上では同じ場所**に
+   *  描けるよう、実際に表示されている大きさで割り戻す */
+  const at = (e: PointerEvent): Pt => {
+    const r = canvas.getBoundingClientRect();
+    return {
+      x: ((e.clientX - r.left) * WIDTH) / r.width,
+      y: ((e.clientY - r.top) * HEIGHT) / r.height,
+    };
+  };
+  canvas.addEventListener("pointerdown", (e) => {
+    // 押した瞬間にフォーカスが body へ逃げると Esc / Mod+Enter が死ぬ
+    e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
+    drawing = {
+      kind: "line",
+      points: [at(e)],
+      color: ink.kind === "eraser" ? PAPER : ink.color,
+      width: nibsOf(ink)[step],
+    };
+    strokes.push(drawing);
+    paint(drawing);
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drawing) return;
+    const p = at(e);
+    // 引き足すのは最後の一区間だけ。全部引き直すのは取り消しのときでよい
+    const last = drawing.points[drawing.points.length - 1];
+    drawing.points.push(p);
+    ctx.strokeStyle = drawing.color;
+    ctx.lineWidth = drawing.width;
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  });
+  const stop = (): void => {
+    drawing = null;
+  };
+  canvas.addEventListener("pointerup", stop);
+  canvas.addEventListener("pointercancel", stop);
+
+  // ---- やり直す ----
+  const undoOne = (): void => {
+    if (strokes.length === 0) return;
+    strokes.pop();
+    repaint();
+  };
+  undo.addEventListener("click", undoOne);
+  clear.addEventListener("click", () => {
+    // クリアも手のひとつ。取り消しで戻せる
+    strokes.push({ kind: "clear" });
+    repaint();
+  });
+
+  body.append(bar, canvas);
+  return {
+    el: body,
+    undo: undoOne,
+    picture: () => new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.92)),
+  };
+}
+
 /**
  * 描いてもらって、その絵を返す。キャンセルなら null。
  *
@@ -151,169 +335,8 @@ export function showDrawing(): Promise<Blob | null> {
     const note = document.createElement("p");
     note.className = "note";
     note.textContent = "Mod+Enter to insert, Esc to discard";
-    const body = document.createElement("div");
-    body.className = "draw";
+    const board = drawBoard();
 
-    // ---- 道具立て ----
-    //
-    // 並びは 3 つの塊 — **何で描くか**（インク）と**どのくらいで**（太さ）を
-    // 左に置き、**やり直すもの**（Undo / Clear）だけを右へ離す。描くために
-    // 選ぶものと、描いたものを取り消すものは種類が違う。
-    //
-    // 筆の並びは**窓を開くたびに組む** — アクセントカラーはその間に変わりうる。
-    // アクセントカラーも 1 本の筆にする（綴りは持たず、ロゴと同じ `--accent` を
-    // 読む。読めなければその筆を出さない）。並びの**末尾**に置くのは、既定に
-    // すると淡いアクセントカラーのときに紙の上で消えるため — 選べば使えるが、
-    // 黙って選ばれてはいない
-    const brush = accent();
-    const palette = brush === null ? PALETTE : [...PALETTE, brush];
-    const inkList: readonly Ink[] = [
-      ...palette.map((color): Ink => ({ kind: "pen", color })),
-      { kind: "eraser" },
-    ];
-
-    let ink: Ink = inkList[0];
-    let step = DEFAULT_STEP;
-
-    const bar = document.createElement("div");
-    bar.className = "tools";
-
-    const nibButtons = picker(PEN_NIBS, nibFace, DEFAULT_STEP, (_, i) => {
-      step = i;
-    });
-    /** ボタンの点を、いま選んでいるインクの太さに合わせる */
-    const syncNibs = (): void => {
-      const table = nibsOf(ink);
-      nibButtons.forEach((b, i) => {
-        b.style.setProperty("--nib", `${table[i]}px`);
-        b.title = `${table[i]}px`;
-        b.setAttribute("aria-label", `${table[i]}px`);
-      });
-    };
-
-    const inks = document.createElement("div");
-    inks.className = "inks";
-    inks.append(
-      ...picker(inkList, inkFace, 0, (value) => {
-        ink = value;
-        syncNibs();
-      }),
-    );
-
-    const nibs = document.createElement("div");
-    nibs.className = "nibs";
-    nibs.append(...nibButtons);
-    syncNibs();
-
-    const undo = button("Undo");
-    undo.title = "Mod+Z";
-    const clear = button("Clear");
-    const actions = document.createElement("div");
-    actions.className = "group";
-    actions.append(undo, clear);
-
-    bar.append(inks, nibs, actions);
-
-    // ---- 紙 ----
-    const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
-    const canvas = document.createElement("canvas");
-    canvas.className = "paper";
-    canvas.width = WIDTH * dpr;
-    canvas.height = HEIGHT * dpr;
-    // 絵の比は常に WIDTH:HEIGHT（画素は dpr 倍）。表示だけは窓に入る大きさまで縮む
-    // （CSS の max-width。高さは canvas 自身の比から決まる）
-    canvas.style.width = `${WIDTH}px`;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("お絵描きの 2d コンテキストを作れない");
-    ctx.scale(dpr, dpr);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    const strokes: Stroke[] = [];
-
-    /** 1 手ぶんを紙に載せる */
-    const paint = (s: Stroke): void => {
-      if (s.kind === "clear") {
-        ctx.fillStyle = PAPER;
-        ctx.fillRect(0, 0, WIDTH, HEIGHT);
-        return;
-      }
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth = s.width;
-      ctx.beginPath();
-      // 1 点だけの手（点を打っただけ）も見えるように、同じ点へ引く
-      const [head, ...rest] = s.points;
-      ctx.moveTo(head.x, head.y);
-      if (rest.length === 0) ctx.lineTo(head.x, head.y);
-      for (const p of rest) ctx.lineTo(p.x, p.y);
-      ctx.stroke();
-    };
-
-    /** 並びの通りに引き直す（取り消しと、消しゴムの後始末） */
-    const repaint = (): void => {
-      ctx.fillStyle = PAPER;
-      ctx.fillRect(0, 0, WIDTH, HEIGHT);
-      for (const s of strokes) paint(s);
-    };
-    repaint();
-
-    // ---- 描く ----
-    let drawing: Extract<Stroke, { kind: "line" }> | null = null;
-    /** 画面の点を紙の座標へ。**表示が縮んでいても紙の上では同じ場所**に
-     *  描けるよう、実際に表示されている大きさで割り戻す */
-    const at = (e: PointerEvent): Pt => {
-      const r = canvas.getBoundingClientRect();
-      return {
-        x: ((e.clientX - r.left) * WIDTH) / r.width,
-        y: ((e.clientY - r.top) * HEIGHT) / r.height,
-      };
-    };
-    canvas.addEventListener("pointerdown", (e) => {
-      // 押した瞬間にフォーカスが body へ逃げると Esc / Mod+Enter が死ぬ
-      e.preventDefault();
-      canvas.setPointerCapture(e.pointerId);
-      drawing = {
-        kind: "line",
-        points: [at(e)],
-        color: ink.kind === "eraser" ? PAPER : ink.color,
-        width: nibsOf(ink)[step],
-      };
-      strokes.push(drawing);
-      paint(drawing);
-    });
-    canvas.addEventListener("pointermove", (e) => {
-      if (!drawing) return;
-      const p = at(e);
-      // 引き足すのは最後の一区間だけ。全部引き直すのは取り消しのときでよい
-      const last = drawing.points[drawing.points.length - 1];
-      drawing.points.push(p);
-      ctx.strokeStyle = drawing.color;
-      ctx.lineWidth = drawing.width;
-      ctx.beginPath();
-      ctx.moveTo(last.x, last.y);
-      ctx.lineTo(p.x, p.y);
-      ctx.stroke();
-    });
-    const stop = (): void => {
-      drawing = null;
-    };
-    canvas.addEventListener("pointerup", stop);
-    canvas.addEventListener("pointercancel", stop);
-
-    // ---- やり直す ----
-    const undoOne = (): void => {
-      if (strokes.length === 0) return;
-      strokes.pop();
-      repaint();
-    };
-    undo.addEventListener("click", undoOne);
-    clear.addEventListener("click", () => {
-      // クリアも手のひとつ。取り消しで戻せる
-      strokes.push({ kind: "clear" });
-      repaint();
-    });
-
-    // ---- 確定 / 破棄 ----
     // 断りは左、進むは右（たずねと同じ並び）。進む側だけが色を持つ
     const row = document.createElement("div");
     row.className = "row";
@@ -323,19 +346,14 @@ export function showDrawing(): Promise<Blob | null> {
     row.append(cancel, go);
 
     // 閉じ方は `<dialog>` の 1 つ — Esc も Cancel も `close()` で、進んだとき
-    // だけ `"ok"` を添える。toBlob を待つ間に Esc を押されても close は
+    // だけ `"ok"` を添える。絵を待つ間に Esc を押されても close は
     // 1 度しか起きないので、二重に返らない
     let picture: Blob | null = null;
     const commit = (): void => {
-      // WebP が作れない環境では PNG へ落ちる（type が空になる）
-      canvas.toBlob(
-        (blob) => {
-          picture = blob;
-          dlg.close("ok");
-        },
-        "image/webp",
-        0.92,
-      );
+      void board.picture().then((blob) => {
+        picture = blob;
+        dlg.close("ok");
+      });
     };
     cancel.addEventListener("click", () => dlg.close());
     go.addEventListener("click", commit);
@@ -347,7 +365,7 @@ export function showDrawing(): Promise<Blob | null> {
         commit();
       } else if ((e.key === "z" || e.key === "Z") && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        undoOne();
+        board.undo();
       }
     });
     dlg.addEventListener("close", () => {
@@ -355,8 +373,7 @@ export function showDrawing(): Promise<Blob | null> {
       resolve(dlg.returnValue === "ok" ? picture : null);
     });
 
-    body.append(bar, canvas);
-    form.append(title, note, body, row);
+    form.append(title, note, board.el, row);
     dlg.append(form);
     document.body.append(dlg);
     dlg.showModal();
