@@ -2,7 +2,7 @@
 // CodeMirror が持つ。打鍵のたびに `onChange(text)` で全文を渡し、受け手が
 // core に読ませて map を描き直す（サイクルは 1 本。読みは決して書かない）。
 
-import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
+import { ChangeSet, Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, keymap, lineNumbers } from "@codemirror/view";
 import {
   defaultKeymap,
@@ -129,9 +129,15 @@ export class MdEditor {
     this.onCaret(this.caret());
   }
 
-  /** 操作の編集列を 1 トランザクションで当てる。undo は 1 手になる。sync はこの中で走る */
-  apply(edits: core.Edit[]): void {
-    this.view.dispatch({ changes: edits });
+  /**
+   * 操作の編集列を 1 トランザクションで当てる。undo は 1 手になる。sync はこの中で走る。
+   * 編集列を 2 つ以上渡せば**順に**当てる（後の列の座標は前の列を当てた後の md）—
+   * 続けて映した操作の組が 1 手になる
+   */
+  apply(...sets: core.Edit[][]): void {
+    let changes = ChangeSet.empty(this.view.state.doc.length);
+    for (const set of sets) changes = changes.compose(ChangeSet.of(set, changes.newLength));
+    this.view.dispatch({ changes });
   }
 
   /** 地図で選んでいる範囲を、こちらの行にも映す */

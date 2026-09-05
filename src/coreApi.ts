@@ -79,6 +79,17 @@ export interface Edit {
   insert: string;
 }
 
+/** 編集列を md に当てた後の全文。続けて操作を映すとき、次の操作が読む md はこれ */
+export const splice = (md: string, edits: Edit[]): string => {
+  let out = "";
+  let at = 0;
+  for (const e of edits) {
+    out += md.slice(at, e.from) + e.insert;
+    at = e.to;
+  }
+  return out + md.slice(at);
+};
+
 /** 前のサイクルの目印。選択を md の打鍵をまたいで持ち越すためのもの */
 export interface Mark {
   from: number;

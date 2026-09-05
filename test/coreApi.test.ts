@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { type View, decode, decodeSurvey, edit, edited, encode, isNode, survey } from "../src/coreApi.ts";
+import { type View, decode, decodeSurvey, edit, edited, encode, isNode, splice, survey } from "../src/coreApi.ts";
 
 test("None の鍵は無い → null。Implicit は label が null", () => {
   const v = decode({ roots: [{ node: { id: 2, blocks: [], children: [] }, sides: [] }] });
@@ -187,4 +187,10 @@ test("isNode — 根も子孫もノード、中身の id と知らない id は�
   assert.equal(isNode(v, 4), true);
   assert.equal(isNode(v, 3), false);
   assert.equal(isNode(v, 9), false);
+});
+
+test("splice: 編集列（前の座標・from 順・重ならない）を md に当てる", () => {
+  assert.equal(splice("abcdef", [{ from: 1, to: 2, insert: "XY" }, { from: 4, to: 6, insert: "" }]), "aXYcd");
+  assert.equal(splice("abc", []), "abc");
+  assert.equal(splice("abc", [{ from: 0, to: 0, insert: "---\n" }]), "---\nabc");
 });

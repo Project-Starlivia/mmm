@@ -5,15 +5,16 @@
 // 作れないので、2 つに分かれること自体は避けられない — どちらが何の真実かを
 // 言い切ることで、食い違いを事故にしない。
 //
-// **宣言を書くのはこの段の範囲外。** 宣言が無い文書は `./`（md と同じ場所）
-// として読み書きする。指したフォルダが宣言と食い違っても直さない — 宣言を
-// 書き換える／初めて決めるのは、まだ無い別の操作の仕事。
+// 宣言が無い文書は `./`（md と同じ場所）として読み書きする。**宣言を決める /
+// 直すのもここ**（`settle`）— ただし道具は宣言を黙って書き換えない。書くのは
+// 計算できたとき（`resolve`）と、人が箱で確定したときだけ。書き込みそのものは
+// md への操作なので `deps.declare` に渡す（main.ts）。
 
 import { type Field, type Part, ask } from "./ask.ts";
 import { handles } from "./handles.ts";
 import { io } from "./io.ts";
 import { bare } from "../map/cards.ts";
-import { under } from "./head.ts";
+import { normalizePath, under } from "./head.ts";
 
 export interface Assets {
   imageUrl(path: string): string | null;
@@ -114,6 +115,41 @@ export function mdPath(rel: string): string {
   return rel.startsWith("../") ? rel : `./${rel.replace(/^\.\//, "")}`;
 }
 
+// ---- 宣言 ----
+
+/**
+ * **宣言の綴りとして通らない理由。** 通るなら null。
+ *
+ * `dirName` は、末尾に来るはずの**選んだフォルダの実名**。`resolve` が効かな
+ * かったとき — つまり選んだフォルダは md を含んでいない — 末尾のフォルダ名は
+ * 必ず選んだものと一致するはずで、一致しなければ打ち間違い。`./`（md と同じ
+ * 場所）もこの場では矛盾になる。
+ *
+ * 位置が計算できたとき（選んだフォルダが md を含む）は null を渡す。宣言は
+ * `./` や `../` の形で、末尾に実名は来ないので照合しようが無い。
+ *
+ * 深さ（`../` が何段か）だけは確かめようが無い — ハンドルから親は辿れない。
+ * **確かめられる嘘は全部止めて、確かめられないところだけ人を信じる。**
+ */
+export function folderProblem(typed: string, dirName: string | null): string | null {
+  const norm = normalizePath(typed);
+  if (norm === null) return "Use a path relative to the .md";
+  if (dirName === null) return null;
+  const last = norm.split("/").filter(Boolean).pop();
+  return last === dirName ? null : `The folder you picked is named ${dirName}`;
+}
+
+/**
+ * 選んだフォルダから md までの断片を、md から見たフォルダの相対に読み替える。
+ * `FileSystemDirectoryHandle.resolve` が返すのは「フォルダ → md」なので、
+ * **末尾のファイル名を除いた数**だけ上へ戻る（`["notes","a.md"]` なら md は
+ * 1 段深いところに居るので `../`）。
+ */
+export function folderFromDoc(segments: string[]): string {
+  const up = Math.max(0, segments.length - 1);
+  return up === 0 ? "./" : "../".repeat(up);
+}
+
 // ---- 画像の名前 ----
 //
 // **決めるのも咎めるのも 1 か所**。`nameProblem` はたずね箱が打鍵のたびに
@@ -185,6 +221,8 @@ export function initAssets(deps: {
   refresh: () => void;
   /** いま頭が言っている宣言（正規化済み）。無ければ null */
   declared: () => string | null;
+  /** 宣言を頭に書く（md への操作。本文の画像もそれに追従する） */
+  declare: (value: string) => void;
 }): Assets {
   const assetUrls = new Map<string, string | null>();
   let cachedBinding: AssetBinding | null | undefined;
@@ -208,25 +246,106 @@ export function initAssets(deps: {
     return cachedBinding;
   }
 
-  /** フォルダを指してもらい、握る。取りやめは false */
-  async function pick(): Promise<boolean> {
+  /** 指してもらった結果。**宣言をどう決めるかは、ここでは決めない** */
+  interface Picked {
+    binding: AssetBinding;
+    /** md から見た位置。`resolve` が効いたときだけ確か（効かなければ null） */
+    computed: string | null;
+    /** 効かなかったときの当て推量。人に確かめてもらう既定値になる */
+    guess: string;
+  }
+
+  /** フォルダを指してもらい、握る。取りやめは null */
+  async function pick(): Promise<Picked | null> {
     const file = io.currentFile();
-    if (!file) return false;
+    if (!file) return null;
     const picker = window.showDirectoryPicker;
-    if (!picker) return false;
+    if (!picker) return null;
     let directory: FileSystemDirectoryHandle;
     try {
       directory = await picker({ startIn: file, mode: "readwrite" });
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return false;
+      if (error instanceof DOMException && error.name === "AbortError") return null;
       throw error;
     }
+    const binding = { doc: file, directory };
     await handles.rememberFolder(file, directory);
-    cachedBinding = { doc: file, directory };
+    cachedBinding = binding;
     live = true;
+    // 選んだフォルダが md を含んでいれば、md から見た位置は**計算できる**。
+    // 含まなければ手がかりはフォルダ名だけ
+    const segments = await directory.resolve(file);
     releaseUrls();
     deps.refresh();
-    return true;
+    return {
+      binding,
+      computed: segments ? folderFromDoc(segments) : null,
+      guess: `./${directory.name}/`,
+    };
+  }
+
+  /**
+   * 指してもらった結果を打てる欄にする。計算できていればそれが値で、実名の
+   * 照合は無い。できていなければ当て推量が値で、末尾を実名と照合する
+   */
+  const fieldOf = (p: Picked): Field => {
+    const dirName = p.computed === null ? p.binding.directory.name : null;
+    return { value: p.computed ?? p.guess, check: (typed) => folderProblem(typed, dirName) };
+  };
+
+  /** 宣言を聞く箱。初めて決めるときと、選び直して食い違ったときの両方 */
+  async function askDeclaration(p: Picked, was: string | null): Promise<string | null> {
+    const parts: Part[] = ["image-folder:", fieldOf(p)];
+    const out = await ask(
+      was === null
+        ? { title: `Where is ${p.binding.directory.name}, seen from the .md?`, ok: "Save", parts }
+        : {
+            title: "The folder changed — update the declaration?",
+            note: "Image paths in the document will follow.",
+            ok: "Update",
+            cancel: "Keep as is",
+            parts,
+          },
+    );
+    return out === null ? null : (out[0] ?? null);
+  }
+
+  /**
+   * 指してもらった結果に対して、宣言を決める。
+   *
+   * **道具は宣言を黙って書き換えない。** 書くのは 2 通りだけ —
+   * `resolve` で**計算できた**とき（推量ではない）と、**人が箱で確定した**とき。
+   *
+   * `inline` は「呼ぶ側のフォームが位置の欄を持っている」の合図。
+   * 画像を置く流れでは、フォルダも名前も 1 枚の中で聞きたいので、
+   * ここでは聞かずに欄だけ返す。
+   */
+  async function settle(p: Picked, inline: boolean): Promise<Field | null> {
+    const was = deps.declared();
+    if (was === null) {
+      if (p.computed !== null) {
+        declare(p.computed);
+        return null;
+      }
+      if (inline) return fieldOf(p);
+      const typed = await askDeclaration(p, null);
+      if (typed !== null) declare(typed);
+      return null;
+    }
+    // 記録があるのに別の場所を指された。**黙って書き換えない** — 直すのも、
+    // 記録を古いままにするのも、人が決める（握りはもう移っている）
+    if (normalizePath(p.computed ?? p.guess) !== was) {
+      const typed = await askDeclaration(p, was);
+      if (typed !== null) declare(typed);
+    }
+    return null;
+  }
+
+  /** 宣言を書く。宣言が変われば「どのパスが読めるか」も変わるので、絵は引き直す */
+  function declare(value: string): void {
+    deps.declare(value);
+    releaseUrls();
+    deps.refresh();
   }
 
   /** 握りが腐った。**捨てて、繋ぎ直しの駅へ落とす** — 腐ったまま持っていると
@@ -242,9 +361,9 @@ export function initAssets(deps: {
 
   /**
    * 書けるフォルダを用意する。握っていればそれ、無ければ指してもらう。
-   * 取りやめは null。
+   * 返すのは「呼ぶ側のフォームに載せる位置の欄」（要らなければ null）。取りやめは null。
    */
-  async function ensureBinding(): Promise<AssetBinding | null> {
+  async function ensureBinding(): Promise<{ binding: AssetBinding; folder: Field | null } | null> {
     const binding = await storedBinding();
     if (binding) {
       const state = await binding.directory.queryPermission({ mode: "readwrite" });
@@ -253,12 +372,16 @@ export function initAssets(deps: {
         (state === "prompt" &&
           (await binding.directory.requestPermission({ mode: "readwrite" })) === "granted")
       ) {
-        return binding;
+        return { binding, folder: null };
       }
       // 許可が下りない札は腐っている。捨ててから指し直してもらう
       forget();
     }
-    return (await pick()) ? storedBinding() : null;
+    const picked = await pick();
+    if (!picked) return null;
+    // 位置の欄は**画像のフォームの中で**聞く（inline）。フォルダと名前は
+    // 1 つの行き先の 2 つの部分でしかないので、箱を分けない
+    return { binding: picked.binding, folder: await settle(picked, true) };
   }
 
   async function loadAsset(path: string): Promise<void> {
@@ -327,30 +450,37 @@ export function initAssets(deps: {
           deps.refresh();
           return;
         }
-        await pick();
+        const picked = await pick();
+        if (picked) await settle(picked, false);
       } catch {
         deps.failed("Couldn't open the image folder");
       }
     },
 
-    /** フォルダを指してもらう。保存されているかの確認は呼ぶ側（main.ts の駅）が済ませている */
+    /**
+     * フォルダを指してもらう。**繋ぎ直しも選び直しも同じ一手** —
+     * 記録が無ければ宣言を決め、あって食い違えば直すか聞く（`settle`）。
+     * 保存されているかの確認は呼ぶ側（main.ts の駅）が済ませている
+     */
     async chooseFolder() {
       try {
-        await pick();
+        const picked = await pick();
+        if (picked) await settle(picked, false);
       } catch {
         deps.failed("Couldn't open the image folder");
       }
     },
 
     async saveToDisk(blob) {
-      let binding: AssetBinding | null;
+      let ready: { binding: AssetBinding; folder: Field | null } | null;
       try {
-        binding = await ensureBinding();
+        ready = await ensureBinding();
       } catch {
         deps.failed("Couldn't open the image folder");
         return null;
       }
-      if (!binding) return null;
+      if (!ready) return null;
+      const { binding, folder } = ready;
 
       const now = new Date();
       const two = (value: number): string => String(value).padStart(2, "0");
@@ -374,9 +504,9 @@ export function initAssets(deps: {
           return here.has(at.toLowerCase()) ? "That name is taken" : null;
         },
       };
-      // **分かっているところは字、分からないところだけ欄。** フォルダは既に
-      // 決まっている（宣言、無ければ `./`）ので、打てるのは名前だけ
-      const shape: Part[] = ["![](", declaredPath(), name, ".webp)"];
+      // **分かっているところは字、分からないところだけ欄。** 位置が決まって
+      // いれば（宣言、または計算できた）`./pics/` はただの字で、打てるのは名前だけ
+      const shape: Part[] = ["![](", folder ?? declaredPath(), name, ".webp)"];
       let out: string[] | null;
       try {
         out = await ask({ title: "Name this image", ok: "Save", parts: shape, preview: shot });
@@ -384,7 +514,9 @@ export function initAssets(deps: {
         URL.revokeObjectURL(shot);
       }
       if (out === null) return null;
-      const typed = out[0] ?? "";
+      // 欄の並び順は `shape` の並び順。位置の欄があるなら先に居る
+      const typed = folder ? (out[1] ?? "") : (out[0] ?? "");
+      if (folder) declare(out[0] ?? folder.value);
 
       const parts = nameParts(typed);
       const last = parts[parts.length - 1];
