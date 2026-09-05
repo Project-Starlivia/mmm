@@ -99,9 +99,9 @@ fn verbatim(md : String, block : @markdown.Block) -> String {
 }
 
 ///|
-/// 閉じのフェンスまで含めた終わり。`$$` / `:::` / コードの span は閉じの行を
-/// 含まないので、原文のまま持つと閉じが落ち、地番で切り出すと閉じが残る。
-/// コードのフェンスは開きの字（`` ` `` か `~`）で閉じる
+/// 閉じのフェンスまで含めた終わり（他の塊と同じく改行込み）。`$` / `:::` /
+/// コードの span は閉じの行を含まないので、原文のまま持つと閉じが落ち、地番で
+/// 切り出すと閉じが残る。コードのフェンスは開きの字（`` ` `` か `~`）で閉じる
 fn closing(md : String, block : @markdown.Block, to : Int) -> Int {
   let fence : UInt16 = match block {
     MathBlock(..) => '$'
@@ -130,7 +130,7 @@ fn closing(md : String, block : @markdown.Block, to : Int) -> Int {
     i = i + 1
   }
   if i >= md.length() || md[i] == '\n' || md[i] == '\r' {
-    i
+    line_end(md, i)
   } else {
     to
   }
@@ -191,6 +191,26 @@ fn column(md : String, at : Int) -> Int {
     i = i - 1
   }
   at - i
+}
+
+///|
+/// その位置の行の頭。
+fn line_start(md : String, at : Int) -> Int {
+  at - column(md, at)
+}
+
+///|
+/// その位置の行の尻（改行の次）。末尾に改行が無ければ文書の尻。
+fn line_end(md : String, at : Int) -> Int {
+  let mut i = at
+  while i < md.length() && md[i] != '\n' {
+    i = i + 1
+  }
+  if i < md.length() {
+    i + 1
+  } else {
+    i
+  }
 }
 
 ///|

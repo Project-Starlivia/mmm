@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type * as core from "../src/coreApi.ts";
 import { GAP, type Layout, type SizeOf, layoutMap } from "../src/map/layout.ts";
-import { NONE, all, arrow, click, extend, hit, neighbor, nextSibling, parentOf, prevSibling, rubber } from "../src/map/select.ts";
+import { NONE, all, arrow, click, extend, hit, neighbor, nextSibling, parentOf, prevSibling, rubber, NOTHING, cardOf, nodesOf } from "../src/map/select.ts";
 
 /** 全部 100 × 30 */
 const size: SizeOf = () => ({ w: 100, h: 30 });
@@ -101,4 +101,12 @@ test("消した後の隣 — 次、無ければ前、無ければ親。消える
   assert.equal(neighbor(L, [2, 3]), 1);
   assert.equal(neighbor(L, [1]), null);
   assert.equal(neighbor(L, [2, 4]), 3); // 飛び飛びでも、残る 3 が最初の次
+});
+
+test("選択は 1 つの値 — ノードの並びかカード 1 枚か。見方は片方が空", () => {
+  assert.deepEqual(nodesOf(NOTHING), { ids: [], anchor: null });
+  assert.equal(cardOf(NOTHING), null);
+  assert.deepEqual(nodesOf({ kind: "nodes", sel: { ids: [2, 3], anchor: 3 } }), { ids: [2, 3], anchor: 3 });
+  assert.equal(cardOf({ kind: "card", id: 7 }), 7);
+  assert.deepEqual(nodesOf({ kind: "card", id: 7 }), { ids: [], anchor: null });
 });

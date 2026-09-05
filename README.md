@@ -5,7 +5,7 @@ from either side.
 
 The file itself is just a `.md`. The Mindmap is only another window onto it.
 
-For the full spec, see [docs/spec.md](docs/spec.md).
+For the full spec, see [docs/spec.md](docs/spec.md). For the shape of the design — which known patterns each part follows and the laws between stages — see [docs/design.md](docs/design.md).
 
 ([日本語版はこちら](README_JA.md))
 

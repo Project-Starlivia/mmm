@@ -249,7 +249,7 @@ test "中身の無い見出しは空ラベル" {
 }
 
 ///|
-test "封筒" {
+test "frontmatter" {
   json_inspect(parse("---\nk: v\n---\n\n# a\n"), content={
     "frontmatter": "k: v\n",
     "eol": "Lf",

@@ -11,7 +11,7 @@ import * as core from "./coreApi.ts";
 import { caretIds, type Range } from "./caret.ts";
 import { MdEditor } from "./editor.ts";
 import { Mindmap, type MapHost } from "./mindmap.ts";
-import { NONE, type Selection } from "./map/select.ts";
+import { type Choice, NOTHING, type Selection, cardOf, nodesOf } from "./map/select.ts";
 import { handles } from "./app/handles.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
@@ -76,11 +76,10 @@ let text = "";
 let doc: core.View = { frontmatter: null, trees: [] };
 /** いまの地番。カーソルの輪・md 側の薄塗り・選択の持ち越しが読む */
 let spots = new Map<number, core.Spot>();
-/** 何を選んでいるか。地図はこれを塗るだけで、自分では持たない */
-let selection: Selection = NONE;
-/** 選んでいるカードの中身の id。ノードの選択とは片方だけ（spec.md「C カード」）。
- *  地図はこれも自分では持たない */
-let picked: number | null = null;
+/** 何を選んでいるか（ノードの並びかカード 1 枚か）。地図はこれを塗るだけで、自分では持たない */
+let choice: Choice = NOTHING;
+const selection = (): Selection => nodesOf(choice);
+const picked = (): number | null => cardOf(choice);
 
 /** 持ち越す目印と、それが anchor だったか。幽霊（当たらなかった目印）も同じ形で運ぶ */
 interface Carried {
@@ -127,10 +126,11 @@ function sync(next: string, edits: core.Edit[]): void {
   const wasEmpty = doc.trees.length === 0;
   // 目印と、それが anchor か。Implicit は行が無いので捨てる
   const carried: Carried[] = [];
-  for (const id of selection.ids) {
+  const was = selection();
+  for (const id of was.ids) {
     const s = spots.get(id);
     if (s && s.label !== null) {
-      carried.push({ mark: { from: s.from, label: s.label }, anchor: id === selection.anchor });
+      carried.push({ mark: { from: s.from, label: s.label }, anchor: id === was.anchor });
     }
   }
   for (const g of ghosts) carried.push(g);
@@ -151,11 +151,14 @@ function sync(next: string, edits: core.Edit[]): void {
     if (carried[i].anchor) anchor = t.id;
   });
   ids.sort((a, b) => a - b);
-  selection = { ids, anchor: anchor ?? (ids.length ? ids[ids.length - 1] : null) };
   ghosts = kept;
   // 中身の id はノードの目印を持たないので、マークでは追いかけない — 消えて
   // いれば外すだけ（構造を変える操作で番号が振り直されることは受け入れる）
-  if (picked !== null && !spots.has(picked)) picked = null;
+  const card = picked();
+  choice =
+    card !== null && spots.has(card)
+      ? { kind: "card", id: card }
+      : { kind: "nodes", sel: { ids, anchor: anchor ?? (ids.length ? ids[ids.length - 1] : null) } };
   map.render();
   editor.highlight(currentHighlight());
   // 白紙の言い出し。**出る理由は 1 つ**（まだ木が無い）で、マップ側も
@@ -170,7 +173,7 @@ function sync(next: string, edits: core.Edit[]): void {
 
 /** 選んでいるノードの md 側の範囲（子孫込み） */
 const selectedRanges = (): Range[] =>
-  selection.ids.flatMap((id) => {
+  selection().ids.flatMap((id) => {
     const s = spots.get(id);
     return s ? [{ from: s.from, to: s.to }] : [];
   });
@@ -181,30 +184,28 @@ const pickedRange = (id: number): Range[] => {
   return s ? [{ from: s.from, to: s.to }] : [];
 };
 
-/** いま塗るべき範囲。ノードとカードの選択は片方だけなので、カードが在ればそちら */
-const currentHighlight = (): Range[] => (picked !== null ? pickedRange(picked) : selectedRanges());
+/** いま塗るべき範囲。カードを選んでいればその中身、そうでなければノードの並び */
+const currentHighlight = (): Range[] => {
+  const card = picked();
+  return card !== null ? pickedRange(card) : selectedRanges();
+};
 
-/** 地図で選び直した。カードの選択と幽霊は要らなくなる */
-function setSelection(sel: Selection, reveal: boolean): void {
-  picked = null;
-  selection = sel;
+/** 地図で選び直した。幽霊は要らなくなる。reveal は md 側を anchor の頭へスクロールするか */
+function choose(next: Choice, reveal: boolean): void {
+  choice = next;
   ghosts = [];
   map.refreshSelection();
   editor.highlight(currentHighlight());
-  if (reveal && sel.anchor !== null) {
-    const s = spots.get(sel.anchor);
+  const anchor = selection().anchor;
+  if (reveal && anchor !== null) {
+    const s = spots.get(anchor);
     if (s) editor.reveal(s.from);
   }
 }
 
-/** カードを選び直した。ノードの選択は外れる */
-function setPicked(id: number | null): void {
-  selection = NONE;
-  ghosts = [];
-  picked = id;
-  map.refreshSelection();
-  editor.highlight(currentHighlight());
-}
+const setSelection = (sel: Selection, reveal: boolean): void => choose({ kind: "nodes", sel }, reveal);
+
+const setPicked = (id: number | null): void => choose(id === null ? NOTHING : { kind: "card", id }, false);
 
 /**
  * 操作を md に映す。**操作の入口はここ 1 本** — 地図は md に触らない。
@@ -238,7 +239,7 @@ function apply(op: core.Op, edit: boolean, keep: number | null = null): number |
     return r.focus;
   }
   // 同じノードに留まる操作（ラベルを打つ）で md を寄せ直さない
-  setSelection({ ids: [r.focus], anchor: r.focus }, r.focus !== selection.anchor);
+  setSelection({ ids: [r.focus], anchor: r.focus }, r.focus !== selection().anchor);
   // 畳まれて埋もれたノードには箱が無く、その場編集を開けない
   if (edit && !map.beginEdit(r.focus, null)) failed("Couldn't start editing — the node is folded");
   return r.focus;
@@ -259,9 +260,9 @@ const host: MapHost = {
     void (async () => {
       if (await ensurePlace()) await assets.connect();
     })(),
-  selection: () => selection,
+  selection,
   setSelection,
-  picked: () => picked,
+  picked,
   setPicked,
   blockText: (id) => {
     const s = spots.get(id);
@@ -537,7 +538,8 @@ function draw(id: number): void {
  * 書けてから消す（mindmap.ts の act）
  */
 async function copy(): Promise<boolean> {
-  const clip = picked !== null ? host.blockText(picked) : copyText(text, doc, spots, selection.ids);
+  const card = picked();
+  const clip = card !== null ? host.blockText(card) : copyText(text, doc, spots, selection().ids);
   if (clip === "") return false;
   try {
     await navigator.clipboard.writeText(clip);
@@ -555,7 +557,7 @@ async function copy(): Promise<boolean> {
  * （見出し・項目）があるかは core に読ませ、TS では `#` を見ない。
  */
 function paste(): void {
-  const anchor = selection.anchor;
+  const anchor = selection().anchor;
   const gen = docGen;
   void (async () => {
     // クリップボードに画像があれば、テキストより優先する。

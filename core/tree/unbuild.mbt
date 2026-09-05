@@ -27,6 +27,8 @@ pub fn unbuild(doc : Doc) -> @markdown.Document {
     node(u, out, r.node, 1, r.sides)
   }
   {
+    // serialize は frontmatter を自分で書く（本文との間に空行を置くため）。
+    // ここで持つのは、指紋（ast_sig）が mdAst ぜんぶを見るため
     frontmatter: doc.frontmatter.map(raw => {
       ({ raw, entries: [], span: nowhere } : @markdown.Frontmatter)
     }),

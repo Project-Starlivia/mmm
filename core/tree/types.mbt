@@ -9,7 +9,7 @@
 ///|
 /// 文書ぜんぶ。木は何本でも生える（`# a` と `# b` は別の木）。
 pub(all) struct Doc {
-  /// 封筒（frontmatter）の原文。無ければ None
+  /// frontmatter の原文。無ければ None
   frontmatter : String?
   eol : Eol
   /// 最初の骨格より前の中身
