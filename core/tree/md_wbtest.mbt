@@ -215,3 +215,118 @@ test "綴り — frontmatter と本文の間は空行 1 つ" {
     ),
   )
 }
+
+///|
+/// ライブラリが読んだままの mdAst の指紋。方言との差を並べるため（試験だけが使う）
+fn raw_ast_sig(md : String) -> String {
+  ast_sig(@markdown.parse(md).document)
+}
+
+///|
+test "方言 — 定義行が続くと、生の span は改行込みになる。飲み込まない" {
+  let two = "# a\n\n[q]: /r\n[s]: /t\n"
+  inspect(
+    raw_ast_sig(two),
+    content=(
+      #|H1Atx[0,4] Blank1[4,5] Def[5,13] Def[13,20]
+    ),
+  )
+  inspect(
+    md_ast_sig(two),
+    content=(
+      #|H1Atx[0,4] Blank1[4,5] Def[5,13] Def[13,21]
+    ),
+  )
+  inspect(
+    serialize(parse(two)),
+    content=(
+      #|# a
+      #|
+      #|[q]: /r
+      #|
+      #|[s]: /t
+      #|
+    ),
+  )
+}
+
+///|
+test "方言 — ::: の中身が 2 塊でも、入れ子でも、閉じまで" {
+  inspect(
+    md_ast_sig(":::note\n- a\n  ***\n:::\n"),
+    content=(
+      #|Directive(note)[0,22]
+    ),
+  )
+  inspect(
+    serialize(parse("# r\n\n:::note\n- a\n  ***\n:::\n")),
+    content=(
+      #|# r
+      #|
+      #|:::note
+      #|- a
+      #|  ***
+      #|:::
+      #|
+    ),
+  )
+  // 入れ子の :::。ライブラリは外の閉じを段落と読む（生は Directive(a)[0,10] … P[16,20]）。
+  // 方言は外の span を閉じまで伸ばし、飲まれた段落を落とすので、書いても増えない
+  inspect(
+    md_ast_sig(":::a\n:::b\nx\n:::\n:::\n"),
+    content=(
+      #|Directive(a)[0,20]
+    ),
+  )
+  inspect(
+    serialize(parse(":::a\n:::b\nx\n:::\n:::\n")),
+    content=(
+      #|:::a
+      #|:::b
+      #|x
+      #|:::
+      #|:::
+      #|
+    ),
+  )
+}
+
+///|
+test "方言 — 閉じの無いフェンスは空行の先のフェンスを掴まない（地番が重ならない）" {
+  inspect(
+    spans_sig("- ```\n  x\n\n```\nz\n```\n"),
+    content=(
+      #|1[0,-,0] 2[0,2,21] 3[2,-,11] 4[11,-,21]
+    ),
+  )
+}
+
+///|
+test "綴り — 段落の直後の線は *** のまま（--- だと setext の下線になる）。冪等" {
+  let quote = "# r\n\n> a\n>\n> ---\n"
+  let once = serialize(parse(quote))
+  inspect(
+    once,
+    content=(
+      #|# r
+      #|
+      #|> a
+      #|> ***
+      #|
+    ),
+  )
+  inspect(serialize(parse(once)) == once, content="true")
+  let tight = "# r\n\n> - a\n>   ***\n"
+  let again = serialize(parse(tight))
+  inspect(
+    again,
+    content=(
+      #|# r
+      #|
+      #|> - a
+      #|>   ***
+      #|
+    ),
+  )
+  inspect(serialize(parse(again)) == again, content="true")
+}
