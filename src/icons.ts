@@ -127,6 +127,10 @@ const MARKS = {
 
 export type IconName = keyof typeof MARKS;
 
+const isIconName = (s: string): s is IconName => s in MARKS;
+/** 絵の名前の全部（並べて見るため） */
+export const ICONS: readonly IconName[] = Object.keys(MARKS).filter(isIconName);
+
 /** 線ではなく面で塗る絵。**よそのロゴだけ** — 自前の絵は全部線で揃える
  *  という約束（一番上のコメント）は変えず、例外だとここに書いて言い切る */
 const FILLED: ReadonlySet<IconName> = new Set(["mark-github"]);
