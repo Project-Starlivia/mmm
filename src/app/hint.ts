@@ -19,12 +19,12 @@
  * 別の場所で変わると、対が崩れる。真ん中がその一手そのもの
  */
 const HINTS = {
-  md: ["Write a ", "# heading", " to start"],
-  map: ["Nothing to show yet — write a ", "# heading", ""],
+  md: ["Write a ", "# title", " to start"],
+  map: ["Press ", "Enter", " to start"],
 } as const;
 
 /**
- * ペインの真ん中に浮かべる言い出し。真ん中の一手（`# heading`）だけが
+ * ペインの真ん中に浮かべる言い出し。真ん中の一手（`# title` / `Enter`）だけが
  * **明るくなる**。
  *
  * 太字にはしない — このアプリに太字は実質無く、沈む（`--ink-dim`）と

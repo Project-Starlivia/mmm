@@ -83,7 +83,7 @@ export class MdEditor {
         lineNumbers(),
         history(),
         // 見た目は上の `.pane-hint` が持つので、ここは読み上げにだけ答える
-        EditorView.contentAttributes.of({ "aria-placeholder": "Write a # heading to start" }),
+        EditorView.contentAttributes.of({ "aria-placeholder": "Write a # title to start" }),
         // フェンスの中も言語で色を付ける。言語一覧はマップのコードカードと
         // 同じものを渡す — 同じフェンスが 2 つの窓で違う色になると、
         // 食い違ったときに理由が説明できない。読み込みは CodeMirror が持つ
