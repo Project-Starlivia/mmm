@@ -11,8 +11,6 @@ function pick<T extends Element>(id: string, kind: new () => T): T {
   return el;
 }
 
-const DEFAULT_HEIGHT = 240;
-
 const grid = pick("grid", HTMLElement);
 
 for (const p of PARTS) {
@@ -31,7 +29,7 @@ for (const p of PARTS) {
     for (const theme of ["dark", "light"] as const) {
       const cell = document.createElement("div");
       cell.className = theme === "light" ? "cell light" : "cell";
-      cell.style.height = `${p.height ?? DEFAULT_HEIGHT}px`;
+      if (p.height !== undefined) cell.style.height = `${p.height}px`;
       cell.title = `${p.name} / ${state} / ${theme}`;
       // ホイールはページのもの。マップは自分のペインでホイールを捕まえて
       // 視点を動かす（アプリでは正しい）が、一覧では 16 枠ぶんの地図の上で

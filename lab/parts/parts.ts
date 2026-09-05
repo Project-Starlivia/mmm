@@ -14,10 +14,16 @@ import { MAP } from "./map.ts";
 
 const nothing = (): void => {};
 
-/** 出ている状態のしらせ（`.on` は 4 秒の出入りの印。ここでは出しっぱなし） */
+/**
+ * 出ている状態のしらせ（`.on` は 4 秒の出入りの印。ここでは出しっぱなし）。
+ * 本物は帯の下に fixed で浮くが、並べて見るには流れの中へ置く — 置き場所は
+ * 道具の話で、見た目（器・字・印）は本体のまま
+ */
 function shown(mark: Parameters<typeof notice>[0], msg: string, sorry: boolean): HTMLDivElement {
   const el = notice(mark, msg, sorry);
   el.classList.add("on");
+  el.style.position = "static";
+  el.style.transform = "none";
   return el;
 }
 
@@ -59,10 +65,14 @@ export const PARTS: Part[] = [
   },
   {
     name: "notice",
-    height: 110,
     states: {
-      ...Object.fromEntries(FAILED.map((m) => [m, () => shown("circle-alert", m, true)])),
-      ...Object.fromEntries(BLOCKED.map((m) => [m, () => shown("triangle-alert", m, false)])),
+      all: () => {
+        const col = document.createElement("div");
+        col.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:12px";
+        for (const m of FAILED) col.append(shown("circle-alert", m, true));
+        for (const m of BLOCKED) col.append(shown("triangle-alert", m, false));
+        return col;
+      },
     },
   },
   {

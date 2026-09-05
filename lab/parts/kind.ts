@@ -8,6 +8,6 @@ export interface Part {
    * 来たら story ファイルへ機械的に写せる
    */
   states: Record<string, () => Element>;
-  /** 枠の高さ（px）。無ければ index.ts の既定 */
+  /** 枠の高さ（px）。無ければ中身なり */
   height?: number;
 }
