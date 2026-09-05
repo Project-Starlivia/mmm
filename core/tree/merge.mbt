@@ -616,13 +616,13 @@ fn mid_line(md : String, at : Int) -> Bool {
 ///|
 /// 部分木ごと断片にして、地番に差す。
 fn replace(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
-  r.out.push(rewrite(r, id_of(x), fragment(x, depth, sides, r.eol)))
+  r.out.push(patch(r, id_of(x), fragment(x, depth, sides, r.eol)))
 }
 
 ///|
 /// 地番 id の範囲を text で置き換える編集。項目の入れ子は列 0 で出るので、
 /// 容器の桁に揃える（1 行目はもう容器が字下げしている）。
-fn rewrite(r : Merge, id : Int, text : String) -> Edit {
+fn patch(r : Merge, id : Int, text : String) -> Edit {
   // 前の木に無い id はここへ来ない — 親の子 id 列が違うので親が書かれる
   let s = r.spans.get(id).unwrap()
   { from: s.from, to: s.to, insert: indent(text, column(r.md, s.from)) }
