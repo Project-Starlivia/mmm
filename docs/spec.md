@@ -113,11 +113,9 @@ pnpm run dev        # コアをビルドしてから vite（http://localhost:131
 - 本番ビルド: `pnpm run build` → `pnpm run preview` で確認
 - コア(`core/*.mbt`)を変更したら `pnpm run core` で JS を再生成
 - コアのテスト: `pnpm run test:core` / UI 側のテスト: `pnpm test`
-- 型チェックだけ: `pnpm run check`（src と test と lab）
+- 型チェックだけ: `pnpm run check`（src・test・lab）
 - 部品の見た目を並べて見る: `pnpm run lab` → http://localhost:13132/parts/
-- 性能の物差し: `pnpm run perf`（追加の依存なし。規模ごとに init / 1 打鍵 /
-  カード抽出 / 全コピー / 全段下げを測る。`pnpm run perf -- fixtures` で
-  `test/fixtures/*.md` も）。負荷サンプルの作り直しは `pnpm run fixtures`
+- 負荷サンプル（`test/fixtures/*.md`）の作り直し: `pnpm run fixtures`
 
 ### 配る
 

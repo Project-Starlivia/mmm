@@ -1,7 +1,7 @@
 // マップのペイン。core の View を layout で箱にし、render で SVG に写す。
 //
 // 持っているのは視点（Camera）と、それを動かす入力（ホイール・ドラッグ・
-// ピンチ・クリック・矩形・矢印・右クリック・長押し）と、画面外の根を指す針
+// ピンチ・クリック・矩形・矢印・右クリック・長押し）と、見失った先を指す針
 // だけ。**選択の値は持たない** — 入力を map/select.ts の値にして host へ渡し、
 // 返ってきた Selection を塗るだけ。値そのものは main.ts が持つ。あるのは
 // 選択、その場編集、消す・並べ替え・畳み・側の操作・カードの選択とその場編集。
@@ -13,7 +13,7 @@ import { contextItems, menuOf } from "./map/context.ts";
 import { type Drop, dropOp, resolveDrop } from "./map/drop.ts";
 import { type Rect, unionRect } from "./map/geometry.ts";
 import { Fingers } from "./map/gesture.ts";
-import { indicatorFor, isVisible } from "./map/indicator.ts";
+import { indicatorFor, isLost, nearest } from "./map/indicator.ts";
 import { type Intent, type Key, keyed, keyedCard } from "./map/keys.ts";
 import { LabelEditor } from "./map/label.ts";
 import { type Layout, cardRect, layoutMap, ownerOf, rootBox } from "./map/layout.ts";
@@ -279,13 +279,17 @@ export class Mindmap {
     if (c) this.setCamera(c);
   }
 
-  /** 選択（無ければ根）を画面の中心へ。拡大率は変えない */
-  centerOnTarget(): void {
-    const sel = this.host.selection().ids.flatMap((id) => {
+  /** 選ばれている箱。畳まれて箱を失ったものは数えない */
+  private selectedBoxes(): Rect[] {
+    return this.host.selection().ids.flatMap((id) => {
       const b = this.layout.boxes.get(id);
       return b ? [b] : [];
     });
-    const target = unionRect(sel) ?? rootBox(this.layout);
+  }
+
+  /** 選択（無ければ根）を画面の中心へ。拡大率は変えない */
+  centerOnTarget(): void {
+    const target = unionRect(this.selectedBoxes()) ?? rootBox(this.layout);
     if (target) this.setCamera(centerOn(this.camera, target, this.paneSize()));
   }
 
@@ -299,6 +303,7 @@ export class Mindmap {
   refreshSelection(): void {
     this.renderer.paintSelection(new Set(this.host.selection().ids));
     this.followCard();
+    this.updateIndicator(); // 針は選択を指す — 視点が動かなくても指し直す
   }
 
   /** その場編集に入る。seed は最初の字。箱が無い（畳まれて埋もれた）ノードは
@@ -389,15 +394,23 @@ export class Mindmap {
     return hit(this.layout, w.x, w.y);
   }
 
-  /** 画面外にある根を控えめな針で指す。ノードが 1 つでも見えていれば出さない */
+  /** 見失った選択（無ければ根）を控えめな針で指す。決めは indicator.ts が持つ */
   private updateIndicator(): void {
-    const root = rootBox(this.layout);
     const pane = this.paneSize();
-    if (!root || [...this.layout.boxes.values()].some((b) => isVisible(b, this.camera, pane))) {
+    const sel = this.selectedBoxes();
+    // 見失ったかは、選択があれば選択の話。無ければ文書の話
+    const watched = sel.length > 0 ? sel : [...this.layout.boxes.values()];
+    // 指す先は、選択ならいちばん近いやつ。無ければ根 — 帰る場所は 1 つでいい
+    const target = !isLost(watched, this.camera, pane)
+      ? null
+      : sel.length > 0
+        ? nearest(sel, this.camera, pane)
+        : rootBox(this.layout);
+    if (!target) {
       this.indicatorEl.style.display = "none";
       return;
     }
-    const ind = indicatorFor(root, this.camera, pane);
+    const ind = indicatorFor(target, this.camera, pane);
     this.indicatorEl.style.display = "block";
     this.indicatorEl.style.left = `${ind.x}px`;
     this.indicatorEl.style.top = `${ind.y}px`;
