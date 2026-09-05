@@ -117,25 +117,35 @@ fn walk(r : Reflect, x : Node, depth : Int, sides : Array[Side]) -> Unit {
         (same(old, x) && ids(children_of(old)) == ids(children_of(x)))
       ) => {
       let s = r.spans.get(id_of(x)).unwrap()
-      let item = x is ListNode(_)
-      // Implicit は行を持たない（範囲は子の和）
-      if !(x is ImplicitNode(_)) && !same_line(old, x) {
-        r.out.push({
-          from: s.from,
-          to: line_end(r.md, s.from),
-          insert: indent(
-            fragment(with_children(with_body(x, []), []), depth, [], r.eol),
-            column(r.md, s.from),
-          ),
-        })
-      }
       // 項目の中身と子は容器の中身の桁（マーカーの 2 つ右）に居る
-      let col = if item { column(r.md, s.from) + 2 } else { 0 }
-      if !(x is ImplicitNode(_)) {
-        body(r, body_of(old), body_of(x), line_end(r.md, s.from), col)
+      let col = if x is ListNode(_) { column(r.md, s.from) + 2 } else { 0 }
+      // Implicit は行も中身も持たない（範囲は子の和）
+      match x {
+        ImplicitNode(_) => ()
+        _ => {
+          let line_to = line_end(r.md, s.from)
+          if !same_line(old, x) {
+            r.out.push({
+              from: s.from,
+              to: line_to,
+              insert: indent(
+                fragment(with_children(with_body(x, []), []), depth, [], r.eol),
+                column(r.md, s.from),
+              ),
+            })
+          }
+          body(r, body_of(old), body_of(x), line_to, col)
+        }
       }
-      let own = own_end(r, old)
-      kids(r, own, col, children_of(old), children_of(x), depth + 1, Map([]))
+      kids(
+        r,
+        own_end(r, old),
+        col,
+        children_of(old),
+        children_of(x),
+        depth + 1,
+        Map([]),
+      )
     }
     _ => replace(r, x, depth, sides)
   }
@@ -150,12 +160,18 @@ fn aligned(olds : Array[Int], news : Array[Int]) -> Bool {
 }
 
 ///|
-/// 列の差分の相手。容器の自分の尻（列が空なら消す起点であり差す位置）、
-/// 列の桁、兄弟の間の隙間。
-priv struct Slot {
+/// 列が納まる容器。列が空のとき消す起点であり差す位置（自分の尻）、列の桁、
+/// 兄弟の間の隙間、そして前に何も無いか（文書の頭 — 隙間は後ろにしか付けられない）。
+priv struct Container {
   own : Int
   col : Int
   sep : String
+  head : Bool
+}
+
+///|
+fn container(own : Int, col : Int, sep : String) -> Container {
+  { own, col, sep, head: own == 0 }
 }
 
 ///|
@@ -168,7 +184,7 @@ priv struct Slot {
 /// 増える並びは、次に残る物の手前なら `断片 ⋯ + sep`、そうでなければ `sep + 断片 ⋯`。
 fn diff(
   r : Reflect,
-  slot : Slot,
+  c : Container,
   olds : Array[Int],
   news : Array[Int],
   keep : (Int) -> Unit,
@@ -179,9 +195,6 @@ fn diff(
   let at = (id : Int) => r.spans.get(id).unwrap()
   let mut i = 0
   let mut prev : Int? = None
-  // 文書の頭（own が 0）では前に何も無いので、隙間は後ろに付く。
-  // 消えた並びの尻（隙間込み）を控え、差すときに何かが続くかを見る
-  let mut edge = slot.own
   while i < olds.length() {
     if now.contains(olds[i]) {
       prev = Some(at(olds[i]).to)
@@ -202,19 +215,8 @@ fn diff(
       match prev {
         Some(p) => (p, last)
         // 文書の頭から消すなら、後ろの隙間も道連れ（頭に空行を残さない）
-        None =>
-          (
-            slot.own,
-            if slot.own == 0 {
-              skip_newlines(r.md, last)
-            } else {
-              last
-            },
-          )
+        None => (c.own, if c.head { skip_newlines(r.md, last) } else { last })
       }
-    }
-    if prev is None && i >= olds.length() {
-      edge = to
     }
     r.out.push({ from, to, insert: "" })
   }
@@ -225,9 +227,9 @@ fn diff(
       if !pend.is_empty() {
         // 残る物のマーカーの手前。差した後ろにその物の字下げを戻す
         let s = at(id)
-        let c = column(r.md, s.from)
+        let col = column(r.md, s.from)
         r.out.push(
-          insert(r, s.from, indent(join(pend, slot.sep), c) + slot.sep + pad(c)),
+          insert(r, s.from, indent(pend.join(c.sep), col) + c.sep + pad(col)),
         )
         pend.clear()
       }
@@ -238,25 +240,40 @@ fn diff(
     }
   }
   if !pend.is_empty() {
-    // 最後に残った物の後ろ。残らなければ容器の自分の尻
-    let pos = match kept {
-      Some(id) => at(id).to
-      None => slot.own
-    }
-    let text = indent(join(pend, slot.sep), slot.col)
-    if kept is None && slot.own == 0 {
-      // 文書の頭。何かが続くときだけ、その手前に隙間を置く
-      let follows = skip_newlines(r.md, edge) < r.md.length()
-      r.out.push(insert(r, pos, text + (if follows { slot.sep } else { "" })))
-    } else {
-      r.out.push(insert(r, pos, slot.sep + pad(slot.col) + text))
+    match kept {
+      Some(id) => r.out.push(insert(r, at(id).to, behind(c, pend)))
+      None => {
+        // 空になった列（元の尻は最後に消えた物の尻）か、元から空の列
+        let tail = match olds.last() {
+          Some(id) => at(id).to
+          None => c.own
+        }
+        r.out.push(insert(r, c.own, first(r, c, pend, tail)))
+      }
     }
   }
 }
 
 ///|
-fn join(parts : Array[String], sep : String) -> String {
-  parts.join(sep)
+/// 残る物の後ろに置く並び。隙間を挟んで、容器の桁に揃える
+fn behind(c : Container, parts : Array[String]) -> String {
+  c.sep + pad(c.col) + indent(parts.join(c.sep), c.col)
+}
+
+///|
+/// 空の容器に置く並び。文書の頭には前が無いので、隙間は後ろ — それも続きが有るときだけ
+/// （`tail` は列の尻。その先に字が無ければ文書の尻）。
+fn first(
+  r : Reflect,
+  c : Container,
+  parts : Array[String],
+  tail : Int,
+) -> String {
+  if !c.head {
+    return behind(c, parts)
+  }
+  let follows = skip_newlines(r.md, tail) < r.md.length()
+  indent(parts.join(c.sep), c.col) + (if follows { c.sep } else { "" })
 }
 
 ///|
@@ -275,10 +292,9 @@ fn kids(
     Some(ListNode(_)) => true
     _ => false
   }
-  let slot : Slot = { own, col, sep: sep(r, item, ids(olds)) }
   diff(
     r,
-    slot,
+    container(own, col, sep(r, item, ids(olds))),
     ids(olds),
     ids(news),
     id => walk(r, now.get(id).unwrap(), depth, sides.get(id).unwrap_or([])),
@@ -290,7 +306,7 @@ fn kids(
 
 ///|
 /// 中身の列の差分。内容だけ変わった中身はその範囲を置き換える。
-/// 並びが変われば列ごと（容器の自分の尻から最後の中身の尻まで）。
+/// 並びが変われば列ごと — 全部消して全部差す（同じ規則で隙間が付く）。
 /// 中身の間は常に空行 1 つ — 項目の中でも、段落がラベルの続きに読まれないように
 /// （書き手が項目の中身をそう書くのと同じ）。
 fn body(
@@ -307,23 +323,20 @@ fn body(
   let now = Map::from_array(news.map(b => (b.id, b)))
   let old_ids = olds.map(b => b.id)
   let new_ids = news.map(b => b.id)
-  let slot : Slot = { own, col, sep: eol(r) }
+  let c = container(own, col, eol(r))
+  let make = (id : Int) => prose([now.get(id).unwrap()], r.eol)
   if !aligned(old_ids, new_ids) {
-    let to = match olds.last() {
+    diff(r, c, old_ids, [], _ => (), make)
+    let tail = match olds.last() {
       Some(b) => r.spans.get(b.id).unwrap().to
       None => own
     }
-    let text = if news.is_empty() {
-      ""
-    } else {
-      slot.sep + pad(col) + indent(prose(news, r.eol), col)
-    }
-    r.out.push({ from: own, to, insert: text })
+    r.out.push(insert(r, own, first(r, c, [prose(news, r.eol)], tail)))
     return
   }
   diff(
     r,
-    slot,
+    c,
     old_ids,
     new_ids,
     id => {
@@ -333,11 +346,11 @@ fn body(
         r.out.push({
           from: s.from,
           to: s.to,
-          insert: indent(prose([b], r.eol), column(r.md, s.from)),
+          insert: indent(make(id), column(r.md, s.from)),
         })
       }
     },
-    id => prose([now.get(id).unwrap()], r.eol),
+    make,
   )
 }
 
@@ -345,12 +358,11 @@ fn body(
 /// 兄弟の間の隙間。容器に元から 2 つ以上居ればその間を写し、居なければ
 /// 項目の列は詰め、見出しと文書の直下は空行 1 つ。
 fn sep(r : Reflect, item : Bool, olds : Array[Int]) -> String {
-  let eol = eol(r)
   if olds.length() >= 2 {
     let a = r.spans.get(olds[0]).unwrap()
     let b = r.spans.get(olds[1]).unwrap()
     return if slice(r.md, a.to, line_start(r.md, b.from)).contains("\n") {
-      eol
+      eol(r)
     } else {
       ""
     }
@@ -358,7 +370,7 @@ fn sep(r : Reflect, item : Bool, olds : Array[Int]) -> String {
   if item {
     ""
   } else {
-    eol
+    eol(r)
   }
 }
 
@@ -371,37 +383,17 @@ fn eol(r : Reflect) -> String {
 }
 
 ///|
-/// 容器の自分の尻 — 最後の中身の尻、中身が無ければ行の尻。Implicit は行を持たない
-/// ので最初の子の頭（範囲の頭）。
-fn own_end(r : Reflect, x : Node) -> Int {
-  let s = r.spans.get(id_of(x)).unwrap()
-  match x {
+/// 前の木のノードの、自分の尻 — 最後の中身の尻、中身が無ければ行の尻。
+/// Implicit は行を持たないので最初の子の頭（範囲の頭）。地番を引くので前の木のものに限る。
+fn own_end(r : Reflect, old : Node) -> Int {
+  let s = r.spans.get(id_of(old)).unwrap()
+  match old {
     ImplicitNode(_) => s.from
     _ =>
-      match body_of(x).last() {
+      match body_of(old).last() {
         Some(b) => r.spans.get(b.id).unwrap().to
         None => line_end(r.md, s.from)
       }
-  }
-}
-
-///|
-/// その位置の行の頭。
-fn line_start(md : String, at : Int) -> Int {
-  at - column(md, at)
-}
-
-///|
-/// その位置の行の尻（改行の次）。末尾に改行が無ければ文書の尻。
-fn line_end(md : String, at : Int) -> Int {
-  let mut i = at
-  while i < md.length() && md[i] != '\n' {
-    i = i + 1
-  }
-  if i < md.length() {
-    i + 1
-  } else {
-    i
   }
 }
 
@@ -424,8 +416,8 @@ fn pad(n : Int) -> String {
 /// 位置 pos に text を差す編集。行の途中（改行の無い末尾）なら改行してから。
 /// 行頭の字下げの後ろは行頭と同じ（項目のマーカーの手前がそこ）。
 fn insert(r : Reflect, pos : Int, text : String) -> Edit {
-  let text = if skip_blank(r.md, pos - column(r.md, pos), pos) < pos {
-    "\n" + text
+  let text = if skip_blank(r.md, line_start(r.md, pos), pos) < pos {
+    eol(r) + text
   } else {
     text
   }
@@ -496,16 +488,9 @@ fn with_body(x : Node, body : Array[Block]) -> Node {
 }
 
 ///|
-/// ノード自身が同じか — ラベル・中身・畳み。子は見ない。
+/// ノード自身が同じか — 行（ラベル・畳み）と中身。子は見ない。
 fn same(a : Node, b : Node) -> Bool {
-  match (a, b) {
-    (HeadingNode(p), HeadingNode(q)) =>
-      p.label == q.label && p.fold == q.fold && p.body == q.body
-    (ListNode(p), ListNode(q)) =>
-      p.label == q.label && p.fold == q.fold && p.body == q.body
-    (ImplicitNode(_), ImplicitNode(_)) => true
-    _ => false
-  }
+  same_line(a, b) && body_of(a) == body_of(b)
 }
 
 ///|

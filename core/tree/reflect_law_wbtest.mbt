@@ -15,7 +15,7 @@ let corpus : Array[String] = [
   "# r\n\n## a\n\n---\n\n## b\n\n***\n\n## c\n", "---\nk: v\n---\n\nhello\n\n# a\n\n[q]: /r\n",
   "# r\r\n\r\n## a\r\n\r\n### x\r\n", "# r\n\n<details>\n<summary>s</summary>\n\n## a\n\nx\n\n</details>\n\n## b\n",
   "# a\n\n### x\n\n# b", "- a\n\n  text\n\n  - b\n- c\n", "# r\n\n- i\n  - j\n\n## a\n",
-  "hello\n\n- a\n- b\n",
+  "hello\n\n- a\n- b\n", "aaa\n\nbbb\n\n# h\n",
 ]
 
 ///|
@@ -33,7 +33,22 @@ enum Change {
   DropBlock
   /// 最初の中身を置き換える
   SetBlock
-} derive(Show)
+  /// 最初の 2 枚を入れ替える
+  Swap
+}
+
+///|
+fn name(how : Change) -> String {
+  match how {
+    Relabel => "Relabel"
+    Delete => "Delete"
+    Adopt => "Adopt"
+    AddBlock => "AddBlock"
+    DropBlock => "DropBlock"
+    SetBlock => "SetBlock"
+    Swap => "Swap"
+  }
+}
 
 ///|
 /// id のノードを how で変えた木。
@@ -72,6 +87,14 @@ fn changed(doc : Doc, id : Int, how : Change) -> Doc {
             }),
           ),
         )
+      Swap => {
+        let bs = body_of(x)
+        if bs.length() < 2 {
+          Some(x)
+        } else {
+          Some(with_body(x, [bs[1], bs[0]] + bs[2:].to_owned()))
+        }
+      }
     }
   })
 }
@@ -101,7 +124,7 @@ fn under_fold(doc : Doc, id : Int) -> Bool {
 }
 
 ///|
-/// 全文へ落ちた編集列か。
+/// 全文へ落ちた編集列か（根を全部消したときも同じ形になるが、そのとき残るノードは無い）。
 fn whole(md : String, edits : Array[Edit]) -> Bool {
   edits.length() == 1 && edits[0].from == 0 && edits[0].to == md.length()
 }
@@ -121,6 +144,9 @@ fn grain(
   if !flat(md).contains("\n\n\n") && flat(out).contains("\n\n\n") {
     fail("\{what}: 連続空行が生まれた\n--- md\n\{md}\n--- out\n\{out}")
   }
+  if !flat(md).has_prefix("\n") && flat(out).has_prefix("\n") {
+    fail("\{what}: 頭に空行が生まれた\n--- out\n\{out}")
+  }
   if whole(md, edits) {
     return
   }
@@ -128,16 +154,14 @@ fn grain(
   for r in after.roots {
     index(news, r.node)
   }
+  let olds : Map[Int, Node] = Map([])
+  for r in before.roots {
+    index(olds, r.node)
+  }
   for id in all_ids(before) {
     guard news.get(id) is Some(x) else { continue }
     let old = spans.get(id).unwrap()
-    guard !(x is ImplicitNode(_)) && under_fold(before, id) == false else {
-      continue
-    }
-    let olds : Map[Int, Node] = Map([])
-    for r in before.roots {
-      index(olds, r.node)
-    }
+    guard !(x is ImplicitNode(_)) && !under_fold(before, id) else { continue }
     guard same_line(olds.get(id).unwrap(), x) else { continue }
     let line_to = line_end(md, old.from)
     for e in edits {
@@ -329,13 +353,13 @@ test "法則 — 行の不可侵と隙間の保存。全ノード × 全部の�
   for md in corpus {
     let (before, spans) = survey(md)
     for id in all_ids(before) {
-      for how in [Relabel, Delete, Adopt, AddBlock, DropBlock, SetBlock] {
+      for how in [Relabel, Delete, Adopt, AddBlock, DropBlock, SetBlock, Swap] {
         let after = changed(before, id, how)
         // 書けない木（根の中身の `---` が側の変わり目に化けるなど）は check が断る
         if after == before || !check(after).is_empty() {
           continue
         }
-        let what = "\{how} \{id} in \{md}"
+        let what = "\{name(how)} \{id} in \{md}"
         let edits = law(md, before, spans, after, what)
         grain(md, before, spans, after, edits, what)
       }

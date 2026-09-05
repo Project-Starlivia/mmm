@@ -243,7 +243,8 @@ fn owner_of(doc : @tree.Doc, block : Int) -> Int? {
 }
 
 ///|
-/// 畳まれた部分木の中に居るか（自分も含む）
+/// 畳まれた部分木の中に居るか（自分も含む）。tree の私有関数は見えないので、
+/// 項目の子は `@tree.ListNode` に包み直して歩く（reflect_law_wbtest.mbt にも同じものが在る）
 fn under_fold(doc : @tree.Doc, id : Int) -> Bool {
   fn go(x : @tree.Node, fold : Bool) -> Bool {
     let (here, mine, kids) = match x {
@@ -342,12 +343,13 @@ test "法則 — 目印の生存。中身だけを変えれば、持ち主のラ
         let got = t.bind(x => x.id)
         if got != expect[k] {
           bad.push(
-            "\{what}: 目印 \{k} が \{expect[k]} でなく \{got} に着く",
+            "\{what}: 目印 \{k} が \{expect[k].to_json().stringify()} でなく \{got.to_json().stringify()} に着く",
           )
         }
       }
     }
   }
-  inspect(seen > 100, content="true")
+  // 網の広さ。corpus か ops_for を触れば動く
+  inspect(seen, content="108")
   json_inspect(bad, content=[])
 }

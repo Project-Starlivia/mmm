@@ -606,3 +606,29 @@ test "文書の頭の散文 — 隙間は後ろに付く" {
   let first = reflect("", b3, s3, { ..b3, body: blocks([Opaque("bye")]) })
   inspect(apply("", first), content="bye\n")
 }
+
+///|
+test "文書の頭の中身を並べ替えても、頭に空行は生まれない" {
+  let md = "aaa\n\nbbb\n\n# h\n"
+  let (before, spans) = survey(md)
+  let bs = before.body
+  let edits = reflect(md, before, spans, { ..before, body: [bs[1], bs[0]] })
+  inspect(apply(md, edits), content="bbb\n\naaa\n\n# h\n")
+  let solo = "p1\n\np2\n"
+  let (b2, s2) = survey(solo)
+  let e2 = reflect(solo, b2, s2, { ..b2, body: [b2.body[1], b2.body[0]] })
+  inspect(apply(solo, e2), content="p2\n\np1\n")
+}
+
+///|
+test "CRLF の文書の、改行の無い末尾に差すときも CRLF" {
+  let md = "# r\r\n\r\n## a"
+  let (before, spans) = survey(md)
+  let edits = reflect(
+    md,
+    before,
+    spans,
+    change(before, 0, [], adopt(fresh("c"))),
+  )
+  inspect(apply(md, edits), content="# r\r\n\r\n## a\r\n\r\n## c\r\n")
+}

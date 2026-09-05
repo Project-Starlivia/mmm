@@ -129,16 +129,8 @@ fn closing(md : String, block : @markdown.Block, to : Int) -> Int {
   while i < md.length() && (md[i] == ' ' || md[i] == '\t') {
     i = i + 1
   }
-  if i >= md.length() {
-    i
-  } else if md[i] == '\n' {
-    i + 1
-  } else if md[i] == '\r' {
-    if i + 1 < md.length() && md[i + 1] == '\n' {
-      i + 2
-    } else {
-      i + 1
-    }
+  if i >= md.length() || md[i] == '\n' || md[i] == '\r' {
+    line_end(md, i)
   } else {
     to
   }
@@ -199,6 +191,26 @@ fn column(md : String, at : Int) -> Int {
     i = i - 1
   }
   at - i
+}
+
+///|
+/// その位置の行の頭。
+fn line_start(md : String, at : Int) -> Int {
+  at - column(md, at)
+}
+
+///|
+/// その位置の行の尻（改行の次）。末尾に改行が無ければ文書の尻。
+fn line_end(md : String, at : Int) -> Int {
+  let mut i = at
+  while i < md.length() && md[i] != '\n' {
+    i = i + 1
+  }
+  if i < md.length() {
+    i + 1
+  } else {
+    i
+  }
 }
 
 ///|
