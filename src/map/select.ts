@@ -58,14 +58,29 @@ export function rubber(L: Layout, r: Rect): Selection {
   return { ids, anchor: last(ids) };
 }
 
-/** world の点がどの箱に居るか。重なりは文書順の後ろが上。外なら null */
-export function hit(L: Layout, x: number, y: number): number | null {
+/** 点から矩形までの距離。中なら 0 */
+const distTo = (r: Rect, x: number, y: number): number =>
+  Math.hypot(Math.max(r.x - x, 0, x - (r.x + r.w)), Math.max(r.y - y, 0, y - (r.y + r.h)));
+
+/**
+ * world の点がどの箱に居るか。箱の外でも `pad` 以内なら当たる（見た目は変えず、
+ * 当たりだけ広げる。pad は呼び手が画面の px から world に直す）。
+ * 複数に掛かれば近い箱、同じ距離なら文書順の後ろ。外なら null
+ */
+export function hit(L: Layout, x: number, y: number, pad: number): number | null {
+  let best: number | null = null;
+  let near = pad;
   for (let i = L.order.length - 1; i >= 0; i--) {
     const id = L.order[i];
     const b = L.boxes.get(id);
-    if (b && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h) return id;
+    if (!b) continue;
+    const d = distTo(b, x, y);
+    if (d <= near && (best === null || d < near)) {
+      best = id;
+      near = d;
+    }
   }
-  return null;
+  return best;
 }
 
 export const all = (L: Layout): Selection => ({ ids: sorted(L.order), anchor: last(L.order) });

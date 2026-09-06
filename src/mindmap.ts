@@ -18,7 +18,7 @@ import { indicatorFor, isLost, nearest } from "./map/indicator.ts";
 import { type Intent, type Key, keyed, keyedCard } from "./map/keys.ts";
 import { LabelEditor } from "./map/label.ts";
 import { type Layout, cardRect, layoutMap, ownerOf, rootBox } from "./map/layout.ts";
-import { labelOf, nodeSize } from "./map/metrics.ts";
+import { HIT_PAD, labelOf, nodeSize } from "./map/metrics.ts";
 import { ContextMenu } from "./map/menu.ts";
 import { CardPick } from "./map/pick.ts";
 import { MapRenderer } from "./map/render.ts";
@@ -403,11 +403,11 @@ export class Mindmap {
     });
   }
 
-  /** 画面の点がどの箱に居るか。無ければ null */
+  /** 画面の点がどの箱に居るか。箱の外でも画面 HIT_PAD px 以内なら当たる。無ければ null */
   private nodeAt(clientX: number, clientY: number): number | null {
     const p = this.local(clientX, clientY);
     const w = toWorld(this.camera, p.x, p.y);
-    return hit(this.layout, w.x, w.y);
+    return hit(this.layout, w.x, w.y, HIT_PAD / this.camera.k);
   }
 
   /** 見失った選択（無ければ根）を控えめな針で指す。決めは indicator.ts が持つ */

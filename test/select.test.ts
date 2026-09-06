@@ -48,8 +48,24 @@ test("矩形 — 触れる箱を全部。anchor は文書順の最後", () => {
 test("点 — どの箱に居るか。外なら null", () => {
   const a = L.boxes.get(2);
   if (!a) throw new Error("a が無い");
-  assert.equal(hit(L, a.x + 1, a.y + 1), 2);
-  assert.equal(hit(L, a.x + a.w + 1, a.y), null);
+  assert.equal(hit(L, a.x + 1, a.y + 1, 0), 2);
+  assert.equal(hit(L, a.x + a.w + 1, a.y, 0), null);
+});
+
+// r は (0, 0) から 100 × 30、a は右隣 (145, 0) から。隙間は 100 〜 145
+test("点 — 余白のぶん箱の外でも当たる。角は箱までの距離で測る", () => {
+  assert.equal(hit(L, 105, 15, 8), 1);
+  assert.equal(hit(L, 105, 15, 0), null);
+  assert.equal(hit(L, 110, 15, 8), null);
+  // 角: (6, 6) 離れは √72 ≈ 8.5
+  assert.equal(hit(L, 106, 36, 8), null);
+  assert.equal(hit(L, 106, 36, 9), 1);
+});
+
+test("点 — 余白が被ったら近い箱。同じ距離なら文書順の後ろ", () => {
+  assert.equal(hit(L, 115, 15, 30), 1);
+  assert.equal(hit(L, 130, 15, 30), 2);
+  assert.equal(hit(L, 122.5, 15, 30), 2);
 });
 
 test("矢印 — 上下は同じ深さの列を端でループ、何も選んでいなければ先頭", () => {

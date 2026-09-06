@@ -14,6 +14,8 @@ import type * as core from "../coreApi.ts";
 import type { CardRow } from "./cards.ts";
 
 export const HIDDEN_MAX_W = 150; // 畳んだノードはこれより広くならない
+/** 箱の当たりを見た目より外へ広げる幅（画面 px）。30px の箱が 46px になり、触れる大きさの目安（44pt）に届く */
+export const HIT_PAD = 8;
 
 // ---- カード行の寸法。**ここが唯一の定義** ----
 
