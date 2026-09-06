@@ -433,35 +433,103 @@ pub fn mmm_map_set_grab(map : @core.Any, on : Bool) -> Unit {
 }
 
 ///|
-/// ファイルのドラッグ中、その画面の点に落ちる先を予告する。`on` が偽なら予告を消す。
-/// 落ちる先のノードの id（無ければ undefined）
-#export_name("mmmMapFileDrop")
-pub fn mmm_map_file_drop(
-  map : @core.Any,
-  x : Double,
-  y : Double,
-  on : Bool,
-) -> Int? {
-  map_of(map).mark_file_drop(if on { Some({ x, y, }) } else { None })
+/// 落とされたファイルの振り分け（core/file/dnd.mbt）。予告は地図が持つ。
+/// ts が渡すのは failed / openMarkdown（札を受けて開く）/ addImage（絵とノードを受けて置く）
+#export_name("mmmDrop")
+pub fn mmm_drop(map : @core.Any, deps : @core.Any) -> Unit {
+  let call = (name : String, args : Array[@core.Any]) => deps._call(name, args)
+  @file.init_drop(@dom.document(), {
+    open_markdown: async fn(file) {
+      @web.settled(call("openMarkdown", [file.as_any()])).wait() |> ignore
+    },
+    add_image: async fn(blob, node) {
+      @web.settled(call("addImage", [blob, @core.any(node)])).wait() |> ignore
+    },
+    mark_drop: at => {
+      map_of(map).mark_file_drop(at.map(p => ({ x: p.0, y: p.1, } : @map.Pt)))
+    },
+    failed: msg => call("failed", [@core.any(msg)]) |> ignore,
+  })
+}
+
+// ---- 書き出し ----
+//
+// マップを外へ出す（core/app/export.mbt）。ts が渡すのは map（持ち手。無ければ null）/
+// name / failed / blocked / empty。ボタンの言い分・並び・出し口は core が持つ
+
+///|
+fn export_deps_of(v : @core.Any) -> @app.ExportDeps {
+  let call = (name : String, args : Array[@core.Any]) => v._call(name, args)
+  let map = v._get("map")
+  {
+    svg: async fn() { if defined(map) { map_of(map).to_svg() } else { None } },
+    name: () => call("name", []).cast(),
+    failed: msg => call("failed", [@core.any(msg)]) |> ignore,
+    blocked: msg => call("blocked", [@core.any(msg)]) |> ignore,
+    empty: () => call("empty", []).cast(),
+  }
 }
 
 ///|
-/// 書き出しに写すもの。`rects`（文書順の箱。x, y, w, h）と `edges` / `nodes`（要素）
-#export_name("mmmMapSvgParts")
-pub fn mmm_map_svg_parts(map : @core.Any) -> @core.Any {
-  let (rects, edges, nodes) = map_of(map).svg_parts()
-  let o = @core.new_object()
-  o._set(
-    "rects",
-    @core.any(
-      FixedArray::from_array(
-        rects.map(r => ([r.x, r.y, r.w, r.h] : FixedArray[Double])),
-      ),
-    ),
+/// ヘッダの書き出し。返るのは持ち手
+#export_name("mmmExport")
+pub fn mmm_export(
+  deps : @core.Any,
+  button : @dom.Element,
+  way_button : @dom.Element,
+) -> @core.Any {
+  @core.any(
+    @app.Export::new(@dom.document(), export_deps_of(deps), button, way_button),
   )
-  o._set("edges", @core.any(edges))
-  o._set("nodes", @core.any(nodes))
-  o
+}
+
+///|
+fn export_of(handle : @core.Any) -> @app.Export {
+  handle.cast()
+}
+
+///|
+/// キー（Mod+E）。ボタンと同じものを走らせる
+#export_name("mmmExportRun")
+pub fn mmm_export_run(e : @core.Any) -> Unit {
+  export_of(e).run()
+}
+
+///|
+/// キー（Mod+Shift+E）。出し方を選び直す
+#export_name("mmmExportChoose")
+pub fn mmm_export_choose(e : @core.Any) -> Unit {
+  export_of(e).choose()
+}
+
+///|
+/// 文書が変わった。押せるかどうかを見直す
+#export_name("mmmExportRefresh")
+pub fn mmm_export_refresh(e : @core.Any) -> Unit {
+  export_of(e).refresh()
+}
+
+///|
+/// 出し方の並び（並べて見るため）
+#export_name("mmmExportWays")
+pub fn mmm_export_ways(deps : @core.Any) -> @dom.Element {
+  @parts.rows(@dom.document(), @app.export_ways(export_deps_of(deps), None))
+}
+
+// ---- お絵描き ----
+
+///|
+/// 描いてもらって、その絵を。取りやめは null
+#export_name("mmmShowDrawing")
+pub fn mmm_show_drawing() -> @js_async.Promise[@core.Any] {
+  promised(async fn() { @core.from_option(@app.show_drawing(@dom.document())) })
+}
+
+///|
+/// お絵描きの form（並べて見るため。押しても何も起きない）
+#export_name("mmmDrawForm")
+pub fn mmm_draw_form() -> @dom.Element {
+  @app.draw_form(@dom.document(), () => (), _ => ()).0
 }
 
 // ---- 部品 ----

@@ -228,12 +228,18 @@ pub fn set_disabled(e : @dom.Element, off : Bool) -> Unit {
 ///|
 /// 文書の根に効いている CSS 変数の値（空白は落とす）
 pub fn css_var(doc : @dom.Document, name : String) -> String {
-  let v : String = window_of(doc)
-    ._call("getComputedStyle", [@core.any(doc.documentElement())])
-    ._call("getPropertyValue", [@core.any(name)])
-    .cast()
-  v.trim(chars=" \t\r\n").to_owned()
+  computed(doc.documentElement(), name)
 }
+
+///|
+/// その要素に効いている計算済みの値（空白は落とす）。CSS 変数も読める
+pub extern "js" fn computed(e : @dom.Element, name : String) -> String =
+  #| (e, name) => e.ownerDocument.defaultView.getComputedStyle(e).getPropertyValue(name).trim()
+
+///|
+/// 閉じて、答えを添える（`returnValue`）
+pub extern "js" fn close_with(dialog : @dom.Element, value : String) -> Unit =
+  #| (d, v) => d.close(v)
 
 ///|
 pub fn head(doc : @dom.Document) -> @dom.Element {

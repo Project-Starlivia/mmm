@@ -1,6 +1,6 @@
 // 部品 × 状態の表。**見本の値は core と src の表から引く** — 絵の名前・しらせの言葉・
 // 言い出し・たずね（core/parts・core/app）、メニューの並び（core/map/context.mbt /
-// files.ts / more.ts / export.ts）。ここが持つのは「どの状態で呼ぶか」だけで、
+// files.ts / more.ts / core/app/export.mbt）。ここが持つのは「どの状態で呼ぶか」だけで、
 // 綴りも並びも持たない。
 //
 // テーマは部品の話ではないので、ここには無い（index.ts が枠に振る）。
@@ -9,8 +9,6 @@ import * as core from "../../src/coreApi.ts";
 import { askForm, icon, menu, notice, paneHint } from "../../src/coreApi.ts";
 import { type Files, filesMenu } from "../../src/app/files.ts";
 import { moreMenu } from "../../src/app/more.ts";
-import { exportWays } from "../../src/app/export.ts";
-import { drawForm } from "../../src/app/draw.ts";
 import type { Part } from "./kind.ts";
 import { MAP, named, sample } from "./map.ts";
 
@@ -82,8 +80,8 @@ const MORE_ACTS = {
   open: nothing,
 };
 /** 書き出しの並びが要るもの。出すもの以外は使われない */
-const exportDeps = (empty: boolean) => ({
-  map: { exportSvg: () => Promise.resolve(null) },
+const exportDeps = (empty: boolean): core.ExportDeps => ({
+  map: null,
   name: () => "notes.md",
   failed: nothing,
   blocked: nothing,
@@ -166,14 +164,14 @@ export const PARTS: Part[] = [
             MORE_ACTS,
           ),
         ),
-      "export-ways": () => menu(exportWays(exportDeps(false))),
-      "export-empty": () => menu(exportWays(exportDeps(true))),
+      "export-ways": () => core.exportWays(exportDeps(false)),
+      "export-empty": () => core.exportWays(exportDeps(true)),
     },
   },
   {
     name: "draw",
     height: 560,
-    states: { open: () => opened(drawForm({ cancel: nothing, insert: nothing }).form) },
+    states: { open: () => opened(core.drawForm()) },
   },
   MAP,
 ];

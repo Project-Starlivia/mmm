@@ -13,6 +13,7 @@ import {
 
 import {
   "moonbitlang/async",
+  "mizchi/js_browser/test_utils",
 } for "wbtest"
 
 supported_targets = "js"

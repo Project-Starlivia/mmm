@@ -5,7 +5,6 @@
 import * as core from "./coreApi.ts";
 import { measure } from "./map/measure.ts";
 import { languageEpoch, tokenize, tokenizeBlock } from "./map/highlight.ts";
-import { mapToSvg } from "./map/toSvg.ts";
 
 export interface MapHost {
   /** いまの文書（core の読みの持ち手。置くのに要る） */
@@ -41,11 +40,10 @@ export interface MapHost {
 }
 
 export class Mindmap {
-  private readonly pane: HTMLElement;
-  private readonly handle: core.MapHandle;
+  /** core の地図そのもの。書き出し・ドロップはこれを渡す */
+  readonly handle: core.MapHandle;
 
   constructor(pane: HTMLElement, host: MapHost) {
-    this.pane = pane;
     this.handle = core.map(
       pane,
       {
@@ -105,17 +103,5 @@ export class Mindmap {
   /** 掴みやすさ（⋯ の Easy grab）。見た目は変えず、叩ける範囲だけ広げる */
   setGrab(on: boolean): void {
     core.mapSetGrab(this.handle, on);
-  }
-
-  /** ファイルのドラッグ中、その画面の点に落ちる先を予告する（app/dnd.ts）。
-   *  `null` は予告を消す合図。当たった先のノードの id（無ければ null）を返す */
-  markFileDrop(at: { x: number; y: number } | null): number | null {
-    return core.mapFileDrop(this.handle, at);
-  }
-
-  /** 書き出し用の SVG。全体。空なら null */
-  exportSvg(): Promise<SVGSVGElement | null> {
-    const p = core.mapSvgParts(this.handle);
-    return mapToSvg({ boxes: p.rects, edges: p.edges, nodes: p.nodes, pane: this.pane });
   }
 }

@@ -14,11 +14,8 @@ import { type Doc, blocked, failed, fromHash, hasImages, io, LINK_WARN_LENGTH, o
 import * as st from "./state.ts";
 import { MdEditor } from "./editor.ts";
 import { Mindmap, type MapHost } from "./mindmap.ts";
-import { initExport } from "./app/export.ts";
 import { NOTHING_TO_RENAME, NO_FILE_ACCESS, NO_RENAME_HERE, filesMenu } from "./app/files.ts";
 import { moreMenu } from "./app/more.ts";
-import { initDrop } from "./app/dnd.ts";
-import { showDrawing } from "./app/draw.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 
 /**
@@ -94,7 +91,7 @@ function onUpdate(s: EditorState, prev: EditorState | null): void {
     editor.showHint(core.empty(t));
     updateDirty();
     showName();
-    exportApi.refresh();
+    core.exportRefresh(exportApi);
     // 何も無いところに最初の木が生まれた瞬間だけ、真ん中へ寄せる
     const wasEmpty = prev === null || core.empty(prev.field(st.tree));
     if (wasEmpty && !core.empty(t)) map.fitView();
@@ -458,7 +455,7 @@ let drawingOpen = false;
 function draw(id: number): void {
   if (drawingOpen) return;
   drawingOpen = true;
-  void showDrawing()
+  void core.showDrawing()
     .then((blob) => (blob === null ? undefined : attachImage(id, blob)))
     .catch((error: unknown) => {
       console.error("drawing failed:", error);
@@ -644,21 +641,18 @@ window.addEventListener("beforeunload", (event) => {
   event.returnValue = "";
 });
 
-// ---------- ドラッグ & ドロップ（振り分けは app/dnd.ts） ----------
+// ---------- ドラッグ & ドロップ（振り分けは core/file/dnd.mbt） ----------
 
-initDrop({
-  markDrop: (at) => map.markFileDrop(at),
+core.drop(map.handle, {
   failed,
   async openMarkdown(file) {
     if (!(await confirmDiscard())) return;
     applyDoc(await io.openHandle(file));
   },
-  async addImages(files, node) {
-    for (const file of files) await attachImage(node, await file.getFile());
-  },
+  addImage: (blob, node) => attachImage(node, blob),
 });
 
-// ---------- ペイン / 書き出し / テーマ / キー（実装は core/app と app/export.ts） ----------
+// ---------- ペイン / 書き出し / テーマ / キー（実装は core/app） ----------
 
 const panes = core.panes({
   mdPane,
@@ -668,15 +662,11 @@ const panes = core.panes({
   focusEditor: () => editor.focus(),
 });
 
-const exportApi = initExport({
-  map,
-  name: docName,
-  failed,
-  blocked,
-  empty: () => core.empty(doc()),
-  button: el("export", HTMLButtonElement),
-  wayButton: el("export-way", HTMLButtonElement),
-});
+const exportApi = core.exportMap(
+  { map: map.handle, name: docName, failed, blocked, empty: () => core.empty(doc()) },
+  el("export", HTMLButtonElement),
+  el("export-way", HTMLButtonElement),
+);
 
 const theme = core.theme(elLogo, (dark) => editor.setTheme(dark));
 
@@ -688,7 +678,7 @@ core.shortcuts({
   togglePaneVis: (which) => core.togglePaneVis(panes, which),
   undo: () => editor.undo(),
   redo: () => editor.redo(),
-  export: (choose) => (choose ? exportApi.choose() : exportApi.run()),
+  export: (choose) => (choose ? core.exportChoose(exportApi) : core.exportRun(exportApi)),
 });
 
 // ---------- boot ----------

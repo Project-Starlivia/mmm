@@ -414,3 +414,29 @@ test "ホイールは動かし、Ctrl+ホイールは拡大。視点は world �
   wheel(-100, true)
   assert_true(s.map.camera.k > 1.0)
 }
+
+///|
+async test "to_svg: 全体を 1 枚に。選択の印は写さず画面には残す。透かしが付き、空なら None" {
+  let s = stand()
+  defer s.win.close()
+  s.stub.selection = { ids: [3], anchor: Some(3), }
+  s.map.refresh_selection()
+  assert_true(@web.has_class(s.map.renderer.node_el(3).unwrap(), "selected"))
+  let svg = s.map.to_svg().unwrap()
+  assert_eq(svg.tagName(), "svg")
+  assert_eq(svg.getAttribute("xmlns"), Some(@web.svg_ns))
+  assert_eq(svg.getAttribute("viewBox").unwrap().split(" ").count(), 4)
+  // 写しに class は残らず、選択の印も無い。画面の側には戻っている
+  assert_eq(svg.querySelectorAll(".selected").length(), 0)
+  assert_eq(svg.querySelectorAll("[class]").length(), 0)
+  assert_true(@web.has_class(s.map.renderer.node_el(3).unwrap(), "selected"))
+  // 線・ノード・透かしの 3 つの層
+  let layers = svg.children()
+  assert_eq(layers.length(), 3)
+  assert_eq(layers[1].children().length(), s.map.layout.order.length())
+  assert_eq(layers[2].tagName(), "a")
+  assert_eq(layers[2].textContent(), "made with mmm")
+  let empty = stand(md="")
+  defer empty.win.close()
+  assert_true(empty.map.to_svg() is None)
+}
