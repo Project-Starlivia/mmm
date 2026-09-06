@@ -780,3 +780,28 @@ test "畳みと側" {
     ),
   )
 }
+
+// ══════════════════════════════════════════════════════════════════
+// 名前 — md の 1 行の原文。mmm は字を足しも引きもしない
+// ══════════════════════════════════════════════════════════════════
+
+///|
+test "名前の字はそのまま — 逃がさず、強調にも直さない" {
+  inspect(serialize(doc([root(h("foo_bar"))])), content="# foo_bar\n")
+  inspect(serialize(doc([root(h("__init__"))])), content="# __init__\n")
+  inspect(serialize(doc([root(h("a\\_b"))])), content="# a\\_b\n")
+  inspect(serialize(doc([root(h("# node"))])), content="# # node\n")
+  inspect(serialize(doc([root(item("foo_bar"))])), content="- foo_bar\n")
+  inspect(serialize(doc([root(item("__init__"))])), content="- __init__\n")
+  inspect(serialize(doc([root(item("# node"))])), content="- # node\n")
+}
+
+///|
+test "名前の字はそのまま — 子と中身を持っても行は変わらない" {
+  inspect(
+    serialize(
+      doc([root(h("a_b", children=[item("c*d", children=[li("e_f")])]))]),
+    ),
+    content="# a_b\n\n- c*d\n  - e_f\n",
+  )
+}

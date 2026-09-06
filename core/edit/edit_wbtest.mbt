@@ -14,6 +14,19 @@ test "Rename — 編集を当てれば名前が替わり、focus はそのノー
 }
 
 ///|
+test "Rename — 名前の字はそのまま md に置かれ、読み直しても同じ" {
+  assert_eq(
+    applied("# a\n", Rename(id=2, label="foo_bar")),
+    ("# foo_bar\n", Some(2)),
+  )
+  assert_eq(
+    applied("# a\n", Rename(id=2, label="__init__")),
+    ("# __init__\n", Some(2)),
+  )
+  assert_eq(applied("- a\n", Rename(id=2, label="2*3")), ("- 2*3\n", Some(2)))
+}
+
+///|
 test "できない操作 — 編集は無く、focus も無い" {
   assert_eq(edit("# a\n", Rename(id=9, label="b")), { edits: [], focus: None, })
 }
