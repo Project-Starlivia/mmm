@@ -1,0 +1,69 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm-app/core/main"
+
+import {
+  "mizchi/js_browser/dom",
+  "mmm-app/core/app",
+  "mmm-app/core/file",
+  "mmm-app/core/map",
+  "mmm-app/core/op",
+  "mmm-app/core/read",
+  "mmm-app/core/render",
+  "mmm-app/core/tree",
+  "mmm-app/core/web",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct App {
+  doc : @dom.Document
+  ed : Editor
+  io : @file.Io
+  map : @render.Mindmap
+  assets : @file.Assets
+  theme : @app.Theme
+  exporter : @app.Export
+  md_pane : @dom.Element
+  map_pane : @dom.Element
+  filename : @dom.Element
+  dirty : @dom.Element
+  mut gen : Int
+  mut saved_text : String
+  mut saved_name : String?
+  mut recent : Array[@web.FileHandle]
+  mut drawing_open : Bool
+  mut grab : Bool
+}
+pub fn App::apply(Self, @op.Op, Bool) -> Int?
+pub fn App::boot(Self) -> Unit
+pub fn App::cycle(Self, @read.Survey?, Bool) -> Unit
+pub fn App::new(@dom.Document, Editor, @file.Io, measure? : (@map.Font, String) -> Double) -> Self
+
+pub(all) struct Editor {
+  text : () -> String
+  survey : () -> @read.Survey
+  holder : () -> @read.Holder
+  selection : () -> @map.Selection
+  picked : () -> Int?
+  set_text : (String) -> Unit
+  apply : (Array[Array[@tree.Edit]], Bool, Int?) -> Unit
+  select : (@read.Anchors?) -> Unit
+  hold : (@read.Holder, @read.Anchors?) -> Unit
+  reveal : (Int) -> Unit
+  undo : () -> Unit
+  redo : () -> Unit
+  focus : () -> Unit
+  set_theme : (Bool) -> Unit
+  show_hint : (Bool) -> Unit
+  tokens : (Array[String], String) -> Array[Array[@render.Token]]
+  tokens_block : (String) -> Array[Array[@render.Token]]
+  epoch : () -> Int
+  on_language_ready : (() -> Unit) -> Unit
+}
+
+// Type aliases
+
+// Traits

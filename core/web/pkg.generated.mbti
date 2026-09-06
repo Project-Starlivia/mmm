@@ -8,6 +8,8 @@ import {
 }
 
 // Values
+pub fn address(@dom.Document) -> String
+
 pub fn after(@core.Any, (@core.Any) -> Unit) -> Unit
 
 pub fn attr_in(@core.Any, String, String) -> String?
@@ -29,6 +31,8 @@ pub fn capture(@dom.Element, Int) -> Unit
 pub fn click(@dom.Element) -> Unit
 
 pub fn client_rect(@dom.Element) -> @dom.DOMRect
+
+pub fn clipboard_image(@dom.Document) -> @js_async.Promise[@core.Any]
 
 pub fn clipboard_write(FixedArray[String], FixedArray[@core.Any]) -> @js_async.Promise[Unit]
 
@@ -52,6 +56,8 @@ pub fn download(@core.Any, String) -> Unit
 
 pub fn drag_files(@core.Any) -> FixedArray[String]
 
+pub fn drop_hash(@dom.Document) -> Unit
+
 pub fn dropped_files(@core.Any) -> @js_async.Promise[FixedArray[FileHandle]]
 
 pub fn el(@dom.Document, String, Array[(String, String)]) -> @dom.Element
@@ -69,6 +75,8 @@ pub fn get_dir(DirHandle, String, Bool) -> @js_async.Promise[DirHandle]
 pub fn get_file(DirHandle, String, Bool) -> @js_async.Promise[FileHandle]
 
 pub fn has_class(@dom.Element, String) -> Bool
+
+pub fn hash(@dom.Document) -> String
 
 pub fn head(@dom.Document) -> @dom.Element
 
@@ -142,6 +150,8 @@ pub fn query_permission(@core.Any, String) -> @js_async.Promise[String]
 
 pub fn rasterize(String, Double, Double, String, Double) -> @js_async.Promise[@core.Any]
 
+pub fn read_clipboard(@dom.Document) -> @js_async.Promise[String]
+
 pub fn read_text(FileHandle) -> @js_async.Promise[String]
 
 pub fn read_url(FileHandle, String) -> @js_async.Promise[String]
@@ -190,15 +200,21 @@ pub fn target_in(@core.Any, String) -> @dom.Element?
 
 pub fn text_blob(String, String) -> @core.Any
 
+pub fn text_width(@dom.Document, String, String) -> Double
+
 pub fn to_webp(@core.Any) -> @js_async.Promise[@core.Any]
 
 pub fn toggle_class(@dom.Element, String, Bool) -> Unit
 
 pub fn value(@dom.Element) -> String
 
+pub fn warn_unload(@core.Any) -> Unit
+
 pub fn window_of(@dom.Document) -> @core.Any
 
 pub fn write_blob(FileHandle, @core.Any) -> @js_async.Promise[Unit]
+
+pub fn write_clipboard(@dom.Document, String) -> @js_async.Promise[Unit]
 
 pub fn write_text(FileHandle, String) -> @js_async.Promise[Unit]
 

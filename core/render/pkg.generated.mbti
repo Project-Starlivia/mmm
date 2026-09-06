@@ -18,6 +18,8 @@ pub fn draw_card(@dom.Document, @map.Card, Spot, Scene) -> Array[@dom.Element]
 
 pub fn items_of(Array[@map.Entry], (@map.Intent) -> Unit) -> Array[@parts.Entry]
 
+pub fn measure(@dom.Document) -> (@map.Font, String) -> Double
+
 // Errors
 
 // Types and methods

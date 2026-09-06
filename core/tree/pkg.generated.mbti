@@ -34,6 +34,8 @@ pub fn number(Doc, Int) -> Int?
 
 pub fn parse(String) -> Doc
 
+pub fn patched(String, Array[Edit]) -> String
+
 pub fn prose(Array[Block], Eol) -> String
 
 pub fn read(String) -> @markdown.Document
