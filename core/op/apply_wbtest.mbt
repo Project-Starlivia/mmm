@@ -1278,6 +1278,8 @@ test "apply の結果は check を通る" {
       ops.push(AddNode(at=NodePlace::After(node=to), labels=["n"]))
       ops.push(AddBlock(at=BlockPlace::In(node=to), content=ThematicBreak))
       ops.push(Graft(at=NodePlace::In(node=to, side=None), md="# g\n\n- i\n"))
+      ops.push(Graft(at=NodePlace::In(node=to, side=None), md="- i\n  - j\n"))
+      ops.push(Graft(at=NodePlace::After(node=to), md="![](q.png)\n\ntext\n"))
     }
   }
   let bad = []
@@ -1295,6 +1297,6 @@ test "apply の結果は check を通る" {
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="382")
+  inspect(some, content="512")
   json_inspect(bad, content=[])
 }
