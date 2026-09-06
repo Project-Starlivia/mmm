@@ -1,9 +1,9 @@
 # 見た目の決め
 
 前半は**世の中の定石**（Refactoring UI、Material 3、Apple HIG、WCAG、
-8pt グリッド）から、mmm に効くものだけを引いたコツ。後半は style.css と map/
+8pt グリッド）から、mmm に効くものだけを引いたコツ。後半は style.css と core/map
 の寸法に散っている数字を役ごとに集めた**いまの決め**（数字の源は style.css と
-metrics.ts のまま。ここは見比べるための地図）。部品を横に並べて見るのは
+core/map/metric.mbt のまま。ここは見比べるための地図）。部品を横に並べて見るのは
 `pnpm run lab` → `/parts/`。
 
 決まっていることは断定で、揃っていないところは末尾に問いとして置く。
@@ -115,8 +115,8 @@ metrics.ts のまま。ここは見比べるための地図）。部品を横に
 6px 12px の内側、8 の隙間。ボタンは枠を持たない字 13px、4px 8px、角 6、
 押せないと 0.4。狭いときは 6px 8px と隙間 6。
 
-#### ノードとカード（map/metrics.ts・layout.ts・drawCard.ts）
-親子の間 `GAP.x` 45、兄弟の間 `GAP.y` 10、木と木の間 34。畳んだ箱の上限幅
+#### ノードとカード（core/map/metric.mbt・layout.mbt、core/render/card.mbt）
+親子の間 `gap.x` 45、兄弟の間 `gap.y` 10、木と木の間 34。畳んだ箱の上限幅
 150。リンク行 26、画像のサムネイル高さ 64、画像と svg の最小幅 200、コード
 1 行 15 と上下 8、水平線の行 12、details の字下げ 14。カードの編集欄は枠 2・
 内側 5・字 11。ラベルの欄は枠 2。

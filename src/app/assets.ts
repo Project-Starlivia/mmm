@@ -15,8 +15,7 @@ import { ASKS } from "./asks.ts";
 import { handles } from "./handles.ts";
 import type { Failed } from "./notice.ts";
 import { io } from "./io.ts";
-import { bare } from "../map/cards.ts";
-import { normalizePath, under } from "./head.ts";
+import { bare, normalizePath, under } from "./head.ts";
 
 export interface Assets {
   imageUrl(path: string): string | null;
