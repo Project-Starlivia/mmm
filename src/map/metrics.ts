@@ -14,8 +14,10 @@ import type * as core from "../coreApi.ts";
 import type { CardRow } from "./cards.ts";
 
 export const HIDDEN_MAX_W = 150; // 畳んだノードはこれより広くならない
-/** 箱の当たりを見た目より外へ広げる幅（画面 px）。狙いのズレを吸う 8 では掴みにくく、実機で 20 に決めた */
-export const HIT_PAD = 20;
+// ---- 当たり（⋯ の Easy grab）。見た目は変えず、判定だけ箱の外へ広げる。world px ----
+
+export const HIT_PAD = 41; // 四方。兄弟の隙間(GAP.y)は丸ごと飲み、親子の隙間(GAP.x)はほぼ埋まる
+export const HIT_EDGE = 63; // 子の見えない端のノードが、枝の伸びる向きにさらに伸ばす分
 
 // ---- カード行の寸法。**ここが唯一の定義** ----
 

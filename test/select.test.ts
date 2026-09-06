@@ -6,7 +6,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type * as core from "../src/coreApi.ts";
 import { GAP, type Layout, type SizeOf, layoutMap } from "../src/map/layout.ts";
-import { NONE, all, arrow, click, extend, hit, nextSibling, parentOf, prevSibling, rubber, NOTHING, cardOf, nodesOf } from "../src/map/select.ts";
+import { NONE, type Reach, all, arrow, click, extend, hit, nextSibling, parentOf, prevSibling, rubber, NOTHING, cardOf, nodesOf } from "../src/map/select.ts";
+
+/** 四方に pad だけ。端の伸びは無し */
+const grow = (pad: number): Reach => ({ pad, edge: 0 });
 
 /** 全部 100 × 30 */
 const size: SizeOf = () => ({ w: 100, h: 30 });
@@ -48,24 +51,51 @@ test("矩形 — 触れる箱を全部。anchor は文書順の最後", () => {
 test("点 — どの箱に居るか。外なら null", () => {
   const a = L.boxes.get(2);
   if (!a) throw new Error("a が無い");
-  assert.equal(hit(L, a.x + 1, a.y + 1, 0), 2);
-  assert.equal(hit(L, a.x + a.w + 1, a.y, 0), null);
+  assert.equal(hit(L, a.x + 1, a.y + 1, grow(0)), 2);
+  assert.equal(hit(L, a.x + a.w + 1, a.y, grow(0)), null);
 });
 
 // r は (0, 0) から 100 × 30、a は右隣 (145, 0) から。隙間は 100 〜 145
-test("点 — 余白のぶん箱の外でも当たる。角は箱までの距離で測る", () => {
-  assert.equal(hit(L, 105, 15, 8), 1);
-  assert.equal(hit(L, 105, 15, 0), null);
-  assert.equal(hit(L, 110, 15, 8), null);
-  // 角: (6, 6) 離れは √72 ≈ 8.5
-  assert.equal(hit(L, 106, 36, 8), null);
-  assert.equal(hit(L, 106, 36, 9), 1);
+test("点 — 範囲のぶん箱の外でも当たる。角も範囲の矩形どおり", () => {
+  assert.equal(hit(L, 105, 15, grow(8)), 1);
+  assert.equal(hit(L, 105, 15, grow(0)), null);
+  assert.equal(hit(L, 110, 15, grow(8)), null);
+  assert.equal(hit(L, 107, 37, grow(8)), 1);
+  assert.equal(hit(L, 109, 37, grow(8)), null);
+});
+
+// r(1) → a(2), b(3) → c(4)。みな右の枝、100 × 30。
+// r (0, 20) / a (145, 0) / b (145, 40) / c (290, 40)。端（子が見えない）は a と c
+const M: Layout = layoutMap(
+  [root(node(1, "r", [node(2, "a"), node(3, "b", [node(4, "c")])]), ["Right", "Right"])],
+  size,
+);
+
+test("端の伸び — 子の見えない端だけ、枝の向きに edge。根と親は伸びない。左の枝は左へ", () => {
+  const r = { pad: 8, edge: 60 };
+  assert.equal(hit(M, 390 + 8 + 30, 55, r), 4); // c の右 38 は far の中
+  assert.equal(hit(M, 390 + 8 + 30, 55, grow(8)), null);
+  assert.equal(hit(M, 245 + 8 + 20, 55, r), null); // b の右へは伸びない（子が居る）。c の帯(290 − 8)にも届かない
+  assert.equal(hit(M, -8 - 30, 35, r), null); // 根の左へも伸びない
+  assert.equal(hit(L, -290 - 8 - 30, 15, r), 4); // 左の枝の端 c は左へ伸びる
+  assert.equal(hit(L, -190 + 8 + 20, 15, r), null); // 右（親側）へは伸びない。親 b の帯(−145 − 8)にも届かない
+});
+
+test("点 — 端の伸びだけで届く箱が居れば、y の近さ → x の近さで選ぶ", () => {
+  // 端の a が右へ 60 伸びると、弟 b の子 c の列（x 290〜）に届く
+  const r = { pad: 15, edge: 60 };
+  // (285, 29): c の帯の中（dx 5, dy 11）。a は far だけで届き、y は a の行の中（dy 0）→ 行で読んで a
+  assert.equal(hit(M, 285, 29, r), 2);
+  // 伸びが無ければ直線距離で c
+  assert.equal(hit(M, 285, 29, grow(15)), 4);
+  // (285, 35): y は a も c も 5 → x が近い c
+  assert.equal(hit(M, 285, 35, r), 4);
 });
 
 test("点 — 余白が被ったら近い箱。同じ距離なら文書順の後ろ", () => {
-  assert.equal(hit(L, 115, 15, 30), 1);
-  assert.equal(hit(L, 130, 15, 30), 2);
-  assert.equal(hit(L, 122.5, 15, 30), 2);
+  assert.equal(hit(L, 115, 15, grow(30)), 1);
+  assert.equal(hit(L, 130, 15, grow(30)), 2);
+  assert.equal(hit(L, 122.5, 15, grow(30)), 2);
 });
 
 test("矢印 — 上下は同じ深さの列を端でループ、何も選んでいなければ先頭", () => {

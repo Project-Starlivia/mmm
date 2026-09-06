@@ -23,7 +23,7 @@ import { initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
 import { deriveName } from "./app/name.ts";
 import { initTheme } from "./app/theme.ts";
-import { sweep } from "./app/persist.ts";
+import { LS_GRAB, load, store, sweep } from "./app/persist.ts";
 import { ask } from "./app/ask.ts";
 import { ASKS } from "./app/asks.ts";
 import { NOTHING_TO_RENAME, NO_FILE_ACCESS, NO_RENAME_HERE, filesMenu } from "./app/files.ts";
@@ -617,14 +617,24 @@ openOnClick(elFiles, () =>
   ),
 );
 
+// 掴みやすさ。見た目の好みと同じく localStorage に持つ（"on" 以外は既定の見た目どおり）
+let grab = load(LS_GRAB) === "on";
+const setGrab = (on: boolean): void => {
+  grab = on;
+  map.setGrab(on);
+  store(LS_GRAB, on ? "on" : "off");
+};
+map.setGrab(grab);
+
 openOnClick(elMore, () =>
   moreMenu(
-    { light: theme.isLight(), linkNote: linkNote() },
+    { light: theme.isLight(), grab, linkNote: linkNote() },
     {
       undo: () => editor.undo(),
       redo: () => editor.redo(),
       pickColor: () => theme.pickColor(),
       toggleTheme: () => theme.toggle(),
+      toggleGrab: () => setGrab(!grab),
       copyLink,
       open: openExternal,
     },
