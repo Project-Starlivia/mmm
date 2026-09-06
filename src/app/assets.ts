@@ -15,7 +15,7 @@ import { ASKS } from "./asks.ts";
 import { handles } from "./handles.ts";
 import type { Failed } from "./notice.ts";
 import { io } from "./io.ts";
-import { bare, normalizePath, under } from "./head.ts";
+import * as core from "../coreApi.ts";
 
 export interface Assets {
   imageUrl(path: string): string | null;
@@ -82,11 +82,11 @@ export function imageType(name: string): string | null {
  * md に書かれたパスが、宣言した保存パスの下に収まるか。
  * 収まればフォルダからの相対を断片で返し、外れていれば null。
  *
- * 「その綴りは宣言の下か」の判定は app/head.ts の `under` が唯一の持ち主。
+ * 「その綴りは宣言の下か」の判定は core の `under` が唯一の持ち主。
  * ここが足すのは、**フォルダの中として受け取ってよいか**の柵だけ。
  */
 export function assetTarget(declared: string, path: string): string[] | null {
-  const rest = under(path, declared);
+  const rest = core.under(path, declared);
   if (rest === null) return null;
   const parts = rest.split("/").filter(Boolean);
   if (parts.length === 0) return null;
@@ -133,7 +133,7 @@ export function mdPath(rel: string): string {
  * **確かめられる嘘は全部止めて、確かめられないところだけ人を信じる。**
  */
 export function folderProblem(typed: string, dirName: string | null): string | null {
-  const norm = normalizePath(typed);
+  const norm = core.normalizePath(typed);
   if (norm === null) return "Use a path relative to the .md";
   if (dirName === null) return null;
   const last = norm.split("/").filter(Boolean).pop();
@@ -335,7 +335,7 @@ export function initAssets(deps: {
     }
     // 記録があるのに別の場所を指された。**黙って書き換えない** — 直すのも、
     // 記録を古いままにするのも、人が決める（握りはもう移っている）
-    if (normalizePath(p.computed ?? p.guess) !== was) {
+    if (core.normalizePath(p.computed ?? p.guess) !== was) {
       const typed = await askDeclaration(p, was);
       if (typed !== null) declare(typed);
     }
@@ -536,9 +536,9 @@ export function initAssets(deps: {
         const rel = `${declaredPath()}${parts.join("/")}`;
         // 鍵はカード側が問い合わせてくる形（裸）に合わせる。
         // md へ書くのは mdPath の形（`./x`）。
-        const old = assetUrls.get(bare(rel));
+        const old = assetUrls.get(core.barePath(rel));
         if (old) URL.revokeObjectURL(old);
-        assetUrls.set(bare(rel), URL.createObjectURL(webpBlob));
+        assetUrls.set(core.barePath(rel), URL.createObjectURL(webpBlob));
         return mdPath(rel);
       } catch {
         // **触って失敗した握りは腐っている。** 抜かれた USB・消されたフォルダ

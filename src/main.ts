@@ -10,18 +10,14 @@
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import type { EditorState } from "@codemirror/state";
 import * as core from "./coreApi.ts";
-import type { Anchors, Holder } from "./caret.ts";
 import * as st from "./state.ts";
 import { MdEditor } from "./editor.ts";
 import { Mindmap, type MapHost } from "./mindmap.ts";
-import { type Choice, NOTHING, cardOf, nodesOf } from "./map/select.ts";
 import { handles } from "./app/handles.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
-import { imageFolder, normalizePath, retarget, setImageFolder } from "./app/head.ts";
 import { initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
-import { deriveName } from "./app/name.ts";
 import { initTheme } from "./app/theme.ts";
 import { LS_GRAB, load, store, sweep } from "./app/persist.ts";
 import { ask } from "./app/ask.ts";
@@ -31,7 +27,6 @@ import { moreMenu } from "./app/more.ts";
 import { blocked, failed } from "./app/notice.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
-import { copyText } from "./app/copy.ts";
 import { initDrop } from "./app/dnd.ts";
 import { showDrawing } from "./app/draw.ts";
 import { onLanguageReady } from "./map/highlight.ts";
@@ -66,14 +61,13 @@ const elLogo = el("logo", SVGSVGElement);
 /** 読み口。値は全部 EditorState の field に居る */
 const state = (): EditorState => editor.state;
 const text = (): string => editor.text();
-const doc = (): core.View => state().field(st.tree).view;
-const spots = (): Map<number, core.Spot> => state().field(st.tree).spots;
-const choice = (): Choice => state().field(st.choice);
-const selection = (): core.Selection => nodesOf(choice());
-const picked = (): number | null => cardOf(choice());
-const holder = (): Holder => state().field(st.holder);
+const doc = (): core.Survey => state().field(st.tree);
+const choice = (): core.Choice => state().field(st.choice);
+const selection = (): core.Selection => core.nodesOf(choice());
+const picked = (): number | null => core.cardOf(choice());
+const holder = (): core.Holder => state().field(st.holder);
 /** 選択（id）をいまの木の地番で位置に。CodeMirror へ渡すのはこの形 */
-const anchorsFor = (c: Choice): Anchors => st.anchorsFor(state().field(st.tree), c);
+const anchorsFor = (c: core.Choice): core.Anchors => core.anchorsFor(doc(), c);
 
 /**
  * loadText を呼ぶたびに進む世代番号。
@@ -86,14 +80,14 @@ let docGen = 0;
 let savedText = "";
 /**
  * 保存済みのファイル名。まだ保存していない文書では null で、名前は本文の
- * 見出しから導出する（app/name.ts）。「無題」という状態は持たない。
+ * 見出しから導出する（core の name）。「無題」という状態は持たない。
  */
 let savedName: string | null = null;
 
 /** 頭が言っている画像フォルダ（正規化済み）。無ければ null */
 const declaredFolder = (): string | null => {
-  const raw = imageFolder(doc().frontmatter);
-  return raw === null ? null : normalizePath(raw);
+  const raw = core.imageFolder(doc());
+  return raw === null ? null : core.normalizePath(raw);
 };
 
 // ---------- サイクル ----------
@@ -108,13 +102,13 @@ function onUpdate(s: EditorState, prev: EditorState | null): void {
   if (prev === null || prev.field(st.tree) !== t) {
     map.render();
     // 白紙の言い出し。**出る理由は 1 つ**（まだ木が無い）で、マップ側も render() の中で同じことを見ている
-    editor.showHint(t.view.roots.length === 0);
+    editor.showHint(core.empty(t));
     updateDirty();
     showName();
     exportApi.refresh();
     // 何も無いところに最初の木が生まれた瞬間だけ、真ん中へ寄せる
-    const wasEmpty = prev === null || prev.field(st.tree).view.roots.length === 0;
-    if (wasEmpty && t.view.roots.length > 0) map.fitView();
+    const wasEmpty = prev === null || core.empty(prev.field(st.tree));
+    if (wasEmpty && !core.empty(t)) map.fitView();
   } else {
     map.refreshSelection();
   }
@@ -122,18 +116,18 @@ function onUpdate(s: EditorState, prev: EditorState | null): void {
 
 /** 地図で選び直した。id を位置に写して CodeMirror に置く（md 側の薄塗りは field が引き直す）。
  *  reveal は md 側を anchor の頭へスクロールするか */
-function choose(next: Choice, reveal: boolean): void {
+function choose(next: core.Choice, reveal: boolean): void {
   editor.select(anchorsFor(next));
-  const anchor = nodesOf(next).anchor;
+  const anchor = core.nodesOf(next).anchor;
   if (reveal && anchor !== null) {
-    const s = spots().get(anchor);
+    const s = core.spot(doc(), anchor);
     if (s) editor.reveal(s.from);
   }
 }
 
 const setSelection = (sel: core.Selection, reveal: boolean): void => choose({ kind: "nodes", sel }, reveal);
 
-const setPicked = (id: number | null): void => choose(id === null ? NOTHING : { kind: "card", id }, false);
+const setPicked = (id: number | null): void => choose(id === null ? core.NOTHING : { kind: "card", id }, false);
 
 /**
  * 持ち主の操作を md に映す。**選択を書く入口はここ 1 本** — 地図は md に触らない。
@@ -158,7 +152,7 @@ function apply(op: core.Op, edit: boolean): number | null {
   // 別のノードへ移ったときだけ md を寄せる（同じノードに留まる操作で手元を揺らさない）。
   // 寄せは編集とは別の、スクロールだけのトランザクション — undo の 1 手には入らない
   if (r.focus !== before) {
-    const s = spots().get(r.focus);
+    const s = core.spot(doc(), r.focus);
     if (s) editor.reveal(s.from);
   }
   // 畳まれて埋もれたノードには箱が無く、その場編集を開けない
@@ -198,7 +192,7 @@ const host: MapHost = {
   picked,
   setPicked,
   blockText: (id) => {
-    const s = spots().get(id);
+    const s = core.spot(doc(), id);
     return s ? text().slice(s.from, s.to) : "";
   },
   apply,
@@ -231,14 +225,14 @@ function updateDirty(): void {
 }
 
 /** いまの文書の名前。保存済みならそのファイル名、まだなら本文から導く */
-const docName = (): string => savedName ?? `${deriveName(doc())}.md`;
+const docName = (): string => savedName ?? `${core.name(doc())}.md`;
 
 /**
  * 名乗りを出し直す。本文を打つそばからタイトルが変わる。
  * タブは名前を持つ文書のときだけ名乗る（`filename.md - mmm`）。
  */
 function showName(): void {
-  const name = savedName ?? (doc().roots.length ? docName() : null);
+  const name = savedName ?? (core.empty(doc()) ? null : docName());
   const title = name === null ? "mmm" : `${name} - mmm`;
   // 打鍵のたびに呼ばれるので、変わっていないなら DOM に触らない
   if (document.title !== title) document.title = title;
@@ -423,13 +417,13 @@ const assets = initAssets({
     // 頭を書いただけでは本文は古い場所を指したまま。**宣言と本文は同じ 1 つの
     // 引っ越し**なので、続けて映して 1 手（1 回の Undo）に畳む。初めての宣言
     // （prev が無い）では本文は触らない — どこから動かすのか分からない
-    const next = normalizePath(value);
+    const next = core.normalizePath(value);
     if (next === null) return; // 読めない綴り（空・絶対パス・URL）は欄が先に止めている
     const prev = declaredFolder();
-    const sets: core.Edit[][] = [[setImageFolder(text(), doc().frontmatter, next)]];
+    const sets: core.Edit[][] = [[core.setImageFolder(doc(), next)]];
     let md = core.splice(text(), sets[0]);
     if (prev !== null) {
-      for (const op of retarget(doc(), prev, next)) {
+      for (const op of core.retarget(doc(), prev, next)) {
         const r = core.edit(md, op);
         sets.push(r.edits);
         md = core.splice(md, r.edits);
@@ -489,12 +483,12 @@ function draw(id: number): void {
 
 /**
  * 選んでいるものをクリップボードへ写す（Mod+C / Mod+X）。カードを選んでいれば
- * その原文、でなければ選択の部分木（`copyText`）。書けたかを返す — Cut は
+ * その原文、でなければ選択の部分木（core の copy）。書けたかを返す — Cut は
  * 書けてから消す（mindmap.ts の act）
  */
 async function copy(): Promise<boolean> {
   const card = picked();
-  const clip = card !== null ? host.blockText(card) : copyText(text(), doc(), spots(), selection().ids);
+  const clip = card !== null ? host.blockText(card) : core.copy(doc(), selection().ids);
   if (clip === "") return false;
   try {
     await navigator.clipboard.writeText(clip);
@@ -697,7 +691,7 @@ const exportApi = initExport({
   name: docName,
   failed,
   blocked,
-  empty: () => doc().roots.length === 0,
+  empty: () => core.empty(doc()),
   button: el("export", HTMLButtonElement),
   wayButton: el("export-way", HTMLButtonElement),
 });

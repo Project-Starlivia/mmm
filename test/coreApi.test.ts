@@ -1,112 +1,64 @@
-// core の JSON を View に整える境界。形を確かめる側の規則を固定する。
+// core の出口と入口の境界。形を確かめる側の規則を固定する。
 //
 // 実行: pnpm test
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { type View, decode, decodeSurvey, edit, edited, encode, isNode, splice, survey } from "../src/coreApi.ts";
+import * as core from "../src/coreApi.ts";
+import { edit, edited, encode, splice, survey } from "../src/coreApi.ts";
 
-test("None の鍵は無い → null。Implicit は label が null", () => {
-  const v = decode({ roots: [{ node: { id: 2, blocks: [], children: [] }, sides: [] }] });
-  assert.equal(v.frontmatter, null);
-  assert.equal(v.roots[0].node.label, null);
-  assert.equal(v.roots[0].node.fold, null);
+test("survey は持ち手 — 問い合わせで読む。地番の label が無ければ null、無い id は null", () => {
+  const s = survey("# r\n\n## a\n\n```\nx\n```\n");
+  assert.equal(core.empty(s), false);
+  assert.equal(core.empty(survey("")), true);
+  assert.deepEqual(core.spot(s, 3), { from: 5, label: 8, to: 21 }); // 地番は中身まで
+  assert.deepEqual(core.spot(s, 4), { from: 11, label: null, to: 21 });
+  assert.equal(core.spot(s, 9), null);
+  assert.equal(core.find(s, "a"), 3);
+  assert.equal(core.find(s, "z"), null);
+  assert.deepEqual(core.blocks(s, 3), [4]);
+  assert.equal(core.name(s), "r");
+  assert.equal(core.frontmatter(s), null);
+  assert.equal(core.frontmatter(survey("---\nk: v\n---\n\n# r\n")), "k: v\n");
 });
 
-test("Block は enum の形から kind に整う", () => {
-  const v = decode({
-    roots: [
-      {
-        node: {
-          id: 2,
-          label: "a",
-          blocks: [
-            { id: 3, content: ["Image", { alt: "", src: "p.png", title: "" }] },
-            { id: 5, content: ["Link", { text: "t", href: "u", title: "" }] },
-            { id: 6, content: ["Code", { info: "js", text: "1\n" }] },
-            { id: 7, content: ["Svg", "<svg/>"] },
-            { id: 8, content: "ThematicBreak" },
-            {
-              id: 9,
-              content: ["Details", { text: "<details>x</details>", open: false, body: "x" }],
-            },
-          ],
-          children: [],
-        },
-        sides: [],
-      },
-    ],
+test("isNode — 根も子孫もノード、中身の id と知らない id は違う", () => {
+  const s = survey("# r\n\n```\nx\n```\n\n## a\n");
+  assert.equal(core.isNode(s, 2), true);
+  assert.equal(core.isNode(s, 4), true);
+  assert.equal(core.isNode(s, 3), false);
+  assert.equal(core.isNode(s, 9), false);
+});
+
+test("選択は core と往復する — chosen / anchorsOf / anchorsFor / ranges", () => {
+  const s = survey("# r\n\n## a\n\n## b\n");
+  const caret = (head: number): core.Caret => ({ ranges: [{ from: head, to: head }], head });
+  assert.deepEqual(core.chosen(s, "md", caret(8), null), { kind: "nodes", sel: { ids: [3], anchor: 3 } });
+  assert.deepEqual(core.chosen(s, "map", caret(8), null), core.NOTHING);
+  assert.deepEqual(core.chosen(s, "map", caret(0), { kind: "nodes", at: [8, 14], anchor: 14 }), {
+    kind: "nodes",
+    sel: { ids: [3, 4], anchor: 4 },
   });
-  assert.deepEqual(
-    v.roots[0].node.blocks.map((b) => b.content.kind),
-    ["image", "link", "code", "svg", "thematicBreak", "details"],
-  );
-  // id はノードと同じ列。Opaque が落ちたぶん（4）は飛んだまま
-  assert.deepEqual(
-    v.roots[0].node.blocks.map((b) => b.id),
-    [3, 5, 6, 7, 8, 9],
-  );
-  const last = v.roots[0].node.blocks[5].content;
-  assert.deepEqual(last, {
-    kind: "details",
-    text: "<details>x</details>",
-    open: false,
-    summary: null,
-    body: "x",
+  assert.deepEqual(core.anchorsOf(s, 4), { kind: "nodes", at: [14], anchor: 14 });
+  assert.deepEqual(core.anchorsFor(s, { kind: "nodes", sel: { ids: [3], anchor: null } }), {
+    kind: "nodes",
+    at: [8],
+    anchor: null,
   });
+  assert.deepEqual(core.ranges(s, { kind: "nodes", sel: { ids: [2, 9], anchor: 2 } }), [{ from: 0, to: 16 }]);
 });
 
-test("frontmatter・fold・sides・空のラベルは値のまま通る", () => {
-  const v = decode({
-    frontmatter: "k: v\n",
-    roots: [
-      {
-        node: {
-          id: 2,
-          label: "r",
-          fold: { open: true, summary: "r" },
-          blocks: [],
-          children: [{ id: 3, label: "", blocks: [], children: [] }],
-        },
-        sides: ["Left"],
-      },
-    ],
-  });
-  assert.equal(v.frontmatter, "k: v\n");
-  assert.deepEqual(v.roots[0].node.fold, { open: true, summary: "r" });
-  assert.deepEqual(v.roots[0].sides, ["Left"]);
-  assert.equal(v.roots[0].node.children[0].label, "");
-});
-
-test("知らない形は黙って通さない", () => {
-  assert.throws(
-    () =>
-      decode({
-        roots: [
-          { node: { id: 1, blocks: [{ id: 2, content: ["Opaque", "x"] }], children: [] }, sides: [] },
-        ],
-      }),
-    /知らない Content/,
-  );
-  assert.throws(
-    () => decode({ roots: [{ node: { id: 1, blocks: [], children: [] }, sides: ["Up"] }] }),
-    /側でない/,
-  );
-});
-
-test("survey の JSON — spots の鍵は数になり、label の無い鍵は null", () => {
-  const s = decodeSurvey({
-    view: { roots: [] },
-    spots: { "1": { from: 0, to: 0 }, "2": { from: 0, label: 2, to: 4 } },
-  });
-  assert.deepEqual(s.spots.get(1), { from: 0, label: null, to: 0 });
-  assert.deepEqual(s.spots.get(2), { from: 0, label: 2, to: 4 });
-});
-
-test("survey は core を往復する — View と地番", () => {
-  const s = survey("# r\n\n## a\n");
-  assert.equal(s.view.roots.length, 1);
-  assert.deepEqual(s.spots.get(3), { from: 5, label: 8, to: 10 });
+test("頭の宣言は core と往復する — imageFolder / setImageFolder / retarget", () => {
+  const s = survey("# r\n\n![a](./img/a.webp)\n");
+  assert.equal(core.imageFolder(s), null);
+  const e = core.setImageFolder(s, "./img/");
+  assert.deepEqual(e, { from: 0, to: 0, insert: "---\nimage-folder: ./img/\n---\n\n" });
+  assert.equal(core.imageFolder(survey(splice("# r\n", [e]))), "./img/");
+  assert.equal(core.retarget(s, "./img/", "../pics/").length, 1);
+  assert.equal(core.normalizePath(" img "), "img/");
+  assert.equal(core.normalizePath("/abs"), null);
+  assert.equal(core.under("./img/a.webp", "img/"), "a.webp");
+  assert.equal(core.barePath("./x"), "x");
 });
 
 test("Op は core の enum の形になる — kind が構築子名、null の鍵は落ち、鍵が無ければ裸の名前", () => {
@@ -151,28 +103,6 @@ test("edit は core を往復する — 編集を当てれば名前が替わり�
 
 test("edit — 同じ名前への Rename は edits が空でも focus は在る（apply が断りと見分ける契約）", () => {
   assert.deepEqual(edit("# a\n", { kind: "rename", id: 2, label: "a" }), { edits: [], focus: 2 });
-});
-
-test("isNode — 根も子孫もノード、中身の id と知らない id は違う", () => {
-  const v: View = {
-    frontmatter: null,
-    roots: [
-      {
-        node: {
-          id: 2,
-          label: "r",
-          fold: null,
-          blocks: [{ id: 3, content: { kind: "thematicBreak" } }],
-          children: [{ id: 4, label: "a", fold: null, blocks: [], children: [] }],
-        },
-        sides: ["Right"],
-      },
-    ],
-  };
-  assert.equal(isNode(v, 2), true);
-  assert.equal(isNode(v, 4), true);
-  assert.equal(isNode(v, 3), false);
-  assert.equal(isNode(v, 9), false);
 });
 
 test("splice: 編集列（前の座標・from 順・重ならない）を md に当てる", () => {

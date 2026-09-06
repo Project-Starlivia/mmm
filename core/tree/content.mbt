@@ -251,3 +251,14 @@ fn block_span(b : @markdown.Block) -> @markdown.Span {
     FootnoteDefinition(span~, ..) => span
   }
 }
+
+///|
+/// 先頭の `./` を落とした形。`./x` と `x` は同じ場所を指すので、比べる前に
+/// 必ずこの形へ寄せる。カードが持つ path も、画像の鍵（app/assets.ts）も、
+/// 宣言の下に在るかの判定（read/head.mbt）も、みなこの形
+pub fn bare_path(path : String) -> String {
+  match path.strip_prefix("./") {
+    Some(v) => v.to_owned()
+    None => path
+  }
+}

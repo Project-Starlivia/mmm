@@ -65,17 +65,15 @@ md に書けない並びは 5 つ。読みが前後の行から意味を決め�
 
 ### View — map が見る木
 
-`project(Doc)`（`view/`）が Doc から**削るだけ**で作り、JSON で ts へ渡す。
-足すものは無い。
+`project(Doc)`（`view/`）が Doc から**削るだけ**で作る。足すものは無い。
+ts には渡らない — 読み（`read/` の Survey = 木 + 地番 + 原文）を持ち手として持ち、
+問い合わせで読む（`is_node` / `spot` / `chosen` / `name` / `copy` / `image_folder` …）。
 
 ```
 View { frontmatter: String?, roots: [Root] }
 Root { node: Node, sides: [Side] }          // 側は Doc の Root と同じ。根の子と並走
 Node { id, label: String?, fold: Fold?, blocks: [Block], children: [Node] }
 ```
-
-TS では必ず持ち主を付けて `core.View` / `core.Node` と書く（`import * as core`）。
-フロントで view は画面を意味し、`Node` は DOM の型と衝突するので、裸の名では出さない。
 
 - **ノードの種類は無い。** Doc が 3 種に分けている理由は全部 md の書き方の
   制約で、描く側には 1 つも要らない
@@ -136,8 +134,8 @@ build / content / fold / merge は方言の mdAst だけを見る。
 
 **id は読みのサイクルを越えて持たない。** 読みが文書順に振る通し番号で、
 位置そのもの。上に 1 つ足せば以降が全部ずれるので、render も選択も id を
-抱え込まず、サイクルごとにいまの木から引き直す（md を打っている間は caret が
-span から、操作の後は操作の結果から）。UUID にしても読み直せば別の値になるだけで、
+抱え込まず、サイクルごとにいまの木から引き直す（md を打っている間は `read/caret` が
+地番から、操作の後は操作の結果から）。UUID にしても読み直せば別の値になるだけで、
 同一性は形式では買えない。木をまたいで引き当てる reconcile は、枝の移動を
 アニメーションで見せたくなるまで要らない。
 
@@ -245,7 +243,7 @@ focus は消えていない兄弟か祖先で、埋もれていない（Delete �
 
 core が持つ同一性は操作の focus だけ。選択の持ち越しは core に無い — id は読みのサイクルの中で
 しか通じず、ts は位置（ラベルの頭）を CodeMirror に預けて編集で写す（`src/state.ts`、
-design.md「状態と拍」）。打鍵ごとの core 呼び出しは `mmmSurvey(md)` の 1 回で、View と地番を返す。
+design.md「状態と拍」）。打鍵ごとの core 呼び出しは `mmmSurvey(md)` の 1 回で、読みの持ち手を返す。
 
 ## パスの積み方
 

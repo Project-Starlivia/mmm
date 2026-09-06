@@ -17,7 +17,6 @@ import { type Files, filesMenu } from "../../src/app/files.ts";
 import { moreMenu } from "../../src/app/more.ts";
 import { exportWays } from "../../src/app/export.ts";
 import { drawForm } from "../../src/app/draw.ts";
-import { NONE } from "../../src/map/select.ts";
 import type { Part } from "./kind.ts";
 import { MAP, named, sample } from "./map.ts";
 
@@ -55,9 +54,9 @@ const SHOT =
 
 /** 右クリック。見本の木の、その名前のノードを選んでいるとき */
 function context(label: string | null): HTMLDivElement {
-  const { view, L } = sample();
-  const id = label === null ? null : named(view, label).id;
-  const sel = id === null ? NONE : { ids: [id], anchor: id };
+  const { s, L } = sample();
+  const id = label === null ? null : named(s, label);
+  const sel = id === null ? core.NONE : { ids: [id], anchor: id };
   return menu(menuOf(core.context(L, sel), nothing));
 }
 

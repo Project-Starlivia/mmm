@@ -13,8 +13,8 @@
 | merge | 正規形を base にした 3-way merge。base → theirs（操作の差）だけを ours（原文）に写し、流儀の差は写さない。要素は手前の隙間を持つ。最後に読み直して形を検証 | 3-way merge（git）。recast（変わっていないノードは元の原文を再利用）。React の keyed diff |
 | focus | 操作が「次に選ぶもの」を返す。ノードを消せば次の兄弟 → 前の兄弟 → 親 | ProseMirror の transaction が selection を運ぶ。Lexical の `$removeNode` |
 | Intent の表 | キー・右クリック・ドラッグ・貼り付けを純粋な表で Intent にし、`apply` 1 本へ | エディタの keymap → command |
-| 状態と拍（state.ts） | doc・カーソル・履歴と並べて、core の答え（View + 地番）・地図の選択の位置・持ち主・選択を EditorState の field に置く。1 トランザクション = 1 サイクル。位置は CodeMirror が編集で写す | Lezer の `syntaxTree`（構文木が StateField）。Redux 型の単一 store |
-| 選択の持ち主（derive） | 持ち主（フォーカスのあるペイン）が決める。md が持つ間はカーソルから、地図が持つ間は位置から導く値。地図は塗るだけ | VS Code / Obsidian のアウトライン（カーソル追従）+ CodeMirror の選択（位置を編集で写す） |
+| 状態と拍（state.ts） | doc・カーソル・履歴と並べて、core の読み（持ち手）・地図の選択の位置・持ち主・選択を EditorState の field に置く。1 トランザクション = 1 サイクル。位置は CodeMirror が編集で写す | Lezer の `syntaxTree`（構文木が StateField）。Redux 型の単一 store |
+| 選択の持ち主（core/read の chosen） | 持ち主（フォーカスのあるペイン）が決める。md が持つ間はカーソルから、地図が持つ間は位置から導く値。地図は塗るだけ | VS Code / Obsidian のアウトライン（カーソル追従）+ CodeMirror の選択（位置を編集で写す） |
 | 配置と描画（core/map・core/render） | View + 寸法 → Layout → SVG の差分。字の実測・画像の URL・色分けは閉包で外から受け、MoonBit の値は持ち手で往復する。入力側は Layout の数を読むだけ | keyed diff（id → 要素）。依存の注入（measure）。opaque handle |
 
 ### なぜ CodeMirror 6 か
@@ -40,8 +40,8 @@ map と同じ表から出す。棚卸しは [ai-docs/codemirror.md](../ai-docs/c
   畳みの中に埋もれていない。無いのは最後の根と文書の散文を消したときだけ
 - **id の順 = 文書順**（ts） — 読みは文書順に番号を振るので、id の大小がそのまま文書順。
   select.ts の並べ替えと `Layout.order` はこれに頼る
-- **中身は子より前に書かれる**（ts） — ノードの自身の文は地番の頭から最初の子の頭まで。caret.ts はこれに頼る
-- **選択に居るのは箱のあるものだけ**（derive） — 畳まれて埋もれたノードは選択に入らない
+- **中身は子より前に書かれる**（ts） — ノードの自身の文は地番の頭から最初の子の頭まで。core/read/caret.mbt はこれに頼る
+- **選択に居るのは箱のあるものだけ**（chosen） — 畳まれて埋もれたノードは選択に入らない
 - **選択を書くのは持ち主の操作だけ**（main.ts） — `apply` は focus を選ぶ。`write`（投下・宣言・
   画像の保存）は md を書くだけで選択に触らない
 

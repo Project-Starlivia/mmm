@@ -8,14 +8,12 @@
 // 判断（当たり・落とし先・キーの表・矢印・寄せ・針）は全部 core/map。
 
 import * as core from "./coreApi.ts";
-import type { Holder } from "./caret.ts";
 import { CardEditor } from "./map/card.ts";
 import { LabelEditor } from "./map/label.ts";
 import { measure } from "./map/measure.ts";
 import { languageEpoch, tokenize } from "./map/highlight.ts";
 import { ContextMenu, type MenuEntry } from "./map/menu.ts";
 import { CardPick } from "./map/pick.ts";
-import { NONE } from "./map/select.ts";
 import { svgEl } from "./map/svg.ts";
 import { mapToSvg } from "./map/toSvg.ts";
 import { icon, isIconName } from "./icons.ts";
@@ -24,7 +22,7 @@ import { paneHint } from "./app/hint.ts";
 import { failed } from "./app/notice.ts";
 
 export interface MapHost {
-  /** いまの文書（core が読んだ View と地番。持ち手ごと — 置くのに要る） */
+  /** いまの文書（core の読みの持ち手。置くのに要る） */
   survey(): core.Survey;
   /** ローカル画像の objectURL。読めていない / 握っていないあいだは null */
   imageUrl(path: string): string | null;
@@ -33,7 +31,7 @@ export interface MapHost {
   /** その字が押された。画像フォルダを繋ぎ直す */
   connectAssets(): void;
   /** 選択を持っている側。md なら輪（内側）、map なら枠（selected）で塗る */
-  holder(): Holder;
+  holder(): core.Holder;
   /** いま選んでいるもの */
   selection(): core.Selection;
   /** 地図で選び直した。reveal は md 側をその頭へスクロールするか */
@@ -259,7 +257,7 @@ export class Mindmap {
 
   render(): void {
     const s = this.host.survey();
-    this.hint.style.display = s.view.roots.length === 0 ? "flex" : "none";
+    this.hint.style.display = core.empty(s) ? "flex" : "none";
     this.layout = core.layout(s, measure);
     this.renderer.draw({
       layout: this.layout,
@@ -596,7 +594,7 @@ export class Mindmap {
             (parseFloat(this.rubber.style.width) > 3 || parseFloat(this.rubber.style.height) > 3);
           this.rubber.style.display = "none";
           this.rubberStart = null;
-          if (!dragged) this.host.setSelection(NONE, false);
+          if (!dragged) this.host.setSelection(core.NONE, false);
         }
       }
       if (e.pointerType === "touch") {

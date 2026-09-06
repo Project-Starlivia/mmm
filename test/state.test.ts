@@ -5,20 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EditorState } from "@codemirror/state";
-import {
-  anchors,
-  anchorsFor,
-  anchorsOf,
-  choice,
-  fields,
-  focused,
-  highlightRanges,
-  holder,
-  setAnchors,
-  setHolder,
-  tree,
-} from "../src/state.ts";
-import { NOTHING } from "../src/map/select.ts";
+import { anchors, choice, fields, focused, highlightRanges, holder, setAnchors, setHolder, tree } from "../src/state.ts";
+import * as core from "../src/coreApi.ts";
 
 /** "# r\n\n## a\n\n## b\n": r=2 [0,2,16], a=3 [5,8,10], b=4 [11,14,16] */
 const md = "# r\n\n## a\n\n## b\n";
@@ -27,8 +15,8 @@ const make = (doc: string, cursor = 0): EditorState =>
 
 test("tree は doc から導く。doc が変わらないトランザクションでは同じ値のまま（parse しない）", () => {
   const s = make(md);
-  assert.equal(s.field(tree).view.roots.length, 1);
-  assert.deepEqual(s.field(tree).spots.get(3), { from: 5, label: 8, to: 10 });
+  assert.equal(core.empty(s.field(tree)), false);
+  assert.deepEqual(core.spot(s.field(tree), 3), { from: 5, label: 8, to: 10 });
   const s2 = s.update({ effects: setHolder.of("map") }).state;
   assert.equal(s2.field(tree), s.field(tree));
   const s3 = s.update({ changes: { from: 0, to: 0, insert: "#" } }).state;
@@ -81,7 +69,7 @@ test("focused は同じトランザクションの後の木で位置に写す。
   assert.deepEqual(grown.field(anchors), { kind: "nodes", at: [16], anchor: 16 });
   assert.deepEqual(grown.field(choice), { kind: "nodes", sel: { ids: [4], anchor: 4 } });
   const none = cut.update({ effects: focused.of(null) }).state;
-  assert.deepEqual(none.field(choice), NOTHING);
+  assert.deepEqual(none.field(choice), core.NOTHING);
 });
 
 test("choice は同じものを選んだままなら前の値のまま（identity で見分けられる）", () => {
@@ -111,10 +99,14 @@ test("anchorsOf / anchorsFor — id と位置の往復。カードは中身の�
   // "# r\n" 0-3、"\n" 4、"## a\n" 5-9、"\n" 10、フェンスは 11 から
   const withCard = make("# r\n\n## a\n\n```\nx\n```\n");
   const t = withCard.field(tree);
-  assert.deepEqual(anchorsOf(t, 3), { kind: "nodes", at: [8], anchor: 8 });
-  assert.deepEqual(anchorsOf(t, 4), { kind: "card", at: 11 });
-  assert.equal(anchorsOf(t, null), null);
-  assert.deepEqual(anchorsFor(t, { kind: "nodes", sel: { ids: [2, 3], anchor: 3 } }), { kind: "nodes", at: [2, 8], anchor: 8 });
-  assert.deepEqual(anchorsFor(t, { kind: "card", id: 4 }), { kind: "card", at: 11 });
-  assert.deepEqual(anchorsFor(t, NOTHING), { kind: "nodes", at: [], anchor: null });
+  assert.deepEqual(core.anchorsOf(t, 3), { kind: "nodes", at: [8], anchor: 8 });
+  assert.deepEqual(core.anchorsOf(t, 4), { kind: "card", at: 11 });
+  assert.equal(core.anchorsOf(t, null), null);
+  assert.deepEqual(core.anchorsFor(t, { kind: "nodes", sel: { ids: [2, 3], anchor: 3 } }), {
+    kind: "nodes",
+    at: [2, 8],
+    anchor: 8,
+  });
+  assert.deepEqual(core.anchorsFor(t, { kind: "card", id: 4 }), { kind: "card", at: 11 });
+  assert.deepEqual(core.anchorsFor(t, core.NOTHING), { kind: "nodes", at: [], anchor: null });
 });
