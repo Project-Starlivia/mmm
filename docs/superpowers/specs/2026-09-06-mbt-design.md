@@ -129,6 +129,9 @@ TS の `Intent` / メニューの行は JSON から読む（今の Op と同じ�
   Layout の JSON（50 ms）が消え、残るのは View の JSON（survey。段 2 で消える）と字の実測
 - 段 2 の後: 5000 ノードで 1 打鍵 41〜54 ms（段 1 の 48〜76 から）。View の JSON も消え、残るのは字の実測（measure のキャッシュは 4000 で
   5000 ラベルに足りない — 次の手）
+- 段 3 の後: 5000 ノードで 1 打鍵は main と同じ環境で 135〜195 ms（main 183〜199。機械の負荷で絶対値は日により動く — 段 2 の日は 41〜54 だった）。Node で mmmSurvey だけ測ると 14〜18 ms（main 24〜34）。host の関数は名前引き（`_call`）でなく関数そのものを取って直に呼ぶ（measure は 1 打鍵に 5000 回）。mindmap.ts は host の配線だけ（886 → 約 150 行）、map/label・card・pick と
+  地図の問い合わせの出口 30 本が消えた。happy-dom の WheelEvent は init の修飾キーを落とす
+  （出来事に直に置く）、ResizeObserver は window にしか無い（global には無い）
 - **タプルは JS では object（`_0`, `_1` …）になる。** `.d.ts` は `[number, …]` と書くが嘘。
   約束のある型は数・文字列・真偽・`FixedArray`・`T?` だけと読み直す。数の組は
   `FixedArray[Double]` で渡し、ts が長さを確かめる

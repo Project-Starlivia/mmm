@@ -49,12 +49,6 @@ export const splice = (md: string, edits: Edit[]): string => {
   return out + md.slice(at);
 };
 
-declare const brand: unique symbol;
-/** MoonBit の値の持ち手。中は見ない — core にそのまま返すためだけのもの */
-export interface Handle {
-  readonly [brand]: never;
-}
-
 // ---- 読み ----
 //
 // 木も地番も core が持つ。ts は持ち手を渡して問い合わせ、返った数・字・真偽を使うだけ。
@@ -189,10 +183,12 @@ export const ranges = (s: Survey, c: Choice): Range[] => {
 
 // ---- 地図 ----
 //
-// 箱は core が持つ。ts は持ち手を渡して問い合わせ、返った数・id・Intent を使うだけ。
+// ペインを渡せば core が置いて描き、入力を受け、判断して答える。ts が渡すのは host —
+// 文書と選択の読み書き（EditorState に居る）と、ブラウザの API（クリップボード・
+// メニューの器・しらせ・字の実測・色分け）。
 
 declare const layoutBrand: unique symbol;
-/** View を置いたもの（持ち手）。箱は core にしか無い */
+/** 読みを置いたもの（持ち手）。見本（lab）が右クリックの行を引くため */
 export interface Layout {
   readonly [layoutBrand]: never;
 }
@@ -207,7 +203,7 @@ export interface Font {
 export type Measure = (font: Font, text: string) => number;
 
 /** 読みを置く。字の実測は canvas なので ts から渡す */
-export const layout = (s: Survey, measure: Measure): Layout => asLayout(mbt.mmmLayout(s, measure));
+export const layout = (s: Survey, measure: Measure): Layout => Object(mbt.mmmLayout(s, measure));
 
 /** 位置と大きさだけの箱。x, y は左上 */
 export interface Rect {
@@ -217,55 +213,10 @@ export interface Rect {
   h: number;
 }
 
-export interface Pt {
-  x: number;
-  y: number;
+/** 何をするか。core の表（keys.mbt / context.mbt）が言い、ts は読まずに core へ返す */
+export interface Intent {
+  readonly raw: unknown;
 }
-
-/** world → 画面: `screen = world * k + t` */
-export interface Camera {
-  k: number;
-  tx: number;
-  ty: number;
-}
-
-/** ペインの大きさ（画面 px） */
-export interface Pane {
-  width: number;
-  height: number;
-}
-
-export type Modifier = "none" | "shift" | "mod";
-
-/** 押されたキー。mod は Ctrl / Cmd のどちらか */
-export interface Key {
-  key: string;
-  shift: boolean;
-  mod: boolean;
-  alt: boolean;
-}
-
-/** 何をするか。core の表（keys.mbt）が言い、ts は実行するだけ */
-export type Intent =
-  /** 操作を md に映す。edit なら focus をそのまま編集開始。消した後に選ぶ隣は core の focus */
-  | { kind: "op"; op: Op; edit: boolean }
-  /** その場編集に入る。seed は最初の字（空のノードで打ち始めたとき） */
-  | { kind: "edit"; id: number; seed: string | null }
-  | { kind: "select"; sel: Selection; reveal: boolean }
-  /** 選択（無ければ根）を画面の中心へ */
-  | { kind: "center" }
-  /** カードを選ぶ（null で外す） */
-  | { kind: "pick"; id: number | null }
-  /** カードをその場で直す */
-  | { kind: "editCard"; id: number }
-  /** クリップボードの URL をリンクカードにして題を打つ / 空のコードを足して打つ / 描いて貼る */
-  | { kind: "link"; id: number }
-  | { kind: "code"; id: number }
-  | { kind: "draw"; id: number }
-  /** クリップボードを貼る。anchor があればそこへ、無ければ文書へ */
-  | { kind: "paste" }
-  /** 選んでいるものをクリップボードへ写す。cut は写せてから消すもの。写せなければ消さない */
-  | { kind: "copy"; cut: Intent | null };
 
 /** 右クリックの 1 行。`mark` は絵の名（icons.ts の表で確かめる）。intent が null なら沈む（why が理由） */
 export interface Item {
@@ -278,158 +229,9 @@ export interface Item {
 }
 export type Entry = Item | "sep";
 
-/** 落とし先。node は pos 0 = 子の末尾 / 1 = 直前 / 2 = 直後、side は根の脇 */
-export type Drop = { kind: "node"; id: number; pos: number } | { kind: "side"; root: number; left: boolean };
-
-/** そのまま style へ入れる値（px） */
-export interface Placement {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  fontSize: number;
-  padding: number;
-  border: number;
-  lineHeight: number;
-}
-
-/** 画面外の対象を指す針。画面 px と、ペイン中心から対象へ向く向き（度） */
-export interface Indicator {
-  x: number;
-  y: number;
-  angle: number;
-}
-
-/** world の点がどの箱に居るか。grab は ⋯ の Easy grab（当たりを箱の外へ広げる） */
-export const hit = (l: Layout, x: number, y: number, grab: boolean): number | null =>
-  mbt.mmmHit(l, x, y, grab) ?? null;
-
-/** 描くノードの id、文書順（= 重なり順） */
-export const order = (l: Layout): number[] => [...mbt.mmmOrder(l)];
-
-/** 在る箱の矩形（world）。無い id は飛ぶ */
-export const rects = (l: Layout, ids: number[]): Rect[] => mbt.mmmRects(l, ids).map(rect4);
-
-/** そのノードの字（Implicit は ""）。箱が無ければ null */
-export const label = (l: Layout, id: number): string | null => mbt.mmmLabel(l, id) ?? null;
-
-/** その中身（ブロック id）の矩形（world）。持ち主が畳まれていれば null */
-export const cardRect = (l: Layout, block: number): Rect | null => opt(mbt.mmmCardRect(l, block), rect4);
-
-/** `data-card` の「ノードの id, 何枚目」から中身の id */
-export const blockAt = (l: Layout, node: number, index: number): number | null =>
-  mbt.mmmBlockAt(l, node, index) ?? null;
-
-/** 選んだものとその子孫（文書順）。落とし先から外す部分木 */
-export const subtree = (l: Layout, ids: number[]): number[] => [...mbt.mmmSubtree(l, ids)];
-
-/** 選ぶ。shift は anchor から文書順に範囲、mod は足す・外す */
-export const click = (l: Layout, sel: Selection, id: number, mod: Modifier): Selection =>
-  selection(JSON.parse(mbt.mmmClick(l, sel.ids, anchorOf(sel), id, mod === "shift" ? 1 : mod === "mod" ? 2 : 0)));
-
-/** 矩形（world）に触れる箱を全部。anchor は文書順の最後 */
-export const rubber = (l: Layout, r: Rect): Selection => selection(JSON.parse(mbt.mmmRubber(l, r.x, r.y, r.w, r.h)));
-
-/** キー 1 回ぶん。null は拾わない（ブラウザに渡す） */
-export const keyed = (l: Layout, sel: Selection, k: Key): Intent | null =>
-  maybe(mbt.mmmKeyed(l, sel.ids, anchorOf(sel), k.key, k.shift, k.mod, k.alt), intent);
-
-/** カードを選んでいるときのキー */
-export const keyedCard = (l: Layout, picked: number, k: Key): Intent | null =>
-  maybe(mbt.mmmKeyedCard(l, picked, k.key, k.shift, k.mod, k.alt), intent);
-
-/** 右クリックの行 */
+/** 右クリックの行（見本のため。地図そのものは core が開く） */
 export const context = (l: Layout, sel: Selection): Entry[] =>
-  list(JSON.parse(mbt.mmmContext(l, sel.ids, anchorOf(sel))), entry);
-
-/** どこへ落とすか。落ちる先が無ければ null */
-export const drop = (l: Layout, at: Pt, dragging: number[]): Drop | null =>
-  maybe(mbt.mmmDrop(l, at.x, at.y, dragging), dropOf);
-
-/** 落とし先を Op に。側は根のものなので In(root, side) で言う */
-export const dropOp = (d: Drop, ids: number[]): Op => ({
-  kind: "raw",
-  json: JSON.parse(mbt.mmmDropOp(JSON.stringify(encode(d)), ids)),
-});
-
-/** 画面の点を world に戻す（座標はペインの左上から測ったもの） */
-export const toWorld = (cam: Camera, x: number, y: number): Pt => pt2(mbt.mmmToWorld(cam.k, cam.tx, cam.ty, x, y));
-
-/** ホイールの目盛りを倍率に読み替え、その点の下の world を動かさずに拡大・縮小 */
-export const zoomAt = (cam: Camera, x: number, y: number, deltaY: number): Camera =>
-  camera(mbt.mmmZoomAt(cam.k, cam.tx, cam.ty, x, y, deltaY));
-
-/** 平行移動だけ（倍率は変えない） */
-export const panBy = (cam: Camera, dx: number, dy: number): Camera => camera(mbt.mmmPanBy(cam.k, cam.tx, cam.ty, dx, dy));
-
-/** 2 本指の位置（ペインの左上から測った画面 px） */
-export interface Span {
-  a: Pt;
-  b: Pt;
-}
-
-/** 2 本指の前後の位置から、見え方を 1 つ出す */
-export const pinch = (cam: Camera, from: Span, to: Span): Camera =>
-  camera(mbt.mmmPinch(cam.k, cam.tx, cam.ty, [from.a.x, from.a.y, from.b.x, from.b.y], [to.a.x, to.a.y, to.b.x, to.b.y]));
-
-/** 全部が入る見え方。拡大はしない。箱が無ければ null */
-export const fit = (l: Layout, pane: Pane, margin: number): Camera | null =>
-  opt(mbt.mmmFit(l, pane.width, pane.height, margin), camera);
-
-/** 選択（無ければ根）を画面の中心へ。拡大率は変えない。どちらも無ければ null */
-export const center = (l: Layout, ids: number[], cam: Camera, pane: Pane): Camera | null =>
-  opt(mbt.mmmCenter(l, ids, cam.k, cam.tx, cam.ty, pane.width, pane.height), camera);
-
-/** その箱が画面に入るまでだけ寄せる。既に見えていれば同じ視点。箱が無ければ null */
-export const show = (l: Layout, id: number, cam: Camera, pane: Pane, margin: number): Camera | null =>
-  opt(mbt.mmmShow(l, id, cam.k, cam.tx, cam.ty, pane.width, pane.height, margin), camera);
-
-/** 見失った選択（無ければ根）を指す針。見失っていなければ null */
-export const indicator = (l: Layout, ids: number[], cam: Camera, pane: Pane): Indicator | null =>
-  opt(mbt.mmmIndicator(l, ids, cam.k, cam.tx, cam.ty, pane.width, pane.height), (v) => {
-    const [x, y, angle] = nums(v, 3);
-    return { x, y, angle };
-  });
-
-/** ラベルの欄をノードの箱に重ねる。text は欄のいまの字。箱が無ければ null */
-export const labelPlace = (l: Layout, id: number, cam: Camera, text: string, measure: Measure): Placement | null =>
-  opt(mbt.mmmLabelPlace(l, id, cam.k, cam.tx, cam.ty, text, measure), placement);
-
-/** カードの欄をその中身の矩形に重ねる。持ち主が畳まれていれば null */
-export const cardPlace = (l: Layout, block: number, cam: Camera, text: string, measure: Measure): Placement | null =>
-  opt(mbt.mmmCardPlace(l, block, cam.k, cam.tx, cam.ty, text, measure), placement);
-
-/** 指の台帳（core/map/gesture.mbt）。何本が生きていて、前回どこに居たか */
-export class Fingers {
-  private readonly handle: Handle = asHandle(mbt.mmmFingers());
-
-  get pinching(): boolean {
-    return mbt.mmmPinching(this.handle);
-  }
-
-  down(id: number, x: number, y: number): void {
-    mbt.mmmFingerDown(this.handle, id, x, y);
-  }
-
-  /** 組の片方が実際に動いたときだけ、その前後を返す */
-  moved(id: number, x: number, y: number): { from: Span; to: Span } | null {
-    const g = mbt.mmmFingerMoved(this.handle, id, x, y);
-    if (g === undefined) return null;
-    const [ax, ay, bx, by, cx, cy, dx, dy] = nums(g, 8);
-    return { from: { a: { x: ax, y: ay }, b: { x: bx, y: by } }, to: { a: { x: cx, y: cy }, b: { x: dx, y: dy } } };
-  }
-
-  up(id: number): void {
-    mbt.mmmFingerUp(this.handle, id);
-  }
-
-  /** ちょうど 1 本だけ生きていれば、その「いま」の位置 */
-  only(): Pt | null {
-    return opt(mbt.mmmFingerOnly(this.handle), pt2);
-  }
-}
-
-// ---- 描画 ----
+  entries(mbt.mmmContext(l, sel.ids, sel.anchor ?? undefined));
 
 /** コードの色分けの 1 塊。`cls` が空なら色の付かない地の文 */
 export interface Token {
@@ -437,61 +239,76 @@ export interface Token {
   cls: string;
 }
 
-/** 1 回の描き直しに要るもの。文書とレイアウトから決まるものと、外から受けるもの */
-export interface Scene {
-  layout: Layout;
+declare const mapBrand: unique symbol;
+/** 地図（持ち手）。置く・描く・入力は core にしか無い */
+export interface MapHandle {
+  readonly [mapBrand]: never;
+}
+
+/** core の地図が外に頼るもの。null は core の側で None になる */
+export interface MapHost {
+  survey(): Survey;
   measure: Measure;
-  /** ローカル画像の objectURL（まだ読めていなければ null） */
-  imageUrl: (path: string) => string | null;
-  /** 読めていない場所取りに添える字。握っていないときだけ（他は null） */
-  imageHint: string | null;
-  /** コードの色分け。(行, 言語) → 行ごとの塊 */
-  tokens: (lines: string[], lang: string) => Token[][];
-  /** 言語の読み込みの世代。変われば描き直す */
-  epoch: number;
+  imageUrl(path: string): string | null;
+  imageHint(): string | null;
+  connectAssets(): void;
+  holder(): Holder;
+  selection(): Selection;
+  setSelection(sel: Selection, reveal: boolean): void;
+  picked(): number | null;
+  setPicked(id: number | null): void;
+  blockText(id: number): string;
+  /** 操作（core の Op の JSON）を md に映す。返り値は映した focus */
+  apply(op: string, edit: boolean): number | null;
+  paste(): void;
+  copy(): Promise<boolean>;
+  draw(id: number): void;
+  /** クリップボードの字（読めなければ ""） */
+  readClipboard(): Promise<string>;
+  tokens(lines: string[], lang: string): Token[][];
+  tokensBlock(text: string): Token[][];
+  epoch(): number;
+  /** 右クリックの行（Entry の列の JSON）をその画面の点に開く。空なら閉じる */
+  menu(x: number, y: number, entries: string): void;
+  failed(msg: string): void;
 }
 
-/**
- * マップの SVG を差分で更新する描き手（core/render）。edgeLayer / nodeLayer を
- * world の <g> に並べ、draw に場面を渡す。要素の形（class / data-*）は style.css と
- * ハンドラとの契約で、core が守る
- */
-export class Renderer {
-  readonly edgeLayer: SVGGElement;
-  readonly nodeLayer: SVGGElement;
-  private readonly handle: Handle;
+/** ペインを地図の器にする。hint（白紙の言い出し）と tool（寄せるボタン）は HTML の部品 */
+export const map = (pane: HTMLElement, host: MapHost, hint: HTMLElement, tool: HTMLElement): MapHandle =>
+  Object(mbt.mmmMap(pane, host, hint, tool));
 
-  constructor() {
-    const r = record(mbt.mmmRenderer());
-    this.handle = handle(r, "handle");
-    this.edgeLayer = field(r, "edgeLayer", svgG);
-    this.nodeLayer = field(r, "nodeLayer", svgG);
-  }
+export const mapRender = (m: MapHandle): void => mbt.mmmMapRender(m);
+export const mapFit = (m: MapHandle): void => mbt.mmmMapFit(m);
+export const mapCenter = (m: MapHandle): void => mbt.mmmMapCenter(m);
+export const mapRefresh = (m: MapHandle): void => mbt.mmmMapRefresh(m);
+export const mapBeginEdit = (m: MapHandle, id: number, seed: string | null): boolean =>
+  mbt.mmmMapBeginEdit(m, id, seed ?? undefined);
+export const mapEditCard = (m: MapHandle, id: number): void => mbt.mmmMapEditCard(m, id);
+export const mapSetGrab = (m: MapHandle, on: boolean): void => mbt.mmmMapSetGrab(m, on);
+/** ファイルの落とし先を予告する。null で消す。落ちる先のノード（無ければ null） */
+export const mapFileDrop = (m: MapHandle, at: { x: number; y: number } | null): number | null =>
+  mbt.mmmMapFileDrop(m, at?.x ?? 0, at?.y ?? 0, at !== null) ?? null;
+/** 「何をするか」（メニューの行が持つもの）を実行する */
+export const mapAct = (m: MapHandle, intent: Intent): void => mbt.mmmMapAct(m, JSON.stringify(intent.raw));
 
-  /** 場面を DOM に写す。文書順（= 重なり順）も合わせる */
-  draw(s: Scene): void {
-    mbt.mmmDraw(this.handle, s.layout, s.measure, s.imageUrl, s.imageHint, s.tokens, s.epoch);
-  }
-
-  /** 選ばれた箱に印（`.selected`）を付ける。変わった箱だけ触る */
-  paint(ids: Iterable<number>): void {
-    mbt.mmmPaint(this.handle, [...ids]);
-  }
-
-  /** そのノードの <g>。無ければ null */
-  nodeEl(id: number): SVGGElement | null {
-    const el: unknown = mbt.mmmNodeEl(this.handle, id);
-    return el instanceof SVGGElement ? el : null;
-  }
-
-  /** そのノードへの線の <path>。無ければ null */
-  edgeEl(id: number): SVGPathElement | null {
-    const el: unknown = mbt.mmmEdgeEl(this.handle, id);
-    return el instanceof SVGPathElement ? el : null;
-  }
+/** 書き出しに写すもの。文書順の箱と、その線・ノードの要素 */
+export interface SvgParts {
+  rects: Rect[];
+  edges: SVGPathElement[];
+  nodes: SVGGElement[];
 }
+
+export const mapSvgParts = (m: MapHandle): SvgParts => {
+  const o = record(mbt.mmmMapSvgParts(m));
+  return {
+    rects: field(o, "rects", (v) => list(v, (r) => rect4(list(r, num)))),
+    edges: field(o, "edges", (v) => list(v, svgPath)),
+    nodes: field(o, "nodes", (v) => list(v, svgG)),
+  };
+};
 
 const svgG = (v: unknown): SVGGElement => (v instanceof SVGGElement ? v : bad("<g> でない"));
+const svgPath = (v: unknown): SVGPathElement => (v instanceof SVGPathElement ? v : bad("<path> でない"));
 
 // ---- 形を確かめながら整える ----
 
@@ -505,7 +322,6 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 const record = (v: unknown): Record<string, unknown> => (isRecord(v) ? v : bad("構造体でない"));
 const str = (v: unknown): string => (typeof v === "string" ? v : bad("文字列でない"));
 const num = (v: unknown): number => (typeof v === "number" ? v : bad("数でない"));
-const bool = (v: unknown): boolean => (typeof v === "boolean" ? v : bad("真偽でない"));
 const list = <T>(v: unknown, read: (x: unknown) => T): T[] =>
   Array.isArray(v) ? v.map(read) : bad("配列でない");
 
@@ -516,14 +332,6 @@ const field = <T>(o: Record<string, unknown>, key: string, read: (v: unknown) =>
 /** Option の鍵。None は鍵ごと落ちている */
 const option = <T>(o: Record<string, unknown>, key: string, read: (v: unknown) => T): T | null =>
   key in o ? read(o[key]) : null;
-
-/** 持ち手の鍵。中は見ない — 在ることだけ確かめる */
-const handle = (o: Record<string, unknown>, key: string): Handle =>
-  field(o, key, (v) => (v === null || v === undefined ? bad(`${key} が空`) : asHandle(v)));
-
-/** MoonBit の値を持ち手として持つ。型は名乗らせず、ここだけが言い切る */
-const asHandle = (v: unknown): Handle => Object(v);
-const asLayout = (v: unknown): Layout => Object(v);
 
 /** 出口の `T?`（`T | undefined`）を読む */
 const opt = <A, B>(v: A | undefined, read: (a: A) => B): B | null => (v === undefined ? null : read(v));
@@ -537,22 +345,6 @@ const rect4 = (v: number[]): Rect => {
   const [x, y, w, h] = nums(v, 4);
   return { x, y, w, h };
 };
-const camera = (v: number[]): Camera => {
-  const [k, tx, ty] = nums(v, 3);
-  return { k, tx, ty };
-};
-const pt2 = (v: number[]): Pt => {
-  const [x, y] = nums(v, 2);
-  return { x, y };
-};
-const placement = (v: number[]): Placement => {
-  const [left, top, width, height, fontSize, padding, border, lineHeight] = nums(v, 8);
-  return { left, top, width, height, fontSize, padding, border, lineHeight };
-};
-
-/** 出口へ渡す anchor。無ければ undefined（MoonBit の None） */
-const anchorOf = (sel: Selection): number | undefined => sel.anchor ?? undefined;
-
 /** enum の形 — `"Tag"`（中身なし）か `["Tag", 中身]`。中身の形は構築子ごとに確かめる */
 function tagged(v: unknown): [string, unknown] {
   if (typeof v === "string") return [v, undefined];
@@ -601,67 +393,26 @@ export function selection(v: unknown): Selection {
   return { ids: field(o, "ids", (x) => list(x, num)), anchor: option(o, "anchor", num) };
 }
 
-/** Intent の JSON。op は core の形のまま持ち、`edit` にそのまま返す（ts は読まない） */
-export function intent(v: unknown): Intent {
-  const [tag, body] = tagged(v);
-  switch (tag) {
-    case "Center":
-      return { kind: "center" };
-    case "Paste":
-      return { kind: "paste" };
-  }
-  const o = record(body);
-  switch (tag) {
-    case "Op":
-      return { kind: "op", op: { kind: "raw", json: field(o, "op", (x) => x) }, edit: field(o, "edit", bool) };
-    case "Edit":
-      return { kind: "edit", id: field(o, "id", num), seed: option(o, "seed", str) };
-    case "Select":
-      return { kind: "select", sel: field(o, "sel", selection), reveal: field(o, "reveal", bool) };
-    case "Pick":
-      return { kind: "pick", id: option(o, "id", num) };
-    case "EditCard":
-      return { kind: "editCard", id: field(o, "id", num) };
-    case "AddLink":
-      return { kind: "link", id: field(o, "id", num) };
-    case "AddCode":
-      return { kind: "code", id: field(o, "id", num) };
-    case "Draw":
-      return { kind: "draw", id: field(o, "id", num) };
-    case "Copy":
-      return { kind: "copy", cut: option(o, "cut", intent) };
-    default:
-      return bad(`知らない Intent ${tag}`);
-  }
-}
-
 function item(v: unknown): Item {
   const o = record(v);
   return {
     label: field(o, "label", str),
     key: option(o, "key", str),
     mark: option(o, "mark", str),
-    intent: option(o, "intent", intent),
+    intent: option(o, "intent", (raw) => ({ raw })),
     why: option(o, "why", str),
     items: option(o, "items", (x) => list(x, item)),
   };
 }
 
-/** 右クリックの行の JSON */
-export function entry(v: unknown): Entry {
+/** 右クリックの行の JSON（Entry の列） */
+export const entries = (json: string): Entry[] => list(JSON.parse(json), entry);
+
+function entry(v: unknown): Entry {
   const [tag, body] = tagged(v);
   if (tag === "Sep") return "sep";
   if (tag === "Item") return item(body);
   return bad(`知らない Entry ${tag}`);
-}
-
-/** 落とし先の JSON */
-export function dropOf(v: unknown): Drop {
-  const [tag, body] = tagged(v);
-  const o = record(body);
-  if (tag === "Node") return { kind: "node", id: field(o, "id", num), pos: field(o, "pos", num) };
-  if (tag === "Side") return { kind: "side", root: field(o, "root", num), left: field(o, "left", bool) };
-  return bad(`知らない Drop ${tag}`);
 }
 
 // ---- 操作を core へ送る ----

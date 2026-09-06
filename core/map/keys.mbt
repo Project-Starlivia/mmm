@@ -34,7 +34,7 @@ pub(all) enum Intent {
   /// 選んでいるもの（カードならその原文、でなければ選択の部分木）をクリップボードへ写す。
   /// cut は写せてから消すもの（Delete と同じ Intent）。写せなければ消さない
   Copy(cut~ : Intent?)
-} derive(Eq, Debug, ToJson)
+} derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 fn op(o : @op.Op) -> Intent {

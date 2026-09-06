@@ -257,19 +257,14 @@ pub fn mmm_edit(md : String, op : String) -> String {
 // ---- 配置 ----
 
 ///|
-/// 読み（mmmSurvey の持ち手）を置く。`measure` は ts の canvas（Font, 字 → 幅）。返るのは Layout の持ち手 —
-/// 箱は出さない。読むには下の問い合わせを使う
+/// 読み（mmmSurvey の持ち手）を置く。`measure` は ts の canvas（Font, 字 → 幅）。
+/// 見本（lab）が右クリックの行を引くためだけに残る — 地図そのものは mmmMap が置く
 #export_name("mmmLayout")
 pub fn mmm_layout(
   survey : @core.Any,
   measure : (@map.Font, String) -> Double,
 ) -> @core.Any {
   @core.any(@map.layout(read(survey).view.roots, @map.node_size(measure)))
-}
-
-///|
-fn lay(handle : @core.Any) -> @map.Layout {
-  handle.cast()
 }
 
 ///|
@@ -283,184 +278,8 @@ fn fixed(a : Array[Int]) -> FixedArray[Int] {
 }
 
 ///|
-fn selection(ids : FixedArray[Int], anchor : Int?) -> @map.Selection {
-  { ids: ints(ids), anchor, }
-}
-
-///|
-fn cam(k : Double, tx : Double, ty : Double) -> @map.Camera {
-  { k, tx, ty, }
-}
-
-///|
-fn triple(c : @map.Camera) -> FixedArray[Double] {
-  [c.k, c.tx, c.ty]
-}
-
-///|
-fn quad(r : @map.Rect) -> FixedArray[Double] {
-  [r.x, r.y, r.w, r.h]
-}
-
-///|
 fn[T : ToJson] json(v : T) -> String {
   ToJson::to_json(v).stringify()
-}
-
-///|
-/// 在る箱の矩形（world）。無い id は飛ばす
-fn rects_of(l : @map.Layout, ids : Array[Int]) -> Array[@map.Rect] {
-  let out = []
-  for id in ids {
-    match l.boxes.get(id) {
-      Some(b) => out.push(b.rect())
-      None => ()
-    }
-  }
-  out
-}
-
-///|
-fn all_rects(l : @map.Layout) -> Array[@map.Rect] {
-  rects_of(l, l.order)
-}
-
-// ---- 箱の問い合わせ ----
-
-///|
-/// world の点がどの箱に居るか。grab は ⋯ の Easy grab
-#export_name("mmmHit")
-pub fn mmm_hit(layout : @core.Any, x : Double, y : Double, grab : Bool) -> Int? {
-  @map.hit(lay(layout), x, y, if grab { @map.grab } else { @map.exact })
-}
-
-///|
-/// 在る箱の矩形（world）。輪・落とし先の線・書き出しの範囲
-#export_name("mmmRects")
-pub fn mmm_rects(
-  layout : @core.Any,
-  ids : FixedArray[Int],
-) -> FixedArray[FixedArray[Double]] {
-  FixedArray::from_array(rects_of(lay(layout), ints(ids)).map(quad))
-}
-
-///|
-/// 描くノードの id、文書順（= 重なり順）
-#export_name("mmmOrder")
-pub fn mmm_order(layout : @core.Any) -> FixedArray[Int] {
-  fixed(lay(layout).order)
-}
-
-///|
-/// そのノードの字（Implicit は ""）。箱が無ければ undefined
-#export_name("mmmLabel")
-pub fn mmm_label(layout : @core.Any, id : Int) -> String? {
-  lay(layout).boxes.get(id).map(b => @map.label_of(b.node))
-}
-
-///|
-/// その中身（ブロック id）の矩形（world）。持ち主が畳まれていれば undefined
-#export_name("mmmCardRect")
-pub fn mmm_card_rect(layout : @core.Any, block : Int) -> FixedArray[Double]? {
-  guard @map.owner_of(lay(layout), block) is Some((b, i)) else { return None }
-  guard @map.card_rect(b, i) is Some(r) else { return None }
-  Some([b.x + r.x, b.y + r.y, r.w, r.h])
-}
-
-///|
-/// `data-card` の「ノードの id, 何枚目」から中身の id
-#export_name("mmmBlockAt")
-pub fn mmm_block_at(layout : @core.Any, node : Int, index : Int) -> Int? {
-  guard lay(layout).boxes.get(node) is Some(b) else { return None }
-  b.node.blocks.get(index).map(blk => blk.id)
-}
-
-///|
-/// 選んだものとその子孫（文書順）。落とし先から外す部分木
-#export_name("mmmSubtree")
-pub fn mmm_subtree(
-  layout : @core.Any,
-  ids : FixedArray[Int],
-) -> FixedArray[Int] {
-  let l = lay(layout)
-  let set : Set[Int] = Set::from_array(ints(ids))
-  // order は親が子より先なので、前から 1 回なめれば「親が部分木に居るか」で決まる
-  for id in l.order {
-    guard l.boxes.get(id) is Some(b) else { continue }
-    if b.parent is Some(p) && set.contains(p.id) {
-      set.add(id)
-    }
-  }
-  fixed(l.order.filter(id => set.contains(id)))
-}
-
-// ---- 選択 ----
-
-///|
-/// 選ぶ。mod は 0 = 素 / 1 = Shift / 2 = Mod。返るのは Selection の JSON
-#export_name("mmmClick")
-pub fn mmm_click(
-  layout : @core.Any,
-  ids : FixedArray[Int],
-  anchor : Int?,
-  id : Int,
-  mod : Int,
-) -> String {
-  let m : @map.Modifier = match mod {
-    1 => Shift
-    2 => Mod
-    _ => Plain
-  }
-  json(@map.click(selection(ids, anchor), id, m, lay(layout).order))
-}
-
-///|
-/// 矩形（world）に触れる箱を全部。Selection の JSON
-#export_name("mmmRubber")
-pub fn mmm_rubber(
-  layout : @core.Any,
-  x : Double,
-  y : Double,
-  w : Double,
-  h : Double,
-) -> String {
-  json(@map.rubber(lay(layout), { x, y, w, h, }))
-}
-
-///|
-/// キー 1 回ぶん。Intent の JSON。拾わなければ ""
-#export_name("mmmKeyed")
-pub fn mmm_keyed(
-  layout : @core.Any,
-  ids : FixedArray[Int],
-  anchor : Int?,
-  key : String,
-  shift : Bool,
-  mod : Bool,
-  alt : Bool,
-) -> String {
-  match
-    @map.keyed(lay(layout), selection(ids, anchor), { key, shift, mod, alt, }) {
-    Some(i) => json(i)
-    None => ""
-  }
-}
-
-///|
-/// カードを選んでいるときのキー。Intent の JSON。拾わなければ ""
-#export_name("mmmKeyedCard")
-pub fn mmm_keyed_card(
-  layout : @core.Any,
-  picked : Int,
-  key : String,
-  shift : Bool,
-  mod : Bool,
-  alt : Bool,
-) -> String {
-  match @map.keyed_card(lay(layout), picked, { key, shift, mod, alt, }) {
-    Some(i) => json(i)
-    None => ""
-  }
 }
 
 ///|
@@ -471,370 +290,193 @@ pub fn mmm_context(
   ids : FixedArray[Int],
   anchor : Int?,
 ) -> String {
-  json(@map.items(lay(layout), selection(ids, anchor)))
+  let l : @map.Layout = layout.cast()
+  json(@map.items(l, { ids: ints(ids), anchor, }))
 }
 
-// ---- 落とし先 ----
+// ---- 地図 ----
+//
+// ペインを渡せば core が置いて描き、入力を受ける。ts は host（文書と選択の読み書き、
+// ブラウザの API）を関数の入った object で渡し、持ち手で頼むだけ。
 
 ///|
-/// どこへ落とすか。Drop の JSON。無ければ ""
-#export_name("mmmDrop")
-pub fn mmm_drop(
-  layout : @core.Any,
-  x : Double,
-  y : Double,
-  dragging : FixedArray[Int],
-) -> String {
-  match @map.resolve(lay(layout), { x, y, }, ints(dragging)) {
-    Some(d) => json(d)
-    None => ""
-  }
+fn str_opt(v : @core.Any) -> String? {
+  @core.identity_option(v)
 }
 
 ///|
-/// 落とし先を Op に。返るのは Op の JSON（mmmEdit にそのまま渡せる）
-#export_name("mmmDropOp")
-pub fn mmm_drop_op(drop : String, ids : FixedArray[Int]) -> String {
-  let d : @map.Drop = @json.from_json(@json.parse(drop)) catch {
-    e => abort("mmmDropOp: Drop の JSON が読めない — \{e}")
-  }
-  json(@map.drop_op(d, ints(ids)))
-}
-
-// ---- 視点 ----
-
-///|
-#export_name("mmmToWorld")
-pub fn mmm_to_world(
-  k : Double,
-  tx : Double,
-  ty : Double,
-  x : Double,
-  y : Double,
-) -> FixedArray[Double] {
-  let p = @map.to_world(cam(k, tx, ty), x, y)
-  [p.x, p.y]
+fn int_opt(v : @core.Any) -> Int? {
+  @core.identity_option(v)
 }
 
 ///|
-#export_name("mmmZoomAt")
-pub fn mmm_zoom_at(
-  k : Double,
-  tx : Double,
-  ty : Double,
-  x : Double,
-  y : Double,
-  delta_y : Double,
-) -> FixedArray[Double] {
-  triple(@map.zoom_at(cam(k, tx, ty), x, y, delta_y))
-}
-
-///|
-#export_name("mmmPanBy")
-pub fn mmm_pan_by(
-  k : Double,
-  tx : Double,
-  ty : Double,
-  dx : Double,
-  dy : Double,
-) -> FixedArray[Double] {
-  triple(@map.pan_by(cam(k, tx, ty), dx, dy))
-}
-
-///|
-/// 2 本指の前後（from a, from b, to a, to b）から見え方を 1 つ
-#export_name("mmmPinch")
-pub fn mmm_pinch(
-  k : Double,
-  tx : Double,
-  ty : Double,
-  from : FixedArray[Double],
-  to : FixedArray[Double],
-) -> FixedArray[Double] {
-  let span = (p : FixedArray[Double]) => {
-    ({ a: { x: p[0], y: p[1], }, b: { x: p[2], y: p[3], }, } : @map.Span)
-  }
-  triple(@map.pinch(cam(k, tx, ty), span(from), span(to)))
-}
-
-///|
-/// 全部が入る見え方。箱が無ければ undefined
-#export_name("mmmFit")
-pub fn mmm_fit(
-  layout : @core.Any,
-  width : Double,
-  height : Double,
-  margin : Double,
-) -> FixedArray[Double]? {
-  @map.fit(all_rects(lay(layout)), { width, height, }, margin).map(triple)
-}
-
-///|
-/// 選択（無ければ根）を画面の中心へ。拡大率は変えない。どちらも無ければ undefined
-#export_name("mmmCenter")
-pub fn mmm_center(
-  layout : @core.Any,
-  ids : FixedArray[Int],
-  k : Double,
-  tx : Double,
-  ty : Double,
-  width : Double,
-  height : Double,
-) -> FixedArray[Double]? {
-  let l = lay(layout)
-  let target = match @map.union(rects_of(l, ints(ids))) {
-    Some(r) => Some(r)
-    None => @map.root_box(l).map(b => b.rect())
-  }
-  target.map(r => triple(@map.center_on(cam(k, tx, ty), r, { width, height, })))
-}
-
-///|
-/// その箱が画面に入るまでだけ寄せる。箱が無ければ undefined
-#export_name("mmmShow")
-pub fn mmm_show(
-  layout : @core.Any,
-  id : Int,
-  k : Double,
-  tx : Double,
-  ty : Double,
-  width : Double,
-  height : Double,
-  margin : Double,
-) -> FixedArray[Double]? {
-  lay(layout).boxes
-  .get(id)
-  .map(b => {
-    triple(
-      @map.pan_to_show(cam(k, tx, ty), b.rect(), { width, height, }, margin),
-    )
-  })
-}
-
-///|
-/// 見失った選択（無ければ根）を指す針（x, y, 角度）。見失っていなければ undefined
-#export_name("mmmIndicator")
-pub fn mmm_indicator(
-  layout : @core.Any,
-  ids : FixedArray[Int],
-  k : Double,
-  tx : Double,
-  ty : Double,
-  width : Double,
-  height : Double,
-) -> FixedArray[Double]? {
-  let l = lay(layout)
-  let c = cam(k, tx, ty)
-  let pane : @map.Pane = { width, height, }
-  let sel = rects_of(l, ints(ids))
-  // 見失ったかは、選択があれば選択の話。無ければ文書の話
-  let watched = if sel.length() > 0 { sel } else { all_rects(l) }
-  guard @map.is_lost(watched, c, pane) else { return None }
-  // 指す先は、選択ならいちばん近いやつ。無ければ根 — 帰る場所は 1 つでいい
-  let target = if sel.length() > 0 {
-    @map.nearest(sel, c, pane)
-  } else {
-    @map.root_box(l).map(b => b.rect())
-  }
-  target.map(r => {
-    let i = @map.indicator_for(r, c, pane)
-    [i.x, i.y, i.angle]
-  })
-}
-
-// ---- 欄の重ね ----
-
-///|
-/// 欄の style に入れる数（left, top, width, height, fontSize, padding, border, lineHeight）。
-/// ts は数を入れるだけで、数えない
-fn place(
-  p : @map.Placement,
-  border : Double,
-  line_height : Double,
-) -> FixedArray[Double] {
-  [
-    p.left,
-    p.top,
-    p.width,
-    p.height,
-    p.font_size,
-    p.padding,
-    border,
-    line_height,
-  ]
-}
-
-///|
-/// ラベルの欄をノードの箱に重ねる。`text` は欄のいまの字（幅は measure で測る）。
-/// 箱が無ければ undefined
-#export_name("mmmLabelPlace")
-pub fn mmm_label_place(
-  layout : @core.Any,
-  id : Int,
-  k : Double,
-  tx : Double,
-  ty : Double,
-  text : String,
-  measure : (@map.Font, String) -> Double,
-) -> FixedArray[Double]? {
-  lay(layout).boxes
-  .get(id)
-  .map(b => {
-    let w = measure(@map.label_font(@map.row_of(b.node)), text)
-    place(@map.label_place(b, cam(k, tx, ty), w), @map.label_border, 0)
-  })
-}
-
-///|
-/// カードの欄をその中身の矩形に重ねる。`text` は欄のいまの字（行に割り、いちばん広い行を
-/// コードの字で測る）。持ち主が畳まれていれば undefined
-#export_name("mmmCardPlace")
-pub fn mmm_card_place(
-  layout : @core.Any,
-  block : Int,
-  k : Double,
-  tx : Double,
-  ty : Double,
-  text : String,
-  measure : (@map.Font, String) -> Double,
-) -> FixedArray[Double]? {
-  mmm_card_rect(layout, block).map(r => {
-    let (x, y, w, h) = (r[0], r[1], r[2], r[3])
-    let lines = text.split("\n").map(l => l.to_owned()).collect()
-    let font : @map.Font = { px: @map.card_font_px.to_int(), mono: true, }
-    let mut widest = 0.0
-    for l in lines {
-      widest = @cmp.maximum(widest, measure(font, l))
-    }
-    place(
-      @map.card_place({ x, y, w, h, }, cam(k, tx, ty), lines.length(), widest),
-      @map.card_border,
-      @map.code_line * k,
-    )
-  })
-}
-
-// ---- 指 ----
-
-///|
-#export_name("mmmFingers")
-pub fn mmm_fingers() -> @core.Any {
-  @core.any(@map.Fingers::new())
-}
-
-///|
-fn fingers(handle : @core.Any) -> @map.Fingers {
-  handle.cast()
-}
-
-///|
-#export_name("mmmFingerDown")
-pub fn mmm_finger_down(
-  handle : @core.Any,
-  id : Int,
-  x : Double,
-  y : Double,
-) -> Unit {
-  fingers(handle).down(id, x, y)
-}
-
-///|
-/// 組の片方が動いたときだけ、前後（from a, from b, to a, to b）。他は undefined
-#export_name("mmmFingerMoved")
-pub fn mmm_finger_moved(
-  handle : @core.Any,
-  id : Int,
-  x : Double,
-  y : Double,
-) -> FixedArray[Double]? {
-  fingers(handle)
-  .moved(id, x, y)
-  .map(g => {
-    let (from, to) = g
-    [from.a.x, from.a.y, from.b.x, from.b.y, to.a.x, to.a.y, to.b.x, to.b.y]
-  })
-}
-
-///|
-#export_name("mmmFingerUp")
-pub fn mmm_finger_up(handle : @core.Any, id : Int) -> Unit {
-  fingers(handle).up(id)
-}
-
-///|
-/// ちょうど 1 本だけなら、その「いま」の位置
-#export_name("mmmFingerOnly")
-pub fn mmm_finger_only(handle : @core.Any) -> FixedArray[Double]? {
-  fingers(handle).only().map(p => [p.x, p.y])
-}
-
-///|
-#export_name("mmmPinching")
-pub fn mmm_pinching(handle : @core.Any) -> Bool {
-  fingers(handle).pinching()
-}
-
-// ---- 描画 ----
-
-///|
-/// 描き手。`handle` を mmmDraw / mmmPaint / mmmNodeEl に渡す。
-/// `edgeLayer` / `nodeLayer` は ts が world の <g> に並べる
-#export_name("mmmRenderer")
-pub fn mmm_renderer() -> @core.Any {
-  let r = @render.Renderer::new(@dom.document())
+/// Selection を ts の形（`{ ids, anchor | null }`）に
+fn selection_obj(sel : @map.Selection) -> @core.Any {
   let o = @core.new_object()
-  o._set("handle", @core.any(r))
-  o._set("edgeLayer", r.edge_layer.as_any())
-  o._set("nodeLayer", r.node_layer.as_any())
+  o._set("ids", @core.any(sel.ids))
+  o._set("anchor", @core.from_option(sel.anchor))
   o
 }
 
 ///|
-/// 場面を DOM に写す。`image_url` は path → objectURL（無ければ null）、
-/// `image_hint` は場所取りに添える字（無ければ null）、`tokens` はコードの色分け
-/// （行, 言語 → 行ごとの {text, cls}）、`epoch` は言語の読み込みの世代
-#export_name("mmmDraw")
-pub fn mmm_draw(
-  handle : @core.Any,
-  layout : @core.Any,
-  measure : (@map.Font, String) -> Double,
-  image_url : (String) -> @core.Any,
-  image_hint : @core.Any,
-  tokens : (Array[String], String) -> Array[Array[@render.Token]],
-  epoch : Int,
-) -> Unit {
-  let r : @render.Renderer = handle.cast()
-  let scene : @render.Scene = {
-    layout: lay(layout),
+/// ts の host を Host に。null は None に、Op と行は JSON に、約束は続きに
+fn host_of(h : @core.Any) -> @render.Host {
+  let call = (name : String, args : Array[@core.Any]) => h._call(name, args)
+  // 打鍵ごとに何千回も呼ぶものは、関数そのものを取って直に呼ぶ（名前引きの呼び出しは
+  // 5000 ノードで 1 打鍵 +15 ms）。null を None に読み替えるものだけ包む
+  let measure : @map.Measure = h._get("measure").cast()
+  let tokens : (Array[String], String) -> Array[Array[@render.Token]] = h
+    ._get("tokens")
+    .cast()
+  {
+    survey: () => call("survey", []).cast(),
     measure,
-    image_url: p => @core.identity_option(image_url(p)),
-    image_hint: @core.identity_option(image_hint),
+    image_url: p => str_opt(call("imageUrl", [@core.any(p)])),
+    image_hint: () => str_opt(call("imageHint", [])),
+    connect_assets: () => call("connectAssets", []) |> ignore,
+    holder: () => {
+      let h : String = call("holder", []).cast()
+      if h == "md" {
+        Md
+      } else {
+        Map
+      }
+    },
+    selection: () => {
+      let o = call("selection", [])
+      { ids: o._get("ids").cast(), anchor: int_opt(o._get("anchor")), }
+    },
+    set_selection: (sel, reveal) => {
+      call("setSelection", [selection_obj(sel), @core.any(reveal)]) |> ignore
+    },
+    picked: () => int_opt(call("picked", [])),
+    set_picked: id => call("setPicked", [@core.from_option(id)]) |> ignore,
+    block_text: id => call("blockText", [@core.any(id)]).cast(),
+    apply: (op, edit) => {
+      int_opt(call("apply", [@core.any(json(op)), @core.any(edit)]))
+    },
+    paste: () => call("paste", []) |> ignore,
+    copy: k => call("copy", [])._call("then", [@core.any(k)]) |> ignore,
+    draw: id => call("draw", [@core.any(id)]) |> ignore,
+    read_clipboard: k => {
+      call("readClipboard", [])._call("then", [@core.any(k)]) |> ignore
+    },
     tokens,
-    epoch,
+    tokens_block: text => call("tokensBlock", [@core.any(text)]).cast(),
+    epoch: () => call("epoch", []).cast(),
+    menu: (x, y, entries) => {
+      call("menu", [@core.any(x), @core.any(y), @core.any(json(entries))])
+      |> ignore
+    },
+    failed: msg => call("failed", [@core.any(msg)]) |> ignore,
   }
-  r.draw(scene)
 }
 
 ///|
-/// 選ばれた箱に印を付ける（変わった箱だけ触る）
-#export_name("mmmPaint")
-pub fn mmm_paint(handle : @core.Any, ids : FixedArray[Int]) -> Unit {
-  let r : @render.Renderer = handle.cast()
-  r.paint(ints(ids))
+/// ペインを地図の器にする。`hint`（白紙の言い出し）と `tool`（真ん中へ寄せるボタン）は
+/// HTML の部品なので ts が作る。返るのは地図の持ち手
+#export_name("mmmMap")
+pub fn mmm_map(
+  pane : @dom.HTMLElement,
+  host : @core.Any,
+  hint : @dom.Element,
+  tool : @dom.Element,
+) -> @core.Any {
+  @core.any(@render.Mindmap::new(pane, host_of(host), hint, tool))
 }
 
 ///|
-/// そのノードの <g>。無ければ null
-#export_name("mmmNodeEl")
-pub fn mmm_node_el(handle : @core.Any, id : Int) -> @core.Any {
-  let r : @render.Renderer = handle.cast()
-  @core.from_option(r.node_el(id))
+fn map_of(handle : @core.Any) -> @render.Mindmap {
+  handle.cast()
 }
 
 ///|
-/// そのノードへの線の <path>。無ければ null
-#export_name("mmmEdgeEl")
-pub fn mmm_edge_el(handle : @core.Any, id : Int) -> @core.Any {
-  let r : @render.Renderer = handle.cast()
-  @core.from_option(r.edge_el(id))
+/// 置き直して描く（文書が変わった）
+#export_name("mmmMapRender")
+pub fn mmm_map_render(map : @core.Any) -> Unit {
+  map_of(map).render()
+}
+
+///|
+/// 全体が入る見え方に
+#export_name("mmmMapFit")
+pub fn mmm_map_fit(map : @core.Any) -> Unit {
+  map_of(map).fit_view()
+}
+
+///|
+/// 選択（無ければ根）を画面の中心へ
+#export_name("mmmMapCenter")
+pub fn mmm_map_center(map : @core.Any) -> Unit {
+  map_of(map).center_on_target()
+}
+
+///|
+/// 選択の塗り直し（置き直さない）
+#export_name("mmmMapRefresh")
+pub fn mmm_map_refresh(map : @core.Any) -> Unit {
+  map_of(map).refresh_selection()
+}
+
+///|
+/// その場編集に入る。seed は最初の字（無ければ undefined）。箱が無ければ false
+#export_name("mmmMapBeginEdit")
+pub fn mmm_map_begin_edit(map : @core.Any, id : Int, seed : String?) -> Bool {
+  map_of(map).begin_edit(id, seed)
+}
+
+///|
+/// カードをその場で開く
+#export_name("mmmMapEditCard")
+pub fn mmm_map_edit_card(map : @core.Any, id : Int) -> Unit {
+  map_of(map).edit_card(id)
+}
+
+///|
+/// 掴みやすさ（⋯ の Easy grab）
+#export_name("mmmMapSetGrab")
+pub fn mmm_map_set_grab(map : @core.Any, on : Bool) -> Unit {
+  map_of(map).set_grab(on)
+}
+
+///|
+/// ファイルのドラッグ中、その画面の点に落ちる先を予告する。`on` が偽なら予告を消す。
+/// 落ちる先のノードの id（無ければ undefined）
+#export_name("mmmMapFileDrop")
+pub fn mmm_map_file_drop(
+  map : @core.Any,
+  x : Double,
+  y : Double,
+  on : Bool,
+) -> Int? {
+  map_of(map).mark_file_drop(if on { Some({ x, y, }) } else { None })
+}
+
+///|
+/// 「何をするか」（Intent の JSON。メニューの行が持つもの）を実行する
+#export_name("mmmMapAct")
+pub fn mmm_map_act(map : @core.Any, intent : String) -> Unit {
+  let i : @map.Intent = @json.from_json(@json.parse(intent)) catch {
+    e => abort("mmmMapAct: Intent の JSON が読めない — \{e}")
+  }
+  map_of(map).act(i)
+}
+
+///|
+/// 書き出しに写すもの。`rects`（文書順の箱。x, y, w, h）と `edges` / `nodes`（要素）
+#export_name("mmmMapSvgParts")
+pub fn mmm_map_svg_parts(map : @core.Any) -> @core.Any {
+  let (rects, edges, nodes) = map_of(map).svg_parts()
+  let o = @core.new_object()
+  o._set(
+    "rects",
+    @core.any(
+      FixedArray::from_array(
+        rects.map(r => ([r.x, r.y, r.w, r.h] : FixedArray[Double])),
+      ),
+    ),
+  )
+  o._set("edges", @core.any(edges))
+  o._set("nodes", @core.any(nodes))
+  o
 }
