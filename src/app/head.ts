@@ -12,7 +12,13 @@
 // 引用符・キーの順序が消える。読むのは 1 キー、書くのも 1 行。
 
 import type * as core from "../coreApi.ts";
-import { bare } from "../map/cards.ts";
+
+/**
+ * 先頭の `./` を落とした形。`./x` と `x` は同じ場所を指すので、比べる前に
+ * 必ずこの形へ寄せる。**画像の鍵（app/assets.ts）になるのもこの形**（core の
+ * カードが持つ path も同じ形 — core/map/card.mbt の `bare`）
+ */
+export const bare = (path: string): string => path.replace(/^\.\//, "");
 
 /** 頭に置く「画像フォルダの場所」の設定名。**綴りはここ 1 つ** */
 export const IMAGE_FOLDER = "image-folder";

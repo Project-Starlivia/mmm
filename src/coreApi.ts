@@ -1,4 +1,4 @@
-// core の出口。**JSON の形を整えるだけ** — 意味は 1 つも足さない。
+// core の出口と入口。**JSON の形を整えるだけ** — 意味は 1 つも足さない。
 //
 // 使う側は `import * as core` で `core.View` / `core.survey(md)` と書く。
 // フロントでは view は画面を意味し、`Node` は DOM のグローバル型と衝突するので、
@@ -7,6 +7,9 @@
 // MoonBit の ToJson は Option の None を鍵ごと落とし、enum を `["Image", {…}]` /
 // `"ThematicBreak"` の形で出す。その形を整えるのはここ 1 か所。信頼境界も
 // ここだけ — 型は名乗らせず確かめる。
+//
+// MoonBit の値（View / Layout / 描き手）は `Handle` として**中を見ずに**持ち、
+// core にそのまま返す。JSON を 2 度組まない、2 度 parse しない。
 
 import * as mbt from "../core/_build/js/release/build/tree/js/js.js";
 
@@ -25,7 +28,7 @@ export interface Block {
   content: Content;
 }
 
-/** 中身そのもの。カードかどうかは map/cards.ts の分類 */
+/** 中身そのもの。カードかどうかは core/map の分類 */
 export type Content =
   | { kind: "image"; alt: string; src: string; title: string }
   | { kind: "link"; text: string; href: string; title: string }
@@ -65,6 +68,9 @@ export function isNode(view: View, id: number): boolean {
   return view.roots.some((t) => under(t.node));
 }
 
+/** Implicit は字を持たない。空の見出しと同じく空の字として扱う */
+export const labelOf = (n: Node): string => n.label ?? "";
+
 /** 地番。ノードが md のどこに書かれているか。label はラベルの頭（Implicit と文書の散文は null） */
 export interface Spot {
   from: number;
@@ -90,17 +96,183 @@ export const splice = (md: string, edits: Edit[]): string => {
   return out + md.slice(at);
 };
 
-/** 打鍵 1 回ぶんの読み。View と地番 */
+declare const brand: unique symbol;
+/** MoonBit の値の持ち手。中は見ない — core にそのまま返すためだけのもの */
+export interface Handle {
+  readonly [brand]: never;
+}
+
+/** 打鍵 1 回ぶんの読み。View と地番と、View の持ち手（layout に渡す） */
 export interface Survey {
   view: View;
   spots: Map<number, Spot>;
+  handle: Handle;
 }
 
 /**
  * md を core に読ませ、View と地番を 1 度に受け取る。読みのサイクルの唯一の入口。
  * 選択の持ち越しは core に無い — 位置は ts が CodeMirror に預けて写す（state.ts）
  */
-export const survey = (md: string): Survey => decodeSurvey(JSON.parse(mbt.mmmSurvey(md)));
+export function survey(md: string): Survey {
+  const r = record(mbt.mmmSurvey(md));
+  return { ...decodeSurvey(JSON.parse(field(r, "json", str))), handle: handle(r, "view") };
+}
+
+// ---- map ----
+
+/** 字。大きさは core が決め、綴り（family）は ts が CSS から読む（map/measure.ts） */
+export interface Font {
+  px: number;
+  mono: boolean;
+}
+
+/** 幅を測る。core の layout / render がこれを閉包で受ける */
+export type Measure = (font: Font, text: string) => number;
+
+/** 位置と大きさだけの箱。x, y は左上 */
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** 親との繋がり。側は繋がりの性質なのでここに乗る（根は繋がりを持たない） */
+export interface Edge {
+  id: number;
+  side: Side;
+}
+
+export interface Box {
+  /** View のノードそのまま。label / fold / blocks はここから読む */
+  node: Node;
+  parent: Edge | null;
+  /** 畳んで埋もれた子孫の数 */
+  buried: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** カードごとの中身の矩形（**箱の左上から見た座標**）。積み方は core が数え、ts は読むだけ */
+  cards: Rect[];
+}
+
+/** View を置いたもの。描くのも当たるのも、これを読む */
+export interface Layout {
+  /** 描くノードの id、文書順（= 重なり順）。畳まれて埋もれたものは入らない */
+  order: number[];
+  boxes: Map<number, Box>;
+  /** Layout の持ち手（描き手に渡す） */
+  handle: Handle;
+}
+
+/** View を置く。字の実測は canvas なので ts から渡す */
+export function layout(s: Survey, measure: Measure): Layout {
+  const r = record(mbt.mmmLayout(s.handle, measure));
+  return { ...decodeLayout(JSON.parse(field(r, "json", str)), s.view), handle: handle(r, "layout") };
+}
+
+/** その中身（ブロック id）を持つ箱と、その行の番号。畳まれて箱が無ければ null */
+export function ownerOf(l: Layout, block: number): { box: Box; index: number } | null {
+  for (const box of l.boxes.values()) {
+    const index = box.node.blocks.findIndex((x) => x.id === block);
+    if (index !== -1) return { box, index };
+  }
+  return null;
+}
+
+/** 最初の木の根。無ければ null（空文書） */
+export function rootBox(l: Layout): Box | null {
+  for (const id of l.order) {
+    const b = l.boxes.get(id);
+    if (b && b.parent === null) return b;
+  }
+  return null;
+}
+
+/** ラベル行の規格。pad は文字の開始位置（箱の左からの距離） */
+export interface Row {
+  px: number;
+  pad: number;
+  h: number;
+}
+
+/** 寸法のうち、入力側（落とし先の帯・入力欄の重ね）が読むもの。数字の源は core/map/metric.mbt */
+export interface Metrics {
+  /** x は親子の間、y は兄弟の間、root は木と木の間 */
+  gap: { x: number; y: number; root: number };
+  row: { normal: Row; hidden: Row };
+  /** コードのプレビュー 1 行の高さ */
+  codeLine: number;
+}
+
+
+/** そのノードのラベル行。畳んでいれば小さいほう */
+export const rowOf = (n: Node): Row => (n.fold === null ? metrics.row.normal : metrics.row.hidden);
+
+// ---- render ----
+
+/** コードの色分けの 1 塊。`cls` が空なら色の付かない地の文 */
+export interface Token {
+  text: string;
+  cls: string;
+}
+
+/** 1 回の描き直しに要るもの。文書とレイアウトから決まるものと、外から受けるもの */
+export interface Scene {
+  layout: Layout;
+  measure: Measure;
+  /** ローカル画像の objectURL（まだ読めていなければ null） */
+  imageUrl: (path: string) => string | null;
+  /** 読めていない場所取りに添える字。握っていないときだけ（他は null） */
+  imageHint: string | null;
+  /** コードの色分け。(行, 言語) → 行ごとの塊 */
+  tokens: (lines: string[], lang: string) => Token[][];
+  /** 言語の読み込みの世代。変われば描き直す */
+  epoch: number;
+}
+
+/**
+ * マップの SVG を差分で更新する描き手（core/render）。edgeLayer / nodeLayer を
+ * world の <g> に並べ、draw に場面を渡す。要素の形（class / data-*）は style.css と
+ * ハンドラとの契約で、core が守る
+ */
+export class Renderer {
+  readonly edgeLayer: SVGGElement;
+  readonly nodeLayer: SVGGElement;
+  private readonly handle: Handle;
+
+  constructor() {
+    const r = record(mbt.mmmRenderer());
+    this.handle = handle(r, "handle");
+    this.edgeLayer = field(r, "edgeLayer", svgG);
+    this.nodeLayer = field(r, "nodeLayer", svgG);
+  }
+
+  /** 場面を DOM に写す。文書順（= 重なり順）も合わせる */
+  draw(s: Scene): void {
+    mbt.mmmDraw(this.handle, s.layout.handle, s.measure, s.imageUrl, s.imageHint, s.tokens, s.epoch);
+  }
+
+  /** 選ばれた箱に印（`.selected`）を付ける。変わった箱だけ触る */
+  paint(ids: Iterable<number>): void {
+    mbt.mmmPaint(this.handle, [...ids]);
+  }
+
+  /** そのノードの <g>。無ければ null */
+  nodeEl(id: number): SVGGElement | null {
+    const el: unknown = mbt.mmmNodeEl(this.handle, id);
+    return el instanceof SVGGElement ? el : null;
+  }
+
+  /** そのノードへの線の <path>。無ければ null */
+  edgeEl(id: number): SVGPathElement | null {
+    const el: unknown = mbt.mmmEdgeEl(this.handle, id);
+    return el instanceof SVGPathElement ? el : null;
+  }
+}
+
+const svgG = (v: unknown): SVGGElement => (v instanceof SVGGElement ? v : bad("<g> でない"));
 
 // ---- JSON の形を確かめながら整える ----
 
@@ -125,6 +297,13 @@ const field = <T>(o: Record<string, unknown>, key: string, read: (v: unknown) =>
 /** Option の鍵。None は鍵ごと落ちている */
 const option = <T>(o: Record<string, unknown>, key: string, read: (v: unknown) => T): T | null =>
   key in o ? read(o[key]) : null;
+
+/** 持ち手の鍵。中は見ない — 在ることだけ確かめる */
+const handle = (o: Record<string, unknown>, key: string): Handle =>
+  field(o, key, (v) => (v === null || v === undefined ? bad(`${key} が空`) : asHandle(v)));
+
+/** MoonBit の値を持ち手として持つ。型は名乗らせず、ここだけが言い切る */
+const asHandle = (v: unknown): Handle => Object(v);
 
 const side = (v: unknown): Side => (v === "Right" || v === "Left" ? v : bad("側でない"));
 
@@ -213,8 +392,8 @@ const spot = (v: unknown): Spot => {
   return { from: field(o, "from", num), label: option(o, "label", num), to: field(o, "to", num) };
 };
 
-/** core の JSON（`mmmSurvey` の出力）を Survey にする。Map の鍵は文字列で来る */
-export function decodeSurvey(json: unknown): Survey {
+/** core の JSON（`mmmSurvey` の `json`）を View と地番にする。Map の鍵は文字列で来る */
+export function decodeSurvey(json: unknown): { view: View; spots: Map<number, Spot> } {
   const o = record(json);
   const spots = new Map<number, Spot>();
   for (const [k, v] of Object.entries(field(o, "spots", record))) {
@@ -224,6 +403,68 @@ export function decodeSurvey(json: unknown): Survey {
   }
   return { view: decode(field(o, "view", (v) => v)), spots };
 }
+
+const rect = (v: unknown): Rect => {
+  const o = record(v);
+  return { x: field(o, "x", num), y: field(o, "y", num), w: field(o, "w", num), h: field(o, "h", num) };
+};
+
+const edge = (v: unknown): Edge => {
+  const o = record(v);
+  return { id: field(o, "id", num), side: field(o, "side", side) };
+};
+
+/** View のノードを id で引く表。箱の `node` は参照であって再符号化ではない */
+function nodesOf(view: View): Map<number, Node> {
+  const out = new Map<number, Node>();
+  const walk = (n: Node): void => {
+    out.set(n.id, n);
+    n.children.forEach(walk);
+  };
+  for (const t of view.roots) walk(t.node);
+  return out;
+}
+
+/** core の JSON（`mmmLayout` の `json`）を Layout にする。node は View から引く */
+export function decodeLayout(json: unknown, view: View): { order: number[]; boxes: Map<number, Box> } {
+  const o = record(json);
+  const nodes = nodesOf(view);
+  const boxes = new Map<number, Box>();
+  for (const b of field(o, "boxes", (v) => list(v, record))) {
+    const id = field(b, "id", num);
+    const n = nodes.get(id) ?? bad(`箱 ${id} のノードが View に無い`);
+    boxes.set(id, {
+      node: n,
+      parent: option(b, "parent", edge),
+      buried: field(b, "buried", num),
+      x: field(b, "x", num),
+      y: field(b, "y", num),
+      w: field(b, "w", num),
+      h: field(b, "h", num),
+      cards: field(b, "cards", (c) => list(c, rect)),
+    });
+  }
+  return { order: field(o, "order", (v) => list(v, num)), boxes };
+}
+
+const row = (v: unknown): Row => {
+  const o = record(v);
+  return { px: field(o, "px", num), pad: field(o, "pad", num), h: field(o, "h", num) };
+};
+
+function decodeMetrics(json: unknown): Metrics {
+  const o = record(json);
+  const g = field(o, "gap", record);
+  const r = field(o, "row", record);
+  return {
+    gap: { x: field(g, "x", num), y: field(g, "y", num), root: field(g, "root", num) },
+    row: { normal: field(r, "normal", row), hidden: field(r, "hidden", row) },
+    codeLine: field(o, "codeLine", num),
+  };
+}
+
+/** 寸法。起動時に 1 度 core から受ける（確かめる道具の後ろに置く — 読み込み順） */
+export const metrics: Metrics = decodeMetrics(JSON.parse(mbt.mmmMetrics()));
 
 // ---- 操作を core へ送る ----
 //

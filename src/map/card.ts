@@ -11,7 +11,8 @@ import type { Camera } from "./camera.ts";
 import type { Rect } from "./geometry.ts";
 import { tokenizeBlock } from "./highlight.ts";
 import type { Placement } from "./label.ts";
-import { CODE_LINE, measure, monoFont } from "./metrics.ts";
+import * as core from "../coreApi.ts";
+import { measure } from "./measure.ts";
 
 /** 入力欄の枠。拡大しない */
 export const CARD_BORDER = 2;
@@ -28,7 +29,7 @@ export const CARD_FONT_PX = 11;
  */
 export function cardPlacement(rect: Rect, cam: Camera, text: { lines: number; widest: number }): Placement {
   const wWorld = Math.max(rect.w, text.widest + CARD_PAD * 2);
-  const hWorld = Math.max(rect.h, text.lines * CODE_LINE + CARD_PAD * 2);
+  const hWorld = Math.max(rect.h, text.lines * core.metrics.codeLine + CARD_PAD * 2);
   return {
     left: rect.x * cam.k + cam.tx,
     top: rect.y * cam.k + cam.ty,
@@ -115,7 +116,7 @@ export class CardEditor {
     const lines = this.textarea.value.split("\n");
     const p = cardPlacement(rect, cam, {
       lines: lines.length,
-      widest: Math.max(...lines.map((l) => measure(monoFont(), l))),
+      widest: Math.max(...lines.map((l) => measure({ px: CARD_FONT_PX, mono: true }, l))),
     });
     const st = this.box.style;
     st.left = `${p.left}px`;
@@ -123,7 +124,7 @@ export class CardEditor {
     st.width = `${p.width}px`;
     st.height = `${p.height}px`;
     st.fontSize = `${p.fontSize}px`;
-    st.lineHeight = `${CODE_LINE * cam.k}px`;
+    st.lineHeight = `${core.metrics.codeLine * cam.k}px`;
     st.padding = `${p.padding}px`;
     st.borderWidth = `${CARD_BORDER}px`;
   }

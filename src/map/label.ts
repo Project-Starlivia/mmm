@@ -7,8 +7,8 @@
 // 倍率 1 では合っているのに 2 倍で箱と文字がずれる。
 
 import type { Camera } from "./camera.ts";
-import type { Box } from "./layout.ts";
-import { labelFont, measure, rowOf } from "./metrics.ts";
+import * as core from "../coreApi.ts";
+import { measure } from "./measure.ts";
 
 /** そのまま style へ入れる値（px） */
 export interface Placement {
@@ -32,16 +32,16 @@ export const LABEL_MIN_PAD = 2;
  * ラベルの x（= `rowOf().padX`）をそのまま倍率に掛けた値でよい。
  * 字が箱より長くなったら右へ伸び、短いときは箱に重なったまま。
  */
-export function labelPlacement(b: Box, cam: Camera, textWidth: number): Placement {
-  const row = rowOf(b.node);
-  const wWorld = Math.max(b.w, textWidth + row.padX * 2);
+export function labelPlacement(b: core.Box, cam: Camera, textWidth: number): Placement {
+  const row = core.rowOf(b.node);
+  const wWorld = Math.max(b.w, textWidth + row.pad * 2);
   return {
     left: b.x * cam.k + cam.tx - LABEL_BORDER,
     top: b.y * cam.k + cam.ty - LABEL_BORDER,
     width: wWorld * cam.k + LABEL_BORDER * 2,
-    height: row.rowH * cam.k + LABEL_BORDER * 2,
-    fontSize: row.fontPx * cam.k,
-    padding: Math.max(row.padX * cam.k, LABEL_MIN_PAD),
+    height: row.h * cam.k + LABEL_BORDER * 2,
+    fontSize: row.px * cam.k,
+    padding: Math.max(row.pad * cam.k, LABEL_MIN_PAD),
   };
 }
 
@@ -55,7 +55,7 @@ export class LabelEditor {
   private composing = false;
   /** 最後に place() へ渡された箱と視点。打鍵のたびに欄を今の値へ合わせ直すのに使う
    *  （変換中は md へ書かず render も走らないので、ここから自分で place() する） */
-  private lastBox: Box | null = null;
+  private lastBox: core.Box | null = null;
   private lastCam: Camera | null = null;
   private readonly pane: HTMLElement;
   private readonly rename: (id: number, label: string) => void;
@@ -104,7 +104,7 @@ export class LabelEditor {
   }
 
   /** 開く。カーソルは末尾（全選択しない）。seed があればそれが最初の字 */
-  open(id: number, b: Box, cam: Camera, label: string, seed: string | null): void {
+  open(id: number, b: core.Box, cam: Camera, label: string, seed: string | null): void {
     this.id = id;
     this.input.value = seed ?? label;
     this.input.style.display = "block";
@@ -117,11 +117,12 @@ export class LabelEditor {
   }
 
   /** 箱に追従する。書くたびに箱が変わるので、描き直しの後に呼ぶ */
-  place(b: Box, cam: Camera): void {
+  place(b: core.Box, cam: Camera): void {
     if (this.id === null) return;
     this.lastBox = b;
     this.lastCam = cam;
-    const p = labelPlacement(b, cam, measure(labelFont(rowOf(b.node)), this.input.value));
+    const row = core.rowOf(b.node);
+    const p = labelPlacement(b, cam, measure({ px: row.px, mono: false }, this.input.value));
     const st = this.input.style;
     st.left = `${p.left}px`;
     st.top = `${p.top}px`;

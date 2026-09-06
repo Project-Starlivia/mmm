@@ -2,10 +2,9 @@
 // 見本の md を core に読ませ、選択と picked だけ持つ代役の host を渡す。
 // 手で Box を組まないのは、それが嘘の置き方になるから。
 
-import { type Node, type View, survey } from "../../src/coreApi.ts";
+import { type Layout, type Node, type View, layout, survey } from "../../src/coreApi.ts";
 import { type MapHost, Mindmap } from "../../src/mindmap.ts";
-import { type Layout, layoutMap } from "../../src/map/layout.ts";
-import { nodeSize } from "../../src/map/metrics.ts";
+import { measure } from "../../src/map/measure.ts";
 import { NONE, type Selection } from "../../src/map/select.ts";
 import type { Part } from "./kind.ts";
 
@@ -65,7 +64,7 @@ function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
   let selection: Selection = NONE;
   let picked: number | null = null;
   const host: MapHost = {
-    doc: () => s.view,
+    survey: () => s,
     imageUrl: () => null,
     imageHint: () => "click to connect",
     connectAssets: () => {},
@@ -103,8 +102,8 @@ function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
 
 /** 見本の木と、その配置。右クリックメニューの見本が選択を渡すのに使う */
 export function sample(): { view: View; L: Layout } {
-  const view = survey(MD).view;
-  return { view, L: layoutMap(view.roots, nodeSize) };
+  const s = survey(MD);
+  return { view: s.view, L: layout(s, measure) };
 }
 
 /** その名前のノード。無ければ例外（見本の md と食い違っている） */

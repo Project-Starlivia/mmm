@@ -5,7 +5,7 @@
 // id は文書順の通し番号なので、数の順がそのまま文書順。
 
 import { dirOf, type Rect } from "./geometry.ts";
-import type { Box, Layout } from "./layout.ts";
+import type * as core from "../coreApi.ts";
 
 /** 選んでいるノード（文書順）と、範囲選択・矢印の基点 */
 export interface Selection {
@@ -50,7 +50,7 @@ export function click(sel: Selection, id: number, mod: Modifier, order: number[]
 }
 
 /** 矩形（world）に触れる箱を全部。anchor は文書順の最後 */
-export function rubber(L: Layout, r: Rect): Selection {
+export function rubber(L: core.Layout, r: Rect): Selection {
   const ids = L.order.filter((id) => {
     const b = L.boxes.get(id);
     return b !== undefined && b.x < r.x + r.w && r.x < b.x + b.w && b.y < r.y + r.h && r.y < b.y + b.h;
@@ -72,7 +72,7 @@ const inside = (r: Rect, x: number, y: number): boolean => {
 /**
  * 見た目の箱の外まで当たりを広げる幅（world px）。`pad` は四方、`edge` は子の見えない
  * 端のノードが枝の伸びる向きにさらに伸ばす分（根は向きが無いので伸びない）。
- * 数字は metrics.ts、見た目どおりは EXACT
+ * 見た目どおりは EXACT、⋯ の Easy grab は GRAB
  */
 export interface Reach {
   pad: number;
@@ -81,10 +81,17 @@ export interface Reach {
 
 export const EXACT: Reach = { pad: 0, edge: 0 };
 
+/**
+ * 当たりの広げ幅（Easy grab）。見た目は変えず、判定だけ箱の外へ広げる。world px。
+ * pad は四方 — 兄弟の隙間（gap.y）は丸ごと飲み、親子の隙間（gap.x）はほぼ埋まる。
+ * edge は子の見えない端のノードが、枝の伸びる向きにさらに伸ばす分
+ */
+export const GRAB: Reach = { pad: 41, edge: 63 };
+
 const grown = (b: Rect, pad: number): Rect => ({ x: b.x - pad, y: b.y - pad, w: b.w + pad * 2, h: b.h + pad * 2 });
 
 /** 箱 1 つの当たりの範囲。`near` は pad の分、`far` はそれに端の伸びを足したもの（near ⊆ far） */
-export function reachOf(b: Box, r: Reach, parents: Set<number>): { near: Rect; far: Rect } {
+export function reachOf(b: core.Box, r: Reach, parents: Set<number>): { near: Rect; far: Rect } {
   const near = grown(b, r.pad);
   const out = b.parent && !parents.has(b.node.id) ? r.edge : 0;
   const left = b.parent && dirOf(b.parent.side) === -1;
@@ -97,7 +104,7 @@ export function reachOf(b: Box, r: Reach, parents: Set<number>): { near: Rect; f
  * だけで届く箱が居るときは行で読む: y の近さ、同じなら x の近さ（端の伸びは横に長く、
  * 直線距離では隣の行の箱に負けてしまうため）。同じ近さなら文書順の後ろ。外なら null
  */
-export function hit(L: Layout, x: number, y: number, reach: Reach): number | null {
+export function hit(L: core.Layout, x: number, y: number, reach: Reach): number | null {
   const parents = new Set([...L.boxes.values()].flatMap((b) => (b.parent ? [b.parent.id] : [])));
   const found: { id: number; dx: number; dy: number; byFar: boolean }[] = [];
   for (const id of L.order) {
@@ -121,16 +128,16 @@ export function hit(L: Layout, x: number, y: number, reach: Reach): number | nul
   return best.id;
 }
 
-export const all = (L: Layout): Selection => ({ ids: sorted(L.order), anchor: last(L.order) });
+export const all = (L: core.Layout): Selection => ({ ids: sorted(L.order), anchor: last(L.order) });
 
 export type ArrowKey = "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight";
 
 export const isArrowKey = (key: string): key is ArrowKey =>
   key === "ArrowUp" || key === "ArrowDown" || key === "ArrowLeft" || key === "ArrowRight";
 
-/** 根からの深さ。Layout は持たないので親を辿って数える。この module の中でしか使わない。
+/** 根からの深さ。core.Layout は持たないので親を辿って数える。この module の中でしか使わない。
  *  未知の id は根と同じ 0（`arrow` は先に `L.boxes.get(anchor)` で弾くので届かない） */
-function depthOf(L: Layout, id: number): number {
+function depthOf(L: core.Layout, id: number): number {
   let d = 0;
   let b = L.boxes.get(id);
   while (b && b.parent) {
@@ -147,7 +154,7 @@ function depthOf(L: Layout, id: number): number {
  * - 左右 … **画面の向き**で読む。根と右の枝は ← が親・→ が子、左の枝は鏡像。
  *   子が無ければ先頭へ回る（行き止まりで無反応になるより一周できるほうが迷わない）
  */
-export function arrow(L: Layout, anchor: number | null, key: ArrowKey): number | null {
+export function arrow(L: core.Layout, anchor: number | null, key: ArrowKey): number | null {
   const order = L.order;
   if (order.length === 0) return null;
   if (anchor === null) return order[0];
@@ -180,21 +187,21 @@ export function extend(sel: Selection, next: number): Selection {
 }
 
 /** 親の id。根なら null */
-export const parentOf = (L: Layout, id: number): number | null => L.boxes.get(id)?.parent?.id ?? null;
+export const parentOf = (L: core.Layout, id: number): number | null => L.boxes.get(id)?.parent?.id ?? null;
 
 /** 同じ親の子（根なら根どうし）を文書順に */
-const siblingsOf = (L: Layout, id: number): number[] => {
+const siblingsOf = (L: core.Layout, id: number): number[] => {
   const p = parentOf(L, id);
   return L.order.filter((x) => parentOf(L, x) === p);
 };
 
-export function prevSibling(L: Layout, id: number): number | null {
+export function prevSibling(L: core.Layout, id: number): number | null {
   const s = siblingsOf(L, id);
   const i = s.indexOf(id);
   return i > 0 ? s[i - 1] : null;
 }
 
-export function nextSibling(L: Layout, id: number): number | null {
+export function nextSibling(L: core.Layout, id: number): number | null {
   const s = siblingsOf(L, id);
   const i = s.indexOf(id);
   return i >= 0 && i < s.length - 1 ? s[i + 1] : null;

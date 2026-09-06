@@ -170,9 +170,15 @@ TS の drop（帯の高さ）と label / card（欄の重ね）がこれを読�
 - **survey に layout を含める** — survey は state.ts の field（DOM を知らない）で回る。
   measure を field に注ぐことになるので、layout は今までどおり mindmap の draw で組む
 
+## 測った（段 5）
+
+- 5000 ノードの文書で末尾に 1 字打つ 1 打鍵（dispatch の同期時間、5 回）: main 50〜67 ms、
+  この枝 68〜85 ms。差の 15〜20 ms は Layout の JSON（5000 箱）の stringify と parse と
+  形の確かめ。許容の内だが、詰めるなら boxes を平らな数の列にする（別 issue）
+- `core/render` の happy-dom は `moon test` から `require("happy-dom")` で引けた
+  （core/_build の下から node が親の node_modules を辿る）
+
 ## 未決
 
-- Layout の JSON の往復（5000 ノードで打鍵ごと）が今の TS の layout より重いか。段 5 で測る。
-  重ければ boxes を平らな数の列にする
-- `core/render` の happy-dom が `moon test` から `require` で引けるか（core/ は repo の下なので
-  node は親の node_modules を辿るはず）。段 4 の最初に確かめる
+- Layout の JSON を平らにするか（上）
+- 出口の置き場 `tree/js` の名（core の科の名付け直しと一緒に）
