@@ -740,6 +740,40 @@ test "Graft は parse した根たちを差す。側は捨て、id は鋳直す"
 }
 
 ///|
+/// Mod+C は選んだ深さのまま写すので、断片は `##` から始まり得る。parse が
+/// 先頭に埋める Implicit は切り出した場所の名残でしかなく、差すときは剥がす
+/// （相対の形で入る）。断片の途中の飛びは綴りなので残す。
+test "Graft は断片の先頭の Implicit を剥がして差す。途中の飛びは残す" {
+  let d = doc([root(h(2, "r"))])
+  assert_eq(
+    run(
+      d,
+      Graft(at=NodePlace::In(node=2, side=None), md="## a\n\n###\n\n## b\n"),
+    ),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(4, "a", children=[h(5, "")]), h(6, "b")]), sides=[
+          Right,
+          Right,
+        ]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  assert_eq(
+    run(d, Graft(at=NodePlace::In(node=2, side=None), md="### a\n\n##### b\n")),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(5, "a", children=[gap(6, [h(7, "b")])])]), sides=[
+          Right,
+        ]),
+      ]),
+      focus: Some(5),
+    }),
+  )
+}
+
+///|
 test "Graft は根の間にも差せる。先頭の散文は行き先の親の body 末尾へ" {
   let d = doc([root(h(2, "r", body=[pic(3)]))])
   assert_eq(
