@@ -10,12 +10,10 @@
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import type { EditorState } from "@codemirror/state";
 import * as core from "./coreApi.ts";
-import { type Doc, blocked, failed, fromHash, hasImages, io, LINK_WARN_LENGTH, openOnClick, toHash } from "./coreApi.ts";
+import { type Doc, blocked, failed, fromHash, hasImages, io, LINK_WARN_LENGTH, NO_FILE_ACCESS, toHash } from "./coreApi.ts";
 import * as st from "./state.ts";
 import { MdEditor } from "./editor.ts";
 import { Mindmap, type MapHost } from "./mindmap.ts";
-import { NOTHING_TO_RENAME, NO_FILE_ACCESS, NO_RENAME_HERE, filesMenu } from "./app/files.ts";
-import { moreMenu } from "./app/more.ts";
 import { onLanguageReady } from "./map/highlight.ts";
 
 /**
@@ -27,11 +25,6 @@ function el<T extends Element>(id: string, kind: abstract new () => T): T {
   const found = document.getElementById(id);
   if (found instanceof kind) return found;
   throw new Error(`#${id} が ${kind.name} ではない`);
-}
-
-/** 新しいタブで開く。`⋯` の外部リンクが通る唯一の道 */
-function openExternal(url: string): void {
-  window.open(url, "_blank", "noopener");
 }
 
 const mdPane = el("md-pane", HTMLElement);
@@ -225,10 +218,10 @@ function showName(): void {
   const shown = docName();
   if (elFilename.textContent !== shown) elFilename.textContent = shown;
   // **押せるときだけ押せる顔をする。** 理由は Files の Rename の行と同じものを使う
-  const why = !io.canRename() ? NO_RENAME_HERE : savedName === null ? NOTHING_TO_RENAME : "";
-  elFilename.title = why === "" ? "Rename — click" : why;
+  const why = core.renameProblem(savedName !== null);
+  elFilename.title = why ?? "Rename — click";
   // 押せなさは `aria-disabled` の 1 つで言う（見た目も読み上げも同じ源）
-  if (why === "") {
+  if (why === null) {
     elFilename.removeAttribute("aria-disabled");
     elFilename.setAttribute("tabindex", "0");
   } else {
@@ -549,34 +542,33 @@ function folderCaption(): string {
 
 // ---------- 帯のメニュー ----------
 
-// 並びは app/files.ts と app/more.ts の表。ここは状態を写して、押されたら走らせる
-openOnClick(elFiles, () =>
-  filesMenu(
-    {
-      savedName,
-      recent: recent.map((file) => file.name),
-      canOpen: io.canOpen(),
-      canSave: io.canSaveAs(),
-      canRename: io.canRename(),
-      canChooseFolder: core.canChooseFolder(),
-      folder: folderCaption(),
+// 並びは core/app の files.mbt と more.mbt の表。ここは状態を写して、押されたら走らせる
+core.filesMenu(
+  elFiles,
+  () => ({
+    savedName,
+    recent: recent.map((file) => file.name),
+    canOpen: io.canOpen(),
+    canSave: io.canSaveAs(),
+    canRename: io.canRename(),
+    canChooseFolder: core.canChooseFolder(),
+    folder: folderCaption(),
+  }),
+  {
+    newFile: () => void newFile(),
+    open: () => void openFile(),
+    openRecent: (i) => {
+      const file = recent[i];
+      if (file) openKnown(file);
     },
-    {
-      newFile: () => void newFile(),
-      open: () => void openFile(),
-      openRecent: (i) => {
-        const file = recent[i];
-        if (file) openKnown(file);
-      },
-      save: () => void saveFile(),
-      saveAs: () => void saveFile(true),
-      rename: () => void renameFile(),
-      chooseFolder: () =>
-        void (async () => {
-          if (await ensurePlace()) await core.chooseFolder(assets);
-        })(),
-    },
-  ),
+    save: () => void saveFile(),
+    saveAs: () => void saveFile(true),
+    rename: () => void renameFile(),
+    chooseFolder: () =>
+      void (async () => {
+        if (await ensurePlace()) await core.chooseFolder(assets);
+      })(),
+  },
 );
 
 // 掴みやすさ。見た目の好みと同じく localStorage に持つ（"on" 以外は既定の見た目どおり）
@@ -588,20 +580,14 @@ const setGrab = (on: boolean): void => {
 };
 map.setGrab(grab);
 
-openOnClick(elMore, () =>
-  moreMenu(
-    { light: core.themeIsLight(theme), grab, linkNote: linkNote() },
-    {
-      undo: () => editor.undo(),
-      redo: () => editor.redo(),
-      pickColor: () => core.themePickColor(theme),
-      toggleTheme: () => core.themeToggle(theme),
-      toggleGrab: () => setGrab(!grab),
-      copyLink,
-      open: openExternal,
-    },
-  ),
-);
+core.moreMenu(elMore, () => ({ light: core.themeIsLight(theme), grab, linkNote: linkNote() }), {
+  undo: () => editor.undo(),
+  redo: () => editor.redo(),
+  pickColor: () => core.themePickColor(theme),
+  toggleTheme: () => core.themeToggle(theme),
+  toggleGrab: () => setGrab(!grab),
+  copyLink,
+});
 
 /**
  * 覚えている文書。**Files の `Recent` に並ぶのがこれ**。メニューは同期で

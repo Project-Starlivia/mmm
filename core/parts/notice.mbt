@@ -37,8 +37,12 @@ pub let failed_words : Array[String] = [
   "Couldn't export", "Couldn't copy", "Couldn't copy the link", "Couldn't paste",
   "Couldn't read that as a link", "Couldn't add the drawing", "Couldn't open that card",
   "Couldn't start editing — the node is folded", "Couldn't do that here", "Select a node to paste an image into",
-  "Select a node to paste a link into", "This browser cannot open or save files",
+  "Select a node to paste a link into", no_file_access,
 ]
+
+///|
+/// File System Access API が無いブラウザで、Files のできない行とショートカットの両方が言う理由。しらせにもなる
+pub let no_file_access = "This browser cannot open or save files"
 
 ///|
 /// 次の一手が相手にあるもの。いまは書き出すものが無いときの Mod+E だけ

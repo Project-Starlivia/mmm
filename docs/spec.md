@@ -51,7 +51,8 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 logo(ロゴの唯一の源) / ask(聞く器。<dialog>) / asks(聞くことの綴りの全部) /
                 share(本文を URL に載せる。gzip → base64url。非同期は js_async の Promise) /
                 export(Mindmap を外へ出す。出し方 4 通りの表・ヘッダのボタン・出し口) /
-                draw(その場で描く窓。紙は手の並びの写像)。試験は happy-dom
+                draw(その場で描く窓。紙は手の並びの写像) / files(帯の Files の行。文書と画像フォルダ) /
+                more(帯の ⋯ の行)。試験は happy-dom
   file/         ディスク（js だけ）。io(File System Access API の窓口。開く・保存・改名・覚えている文書) /
                 handles(札を IndexedDB に置く台帳。置き場は閉包で受け、試験は手元の表) /
                 assets(画像の読み書き。宣言は md の頭、許可は札。宣言を決める / 直すのは settle で、
@@ -93,9 +94,6 @@ src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す�
                — focus を選ぶ — と write(op) — 選択に触らない、持ち主の focusin、
                貼り付け・投下・描いた絵の保存、ファイル I/O、帯。文書から導く値は
                持たない — 持つのはファイルの状態だけ)
-  app/         帯の並びの表 — files(帯の Files の行。文書と画像フォルダ) / more(帯の ⋯ の行)。
-               持ち物・ペイン・キー・テーマ・たずね・リンク・書き出し・お絵描きは core/app、
-               ファイル・札・画像・ドロップは core/file
 test/   検証 — core に触らない純粋層(camera / geometry / gesture / highlight /
         indicator / panes / share / assets / metrics / head)と、core の出口(coreApi)・
         分類(cards)・配置(layout)・select / caret / keys / label / context / drop /

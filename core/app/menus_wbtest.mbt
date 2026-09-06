@@ -1,0 +1,129 @@
+// 帯の並び（Files / ⋯）。行の形と、沈む理由・切り替えた先の言葉を固定する
+
+///|
+fn row_of(e : @parts.Entry) -> String {
+  match e {
+    Run(r, _) | Done(r, _) | Sub(r, _, _) =>
+      r.label +
+      (match r.disabled {
+        No => ""
+        Yes => " (off)"
+        Why(why) => " (off: " + why + ")"
+      })
+    Caption(t, _) => "# " + t
+    Sep => "---"
+  }
+}
+
+///|
+let nop : () -> Unit = () => ()
+
+///|
+let file_acts : FileActs = {
+  new_file: nop,
+  open: nop,
+  open_recent: _ => (),
+  save: nop,
+  save_as: nop,
+  rename: nop,
+  choose_folder: nop,
+}
+
+///|
+let saved : Files = {
+  saved_name: Some("notes.md"),
+  recent: ["ideas.md", "todo.md"],
+  can_open: true,
+  can_save: true,
+  can_rename: true,
+  can_choose_folder: true,
+  folder: "pics",
+}
+
+///|
+test "files_menu: 見出しが状態を言い、続く行ができること。Recent は入れ子で、押せば番号" {
+  let mut opened = -1
+  let rows = files_menu(saved, { ..file_acts, open_recent: i => opened = i, })
+  assert_eq(rows.map(row_of), [
+    "# notes.md", "New", "Open", "Recent", "Save", "Save as", "Rename", "# pics",
+    "Choose folder",
+  ])
+  guard rows[3] is Sub(_, items, None) else {
+    fail("Recent が入れ子でない")
+  }
+  assert_eq(items.map(row_of), ["ideas.md", "todo.md"])
+  guard items[1] is Run(_, go) else { fail("行でない") }
+  go()
+  assert_eq(opened, 1)
+}
+
+///|
+test "files_menu: 保存していなければ見出しは not saved yet、Recent が無ければ沈み、Rename は理由を言う" {
+  let rows = files_menu(
+    { ..saved, saved_name: None, recent: [], folder: "no folder", },
+    file_acts,
+  )
+  assert_eq(rows[0] |> row_of, "# not saved yet")
+  assert_eq(rows[3] |> row_of, "Recent (off: Nothing opened yet)")
+  assert_eq(rows[6] |> row_of, "Rename (off: " + nothing_to_rename + ")")
+  assert_eq(rows[7] |> row_of, "# no folder")
+}
+
+///|
+test "files_menu: ファイルを扱えない環境では開く・保存・フォルダが同じ 1 つの理由で沈む。改名はその環境の理由" {
+  let rows = files_menu(
+    {
+      ..saved,
+      can_open: false,
+      can_save: false,
+      can_rename: false,
+      can_choose_folder: false,
+    },
+    file_acts,
+  )
+  let why = " (off: " + @parts.no_file_access + ")"
+  assert_eq(rows[2] |> row_of, "Open" + why)
+  assert_eq(rows[4] |> row_of, "Save" + why)
+  assert_eq(rows[5] |> row_of, "Save as" + why)
+  assert_eq(rows[6] |> row_of, "Rename (off: " + no_rename_here + ")")
+  assert_eq(rows[8] |> row_of, "Choose folder" + why)
+  assert_eq(rename_problem(true, true), None)
+}
+
+///|
+test "more_menu: 3 つの塊。テーマと掴みやすさの行は切り替えた先を言い、Copy link は閉じずに答える" {
+  let mut copied = 0
+  let acts : MoreActs = {
+    undo: nop,
+    redo: nop,
+    pick_color: nop,
+    toggle_theme: nop,
+    toggle_grab: nop,
+    copy_link: k => {
+      copied += 1
+      k(true)
+    },
+  }
+  let dark = more_menu(
+    { light: false, grab: false, link_note: k => k([]), },
+    acts,
+  )
+  assert_eq(dark.map(row_of), [
+    "Undo", "Redo", "---", "Accent color", "Light theme", "Easy grab", "---", "Copy link",
+    "---", "Shortcuts", "GitHub",
+  ])
+  let light = more_menu(
+    { light: true, grab: true, link_note: k => k(["Images won't travel"]), },
+    acts,
+  )
+  assert_eq(light[4] |> row_of, "Dark theme")
+  assert_eq(light[5] |> row_of, "Exact hit")
+  guard light[7] is Done(r, go) else { fail("Copy link が Done でない") }
+  assert_eq(r.mark, Some("link"))
+  let notes = []
+  r.note.unwrap()(n => notes.push(n))
+  assert_eq(notes, [["Images won't travel"]])
+  let mut ok = false
+  go(v => ok = v)
+  assert_eq((copied, ok), (1, true))
+}

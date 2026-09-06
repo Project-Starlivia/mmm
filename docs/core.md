@@ -416,7 +416,8 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
   リンク（`share.mbt`。gzip → base64url。非同期は `moonbitlang/async/js_async` の Promise で出す —
   作法は 2026-09-07-mbt-practice.md）、書き出し（`export.mbt`。出し方 4 通りの表と、ヘッダのボタンの
   言い分・頷き。出す口は web/ の 1 行）、お絵描き（`draw.mbt`。紙は手の並びの写像 `Sheet` で、
-  載せ先 `Paint` は canvas の 2d か試験の記録）。
+  載せ先 `Paint` は canvas の 2d か試験の記録）、帯の並び（`files.mbt` / `more.mbt`。純粋な表 —
+  いまの状態を受けて行を返し、押されたら閉包を呼ぶだけ。ts は状態を開くたびに読ませる）。
   文書と選択の読み書きは ts の main.ts が閉包で渡す
 - **判断も map/** — 選択（当たり・矩形・矢印・親兄弟）、落とし先、キーの表（`Intent`）、
   右クリックの行、視点の算術、針、指の台帳、欄の重ね。全部純粋で、wbtest で固定する

@@ -12,8 +12,6 @@ import {
 // Values
 pub fn md_ast_sig(String) -> String
 
-pub fn mmm_accent() -> String?
-
 pub fn mmm_anchors_for(@core.Any, String) -> String
 
 pub fn mmm_anchors_of(@core.Any, Int?) -> String
@@ -84,6 +82,10 @@ pub fn mmm_failed(String) -> Unit
 
 pub fn mmm_failed_words() -> FixedArray[String]
 
+pub fn mmm_files_menu(@dom.Element, () -> @core.Any, @core.Any) -> Unit
+
+pub fn mmm_files_rows(@core.Any, @core.Any) -> @dom.Element
+
 pub fn mmm_find(@core.Any, String) -> Int?
 
 pub fn mmm_folder_for(@web.FileHandle) -> @js_async.Promise[@core.Any]
@@ -107,8 +109,6 @@ pub fn mmm_image_folder(@core.Any) -> String?
 pub fn mmm_image_url(@core.Any, String) -> String?
 
 pub fn mmm_is_node(@core.Any, Int) -> Bool
-
-pub fn mmm_label(String, String, Bool) -> Array[@dom.Node]
 
 pub fn mmm_layout(@core.Any, (@map.Font, String) -> Double) -> @core.Any
 
@@ -134,11 +134,13 @@ pub fn mmm_map_render(@core.Any) -> Unit
 
 pub fn mmm_map_set_grab(@core.Any, Bool) -> Unit
 
-pub fn mmm_menu_rows(@core.Any) -> @dom.Element
+pub fn mmm_more_menu(@dom.Element, () -> @core.Any, @core.Any) -> Unit
+
+pub fn mmm_more_rows(@core.Any, @core.Any) -> @dom.Element
 
 pub fn mmm_name(@core.Any) -> String
 
-pub fn mmm_nod(@core.Any, (String) -> Unit, (Bool) -> Unit) -> Unit
+pub fn mmm_no_file_access() -> String
 
 pub fn mmm_normalize_path(String) -> String?
 
@@ -149,8 +151,6 @@ pub fn mmm_open_dialog() -> @js_async.Promise[@core.Any]
 pub fn mmm_open_handle(@web.FileHandle) -> @js_async.Promise[@core.Any]
 
 pub fn mmm_open_known(@web.FileHandle) -> @js_async.Promise[@core.Any]
-
-pub fn mmm_open_on_click(@dom.Element, () -> @core.Any) -> Unit
 
 pub fn mmm_pane_hint(String) -> @dom.Element
 
@@ -167,6 +167,8 @@ pub fn mmm_recent() -> @js_async.Promise[FixedArray[@web.FileHandle]]
 pub fn mmm_remember_folder(@web.FileHandle, @web.DirHandle) -> @js_async.Promise[Unit]
 
 pub fn mmm_rename_file(String) -> @js_async.Promise[@core.Any]
+
+pub fn mmm_rename_problem(Bool) -> String?
 
 pub fn mmm_retarget(@core.Any, String, String) -> String
 
