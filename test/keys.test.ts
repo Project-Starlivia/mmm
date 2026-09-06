@@ -201,7 +201,7 @@ test("複数選択の Tab は先頭の前の兄弟の子へ、Shift+Tab は先�
   assert.equal(keyed(M, { ids: [2, 3], anchor: 3 }, k("Tab", { shift: true })), null);
 });
 
-test("Shift+H は畳む / 畳みを外す。Implicit と無選択は拾わない", () => {
+test("Shift+H は畳む / 畳みを外す。Implicit も畳む（core が綴る）。無選択は拾わない", () => {
   const F: Layout = layoutMap(
     [
       root(
@@ -216,7 +216,7 @@ test("Shift+H は畳む / 畳みを外す。Implicit と無選択は拾わない
   );
   assert.deepEqual(keyed(F, one(2), k("H", { shift: true })), { kind: "op", op: { kind: "fold", id: 2, open: false }, edit: false });
   assert.deepEqual(keyed(F, one(3), k("H", { shift: true })), { kind: "op", op: { kind: "unfold", id: 3 }, edit: false });
-  assert.equal(keyed(F, one(4), k("H", { shift: true })), null);
+  assert.deepEqual(keyed(F, one(4), k("H", { shift: true })), { kind: "op", op: { kind: "fold", id: 4, open: false }, edit: false });
   assert.equal(keyed(F, NONE, k("H", { shift: true })), null);
 });
 

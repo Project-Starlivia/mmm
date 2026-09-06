@@ -58,10 +58,9 @@ export function contextItems(L: Layout, sel: Selection): Entry[] {
       label: folded ? "Show (unfold)" : "Hide (fold)",
       key: "Shift+H",
       mark: folded ? "chevrons-up-down" : "chevrons-down-up",
-      // Implicit（label === null）は理由を持つ。anchor が無い（node === null）だけなら、
-      // 沈む理由は「選んでいない」こと自体が語るので why は付けない
-      intent: node === null || node.label === null ? null : press(L, sel, "H", true),
-      ...(node !== null && node.label === null ? { why: "Nothing to fold here" } : {}),
+      // anchor が無い（node === null）なら、沈む理由は「選んでいない」こと自体が
+      // 語るので why は付けない
+      intent: node === null ? null : press(L, sel, "H", true),
     },
     {
       label: "Flip side",

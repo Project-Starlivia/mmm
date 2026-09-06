@@ -6,13 +6,13 @@
 ///|
 /// **md に書ける木しか返さない。** 何が書けないかは check が 1 つで言う
 /// （骨格の直前の水平線・見出しに飲み込まれる項目・項目の根の側）ので、
-/// 操作ごとに規則を写さず、組んだ結果を check に通して断る。
-/// 見出しの深さだけは断らずに綴り替える（`cap`）— 断ると 6 段目で何も足せなくなる。
+/// 操作ごとに規則を写さず、組んだ結果を check に通す。見出しの深さは cap が
+/// 綴り替え、Implicit を綴れば直る破れは mend が繕い、残れば断る。
+/// cap が先 — 天井を越えた見出しは mend には直せない。
 pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
   guard attempt(doc, op) is Some(d) else { return None }
-  let capped = cap(d.doc)
-  guard @tree.check(capped).is_empty() else { return None }
-  Some({ doc: capped, focus: d.focus.filter(f => has(capped, f)) })
+  guard mend(cap(d.doc)) is Some(doc) else { return None }
+  Some({ doc, focus: d.focus.filter(f => has(doc, f)) })
 }
 
 ///|
@@ -83,6 +83,63 @@ fn cap(doc : @tree.Doc) -> @tree.Doc {
 }
 
 ///|
+/// check の破れのうち、Implicit で直るものを直して通し直す。子が尽きた Implicit
+/// （`BarrenImplicit`）は消す — 道具は途中で席が消えないように残しておくので、
+/// 掃除はここ。見出しの直後に来た Implicit（`Swallowed`）と、項目を子に持った
+/// Implicit（`GappedItem` の親）は綴る。消すものは綴らないので、消す回は綴らない。
+/// 一回ごとに Implicit は減るので止まる。残った破れは None。
+fn mend(doc : @tree.Doc) -> @tree.Doc? {
+  let mut cur = doc
+  for ;; {
+    let flaws = @tree.check(cur)
+    if flaws.is_empty() {
+      return Some(cur)
+    }
+    let barren = []
+    let ids = []
+    for f in flaws {
+      match f {
+        BarrenImplicit(id) => barren.push(id)
+        Swallowed(id) => ids.push(id)
+        GappedItem(id) => ids.push(parent(cur, id).unwrap())
+        _ => ()
+      }
+    }
+    let mut fixed = false
+    for id in barren {
+      guard splice(cur, id, _ => []) is Some(d) else { return None }
+      cur = d
+      fixed = true
+    }
+    if barren.is_empty() {
+      for id in ids {
+        guard find(cur, id) is Some(ImplicitNode(g)) else { continue }
+        guard splice(cur, id, _ => [spell(g, "")]) is Some(d) else {
+          return None
+        }
+        cur = d
+        fixed = true
+      }
+    }
+    if !fixed {
+      return None
+    }
+  }
+}
+
+///|
+/// Implicit を綴る。行を省いた空の見出しなので、名を付ければ見出しそのもの。
+fn spell(g : @tree.ImplicitNode, label : String) -> @tree.Node {
+  @tree.HeadingNode({
+    id: g.id,
+    label,
+    fold: None,
+    body: [],
+    children: g.children,
+  })
+}
+
+///|
 fn attempt(doc : @tree.Doc, op : Op) -> Done? {
   match op {
     Rename(id~, label~) => rename(doc, id, label)
@@ -116,20 +173,14 @@ fn rename(doc : @tree.Doc, id : Int, label : String) -> Done? {
   let m = match n {
     HeadingNode(h) => @tree.HeadingNode({ ..h, label, })
     ListNode(l) => @tree.ListNode({ ..l, label, })
-    ImplicitNode(g) =>
-      @tree.HeadingNode({
-        id: g.id,
-        label,
-        fold: None,
-        body: [],
-        children: g.children,
-      })
+    ImplicitNode(g) => spell(g, label)
   }
   done(splice(doc, id, _ => [m]), Some(id))
 }
 
 ///|
 /// 定義ごと畳む。名前はラベル（書けなければ名無し）。畳み済みなら open だけ替わる。
+/// Implicit は綴ってから畳む。
 fn fold(doc : @tree.Doc, id : Int, open : Bool) -> Done? {
   guard find(doc, id) is Some(n) else { return None }
   fn folding(label : String) -> @tree.Fold {
@@ -147,7 +198,10 @@ fn fold(doc : @tree.Doc, id : Int, open : Bool) -> Done? {
     HeadingNode(h) =>
       @tree.HeadingNode({ ..h, fold: Some(next(h.fold, h.label)) })
     ListNode(l) => @tree.ListNode({ ..l, fold: Some(next(l.fold, l.label)) })
-    ImplicitNode(_) => return None
+    ImplicitNode(g) => {
+      guard splice(doc, id, _ => [spell(g, "")]) is Some(d) else { return None }
+      return fold(d, id, open)
+    }
   }
   done(splice(doc, id, _ => [m]), Some(id))
 }
@@ -220,13 +274,15 @@ fn delete(doc : @tree.Doc, ids : Array[Int]) -> Done? {
     guard erase(cur, id) is Some(d) else { return None }
     cur = d
   }
+  // 子が尽きた Implicit を選ばないように、掃除してから選ぶ
+  guard mend(cur) is Some(swept) else { return None }
   let mut focus = None
   for w in wants {
-    if focus is None && has(cur, w) {
+    if focus is None && has(swept, w) {
       focus = Some(w)
     }
   }
-  Some({ doc: cur, focus })
+  Some({ doc: swept, focus })
 }
 
 ///|
@@ -409,20 +465,7 @@ fn flip(doc : @tree.Doc, id : Int) -> Done? {
           next = next + 1
         }
       }
-      let root_id = id_of(r.node)
-      // 根の Implicit は引き出す相手しか持たないことがある。掃除で消えた根は、
-      // 引き出したものを子に置き直す。
-      match find(rest, root_id) {
-        Some(_) => done(append(rest, node=root_id, side~, [wrapped]), Some(id))
-        None => {
-          let roots = rest.roots.copy()
-          roots.insert(path[0], {
-            node: @tree.ImplicitNode({ id: root_id, children: [wrapped] }),
-            sides: [side],
-          })
-          Some({ doc: { ..rest, roots, }, focus: Some(id) })
-        }
-      }
+      done(append(rest, node=id_of(r.node), side~, [wrapped]), Some(id))
     }
   }
 }
