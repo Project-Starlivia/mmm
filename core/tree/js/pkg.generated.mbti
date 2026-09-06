@@ -62,9 +62,23 @@ pub fn mmm_copy(@core.Any, FixedArray[Int]) -> String
 
 pub fn mmm_current_file() -> @core.Any
 
+pub fn mmm_draw_form() -> @dom.Element
+
+pub fn mmm_drop(@core.Any, @core.Any) -> Unit
+
 pub fn mmm_edit(String, String) -> String
 
 pub fn mmm_empty(@core.Any) -> Bool
+
+pub fn mmm_export(@core.Any, @dom.Element, @dom.Element) -> @core.Any
+
+pub fn mmm_export_choose(@core.Any) -> Unit
+
+pub fn mmm_export_refresh(@core.Any) -> Unit
+
+pub fn mmm_export_run(@core.Any) -> Unit
+
+pub fn mmm_export_ways(@core.Any) -> @dom.Element
 
 pub fn mmm_failed(String) -> Unit
 
@@ -112,8 +126,6 @@ pub fn mmm_map_center(@core.Any) -> Unit
 
 pub fn mmm_map_edit_card(@core.Any, Int) -> Unit
 
-pub fn mmm_map_file_drop(@core.Any, Double, Double, Bool) -> Int?
-
 pub fn mmm_map_fit(@core.Any) -> Unit
 
 pub fn mmm_map_refresh(@core.Any) -> Unit
@@ -121,8 +133,6 @@ pub fn mmm_map_refresh(@core.Any) -> Unit
 pub fn mmm_map_render(@core.Any) -> Unit
 
 pub fn mmm_map_set_grab(@core.Any, Bool) -> Unit
-
-pub fn mmm_map_svg_parts(@core.Any) -> @core.Any
 
 pub fn mmm_menu_rows(@core.Any) -> @dom.Element
 
@@ -171,6 +181,8 @@ pub fn mmm_serialize(String) -> String
 pub fn mmm_set_image_folder(@core.Any, String) -> String
 
 pub fn mmm_shortcuts(@core.Any) -> Unit
+
+pub fn mmm_show_drawing() -> @js_async.Promise[@core.Any]
 
 pub fn mmm_spot(@core.Any, Int) -> FixedArray[Int]?
 

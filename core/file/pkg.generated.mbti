@@ -18,6 +18,8 @@ pub fn idb_store() -> Store
 
 pub fn image_type(String) -> String?
 
+pub fn init_drop(@dom.Document, Drop) -> Unit
+
 pub fn md_path(String) -> String
 
 pub fn name_parts(String) -> Array[String]
@@ -61,6 +63,13 @@ pub(all) struct Binding {
 pub(all) struct Doc {
   name : String
   text : String
+}
+
+pub(all) struct Drop {
+  open_markdown : async (@web.FileHandle) -> Unit
+  add_image : async (@core.Any, Int) -> Unit
+  mark_drop : ((Double, Double)?) -> Int?
+  failed : (String) -> Unit
 }
 
 pub struct Handles {

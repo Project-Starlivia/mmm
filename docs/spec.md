@@ -40,23 +40,29 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 context(右クリックの行) / camera(視点。world ↔ 画面、寄せ、ピンチ) /
                 indicator(画面外の根を指す針) / gesture(指の台帳) / place(欄を箱に重ねる算術)
   web/          DOM の小さな道具（js だけ）。svg(要素を作る) / dom(style・矩形・捕捉・
-                欄の値・出来事の的・約束を 1 行ずつ包む。**他の package は `_get` / `_call` を書かない**)
+                欄の値・出来事の的・約束を 1 行ずつ包む) / disk(File System Access・IndexedDB・Blob) /
+                canvas(紙。2d の文脈と手) / out(直列化・ラスタ化・ダウンロード・クリップボード・埋め込み) /
+                drag(ファイルのドラッグ)。**他の package は `_get` / `_call` を書かない**
   parts/        部品（js だけ）。icons(絵の唯一の源。Lucide の綴り) / notice(しらせ。言葉の表も) /
                 hint(空のときの言い出し) / tool(ペインの隅に浮く道具の器) / menu(メニューの器。
                 行の形・入れ子・キーで辿る・外を押せば閉じる)。試験は happy-dom
   app/          帯と枠（js だけ）。persist(持ち物。localStorage の綴りはここだけ) / panes(2 つの
                 出し分けと分割線) / shortcuts(全体のキー) / theme(テーマ・アクセントカラー・favicon) /
                 logo(ロゴの唯一の源) / ask(聞く器。<dialog>) / asks(聞くことの綴りの全部) /
-                share(本文を URL に載せる。gzip → base64url。非同期は js_async の Promise)。試験は happy-dom
+                share(本文を URL に載せる。gzip → base64url。非同期は js_async の Promise) /
+                export(Mindmap を外へ出す。出し方 4 通りの表・ヘッダのボタン・出し口) /
+                draw(その場で描く窓。紙は手の並びの写像)。試験は happy-dom
   file/         ディスク（js だけ）。io(File System Access API の窓口。開く・保存・改名・覚えている文書) /
                 handles(札を IndexedDB に置く台帳。置き場は閉包で受け、試験は手元の表) /
                 assets(画像の読み書き。宣言は md の頭、許可は札。宣言を決める / 直すのは settle で、
-                md に書くのは main.ts の declare。置く名前の柵と宣言の柵は純粋で試験する)。札は不透明な持ち手
+                md に書くのは main.ts の declare。置く名前の柵と宣言の柵は純粋で試験する) /
+                dnd(落ちたファイルの振り分け。.md は開く、画像はノードの上だけ受ける)。札は不透明な持ち手
   render/       地図のペイン（js だけ）。card(Card 1 枚 → SVG) / render(Renderer。id → 要素、
                 transform / d のキャッシュ、並び直し、paint) / mindmap(器と入力。ホイール・
                 ポインタ・キー・右クリック・長押し・ドラッグを受けて map/ の判断に繋ぎ、
                 答えを host へ返す。輪・矩形・落とし先の印・針・視点・右クリックの器) /
-                field(ラベルとカードの欄) / pick(選んでいるカードの枠と ×) / host(外に頼るものの閉包)。
+                field(ラベルとカードの欄) / pick(選んでいるカードの枠と ×) / host(外に頼るものの閉包) /
+                export(全体を 1 枚の svg に。計算済みスタイルを焼き込み、透かしを付ける)。
                 class と data-* は style.css との契約。試験は happy-dom
   read/         md を読んだもの（Survey = 木 + 地番 + 原文）と、木の判断。ts はこれを持ち手として
                 持ち、問い合わせで読む。survey(is_node / empty / find / blocks) / caret(md の
@@ -77,24 +83,19 @@ src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す�
                1 トランザクションを 1 回 onUpdate で外へ。薄塗りは state.ts の範囲から
                field で導く。フェンスの中は map/highlight.ts と同じ言語表で色を付ける)
   mindmap.ts   Mindmap 側の配線(core の地図に渡す host — 文書と選択の読み書き、クリップボード、
-               字の実測と色分け — と書き出し。入力・印・視点・欄・右クリックは core/render)
+               字の実測と色分け。入力・印・視点・欄・右クリック・書き出しは core/render)
   style.css    全体のスタイル(部品ごとの塊。入れ子は CSS 自身の機能。色・影・輪の数字は
                `:root` のトークンだけが持ち、状態は `.selected` / `.on` / `aria-disabled` で言う)
   map/         ブラウザの都合（地図そのものは core/render）—
                measure(字の実測。core の Font に CSS の字の綴りを合わせて canvas で測る) /
-               highlight(コードの色分け。core の描画に閉包で渡す) /
-               toSvg(1 枚の svg にする) / svg(要素を作る)
+               highlight(コードの色分け。core の描画に閉包で渡す)
   main.ts      束ねる場所(1 トランザクション = 1 サイクルの出口 onUpdate、操作の入口 apply(op, edit)
                — focus を選ぶ — と write(op) — 選択に触らない、持ち主の focusin、
                貼り付け・投下・描いた絵の保存、ファイル I/O、帯。文書から導く値は
                持たない — 持つのはファイルの状態だけ)
-  app/         ブラウザの API に触るもの —
-               dnd(落ちたファイルの振り分け。.md は開く、画像はノードの上だけ受ける) /
-               draw(その場で描く窓) / export(Mindmap を外へ出す) /
-               fsa(File System Access の型の補い。実装は無い) /
-               files(帯の Files の行。文書と画像フォルダ) /
-               more(帯の ⋯ の行)。持ち物・ペイン・キー・テーマ・たずね・リンクは core/app、
-               ファイル・札・画像は core/file
+  app/         帯の並びの表 — files(帯の Files の行。文書と画像フォルダ) / more(帯の ⋯ の行)。
+               持ち物・ペイン・キー・テーマ・たずね・リンク・書き出し・お絵描きは core/app、
+               ファイル・札・画像・ドロップは core/file
 test/   検証 — core に触らない純粋層(camera / geometry / gesture / highlight /
         indicator / panes / share / assets / metrics / head)と、core の出口(coreApi)・
         分類(cards)・配置(layout)・select / caret / keys / label / context / drop /
@@ -974,7 +975,7 @@ focus** — ノードを消せば次の兄弟 → 前の兄弟 → 親（core.md
 書き出せば畳んだ姿が出る。どちらも一時的な UI 状態(選択・ドロップ印)は
 含まれない。
 
-**出し方はどちらも同じ 4 つ**で、並びの定義は `app/export.ts` の 1 か所。
+**出し方はどちらも同じ 4 つ**で、並びの定義は `core/app/export.mbt` の 1 か所。
 
 | | |
 |---|---|

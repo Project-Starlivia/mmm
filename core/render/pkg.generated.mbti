@@ -138,6 +138,7 @@ pub fn Mindmap::refresh_selection(Self) -> Unit
 pub fn Mindmap::render(Self) -> Unit
 pub fn Mindmap::set_grab(Self, Bool) -> Unit
 pub fn Mindmap::svg_parts(Self) -> (Array[@map.Rect], Array[@dom.Element], Array[@dom.Element])
+pub async fn Mindmap::to_svg(Self) -> @dom.Element?
 
 pub struct Panning {
   px : Double

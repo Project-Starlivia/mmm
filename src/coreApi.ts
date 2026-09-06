@@ -205,14 +205,6 @@ export type Measure = (font: Font, text: string) => number;
 /** 読みを置く。字の実測は canvas なので ts から渡す */
 export const layout = (s: Survey, measure: Measure): Layout => Object(mbt.mmmLayout(s, measure));
 
-/** 位置と大きさだけの箱。x, y は左上 */
-export interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
 /** コードの色分けの 1 塊。`cls` が空なら色の付かない地の文 */
 export interface Token {
   text: string;
@@ -262,28 +254,64 @@ export const mapBeginEdit = (m: MapHandle, id: number, seed: string | null): boo
   mbt.mmmMapBeginEdit(m, id, seed ?? undefined);
 export const mapEditCard = (m: MapHandle, id: number): void => mbt.mmmMapEditCard(m, id);
 export const mapSetGrab = (m: MapHandle, on: boolean): void => mbt.mmmMapSetGrab(m, on);
-/** ファイルの落とし先を予告する。null で消す。落ちる先のノード（無ければ null） */
-export const mapFileDrop = (m: MapHandle, at: { x: number; y: number } | null): number | null =>
-  mbt.mmmMapFileDrop(m, at?.x ?? 0, at?.y ?? 0, at !== null) ?? null;
+/** 落とされたファイルの振り分け（core/file/dnd.mbt）。`.md` は開き、画像はノードの上に
+ *  落ちたときだけ置く。予告（落ちる先の線）は地図が持つ */
+export const drop = (
+  m: MapHandle,
+  deps: {
+    /** `.md` が落ちた */
+    openMarkdown: (file: FileSystemFileHandle) => Promise<void>;
+    /** 画像がノードの上に落ちた（ノードの外なら呼ばれない） */
+    addImage: (blob: Blob, node: number) => Promise<void>;
+    failed: (msg: Failed) => void;
+  },
+): void => mbt.mmmDrop(m, deps);
 
-/** 書き出しに写すもの。文書順の箱と、その線・ノードの要素 */
-export interface SvgParts {
-  rects: Rect[];
-  edges: SVGPathElement[];
-  nodes: SVGGElement[];
+// ---- 書き出し ----
+//
+// マップを外へ出す（core/app/export.mbt）。出し方 4 通りの表・ボタンの言い分・出し口は core が持ち、
+// ts が渡すのは地図の持ち手と、名前・しらせ・空かどうか
+
+export interface ExportDeps {
+  /** 写す地図。並べて見るだけなら null */
+  map: MapHandle | null;
+  /** ダウンロード名の元になる、いまのファイル名 */
+  name: () => string;
+  failed: (msg: Failed) => void;
+  /** 出すものが無い。キーから来たときだけここへ落ちる */
+  blocked: (msg: Blocked) => void;
+  /** マップに 1 つも枝が無いか */
+  empty: () => boolean;
 }
 
-export const mapSvgParts = (m: MapHandle): SvgParts => {
-  const o = record(mbt.mmmMapSvgParts(m));
-  return {
-    rects: field(o, "rects", (v) => list(v, (r) => rect4(list(r, num)))),
-    edges: field(o, "edges", (v) => list(v, svgPath)),
-    nodes: field(o, "nodes", (v) => list(v, svgG)),
-  };
-};
+declare const exportBrand: unique symbol;
+/** ヘッダの書き出し（持ち手） */
+export interface Export {
+  readonly [exportBrand]: never;
+}
 
-const svgG = (v: unknown): SVGGElement => (v instanceof SVGGElement ? v : bad("<g> でない"));
-const svgPath = (v: unknown): SVGPathElement => (v instanceof SVGPathElement ? v : bad("<path> でない"));
+/** ヘッダの書き出しを立てる。`button` はいまの出し方で出す、`wayButton` は選び直す `▾` */
+export const exportMap = (deps: ExportDeps, button: HTMLButtonElement, wayButton: HTMLButtonElement): Export =>
+  Object(mbt.mmmExport(deps, button, wayButton));
+/** キー（Mod+E）。ボタンと同じものを走らせる */
+export const exportRun = (e: Export): void => mbt.mmmExportRun(e);
+/** キー（Mod+Shift+E）。出し方を選び直す */
+export const exportChoose = (e: Export): void => mbt.mmmExportChoose(e);
+/** 文書が変わった。押せるかどうかを見直す */
+export const exportRefresh = (e: Export): void => mbt.mmmExportRefresh(e);
+/** 出し方の並び（並べて見るため） */
+export const exportWays = (deps: ExportDeps): HTMLDivElement => div(mbt.mmmExportWays(deps));
+
+// ---- お絵描き ----
+
+/** 窓を開いて描いてもらい、確定した絵を返す。取りやめなら null */
+export const showDrawing = (): Promise<Blob | null> =>
+  Promise.resolve(mbt.mmmShowDrawing()).then((v) => (v instanceof Blob ? v : null));
+/** お絵描きの form（並べて見るため） */
+export const drawForm = (): HTMLFormElement => {
+  const f = mbt.mmmDrawForm();
+  return f instanceof HTMLFormElement ? f : bad("<form> でない");
+};
 
 // ---- 部品 ----
 //
@@ -658,10 +686,6 @@ const maybe = <T>(json: string, read: (v: unknown) => T): T | null => (json === 
 
 /** 出口の数の列。長さが違えば壊れている（タプルは JS では object になるので、数の列で渡す） */
 const nums = (v: number[], n: number): number[] => (v.length === n ? v : bad(`数が ${n} 個でない`));
-const rect4 = (v: number[]): Rect => {
-  const [x, y, w, h] = nums(v, 4);
-  return { x, y, w, h };
-};
 /** enum の形 — `"Tag"`（中身なし）か `["Tag", 中身]`。中身の形は構築子ごとに確かめる */
 function tagged(v: unknown): [string, unknown] {
   if (typeof v === "string") return [v, undefined];

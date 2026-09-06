@@ -22,21 +22,45 @@ pub fn can_rename() -> Bool
 
 pub fn can_save_as() -> Bool
 
+pub fn canvas_blob(@dom.Element, String, Double) -> @js_async.Promise[@core.Any]
+
 pub fn capture(@dom.Element, Int) -> Unit
+
+pub fn click(@dom.Element) -> Unit
 
 pub fn client_rect(@dom.Element) -> @dom.DOMRect
 
+pub fn clipboard_write(FixedArray[String], FixedArray[@core.Any]) -> @js_async.Promise[Unit]
+
 pub fn close_dialog(@dom.Element) -> Unit
 
+pub fn close_with(@dom.Element, String) -> Unit
+
+pub fn computed(@dom.Element, String) -> String
+
 pub fn css_var(@dom.Document, String) -> String
+
+pub fn data_url(String) -> @js_async.Promise[String]
 
 pub fn delta(@core.Any) -> (Double, Double)
 
 pub fn detail(@core.Any) -> Int
 
+pub fn device_pixel_ratio(@dom.Document) -> Double
+
+pub fn download(@core.Any, String) -> Unit
+
+pub fn drag_files(@core.Any) -> FixedArray[String]
+
+pub fn dropped_files(@core.Any) -> @js_async.Promise[FixedArray[FileHandle]]
+
 pub fn el(@dom.Document, String, Array[(String, String)]) -> @dom.Element
 
 pub fn event_type(@core.Any) -> String
+
+pub fn file_of(FileHandle) -> @js_async.Promise[@core.Any]
+
+pub fn fill_rect(@core.Any, String, Double, Double) -> Unit
 
 pub fn focus(@dom.Element) -> Unit
 
@@ -70,6 +94,8 @@ pub fn is_touch(@core.Any) -> Bool
 
 pub fn keyboard(@core.Any) -> @dom.KeyboardEvent
 
+pub fn left_window(@core.Any) -> Bool
+
 pub fn list_entries(DirHandle) -> @js_async.Promise[@core.Any]
 
 pub fn listen(@dom.Element, String, (@core.Any) -> Unit, capture? : Bool) -> Unit
@@ -96,6 +122,8 @@ pub fn on_window(@dom.Document, String, (@core.Any) -> Unit, capture? : Bool) ->
 
 pub fn open_url(String) -> Unit
 
+pub fn paper_2d(@dom.Element, Double) -> @core.Any
+
 pub fn pick_directory(@core.Any, String) -> @js_async.Promise[@core.Any]
 
 pub fn pick_open(@core.Any) -> @js_async.Promise[@core.Any]
@@ -111,6 +139,8 @@ pub fn promise_of(((@core.Any) -> Unit) -> Unit) -> @js_async.Promise[@core.Any]
 pub fn px(Double) -> String
 
 pub fn query_permission(@core.Any, String) -> @js_async.Promise[String]
+
+pub fn rasterize(String, Double, Double, String, Double) -> @js_async.Promise[@core.Any]
 
 pub fn read_text(FileHandle) -> @js_async.Promise[String]
 
@@ -132,11 +162,17 @@ pub fn select_all(@dom.Element) -> Unit
 
 pub fn select_range(@dom.Element, Int, Int) -> Unit
 
+pub fn serialize(@dom.Element) -> String
+
 pub fn set_disabled(@dom.Element, Bool) -> Unit
+
+pub fn set_drop_effect(@core.Any, String) -> Unit
 
 pub fn set_style(@dom.Element, String, String) -> Unit
 
 pub fn set_value(@dom.Element, String) -> Unit
+
+pub fn settled(@core.Any) -> @js_async.Promise[@core.Any]
 
 pub fn show(@dom.Element, String, Bool) -> Unit
 
@@ -146,9 +182,13 @@ pub fn stamp() -> String
 
 pub fn stop(@core.Any) -> Unit
 
+pub fn stroke_line(@core.Any, String, Double, FixedArray[Double]) -> Unit
+
 pub let svg_ns : String
 
 pub fn target_in(@core.Any, String) -> @dom.Element?
+
+pub fn text_blob(String, String) -> @core.Any
 
 pub fn to_webp(@core.Any) -> @js_async.Promise[@core.Any]
 
