@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { survey } from "../src/coreApi.ts";
 import { imageFolder, retarget, setImageFolder } from "../src/app/head.ts";
 
-const view = (md: string) => survey(md, [], []).view;
+const view = (md: string) => survey(md).view;
 
 /** md から宣言を引く */
 const folderOf = (md: string): string | null => imageFolder(view(md).frontmatter);

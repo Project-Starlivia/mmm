@@ -130,21 +130,22 @@ test "Unfold は畳みを外す" {
 }
 
 ///|
-test "Delete は部分木ごと。根の子なら side も、Implicit の掃除も" {
+test "Delete は部分木ごと。根の子なら side も、Implicit の掃除も。focus は残った親" {
   let d = doc([
     root(
       h(2, "r", children=[h(3, "a", children=[h(4, "x")]), gap(5, [h(6, "y")])]),
       sides=[Right, Left],
     ),
   ])
+  // a の次の兄弟は Implicit 5 だが y ごと消えるので、親 r
   assert_eq(
     run(d, Delete(ids=[4, 6, 3])),
-    Some({ doc: doc([root(h(2, "r"), sides=[])]), focus: None }),
+    Some({ doc: doc([root(h(2, "r"), sides=[])]), focus: Some(2) }),
   )
 }
 
 ///|
-test "Delete は中身も 1 枚ずつ（持ち主が focus）。根も Root ごと" {
+test "Delete は中身も 1 枚ずつ（持ち主が focus）。根も Root ごと（隣の根が focus）" {
   let d = doc([root(h(2, "r", body=[pic(3), code(4)])), root(h(5, "s"))])
   assert_eq(
     run(d, Delete(ids=[3])),
@@ -153,14 +154,15 @@ test "Delete は中身も 1 枚ずつ（持ち主が focus）。根も Root ご�
       focus: Some(2),
     }),
   )
-  // 持ち主ごと消せば focus は無い
+  // 持ち主ごと消せば、先頭は文書順で r（ノード）なので、次の根 s
   assert_eq(
     run(d, Delete(ids=[2, 3])),
-    Some({ doc: doc([root(h(5, "s"))]), focus: None }),
+    Some({ doc: doc([root(h(5, "s"))]), focus: Some(5) }),
   )
+  // 末尾の根を消せば前の根
   assert_eq(
     run(d, Delete(ids=[5])),
-    Some({ doc: doc([root(h(2, "r", body=[pic(3), code(4)]))]), focus: None }),
+    Some({ doc: doc([root(h(2, "r", body=[pic(3), code(4)]))]), focus: Some(2) }),
   )
 }
 
@@ -169,6 +171,44 @@ test "Delete は空と知らない id に None" {
   let d = doc([root(h(2, "r"))])
   assert_eq(run(d, Delete(ids=[])), None)
   assert_eq(run(d, Delete(ids=[2, 9])), None)
+}
+
+///|
+test "Delete したノードの focus は次の兄弟 → 前の兄弟 → 親。消えるものは飛ばし、畳まれた兄弟はそれ自身" {
+  let d = doc([
+    root(
+      h(2, "r", children=[h(3, "a"), h(4, "b", children=[h(5, "x")]), h(6, "c")]),
+      sides=[Right, Right, Right],
+    ),
+  ])
+  let focus = (op : Op) => run(d, op).map(x => x.focus)
+  // 次の兄弟
+  assert_eq(focus(Delete(ids=[3])), Some(Some(4)))
+  // 末尾なら前の兄弟。その子孫（x）ではない
+  assert_eq(focus(Delete(ids=[6])), Some(Some(4)))
+  // 次が一緒に消えるなら飛ばす
+  assert_eq(focus(Delete(ids=[3, 4])), Some(Some(6)))
+  // 兄弟が尽きれば親
+  assert_eq(focus(Delete(ids=[3, 4, 6])), Some(Some(2)))
+  // 子孫も選んでいても、基準は文書順の先頭（a）
+  assert_eq(focus(Delete(ids=[5, 3])), Some(Some(4)))
+  // 最後の根なら何も無い
+  assert_eq(
+    run(doc([root(h(2, "r"))]), Delete(ids=[2])).map(x => x.focus),
+    Some(None),
+  )
+  // 前の兄弟が畳まれていれば、その兄弟そのもの（埋もれた子孫には落ちない）
+  let folded : @tree.Fold = { open: false, summary: Some("b") }
+  let f = doc([
+    root(
+      h(2, "r", children=[
+        h(3, "b", fold=Some(folded), children=[h(4, "y")]),
+        h(5, "c"),
+      ]),
+      sides=[Right, Right],
+    ),
+  ])
+  assert_eq(run(f, Delete(ids=[5])).map(x => x.focus), Some(Some(3)))
 }
 
 ///|
@@ -875,6 +915,40 @@ test "Graft は parse した根たちを差す。側は捨て、id は鋳直す"
         ),
       ]),
       focus: Some(4),
+    }),
+  )
+}
+
+///|
+/// Mod+C は選んだ深さのまま写すので、断片は `##` から始まり得る。parse が
+/// 先頭に埋める Implicit は切り出した場所の名残でしかなく、差すときは剥がす
+/// （相対の形で入る）。断片の途中の飛びは綴りなので残す。
+test "Graft は断片の先頭の Implicit を剥がして差す。途中の飛びは残す" {
+  let d = doc([root(h(2, "r"))])
+  assert_eq(
+    run(
+      d,
+      Graft(at=NodePlace::In(node=2, side=None), md="## a\n\n###\n\n## b\n"),
+    ),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(4, "a", children=[h(5, "")]), h(6, "b")]), sides=[
+          Right,
+          Right,
+        ]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  assert_eq(
+    run(d, Graft(at=NodePlace::In(node=2, side=None), md="### a\n\n##### b\n")),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(5, "a", children=[gap(6, [h(7, "b")])])]), sides=[
+          Right,
+        ]),
+      ]),
+      focus: Some(5),
     }),
   )
 }

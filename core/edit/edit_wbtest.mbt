@@ -28,8 +28,9 @@ test "AddNode — 新しいノードの focus は、読み直したときの番�
 }
 
 ///|
-test "Delete — 消した後は focus が無い" {
-  assert_eq(applied("# a\n\n# b\n", Delete(ids=[3])), ("# a\n", None))
+test "Delete — 消した後は隣が focus。最後の根なら無い" {
+  assert_eq(applied("# a\n\n# b\n", Delete(ids=[3])), ("# a\n", Some(2)))
+  assert_eq(applied("# a\n", Delete(ids=[2])), ("", None))
 }
 
 ///|

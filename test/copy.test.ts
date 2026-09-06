@@ -9,7 +9,7 @@ import { survey } from "../src/coreApi.ts";
 
 /** md を core に読ませて、copyText に要るものを揃える */
 const read = (md: string) => {
-  const s = survey(md, [], []);
+  const s = survey(md);
   return (ids: number[]) => copyText(md, s.view, s.spots, ids);
 };
 

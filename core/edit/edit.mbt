@@ -8,7 +8,7 @@
 
 ///|
 /// 操作を md に映した結果。edits は CodeMirror の changes の形。
-/// focus は編集を当てて読み直した木での id（消した後は None）。
+/// focus は編集を当てて読み直した木での id（ノードを消せば隣、中身を消せば持ち主。最後の根か文書の散文を消した後は None）。
 pub(all) struct Edited {
   edits : Array[@tree.Edit]
   focus : Int?
