@@ -2,10 +2,11 @@
 // 見本の md を core に読ませ、選択と picked だけ持つ代役の host を渡す。
 // 手で Box を組まないのは、それが嘘の置き方になるから。
 
+import * as core from "../../src/coreApi.ts";
 import { type Layout, type Node, type View, layout, survey } from "../../src/coreApi.ts";
 import { type MapHost, Mindmap } from "../../src/mindmap.ts";
 import { measure } from "../../src/map/measure.ts";
-import { NONE, type Selection } from "../../src/map/select.ts";
+import { NONE } from "../../src/map/select.ts";
 import type { Part } from "./kind.ts";
 
 const MD = `# mmm
@@ -61,7 +62,7 @@ function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
   const el = document.createElement("div");
   el.style.height = "100%"; // 枠いっぱいに（アプリでは #map-pane の flex が決める）
   const s = survey(md);
-  let selection: Selection = NONE;
+  let selection: core.Selection = NONE;
   let picked: number | null = null;
   const host: MapHost = {
     survey: () => s,

@@ -14,7 +14,7 @@ import type { Anchors, Holder } from "./caret.ts";
 import * as st from "./state.ts";
 import { MdEditor } from "./editor.ts";
 import { Mindmap, type MapHost } from "./mindmap.ts";
-import { type Choice, NOTHING, type Selection, cardOf, nodesOf } from "./map/select.ts";
+import { type Choice, NOTHING, cardOf, nodesOf } from "./map/select.ts";
 import { handles } from "./app/handles.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
@@ -69,7 +69,7 @@ const text = (): string => editor.text();
 const doc = (): core.View => state().field(st.tree).view;
 const spots = (): Map<number, core.Spot> => state().field(st.tree).spots;
 const choice = (): Choice => state().field(st.choice);
-const selection = (): Selection => nodesOf(choice());
+const selection = (): core.Selection => nodesOf(choice());
 const picked = (): number | null => cardOf(choice());
 const holder = (): Holder => state().field(st.holder);
 /** 選択（id）をいまの木の地番で位置に。CodeMirror へ渡すのはこの形 */
@@ -131,7 +131,7 @@ function choose(next: Choice, reveal: boolean): void {
   }
 }
 
-const setSelection = (sel: Selection, reveal: boolean): void => choose({ kind: "nodes", sel }, reveal);
+const setSelection = (sel: core.Selection, reveal: boolean): void => choose({ kind: "nodes", sel }, reveal);
 
 const setPicked = (id: number | null): void => choose(id === null ? NOTHING : { kind: "card", id }, false);
 

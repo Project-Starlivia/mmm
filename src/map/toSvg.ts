@@ -9,7 +9,7 @@
 // **地は持たない。** 貼り先の色にそのまま乗るよう透明のままにする —
 // 板を敷かないので、角丸にする／しないの検討も要らない。
 
-import type { Rect } from "./geometry.ts";
+import type * as core from "../coreApi.ts";
 import { SVG_NS, svgEl } from "./svg.ts";
 
 /** 透かしの出所。配り先（wrangler.jsonc の `workers_dev` 名）を変えたらここも */
@@ -20,7 +20,7 @@ const WM_BAND = 22;
 
 export async function mapToSvg(args: {
   /** 収める範囲。写すノードの箱をそのまま渡す */
-  boxes: Iterable<Rect>;
+  boxes: Iterable<core.Rect>;
   /** 写す親子の線 */
   edges: Iterable<SVGPathElement>;
   /** 写すノード */

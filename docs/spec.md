@@ -31,10 +31,14 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
   edit/         境界。edit(md, op) が survey → apply → merge を繋ぎ、編集列と
                 読み直した木での focus を返す。law_wbtest.mbt が操作 × 合流の結合を
                 総当たりで固定する。決めは core.md「境界」
-  map/          Mindmap の配置。DOM を知らない — geometry(座標系。側 → 符号はここだけ) /
+  map/          Mindmap の配置と判断。DOM を知らない — geometry(座標系。側 → 符号はここだけ) /
                 card(Block → Card。分類だけ) / metric(寸法の唯一の定義。字の実測は
                 Measure で外から受ける) / layout(View → Layout。畳みの埋没と sides の zip、
-                付け根の配り、card_rect / owner_of / edge_ends) / edge(線の形。d 属性)
+                付け根の配り、card_rect / owner_of / edge_ends) / edge(線の形。d 属性) /
+                select(選択の値と、入力でどう変わるか。矩形・矢印・点の当たり・親兄弟と隣。
+                Easy grab の広げ幅) / drop(ドラッグの落とし先) / keys(キー → Intent の表) /
+                context(右クリックの行) / camera(視点。world ↔ 画面、寄せ、ピンチ) /
+                indicator(画面外の根を指す針) / gesture(指の台帳) / place(欄を箱に重ねる算術)
   render/       Layout → SVG の差分更新（js だけ。mizchi/js_browser の DOM の型で書く）。
                 svg(要素を作る) / card(Card 1 枚 → SVG) / render(Renderer。id → 要素、
                 transform / d のキャッシュ、並び直し、paint)。class と data-* は
@@ -43,8 +47,9 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 データは JSON、MoonBit の値は不透明な持ち手で往復する
 src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す・動かす・カードを扱う・
         貼る/落とす/描く。**
-  coreApi.ts   core の出口と入口。JSON の形を整える唯一の場所（survey が View・地番を受け、
-               edit が Op を送る）。TS では必ず `core.View` と書く
+  coreApi.ts   core の出口と入口。形を整える唯一の場所（survey が View・地番を受け、edit が Op を
+               送る。地図は持ち手を渡して問い合わせる — hit / click / keyed / drop / fit …）。
+               木も箱も core から出ない。TS では必ず `core.View` と書く
   caret.ts     md のカーソル、または地図の選択の位置がどのノードに掛かるか（最も深いもの。
                区間の重なりだけ）。derive が持ち主とそれらから選択を導く。選択の規則はここだけ
   state.ts     文書から導けるものの置き場(EditorState の field: tree = core の答え、anchors = 地図の
@@ -53,25 +58,20 @@ src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す�
   editor.ts    Markdown 側(CodeMirror 6、履歴も CodeMirror。state.ts の field を載せ、
                1 トランザクションを 1 回 onUpdate で外へ。薄塗りは state.ts の範囲から
                field で導く。フェンスの中は map/highlight.ts と同じ言語表で色を付ける)
-  mindmap.ts   Mindmap 側(視点と描画と、選択の入力。叩く・矩形・矢印・右クリック・長押し・
-               ドラッグを値にして act へ渡し、選択を輪（md が持つ間）か枠（地図が持つ間）で塗る。
-               キーは map/keys.ts の表に渡し、返った Intent を実行する。カードの選択とその場編集、
-               ファイルの投下の予告。パン・ズーム・ピンチ・寄せ・針・書き出し)
+  mindmap.ts   Mindmap 側の配線(叩く・矩形・矢印・右クリック・長押し・ドラッグ・キーを core に
+               渡し、返った選択と Intent を実行する。選択を輪（md が持つ間）か枠（地図が持つ間）で
+               塗る。カードの選択とその場編集、ファイルの投下の予告。視点の値と、パン・ズーム・
+               ピンチ・寄せ・針・書き出し — 算術は core)
   icons.ts     ボタンとメニューの絵の唯一の源(線で引く / currentColor)
   style.css    全体のスタイル(部品ごとの塊。入れ子は CSS 自身の機能。色・影・輪の数字は
                `:root` のトークンだけが持ち、状態は `.selected` / `.on` / `aria-disabled` で言う)
-  map/         入力側の純粋層（配置と描画は core/map・core/render）— geometry(入力側の
-               算術。側 → 符号は ts ではここだけ) / camera(視点。world ↔ 画面) /
+  map/         地図の器（判断は core/map、配置と描画は core/map・core/render）—
                measure(字の実測。core の Font に CSS の字の綴りを合わせて canvas で測る) /
                highlight(コードの色分け。core の描画に閉包で渡す) /
-               select(選択の値と、入力でどう変わるか。矩形・矢印・点の当たり・
-               親兄弟と隣。Easy grab の広げ幅 GRAB) / context(右クリックメニューの行。純粋な表) /
-               drop(ドラッグの落とし先の判定。純粋) / pick(選んでいるカードの枠と ×) /
-               card(カードのその場編集の器と配置) /
-               toSvg(1 枚の svg にする) / svg(要素を作る) / indicator(画面外の
-               根を指す針) / gesture(指の台帳) / menu(メニューの器) /
-               keys(キー → 何をするか。純粋な表) / label(ラベルのその場編集。
-               <input> の器と、箱に重ねる算術)
+               select(選択の**値**。ノードの並びかカード 1 枚か) / pick(選んでいるカードの枠と ×) /
+               label(ラベルのその場編集。<input> の器。置き場は core に聞く) /
+               card(カードのその場編集の器。同じ) / menu(メニューの器) /
+               toSvg(1 枚の svg にする) / svg(要素を作る)
   main.ts      束ねる場所(1 トランザクション = 1 サイクルの出口 onUpdate、操作の入口 apply(op, edit)
                — focus を選ぶ — と write(op) — 選択に触らない、持ち主の focusin、
                貼り付け・投下・描いた絵の保存、ファイル I/O、帯。文書から導く値は

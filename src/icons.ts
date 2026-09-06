@@ -130,7 +130,7 @@ const MARKS = {
 
 export type IconName = keyof typeof MARKS;
 
-const isIconName = (s: string): s is IconName => s in MARKS;
+export const isIconName = (s: string): s is IconName => s in MARKS;
 /** 絵の名前の全部（並べて見るため） */
 export const ICONS: readonly IconName[] = Object.keys(MARKS).filter(isIconName);
 

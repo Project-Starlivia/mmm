@@ -2,48 +2,10 @@
 // <input> を 1 つ重ねる。**打つたびに md へ書く**（キャンセルは存在しない。
 // 打った字はもう md に在る — spec.md「Mindmap 側」）。IME の変換中は待ち、確定で書く。
 //
-// 枠(border)と余白(padding)は CSS ピクセルでズームに追従しないので、world の
-// 単位で組んでから 1 度だけ倍率を掛け、追従しないぶんを別に足す — これを間違えると
-// 倍率 1 では合っているのに 2 倍で箱と文字がずれる。
+// 欄をどこに置くかは core（`core.labelPlace`）が数え、ここは style に入れるだけ。
 
-import type { Camera } from "./camera.ts";
 import * as core from "../coreApi.ts";
 import { measure } from "./measure.ts";
-
-/** そのまま style へ入れる値（px） */
-export interface Placement {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  fontSize: number;
-  padding: number;
-}
-
-/** 入力欄の枠。拡大しない */
-export const LABEL_BORDER = 2;
-/** 余白をいくら縮めても、これだけは残す（字が縁に貼り付かないように） */
-export const LABEL_MIN_PAD = 2;
-
-/**
- * 入力欄をノードのラベル行に**ぴったり**重ねる。`textWidth` は world 単位で実測した
- * 字の幅（余白は含まない）。`box-sizing: border-box` なので字は left + border + padding
- * から始まる。left を border ぶん外へずらせばその分が打ち消え、padding は SVG の
- * ラベルの x（= `rowOf().padX`）をそのまま倍率に掛けた値でよい。
- * 字が箱より長くなったら右へ伸び、短いときは箱に重なったまま。
- */
-export function labelPlacement(b: core.Box, cam: Camera, textWidth: number): Placement {
-  const row = core.rowOf(b.node);
-  const wWorld = Math.max(b.w, textWidth + row.pad * 2);
-  return {
-    left: b.x * cam.k + cam.tx - LABEL_BORDER,
-    top: b.y * cam.k + cam.ty - LABEL_BORDER,
-    width: wWorld * cam.k + LABEL_BORDER * 2,
-    height: row.h * cam.k + LABEL_BORDER * 2,
-    fontSize: row.px * cam.k,
-    padding: Math.max(row.pad * cam.k, LABEL_MIN_PAD),
-  };
-}
 
 /** 入力欄の器。開く / 打つたびに rename / 閉じる。値の意味は持たない */
 export class LabelEditor {
@@ -53,10 +15,9 @@ export class LabelEditor {
    *  （欄が開いている間は keydown が地図へ届かない） */
   private id: number | null = null;
   private composing = false;
-  /** 最後に place() へ渡された箱と視点。打鍵のたびに欄を今の値へ合わせ直すのに使う
+  /** 最後に place() へ渡された配置と視点。打鍵のたびに欄を今の値へ合わせ直すのに使う
    *  （変換中は md へ書かず render も走らないので、ここから自分で place() する） */
-  private lastBox: core.Box | null = null;
-  private lastCam: Camera | null = null;
+  private last: { layout: core.Layout; cam: core.Camera } | null = null;
   private readonly pane: HTMLElement;
   private readonly rename: (id: number, label: string) => void;
 
@@ -76,7 +37,7 @@ export class LabelEditor {
     });
     this.input.addEventListener("input", (e) => {
       // 欄は打った字の分だけ先に育つ（card.ts と同じ）。md へ書くかは別の話
-      if (this.lastBox && this.lastCam) this.place(this.lastBox, this.lastCam);
+      if (this.last) this.place(this.last.layout, this.last.cam);
       if (this.composing || (e instanceof InputEvent && e.isComposing)) return;
       this.write();
     });
@@ -104,11 +65,11 @@ export class LabelEditor {
   }
 
   /** 開く。カーソルは末尾（全選択しない）。seed があればそれが最初の字 */
-  open(id: number, b: core.Box, cam: Camera, label: string, seed: string | null): void {
+  open(id: number, layout: core.Layout, cam: core.Camera, label: string, seed: string | null): void {
     this.id = id;
     this.input.value = seed ?? label;
     this.input.style.display = "block";
-    this.place(b, cam);
+    this.place(layout, cam);
     this.input.focus();
     const end = this.input.value.length;
     this.input.setSelectionRange(end, end);
@@ -116,13 +77,16 @@ export class LabelEditor {
     if (seed !== null) this.write();
   }
 
-  /** 箱に追従する。書くたびに箱が変わるので、描き直しの後に呼ぶ */
-  place(b: core.Box, cam: Camera): void {
+  /** 箱に追従する。書くたびに箱が変わるので、描き直しの後に呼ぶ。
+   *  箱が消えていれば（畳まれて埋もれた）閉じる */
+  place(layout: core.Layout, cam: core.Camera): void {
     if (this.id === null) return;
-    this.lastBox = b;
-    this.lastCam = cam;
-    const row = core.rowOf(b.node);
-    const p = labelPlacement(b, cam, measure({ px: row.px, mono: false }, this.input.value));
+    const p = core.labelPlace(layout, this.id, cam, this.input.value, measure);
+    if (p === null) {
+      this.close();
+      return;
+    }
+    this.last = { layout, cam };
     const st = this.input.style;
     st.left = `${p.left}px`;
     st.top = `${p.top}px`;
@@ -131,7 +95,7 @@ export class LabelEditor {
     st.fontSize = `${p.fontSize}px`;
     st.paddingLeft = `${p.padding}px`;
     st.paddingRight = `${p.padding}px`;
-    st.borderWidth = `${LABEL_BORDER}px`;
+    st.borderWidth = `${p.border}px`;
   }
 
   /** 閉じる。書くものは無い（もう書いてある）。二重に閉じても何も起きない */
@@ -144,8 +108,7 @@ export class LabelEditor {
       this.write();
     }
     this.id = null;
-    this.lastBox = null;
-    this.lastCam = null;
+    this.last = null;
     this.input.style.display = "none";
   }
 
