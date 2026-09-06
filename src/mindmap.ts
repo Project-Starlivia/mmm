@@ -18,11 +18,11 @@ import { indicatorFor, isLost, nearest } from "./map/indicator.ts";
 import { type Intent, type Key, keyed, keyedCard } from "./map/keys.ts";
 import { LabelEditor } from "./map/label.ts";
 import { type Layout, cardRect, layoutMap, ownerOf, rootBox } from "./map/layout.ts";
-import { labelOf, nodeSize } from "./map/metrics.ts";
+import { HIT_EDGE, HIT_PAD, labelOf, nodeSize } from "./map/metrics.ts";
 import { ContextMenu } from "./map/menu.ts";
 import { CardPick } from "./map/pick.ts";
 import { MapRenderer } from "./map/render.ts";
-import { NONE, type Selection, click, hit, rubber } from "./map/select.ts";
+import { EXACT, NONE, type Selection, click, hit, rubber } from "./map/select.ts";
 import { svgEl } from "./map/svg.ts";
 import { mapToSvg } from "./map/toSvg.ts";
 import { icon } from "./icons.ts";
@@ -102,6 +102,7 @@ export class Mindmap {
   private rubberStart: { x: number; y: number } | null = null;
   /** 押したまま離すのを待つノード（指、または選んでいる箱をマウスで）。動かさずに離せば選ぶ */
   private tapped: { id: number; x: number; y: number } | null = null;
+  private grab = false;
   /** Space を押している間、左ドラッグはパン */
   private spaceHeld = false;
   private label: LabelEditor;
@@ -403,11 +404,16 @@ export class Mindmap {
     });
   }
 
-  /** 画面の点がどの箱に居るか。無ければ null */
+  /** 画面の点がどの箱に居るか。Easy grab なら箱の外まで当たる（select.ts の hit）。無ければ null */
   private nodeAt(clientX: number, clientY: number): number | null {
     const p = this.local(clientX, clientY);
     const w = toWorld(this.camera, p.x, p.y);
-    return hit(this.layout, w.x, w.y);
+    return hit(this.layout, w.x, w.y, this.grab ? { pad: HIT_PAD, edge: HIT_EDGE } : EXACT);
+  }
+
+  /** 掴みやすさ（⋯ の Easy grab）。見た目は変えず、叩ける範囲だけ広げる */
+  setGrab(on: boolean): void {
+    this.grab = on;
   }
 
   /** 見失った選択（無ければ根）を控えめな針で指す。決めは indicator.ts が持つ */

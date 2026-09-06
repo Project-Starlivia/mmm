@@ -5,7 +5,7 @@
 // id は文書順の通し番号なので、数の順がそのまま文書順。
 
 import { dirOf, type Rect } from "./geometry.ts";
-import type { Layout } from "./layout.ts";
+import type { Box, Layout } from "./layout.ts";
 
 /** 選んでいるノード（文書順）と、範囲選択・矢印の基点 */
 export interface Selection {
@@ -58,14 +58,67 @@ export function rubber(L: Layout, r: Rect): Selection {
   return { ids, anchor: last(ids) };
 }
 
-/** world の点がどの箱に居るか。重なりは文書順の後ろが上。外なら null */
-export function hit(L: Layout, x: number, y: number): number | null {
-  for (let i = L.order.length - 1; i >= 0; i--) {
-    const id = L.order[i];
+/** 点から矩形までの、軸ごとの距離。中なら 0 */
+const gapTo = (r: Rect, x: number, y: number): { dx: number; dy: number } => ({
+  dx: Math.max(r.x - x, 0, x - (r.x + r.w)),
+  dy: Math.max(r.y - y, 0, y - (r.y + r.h)),
+});
+
+const inside = (r: Rect, x: number, y: number): boolean => {
+  const g = gapTo(r, x, y);
+  return g.dx === 0 && g.dy === 0;
+};
+
+/**
+ * 見た目の箱の外まで当たりを広げる幅（world px）。`pad` は四方、`edge` は子の見えない
+ * 端のノードが枝の伸びる向きにさらに伸ばす分（根は向きが無いので伸びない）。
+ * 数字は metrics.ts、見た目どおりは EXACT
+ */
+export interface Reach {
+  pad: number;
+  edge: number;
+}
+
+export const EXACT: Reach = { pad: 0, edge: 0 };
+
+const grown = (b: Rect, pad: number): Rect => ({ x: b.x - pad, y: b.y - pad, w: b.w + pad * 2, h: b.h + pad * 2 });
+
+/** 箱 1 つの当たりの範囲。`near` は pad の分、`far` はそれに端の伸びを足したもの（near ⊆ far） */
+export function reachOf(b: Box, r: Reach, parents: Set<number>): { near: Rect; far: Rect } {
+  const near = grown(b, r.pad);
+  const out = b.parent && !parents.has(b.node.id) ? r.edge : 0;
+  const left = b.parent && dirOf(b.parent.side) === -1;
+  return { near, far: { ...near, x: near.x - (left ? out : 0), w: near.w + out } };
+}
+
+/**
+ * world の点がどの箱に居るか。当たりは見た目の箱を `reach` の分だけ広げた範囲。
+ * 複数の範囲に入れば見た目の箱に近い方 — ふつうは直線距離。ただし端の伸び（far）
+ * だけで届く箱が居るときは行で読む: y の近さ、同じなら x の近さ（端の伸びは横に長く、
+ * 直線距離では隣の行の箱に負けてしまうため）。同じ近さなら文書順の後ろ。外なら null
+ */
+export function hit(L: Layout, x: number, y: number, reach: Reach): number | null {
+  const parents = new Set([...L.boxes.values()].flatMap((b) => (b.parent ? [b.parent.id] : [])));
+  const found: { id: number; dx: number; dy: number; byFar: boolean }[] = [];
+  for (const id of L.order) {
     const b = L.boxes.get(id);
-    if (b && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h) return id;
+    if (!b) continue;
+    const r = reachOf(b, reach, parents);
+    if (!inside(r.far, x, y)) continue;
+    found.push({ id, ...gapTo(b, x, y), byFar: !inside(r.near, x, y) });
   }
-  return null;
+  if (found.length === 0) return null;
+  const rowwise = found.some((f) => f.byFar);
+  const key = rowwise
+    ? (f: { dx: number; dy: number }): [number, number] => [f.dy, f.dx]
+    : (f: { dx: number; dy: number }): [number, number] => [Math.hypot(f.dx, f.dy), 0];
+  // 文書順の後ろが勝つよう、同じ近さでは後ろで置き換える
+  let best = found[0];
+  for (const f of found.slice(1)) {
+    const [a, b] = [key(f), key(best)];
+    if (a[0] < b[0] || (a[0] === b[0] && a[1] <= b[1])) best = f;
+  }
+  return best.id;
 }
 
 export const all = (L: Layout): Selection => ({ ids: sorted(L.order), anchor: last(L.order) });

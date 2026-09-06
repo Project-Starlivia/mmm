@@ -83,6 +83,7 @@ const MORE_ACTS = {
   redo: nothing,
   pickColor: nothing,
   toggleTheme: nothing,
+  toggleGrab: nothing,
   copyLink: () => Promise.resolve(true),
   open: nothing,
 };
@@ -161,11 +162,11 @@ export const PARTS: Part[] = [
             FILES_ACTS,
           ),
         ),
-      "more-dark": () => menu(moreMenu({ light: false, linkNote: Promise.resolve([]) }, MORE_ACTS)),
+      "more-dark": () => menu(moreMenu({ light: false, grab: false, linkNote: Promise.resolve([]) }, MORE_ACTS)),
       "more-light-noted": () =>
         menu(
           moreMenu(
-            { light: true, linkNote: Promise.resolve(["Images won't travel", "Long link — may be cut"]) },
+            { light: true, grab: true, linkNote: Promise.resolve(["Images won't travel", "Long link — may be cut"]) },
             MORE_ACTS,
           ),
         ),
