@@ -294,6 +294,30 @@ async fn Assets::pick(self : Assets) -> Picked? {
 }
 
 ///|
+/// その名前では**置けない**理由。名前そのものの検査（`name_problem`）に、
+/// **置き場に同じ名前が居るか**を足したもの。置けるなら None。
+/// `here` はそのフォルダに既に在る名前（小文字、`.webp` 込み）。
+///
+/// 1 つの関数にしてあるのは、貼る側と並べて見る道具が**同じ検査を通す**ため —
+/// 言葉を写すと、条件を足したときに片方だけ古くなる
+pub fn image_name_problem(typed : String, here : Set[String]) -> String? {
+  match name_problem(typed) {
+    Some(why) => Some(why)
+    None => {
+      let parts = name_parts(typed)
+      guard parts.last() is Some(last) else { return None }
+      let head = parts.iter().take(parts.length() - 1).collect()
+      head.push(last + ".webp")
+      if here.contains(head.join("/").to_lower()) {
+        Some("That name is taken")
+      } else {
+        None
+      }
+    }
+  }
+}
+
+///|
 /// 指してもらった結果を打てる欄にする。計算できていればそれが値で、実名の
 /// 照合は無い。できていなければ当て推量が値で、末尾を実名と照合する
 fn field_of(p : Picked) -> @app.Field {
@@ -309,28 +333,17 @@ fn field_of(p : Picked) -> @app.Field {
 }
 
 ///|
-/// 宣言を聞く箱。初めて決めるときと、選び直して食い違ったときの両方
+/// 宣言を聞く箱。初めて決めるときと、選び直して食い違ったときの両方。
+/// **綴りは持たない** — 箱は表（core/app/asks.mbt）から引き、ここが渡すのは欄だけ
 async fn Assets::ask_declaration(
   self : Assets,
   p : Picked,
   was : String?,
 ) -> String? {
-  let parts : Array[@app.Part] = [Text("image-folder:"), Blank(field_of(p))]
+  let field = field_of(p)
   let a = match was {
-    None =>
-      @app.ask_of(
-        "Where is \{p.binding.directory.name()}, seen from the .md?",
-        "Save",
-        parts~,
-      )
-    Some(_) =>
-      @app.ask_of(
-        "The folder changed — update the declaration?",
-        "Update",
-        note=Some("Image paths in the document will follow."),
-        cancel=Some("Keep as is"),
-        parts~,
-      )
+    None => @app.declaration(p.binding.directory.name(), field)
+    Some(_) => @app.redeclaration(field)
   }
   @app.asked(self.doc, a).bind(out => out.get(0))
 }
@@ -602,22 +615,7 @@ pub async fn Assets::save_to_disk(self : Assets, blob : @core.Any) -> String? {
   let here = taken(binding.directory)
   let name : @app.Field = {
     value: @web.stamp(),
-    check: Some(typed => {
-      match name_problem(typed) {
-        Some(why) => Some(why)
-        None => {
-          let parts = name_parts(typed)
-          guard parts.last() is Some(last) else { return None }
-          let head = parts.iter().take(parts.length() - 1).collect()
-          head.push(last + ".webp")
-          if here.contains(head.join("/").to_lower()) {
-            Some("That name is taken")
-          } else {
-            None
-          }
-        }
-      }
-    }),
+    check: Some(typed => image_name_problem(typed, here)),
   }
   // **分かっているところは字、分からないところだけ欄。** 位置が決まって
   // いれば（宣言、または計算できた）`./pics/` はただの字で、打てるのは名前だけ

@@ -128,11 +128,20 @@ export const PARTS: Part[] = [
       rename: () => asked("rename", "notes.md"),
       "image-name": () =>
         asked("imageName", { shape: ["![](", "./pics/", { value: "2026-09-05-101500" }, ".webp)"], shot: SHOT }),
+      // **言葉は写さない。** 置き場に `shot.webp` が居ることにすれば、
+      // 本物の検査（core/file/assets.mbt の image_name_problem）が理由を返す
       "image-name-taken": () =>
         asked("imageName", {
-          shape: ["![](", "./pics/", { value: "shot", check: () => "That name is taken" }, ".webp)"],
+          shape: ["![](", "./pics/", { value: "shot" }, ".webp)"],
           shot: SHOT,
+          taken: ["shot.webp"],
         }),
+      // 宣言。計算できていれば道が入り（dirName は渡さない）、当て推量なら
+      // フォルダの実名と末尾を照合する
+      declaration: () => asked("declaration", { folder: "pics", value: "./pics/" }),
+      // 指したのは pics なのに、道の末尾が違う。実名と照合して止める
+      "declaration-mismatch": () => asked("declaration", { folder: "pics", value: "./img/", dirName: "pics" }),
+      redeclaration: () => asked("redeclaration", { value: "./img/" }),
     },
   },
   {

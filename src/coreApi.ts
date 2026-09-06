@@ -535,9 +535,17 @@ export const asks = {
   imageName: (shape: Part[], shot: string): Promise<string[] | null> => named("imageName", { shape, shot }),
 };
 
-/** たずねの中身（form）だけ。並べて見るため */
-export const askForm = (kind: "discard" | "place" | "connect" | "rename" | "imageName", args: unknown = null): HTMLFormElement =>
-  form(mbt.mmmAskForm(kind, args));
+/**
+ * たずねの中身（form）だけ。並べて見るため。
+ *
+ * **欄の検査は本物を通す** — `declaration` / `redeclaration` は `dirName` を、
+ * `imageName` は `taken`（置き場に既に在る名前）を渡せば、だめな値でその検査が
+ * 本物の理由を返す。言葉をここへ写さない
+ */
+export const askForm = (
+  kind: "discard" | "place" | "connect" | "rename" | "imageName" | "declaration" | "redeclaration",
+  args: unknown = null,
+): HTMLFormElement => form(mbt.mmmAskForm(kind, args));
 
 const form = (v: unknown): HTMLFormElement => (v instanceof HTMLFormElement ? v : bad("<form> でない"));
 

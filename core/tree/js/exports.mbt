@@ -868,6 +868,13 @@ pub fn mmm_theme_set_dirty(theme : @core.Any, dirty : Bool) -> Unit {
 ///|
 /// ts の並び（字か `{ value, check? }`）を Part に
 fn parts_of(v : @core.Any) -> Array[@app.Part] {
+  parts_with(v, None)
+}
+
+///|
+/// 字と欄の並び。`here`（置き場に既に在る名前）を渡すと、欄は**本物の検査**を
+/// 積む — 並べて見る道具が言葉を写さずに済む。渡さなければ ts の `check` のまま
+fn parts_with(v : @core.Any, here : Set[String]?) -> Array[@app.Part] {
   @core.array_from(v).map(x => {
     if @core.typeof_(x) == "string" {
       @app.Text(x.cast())
@@ -875,10 +882,14 @@ fn parts_of(v : @core.Any) -> Array[@app.Part] {
       let check = x._get("check")
       @app.Blank({
         value: x._get("value").cast(),
-        check: if defined(check) {
-          Some(value => str_opt(check._invoke([@core.any(value)])))
-        } else {
-          None
+        check: match here {
+          Some(here) => Some(typed => @file.image_name_problem(typed, here))
+          None =>
+            if defined(check) {
+              Some(value => str_opt(check._invoke([@core.any(value)])))
+            } else {
+              None
+            }
         },
       })
     }
@@ -907,9 +918,34 @@ fn named_ask(kind : String, args : @core.Any) -> @app.Ask {
     "place" => @app.place()
     "connect" => @app.connect(args.cast())
     "rename" => @app.rename(args.cast())
-    "imageName" =>
-      @app.image_name(parts_of(args._get("shape")), args._get("shot").cast())
+    "imageName" => {
+      let taken = args._get("taken")
+      let here : Set[String]? = if defined(taken) {
+        Some(Set::from_array(@core.array_from(taken).map(x => x.cast())))
+      } else {
+        None
+      }
+      @app.image_name(
+        parts_with(args._get("shape"), here),
+        args._get("shot").cast(),
+      )
+    }
+    "declaration" =>
+      @app.declaration(args._get("folder").cast(), folder_field(args))
+    "redeclaration" => @app.redeclaration(folder_field(args))
     _ => abort("知らないたずね: " + kind)
+  }
+}
+
+///|
+/// 宣言の欄。**検査は本物**（core/file/assets.mbt）— 並べて見る道具が言葉を
+/// 写さずに済むよう、だめな値を渡せばそのまま本物の理由が出る。
+/// `dirName` はフォルダの実名（末尾を照合する。計算できていれば渡さない）
+fn folder_field(args : @core.Any) -> @app.Field {
+  let dir_name = str_opt(args._get("dirName"))
+  {
+    value: args._get("value").cast(),
+    check: Some(typed => @file.folder_problem(typed, dir_name)),
   }
 }
 
