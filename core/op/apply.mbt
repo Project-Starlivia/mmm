@@ -314,6 +314,28 @@ fn sign_in(n : @tree.Node) -> @tree.Sign {
 }
 
 ///|
+/// 席の綴り。新しく差すもの・運ぶものはこれに従う（「綴りは席が決める」）。
+/// Before / After は隣の綴り、In は末尾の子の綴り、子が無ければ親（項目なら項目、
+/// それ以外は見出し）、In(doc_id) は最後の根（無ければ見出し）。席が無ければ None。
+fn sign_at(doc : @tree.Doc, at : NodePlace) -> @tree.Sign? {
+  match at {
+    Before(node~) => find(doc, node).map(sign_of)
+    After(node~) => find(doc, node).map(sign_of)
+    In(node~, ..) =>
+      if node == @tree.doc_id {
+        Some(
+          match doc.roots.last() {
+            Some(r) => sign_of(r.node)
+            None => @tree.Heading
+          },
+        )
+      } else {
+        find(doc, node).map(sign_in)
+      }
+  }
+}
+
+///|
 /// 席が指している id。
 fn anchor(at : NodePlace) -> Int {
   match at {
@@ -324,35 +346,13 @@ fn anchor(at : NodePlace) -> Int {
 }
 
 ///|
-/// 新しいノードを差す。綴りは隣に従う。根の隣（`In(doc_id)`）は最後の根に従う。
+/// 新しいノードを差す。綴りは席が決める（`sign_at`）。
 fn add_node(doc : @tree.Doc, at : NodePlace, labels : Array[String]) -> Done? {
   guard !labels.is_empty() else { return None }
+  guard sign_at(doc, at) is Some(sign) else { return None }
   let first = fresh(doc)
-  fn news(sign : @tree.Sign) -> Array[@tree.Node] {
-    labels.mapi((k, label) => make(sign, first + k, label))
-  }
-
-  let sign = match at {
-    Before(node~) => {
-      guard find(doc, node) is Some(n) else { return None }
-      sign_of(n)
-    }
-    After(node~) => {
-      guard find(doc, node) is Some(n) else { return None }
-      sign_of(n)
-    }
-    In(node~, ..) =>
-      if node == @tree.doc_id {
-        match doc.roots.last() {
-          Some(r) => sign_of(r.node)
-          None => @tree.Heading
-        }
-      } else {
-        guard find(doc, node) is Some(n) else { return None }
-        sign_in(n)
-      }
-  }
-  done(place(doc, at, news(sign)), Some(first))
+  let news = labels.mapi((k, label) => make(sign, first + k, label))
+  done(place(doc, at, news), Some(first))
 }
 
 ///|
