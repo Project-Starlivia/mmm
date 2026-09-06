@@ -380,7 +380,7 @@ export function drawForm(on: { cancel(): void; insert(picture: Promise<Blob | nu
  */
 export function showDrawing(): Promise<Blob | null> {
   return new Promise((resolve) => {
-    // 器はたずね（app/ask.ts）と同じ `<dialog class="ask">`。焦点の閉じ込め・
+    // 器はたずね（core/parts/ask.mbt）と同じ `<dialog class="ask">`。焦点の閉じ込め・
     // Esc・後ろの幕はブラウザが持つので、ここでは書かない
     const dlg = document.createElement("dialog");
     dlg.className = "ask";

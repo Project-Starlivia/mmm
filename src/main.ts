@@ -10,7 +10,7 @@
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import type { EditorState } from "@codemirror/state";
 import * as core from "./coreApi.ts";
-import { blocked, failed, openOnClick } from "./coreApi.ts";
+import { ask, blocked, failed, openOnClick } from "./coreApi.ts";
 import * as st from "./state.ts";
 import { MdEditor } from "./editor.ts";
 import { Mindmap, type MapHost } from "./mindmap.ts";
@@ -21,7 +21,6 @@ import { initExport } from "./app/export.ts";
 import { initPanes } from "./app/panes.ts";
 import { initTheme } from "./app/theme.ts";
 import { LS_GRAB, load, store, sweep } from "./app/persist.ts";
-import { ask } from "./app/ask.ts";
 import { ASKS } from "./app/asks.ts";
 import { NOTHING_TO_RENAME, NO_FILE_ACCESS, NO_RENAME_HERE, filesMenu } from "./app/files.ts";
 import { moreMenu } from "./app/more.ts";

@@ -1,8 +1,8 @@
-// アプリが聞くことの全部。**並べ方はここ 1 つ** — 器（ask.ts）は聞き方を
-// 知らず、聞く場所（main.ts / assets.ts）は綴りを持たない。並べて見る道具も
-// ここを読む。値が要るものは関数（聞く時点で決まるものを受ける）。
+// アプリが聞くことの全部。**並べ方はここ 1 つ** — 器（core/parts/ask.mbt）は
+// 聞き方を知らず、聞く場所（main.ts / assets.ts）は綴りを持たない。並べて見る
+// 道具もここを読む。値が要るものは関数（聞く時点で決まるものを受ける）。
 
-import type { Ask, Part } from "./ask.ts";
+import type { Ask, Part } from "../coreApi.ts";
 
 export const ASKS = {
   /** 未保存の文書を捨てて先へ進むか */

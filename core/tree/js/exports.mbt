@@ -636,3 +636,67 @@ pub fn mmm_open_on_click(
 pub fn mmm_menu_rows(items : @core.Any) -> @dom.Element {
   @parts.rows(@dom.document(), entries_of(items))
 }
+
+// ---- たずね ----
+//
+// 聞くことの綴りは ts（app/asks.ts）が持ち、器だけが core にある。行の並びと
+// 同じく、ts の object（title / note / ok / cancel / parts / preview）で受ける。
+// `parts` は字（文字列）か欄（`{ value, check? }`）
+
+///|
+/// ts の並びの 1 つを Part に
+fn part_of(v : @core.Any) -> @parts.Part {
+  if @core.typeof_(v) == "string" {
+    return Word(v.cast())
+  }
+  let check = v._get("check")
+  Blank({
+    value: v._get("value").cast(),
+    check: if defined(check) {
+      Some(s => {
+        let why = check._invoke([@core.any(s)])
+        if @core.is_nullish(why) {
+          None
+        } else {
+          Some(why.cast())
+        }
+      })
+    } else {
+      None
+    },
+  })
+}
+
+///|
+/// ts の箱 1 つを Ask に
+fn ask_of(v : @core.Any) -> @parts.Ask {
+  let parts = v._get("parts")
+  {
+    title: v._get("title").cast(),
+    note: str_opt(v._get("note")),
+    ok: v._get("ok").cast(),
+    cancel: str_opt(v._get("cancel")),
+    parts: if defined(parts) {
+      @core.array_from(parts).map(part_of)
+    } else {
+      []
+    },
+    preview: str_opt(v._get("preview")),
+  }
+}
+
+///|
+/// 聞いて、答えを待つ。欄の値を並び順で続きへ渡す（断られたら渡さない）
+#export_name("mmmAsk")
+pub fn mmm_ask(a : @core.Any, k : (FixedArray[String]?) -> Unit) -> Unit {
+  @parts.ask(@dom.document(), ask_of(a), out => {
+    k(out.map(vs => FixedArray::from_array(vs)))
+  })
+}
+
+///|
+/// たずねの中身だけ（並べて見るため。器に載せるのは呼ぶ側）
+#export_name("mmmAskForm")
+pub fn mmm_ask_form(a : @core.Any) -> @dom.Element {
+  @parts.ask_form(@dom.document(), ask_of(a), () => ()).0
+}

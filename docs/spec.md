@@ -43,7 +43,8 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 欄の値・出来事の的・約束を 1 行ずつ包む。**他の package は `_get` / `_call` を書かない**)
   parts/        部品（js だけ）。icons(絵の唯一の源。Lucide の綴り) / notice(しらせ。言葉の表も) /
                 hint(空のときの言い出し) / tool(ペインの隅に浮く道具の器) / menu(メニューの器。
-                行の形・入れ子・キーで辿る・外を押せば閉じる)。試験は happy-dom
+                行の形・入れ子・キーで辿る・外を押せば閉じる) / ask(たずねの器。字と欄の並び、
+                打つそばからの見直し、`<dialog>`)。試験は happy-dom
   render/       地図のペイン（js だけ）。card(Card 1 枚 → SVG) / render(Renderer。id → 要素、
                 transform / d のキャッシュ、並び直し、paint) / mindmap(器と入力。ホイール・
                 ポインタ・キー・右クリック・長押し・ドラッグを受けて map/ の判断に繋ぎ、
@@ -91,7 +92,7 @@ src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す�
                draw(その場で描く窓) / io(File System Access API の窓口) /
                handles(ハンドルを IndexedDB に置く層) / logo(ロゴの唯一の源) /
                shortcuts(全体のキー) / export(Mindmap を外へ出す) /
-               ask(聞く器) / asks(聞くことの綴りの全部) /
+               asks(聞くことの綴りの全部。器は core/parts/ask) /
                files(帯の Files の行。文書と画像フォルダ) / more(帯の ⋯ の行)
 test/   検証 — core に触らない純粋層(camera / geometry / gesture / highlight /
         indicator / panes / share / assets / metrics / head)と、core の出口(coreApi)・

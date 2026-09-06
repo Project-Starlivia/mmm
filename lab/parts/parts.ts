@@ -1,14 +1,13 @@
 // 部品 × 状態の表。**見本の値は core と src の表から引く** — 絵の名前・しらせの言葉・
-// 言い出し（core/parts）、たずね（asks.ts）、メニューの並び（core/map/context.mbt /
+// 言い出し・たずねの器（core/parts）、たずねの綴り（asks.ts）、メニューの並び（core/map/context.mbt /
 // files.ts / more.ts / export.ts）。ここが持つのは「どの状態で呼ぶか」だけで、
 // 綴りも並びも持たない。
 //
 // テーマは部品の話ではないので、ここには無い（index.ts が枠に振る）。
 
-import { type Ask, askForm } from "../../src/app/ask.ts";
 import { ASKS } from "../../src/app/asks.ts";
 import * as core from "../../src/coreApi.ts";
-import { icon, menu, notice, paneHint } from "../../src/coreApi.ts";
+import { type Ask, askForm, icon, menu, notice, paneHint } from "../../src/coreApi.ts";
 import { type Files, filesMenu } from "../../src/app/files.ts";
 import { moreMenu } from "../../src/app/more.ts";
 import { exportWays } from "../../src/app/export.ts";
@@ -39,7 +38,7 @@ function opened(form: HTMLFormElement): HTMLDialogElement {
   dlg.append(form);
   return dlg;
 }
-const asked = (a: Ask): HTMLDialogElement => opened(askForm(a, nothing).form);
+const asked = (a: Ask): HTMLDialogElement => opened(askForm(a));
 
 /** 灰色の四角。画像の名前を聞くときの「その画像」の代わり */
 const SHOT =

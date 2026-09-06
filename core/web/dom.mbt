@@ -217,3 +217,29 @@ pub fn on_window(
   let t : @event.EventTarget = window_of(doc).cast()
   t.addEventListener(name, f)
 }
+
+///|
+/// 塞いで開く（`<dialog>`）。後ろを暗くする・焦点を閉じ込める・Escape で閉じるは
+/// ブラウザが持つ
+pub fn show_modal(e : @dom.Element) -> Unit {
+  e.as_any()._call("showModal", []) |> ignore
+}
+
+///|
+/// 閉じる（`<dialog>`）
+pub fn close(e : @dom.Element) -> Unit {
+  e.as_any()._call("close", []) |> ignore
+}
+
+///|
+/// 閉じ方の答え（`<dialog>` の returnValue。送ったボタンの value が入り、
+/// Escape や外からの close では空のまま）
+pub fn return_value(e : @dom.Element) -> String {
+  e.as_any()._get("returnValue").cast()
+}
+
+///|
+/// 欄の中身をぜんぶ選ぶ
+pub fn select(e : @dom.Element) -> Unit {
+  e.as_any()._call("select", []) |> ignore
+}

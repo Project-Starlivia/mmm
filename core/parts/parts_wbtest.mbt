@@ -217,3 +217,129 @@ test "Menu: 入れ子は行の隣に開き、子から選べば親ごと閉じ�
   m.close_sub()
   assert_eq(attr(m.el.querySelectorAll(".item")[2], "aria-expanded"), "false")
 }
+
+///|
+/// 欄に打つ（値を入れて、打ったと言う）
+fn type_in(w : @dom.Window, input : @dom.Element, text : String) -> Unit {
+  @web.set_value(input, text)
+  let init = @core.new_object()
+  init._set("bubbles", @core.any(true))
+  let ev = @core.new(w.as_any()._get("Event"), [@core.any("input"), init])
+  input.as_event_target().dispatchEvent(ev.cast()) |> ignore
+}
+
+///|
+test "ask_form: 題・補足・絵・字と欄の並び・ボタンの綴り。欄の値は並び順で読める" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let d = doc_of(w)
+  let (form, values) = ask_form(
+    d,
+    {
+      title: "Name this image",
+      note: Some("Images here point to ./pics/."),
+      ok: "Save",
+      cancel: None,
+      parts: [
+        Word("![]("),
+        Blank({ value: "shot", check: None, }),
+        Word(".webp)"),
+      ],
+      preview: Some("data:,"),
+    },
+    () => (),
+  )
+  assert_eq(attr(form, "method"), "dialog")
+  assert_eq(
+    form.querySelector(".title").unwrap().textContent(),
+    "Name this image",
+  )
+  assert_eq(
+    form.querySelector(".note").unwrap().textContent(),
+    "Images here point to ./pics/.",
+  )
+  assert_eq(attr(form.querySelector(".shot").unwrap(), "src"), "data:,")
+  // 欄は並びの中に居る
+  assert_eq(form.querySelector(".parts").unwrap().textContent(), "![](.webp)")
+  let input = form.querySelector(".parts input").unwrap()
+  assert_eq(attr(input, "size"), "6")
+  let buttons = form.querySelectorAll(".row button")
+  assert_eq(buttons[0].textContent(), "Cancel")
+  assert_eq(attr(buttons[0], "type"), "button")
+  assert_eq(buttons[1].textContent(), "Save")
+  assert_eq(attr(buttons[1], "value"), "ok")
+  // 見直す相手が居なければ、理由の置き場も出さない
+  assert_eq(form.querySelectorAll(".bad").length(), 0)
+  assert_eq(values(), ["shot"])
+  @web.set_value(input, "later")
+  assert_eq(values(), ["later"])
+}
+
+///|
+test "ask_form: 打つそばから見直す — だめな間は進む道が閉じ、理由が並びのすぐ下に出る" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let d = doc_of(w)
+  let (form, _) = ask_form(
+    d,
+    {
+      title: "New file name",
+      note: None,
+      ok: "Rename",
+      cancel: Some("Keep as is"),
+      parts: [
+        Blank({
+          value: "",
+          check: Some(v => if v == "" { Some("Give it a name") } else { None }),
+        }),
+      ],
+      preview: None,
+    },
+    () => (),
+  )
+  let go = form.querySelector(".go").unwrap()
+  let bad = form.querySelector(".bad").unwrap()
+  assert_eq(attr(bad, "aria-live"), "polite")
+  // 開いた時点で見直してある
+  assert_true(go.hasAttribute("disabled"))
+  assert_false(bad.hasAttribute("hidden"))
+  assert_eq(bad.textContent(), "Give it a name")
+  type_in(w, form.querySelector("input").unwrap(), "notes.md")
+  assert_false(go.hasAttribute("disabled"))
+  assert_true(bad.hasAttribute("hidden"))
+  assert_eq(bad.textContent(), "")
+  assert_eq(form.querySelectorAll(".row button")[0].textContent(), "Keep as is")
+}
+
+///|
+test "ask: 器に載せて開く。進めば値、断れば何も返らない。どちらでも器は残らない" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let d = doc_of(w)
+  let a : Ask = {
+    title: "New file name",
+    note: None,
+    ok: "Rename",
+    cancel: None,
+    parts: [Blank({ value: "notes.md", check: None, })],
+    preview: None,
+  }
+  let out : Array[Array[String]?] = []
+  ask(d, a, v => out.push(v))
+  let dlg = d.querySelector("dialog.ask").unwrap()
+  assert_true(dlg.hasAttribute("open"))
+  // 進む側は送信そのもの。押したボタンの value が returnValue になる
+  @web.set_value(d.querySelector("dialog.ask input").unwrap(), "renamed.md")
+  @dom.HTMLElement::cast_from_element(
+    d.querySelector("dialog.ask .go").unwrap(),
+  ).click()
+  assert_eq(out, [Some(["renamed.md"])])
+  assert_eq(d.querySelectorAll("dialog.ask").length(), 0)
+  // 断る側は閉じるだけ（returnValue は空のまま）
+  ask(d, a, v => out.push(v))
+  @dom.HTMLElement::cast_from_element(
+    d.querySelectorAll("dialog.ask .row button")[0],
+  ).click()
+  assert_eq(out, [Some(["renamed.md"]), None])
+  assert_eq(d.querySelectorAll("dialog.ask").length(), 0)
+}

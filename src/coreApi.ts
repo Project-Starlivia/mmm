@@ -374,7 +374,52 @@ export const menu = (items: MenuEntry[]): HTMLDivElement => div(mbt.mmmMenuRows(
 export const contextMenu = (l: Layout, sel: Selection): HTMLDivElement =>
   div(mbt.mmmContextMenu(l, sel.ids, sel.anchor ?? undefined));
 
+/**
+ * 打てる欄。並びの中で値を 1 つ受け持つ。`check` は**打つそばから効く** —
+ * だめな値のまま押させて後から失敗を言うのは、打った本人が既に知っていることの後出し
+ */
+export interface Field {
+  value: string;
+  /** その値では進めない理由。進めるなら null */
+  check?: (value: string) => string | null;
+}
+
+/** 並べるもの。**分かっているところは字、分からないところだけ欄** */
+export type Part = string | Field;
+
+/**
+ * 聞くこと 1 つぶん。器は `<dialog class="ask">` 1 つで、聞き方が増えても
+ * 変わるのは並べ方だけ。決めは core/parts/ask.mbt
+ */
+export interface Ask {
+  /** 何を聞いているか。1 行で言い切る */
+  title: string;
+  /** 補足。要るときだけ */
+  note?: string;
+  /** 進む側のボタンの名前（`OK` / `Discard` など） */
+  ok: string;
+  /** 断る側の名前。既定は `Cancel` */
+  cancel?: string;
+  /** 字と欄の並び。空なら はい/いいえ */
+  parts?: Part[];
+  /** 何の話をしているかを見せる絵 */
+  preview?: string;
+}
+
+/** 聞いて、**答えを待つ**。欄の値を並び順で返す。断られたら null */
+export const ask = (a: Ask): Promise<string[] | null> =>
+  new Promise((resolve) =>
+    mbt.mmmAsk(a, (vs) => {
+      resolve(vs === undefined ? null : [...vs]);
+      return undefined;
+    }),
+  );
+
+/** たずねの中身だけ。器に載せるのは呼ぶ側 — 並べて見るためのもの */
+export const askForm = (a: Ask): HTMLFormElement => form(mbt.mmmAskForm(a));
+
 const div = (v: unknown): HTMLDivElement => (v instanceof HTMLDivElement ? v : bad("<div> でない"));
+const form = (v: unknown): HTMLFormElement => (v instanceof HTMLFormElement ? v : bad("<form> でない"));
 const svgSvg = (v: unknown): SVGSVGElement => (v instanceof SVGSVGElement ? v : bad("<svg> でない"));
 const node = (v: unknown): Node => (v instanceof Node ? v : bad("Node でない"));
 
