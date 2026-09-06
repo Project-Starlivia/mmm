@@ -728,13 +728,16 @@ html, body {
   & text.details-row { font-size: 12px; fill: var(--ink-dim); dominant-baseline: central; }
   & text.details-line { font-size: 11px; fill: var(--ink); white-space: pre; dominant-baseline: central; }
 
-  /* 畳んだノード（core の Fold） */
+  /* 畳んだノード（core の Fold）。畳みの印は破線。閉じていれば小さく沈め、
+     開いていれば（`<details open>`）子が出るので沈めない */
   &.folded {
-    opacity: 0.4;
-
-    /* 畳んだノードは小さく丸めて、別のものだと分かるようにする */
+    /* 畳んだノードは丸めて破線にし、別のものだと分かるようにする */
     & rect.box { rx: 4px; stroke-dasharray: 4 3; }
-    & text.label { fill: var(--ink-dim); }
+
+    &:not(.open) {
+      opacity: 0.4;
+      & text.label { fill: var(--ink-dim); }
+    }
   }
 }
 

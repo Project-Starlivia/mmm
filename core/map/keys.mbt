@@ -182,16 +182,11 @@ pub fn keyed(l : Layout, sel : Selection, k : Key) -> Intent? {
   if k.alt {
     return None
   }
-  if k.key == "H" && k.shift && !k.mod {
+  // 畳み（F = fold）。畳む（閉）→ 開く（`<details open>`）→ 外す、を 1 つのキーで巡る
+  if k.key == "F" && k.shift && !k.mod {
     guard anchor is Some(anchor) else { return None }
     guard node_of(l, Some(anchor)) is Some(node) else { return None }
-    return Some(
-      if node.fold is Some(_) {
-        Op(op=Unfold(id=anchor), edit=false)
-      } else {
-        Op(op=Fold(id=anchor, open=false), edit=false)
-      },
-    )
+    return Some(fold_step(node, anchor))
   }
   if k.key == "Escape" {
     return Some(Select(sel=none, reveal=false))
@@ -268,4 +263,25 @@ pub fn keyed_card(l : Layout, picked : Int, k : Key) -> Intent? {
     return Some(EditCard(id=picked))
   }
   None
+}
+
+///|
+/// 畳みの次の状態。畳んでいなければ畳む（閉）、閉じていれば開く（`<details open>`。
+/// 子は出るが畳みのまま）、開いていれば外す。右クリックの行も同じ 1 歩
+pub fn fold_step(node : @view.Node, id : Int) -> Intent {
+  match node.fold {
+    None => Op(op=Fold(id~, open=false), edit=false)
+    Some({ open: false, .. }) => Op(op=Fold(id~, open=true), edit=false)
+    Some(_) => Op(op=Unfold(id~), edit=false)
+  }
+}
+
+///|
+/// 畳みの行の字。次の 1 歩を名乗る
+pub fn fold_label(node : @view.Node?) -> String {
+  match node {
+    Some({ fold: Some({ open: false, .. }), .. }) => "Open (folded)"
+    Some({ fold: Some(_), .. }) => "Unfold"
+    _ => "Fold"
+  }
 }

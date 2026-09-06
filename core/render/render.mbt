@@ -120,14 +120,15 @@ fn shape_of(b : @map.Box, scene : Scene) -> Shape {
   {
     w: b.w,
     h: b.h,
-    folded: n.fold is Some(_),
+    folded: @map.closed(n),
     buried: b.buried,
     epoch: scene.epoch,
-    // 畳んでいれば summary が字になる。summary だけ変わっても描き直すように
-    label: if n.fold is Some(_) {
-      @map.fold_name(n)
-    } else {
-      @map.label_of(n)
+    // 畳んでいれば summary が字になる（開いていても）。印は開閉で変わるので、
+    // 開いた畳みは open_label（▽ 付き）で見る
+    label: match n.fold {
+      Some({ open: true, .. }) => @map.open_label(n)
+      Some(_) => @map.fold_name(n)
+      None => @map.label_of(n)
     },
     cards: b.cards,
     // 画像は「まだ読めていない」から「読めた」へ後から変わる
@@ -201,6 +202,8 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
     // **文書から決まるクラスだけ**を、1 つずつ付け外しする
     toggle_class(g, "root", b.parent is None)
     toggle_class(g, "folded", n.fold is Some(_))
+    // 開いた畳み。畳みの印（破線）は残し、沈めない
+    toggle_class(g, "open", n.fold is Some({ open: true, .. }))
     let tf = "translate(\{num(b.x)} \{num(b.y)})"
     if self.node_tf.get(id) != Some(tf) {
       g.setAttribute("transform", tf)
@@ -221,8 +224,14 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
         ("height", num(b.h)),
       ]).as_node(),
     )
-    let folded = n.fold is Some(_)
-    let text = if folded { @map.fold_name(n) } else { @map.label_of(n) }
+    let folded = @map.closed(n)
+    // 畳まれていれば名前は summary（開いていても）。閉じていれば小さく詰めて、
+    // 開いていれば ▽ を付けて普通の行に
+    let text = if n.fold is Some(_) {
+      @map.fold_name(n)
+    } else {
+      @map.label_of(n)
+    }
     let row = @map.row_of(n)
     let label = el(doc, "text", [
       ("class", "label" + (if text == "" { " empty" } else { "" })),
@@ -234,6 +243,8 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
     label.setTextContent(
       if folded {
         @map.hidden_label(n, b.buried, scene.measure)
+      } else if n.fold is Some(_) {
+        @map.open_label(n)
       } else {
         @map.display_label(text)
       },

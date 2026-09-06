@@ -110,12 +110,13 @@ fn descendants(n : @view.Node) -> Int {
 }
 
 ///|
-/// 見えている子。畳んだノードの下は無い — 畳みの裁定はここ 1 つ
+/// 見えている子。閉じた畳みの下は無い — 畳みの裁定はここ 1 つ。
+/// 開いた畳み（`<details open>`）の子は普通に出る
 fn kids_of(n : @view.Node) -> Array[@view.Node] {
-  if n.fold is None {
-    n.children
-  } else {
+  if closed(n) {
     []
+  } else {
+    n.children
   }
 }
 
@@ -153,7 +154,7 @@ fn Pass::twig_of(self : Pass, n : @view.Node) -> Twig {
   match self.twigs.get(n.id) {
     Some(t) => t
     None => {
-      let folded = n.fold is Some(_)
+      let folded = closed(n)
       let cs = if folded { [] } else { cards(n.blocks) }
       let buried = if folded { descendants(n) } else { 0 }
       let t = { cards: cs, buried, size: (self.size)(n, cs, buried), }

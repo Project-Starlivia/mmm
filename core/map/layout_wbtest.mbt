@@ -94,6 +94,20 @@ test "畳んだノードの下は置かず、埋もれた子孫の数だけ残�
 }
 
 ///|
+/// `<details open>` は開いた畳み。子は普通に出て、埋もれる子孫は無い
+test "開いた畳みの下は普通に置く" {
+  let opened = node(
+    2,
+    "a",
+    children=[node(3, "b", children=[node(4, "c")])],
+    fold=Some({ open: true, summary: Some("s"), }),
+  )
+  let l = layout([root(node(1, "r", children=[opened]))], size)
+  assert_eq(l.order, [1, 2, 3, 4])
+  assert_eq(box(l, 2).buried, 0)
+}
+
+///|
 test "順は文書順（親が先、子はその後）" {
   let l = layout(
     [

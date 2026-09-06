@@ -94,18 +94,15 @@ pub fn items(l : Layout, sel : Selection) -> Array[Entry] {
     Sep,
     // anchor が無い（node が None）なら、沈む理由は「選んでいない」こと自体が
     // 語るので why は付けない
+    // 畳みは 1 歩ずつ巡る（畳む → 開く → 外す）。行はキーと同じ 1 歩を名乗る
     item(
-      if folded {
-        "Show (unfold)"
-      } else {
-        "Hide (fold)"
-      },
+      fold_label(node),
       if node is None {
         None
       } else {
-        press(l, sel, "H", true, false)
+        press(l, sel, "F", true, false)
       },
-      key="Shift+H",
+      key="Shift+F",
       mark=if folded { "chevrons-up-down" } else { "chevrons-down-up" },
     ),
     match sel.anchor {
