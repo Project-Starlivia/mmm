@@ -1023,7 +1023,7 @@ test "AddNode は 6 段目の下なら項目で足す" {
 }
 
 ///|
-test "Graft は 6 段目の下なら部分木ごと項目にする。途中の飛びは畳む" {
+test "Graft は 6 段目の下なら部分木ごと項目にする。途中の飛びは空の項目" {
   assert_eq(
     run(
       six([]),
@@ -1034,18 +1034,21 @@ test "Graft は 6 段目の下なら部分木ごと項目にする。途中の�
       focus: Some(8),
     }),
   )
-  // `#` → `###` の飛びは Implicit だが、項目は飛びを綴れないので消える
+  // `#` → `###` の飛びは Implicit。項目は行を省けないので、空の項目として綴る（形は保つ）
   assert_eq(
     run(
       six([]),
       Graft(at=NodePlace::In(node=7, side=None), md="# p\n\n### q\n"),
     ),
-    Some({ doc: six([item(8, "p", children=[li(10, "q")])]), focus: Some(8) }),
+    Some({
+      doc: six([item(8, "p", children=[li(9, "", children=[li(10, "q")])])]),
+      focus: Some(8),
+    }),
   )
 }
 
 ///|
-test "MoveNode は 6 段目の下へ落とせば見出しを項目にする。Implicit は消え、focus も消える" {
+test "MoveNode は 6 段目の下へ落とせば見出しを項目にする。Implicit は空の項目になり、focus は残る" {
   let d = six([])
   let x = root(h(8, "x", body=[pic(9)], children=[h(10, "y")]), sides=[Right])
   let e : @tree.Doc = { ..d, roots: [..d.roots, x] }
@@ -1060,7 +1063,7 @@ test "MoveNode は 6 段目の下へ落とせば見出しを項目にする。Im
   let f : @tree.Doc = { ..d, roots: [..d.roots, g] }
   assert_eq(
     run(f, MoveNode(ids=[8], at=NodePlace::In(node=7, side=None))),
-    Some({ doc: six([item(9, "z")]), focus: None }),
+    Some({ doc: six([item(8, "", children=[li(9, "z")])]), focus: Some(8) }),
   )
 }
 

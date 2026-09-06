@@ -16,36 +16,69 @@ pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
 }
 
 ///|
+/// 部分木をその綴りで書き直す。形（ラベル・中身・子・畳み・飛び）は保ち、綴りだけ替える。
+/// 項目にするとき、飛び（Implicit）は行を省けないので空の項目として綴る（`- - b`）。
+/// 見出しにするとき、Implicit はそのまま — 省いたままで読めない席かは check と mend が見る。
+/// 決めは docs/superpowers/specs/2026-09-06-paste-design.md
+fn respell(n : @tree.Node, sign : @tree.Sign) -> @tree.Node {
+  match sign {
+    Item => @tree.ListNode(as_item(n))
+    Heading =>
+      match n {
+        HeadingNode(h) =>
+          @tree.HeadingNode({
+            ..h,
+            children: h.children.map(c => respell(c, Heading)),
+          })
+        ImplicitNode(g) =>
+          @tree.ImplicitNode({
+            ..g,
+            children: g.children.map(c => respell(c, Heading)),
+          })
+        ListNode(l) =>
+          @tree.HeadingNode({
+            id: l.id,
+            label: l.label,
+            fold: l.fold,
+            body: l.body,
+            children: l.children.map(c => respell(@tree.ListNode(c), Heading)),
+          })
+      }
+  }
+}
+
+///|
+/// 部分木を項目で書く。型が「項目の子孫は項目」なので、下は全部項目になる。
+fn as_item(n : @tree.Node) -> @tree.ListNode {
+  match n {
+    ListNode(l) => l
+    HeadingNode(h) =>
+      {
+        id: h.id,
+        label: h.label,
+        fold: h.fold,
+        body: h.body,
+        children: h.children.map(as_item),
+      }
+    ImplicitNode(g) =>
+      {
+        id: g.id,
+        label: "",
+        fold: None,
+        body: [],
+        children: g.children.map(as_item),
+      }
+  }
+}
+
+///|
 /// 見出しの天井。`@tree.deepest` より深くに着いた見出しは部分木ごと項目に
 /// 綴り替える — 手で書くときも `######` の下は `- ` でしか続けられない。
-/// 天井より深い Implicit は、項目が飛びを綴れないので消え、子が繰り上がる
-/// （focus なら消える）。天井の Implicit は行を省いた空の見出しなので残す
+/// 天井より深い Implicit は空の項目として綴る（飛びは形なので運ぶ。`- - b`）。
+/// 天井の Implicit は行を省いた空の見出しなので残す
 /// （子が項目になれば `GappedItem` — 綴れば読める）。上の段には触らないので、
 /// parse の出力には何もしない。
 fn cap(doc : @tree.Doc) -> @tree.Doc {
-  fn items(n : @tree.Node, out : Array[@tree.ListNode]) -> Unit {
-    match n {
-      ListNode(l) => out.push(l)
-      HeadingNode(h) => {
-        let children = []
-        for c in h.children {
-          items(c, children)
-        }
-        out.push({
-          id: h.id,
-          label: h.label,
-          fold: h.fold,
-          body: h.body,
-          children,
-        })
-      }
-      ImplicitNode(g) =>
-        for c in g.children {
-          items(c, out)
-        }
-    }
-  }
-
   fn node(n : @tree.Node, depth : Int, out : Array[@tree.Node]) -> Unit {
     fn under(xs : Array[@tree.Node]) -> Array[@tree.Node] {
       let children = []
@@ -61,13 +94,7 @@ fn cap(doc : @tree.Doc) -> @tree.Doc {
       ImplicitNode(g) if depth <= @tree.deepest =>
         out.push(@tree.ImplicitNode({ ..g, children: under(g.children) }))
       ListNode(_) => out.push(n)
-      _ => {
-        let ls = []
-        items(n, ls)
-        for l in ls {
-          out.push(@tree.ListNode(l))
-        }
-      }
+      _ => out.push(respell(n, Item))
     }
   }
 
