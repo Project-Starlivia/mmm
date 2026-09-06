@@ -18,8 +18,10 @@ pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
 ///|
 /// 見出しの天井。`@tree.deepest` より深くに着いた見出しは部分木ごと項目に
 /// 綴り替える — 手で書くときも `######` の下は `- ` でしか続けられない。
-/// Implicit は項目が飛びを綴れないので消え、子が繰り上がる（focus なら消える）。
-/// 上の段には触らないので、parse の出力には何もしない。
+/// 天井より深い Implicit は、項目が飛びを綴れないので消え、子が繰り上がる
+/// （focus なら消える）。天井の Implicit は行を省いた空の見出しなので残す
+/// （子が項目になれば `GappedItem` — 綴れば読める）。上の段には触らないので、
+/// parse の出力には何もしない。
 fn cap(doc : @tree.Doc) -> @tree.Doc {
   fn items(n : @tree.Node, out : Array[@tree.ListNode]) -> Unit {
     match n {
@@ -56,7 +58,7 @@ fn cap(doc : @tree.Doc) -> @tree.Doc {
     match n {
       HeadingNode(h) if depth <= @tree.deepest =>
         out.push(@tree.HeadingNode({ ..h, children: under(h.children) }))
-      ImplicitNode(g) if depth < @tree.deepest =>
+      ImplicitNode(g) if depth <= @tree.deepest =>
         out.push(@tree.ImplicitNode({ ..g, children: under(g.children) }))
       ListNode(_) => out.push(n)
       _ => {
