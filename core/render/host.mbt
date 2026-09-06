@@ -43,8 +43,6 @@ pub(all) struct Host {
   tokens_block : (String) -> Array[Array[Token]]
   /// 言語の読み込みの世代。変われば描き直す
   epoch : () -> Int
-  /// 右クリックの行をその画面の点に開く（器は ts の menu.ts）
-  menu : (Double, Double, Array[@map.Entry]) -> Unit
   /// しらせ（app/notice.ts の言葉）
   failed : (String) -> Unit
 }

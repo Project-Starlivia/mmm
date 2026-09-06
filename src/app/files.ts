@@ -6,8 +6,7 @@
 // 並びは純粋な表。いまの状態（`Files`）を受けて行を返し、押されたら `Acts` を
 // 呼ぶだけ — 文書もファイルも知らない。並べて見る道具は好きな状態を渡す。
 
-import type { MenuEntry } from "../map/menu.ts";
-import type { Failed } from "./notice.ts";
+import type { Failed, MenuEntry } from "../coreApi.ts";
 
 /** 改名する相手そのものがディスクに無い（保存したらもう改名する必要が無いので、駅にならない） */
 export const NOTHING_TO_RENAME = "Save the .md first — nothing on disk to rename yet";
@@ -16,7 +15,7 @@ export const NOTHING_TO_RENAME = "Save the .md first — nothing on disk to rena
 export const NO_RENAME_HERE = "This browser can't rename files";
 
 /** File System Access API が無いブラウザで、Files のできない行と
- *  ショートカットの両方がこの理由を言う。しらせにもなる（notice.ts の FAILED の 1 つ） */
+ *  ショートカットの両方がこの理由を言う。しらせにもなる（core/parts/notice.mbt の言葉の 1 つ） */
 export const NO_FILE_ACCESS = "This browser cannot open or save files" satisfies Failed;
 
 export interface Files {

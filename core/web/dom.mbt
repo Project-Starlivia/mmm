@@ -1,5 +1,5 @@
 // DOM の小さな道具。js_browser に型の無い呼び出し（style・画面の矩形・ポインタの
-// 捕捉・欄の値・出来事の的）を、ここで 1 行ずつ包む。**他のファイルは `_get` /
+// 捕捉・欄の値・出来事の的・約束）を、ここで 1 行ずつ包む。**他の package は `_get` /
 // `_call` を書かない** — 綴りの間違いはこの 1 か所でしか起きない。
 
 ///|
@@ -165,4 +165,55 @@ pub fn open_url(url : String) -> Unit {
     @core.any("noopener,noreferrer"),
   ])
   |> ignore
+}
+
+///|
+/// 約束（Promise）が済んだら続きを呼ぶ
+pub fn after(promise : @core.Any, k : (@core.Any) -> Unit) -> Unit {
+  promise._call("then", [@core.from_fn1(k)]) |> ignore
+}
+
+///|
+/// 出来事の細部（click なら押した回数。キーで押した click は 0）
+pub fn detail(e : @core.Any) -> Int {
+  e._get("detail").cast()
+}
+
+///|
+/// 要素の描かれた大きさ（offsetWidth / offsetHeight）
+pub fn offset_size(e : @dom.Element) -> (Double, Double) {
+  (
+    e.as_any()._get("offsetWidth").cast(),
+    e.as_any()._get("offsetHeight").cast(),
+  )
+}
+
+///|
+/// 同じ要素か
+pub fn same(a : @dom.Element, b : @dom.Element) -> Bool {
+  @core.equal(a.as_any(), b.as_any())
+}
+
+///|
+/// その文書の窓（happy-dom は global に window を持たないので、文書から辿る）
+pub fn window_of(doc : @dom.Document) -> @core.Any {
+  doc.as_any()._get("defaultView")
+}
+
+///|
+/// 窓の大きさ（innerWidth / innerHeight）
+pub fn inner_size(doc : @dom.Document) -> (Double, Double) {
+  let w = window_of(doc)
+  (w._get("innerWidth").cast(), w._get("innerHeight").cast())
+}
+
+///|
+/// 窓の出来事を聞く
+pub fn on_window(
+  doc : @dom.Document,
+  name : String,
+  f : (@core.Any) -> Unit,
+) -> Unit {
+  let t : @event.EventTarget = window_of(doc).cast()
+  t.addEventListener(name, f)
 }

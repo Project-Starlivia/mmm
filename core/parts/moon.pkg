@@ -2,18 +2,10 @@ pkgtype(kind: "library")
 
 import {
   "moonbitlang/core/cmp",
-  "moonbitlang/core/math",
-  "moonbitlang/core/string",
   "mizchi/js/core",
   "mizchi/js/builtins/global",
   "mizchi/js_browser/dom",
-  "mmm-app/core/tree",
-  "mmm-app/core/view",
-  "mmm-app/core/op",
-  "mmm-app/core/map",
-  "mmm-app/core/read",
   "mmm-app/core/web",
-  "mmm-app/core/parts",
 }
 
 import {

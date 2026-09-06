@@ -105,6 +105,8 @@ pub struct Mindmap {
   mut drop_parent : Int?
   /// 兄弟へ挿入する予告の線。world に浮かぶ
   drop_line : @dom.Element
+  /// 右クリック（と長押し）のメニュー
+  menu : @parts.Menu
 }
 
 ///|
@@ -113,21 +115,15 @@ fn place_layout(host : Host) -> @map.Layout {
 }
 
 ///|
-/// ペインを地図の器にする。`hint`（白紙の言い出し）と `tool`（真ん中へ寄せるボタン）は
-/// HTML の部品なので ts が作り、ここが並べる
-pub fn Mindmap::new(
-  pane : @dom.HTMLElement,
-  host : Host,
-  hint : @dom.Element,
-  tool : @dom.Element,
-) -> Mindmap {
+/// ペインを地図の器にする
+pub fn Mindmap::new(pane : @dom.HTMLElement, host : Host) -> Mindmap {
   let doc = pane.ownerDocument().unwrap()
   // この pane はマップの器になった。見た目（style.css の `.map-pane`）はここで付く
-  toggle_class(pane.as_element(), "map-pane", true)
-  let svg = el(doc, "svg", [("class", "map-svg")])
-  let world = el(doc, "g", [])
-  let caret_layer = el(doc, "g", [])
-  let drop_line = el(doc, "line", [
+  @web.toggle_class(pane.as_element(), "map-pane", true)
+  let svg = @web.el(doc, "svg", [("class", "map-svg")])
+  let world = @web.el(doc, "g", [])
+  let caret_layer = @web.el(doc, "g", [])
+  let drop_line = @web.el(doc, "line", [
     ("class", "drop-line"),
     ("visibility", "hidden"),
   ])
@@ -140,7 +136,7 @@ pub fn Mindmap::new(
   world.append(drop_line.as_node())
   svg.append(world.as_node())
   pane.append(svg.as_node())
-  let rubber = html(doc, "div", "rubber").as_element()
+  let rubber = @web.html(doc, "div", "rubber").as_element()
   pane.append(rubber.as_node())
   let label = LabelField::new(doc, pane, host.measure, (id, label) => {
     (host.apply)(Rename(id~, label~), false) |> ignore
@@ -149,11 +145,20 @@ pub fn Mindmap::new(
     id,
     text,
   ) => (host.apply)(SetBlock(id~, content=Opaque(text)), false) |> ignore)
-  show(hint, "flex", false)
+  // md からの始め方は md ペイン自身が同じ器で言う
+  let hint = @parts.pane_hint(doc, "map")
+  @web.show(hint, "flex", false)
   pane.append(hint.as_node())
-  let indicator_el = html(doc, "div", "map-indicator").as_element()
-  show(indicator_el, "block", false)
+  let indicator_el = @web.html(doc, "div", "map-indicator").as_element()
+  @web.show(indicator_el, "block", false)
   pane.append(indicator_el.as_node())
+  let tool = @parts.pane_tool(doc, "map-center")
+  let center = doc.createElement("button")
+  center.setAttribute("type", "button")
+  center.setAttribute("title", "Center the view — Home")
+  center.setAttribute("aria-label", "Center the view")
+  center.append(@parts.icon(doc, "crosshair").as_node())
+  tool.append(center.as_node())
   pane.append(tool.as_node())
   let m : Mindmap = {
     pane,
@@ -187,7 +192,9 @@ pub fn Mindmap::new(
     drop: None,
     drop_parent: None,
     drop_line,
+    menu: @parts.Menu::new(doc),
   }
+  @web.listen(center, "click", _ => m.center_on_target())
   m.bind_wheel()
   m.bind_pointer()
   m.bind_click()
@@ -195,7 +202,7 @@ pub fn Mindmap::new(
   m.bind_keys()
   m.apply_camera()
   // 大きさが無いうちに頼まれた fit は、付いてから 1 度走る
-  observe_resize(pane.as_element(), () => {
+  @web.observe_resize(pane.as_element(), () => {
     m.rect = None
     if m.fit_pending {
       m.fit_view()
@@ -211,7 +218,7 @@ fn Mindmap::pane_rect(self : Mindmap) -> @dom.DOMRect {
   match self.rect {
     Some(r) => r
     None => {
-      let r = client_rect(self.pane.as_element())
+      let r = @web.client_rect(self.pane.as_element())
       self.rect = Some(r)
       r
     }
@@ -291,12 +298,12 @@ fn Mindmap::apply_camera(self : Mindmap) -> Unit {
   let { k, tx, ty, } = self.camera
   self.world.setAttribute(
     "transform",
-    "translate(\{num(tx)} \{num(ty)}) scale(\{num(k)})",
+    "translate(\{@web.num(tx)} \{@web.num(ty)}) scale(\{@web.num(k)})",
   )
   let pane = self.pane.as_element()
-  set_style(pane, "background-position", "\{px(tx)} \{px(ty)}")
-  let cell = px(grid * k)
-  set_style(pane, "background-size", "\{cell} \{cell}")
+  @web.set_style(pane, "background-position", "\{@web.px(tx)} \{@web.px(ty)}")
+  let cell = @web.px(grid * k)
+  @web.set_style(pane, "background-size", "\{cell} \{cell}")
 }
 
 // ---------- 置く・描く ----------
@@ -304,7 +311,7 @@ fn Mindmap::apply_camera(self : Mindmap) -> Unit {
 ///|
 pub fn Mindmap::render(self : Mindmap) -> Unit {
   let s = (self.host.survey)()
-  show(self.hint, "flex", s.empty())
+  @web.show(self.hint, "flex", s.empty())
   self.layout = place_layout(self.host)
   self.renderer.draw({
     layout: self.layout,
@@ -501,16 +508,16 @@ fn Mindmap::ring(self : Mindmap, ids : Array[Int]) -> Unit {
   }
   while self.caret_rings.length() < boxes.length() {
     let doc = self.renderer.doc
-    let ring = el(doc, "rect", [("class", "caret-ring")])
+    let ring = @web.el(doc, "rect", [("class", "caret-ring")])
     self.caret_layer.append(ring.as_node())
     self.caret_rings.push(ring)
   }
   for i, b in boxes {
     let ring = self.caret_rings[i]
-    ring.setAttribute("x", num(b.x + ring_inset))
-    ring.setAttribute("y", num(b.y + ring_inset))
-    ring.setAttribute("width", num(b.w - ring_inset * 2.0))
-    ring.setAttribute("height", num(b.h - ring_inset * 2.0))
+    ring.setAttribute("x", @web.num(b.x + ring_inset))
+    ring.setAttribute("y", @web.num(b.y + ring_inset))
+    ring.setAttribute("width", @web.num(b.w - ring_inset * 2.0))
+    ring.setAttribute("height", @web.num(b.h - ring_inset * 2.0))
   }
 }
 
@@ -553,17 +560,17 @@ fn Mindmap::update_indicator(self : Mindmap) -> Unit {
     @map.root_box(self.layout).map(b => b.rect())
   }
   guard target is Some(r) else {
-    show(self.indicator_el, "block", false)
+    @web.show(self.indicator_el, "block", false)
     return
   }
   let i = @map.indicator_for(r, self.camera, pane)
-  show(self.indicator_el, "block", true)
-  set_style(self.indicator_el, "left", px(i.x))
-  set_style(self.indicator_el, "top", px(i.y))
-  set_style(
+  @web.show(self.indicator_el, "block", true)
+  @web.set_style(self.indicator_el, "left", @web.px(i.x))
+  @web.set_style(self.indicator_el, "top", @web.px(i.y))
+  @web.set_style(
     self.indicator_el,
     "transform",
-    "translate(-50%, -50%) rotate(\{num(i.angle)}deg)",
+    "translate(-50%, -50%) rotate(\{@web.num(i.angle)}deg)",
   )
 }
 
@@ -592,10 +599,10 @@ pub fn Mindmap::svg_parts(
 ///|
 /// 見え方を変える入力（ホイールのズームとスクロール）。動かし方そのものは map/camera.mbt
 fn Mindmap::bind_wheel(self : Mindmap) -> Unit {
-  listen(self.pane.as_element(), "wheel", e => {
-    prevent(e)
-    let m = mouse(e)
-    let (dx, dy) = delta(e)
+  @web.listen(self.pane.as_element(), "wheel", e => {
+    @web.prevent(e)
+    let m = @web.mouse(e)
+    let (dx, dy) = @web.delta(e)
     if m.ctrlKey || m.metaKey {
       let p = self.at(m.clientX, m.clientY)
       self.set_camera(@map.zoom_at(self.camera, p.x, p.y, dy))
@@ -617,7 +624,7 @@ fn far(x : Double, y : Double, p : Press) -> Bool {
 
 ///|
 fn Mindmap::cursor(self : Mindmap, v : String) -> Unit {
-  set_style(self.pane.as_element(), "cursor", v)
+  @web.set_style(self.pane.as_element(), "cursor", v)
 }
 
 ///|
@@ -627,14 +634,14 @@ fn Mindmap::cursor(self : Mindmap, v : String) -> Unit {
 /// 取るのは、リンクの ↗ が pointerdown を止めるため
 fn Mindmap::bind_pointer(self : Mindmap) -> Unit {
   let pane = self.pane.as_element()
-  listen(
+  @web.listen(
     pane,
     "pointerdown",
     e => {
-      guard is_touch(e) else { return }
-      let m = mouse(e)
+      guard @web.is_touch(e) else { return }
+      let m = @web.mouse(e)
       let p = self.at(m.clientX, m.clientY)
-      self.fingers.down(pointer_id(e), p.x, p.y)
+      self.fingers.down(@web.pointer_id(e), p.x, p.y)
       // 2 本目が乗った時点で 1 本ぶんのパンは畳む。tapped も畳む —
       // 畳まなければピンチ中ずっと最初の指の場所に居座り、離したときに選んでしまう
       if self.fingers.pinching() {
@@ -644,34 +651,34 @@ fn Mindmap::bind_pointer(self : Mindmap) -> Unit {
     },
     capture=true,
   )
-  listen(pane, "pointerdown", e => self.pointer_down(e))
-  listen(pane, "pointermove", e => self.pointer_move(e))
-  listen(pane, "pointerup", e => self.pointer_end(e))
-  listen(pane, "pointercancel", e => self.pointer_end(e))
+  @web.listen(pane, "pointerdown", e => self.pointer_down(e))
+  @web.listen(pane, "pointermove", e => self.pointer_move(e))
+  @web.listen(pane, "pointerup", e => self.pointer_end(e))
+  @web.listen(pane, "pointercancel", e => self.pointer_end(e))
 }
 
 ///|
 fn Mindmap::pointer_down(self : Mindmap, e : @core.Any) -> Unit {
-  guard target_in(
+  guard @web.target_in(
       e, ".link-open, .image-connect, .pane-tool, .label-editor, .card-editor",
     )
     is None else {
     return
   }
-  let touch = is_touch(e)
+  let touch = @web.is_touch(e)
   if touch && self.fingers.pinching() {
     return
   }
   // 長押しの印は次の押下で用済み（contextmenu を合成しない環境で残らないように）
   self.menu_by_hold = false
-  let m = mouse(e)
+  let m = @web.mouse(e)
   guard m.button == 0 || m.button == 1 else { return }
   self.pane.focus()
   // カードと × の上の押下は、そのクリック（bind_click）のもの。ここで
   // ノードを選び直すと、pointerup が選択を作り直して picked を落とす
-  guard target_in(e, "[data-card], [data-delete]") is None else { return }
+  guard @web.target_in(e, "[data-card], [data-delete]") is None else { return }
   let id = self.node_at(m.clientX, m.clientY)
-  let pointer = pointer_id(e)
+  let pointer = @web.pointer_id(e)
   // パンは 3 つ入り口を持つ: 中クリック / Space+ドラッグ / 指で背景をなぞる。
   // 担当する手が違うので、どれか 1 つでは塞がる場面がある
   if m.button == 1 || self.space_held || (touch && id is None) {
@@ -682,8 +689,8 @@ fn Mindmap::pointer_down(self : Mindmap, e : @core.Any) -> Unit {
       oy: self.camera.ty,
     })
     self.cursor("grabbing")
-    capture(self.pane.as_element(), pointer)
-    prevent(e)
+    @web.capture(self.pane.as_element(), pointer)
+    @web.prevent(e)
     return
   }
   if touch {
@@ -728,25 +735,25 @@ fn Mindmap::pointer_down(self : Mindmap, e : @core.Any) -> Unit {
         )
         self.drag_cand = Some({ id, x: m.clientX, y: m.clientY, })
       }
-      capture(self.pane.as_element(), pointer)
-      prevent(e)
+      @web.capture(self.pane.as_element(), pointer)
+      @web.prevent(e)
     }
     None => {
       // 背景。ドラッグすれば矩形選択、動かさずに離せば選択を解く
       self.rubber_start = Some(self.at(m.clientX, m.clientY))
       self.rubber_size = (0, 0)
-      capture(self.pane.as_element(), pointer)
-      prevent(e)
+      @web.capture(self.pane.as_element(), pointer)
+      @web.prevent(e)
     }
   }
 }
 
 ///|
 fn Mindmap::pointer_move(self : Mindmap, e : @core.Any) -> Unit {
-  let m = mouse(e)
-  if is_touch(e) {
+  let m = @web.mouse(e)
+  if @web.is_touch(e) {
     let p = self.at(m.clientX, m.clientY)
-    match self.fingers.moved(pointer_id(e), p.x, p.y) {
+    match self.fingers.moved(@web.pointer_id(e), p.x, p.y) {
       Some((from, to)) => {
         self.set_camera(@map.pinch(self.camera, from, to))
         return
@@ -789,11 +796,11 @@ fn Mindmap::pointer_move(self : Mindmap, e : @core.Any) -> Unit {
       let y = @cmp.minimum(s.y, p.y)
       let w = (p.x - s.x).abs()
       let h = (p.y - s.y).abs()
-      show(self.rubber, "block", true)
-      set_style(self.rubber, "left", px(x))
-      set_style(self.rubber, "top", px(y))
-      set_style(self.rubber, "width", px(w))
-      set_style(self.rubber, "height", px(h))
+      @web.show(self.rubber, "block", true)
+      @web.set_style(self.rubber, "left", @web.px(x))
+      @web.set_style(self.rubber, "top", @web.px(y))
+      @web.set_style(self.rubber, "width", @web.px(w))
+      @web.set_style(self.rubber, "height", @web.px(h))
       self.rubber_size = (w, h)
       let a = @map.to_world(self.camera, x, y)
       let b = @map.to_world(self.camera, x + w, y + h)
@@ -816,7 +823,7 @@ fn Mindmap::pointer_move(self : Mindmap, e : @core.Any) -> Unit {
 ///|
 fn Mindmap::pointer_end(self : Mindmap, e : @core.Any) -> Unit {
   self.drop_hold()
-  let up = event_type(e) == "pointerup"
+  let up = @web.event_type(e) == "pointerup"
   match self.dragging {
     Some(d) => {
       // cancel は取り消しなので、印だけ消して Op は投げない
@@ -842,7 +849,7 @@ fn Mindmap::pointer_end(self : Mindmap, e : @core.Any) -> Unit {
       if self.rubber_start is Some(_) {
         let (w, h) = self.rubber_size
         let dragged = w > 3 || h > 3
-        show(self.rubber, "block", false)
+        @web.show(self.rubber, "block", false)
         self.rubber_start = None
         if !dragged {
           (self.host.set_selection)(@map.none, false)
@@ -850,8 +857,8 @@ fn Mindmap::pointer_end(self : Mindmap, e : @core.Any) -> Unit {
       }
     }
   }
-  if is_touch(e) {
-    self.lift_finger(pointer_id(e))
+  if @web.is_touch(e) {
+    self.lift_finger(@web.pointer_id(e))
     // 組が壊れて残った指でパンを立て直したなら、その up ではない
     if self.panning is Some(_) && self.fingers.only() is Some(_) {
       return
@@ -913,7 +920,7 @@ fn Mindmap::start_drag(
   self.dragging = Some({ ids: sel.ids, subtree: self.subtree(sel.ids), })
   for nid in sel.ids {
     match self.renderer.node_el(nid) {
-      Some(g) => toggle_class(g, "dragging", true)
+      Some(g) => @web.toggle_class(g, "dragging", true)
       None => ()
     }
   }
@@ -943,10 +950,10 @@ fn Mindmap::paint_drop(self : Mindmap) -> Unit {
       } else {
         guard self.layout.boxes.get(id) is Some(b) else { return }
         let y = if pos == 1 { b.y } else { b.y + b.h }
-        self.drop_line.setAttribute("x1", num(b.x))
-        self.drop_line.setAttribute("x2", num(b.x + b.w))
-        self.drop_line.setAttribute("y1", num(y))
-        self.drop_line.setAttribute("y2", num(y))
+        self.drop_line.setAttribute("x1", @web.num(b.x))
+        self.drop_line.setAttribute("x2", @web.num(b.x + b.w))
+        self.drop_line.setAttribute("y1", @web.num(y))
+        self.drop_line.setAttribute("y2", @web.num(y))
         self.drop_line.setAttribute("visibility", "visible")
       }
   }
@@ -955,7 +962,7 @@ fn Mindmap::paint_drop(self : Mindmap) -> Unit {
 ///|
 fn Mindmap::mark_drop_parent(self : Mindmap, id : Int) -> Unit {
   match self.renderer.node_el(id) {
-    Some(g) => toggle_class(g, "drop-parent", true)
+    Some(g) => @web.toggle_class(g, "drop-parent", true)
     None => ()
   }
   self.drop_parent = Some(id)
@@ -967,7 +974,7 @@ fn Mindmap::clear_drop_mark(self : Mindmap) -> Unit {
   match self.drop_parent {
     Some(id) => {
       match self.renderer.node_el(id) {
-        Some(g) => toggle_class(g, "drop-parent", false)
+        Some(g) => @web.toggle_class(g, "drop-parent", false)
         None => ()
       }
       self.drop_parent = None
@@ -1000,7 +1007,7 @@ fn Mindmap::end_drag(self : Mindmap) -> Unit {
     Some(d) =>
       for id in d.ids {
         match self.renderer.node_el(id) {
-          Some(g) => toggle_class(g, "dragging", false)
+          Some(g) => @web.toggle_class(g, "dragging", false)
           None => ()
         }
       }
@@ -1015,8 +1022,8 @@ fn Mindmap::end_drag(self : Mindmap) -> Unit {
 /// リンクの ↗ と、読めていない画像の「繋ぐ」の字、カードと ×、ダブルクリックの編集
 fn Mindmap::bind_click(self : Mindmap) -> Unit {
   let pane = self.pane.as_element()
-  listen(pane, "click", e => {
-    match attr_in(e, "[data-delete]", "data-delete") {
+  @web.listen(pane, "click", e => {
+    match @web.attr_in(e, "[data-delete]", "data-delete") {
       Some(del) => {
         match int_of(del) {
           Some(id) => (self.host.apply)(Delete(ids=[id]), false) |> ignore
@@ -1026,11 +1033,11 @@ fn Mindmap::bind_click(self : Mindmap) -> Unit {
       }
       None => ()
     }
-    if target_in(e, ".image-connect") is Some(_) {
+    if @web.target_in(e, ".image-connect") is Some(_) {
       (self.host.connect_assets)()
       return
     }
-    match attr_in(e, "[data-card]", "data-card") {
+    match @web.attr_in(e, "[data-card]", "data-card") {
       Some(spot) => {
         match self.block_at(spot) {
           Some(id) =>
@@ -1047,28 +1054,28 @@ fn Mindmap::bind_click(self : Mindmap) -> Unit {
       }
       None => ()
     }
-    match attr_in(e, ".link-open", "data-url") {
-      Some(url) if url != "" => open_url(url)
+    match @web.attr_in(e, ".link-open", "data-url") {
+      Some(url) if url != "" => @web.open_url(url)
       _ => ()
     }
   })
-  listen(self.renderer.node_layer, "pointerdown", e => {
-    if target_in(e, ".link-open, .image-connect") is Some(_) {
-      stop(e)
+  @web.listen(self.renderer.node_layer, "pointerdown", e => {
+    if @web.target_in(e, ".link-open, .image-connect") is Some(_) {
+      @web.stop(e)
     }
   })
-  listen(pane, "dblclick", e => {
-    guard target_in(
+  @web.listen(pane, "dblclick", e => {
+    guard @web.target_in(
         e, ".link-open, .image-connect, .label-editor, .card-editor",
       )
       is None else {
       return
     }
-    match attr_in(e, "[data-card]", "data-card") {
+    match @web.attr_in(e, "[data-card]", "data-card") {
       Some(spot) => {
         match self.block_at(spot) {
           Some(id) => {
-            prevent(e)
+            @web.prevent(e)
             self.edit_card(id)
           }
           None => ()
@@ -1077,9 +1084,9 @@ fn Mindmap::bind_click(self : Mindmap) -> Unit {
       }
       None => ()
     }
-    let m = mouse(e)
+    let m = @web.mouse(e)
     guard self.node_at(m.clientX, m.clientY) is Some(id) else { return }
-    prevent(e)
+    @web.prevent(e)
     self.begin_edit(id, None) |> ignore
   })
 }
@@ -1106,28 +1113,66 @@ fn Mindmap::open_menu(self : Mindmap, x : Double, y : Double) -> Unit {
   self.label.close()
   self.card.close()
   guard self.node_at(x, y) is Some(id) else {
-    (self.host.menu)(x, y, [])
+    self.menu.hide(false)
     return
   }
   let sel = (self.host.selection)()
   if !sel.ids.contains(id) {
     (self.host.set_selection)({ ids: [id], anchor: Some(id), }, false)
   }
-  (self.host.menu)(x, y, @map.items(self.layout, (self.host.selection)()))
+  self.menu.show(
+    x,
+    y,
+    items_of(@map.items(self.layout, (self.host.selection)()), i => self.act(i)),
+  )
+}
+
+///|
+/// 右クリックの行（map/context.mbt）をメニューの器の行に写す。押せば `act` へ渡すだけで、
+/// 意味はここに増やさない。沈む行は `why` を押せない理由として持ち、無ければただ沈む。
+/// 絵の名は表（parts/icons.mbt）に無ければ落とす
+pub fn items_of(
+  es : Array[@map.Entry],
+  act : (@map.Intent) -> Unit,
+) -> Array[@parts.Entry] {
+  fn one(it : @map.Item) -> @parts.Entry {
+    let row = @parts.row(
+      it.label,
+      key=it.key,
+      mark=it.mark.filter(@parts.is_icon),
+      disabled=match (it.intent, it.why) {
+        (Some(_), _) => No
+        (None, Some(why)) => Why(why)
+        (None, None) => Yes
+      },
+    )
+    let run = it.intent.map(i => () => act(i))
+    match it.items {
+      Some(items) => Sub(row, items.map(one), run)
+      None => Run(row, run.unwrap_or(() => ()))
+    }
+  }
+
+  es.map(e => {
+    match e {
+      Sep => @parts.Sep
+      Item(it) => one(it)
+    }
+  })
 }
 
 ///|
 /// 右クリック。触った箱が選ばれていなければそれへ選び直してから開く。長押しが
 /// 開いた直後の（触った指が上げるときに走る）contextmenu は握り潰す — 二重に開かせない
 fn Mindmap::bind_context_menu(self : Mindmap) -> Unit {
-  listen(self.pane.as_element(), "contextmenu", e => {
-    prevent(e)
+  @web.listen(self.pane.as_element(), "contextmenu", e => {
+    @web.prevent(e)
     if self.menu_by_hold {
       self.menu_by_hold = false
       return
     }
     self.drop_hold()
-    let m = mouse(e)
+    let m = @web.mouse(e)
     self.open_menu(m.clientX, m.clientY)
   })
 }
@@ -1168,20 +1213,20 @@ pub fn Mindmap::act(self : Mindmap, intent : @map.Intent) -> Unit {
 /// 地図の中だけで効くキー。全体のキーは app/shortcuts.ts
 fn Mindmap::bind_keys(self : Mindmap) -> Unit {
   let pane = self.pane.as_element()
-  listen(pane, "keydown", e => {
-    let k = keyboard(e)
+  @web.listen(pane, "keydown", e => {
+    let k = @web.keyboard(e)
     if k.isComposing || k.keyCode == 229 {
       return
     }
     if self.dragging is Some(_) && k.key == "Escape" {
       self.end_drag()
-      prevent(e)
+      @web.prevent(e)
       return
     }
     if k.key == " " {
       self.space_held = true
       self.cursor("grab")
-      prevent(e)
+      @web.prevent(e)
       return
     }
     let key : @map.Key = {
@@ -1197,15 +1242,15 @@ fn Mindmap::bind_keys(self : Mindmap) -> Unit {
     guard intent is Some(i) else {
       // 表が断った Tab（選んでいない・前の兄弟が無い）でも、地図から焦点を逃がさない
       if k.key == "Tab" {
-        prevent(e)
+        @web.prevent(e)
       }
       return
     }
-    prevent(e)
+    @web.prevent(e)
     self.act(i)
   })
-  listen(pane, "keyup", e => {
-    if keyboard(e).key == " " {
+  @web.listen(pane, "keyup", e => {
+    if @web.keyboard(e).key == " " {
       self.space_held = false
       if self.panning is None {
         self.cursor("")
@@ -1215,7 +1260,7 @@ fn Mindmap::bind_keys(self : Mindmap) -> Unit {
   // Space を押したままペインの外へフォーカスが抜けると keyup が来ない。
   // 持ったままになるとカーソルが grab に貼り付き、背景の左ドラッグが
   // ずっと矩形選択でなくパンになる
-  listen(pane, "focusout", _ => {
+  @web.listen(pane, "focusout", _ => {
     self.space_held = false
     if self.panning is None {
       self.cursor("")

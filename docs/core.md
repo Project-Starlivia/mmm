@@ -387,7 +387,12 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
   ペインを地図の器にし、ホイール・ポインタ・キー・右クリック・長押し・ドラッグを受けて
   map/ の判断に繋ぎ、選択・操作・カードの選択を `Host` の閉包で ts へ返す（値は
   EditorState に居る）。輪・矩形・落とし先の印・針・欄（`field.mbt`）・カードの枠
-  （`pick.mbt`）もここ。js だけ（`supported_targets = "js"`）で、試験は happy-dom
+  （`pick.mbt`）もここ。右クリックの器は parts/ の `Menu`。js だけ（`supported_targets = "js"`）で、試験は happy-dom
+- **parts/** — 帯と地図が共に使う部品。絵（`icons.mbt`。Lucide の綴りが唯一の表）、しらせ
+  （`notice.mbt`。言葉の表もここで、知らない言葉は止める）、言い出し、道具の器、メニューの器
+  （`menu.mbt`。行の形・入れ子・キーで辿る・外を押せば閉じる）。ts は作ってもらって置くだけ
+- **web/** — DOM の小さな道具。js_browser に型の無い呼び出しを 1 行ずつ包み、他の package は
+  `_get` / `_call` を書かない
 - **判断も map/** — 選択（当たり・矩形・矢印・親兄弟）、落とし先、キーの表（`Intent`）、
   右クリックの行、視点の算術、針、指の台帳、欄の重ね。全部純粋で、wbtest で固定する
 - **出口** — `mmmSurvey(md) -> 持ち手` と木の問い合わせ（`mmmSpot` / `mmmChosen` /

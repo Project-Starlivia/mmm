@@ -66,8 +66,8 @@ pub struct Renderer {
 pub fn Renderer::new(doc : @dom.Document) -> Renderer {
   {
     doc,
-    edge_layer: el(doc, "g", []),
-    node_layer: el(doc, "g", []),
+    edge_layer: @web.el(doc, "g", []),
+    node_layer: @web.el(doc, "g", []),
     node_els: Map([]),
     edge_els: Map([]),
     shapes: Map([]),
@@ -98,7 +98,7 @@ pub fn Renderer::paint(self : Renderer, sel : Array[Int]) -> Unit {
   for id in self.selected {
     if !next.contains(id) {
       match self.node_els.get(id) {
-        Some(g) => toggle_class(g, "selected", false)
+        Some(g) => @web.toggle_class(g, "selected", false)
         None => ()
       }
     }
@@ -106,7 +106,7 @@ pub fn Renderer::paint(self : Renderer, sel : Array[Int]) -> Unit {
   for id in next {
     if !self.selected.contains(id) {
       match self.node_els.get(id) {
-        Some(g) => toggle_class(g, "selected", true)
+        Some(g) => @web.toggle_class(g, "selected", true)
         None => ()
       }
     }
@@ -160,7 +160,7 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
         let path = match self.edge_els.get(id) {
           Some(p) => p
           None => {
-            let p = el(doc, "path", [("class", "edge")])
+            let p = @web.el(doc, "path", [("class", "edge")])
             self.edge_layer.append(p.as_node())
             self.edge_els[id] = p
             p
@@ -187,21 +187,24 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
     let g = match self.node_els.get(id) {
       Some(g) => g
       None => {
-        let g = el(doc, "g", [("class", "node"), ("data-id", id.to_string())])
+        let g = @web.el(doc, "g", [
+          ("class", "node"),
+          ("data-id", id.to_string()),
+        ])
         self.node_layer.append(g.as_node())
         self.node_els[id] = g
         self.shapes.remove(id) // 新規なので必ず中身を作る
         // 選んだまま消えて戻った箱（畳みを開いた等）。印は paint の差分の外
         if self.selected.contains(id) {
-          toggle_class(g, "selected", true)
+          @web.toggle_class(g, "selected", true)
         }
         g
       }
     }
     // **文書から決まるクラスだけ**を、1 つずつ付け外しする
-    toggle_class(g, "root", b.parent is None)
-    toggle_class(g, "folded", n.fold is Some(_))
-    let tf = "translate(\{num(b.x)} \{num(b.y)})"
+    @web.toggle_class(g, "root", b.parent is None)
+    @web.toggle_class(g, "folded", n.fold is Some(_))
+    let tf = "translate(\{@web.num(b.x)} \{@web.num(b.y)})"
     if self.node_tf.get(id) != Some(tf) {
       g.setAttribute("transform", tf)
       self.node_tf[id] = tf
@@ -215,19 +218,19 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
     // 角丸は状態（畳んでいるか）で変わるだけの定数なので CSS が持つ。
     // ここが出すのはレイアウトが計算した数だけ
     g.append(
-      el(doc, "rect", [
+      @web.el(doc, "rect", [
         ("class", "box"),
-        ("width", num(b.w)),
-        ("height", num(b.h)),
+        ("width", @web.num(b.w)),
+        ("height", @web.num(b.h)),
       ]).as_node(),
     )
     let folded = n.fold is Some(_)
     let text = if folded { @map.fold_name(n) } else { @map.label_of(n) }
     let row = @map.row_of(n)
-    let label = el(doc, "text", [
+    let label = @web.el(doc, "text", [
       ("class", "label" + (if text == "" { " empty" } else { "" })),
-      ("x", num(row.pad)),
-      ("y", num(row.h / 2.0)),
+      ("x", @web.num(row.pad)),
+      ("y", @web.num(row.h / 2.0)),
       // font-size は CSS ではなく属性で入れる（同じ数字を 2 箇所に置かない）
       ("font-size", row.px.to_string()),
     ])
@@ -238,7 +241,7 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
         @map.display_label(text)
       },
     )
-    let title = el(doc, "title", [])
+    let title = @web.el(doc, "title", [])
     title.setTextContent(
       if folded {
         "\{text}\n(\{b.buried} folded)"

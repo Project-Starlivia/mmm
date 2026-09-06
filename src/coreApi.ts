@@ -213,26 +213,6 @@ export interface Rect {
   h: number;
 }
 
-/** 何をするか。core の表（keys.mbt / context.mbt）が言い、ts は読まずに core へ返す */
-export interface Intent {
-  readonly raw: unknown;
-}
-
-/** 右クリックの 1 行。`mark` は絵の名（icons.ts の表で確かめる）。intent が null なら沈む（why が理由） */
-export interface Item {
-  label: string;
-  key: string | null;
-  mark: string | null;
-  intent: Intent | null;
-  why: string | null;
-  items: Item[] | null;
-}
-export type Entry = Item | "sep";
-
-/** 右クリックの行（見本のため。地図そのものは core が開く） */
-export const context = (l: Layout, sel: Selection): Entry[] =>
-  entries(mbt.mmmContext(l, sel.ids, sel.anchor ?? undefined));
-
 /** コードの色分けの 1 塊。`cls` が空なら色の付かない地の文 */
 export interface Token {
   text: string;
@@ -268,14 +248,11 @@ export interface MapHost {
   tokens(lines: string[], lang: string): Token[][];
   tokensBlock(text: string): Token[][];
   epoch(): number;
-  /** 右クリックの行（Entry の列の JSON）をその画面の点に開く。空なら閉じる */
-  menu(x: number, y: number, entries: string): void;
   failed(msg: string): void;
 }
 
-/** ペインを地図の器にする。hint（白紙の言い出し）と tool（寄せるボタン）は HTML の部品 */
-export const map = (pane: HTMLElement, host: MapHost, hint: HTMLElement, tool: HTMLElement): MapHandle =>
-  Object(mbt.mmmMap(pane, host, hint, tool));
+/** ペインを地図の器にする */
+export const map = (pane: HTMLElement, host: MapHost): MapHandle => Object(mbt.mmmMap(pane, host));
 
 export const mapRender = (m: MapHandle): void => mbt.mmmMapRender(m);
 export const mapFit = (m: MapHandle): void => mbt.mmmMapFit(m);
@@ -288,8 +265,6 @@ export const mapSetGrab = (m: MapHandle, on: boolean): void => mbt.mmmMapSetGrab
 /** ファイルの落とし先を予告する。null で消す。落ちる先のノード（無ければ null） */
 export const mapFileDrop = (m: MapHandle, at: { x: number; y: number } | null): number | null =>
   mbt.mmmMapFileDrop(m, at?.x ?? 0, at?.y ?? 0, at !== null) ?? null;
-/** 「何をするか」（メニューの行が持つもの）を実行する */
-export const mapAct = (m: MapHandle, intent: Intent): void => mbt.mmmMapAct(m, JSON.stringify(intent.raw));
 
 /** 書き出しに写すもの。文書順の箱と、その線・ノードの要素 */
 export interface SvgParts {
@@ -309,6 +284,99 @@ export const mapSvgParts = (m: MapHandle): SvgParts => {
 
 const svgG = (v: unknown): SVGGElement => (v instanceof SVGGElement ? v : bad("<g> でない"));
 const svgPath = (v: unknown): SVGPathElement => (v instanceof SVGPathElement ? v : bad("<path> でない"));
+
+// ---- 部品 ----
+//
+// 絵・しらせ・言い出し・道具の器・メニューの器（core/parts）。ts は作ってもらって置くだけ。
+// 綴り（絵の名・しらせの言葉）の表は core が持ち、知らない綴りは core が止める。
+
+/** 絵の名（Lucide の綴り）。表は core/parts/icons.mbt */
+export type IconName = string;
+
+/** その名前の絵。線で引き、色は currentColor */
+export const icon = (name: IconName): SVGSVGElement => svgSvg(mbt.mmmIcon(name));
+
+/** 絵の名前の全部（並べて見るため） */
+export const iconNames = (): IconName[] => [...mbt.mmmIconNames()];
+
+/** 絵と文字を並べたボタンの中身にする（絵が先か後かは呼ぶ側が決める） */
+export const label = (text: string, name: IconName, after = false): Node[] => list(mbt.mmmLabel(text, name, after), node);
+
+/**
+ * 押した場所で答える。走っているあいだ回し、済んだらチェックを引く。`put` はその絵を
+ * いまの場所に出す。しくじったら何も出さない — 戻す係は呼ぶ側
+ */
+export const nod = (work: Promise<boolean>, put: (name: IconName) => void): Promise<boolean> =>
+  new Promise((resolve) =>
+    mbt.mmmNod(
+      work,
+      (name) => {
+        put(name);
+        return undefined;
+      },
+      (ok) => {
+        resolve(ok);
+        return undefined;
+      },
+    ),
+  );
+
+/** しらせの言葉。表は core/parts/notice.mbt（failedWords / blockedWords） */
+export type Failed = string;
+export type Blocked = string;
+
+/** こちらが果たせなかった（詫びが付く） */
+export const failed = (msg: Failed): void => mbt.mmmFailed(msg);
+/** 先へ進めない。次の一手はそちらにある */
+export const blocked = (msg: Blocked): void => mbt.mmmBlocked(msg);
+/** しらせ 1 つぶん。置くのは呼ぶ側（並べて見るため） */
+export const notice = (mark: IconName, msg: string, sorry: boolean): HTMLDivElement => div(mbt.mmmNotice(mark, msg, sorry));
+export const failedWords = (): Failed[] => [...mbt.mmmFailedWords()];
+export const blockedWords = (): Blocked[] => [...mbt.mmmBlockedWords()];
+
+/** 空のときの言い出し。2 つのペインが同じ器を使う */
+export const paneHint = (pane: "md" | "map"): HTMLDivElement => div(mbt.mmmPaneHint(pane));
+
+/** ペインの隅に浮く小さな道具の器。押しても下へ抜けない */
+export const paneTool = (name: string): HTMLDivElement => div(mbt.mmmPaneTool(name));
+
+/**
+ * メニューの 1 行。`sep` は区切り線、`items` を持つ行は入れ子、`caption` は見出し。
+ * `disabled` に文字列を渡せば、それが押せない理由として hover に出る。
+ * `note` は押す前に知っておくとよいこと（約束でもよい — 届いた時点でその行に印が付く）。
+ * `run` は閉じて走る。`done` は閉じずに走り、済んだらその行の絵がチェックになる
+ * （できたかを返す）。決めは core/parts/menu.mbt
+ */
+type Disabled = boolean | string;
+type Note = string[] | Promise<string[]>;
+interface Row {
+  label: string;
+  key?: string;
+  mark?: IconName;
+  note?: Note;
+  disabled?: Disabled;
+}
+type Act = { run: () => void; done?: never } | { done: () => Promise<boolean>; run?: never };
+export type MenuEntry =
+  | (Row & Act)
+  | (Row & { items: MenuEntry[]; run?: () => void })
+  | { caption: string; mark?: IconName }
+  | "sep";
+
+/** そのボタンでメニューを開く。並びは開くたびに作る（押した瞬間の文書に合わせるため） */
+export const openOnClick = (button: HTMLButtonElement, items: () => MenuEntry[]): void =>
+  mbt.mmmOpenOnClick(button, items);
+
+/** 行だけのメニュー。位置も開閉も持たない — 並べて見るためのもの */
+export const menu = (items: MenuEntry[]): HTMLDivElement => div(mbt.mmmMenuRows(items));
+
+/** 右クリックの行（並べて見るため。地図そのものは core が開く） */
+export const contextMenu = (l: Layout, sel: Selection): HTMLDivElement =>
+  div(mbt.mmmContextMenu(l, sel.ids, sel.anchor ?? undefined));
+
+const div = (v: unknown): HTMLDivElement => (v instanceof HTMLDivElement ? v : bad("<div> でない"));
+const svgSvg = (v: unknown): SVGSVGElement => (v instanceof SVGSVGElement ? v : bad("<svg> でない"));
+const node = (v: unknown): Node => (v instanceof Node ? v : bad("Node でない"));
 
 // ---- 形を確かめながら整える ----
 
@@ -392,29 +460,6 @@ export function selection(v: unknown): Selection {
   const o = record(v);
   return { ids: field(o, "ids", (x) => list(x, num)), anchor: option(o, "anchor", num) };
 }
-
-function item(v: unknown): Item {
-  const o = record(v);
-  return {
-    label: field(o, "label", str),
-    key: option(o, "key", str),
-    mark: option(o, "mark", str),
-    intent: option(o, "intent", (raw) => ({ raw })),
-    why: option(o, "why", str),
-    items: option(o, "items", (x) => list(x, item)),
-  };
-}
-
-/** 右クリックの行の JSON（Entry の列） */
-export const entries = (json: string): Entry[] => list(JSON.parse(json), entry);
-
-function entry(v: unknown): Entry {
-  const [tag, body] = tagged(v);
-  if (tag === "Sep") return "sep";
-  if (tag === "Item") return item(body);
-  return bad(`知らない Entry ${tag}`);
-}
-
 // ---- 操作を core へ送る ----
 //
 // 席は隣の id で言う（添字は無い）。`in` は列の末尾で、side は node が根のときだけ意味を持つ。

@@ -10,6 +10,8 @@ import {
   "mmm-app/core/op",
   "mmm-app/core/edit",
   "mmm-app/core/map",
+  "mmm-app/core/web",
+  "mmm-app/core/parts",
   "mmm-app/core/render",
   "mmm-app/core/read",
 }

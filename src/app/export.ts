@@ -7,10 +7,17 @@
 // 文書ぜんぶを相手にするのと同じ高さにヘッダを置く（枝だけの書き出しは、
 // 選択が戻ったときに右クリックへ）。
 
-import { type MenuEntry, openOnClick } from "../map/menu.ts";
-import { type IconName, icon, label, nod } from "../icons.ts";
+import {
+  type Blocked,
+  type Failed,
+  type IconName,
+  type MenuEntry,
+  icon,
+  label,
+  nod,
+  openOnClick,
+} from "../coreApi.ts";
 import { LS_WAY, load, store } from "./persist.ts";
-import type { Blocked, Failed } from "./notice.ts";
 
 /**
  * ラスタの倍率。**選ばせない** — 書き出したものは画面で見えている通りで

@@ -13,9 +13,9 @@
 import { type Field, type Part, ask } from "./ask.ts";
 import { ASKS } from "./asks.ts";
 import { handles } from "./handles.ts";
-import type { Failed } from "./notice.ts";
 import { io } from "./io.ts";
 import * as core from "../coreApi.ts";
+import type { Failed } from "../coreApi.ts";
 
 export interface Assets {
   imageUrl(path: string): string | null;

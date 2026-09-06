@@ -283,15 +283,18 @@ fn[T : ToJson] json(v : T) -> String {
 }
 
 ///|
-/// 右クリックの行。Entry の列の JSON
-#export_name("mmmContext")
-pub fn mmm_context(
+/// 右クリックの行（並べて見るため。地図そのものは core が開く）
+#export_name("mmmContextMenu")
+pub fn mmm_context_menu(
   layout : @core.Any,
   ids : FixedArray[Int],
   anchor : Int?,
-) -> String {
+) -> @dom.Element {
   let l : @map.Layout = layout.cast()
-  json(@map.items(l, { ids: ints(ids), anchor, }))
+  @parts.rows(
+    @dom.document(),
+    @render.items_of(@map.items(l, { ids: ints(ids), anchor, }), _ => ()),
+  )
 }
 
 // ---- 地図 ----
@@ -364,25 +367,15 @@ fn host_of(h : @core.Any) -> @render.Host {
     tokens,
     tokens_block: text => call("tokensBlock", [@core.any(text)]).cast(),
     epoch: () => call("epoch", []).cast(),
-    menu: (x, y, entries) => {
-      call("menu", [@core.any(x), @core.any(y), @core.any(json(entries))])
-      |> ignore
-    },
     failed: msg => call("failed", [@core.any(msg)]) |> ignore,
   }
 }
 
 ///|
-/// ペインを地図の器にする。`hint`（白紙の言い出し）と `tool`（真ん中へ寄せるボタン）は
-/// HTML の部品なので ts が作る。返るのは地図の持ち手
+/// ペインを地図の器にする。返るのは地図の持ち手
 #export_name("mmmMap")
-pub fn mmm_map(
-  pane : @dom.HTMLElement,
-  host : @core.Any,
-  hint : @dom.Element,
-  tool : @dom.Element,
-) -> @core.Any {
-  @core.any(@render.Mindmap::new(pane, host_of(host), hint, tool))
+pub fn mmm_map(pane : @dom.HTMLElement, host : @core.Any) -> @core.Any {
+  @core.any(@render.Mindmap::new(pane, host_of(host)))
 }
 
 ///|
@@ -453,16 +446,6 @@ pub fn mmm_map_file_drop(
 }
 
 ///|
-/// 「何をするか」（Intent の JSON。メニューの行が持つもの）を実行する
-#export_name("mmmMapAct")
-pub fn mmm_map_act(map : @core.Any, intent : String) -> Unit {
-  let i : @map.Intent = @json.from_json(@json.parse(intent)) catch {
-    e => abort("mmmMapAct: Intent の JSON が読めない — \{e}")
-  }
-  map_of(map).act(i)
-}
-
-///|
 /// 書き出しに写すもの。`rects`（文書順の箱。x, y, w, h）と `edges` / `nodes`（要素）
 #export_name("mmmMapSvgParts")
 pub fn mmm_map_svg_parts(map : @core.Any) -> @core.Any {
@@ -479,4 +462,177 @@ pub fn mmm_map_svg_parts(map : @core.Any) -> @core.Any {
   o._set("edges", @core.any(edges))
   o._set("nodes", @core.any(nodes))
   o
+}
+
+// ---- 部品 ----
+//
+// 絵・しらせ・言い出し・道具の器・メニューの器（core/parts）。ts は作ってもらって置くだけ。
+// メニューの行は ts の object（label / key / mark / note / disabled / run / done / items /
+// caption、または "sep"）で受け、ここで Entry にする
+
+///|
+fn defined(v : @core.Any) -> Bool {
+  !@core.is_nullish(v)
+}
+
+///|
+/// ts の行 1 つを Entry に
+fn entry_of(v : @core.Any) -> @parts.Entry {
+  if @core.typeof_(v) == "string" {
+    return Sep
+  }
+  let caption = v._get("caption")
+  if defined(caption) {
+    return Caption(caption.cast(), str_opt(v._get("mark")))
+  }
+  let d = v._get("disabled")
+  let disabled : @parts.Disabled = if !defined(d) {
+    No
+  } else if @core.typeof_(d) == "string" {
+    Why(d.cast())
+  } else if d.cast() {
+    Yes
+  } else {
+    No
+  }
+  let note = v._get("note")
+  let row = @parts.row(
+    v._get("label").cast(),
+    key=str_opt(v._get("key")),
+    mark=str_opt(v._get("mark")),
+    note=if defined(note) {
+      Some(k => {
+        if @core.is_array(note) {
+          k(note.cast())
+        } else {
+          @web.after(note, texts => k(texts.cast()))
+        }
+      })
+    } else {
+      None
+    },
+    disabled~,
+  )
+  let run = v._get("run")
+  let go = () => run._invoke([]) |> ignore
+  let items = v._get("items")
+  if defined(items) {
+    return Sub(
+      row,
+      @core.array_from(items).map(entry_of),
+      if defined(run) {
+        Some(go)
+      } else {
+        None
+      },
+    )
+  }
+  let done = v._get("done")
+  if defined(done) {
+    return Done(row, k => @web.after(done._invoke([]), ok => k(ok.cast())))
+  }
+  Run(row, go)
+}
+
+///|
+fn entries_of(v : @core.Any) -> Array[@parts.Entry] {
+  @core.array_from(v).map(entry_of)
+}
+
+///|
+/// その名前の絵（Lucide の綴り）
+#export_name("mmmIcon")
+pub fn mmm_icon(name : String) -> @dom.Element {
+  @parts.icon(@dom.document(), name)
+}
+
+///|
+/// 絵の名前の全部（並べて見るため）
+#export_name("mmmIconNames")
+pub fn mmm_icon_names() -> FixedArray[String] {
+  FixedArray::from_array(@parts.names())
+}
+
+///|
+/// 字と絵を並べたボタンの中身
+#export_name("mmmLabel")
+pub fn mmm_label(
+  text : String,
+  name : String,
+  after : Bool,
+) -> Array[@dom.Node] {
+  @parts.label(@dom.document(), text, name, after)
+}
+
+///|
+/// 押した場所で答える。`work` は Promise[Bool]、済めば `k(ok)`
+#export_name("mmmNod")
+pub fn mmm_nod(
+  work : @core.Any,
+  put : (String) -> Unit,
+  k : (Bool) -> Unit,
+) -> Unit {
+  @parts.nod(kk => @web.after(work, ok => kk(ok.cast())), put, k)
+}
+
+///|
+#export_name("mmmFailed")
+pub fn mmm_failed(msg : String) -> Unit {
+  @parts.failed(msg)
+}
+
+///|
+#export_name("mmmBlocked")
+pub fn mmm_blocked(msg : String) -> Unit {
+  @parts.blocked(msg)
+}
+
+///|
+/// しらせ 1 つぶん（並べて見るため）
+#export_name("mmmNotice")
+pub fn mmm_notice(mark : String, msg : String, sorry : Bool) -> @dom.Element {
+  @parts.notice(@dom.document(), mark, msg, sorry)
+}
+
+///|
+#export_name("mmmFailedWords")
+pub fn mmm_failed_words() -> FixedArray[String] {
+  FixedArray::from_array(@parts.failed_words)
+}
+
+///|
+#export_name("mmmBlockedWords")
+pub fn mmm_blocked_words() -> FixedArray[String] {
+  FixedArray::from_array(@parts.blocked_words)
+}
+
+///|
+/// 空のときの言い出し（"md" / "map"）
+#export_name("mmmPaneHint")
+pub fn mmm_pane_hint(pane : String) -> @dom.Element {
+  @parts.pane_hint(@dom.document(), pane)
+}
+
+///|
+/// ペインの隅に浮く道具の器
+#export_name("mmmPaneTool")
+pub fn mmm_pane_tool(name : String) -> @dom.Element {
+  @parts.pane_tool(@dom.document(), name)
+}
+
+///|
+/// そのボタンでメニューを開く。並びは開くたびに `items()` で作る
+#export_name("mmmOpenOnClick")
+pub fn mmm_open_on_click(
+  button : @dom.Element,
+  items : () -> @core.Any,
+) -> Unit {
+  @parts.open_on_click(button, () => entries_of(items()))
+}
+
+///|
+/// 行だけのメニュー（並べて見るため）
+#export_name("mmmMenuRows")
+pub fn mmm_menu_rows(items : @core.Any) -> @dom.Element {
+  @parts.rows(@dom.document(), entries_of(items))
 }
