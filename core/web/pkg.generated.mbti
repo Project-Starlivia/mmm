@@ -12,6 +12,10 @@ pub fn after(@core.Any, (@core.Any) -> Unit) -> Unit
 
 pub fn attr_in(@core.Any, String, String) -> String?
 
+pub fn blob_type(@core.Any) -> String
+
+pub fn can_choose_folder() -> Bool
+
 pub fn can_open() -> Bool
 
 pub fn can_rename() -> Bool
@@ -35,6 +39,10 @@ pub fn el(@dom.Document, String, Array[(String, String)]) -> @dom.Element
 pub fn event_type(@core.Any) -> String
 
 pub fn focus(@dom.Element) -> Unit
+
+pub fn get_dir(DirHandle, String, Bool) -> @js_async.Promise[DirHandle]
+
+pub fn get_file(DirHandle, String, Bool) -> @js_async.Promise[FileHandle]
 
 pub fn has_class(@dom.Element, String) -> Bool
 
@@ -62,6 +70,8 @@ pub fn is_touch(@core.Any) -> Bool
 
 pub fn keyboard(@core.Any) -> @dom.KeyboardEvent
 
+pub fn list_entries(DirHandle) -> @js_async.Promise[@core.Any]
+
 pub fn listen(@dom.Element, String, (@core.Any) -> Unit, capture? : Bool) -> Unit
 
 pub fn match_media(@dom.Document, String) -> @dom.MediaQueryList
@@ -76,6 +86,8 @@ pub fn now() -> Double
 
 pub fn num(Double) -> String
 
+pub fn object_url(@core.Any) -> String
+
 pub fn observe_resize(@dom.Element, () -> Unit) -> Unit
 
 pub fn offset_size(@dom.Element) -> (Double, Double)
@@ -83,6 +95,8 @@ pub fn offset_size(@dom.Element) -> (Double, Double)
 pub fn on_window(@dom.Document, String, (@core.Any) -> Unit, capture? : Bool) -> Unit
 
 pub fn open_url(String) -> Unit
+
+pub fn pick_directory(@core.Any, String) -> @js_async.Promise[@core.Any]
 
 pub fn pick_open(@core.Any) -> @js_async.Promise[@core.Any]
 
@@ -92,15 +106,23 @@ pub fn pointer_id(@core.Any) -> Int
 
 pub fn prevent(@core.Any) -> Unit
 
+pub fn promise_of(((@core.Any) -> Unit) -> Unit) -> @js_async.Promise[@core.Any]
+
 pub fn px(Double) -> String
 
 pub fn query_permission(@core.Any, String) -> @js_async.Promise[String]
 
 pub fn read_text(FileHandle) -> @js_async.Promise[String]
 
+pub fn read_url(FileHandle, String) -> @js_async.Promise[String]
+
 pub fn request_permission(@core.Any, String) -> @js_async.Promise[String]
 
+pub fn resolve_path(DirHandle, FileHandle) -> @js_async.Promise[@core.Any]
+
 pub fn return_value(@dom.Element) -> String
+
+pub fn revoke_url(String) -> Unit
 
 pub fn same(@dom.Element, @dom.Element) -> Bool
 
@@ -120,17 +142,23 @@ pub fn show(@dom.Element, String, Bool) -> Unit
 
 pub fn show_modal(@dom.Element) -> Unit
 
+pub fn stamp() -> String
+
 pub fn stop(@core.Any) -> Unit
 
 pub let svg_ns : String
 
 pub fn target_in(@core.Any, String) -> @dom.Element?
 
+pub fn to_webp(@core.Any) -> @js_async.Promise[@core.Any]
+
 pub fn toggle_class(@dom.Element, String, Bool) -> Unit
 
 pub fn value(@dom.Element) -> String
 
 pub fn window_of(@dom.Document) -> @core.Any
+
+pub fn write_blob(FileHandle, @core.Any) -> @js_async.Promise[Unit]
 
 pub fn write_text(FileHandle, String) -> @js_async.Promise[Unit]
 
@@ -140,6 +168,7 @@ pub fn write_text(FileHandle, String) -> @js_async.Promise[Unit]
 #external
 pub type DirHandle
 pub fn DirHandle::as_any(Self) -> @core.Any
+pub fn DirHandle::name(Self) -> String
 
 #external
 pub type FileHandle

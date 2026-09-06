@@ -399,7 +399,9 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
   （`menu.mbt`。行の形・入れ子・キーで辿る・外を押せば閉じる）。ts は作ってもらって置くだけ
 - **file/** — ディスク。`Io`（File System Access API の窓口。いま開いているファイル、
   開く・保存・改名、覚えている文書）と `Handles`（札を IndexedDB に置く台帳。置き場 `Store` は
-  閉包で受け、試験は手元の表で回す）。札（`FileHandle` / `DirHandle`）は `#external` の持ち手で、
+  閉包で受け、試験は手元の表で回す）、`Assets`（画像の読み書き。宣言は md の頭が持ち、許可は
+  札。フォルダを指してもらい、宣言を決める / 直す `settle`、置く名前の柵、webp への変換と書き込み）。
+  札（`FileHandle` / `DirHandle`）は `#external` の持ち手で、
   中は覗かない。**置き場に入れる行は素の object に組み直す** — MoonBit の Option は JS の値ではない
 - **web/** — DOM の小さな道具。js_browser に型の無い呼び出しを 1 行ずつ包み、他の package は
   `_get` / `_call` を書かない

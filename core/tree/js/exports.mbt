@@ -1042,3 +1042,95 @@ pub fn mmm_remember_folder(
 pub fn mmm_forget_folder(file : @web.FileHandle) -> @js_async.Promise[Unit] {
   promised(async fn() { disk.handles.forget_folder(file) })
 }
+
+// ---- 画像 ----
+//
+// Markdown からの相対パスで画像を読み書きする（core/file/assets.mbt）。宣言は md の頭、
+// 許可は札。ts が渡すのは failed / refresh / declared / declare の 4 つの閉包
+
+///|
+/// 画像の握り。返るのは持ち手
+#export_name("mmmAssets")
+pub fn mmm_assets(deps : @core.Any) -> @core.Any {
+  let call = (name : String, args : Array[@core.Any]) => deps._call(name, args)
+  @core.any(
+    @file.Assets::new(@dom.document(), disk, {
+      failed: msg => call("failed", [@core.any(msg)]) |> ignore,
+      refresh: () => call("refresh", []) |> ignore,
+      declared: () => str_opt(call("declared", [])),
+      set_declared: value => call("declare", [@core.any(value)]) |> ignore,
+    }),
+  )
+}
+
+///|
+fn assets_of(handle : @core.Any) -> @file.Assets {
+  handle.cast()
+}
+
+///|
+/// ローカル画像の objectURL。まだ読めていなければ undefined（引きに行く）
+#export_name("mmmImageUrl")
+pub fn mmm_image_url(assets : @core.Any, path : String) -> String? {
+  assets_of(assets).image_url(path)
+}
+
+///|
+/// 文書が入れ替わった。絵も握りも捨てる
+#export_name("mmmAssetsClear")
+pub fn mmm_assets_clear(assets : @core.Any) -> Unit {
+  assets_of(assets).clear()
+}
+
+///|
+/// いま結び付いている画像フォルダの名前。無ければ undefined
+#export_name("mmmFolderName")
+pub fn mmm_folder_name(assets : @core.Any) -> String? {
+  assets_of(assets).folder_name()
+}
+
+///|
+/// いま画像が読めているか（同期）
+#export_name("mmmReadable")
+pub fn mmm_readable(assets : @core.Any) -> Bool {
+  assets_of(assets).readable()
+}
+
+///|
+#export_name("mmmCanChooseFolder")
+pub fn mmm_can_choose_folder() -> Bool {
+  @web.can_choose_folder()
+}
+
+///|
+/// 札を引き直し、許可まで見て、読める状態か
+#export_name("mmmConnected")
+pub fn mmm_connected(assets : @core.Any) -> @js_async.Promise[Bool] {
+  promised(async fn() { assets_of(assets).connected() })
+}
+
+///|
+/// 繋ぎ直す（札があれば許可を聞くだけ。無ければ指してもらう）
+#export_name("mmmConnect")
+pub fn mmm_connect(assets : @core.Any) -> @js_async.Promise[Unit] {
+  promised(async fn() { assets_of(assets).connect() })
+}
+
+///|
+/// フォルダを指してもらう
+#export_name("mmmChooseFolder")
+pub fn mmm_choose_folder(assets : @core.Any) -> @js_async.Promise[Unit] {
+  promised(async fn() { assets_of(assets).choose_folder() })
+}
+
+///|
+/// 画像を置き、md に書く相対パスを。取りやめ / 失敗は null
+#export_name("mmmSaveImage")
+pub fn mmm_save_image(
+  assets : @core.Any,
+  blob : @core.Any,
+) -> @js_async.Promise[@core.Any] {
+  promised(async fn() {
+    @core.from_option(assets_of(assets).save_to_disk(blob))
+  })
+}

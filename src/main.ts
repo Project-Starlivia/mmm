@@ -14,7 +14,6 @@ import { type Doc, blocked, failed, fromHash, hasImages, io, LINK_WARN_LENGTH, o
 import * as st from "./state.ts";
 import { MdEditor } from "./editor.ts";
 import { Mindmap, type MapHost } from "./mindmap.ts";
-import { initAssets } from "./app/assets.ts";
 import { initExport } from "./app/export.ts";
 import { NOTHING_TO_RENAME, NO_FILE_ACCESS, NO_RENAME_HERE, filesMenu } from "./app/files.ts";
 import { moreMenu } from "./app/more.ts";
@@ -170,11 +169,11 @@ const editor = new MdEditor(mdPane, onUpdate);
 
 const host: MapHost = {
   survey: () => state().field(st.tree),
-  imageUrl: (path) => assets.imageUrl(path),
-  imageHint: () => (assets.readable() ? null : "click to connect"),
+  imageUrl: (path) => core.imageUrl(assets, path),
+  imageHint: () => (core.readable(assets) ? null : "click to connect"),
   connectAssets: () =>
     void (async () => {
-      if (await ensurePlace()) await assets.connect();
+      if (await ensurePlace()) await core.connect(assets);
     })(),
   holder,
   selection,
@@ -245,7 +244,7 @@ function showName(): void {
 function loadText(next: string, name: string | null): void {
   docGen++;
   savedName = name;
-  assets.clear(); // image paths are relative to the (new) md
+  core.assetsClear(assets); // image paths are relative to the (new) md
   editor.setText(next); // → onUpdate
   map.fitView();
   // 文書が入れ替わった。**Recent の並びもここで引き直す**
@@ -273,12 +272,12 @@ async function offerConnect(): Promise<void> {
   if (savedName === null || !hasImages(text())) return;
   // 許可を確かめるあいだに別の文書へ移っていたら、もうこの文書の話ではない
   const gen = docGen;
-  if (await assets.connected()) return;
+  if (await core.connected(assets)) return;
   if (gen !== docGen) return;
   const where = declaredFolder() ?? "./";
   const go = await core.asks.connect(where);
   // 箱を読んでいるあいだに移っていることもある。**繋ぐ直前にもう一度見る**
-  if (go !== null && gen === docGen) await assets.connect();
+  if (go !== null && gen === docGen) await core.connect(assets);
 }
 
 async function openFile(): Promise<void> {
@@ -331,7 +330,7 @@ async function saveFile(asNew = false): Promise<void> {
       showName();
       // **写しは別の文書。** 握りは「この md から見たあのフォルダ」という対
       // でしか意味を持たないので、md が別の場所へ移った時点で対ごと無効
-      assets.clear();
+      core.assetsClear(assets);
       void refreshRecent();
       void offerConnect();
     } else {
@@ -397,9 +396,9 @@ async function confirmDiscard(): Promise<boolean> {
 }
 
 // ---------- 画像（ローカルファースト） ----------
-// 実装は app/assets.ts。ここは「いまのファイル」と描き直しを繋ぐだけ
+// 実装は core/file/assets.mbt。ここは「いまのファイル」と描き直しを繋ぐだけ
 
-const assets = initAssets({
+const assets = core.assets({
   failed,
   refresh: () => map.render(),
   declared: () => declaredFolder(),
@@ -437,12 +436,12 @@ async function ensurePlace(): Promise<boolean> {
 /**
  * 画像をディスクへ置いて、そのノードの中身として足す（Image のブロック）。
  * **貼り付け・ドロップ・お絵描きが通る唯一の道** — WebP への変換も名前の
- * 確認も画像フォルダの結び付けも、`assets.saveToDisk` が 1 か所で持つ。
+ * 確認も画像フォルダの結び付けも、core の `save_to_disk` が 1 か所で持つ。
  */
 async function attachImage(id: number, blob: Blob): Promise<void> {
   const gen = docGen;
   if (!(await ensurePlace())) return;
-  const rel = await assets.saveToDisk(blob);
+  const rel = await core.saveImage(assets, blob);
   // 置いているあいだに文書が入れ替わった（世代）／ノードが消えている（id）ことがある
   if (rel === null || gen !== docGen || !core.isNode(doc(), id)) return;
   write({
@@ -540,12 +539,12 @@ function paste(): void {
 }
 
 /**
- * 画像フォルダの状態。**言葉は宣言と許可の 2 つだけ**（app/assets.ts の冒頭が
+ * 画像フォルダの状態。**言葉は宣言と許可の 2 つだけ**（core/file/assets.mbt の冒頭が
  * 名付けたもの）。許可が無いときは宣言のパスを出す — どこを指していて届いて
  * いないのかが見えないと、直しようがない。
  */
 function folderCaption(): string {
-  const name = assets.folderName();
+  const name = core.folderName(assets);
   const declared = declaredFolder();
   if (name === null) return declared === null ? "no folder" : `${declared}, no access`;
   return declared !== null ? name : `${name}, not declared`;
@@ -562,7 +561,7 @@ openOnClick(elFiles, () =>
       canOpen: io.canOpen(),
       canSave: io.canSaveAs(),
       canRename: io.canRename(),
-      canChooseFolder: assets.canChooseFolder(),
+      canChooseFolder: core.canChooseFolder(),
       folder: folderCaption(),
     },
     {
@@ -577,7 +576,7 @@ openOnClick(elFiles, () =>
       rename: () => void renameFile(),
       chooseFolder: () =>
         void (async () => {
-          if (await ensurePlace()) await assets.chooseFolder();
+          if (await ensurePlace()) await core.chooseFolder(assets);
         })(),
     },
   ),
