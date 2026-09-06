@@ -497,6 +497,8 @@ fn shift(n : @tree.Node, by : Int) -> @tree.Node {
 ///|
 /// md を読んで、根たちを席に差す。側は捨て、綴りは読んだまま。
 /// 先頭の散文は行き先の親の body 末尾へ（In なら node 自身、根の間なら doc の散文）。
+/// 断片が `##` から始まると parse は根を Implicit で包む（深さ 1 の飛び）。
+/// それは切り出した場所の名残でしかないので剥がし、相対の形で差す。
 fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   let sub = @tree.parse(md)
   guard !(sub.roots.is_empty() && sub.body.is_empty()) else { return None }
@@ -504,7 +506,7 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   let prose = sub.body.map(b => {
     ({ id: b.id + by, content: b.content } : @tree.Block)
   })
-  let subs = sub.roots.map(r => shift(r.node, by))
+  let subs = peel(sub.roots.map(r => r.node)).map(n => shift(n, by))
   let host = match at {
     In(node~, ..) => node
     _ => {
@@ -523,4 +525,14 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
     return Some({ doc: cur, focus: None })
   }
   done(place(cur, at, subs), Some(id_of(subs[0])))
+}
+
+///|
+/// 根が Implicit 1 つだけなら、その子たちを根にする。飛びが何段でも剥がす。
+/// 途中の飛び（子の中の Implicit）は綴りなので触らない。
+fn peel(roots : Array[@tree.Node]) -> Array[@tree.Node] {
+  match roots {
+    [ImplicitNode(g)] => peel(g.children)
+    _ => roots
+  }
 }

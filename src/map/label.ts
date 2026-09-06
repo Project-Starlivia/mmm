@@ -53,6 +53,10 @@ export class LabelEditor {
    *  （欄が開いている間は keydown が地図へ届かない） */
   private id: number | null = null;
   private composing = false;
+  /** 最後に place() へ渡された箱と視点。打鍵のたびに欄を今の値へ合わせ直すのに使う
+   *  （変換中は md へ書かず render も走らないので、ここから自分で place() する） */
+  private lastBox: Box | null = null;
+  private lastCam: Camera | null = null;
   private readonly pane: HTMLElement;
   private readonly rename: (id: number, label: string) => void;
 
@@ -71,6 +75,8 @@ export class LabelEditor {
       this.write();
     });
     this.input.addEventListener("input", (e) => {
+      // 欄は打った字の分だけ先に育つ（card.ts と同じ）。md へ書くかは別の話
+      if (this.lastBox && this.lastCam) this.place(this.lastBox, this.lastCam);
       if (this.composing || (e instanceof InputEvent && e.isComposing)) return;
       this.write();
     });
@@ -113,6 +119,8 @@ export class LabelEditor {
   /** 箱に追従する。書くたびに箱が変わるので、描き直しの後に呼ぶ */
   place(b: Box, cam: Camera): void {
     if (this.id === null) return;
+    this.lastBox = b;
+    this.lastCam = cam;
     const p = labelPlacement(b, cam, measure(labelFont(rowOf(b.node)), this.input.value));
     const st = this.input.style;
     st.left = `${p.left}px`;
@@ -135,6 +143,8 @@ export class LabelEditor {
       this.write();
     }
     this.id = null;
+    this.lastBox = null;
+    this.lastCam = null;
     this.input.style.display = "none";
   }
 
