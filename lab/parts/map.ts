@@ -3,8 +3,7 @@
 // 手で Box を組まないのは、それが嘘の置き方になるから。
 
 import * as core from "../../src/coreApi.ts";
-import { type MapHost, Mindmap } from "../../src/mindmap.ts";
-import { measure } from "../../src/map/measure.ts";
+import { languageEpoch, tokenize, tokenizeBlock } from "../../src/map/highlight.ts";
 import type { Part } from "./kind.ts";
 
 const MD = `# mmm
@@ -45,8 +44,8 @@ folded text
 
 interface Stand {
   el: HTMLDivElement;
-  map: Mindmap;
-  host: MapHost;
+  map: core.MapHandle;
+  host: core.MapHost;
   s: core.Survey;
 }
 
@@ -62,7 +61,7 @@ function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
   const s = core.survey(md);
   let selection: core.Selection = core.NONE;
   let picked: number | null = null;
-  const host: MapHost = {
+  const host: core.MapHost = {
     survey: () => s,
     imageUrl: () => null,
     imageHint: () => "click to connect",
@@ -71,25 +70,24 @@ function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
     selection: () => selection,
     setSelection: (sel) => {
       selection = sel;
-      map.refreshSelection();
+      core.mapRefresh(map);
     },
     picked: () => picked,
     setPicked: (id) => {
       picked = id;
-      map.refreshSelection();
+      core.mapRefresh(map);
     },
     blockText: (id) => {
       const sp = core.spot(s, id);
       return sp ? md.slice(sp.from, sp.to) : "";
     },
-    apply: () => null,
-    paste: () => {},
-    copy: () => Promise.resolve(true),
-    draw: () => {},
+    tokens: tokenize,
+    tokensBlock: tokenizeBlock,
+    epoch: languageEpoch,
   };
-  const map = new Mindmap(el, host);
-  map.render();
-  map.fitView();
+  const map = core.map(el, host);
+  core.mapRender(map);
+  core.mapFit(map);
   const grown = new ResizeObserver(([e]) => {
     if (!e || e.contentRect.width === 0) return;
     grown.disconnect();
@@ -102,7 +100,7 @@ function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
 /** 見本の木と、その配置。右クリックメニューの見本が選択を渡すのに使う */
 export function sample(): { s: core.Survey; L: core.Layout } {
   const s = core.survey(MD);
-  return { s, L: core.layout(s, measure) };
+  return { s, L: core.layout(s) };
 }
 
 /** その名前のノードの id。無ければ例外（見本の md と食い違っている） */
@@ -119,7 +117,7 @@ function firstBlock(s: core.Survey, label: string): number {
   return b;
 }
 
-const select = (host: MapHost, ids: number[]): void => host.setSelection({ ids, anchor: ids[0] ?? null }, false);
+const select = (host: core.MapHost, ids: number[]): void => host.setSelection({ ids, anchor: ids[0] ?? null }, false);
 
 export const MAP: Part = {
   name: "map",
@@ -129,8 +127,8 @@ export const MAP: Part = {
     empty: () => stand(""),
     selected: () => stand(MD, ({ s, host }) => select(host, [named(s, "Left")])),
     "selected-many": () => stand(MD, ({ s, host }) => select(host, ["Left", "one", "two"].map((l) => named(s, l)))),
-    "label-editor": () => stand(MD, ({ s, map }) => map.beginEdit(named(s, "Left"), null)),
-    "card-editor": () => stand(MD, ({ s, map }) => map.editCard(firstBlock(s, "Right"))),
+    "label-editor": () => stand(MD, ({ s, map }) => core.mapBeginEdit(map, named(s, "Left"), null)),
+    "card-editor": () => stand(MD, ({ s, map }) => core.mapEditCard(map, firstBlock(s, "Right"))),
     "card-pick": () => stand(MD, ({ s, host }) => host.setPicked(firstBlock(s, "Right"))),
     indicator: () =>
       stand(MD, ({ el }) =>

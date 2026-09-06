@@ -8,11 +8,11 @@ import {
 }
 
 // Values
-pub fn blocked(String) -> Unit
+pub fn blocked(@dom.Document, String) -> Unit
 
 pub let blocked_words : Array[String]
 
-pub fn failed(String) -> Unit
+pub fn failed(@dom.Document, String) -> Unit
 
 pub let failed_words : Array[String]
 

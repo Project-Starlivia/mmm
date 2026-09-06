@@ -33,7 +33,7 @@ Undo / Redo と表示の切り替えは、その場の入力欄（ラベル・�
 
 ## Mindmap
 
-Mindmap の中だけで効く（`src/mindmap.ts`）。
+Mindmap の中だけで効く（core/render/mindmap.mbt）。
 
 **編集**
 

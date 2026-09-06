@@ -76,14 +76,6 @@ const MORE_ACTS: core.MoreActs = {
   toggleGrab: nothing,
   copyLink: () => Promise.resolve(true),
 };
-/** 書き出しの並びが要るもの。出すもの以外は使われない */
-const exportDeps = (empty: boolean): core.ExportDeps => ({
-  map: null,
-  name: () => "notes.md",
-  failed: nothing,
-  blocked: nothing,
-  empty: () => empty,
-});
 
 export const PARTS: Part[] = [
   {
@@ -156,8 +148,8 @@ export const PARTS: Part[] = [
           { light: true, grab: true, linkNote: Promise.resolve(["Images won't travel", "Long link — may be cut"]) },
           MORE_ACTS,
         ),
-      "export-ways": () => core.exportWays(exportDeps(false)),
-      "export-empty": () => core.exportWays(exportDeps(true)),
+      "export-ways": () => core.exportWays(false),
+      "export-empty": () => core.exportWays(true),
     },
   },
   {

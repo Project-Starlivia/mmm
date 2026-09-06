@@ -27,6 +27,21 @@ pub(all) struct Edit {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+/// 編集列（前の座標・from 順・重ならない）を md に当てた後の全文。
+/// 続けて操作を映すとき、次の操作が読む md はこれ
+pub fn patched(md : String, edits : Array[Edit]) -> String {
+  let out = StringBuilder()
+  let mut at = 0
+  for e in edits {
+    out.write_string(String::unsafe_substring(md, start=at, end=e.from))
+    out.write_string(e.insert)
+    at = e.to
+  }
+  out.write_string(String::unsafe_substring(md, start=at, end=md.length()))
+  out.to_string()
+}
+
+///|
 /// 後の木を映す編集列。from 順で、範囲は重ならない。
 pub fn merge(
   md : String,

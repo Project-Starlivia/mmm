@@ -418,14 +418,18 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
   言い分・頷き。出す口は web/ の 1 行）、お絵描き（`draw.mbt`。紙は手の並びの写像 `Sheet` で、
   載せ先 `Paint` は canvas の 2d か試験の記録）、帯の並び（`files.mbt` / `more.mbt`。純粋な表 —
   いまの状態を受けて行を返し、押されたら閉包を呼ぶだけ。ts は状態を開くたびに読ませる）。
-  文書と選択の読み書きは ts の main.ts が閉包で渡す
+  文書と選択の読み書きは main/ が持つ
+- **main/** — 束ねる場所（`app.mbt`）。1 トランザクション = 1 サイクルの出口 `cycle`（木が変われば描き直し、
+  でなければ塗り直し）、操作の入口 `apply`（持ち主の操作。focus を選ぶ）と `write`（それ以外。選択に
+  触らない）、持ち主の focusin、貼り付け・投下・描いた絵の保存、ファイル I/O、リンク、帯。文書から導く値は
+  持たず、持つのはファイルの状態（世代・保存した本文と名前・覚えている文書）だけ。CodeMirror の読み書きは
+  `Editor` の閉包で受け、試験は happy-dom と md 1 本の写しで回す。字の実測は render/ の `measure`
+  （canvas。綴りは style.css の `--font` / `--mono`）
 - **判断も map/** — 選択（当たり・矩形・矢印・親兄弟）、落とし先、キーの表（`Intent`）、
   右クリックの行、視点の算術、針、指の台帳、欄の重ね。全部純粋で、wbtest で固定する
-- **出口** — `mmmSurvey(md) -> 持ち手` と木の問い合わせ（`mmmSpot` / `mmmChosen` /
-  `mmmName` …）、`mmmMap(pane, host) -> 持ち手` と `mmmMapRender` /
-  `mmmMapFit` / `mmmMapBeginEdit` / `mmmMapAct` …、`mmmExport` / `mmmDrop` / `mmmShowDrawing`、
-  `mmmEdit(md, op)`。
-  `mmmLayout` / `mmmContext` は見本（lab）が右クリックの行を引くためだけに残る。
+- **出口** — `mmmMain(editor) -> 持ち手` / `mmmBoot` / `mmmCycle` がアプリそのもの。ほかは
+  EditorState の field が読む問い合わせ（`mmmSurvey` / `mmmSpot` / `mmmChosen` / `mmmAnchorsOf` …）と、
+  見本（lab）が置く部品（`mmmMap` / `mmmLayout` / `mmmContextMenu` / `mmmFilesRows` …）だけ。
   **木も箱も core から出ない。** 境界は数・文字列・真偽・持ち手と、操作 1 回ぶんの小さな
   JSON（Intent・落とし先・メニューの行・選択）。数の組は `FixedArray[Double]` で渡す —
   **タプルは JS では object になる**（`.d.ts` は配列と書くが嘘）。決めは
