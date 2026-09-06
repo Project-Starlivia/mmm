@@ -507,6 +507,20 @@ export const askForm = (kind: "discard" | "place" | "connect" | "rename" | "imag
 
 const form = (v: unknown): HTMLFormElement => (v instanceof HTMLFormElement ? v : bad("<form> でない"));
 
+// ---- リンク ----
+//
+// 本文を URL フラグメント（`#md=…`）へ載せる / 戻す。圧縮は core（gzip → base64url）
+
+/** 本文を載せたフラグメント。URL の組み立ては呼ぶ側 */
+export const toHash = (text: string): Promise<string> => Promise.resolve(mbt.mmmToHash(text)).then(str);
+/** `location.hash` から本文を。リンクでなければ・壊れていれば null */
+export const fromHash = (hash: string): Promise<string | null> =>
+  Promise.resolve(mbt.mmmFromHash(hash)).then((v) => (v === null ? null : str(v)));
+/** 画像を貼った行があるか。画像は旅をしないので、Copy link の但し書きに */
+export const hasImages = (text: string): boolean => mbt.mmmHasImages(text);
+/** この長さを超えたら「一部のアプリでは切られるかも」と伝える */
+export const LINK_WARN_LENGTH: number = mbt.mmmLinkWarnLength();
+
 // ---- 形を確かめながら整える ----
 
 const bad = (what: string): never => {

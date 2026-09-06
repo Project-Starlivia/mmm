@@ -873,3 +873,37 @@ pub fn mmm_ask_named(
 pub fn mmm_ask_form(kind : String, args : @core.Any) -> @dom.Element {
   @app.ask_form(@dom.document(), named_ask(kind, args), () => ()).0
 }
+
+// ---- リンク ----
+//
+// 本文を URL フラグメントへ載せる / 戻す（core/app/share.mbt）。非同期は JS の Promise で返す
+
+///|
+/// 本文を載せたフラグメント（`#md=...`）
+#export_name("mmmToHash")
+pub fn mmm_to_hash(text : String) -> @js_async.Promise[String] {
+  @js_async.Promise::from_async(async fn() { @app.to_hash(text) })
+}
+
+///|
+/// `location.hash` から本文を。リンクでなければ・壊れていれば null
+#export_name("mmmFromHash")
+pub fn mmm_from_hash(hash : String) -> @js_async.Promise[@core.Any] {
+  @js_async.Promise::from_async(async fn() {
+    @core.from_option(@app.from_hash(hash))
+  })
+}
+
+///|
+/// 画像を貼った行があるか
+#export_name("mmmHasImages")
+pub fn mmm_has_images(text : String) -> Bool {
+  @app.has_images(text)
+}
+
+///|
+/// この長さを超えたリンクは「切られるかも」と言う
+#export_name("mmmLinkWarnLength")
+pub fn mmm_link_warn_length() -> Int {
+  @app.link_warn_length
+}
