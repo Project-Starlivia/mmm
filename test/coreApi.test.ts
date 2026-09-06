@@ -27,20 +27,15 @@ test("isNode — 根も子孫もノード、中身の id と知らない id は�
   assert.equal(core.isNode(s, 9), false);
 });
 
-test("選択は core と往復する — chosen / anchorsOf / anchorsFor / ranges", () => {
+test("選択は持ち手で往復する — chosen / selection / card / anchorsOf / carry / ranges", () => {
   const s = survey("# r\n\n## a\n\n## b\n");
   const caret = (head: number): core.Caret => ({ ranges: [{ from: head, to: head }], head });
-  assert.deepEqual(core.chosen(s, "md", caret(8), null), { kind: "nodes", sel: { ids: [3], anchor: 3 } });
-  assert.deepEqual(core.chosen(s, "map", caret(8), null), core.NOTHING);
-  assert.deepEqual(core.chosen(s, "map", caret(0), { kind: "nodes", at: [8, 14], anchor: 14 }), {
-    kind: "nodes",
-    sel: { ids: [3, 4], anchor: 4 },
-  });
-  assert.deepEqual(core.anchorsOf(s, 4), { kind: "nodes", at: [14], anchor: 14 });
-  assert.deepEqual(core.anchorsFor(s, { kind: "nodes", sel: { ids: [3], anchor: null } }), {
-    kind: "nodes",
-    at: [8],
-    anchor: null,
-  });
-  assert.deepEqual(core.ranges(s, { kind: "nodes", sel: { ids: [2, 9], anchor: 2 } }), [{ from: 0, to: 16 }]);
+  assert.deepEqual(core.selection(core.chosen(s, "md", caret(8), null)), { ids: [3], anchor: 3 });
+  assert.equal(core.sameChoice(core.chosen(s, "map", caret(8), null), core.NOTHING), true);
+  const both = core.chosen(s, "map", caret(0), core.nodeAt([8, 14], 14));
+  assert.deepEqual(core.selection(both), { ids: [3, 4], anchor: 4 });
+  assert.equal(core.card(both), null);
+  assert.deepEqual(core.anchorsAt(core.anchorsOf(s, 4)!), { kind: "nodes", at: [14], anchor: 14 });
+  assert.deepEqual(core.anchorsAt(core.carry(core.nodeAt([8, 14], 14), (p) => p + 2)), { kind: "nodes", at: [10, 16], anchor: 16 });
+  assert.deepEqual(core.ranges(s, core.chosen(s, "md", caret(1), null)), [{ from: 0, to: 16 }]);
 });

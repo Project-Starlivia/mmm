@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { type Plugin, defineConfig } from "vite";
-import { mmmLogoSvg } from "./core/_build/js/release/build/tree/js/js.js";
+import { mmmLogoSvg } from "./core/_build/js/release/build/js/js.js";
 
 /**
  * 素の favicon を `/favicon.svg` に置く。形の源は core/app/logo.mbt、色の源は
