@@ -26,6 +26,8 @@ pub fn canvas_paint(@core.Any) -> Paint
 
 pub fn connect(String) -> Ask
 
+pub fn declaration(String, Field) -> Ask
+
 pub fn discard() -> Ask
 
 pub fn draw_form(@dom.Document, () -> Unit, (Board) -> Unit, paint? : ((@dom.Element) -> Paint)?) -> (@dom.Element, Board)
@@ -73,6 +75,8 @@ pub let nothing_to_rename : String
 pub fn place() -> Ask
 
 pub fn project(Vis, Array[Vis]) -> Vis
+
+pub fn redeclaration(Field) -> Ask
 
 pub fn rename(String) -> Ask
 
