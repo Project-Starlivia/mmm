@@ -65,8 +65,8 @@ test("複数選択では宛先が 1 つの行が沈む。Delete は沈まない"
   assert.notEqual(row(es, "Delete").intent, null);
 });
 
-test("Implicit は畳めず、根は側を持たない", () => {
-  assert.equal(row(contextItems(L, { ids: [4], anchor: 4 }), "Hide (fold)").why, "Nothing to fold here");
+test("Implicit も畳める。根は側を持たない", () => {
+  assert.deepEqual(row(contextItems(L, { ids: [4], anchor: 4 }), "Hide (fold)").intent, { kind: "op", op: { kind: "fold", id: 4, open: false }, edit: false });
   assert.equal(row(contextItems(L, { ids: [2], anchor: 2 }), "Flip side").why, "The root has no side");
   assert.deepEqual(row(contextItems(L, { ids: [5], anchor: 5 }), "Flip side").intent, { kind: "op", op: { kind: "flipSide", id: 5 }, edit: false });
 });
