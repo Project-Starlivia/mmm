@@ -4,12 +4,19 @@ package "mmm-app/core/web"
 import {
   "mizchi/js/core",
   "mizchi/js_browser/dom",
+  "moonbitlang/async/js_async",
 }
 
 // Values
 pub fn after(@core.Any, (@core.Any) -> Unit) -> Unit
 
 pub fn attr_in(@core.Any, String, String) -> String?
+
+pub fn can_open() -> Bool
+
+pub fn can_rename() -> Bool
+
+pub fn can_save_as() -> Bool
 
 pub fn capture(@dom.Element, Int) -> Unit
 
@@ -35,9 +42,21 @@ pub fn head(@dom.Document) -> @dom.Element
 
 pub fn html(@dom.Document, String, String) -> @dom.HTMLElement
 
+pub fn idb_close(@core.Any) -> Unit
+
+pub fn idb_ensure_store(@core.Any, String) -> Unit
+
+pub fn idb_open(String, Int, (@core.Any) -> Unit) -> @js_async.Promise[@core.Any]
+
+pub fn idb_run(@core.Any, String, String, (@core.Any) -> @core.Any) -> @js_async.Promise[@core.Any]
+
 pub fn inner_size(@dom.Document) -> (Double, Double)
 
 pub fn is_composing(@core.Any) -> Bool
+
+pub fn is_dir_handle(@core.Any) -> Bool
+
+pub fn is_file_handle(@core.Any) -> Bool
 
 pub fn is_touch(@core.Any) -> Bool
 
@@ -51,6 +70,10 @@ pub fn matches(@dom.MediaQueryList) -> Bool
 
 pub fn mouse(@core.Any) -> @dom.MouseEvent
 
+pub fn move_to(FileHandle, String) -> @js_async.Promise[Unit]
+
+pub fn now() -> Double
+
 pub fn num(Double) -> String
 
 pub fn observe_resize(@dom.Element, () -> Unit) -> Unit
@@ -61,15 +84,27 @@ pub fn on_window(@dom.Document, String, (@core.Any) -> Unit, capture? : Bool) ->
 
 pub fn open_url(String) -> Unit
 
+pub fn pick_open(@core.Any) -> @js_async.Promise[@core.Any]
+
+pub fn pick_save(String, @core.Any) -> @js_async.Promise[@core.Any]
+
 pub fn pointer_id(@core.Any) -> Int
 
 pub fn prevent(@core.Any) -> Unit
 
 pub fn px(Double) -> String
 
+pub fn query_permission(@core.Any, String) -> @js_async.Promise[String]
+
+pub fn read_text(FileHandle) -> @js_async.Promise[String]
+
+pub fn request_permission(@core.Any, String) -> @js_async.Promise[String]
+
 pub fn return_value(@dom.Element) -> String
 
 pub fn same(@dom.Element, @dom.Element) -> Bool
+
+pub fn same_entry(@core.Any, @core.Any) -> @js_async.Promise[Bool]
 
 pub fn select_all(@dom.Element) -> Unit
 
@@ -97,9 +132,19 @@ pub fn value(@dom.Element) -> String
 
 pub fn window_of(@dom.Document) -> @core.Any
 
+pub fn write_text(FileHandle, String) -> @js_async.Promise[Unit]
+
 // Errors
 
 // Types and methods
+#external
+pub type DirHandle
+pub fn DirHandle::as_any(Self) -> @core.Any
+
+#external
+pub type FileHandle
+pub fn FileHandle::as_any(Self) -> @core.Any
+pub fn FileHandle::name(Self) -> String
 
 // Type aliases
 

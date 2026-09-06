@@ -10,12 +10,10 @@
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import type { EditorState } from "@codemirror/state";
 import * as core from "./coreApi.ts";
-import { blocked, failed, fromHash, hasImages, LINK_WARN_LENGTH, openOnClick, toHash } from "./coreApi.ts";
+import { type Doc, blocked, failed, fromHash, hasImages, io, LINK_WARN_LENGTH, openOnClick, toHash } from "./coreApi.ts";
 import * as st from "./state.ts";
 import { MdEditor } from "./editor.ts";
 import { Mindmap, type MapHost } from "./mindmap.ts";
-import { handles } from "./app/handles.ts";
-import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
 import { initExport } from "./app/export.ts";
 import { NOTHING_TO_RENAME, NO_FILE_ACCESS, NO_RENAME_HERE, filesMenu } from "./app/files.ts";
@@ -617,14 +615,7 @@ openOnClick(elMore, () =>
 let recent: FileSystemFileHandle[] = [];
 
 async function refreshRecent(): Promise<void> {
-  const now = io.currentFile();
-  const rows = await handles.list();
-  const out: FileSystemFileHandle[] = [];
-  for (const row of rows) {
-    if (now && (await row.doc.isSameEntry(now))) continue;
-    out.push(row.doc);
-  }
-  recent = out;
+  recent = await io.recent();
 }
 
 /** 覚えている文書を開く。**許可はここで取り直す** — 押されたことがその資格 */

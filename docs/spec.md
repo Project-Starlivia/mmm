@@ -48,6 +48,8 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 出し分けと分割線) / shortcuts(全体のキー) / theme(テーマ・アクセントカラー・favicon) /
                 logo(ロゴの唯一の源) / ask(聞く器。<dialog>) / asks(聞くことの綴りの全部) /
                 share(本文を URL に載せる。gzip → base64url。非同期は js_async の Promise)。試験は happy-dom
+  file/         ディスク（js だけ）。io(File System Access API の窓口。開く・保存・改名・覚えている文書) /
+                handles(札を IndexedDB に置く台帳。置き場は閉包で受け、試験は手元の表)。札は不透明な持ち手
   render/       地図のペイン（js だけ）。card(Card 1 枚 → SVG) / render(Renderer。id → 要素、
                 transform / d のキャッシュ、並び直し、paint) / mindmap(器と入力。ホイール・
                 ポインタ・キー・右クリック・長押し・ドラッグを受けて map/ の判断に繋ぎ、
@@ -87,10 +89,11 @@ src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す�
   app/         ブラウザの API に触るもの — assets(画像の読み書き。保存は saveToDisk。宣言を
                決める / 直すのは settle で、md に書くのは main.ts の declare) /
                dnd(落ちたファイルの振り分け。.md は開く、画像はノードの上だけ受ける) /
-               draw(その場で描く窓) / io(File System Access API の窓口) /
-               handles(ハンドルを IndexedDB に置く層) / export(Mindmap を外へ出す) /
+               draw(その場で描く窓) / export(Mindmap を外へ出す) /
+               fsa(File System Access の型の補い。実装は無い) /
                files(帯の Files の行。文書と画像フォルダ) /
-               more(帯の ⋯ の行)。持ち物・ペイン・キー・テーマ・たずねは core/app
+               more(帯の ⋯ の行)。持ち物・ペイン・キー・テーマ・たずね・リンクは core/app、
+               ファイルと札は core/file
 test/   検証 — core に触らない純粋層(camera / geometry / gesture / highlight /
         indicator / panes / share / assets / metrics / head)と、core の出口(coreApi)・
         分類(cards)・配置(layout)・select / caret / keys / label / context / drop /

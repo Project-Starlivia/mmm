@@ -4,6 +4,7 @@
 // ここが知っているのは「何が落ちたか」までで、開く / 置くの中身は呼び出し側。
 
 import type { Failed } from "../coreApi.ts";
+import "./fsa.ts";
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 const MARKDOWN = /\.(md|markdown|txt)$/i;

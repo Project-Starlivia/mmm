@@ -19,6 +19,10 @@ mizchi/js 0.12.2 / moonbitlang/async 0.20.5 のもの。
   `FixedArray`。閉包の引数・返り値としてなら `Array` はそのまま JS の配列
 - **null は `T?` にしない** — `Some(null)` になりうる。JS から来る値は
   `@core.identity_option` で None に、出すときは `@core.from_option` で null に
+- **`T?` が `T | undefined` になるのは数・文字列など unboxed のときだけ。** `#external` や
+  `@core.Any` の `T?` は箱（`None` が `{}` に見える object）で、そのまま JS に渡すと壊れる。
+  JS に置く object（IndexedDB の行・host へ返す値）は `new_object` + `from_option` で組み直す
+  （core/file/handles.mbt の `row_of`。試験で見つけた）
 - **JS の関数は MoonBit の閉包としてそのまま呼べる**。打鍵ごとに何千回も呼ぶものは
   `_call("name", [...])` の名前引きでなく、`_get("name").cast()` で関数そのものを取って
   直に呼ぶ（measure で 5000 ノード +15 ms の差）
