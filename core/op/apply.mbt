@@ -633,18 +633,17 @@ fn shift(n : @tree.Node, by : Int) -> @tree.Node {
 }
 
 ///|
-/// md を読んで、根たちを席に差す。側は捨て、綴りは読んだまま。
-/// 先頭の散文は行き先の親の body 末尾へ（In なら node 自身、根の間なら doc の散文）。
+/// md を読んで形にし、席の綴りで差す。断片が持ち込むのは形（ラベル・中身・子・畳み・
+/// 飛び）だけで、`#` の本数・マーカー・字下げ・先頭の飛びは書き方なので捨てる。
+/// 一番外の段落は行ごとにノード、それ以外の中身は行き先の親の body 末尾へ
+/// （行き先が文書なら断る — 文書の散文はマップに出ない）。
 /// 断片が `##` から始まると parse は根を Implicit で包む（深さ 1 の飛び）。
 /// それは切り出した場所の名残でしかないので剥がし、相対の形で差す。
+/// 決めは docs/superpowers/specs/2026-09-06-paste-design.md
 fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   let sub = @tree.parse(md)
   guard !(sub.roots.is_empty() && sub.body.is_empty()) else { return None }
-  let by = fresh(doc) - (@tree.doc_id + 1)
-  let prose = sub.body.map(b => {
-    ({ id: b.id + by, content: b.content } : @tree.Block)
-  })
-  let subs = peel(sub.roots.map(r => r.node)).map(n => shift(n, by))
+  guard sign_at(doc, at) is Some(sign) else { return None }
   let host = match at {
     In(node~, ..) => node
     _ => {
@@ -652,17 +651,42 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
       p
     }
   }
+  // 一番外の中身を、行のノードになる段落と、body へ行く中身に分ける
+  let labels : Array[String] = []
+  let rest : Array[@tree.Block] = []
+  for b in sub.body {
+    let ls = match b.content {
+      Opaque(text) => @tree.lines(text)
+      _ => None
+    }
+    match ls {
+      Some(ls) => labels.append(ls)
+      None => rest.push(b)
+    }
+  }
+  // 行のノードは文書に無い番号から、断片の id はその先へ寄せる
+  let first = fresh(doc)
+  let by = first + labels.length() - (@tree.doc_id + 1)
+  let heads = labels.mapi((k, label) => make(sign, first + k, label))
+  let prose = rest.map(b => {
+    ({ id: b.id + by, content: b.content } : @tree.Block)
+  })
+  let subs = peel(sub.roots.map(r => r.node)).map(n => {
+    respell(shift(n, by), sign)
+  })
+  let nodes = [..heads, ..subs]
   let mut cur = doc
   if !prose.is_empty() {
+    guard host != @tree.doc_id else { return None }
     guard body(cur, node=host, bs => [..bs, ..prose]) is Some(d) else {
       return None
     }
     cur = d
   }
-  if subs.is_empty() {
-    return Some({ doc: cur, focus: None })
+  if nodes.is_empty() {
+    return Some({ doc: cur, focus: Some(prose[0].id) })
   }
-  done(place(cur, at, subs), Some(id_of(subs[0])))
+  done(place(cur, at, nodes), Some(id_of(nodes[0])))
 }
 
 ///|

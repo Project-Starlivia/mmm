@@ -954,8 +954,56 @@ test "Graft は断片の先頭の Implicit を剥がして差す。途中の飛�
 }
 
 ///|
-test "Graft は根の間にも差せる。先頭の散文は行き先の親の body 末尾へ" {
+/// 断片の一番外の段落は行ごとにノード、それ以外の中身は行き先の親の body の末尾。
+/// 文書（anchor 無し）へ中身は断る — 文書の散文はマップに出ない。
+test "Graft の一番外 — 段落は行ごとにノード、中身は親の body、文書へ中身は None" {
   let d = doc([root(h(2, "r", body=[pic(3)]))])
+  // 根の隣に段落 2 行 → 最後の根に従って見出しの根 2 つ
+  assert_eq(
+    run(d, Graft(at=NodePlace::After(node=2), md="text\nmore\n")),
+    Some({
+      doc: doc([
+        root(h(2, "r", body=[pic(3)])),
+        root(h(4, "text")),
+        root(h(5, "more")),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  // 中身 1 枚は親の body の末尾。focus はその中身
+  assert_eq(
+    run(d, Graft(at=NodePlace::In(node=2, side=None), md="![](q.png)\n")),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", body=[
+            pic(3),
+            { id: 4, content: Image(alt="", src="q.png", title="") },
+          ]),
+        ),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  // URL 1 行は読みがリンクと読むので中身（特別扱いは無い）
+  assert_eq(
+    run(d, Graft(at=NodePlace::In(node=2, side=None), md="https://x\n")),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", body=[
+            pic(3),
+            {
+              id: 4,
+              content: Link(text="https://x", href="https://x", title=""),
+            },
+          ]),
+        ),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  // 文書へ中身は断る
   assert_eq(
     run(
       d,
@@ -964,35 +1012,104 @@ test "Graft は根の間にも差せる。先頭の散文は行き先の親の b
         md="![](q.png)\n\n# s\n",
       ),
     ),
-    Some({
-      doc: doc([root(h(2, "r", body=[pic(3)])), root(h(5, "s"))], body=[
-        { id: 4, content: Image(alt="", src="q.png", title="") },
-      ]),
-      focus: Some(5),
-    }),
+    None,
   )
+  // 混ざった断片 — 一番外の段落はノード、見出しの下の中身はその見出しのまま
   assert_eq(
-    run(d, Graft(at=NodePlace::After(node=2), md="text\n")),
+    run(
+      d,
+      Graft(
+        at=NodePlace::In(node=2, side=None),
+        md="intro\n\n# a\n\n![](p.png)\n\n- b\n",
+      ),
+    ),
     Some({
-      doc: doc([root(h(2, "r", body=[pic(3)]))], body=[
-        { id: 4, content: Opaque("text") },
+      doc: doc([
+        root(
+          h(2, "r", body=[pic(3)], children=[
+            h(4, "intro"),
+            h(6, "a", body=[pic(7)], children=[h(8, "b")]),
+          ]),
+          sides=[Right, Right],
+        ),
       ]),
-      focus: None,
+      focus: Some(4),
     }),
   )
 }
 
 ///|
-test "Graft は空・知らない id・項目の下に見出し、に None" {
+/// 断片が持ち込むのは形だけ。綴りは席が決める（`sign_at`）。
+test "Graft は席の綴りで差す — 見出しの列では見出し、項目の列では項目" {
+  // 子が見出しの見出しへ項目 — 見出しの直後の項目は飲み込まれるので、綴り替えないと書けない
+  let d = doc([root(h(2, "r", children=[h(3, "a")]), sides=[Right])])
+  assert_eq(
+    run(d, Graft(at=NodePlace::In(node=2, side=None), md="- b\n  - c\n")),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(3, "a"), h(4, "b", children=[h(5, "c")])]), sides=[
+          Right,
+          Right,
+        ]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  // 子が項目の見出しへ見出し（`##` 始まりの飛びは剥がす。Implicit の id 1 つが飛ぶ）
+  let e = doc([root(h(2, "r", children=[item(3, "a")]), sides=[Right])])
+  assert_eq(
+    run(e, Graft(at=NodePlace::In(node=2, side=None), md="## b\n\n- c\n")),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[item(3, "a"), item(5, "b", children=[li(6, "c")])]),
+          sides=[Right, Right],
+        ),
+      ]),
+      focus: Some(5),
+    }),
+  )
+  // 子の無い見出しへ項目 — 隣がいないので親に従い見出し（Tab と同じ答え）
+  let f = doc([root(h(2, "r"))])
+  assert_eq(
+    run(f, Graft(at=NodePlace::In(node=2, side=None), md="- b\n")),
+    Some({
+      doc: doc([root(h(2, "r", children=[h(3, "b")]), sides=[Right])]),
+      focus: Some(3),
+    }),
+  )
+  // 根が見出しの文書へ項目 — 最後の根に従って見出しの根
+  assert_eq(
+    run(f, Graft(at=NodePlace::In(node=@tree.doc_id, side=None), md="- b\n")),
+    Some({ doc: doc([root(h(2, "r")), root(h(3, "b"))]), focus: Some(3) }),
+  )
+}
+
+///|
+test "Graft は空・知らない id に None。項目の下の見出しは項目になる" {
   let d = doc([root(h(2, "r", children=[item(3, "a")]), sides=[Right])])
   assert_eq(run(d, Graft(at=NodePlace::In(node=2, side=None), md="")), None)
+  assert_eq(
+    run(d, Graft(at=NodePlace::In(node=2, side=None), md="  \n\n")),
+    None,
+  )
   assert_eq(
     run(d, Graft(at=NodePlace::In(node=9, side=None), md="# p\n")),
     None,
   )
   assert_eq(
-    run(d, Graft(at=NodePlace::In(node=3, side=None), md="# p\n")),
-    None,
+    run(d, Graft(at=NodePlace::In(node=3, side=None), md="# p\n\n## q\n")),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            item(3, "a", children=[li(4, "p", children=[li(5, "q")])]),
+          ]),
+          sides=[Right],
+        ),
+      ]),
+      focus: Some(4),
+    }),
   )
 }
 
@@ -1144,6 +1261,6 @@ test "apply の結果は check を通る" {
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="308")
+  inspect(some, content="338")
   json_inspect(bad, content=[])
 }
