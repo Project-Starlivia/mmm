@@ -211,13 +211,15 @@ fn delete(doc : @tree.Doc, ids : Array[Int]) -> Done? {
     guard erase(cur, id) is Some(d) else { return None }
     cur = d
   }
+  // 子が尽きた Implicit を選ばないように、掃除してから選ぶ
+  guard mend(cur) is Some(swept) else { return None }
   let mut focus = None
   for w in wants {
-    if focus is None && has(cur, w) {
+    if focus is None && has(swept, w) {
       focus = Some(w)
     }
   }
-  Some({ doc: cur, focus })
+  Some({ doc: swept, focus })
 }
 
 ///|
