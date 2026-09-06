@@ -816,3 +816,32 @@ test "項目の中の見出しは、書き戻せば入れ子の項目" {
     content="- x\n  - n\n    - s\n",
   )
 }
+
+///|
+/// #93 — 題は原文のまま置く。逃がしは打つ人の仕事で、mmm は足しも引きもしない
+test "Link の題はそのまま — 逃がしを足さず、消さない" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("a", body=[
+            Link(text="\\[WIP\\] design", href="https://e.com/x", title=""),
+          ]),
+        ),
+      ]),
+    ),
+    content="# a\n\n[\\[WIP\\] design](https://e.com/x)\n",
+  )
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("a", body=[
+            Link(text="[WIP] design", href="https://e.com/x", title=""),
+          ]),
+        ),
+      ]),
+    ),
+    content="# a\n\n[[WIP] design](https://e.com/x)\n",
+  )
+}

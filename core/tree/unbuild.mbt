@@ -209,7 +209,9 @@ fn content(u : Unbuild, out : Array[@markdown.Block], b : Block) -> Unit {
       out.push(paragraph([Image(alt~, url=src, title~, span=nowhere)]))
     Link(text~, href~, title~) =>
       out.push(
-        paragraph([Link(children=inlines(text), url=href, title~, span=nowhere)]),
+        paragraph([
+          Link(children=[verbatim_inline(text)], url=href, title~, span=nowhere),
+        ]),
       )
     Code(info~, text~) =>
       out.push(
@@ -246,11 +248,6 @@ fn splice(u : Unbuild, out : Array[@markdown.Block], text : String) -> Unit {
 }
 
 ///|
-fn inlines(text : String) -> Array[@markdown.Inline] {
-  @markdown.parse_inlines(text)
-}
-
-///|
 /// 見出しの行。**名前は md の 1 行の原文**なので、ライブラリに読み直させず
 /// 生の行として渡す（`HtmlBlock` は中身を逃がさずそのまま書く）。
 /// 空の名前は `##` だけ（Implicit を綴った空の見出しと同じ）。
@@ -260,7 +257,7 @@ fn heading(level : Int, label : String) -> @markdown.Block {
 }
 
 ///|
-/// 項目の名前。生の字として段落に置く（逃がさない）。
+/// 項目の名前と Link の題。生の字として段落に置く（逃がさない）。
 fn verbatim_inline(text : String) -> @markdown.Inline {
   HtmlInline(html=text, span=nowhere)
 }
