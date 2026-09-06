@@ -17,7 +17,7 @@ fn change(doc : Doc, root : Int, path : Array[Int], f : (Node) -> Node) -> Doc {
       Right
     }
   })
-  roots[root] = { node, sides }
+  roots[root] = { node, sides, }
   { ..doc, roots, }
 }
 
@@ -31,12 +31,12 @@ fn rewrite(x : Node, path : Array[Int], k : Int, f : (Node) -> Node) -> Node {
     HeadingNode(h) => {
       let kids = h.children.copy()
       kids[i] = rewrite(kids[i], path, k + 1, f)
-      HeadingNode({ ..h, children: kids })
+      HeadingNode({ ..h, children: kids, })
     }
     ImplicitNode(g) => {
       let kids = g.children.copy()
       kids[i] = rewrite(kids[i], path, k + 1, f)
-      ImplicitNode({ ..g, children: kids })
+      ImplicitNode({ ..g, children: kids, })
     }
     ListNode(l) => {
       let kids = l.children.copy()
@@ -44,7 +44,7 @@ fn rewrite(x : Node, path : Array[Int], k : Int, f : (Node) -> Node) -> Node {
         ListNode(c) => c
         _ => abort("項目の子は項目")
       }
-      ListNode({ ..l, children: kids })
+      ListNode({ ..l, children: kids, })
     }
   }
 }
@@ -64,13 +64,13 @@ fn relabel(label : String) -> (Node) -> Node {
 fn adopt(kid : Node) -> (Node) -> Node {
   x => {
     match x {
-      HeadingNode(h) => HeadingNode({ ..h, children: h.children + [kid] })
+      HeadingNode(h) => HeadingNode({ ..h, children: h.children + [kid], })
       ListNode(l) =>
         match kid {
-          ListNode(c) => ListNode({ ..l, children: l.children + [c] })
+          ListNode(c) => ListNode({ ..l, children: l.children + [c], })
           _ => abort("項目の子は項目")
         }
-      ImplicitNode(g) => ImplicitNode({ ..g, children: g.children + [kid] })
+      ImplicitNode(g) => ImplicitNode({ ..g, children: g.children + [kid], })
     }
   }
 }
@@ -78,15 +78,15 @@ fn adopt(kid : Node) -> (Node) -> Node {
 ///|
 fn orphan(x : Node) -> Node {
   match x {
-    HeadingNode(h) => HeadingNode({ ..h, children: [] })
-    ListNode(l) => ListNode({ ..l, children: [] })
-    ImplicitNode(g) => ImplicitNode({ ..g, children: [] })
+    HeadingNode(h) => HeadingNode({ ..h, children: [], })
+    ListNode(l) => ListNode({ ..l, children: [], })
+    ImplicitNode(g) => ImplicitNode({ ..g, children: [], })
   }
 }
 
 ///|
 fn fresh(label : String) -> Node {
-  HeadingNode({ id: 99, label, fold: None, body: [], children: [] })
+  HeadingNode({ id: 99, label, fold: None, body: [], children: [], })
 }
 
 ///|
@@ -112,7 +112,7 @@ test "中身を足せば、そのノードの地番" {
   let (before, spans) = survey(md)
   let after = change(before, 0, [0], x => {
     match x {
-      HeadingNode(h) => HeadingNode({ ..h, body: blocks([Opaque("x")]) })
+      HeadingNode(h) => HeadingNode({ ..h, body: blocks([Opaque("x")]), })
       other => other
     }
   })
@@ -158,7 +158,7 @@ test "頭に差せば次に残る子の手前" {
   let after = change(before, 0, [], x => {
     match x {
       HeadingNode(h) =>
-        HeadingNode({ ..h, children: [fresh("c")] + h.children })
+        HeadingNode({ ..h, children: [fresh("c")] + h.children, })
       other => other
     }
   })
@@ -173,7 +173,7 @@ test "消えた子は範囲ごと消える" {
   let (before, spans) = survey(md)
   let after = change(before, 0, [], x => {
     match x {
-      HeadingNode(h) => HeadingNode({ ..h, children: [h.children[0]] })
+      HeadingNode(h) => HeadingNode({ ..h, children: [h.children[0]], })
       other => other
     }
   })
@@ -188,7 +188,7 @@ test "並べ替えは容器ごと" {
   let (before, spans) = survey(md)
   let after = change(before, 0, [], x => {
     match x {
-      HeadingNode(h) => HeadingNode({ ..h, children: h.children.rev() })
+      HeadingNode(h) => HeadingNode({ ..h, children: h.children.rev(), })
       other => other
     }
   })
@@ -238,7 +238,7 @@ test "入れ子の項目の手前に差せば、後ろに字下げを戻す" {
     match x {
       ListNode(l) =>
         match z {
-          ListNode(c) => ListNode({ ..l, children: [c] + l.children })
+          ListNode(c) => ListNode({ ..l, children: [c] + l.children, })
           _ => abort("項目")
         }
       other => other
@@ -265,7 +265,7 @@ test "入れ子の項目が消えれば字下げも道連れ" {
   let (before, spans) = survey(md)
   let after = change(before, 0, [], x => {
     match x {
-      ListNode(l) => ListNode({ ..l, children: [l.children[1]] })
+      ListNode(l) => ListNode({ ..l, children: [l.children[1]], })
       other => other
     }
   })
@@ -280,7 +280,7 @@ test "側の在る根に子を足せば根が丸ごと" {
   let (before, spans) = survey(md)
   let roots = before.roots.copy()
   let r = roots[0]
-  roots[0] = { node: adopt(fresh("c"))(r.node), sides: r.sides + [Right] }
+  roots[0] = { node: adopt(fresh("c"))(r.node), sides: r.sides + [Right], }
   let after : Doc = { ..before, roots, }
   json_inspect(merge(md, before, spans, after), content=[
     {
@@ -320,7 +320,7 @@ test "側が変われば根が丸ごと" {
   let md = "# r\n\n## a\n\n## b\n"
   let (before, spans) = survey(md)
   let roots = before.roots.copy()
-  roots[0] = { node: roots[0].node, sides: [Right, Left] }
+  roots[0] = { node: roots[0].node, sides: [Right, Left], }
   let after : Doc = { ..before, roots, }
   json_inspect(merge(md, before, spans, after), content=[
     { "from": 0, "to": 16, "insert": "# r\n\n## a\n\n---\n\n## b\n" },
@@ -373,7 +373,7 @@ test "入れ子の項目の子は、容器の中身の桁に差す" {
 test "散文" {
   let md = "hello\n\n# a\n"
   let (before, spans) = survey(md)
-  let after : Doc = { ..before, body: blocks([Opaque("bye")]) }
+  let after : Doc = { ..before, body: blocks([Opaque("bye")]), }
   json_inspect(merge(md, before, spans, after), content=[
     { "from": 0, "to": 6, "insert": "bye\n" },
   ])
@@ -385,7 +385,7 @@ test "根も同じ — 増えれば隣に差す" {
   let (before, spans) = survey(md)
   let after : Doc = {
     ..before,
-    roots: before.roots + [{ node: fresh("b"), sides: [] }],
+    roots: before.roots + [{ node: fresh("b"), sides: [], }],
   }
   json_inspect(merge(md, before, spans, after), content=[
     { "from": 4, "to": 4, "insert": "\n# b\n" },
@@ -396,7 +396,7 @@ test "根も同じ — 増えれば隣に差す" {
 test "根が消えれば範囲ごと消える" {
   let md = "# a\n\n# b\n"
   let (before, spans) = survey(md)
-  let after : Doc = { ..before, roots: [before.roots[0]] }
+  let after : Doc = { ..before, roots: [before.roots[0]], }
   json_inspect(merge(md, before, spans, after), content=[
     { "from": 4, "to": 9, "insert": "" },
   ])
@@ -406,7 +406,7 @@ test "根が消えれば範囲ごと消える" {
 test "根が無い文書に最初の根を差す" {
   let md = "hello\n"
   let (before, spans) = survey(md)
-  let after : Doc = { ..before, roots: [{ node: fresh("b"), sides: [] }] }
+  let after : Doc = { ..before, roots: [{ node: fresh("b"), sides: [], }], }
   json_inspect(merge(md, before, spans, after), content=[
     { "from": 6, "to": 6, "insert": "\n# b\n" },
   ])
@@ -510,7 +510,7 @@ test "中身を置き換えれば、その範囲だけ" {
     before,
     0,
     [0],
-    rebody([{ id: body_of(a)[0].id, content: Opaque("bye") }]),
+    rebody([{ id: body_of(a)[0].id, content: Opaque("bye"), }]),
   )
   json_inspect(merge(md, before, spans, after), content=[
     { "from": 11, "to": 17, "insert": "bye\n" },
@@ -527,7 +527,7 @@ test "消える子は手前の隙間を道連れ" {
         HeadingNode(h) => {
           let kids = h.children.copy()
           let _ = kids.remove(i)
-          HeadingNode({ ..h, children: kids })
+          HeadingNode({ ..h, children: kids, })
         }
         other => other
       }
@@ -559,11 +559,11 @@ test "増える子は正規形の隙間を連れてくる — 兄弟の後ろに
 test "詰まった項目の列は詰まったまま" {
   let md = "- a\n- b\n"
   let (before, spans) = survey(md)
-  let kid = ListNode({ id: 99, label: "c", fold: None, body: [], children: [] })
+  let kid = ListNode({ id: 99, label: "c", fold: None, body: [], children: [], })
   let grown = merge(md, before, spans, change(before, 0, [], adopt(kid)))
   json_inspect(grown, content=[{ "from": 4, "to": 4, "insert": "  - c\n" }])
   inspect(apply(md, grown), content="- a\n  - c\n- b\n")
-  let after : Doc = { ..before, roots: [before.roots[0]] }
+  let after : Doc = { ..before, roots: [before.roots[0]], }
   let cut = merge(md, before, spans, after)
   json_inspect(cut, content=[{ "from": 4, "to": 8, "insert": "" }])
 }
@@ -593,14 +593,14 @@ test "文書の頭の散文 — 隙間は後ろに付く" {
     body: blocks([Opaque("bye")]),
   })
   inspect(apply(md, swapped), content="bye\n\n# a\n")
-  let gone = merge(md, before, spans, { ..before, body: [] })
+  let gone = merge(md, before, spans, { ..before, body: [], })
   inspect(apply(md, gone), content="# a\n")
   let bare = "# a\n"
   let (b2, s2) = survey(bare)
-  let born = merge(bare, b2, s2, { ..b2, body: blocks([Opaque("bye")]) })
+  let born = merge(bare, b2, s2, { ..b2, body: blocks([Opaque("bye")]), })
   inspect(apply(bare, born), content="bye\n\n# a\n")
   let (b3, s3) = survey("")
-  let first = merge("", b3, s3, { ..b3, body: blocks([Opaque("bye")]) })
+  let first = merge("", b3, s3, { ..b3, body: blocks([Opaque("bye")]), })
   inspect(apply("", first), content="bye\n")
 }
 
@@ -609,11 +609,11 @@ test "文書の頭の中身を並べ替えても、頭に空行は生まれな�
   let md = "aaa\n\nbbb\n\n# h\n"
   let (before, spans) = survey(md)
   let bs = before.body
-  let edits = merge(md, before, spans, { ..before, body: [bs[1], bs[0]] })
+  let edits = merge(md, before, spans, { ..before, body: [bs[1], bs[0]], })
   inspect(apply(md, edits), content="bbb\n\naaa\n\n# h\n")
   let solo = "p1\n\np2\n"
   let (b2, s2) = survey(solo)
-  let e2 = merge(solo, b2, s2, { ..b2, body: [b2.body[1], b2.body[0]] })
+  let e2 = merge(solo, b2, s2, { ..b2, body: [b2.body[1], b2.body[0]], })
   inspect(apply(solo, e2), content="p2\n\np1\n")
 }
 
@@ -643,7 +643,7 @@ test "改行の無い末尾のノードを外へ出しても、空行は 1 つ" 
   let a = children_of(r)[0]
   let after : Doc = {
     ..before,
-    roots: [{ node: with_children(r, []), sides: [] }, { node: a, sides: [] }],
+    roots: [{ node: with_children(r, []), sides: [], }, { node: a, sides: [], }],
   }
   let edits = merge(md, before, spans, after)
   inspect(apply(md, edits), content="# r\n\n# a\n\nhello\n")
@@ -684,7 +684,13 @@ test "列の頭の境目は列のもの — 頭を消しても差しても、境
     change(b1, 0, [], x => with_children(x, [kids1[1]])),
   )
   inspect(apply(tight, cut), content="# r\n- b\n")
-  let item = ListNode({ id: 99, label: "z", fold: None, body: [], children: [] })
+  let item = ListNode({
+    id: 99,
+    label: "z",
+    fold: None,
+    body: [],
+    children: [],
+  })
   let born = merge(
     tight,
     b1,
@@ -708,12 +714,12 @@ test "列の頭の境目は列のもの — 頭を消しても差しても、境
 test "frontmatter の直後の空行は、頭の要素を触っても消えない" {
   let md = "---\nk: v\n---\n\n# a\n\n# b\n"
   let (before, spans) = survey(md)
-  let less : Doc = { ..before, roots: [before.roots[1]] }
+  let less : Doc = { ..before, roots: [before.roots[1]], }
   inspect(
     apply(md, merge(md, before, spans, less)),
     content="---\nk: v\n---\n\n# b\n",
   )
-  let prose : Doc = { ..before, body: blocks([Opaque("x")]) }
+  let prose : Doc = { ..before, body: blocks([Opaque("x")]), }
   inspect(
     apply(md, merge(md, before, spans, prose)),
     content="---\nk: v\n---\n\nx\n\n# a\n\n# b\n",
@@ -721,7 +727,7 @@ test "frontmatter の直後の空行は、頭の要素を触っても消えな�
   let said = "---\nk: v\n---\n\nhello\n\n# a\n"
   let (b2, s2) = survey(said)
   inspect(
-    apply(said, merge(said, b2, s2, { ..b2, body: [] })),
+    apply(said, merge(said, b2, s2, { ..b2, body: [], })),
     content="---\nk: v\n---\n\n# a\n",
   )
 }
@@ -739,9 +745,9 @@ test "空行の後に詰めて書いた列の頭を包んでも、その空行�
   let md = "# r\n\n- a\n- b\n"
   let (before, spans) = survey(md)
   let kids = children_of(before.roots[0].node)
-  let w = ListNode({ id: 99, label: "w", fold: None, body: [], children: [] })
+  let w = ListNode({ id: 99, label: "w", fold: None, body: [], children: [], })
   let wrapped = with_children(
-    ListNode({ id: 99, label: "w", fold: None, body: [], children: [] }),
+    ListNode({ id: 99, label: "w", fold: None, body: [], children: [], }),
     [kids[0]],
   )
   ignore(w)
@@ -753,7 +759,7 @@ test "空行の後に詰めて書いた列の頭を包んでも、その空行�
   let loose = "# r\n\n- a\n\n- b\n"
   let (b2, s2) = survey(loose)
   let k2 = children_of(b2.roots[0].node)
-  let z = ListNode({ id: 98, label: "z", fold: None, body: [], children: [] })
+  let z = ListNode({ id: 98, label: "z", fold: None, body: [], children: [], })
   inspect(
     apply(
       loose,
@@ -770,7 +776,7 @@ test "散文を消しながら根の頭に差しても、文書の頭に空行�
   let after : Doc = {
     ..before,
     body: [],
-    roots: [{ node: fresh("z"), sides: [] }] + before.roots,
+    roots: [{ node: fresh("z"), sides: [], }] + before.roots,
   }
   inspect(apply(md, merge(md, before, spans, after)), content="# z\n\n# a\n")
 }

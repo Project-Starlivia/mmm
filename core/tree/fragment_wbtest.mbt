@@ -46,7 +46,7 @@ test "Implicit は子だけを書き、側は水平線" {
 test "畳みは部分木ごと包む" {
   inspect(
     fragment(
-      h("a", children=[h("b")], fold=Some({ open: false, summary: None })),
+      h("a", children=[h("b")], fold=Some({ open: false, summary: None, })),
       2,
       [],
       Lf,

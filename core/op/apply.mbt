@@ -12,7 +12,7 @@
 pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
   guard attempt(doc, op) is Some(d) else { return None }
   guard mend(cap(d.doc)) is Some(doc) else { return None }
-  Some({ doc, focus: d.focus.filter(f => has(doc, f)) })
+  Some({ doc, focus: d.focus.filter(f => has(doc, f)), })
 }
 
 ///|
@@ -90,9 +90,9 @@ fn cap(doc : @tree.Doc) -> @tree.Doc {
 
     match n {
       HeadingNode(h) if depth <= @tree.deepest =>
-        out.push(@tree.HeadingNode({ ..h, children: under(h.children) }))
+        out.push(@tree.HeadingNode({ ..h, children: under(h.children), }))
       ImplicitNode(g) if depth <= @tree.deepest =>
-        out.push(@tree.ImplicitNode({ ..g, children: under(g.children) }))
+        out.push(@tree.ImplicitNode({ ..g, children: under(g.children), }))
       ListNode(_) => out.push(n)
       _ => out.push(respell(n, Item))
     }
@@ -104,7 +104,7 @@ fn cap(doc : @tree.Doc) -> @tree.Doc {
     roots: doc.roots.map(r => {
       let out = []
       node(r.node, 1, out)
-      { ..r, node: out[0] }
+      { ..r, node: out[0], }
     }),
   }
 }
@@ -188,7 +188,7 @@ fn attempt(doc : @tree.Doc, op : Op) -> Done? {
 /// 道具の結果を Done に包む。
 fn done(doc : @tree.Doc?, focus : Int?) -> Done? {
   match doc {
-    Some(d) => Some({ doc: d, focus })
+    Some(d) => Some({ doc: d, focus, })
     None => None
   }
 }
@@ -211,7 +211,7 @@ fn rename(doc : @tree.Doc, id : Int, label : String) -> Done? {
 fn fold(doc : @tree.Doc, id : Int, open : Bool) -> Done? {
   guard find(doc, id) is Some(n) else { return None }
   fn folding(label : String) -> @tree.Fold {
-    { open, summary: if @tree.writable(label) { Some(label) } else { None } }
+    { open, summary: if @tree.writable(label) { Some(label) } else { None }, }
   }
 
   fn next(fold : @tree.Fold?, label : String) -> @tree.Fold {
@@ -223,8 +223,8 @@ fn fold(doc : @tree.Doc, id : Int, open : Bool) -> Done? {
 
   let m = match n {
     HeadingNode(h) =>
-      @tree.HeadingNode({ ..h, fold: Some(next(h.fold, h.label)) })
-    ListNode(l) => @tree.ListNode({ ..l, fold: Some(next(l.fold, l.label)) })
+      @tree.HeadingNode({ ..h, fold: Some(next(h.fold, h.label)), })
+    ListNode(l) => @tree.ListNode({ ..l, fold: Some(next(l.fold, l.label)), })
     ImplicitNode(g) => {
       guard splice(doc, id, _ => [spell(g, "")]) is Some(d) else { return None }
       return fold(d, id, open)
@@ -240,11 +240,11 @@ fn unfold(doc : @tree.Doc, id : Int) -> Done? {
   let m = match n {
     HeadingNode(h) => {
       guard h.fold is Some(_) else { return None }
-      @tree.HeadingNode({ ..h, fold: None })
+      @tree.HeadingNode({ ..h, fold: None, })
     }
     ListNode(l) => {
       guard l.fold is Some(_) else { return None }
-      @tree.ListNode({ ..l, fold: None })
+      @tree.ListNode({ ..l, fold: None, })
     }
     ImplicitNode(_) => return None
   }
@@ -309,7 +309,7 @@ fn delete(doc : @tree.Doc, ids : Array[Int]) -> Done? {
       focus = Some(w)
     }
   }
-  Some({ doc: swept, focus })
+  Some({ doc: swept, focus, })
 }
 
 ///|
@@ -317,8 +317,8 @@ fn delete(doc : @tree.Doc, ids : Array[Int]) -> Done? {
 fn make(sign : @tree.Sign, id : Int, label : String) -> @tree.Node {
   match sign {
     Heading =>
-      @tree.HeadingNode({ id, label, fold: None, body: [], children: [] })
-    Item => @tree.ListNode({ id, label, fold: None, body: [], children: [] })
+      @tree.HeadingNode({ id, label, fold: None, body: [], children: [], })
+    Item => @tree.ListNode({ id, label, fold: None, body: [], children: [], })
   }
 }
 
@@ -389,9 +389,9 @@ fn wrap(doc : @tree.Doc, id : Int, label : String) -> Done? {
   let nid = fresh(doc)
   let w = match n {
     ListNode(l) =>
-      @tree.ListNode({ id: nid, label, fold: None, body: [], children: [l] })
+      @tree.ListNode({ id: nid, label, fold: None, body: [], children: [l], })
     _ =>
-      @tree.HeadingNode({ id: nid, label, fold: None, body: [], children: [n] })
+      @tree.HeadingNode({ id: nid, label, fold: None, body: [], children: [n], })
   }
   done(splice(doc, id, _ => [w]), Some(nid))
 }
@@ -471,14 +471,14 @@ fn flip(doc : @tree.Doc, id : Int) -> Done? {
 
   match path.length() {
     1 => {
-      roots[path[0]] = { ..r, sides: r.sides.map(flipped) }
-      Some({ doc: { ..doc, roots, }, focus: Some(id) })
+      roots[path[0]] = { ..r, sides: r.sides.map(flipped), }
+      Some({ doc: { ..doc, roots, }, focus: Some(id), })
     }
     2 => {
       let sides = r.sides.copy()
       sides[path[1]] = flipped(side_at(path[1]))
       roots[path[0]] = { ..r, sides, }
-      Some({ doc: { ..doc, roots, }, focus: Some(id) })
+      Some({ doc: { ..doc, roots, }, focus: Some(id), })
     }
     depth => {
       let side = flipped(side_at(path[1]))
@@ -489,7 +489,7 @@ fn flip(doc : @tree.Doc, id : Int) -> Done? {
       // 項目は相対記法で深さを持たないので、飛びを綴れない。直に深さ 2 へ
       if !(wrapped is ListNode(_)) {
         for _ in 0..<(depth - 2) {
-          wrapped = @tree.ImplicitNode({ id: next, children: [wrapped] })
+          wrapped = @tree.ImplicitNode({ id: next, children: [wrapped], })
           next = next + 1
         }
       }
@@ -547,7 +547,7 @@ fn add_block(
   content : @tree.Content,
 ) -> Done? {
   guard holder(doc, at) is Some(o) else { return None }
-  let b : @tree.Block = { id: fresh(doc), content }
+  let b : @tree.Block = { id: fresh(doc), content, }
   done(body(doc, node=o, bs => put(bs, at, [b])), Some(b.id))
 }
 
@@ -556,7 +556,7 @@ fn set_block(doc : @tree.Doc, id : Int, content : @tree.Content) -> Done? {
   guard owner(doc, block=id) is Some(o) else { return None }
   done(
     body(doc, node=o, bs => {
-      bs.map(b => if b.id == id { { id, content } } else { b })
+      bs.map(b => if b.id == id { { id, content, } } else { b })
     }),
     Some(id),
   )
@@ -609,11 +609,16 @@ fn anchor_block(at : BlockPlace) -> Int {
 /// 部分木の id をまとめてずらす。parse が振った番号を、いまの木に無い番号へ。
 fn shift(n : @tree.Node, by : Int) -> @tree.Node {
   fn blocks(bs : Array[@tree.Block]) -> Array[@tree.Block] {
-    bs.map(b => { id: b.id + by, content: b.content })
+    bs.map(b => { id: b.id + by, content: b.content, })
   }
 
   fn list(l : @tree.ListNode) -> @tree.ListNode {
-    { ..l, id: l.id + by, body: blocks(l.body), children: l.children.map(list) }
+    {
+      ..l,
+      id: l.id + by,
+      body: blocks(l.body),
+      children: l.children.map(list),
+    }
   }
 
   match n {
@@ -670,7 +675,7 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   let by = first + labels.length() - (@tree.doc_id + 1)
   let heads = labels.mapi((k, label) => make(sign, first + k, label))
   let prose = rest.map(b => {
-    ({ id: b.id + by, content: b.content } : @tree.Block)
+    ({ id: b.id + by, content: b.content, } : @tree.Block)
   })
   let subs = peel(sub.roots.map(r => r.node)).map(n => {
     respell(shift(n, by), sign)
@@ -685,7 +690,7 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
     cur = d
   }
   if nodes.is_empty() {
-    return Some({ doc: cur, focus: Some(prose[0].id) })
+    return Some({ doc: cur, focus: Some(prose[0].id), })
   }
   done(place(cur, at, nodes), Some(id_of(nodes[0])))
 }

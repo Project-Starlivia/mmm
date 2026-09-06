@@ -64,10 +64,10 @@ pub fn check(doc : Doc) -> Array[Flaw] {
 
   // 中身の尻に水平線があれば、次の骨格の行で境界に読まれる。
   // 項目の中の水平線は中身なので保留しない
-  let border : Ref[Int?] = { val: None }
+  let border : Ref[Int?] = { val: None, }
   fn trailing(bs : Array[Block]) -> Int? {
     match bs.last() {
-      Some({ id, content: ThematicBreak }) => Some(id)
+      Some({ id, content: ThematicBreak, }) => Some(id)
       _ => None
     }
   }
