@@ -1,8 +1,10 @@
 // 書きの道具。id の席を f の返した列に置き換え、根までの道を組み直す。
 //
-// **check の書き込み版。** 読む側で check が見張る 3 つの約束（項目の子は項目 /
-// Implicit は子を持つ / sides は根の子と並走）を、書く側で破らないように組む
-// 唯一の場所。f は「どうしたいか」だけを言い、できるかは席を知るここが決める。
+// **check の書き込み版。** 読む側で check が見張る 2 つの約束（項目の子は項目 /
+// sides は根の子と並走）を、書く側で破らないように組む唯一の場所。f は
+// 「どうしたいか」だけを言い、できるかは席を知るここが決める。
+// 子が尽きた Implicit は残す — 抜いてから差す操作の途中で席が消えないように。
+// 掃除は門（mend）の仕事。
 
 ///|
 /// 1 回の置き換え。歩きながら「席が見つかったか」「席の型に合わなかったか」を残す。
@@ -30,10 +32,7 @@ fn splice(
         roots.push({ node: y, sides: sides_for(y, r) })
       }
     } else {
-      match rebuild_root(s, r) {
-        Some(x) => roots.push(x)
-        None => ()
-      }
+      roots.push(rebuild_root(s, r))
     }
   }
   if !s.hit || s.bad {
@@ -56,8 +55,8 @@ fn sides_for(y : @tree.Node, old : @tree.Root) -> Array[@tree.Side] {
 }
 
 ///|
-/// 根 1 本。子の列と sides を並走して組み直す。Implicit の子が尽きたら None。
-fn rebuild_root(s : Splice, r : @tree.Root) -> @tree.Root? {
+/// 根 1 本。子の列と sides を並走して組み直す。
+fn rebuild_root(s : Splice, r : @tree.Root) -> @tree.Root {
   match r.node {
     HeadingNode(h) => {
       let (children, sides) = rebuild_root_heading_children(
@@ -65,7 +64,7 @@ fn rebuild_root(s : Splice, r : @tree.Root) -> @tree.Root? {
         h.children,
         r.sides,
       )
-      Some({ node: HeadingNode({ ..h, children, }), sides })
+      { node: HeadingNode({ ..h, children, }), sides }
     }
     ImplicitNode(g) => {
       let (children, sides) = rebuild_root_heading_children(
@@ -73,15 +72,11 @@ fn rebuild_root(s : Splice, r : @tree.Root) -> @tree.Root? {
         g.children,
         r.sides,
       )
-      if children.is_empty() {
-        None
-      } else {
-        Some({ node: ImplicitNode({ ..g, children, }), sides })
-      }
+      { node: ImplicitNode({ ..g, children, }), sides }
     }
     ListNode(l) => {
       let (children, sides) = rebuild_root_item_children(s, l.children, r.sides)
-      Some({ node: ListNode({ ..l, children, }), sides })
+      { node: ListNode({ ..l, children, }), sides }
     }
   }
 }
@@ -104,13 +99,8 @@ fn rebuild_root_heading_children(
         out_sides.push(side)
       }
     } else {
-      match rebuild_node(s, x) {
-        Some(y) => {
-          out.push(y)
-          out_sides.push(side)
-        }
-        None => ()
-      }
+      out.push(rebuild_node(s, x))
+      out_sides.push(side)
     }
   }
   (out, out_sides)
@@ -147,22 +137,14 @@ fn rebuild_root_item_children(
 }
 
 ///|
-/// ノード 1 つ。子の列を組み直し、Implicit の子が尽きたら None。
-fn rebuild_node(s : Splice, x : @tree.Node) -> @tree.Node? {
+/// ノード 1 つ。子の列を組み直す。
+fn rebuild_node(s : Splice, x : @tree.Node) -> @tree.Node {
   match x {
     HeadingNode(h) =>
-      Some(
-        HeadingNode({ ..h, children: rebuild_heading_children(s, h.children) }),
-      )
-    ListNode(l) => Some(ListNode(rebuild_item(s, l)))
-    ImplicitNode(g) => {
-      let children = rebuild_heading_children(s, g.children)
-      if children.is_empty() {
-        None
-      } else {
-        Some(ImplicitNode({ ..g, children, }))
-      }
-    }
+      HeadingNode({ ..h, children: rebuild_heading_children(s, h.children) })
+    ListNode(l) => ListNode(rebuild_item(s, l))
+    ImplicitNode(g) =>
+      ImplicitNode({ ..g, children: rebuild_heading_children(s, g.children) })
   }
 }
 
@@ -180,10 +162,7 @@ fn rebuild_heading_children(
         out.push(y)
       }
     } else {
-      match rebuild_node(s, x) {
-        Some(y) => out.push(y)
-        None => ()
-      }
+      out.push(rebuild_node(s, x))
     }
   }
   out

@@ -37,15 +37,19 @@ test "空にすると抜ける。根の子なら side も減る" {
 }
 
 ///|
-test "消して Implicit の子が尽きれば Implicit も消える" {
+/// 子が尽きた Implicit の掃除は門（mend）の仕事。途中の席が消えないように、
+/// splice は残す
+test "消して Implicit の子が尽きても、splice は Implicit を残す" {
   let d = doc([root(h(2, "r", children=[gap(3, [h(4, "x")])]), sides=[Right])])
-  assert_eq(splice(d, 4, _ => []), Some(doc([root(h(2, "r"), sides=[])])))
-}
-
-///|
-test "根の Implicit が空になれば Root ごと消える" {
-  let d = doc([root(gap(2, [h(3, "x")]), sides=[Right]), root(h(4, "s"))])
-  assert_eq(splice(d, 3, _ => []), Some(doc([root(h(4, "s"))])))
+  assert_eq(
+    splice(d, 4, _ => []),
+    Some(doc([root(h(2, "r", children=[gap(3, [])]), sides=[Right])])),
+  )
+  let e = doc([root(gap(2, [h(3, "x")]), sides=[Right]), root(h(4, "s"))])
+  assert_eq(
+    splice(e, 3, _ => []),
+    Some(doc([root(gap(2, []), sides=[]), root(h(4, "s"))])),
+  )
 }
 
 ///|

@@ -96,11 +96,25 @@ test "Fold は書けない名前なら名無しで畳む" {
 }
 
 ///|
-test "Fold は Implicit と中身に None。Unfold は畳んでいなければ None" {
+test "Fold は Implicit を綴ってから畳む。中身に None。Unfold は畳んでいなければ None" {
   let d = doc([
     root(h(2, "r", body=[pic(3)], children=[gap(4, [h(5, "x")])]), sides=[Right]),
   ])
-  assert_eq(run(d, Fold(id=4, open=false)), None)
+  let folded : @tree.Fold = { open: false, summary: Some("") }
+  assert_eq(
+    run(d, Fold(id=4, open=false)),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", body=[pic(3)], children=[
+            h(4, "", fold=Some(folded), children=[h(5, "x")]),
+          ]),
+          sides=[Right],
+        ),
+      ]),
+      focus: Some(4),
+    }),
+  )
   assert_eq(run(d, Fold(id=3, open=false)), None)
   assert_eq(run(d, Unfold(id=2)), None)
 }
@@ -502,6 +516,117 @@ test "MoveNode は綴りを保つ。項目は見出しの下に置け、見出�
 }
 
 ///|
+/// Implicit は行を省いた空の見出し。省いたままでは読めない席に来れば綴られ
+/// （label `""`）、id は変わらない。
+test "Implicit は見出しの直後に来れば綴られる" {
+  // a → [Implicit → x, b]。b を上へも Implicit を下へも、同じ形
+  let d = doc([
+    root(
+      h(2, "r", children=[h(3, "a", children=[gap(4, [h(5, "x")]), h(6, "b")])]),
+      sides=[Right],
+    ),
+  ])
+  let spelled = doc([
+    root(
+      h(2, "r", children=[
+        h(3, "a", children=[h(6, "b"), h(4, "", children=[h(5, "x")])]),
+      ]),
+      sides=[Right],
+    ),
+  ])
+  assert_eq(
+    run(d, MoveNode(ids=[6], at=Before(node=4))),
+    Some({ doc: spelled, focus: Some(6) }),
+  )
+  assert_eq(
+    run(d, MoveNode(ids=[4], at=After(node=6))),
+    Some({ doc: spelled, focus: Some(4) }),
+  )
+  // 新しい隣も同じ
+  assert_eq(
+    run(d, AddNode(at=Before(node=4), labels=["n"])),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            h(3, "a", children=[
+              h(7, "n"),
+              h(4, "", children=[h(5, "x")]),
+              h(6, "b"),
+            ]),
+          ]),
+          sides=[Right],
+        ),
+      ]),
+      focus: Some(7),
+    }),
+  )
+  // 根の子は、直前と側が変わらなければ境界が無い
+  let e = doc([
+    root(h(2, "r", children=[h(3, "a"), gap(4, [h(5, "x")]), h(6, "b")]), sides=[
+      Right,
+      Left,
+      Right,
+    ]),
+  ])
+  assert_eq(
+    run(e, MoveNode(ids=[6], at=Before(node=4))),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            h(3, "a"),
+            h(6, "b"),
+            h(4, "", children=[h(5, "x")]),
+          ]),
+          sides=[Right, Left, Left],
+        ),
+      ]),
+      focus: Some(6),
+    }),
+  )
+}
+
+///|
+/// 抜き取りで子が尽きた Implicit は操作の後で消える（掃除は門の仕事）ので、
+/// その隣を席にできる。根まで登れば Root ごと消える
+test "Implicit の唯一の子を、その Implicit の隣へ動かせる" {
+  let d = doc([root(h(2, "r", children=[gap(3, [h(4, "a")])]), sides=[Right])])
+  let out = Some({
+    doc: doc([root(h(2, "r", children=[h(4, "a")]), sides=[Right])]),
+    focus: Some(4),
+  })
+  assert_eq(run(d, MoveNode(ids=[4], at=Before(node=3))), out)
+  assert_eq(run(d, MoveNode(ids=[4], at=After(node=3))), out)
+  let e = doc([root(gap(2, [h(3, "a")]), sides=[Right]), root(h(4, "b"))])
+  assert_eq(
+    run(e, MoveNode(ids=[3], at=After(node=2))),
+    Some({ doc: doc([root(h(3, "a")), root(h(4, "b"))]), focus: Some(3) }),
+  )
+}
+
+///|
+test "Implicit は項目を子に持てば綴られる" {
+  let d = doc([
+    root(h(2, "r", children=[gap(3, [h(4, "x", children=[item(5, "i")])])]), sides=[
+      Right,
+    ]),
+  ])
+  assert_eq(
+    run(d, MoveNode(ids=[5], at=Before(node=4))),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[h(3, "", children=[item(5, "i"), h(4, "x")])]),
+          sides=[Right],
+        ),
+      ]),
+      focus: Some(5),
+    }),
+  )
+}
+
+///|
 test "MoveNode は空・中身・知らない id・動かすものの中へ、に None" {
   let d = doc([
     root(
@@ -607,8 +732,8 @@ test "FlipSide の深い項目は Implicit で包まず引き出す" {
 
 ///|
 /// 深いノードを引き出した先が、直前の兄弟と同じ側なら境界が無く、
-/// Implicit はその兄弟に飲み込まれる（check が言う）。
-test "FlipSide の深いノードは、引き出す先に境界が無ければ None" {
+/// Implicit はその兄弟に飲み込まれる（check が言う）ので、外の 1 枚が綴られる。
+test "FlipSide の深いノードは、引き出す先に境界が無ければ Implicit が綴られる" {
   let d = doc([
     root(
       h(2, "r", children=[
@@ -618,7 +743,22 @@ test "FlipSide の深いノードは、引き出す先に境界が無ければ N
       sides=[Right, Left],
     ),
   ])
-  assert_eq(run(d, FlipSide(id=5)), None)
+  assert_eq(
+    run(d, FlipSide(id=5)),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            h(3, "a", children=[h(4, "x")]),
+            h(6, "b"),
+            h(8, "", children=[gap(7, [h(5, "y")])]),
+          ]),
+          sides=[Right, Left, Left],
+        ),
+      ]),
+      focus: Some(5),
+    }),
+  )
 }
 
 ///|
@@ -911,6 +1051,6 @@ test "apply の結果は check を通る" {
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="293")
+  inspect(some, content="308")
   json_inspect(bad, content=[])
 }
