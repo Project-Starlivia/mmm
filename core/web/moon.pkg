@@ -1,0 +1,9 @@
+pkgtype(kind: "library")
+
+import {
+  "mizchi/js/core",
+  "mizchi/js/web/event",
+  "mizchi/js_browser/dom",
+}
+
+supported_targets = "js"

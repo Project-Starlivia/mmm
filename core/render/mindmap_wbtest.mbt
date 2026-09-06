@@ -21,7 +21,6 @@ struct Stub {
   mut picked : Int?
   applied : Array[@op.Op]
   reveals : Array[Bool]
-  menus : Array[(Double, Double, Int)]
   failed : Array[String]
   mut pasted : Int
   mut drawn : Int?
@@ -37,7 +36,6 @@ fn Stub::new(md : String) -> Stub {
     picked: None,
     applied: [],
     reveals: [],
-    menus: [],
     failed: [],
     pasted: 0,
     drawn: None,
@@ -81,7 +79,6 @@ fn Stub::host(self : Stub) -> Host {
       text.split("\n").map(l => [{ text: l.to_owned(), cls: "", }]).collect()
     },
     epoch: () => 0,
-    menu: (x, y, entries) => self.menus.push((x, y, entries.length())),
     failed: msg => self.failed.push(msg),
   }
 }
@@ -99,12 +96,10 @@ struct Stand {
 fn stand(md? : String = sample_md) -> Stand {
   let win = @test_utils.create_happy_window()
   let doc = win.document()
-  let pane = html(doc, "div", "")
+  let pane = @web.html(doc, "div", "")
   doc.body().unwrap().append(pane.as_node())
-  let hint = html(doc, "div", "pane-hint").as_element()
-  let tool = html(doc, "div", "pane-tool").as_element()
   let stub = Stub::new(md)
-  let map = Mindmap::new(pane, stub.host(), hint, tool)
+  let map = Mindmap::new(pane, stub.host())
   map.render()
   { win, pane, map, stub, }
 }
@@ -169,7 +164,7 @@ test "立てると器が揃い、描いたノードは文書順。白紙なら�
   let s = stand()
   defer s.win.close()
   let pane = s.pane.as_element()
-  assert_true(has_class(pane, "map-pane"))
+  assert_true(@web.has_class(pane, "map-pane"))
   assert_eq(pane.querySelectorAll(".node").length(), 3)
   assert_eq(pane.querySelector(".map-svg") is Some(_), true)
   assert_eq(pane.querySelector(".rubber") is Some(_), true)
@@ -201,8 +196,8 @@ test "箱を押して離すと選ぶ（reveal 付き）。Shift で範囲。背�
   assert_eq(s.stub.selection.ids, [3, 4])
   // 地図が持つ間は selected の枠
   s.map.refresh_selection()
-  assert_true(has_class(s.map.renderer.node_el(3).unwrap(), "selected"))
-  assert_true(has_class(s.map.renderer.node_el(4).unwrap(), "selected"))
+  assert_true(@web.has_class(s.map.renderer.node_el(3).unwrap(), "selected"))
+  assert_true(@web.has_class(s.map.renderer.node_el(4).unwrap(), "selected"))
   click_at(s, 5, 5)
   assert_eq(s.stub.selection, @map.none)
 }
@@ -217,9 +212,9 @@ test "md が持つ間は輪。輪は箱の 3px 内側で、本数は選択の数
   let rings = s.pane.as_element().querySelectorAll(".caret-ring")
   assert_eq(rings.length(), 2)
   let b = s.map.layout.boxes.get(2).unwrap()
-  assert_eq(rings[0].getAttribute("x"), Some(num(b.x + 3.0)))
-  assert_eq(rings[0].getAttribute("width"), Some(num(b.w - 6.0)))
-  assert_false(has_class(s.map.renderer.node_el(3).unwrap(), "selected"))
+  assert_eq(rings[0].getAttribute("x"), Some(@web.num(b.x + 3.0)))
+  assert_eq(rings[0].getAttribute("width"), Some(@web.num(b.w - 6.0)))
+  assert_false(@web.has_class(s.map.renderer.node_el(3).unwrap(), "selected"))
   s.stub.selection = @map.none
   s.map.refresh_selection()
   assert_eq(s.pane.as_element().querySelectorAll(".caret-ring").length(), 0)
@@ -262,7 +257,7 @@ test "掴んで動かすと落とし先を予告し、離すと MoveNode。Escap
   fire(s, "PointerEvent", "pointerdown", ax, ay)
   fire(s, "PointerEvent", "pointermove", bx, by + 20.0)
   assert_true(s.map.dragging is Some(_))
-  assert_true(has_class(s.map.renderer.node_el(3).unwrap(), "dragging"))
+  assert_true(@web.has_class(s.map.renderer.node_el(3).unwrap(), "dragging"))
   assert_true(s.map.drop is Some(_))
   let line = s.pane.as_element().querySelector(".drop-line").unwrap()
   let parent = s.pane.as_element().querySelector(".drop-parent")
@@ -273,7 +268,7 @@ test "掴んで動かすと落とし先を予告し、離すと MoveNode。Escap
   fire(s, "PointerEvent", "pointerup", bx, by + 20.0)
   assert_true(s.map.dragging is None)
   assert_true(s.stub.applied.last() is Some(MoveNode(..)))
-  assert_false(has_class(s.map.renderer.node_el(3).unwrap(), "dragging"))
+  assert_false(@web.has_class(s.map.renderer.node_el(3).unwrap(), "dragging"))
   // 取り消し
   fire(s, "PointerEvent", "pointerdown", ax, ay)
   fire(s, "PointerEvent", "pointermove", bx, by + 20.0)
@@ -291,10 +286,17 @@ test "右クリックは触った箱を選び直してから行を開く。箱�
   let (ax, ay) = mid(s, 3)
   fire(s, "MouseEvent", "contextmenu", ax, ay)
   assert_eq(s.stub.selection.ids, [3])
-  assert_eq(s.stub.menus.length(), 1)
-  assert_true(s.stub.menus[0].2 > 0)
+  assert_true(s.map.menu.is_open())
+  let rows = s.map.menu.el.querySelectorAll(".item")
+  assert_true(rows.length() > 0)
+  // 行を押せば Intent が走る（Rename の行 → 欄が開く）
+  let rename = rows.filter(r => r.textContent().has_prefix("Rename"))
+  assert_eq(rename.length(), 1)
+  @dom.HTMLElement::cast_from_element(rename[0]).click()
+  assert_false(s.map.menu.is_open())
+  assert_eq(s.map.label.editing(), Some(3))
   fire(s, "MouseEvent", "contextmenu", 5, 5)
-  assert_eq(s.stub.menus[1].2, 0)
+  assert_false(s.map.menu.is_open())
 }
 
 ///|
@@ -305,8 +307,8 @@ test "ダブルクリックでラベルの欄が開き、打てば Rename。Esca
   fire(s, "MouseEvent", "dblclick", ax, ay)
   assert_eq(s.map.label.editing(), Some(3))
   let input = s.pane.as_element().querySelector(".label-editor").unwrap()
-  assert_eq(value(input), "a")
-  set_value(input, "ab")
+  assert_eq(@web.value(input), "a")
+  @web.set_value(input, "ab")
   fire(s, "Event", "input", 0, 0, target=Some(input))
   assert_true(s.stub.applied.last() is Some(Rename(id=3, label="ab")))
   fire(s, "KeyboardEvent", "keydown", 0, 0, key="Escape", target=Some(input))
@@ -334,13 +336,13 @@ test "カードは選ぶと枠が出て、開けば欄、閉じるときに変�
   s.map.edit_card(5)
   assert_eq(s.map.card.editing(), Some(5))
   let ta = s.pane.as_element().querySelector("textarea").unwrap()
-  assert_eq(value(ta), "```ts\nx\n```")
+  assert_eq(@web.value(ta), "```ts\nx\n```")
   // 変えずに閉じれば書かない
   let n = s.stub.applied.length()
   s.map.card.close()
   assert_eq(s.stub.applied.length(), n)
   s.map.edit_card(5)
-  set_value(ta, "```ts\ny\n```")
+  @web.set_value(ta, "```ts\ny\n```")
   s.map.card.close()
   assert_true(
     s.stub.applied.last()
@@ -380,9 +382,11 @@ test "ファイルの落とし先: 箱の上なら drop-parent、外なら無し
   defer s.win.close()
   let (ax, ay) = mid(s, 3)
   assert_eq(s.map.mark_file_drop(Some({ x: ax, y: ay, })), Some(3))
-  assert_true(has_class(s.map.renderer.node_el(3).unwrap(), "drop-parent"))
+  assert_true(@web.has_class(s.map.renderer.node_el(3).unwrap(), "drop-parent"))
   assert_eq(s.map.mark_file_drop(Some({ x: 1, y: 1, })), None)
-  assert_false(has_class(s.map.renderer.node_el(3).unwrap(), "drop-parent"))
+  assert_false(
+    @web.has_class(s.map.renderer.node_el(3).unwrap(), "drop-parent"),
+  )
   assert_eq(s.map.mark_file_drop(None), None)
 }
 

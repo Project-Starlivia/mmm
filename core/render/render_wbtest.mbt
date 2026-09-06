@@ -167,18 +167,18 @@ test "paint は変わった箱だけ触り、箱が無い id は戻ったとき�
   let roots = [root(node(1, "r", children=[node(2, "a")]))]
   r.draw(scene(roots))
   r.paint([1, 9])
-  assert_true(has_class(r.node_el(1).unwrap(), "selected"))
-  assert_true(!has_class(r.node_el(2).unwrap(), "selected"))
+  assert_true(@web.has_class(r.node_el(1).unwrap(), "selected"))
+  assert_true(!@web.has_class(r.node_el(2).unwrap(), "selected"))
   r.paint([2])
-  assert_true(!has_class(r.node_el(1).unwrap(), "selected"))
-  assert_true(has_class(r.node_el(2).unwrap(), "selected"))
+  assert_true(!@web.has_class(r.node_el(1).unwrap(), "selected"))
+  assert_true(@web.has_class(r.node_el(2).unwrap(), "selected"))
   // 選んだまま消えて戻った箱には印が付く
   r.draw(scene([root(node(1, "r"))]))
   assert_true(r.node_el(2) is None)
   r.draw(scene(roots))
-  assert_true(has_class(r.node_el(2).unwrap(), "selected"))
+  assert_true(@web.has_class(r.node_el(2).unwrap(), "selected"))
   r.paint([])
-  assert_true(!has_class(r.node_el(2).unwrap(), "selected"))
+  assert_true(!@web.has_class(r.node_el(2).unwrap(), "selected"))
 }
 
 ///|

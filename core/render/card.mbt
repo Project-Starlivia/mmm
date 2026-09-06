@@ -31,12 +31,12 @@ pub(all) struct Token {
 ///|
 /// 行と行のあいだの仕切り。種類によらず引く
 fn separator(doc : @dom.Document, at : Spot) -> @dom.Element {
-  el(doc, "line", [
+  @web.el(doc, "line", [
     ("class", "sep"),
-    ("x1", num(@map.normal.pad - 4.0)),
-    ("y1", num(at.row_y)),
-    ("x2", num(at.box_w - @map.normal.pad + 4.0)),
-    ("y2", num(at.row_y)),
+    ("x1", @web.num(@map.normal.pad - 4.0)),
+    ("y1", @web.num(at.row_y)),
+    ("x2", @web.num(at.box_w - @map.normal.pad + 4.0)),
+    ("y2", @web.num(at.row_y)),
   ])
 }
 
@@ -50,27 +50,27 @@ fn link(
   let { x, y, w, h, } = at.rect
   // 当たり判定の面。他の 3 種は絵や背景がその役をするが、リンクは文字しか
   // 描かないので、行いっぱいの透明な面を敷く
-  let hit = el(doc, "rect", [
+  let hit = @web.el(doc, "rect", [
     ("class", "link-hit"),
     ("data-card", at.spot),
-    ("x", num(x)),
-    ("y", num(y)),
-    ("width", num(w)),
-    ("height", num(h)),
+    ("x", @web.num(x)),
+    ("y", @web.num(y)),
+    ("width", @web.num(w)),
+    ("height", @web.num(h)),
   ])
-  let text = el(doc, "text", [
+  let text = @web.el(doc, "text", [
     ("class", "link-row"),
-    ("x", num(x)),
-    ("y", num(y + h / 2.0)),
+    ("x", @web.num(x)),
+    ("y", @web.num(y + h / 2.0)),
   ])
   text.setTextContent(title)
-  let tip = el(doc, "title", [])
+  let tip = @web.el(doc, "title", [])
   tip.setTextContent(url)
-  let open = el(doc, "text", [
+  let open = @web.el(doc, "text", [
     ("class", "link-open"),
     // 枠の内側に収める。外へ出すと、選択の枠が本体より小さく見える
-    ("x", num(x + w)),
-    ("y", num(y + h / 2.0)),
+    ("x", @web.num(x + w)),
+    ("y", @web.num(y + h / 2.0)),
     ("text-anchor", "end"),
     ("data-url", url),
   ])
@@ -82,12 +82,12 @@ fn link(
 /// 絵を 1 枚。インライン SVG もローカル画像も、貼り方はここだけ
 fn picture(doc : @dom.Document, href : String, at : Spot) -> @dom.Element {
   let { x, y, w, h, } = at.rect
-  el(doc, "image", [
+  @web.el(doc, "image", [
     ("data-card", at.spot),
-    ("x", num(x)),
-    ("y", num(y)),
-    ("width", num(w)),
-    ("height", num(h)),
+    ("x", @web.num(x)),
+    ("y", @web.num(y)),
+    ("width", @web.num(w)),
+    ("height", @web.num(h)),
     ("preserveAspectRatio", "xMidYMid meet"),
     ("href", href),
   ])
@@ -119,33 +119,33 @@ fn image(
   // まだ読めていない（握っていない / ファイルが無い）。読めたときに配置が
   // 飛ばないよう、同じ大きさの場所取りを置く
   let { x, y, w, h, } = at.rect
-  let box = el(doc, "rect", [
+  let box = @web.el(doc, "rect", [
     ("class", "image-placeholder"),
     ("data-card", at.spot),
-    ("x", num(x)),
-    ("y", num(y)),
-    ("width", num(w)),
-    ("height", num(h)),
+    ("x", @web.num(x)),
+    ("y", @web.num(y)),
+    ("width", @web.num(w)),
+    ("height", @web.num(h)),
   ])
   // **黙って空にしない。** 読めない理由は 4 通りあるのに症状は 1 つなので、
   // 場所取りが自分で言う。握っていないだけなら、ここが入口も兼ねる
   let mid = y + h / 2.0
-  let label = el(doc, "text", [
+  let label = @web.el(doc, "text", [
     ("class", "image-name"),
     ("data-card", at.spot),
-    ("x", num(x + w / 2.0)),
-    ("y", num(if scene.image_hint is None { mid } else { mid - 7.0 })),
+    ("x", @web.num(x + w / 2.0)),
+    ("y", @web.num(if scene.image_hint is None { mid } else { mid - 7.0 })),
     ("text-anchor", "middle"),
   ])
   label.setTextContent(name)
   guard scene.image_hint is Some(hint) else { return [box, label] }
   // 入口は**この字だけ**。場所取りそのものは選択のままにしておく
   // （2 つの意味を 1 つの当たり判定に乗せない）
-  let connect = el(doc, "text", [
+  let connect = @web.el(doc, "text", [
     ("class", "image-connect"),
     ("data-connect", "1"),
-    ("x", num(x + w / 2.0)),
-    ("y", num(mid + 8.0)),
+    ("x", @web.num(x + w / 2.0)),
+    ("y", @web.num(mid + 8.0)),
     ("text-anchor", "middle"),
   ])
   connect.setTextContent(hint)
@@ -163,29 +163,29 @@ fn code(
   let { x, y, w, h, } = at.rect
   // 背景は左右にも張り出す（コードは箱の縁まで塗る）。張り出しは矩形に
   // 織り込み済みなので、ここで足し直さない
-  let bg = el(doc, "rect", [
+  let bg = @web.el(doc, "rect", [
     ("class", "code-bg"),
     ("data-card", at.spot),
-    ("x", num(x)),
-    ("y", num(y)),
-    ("width", num(w)),
-    ("height", num(h)),
+    ("x", @web.num(x)),
+    ("y", @web.num(y)),
+    ("width", @web.num(w)),
+    ("height", @web.num(h)),
   ])
   if lang != "" {
-    let tip = el(doc, "title", [])
+    let tip = @web.el(doc, "title", [])
     tip.setTextContent(lang)
     bg.append(tip.as_node())
   }
   let out = [bg]
   let tokens = (scene.tokens)(lines, lang)
   for i, _ in lines {
-    let line = el(doc, "text", [
+    let line = @web.el(doc, "text", [
       ("class", "code-line"),
       ("data-card", at.spot),
-      ("x", num(@map.normal.pad + 1.0)),
+      ("x", @web.num(@map.normal.pad + 1.0)),
       (
         "y",
-        num(
+        @web.num(
           at.row_y +
           @map.code_pad +
           i.to_double() * @map.code_line +
@@ -195,7 +195,7 @@ fn code(
     ])
     // 幅の判断は素の文字列で行い、色の付いた塊をそこへ合わせる
     for t in tokens[i] {
-      let span = el(
+      let span = @web.el(
         doc,
         "tspan",
         if t.cls == "" {
@@ -217,13 +217,13 @@ fn code(
 fn rule(doc : @dom.Document, at : Spot) -> Array[@dom.Element] {
   let { x, y, w, h, } = at.rect
   [
-    el(doc, "line", [
+    @web.el(doc, "line", [
       ("class", "break"),
       ("data-card", at.spot),
-      ("x1", num(x)),
-      ("y1", num(y + h / 2.0)),
-      ("x2", num(x + w)),
-      ("y2", num(y + h / 2.0)),
+      ("x1", @web.num(x)),
+      ("y1", @web.num(y + h / 2.0)),
+      ("x2", @web.num(x + w)),
+      ("y2", @web.num(y + h / 2.0)),
     ]),
   ]
 }
@@ -240,16 +240,16 @@ fn details(
 ) -> Array[@dom.Element] {
   let x = at.rect.x
   let row_mid = at.row_y + @map.details_row / 2.0 // summary の行の中心
-  let mark = el(doc, "text", [
+  let mark = @web.el(doc, "text", [
     ("class", "details-mark"),
-    ("x", num(x)),
-    ("y", num(row_mid)),
+    ("x", @web.num(x)),
+    ("y", @web.num(row_mid)),
   ])
   mark.setTextContent(if open { "▾" } else { "▸" })
-  let name = el(doc, "text", [
+  let name = @web.el(doc, "text", [
     ("class", "details-row"),
-    ("x", num(x + @map.details_indent)),
-    ("y", num(row_mid)),
+    ("x", @web.num(x + @map.details_indent)),
+    ("y", @web.num(row_mid)),
   ])
   name.setTextContent(
     match summary {
@@ -261,10 +261,13 @@ fn details(
   guard open else { return out }
   let top = at.row_y + @map.details_row
   for i, text in lines {
-    let line = el(doc, "text", [
+    let line = @web.el(doc, "text", [
       ("class", "details-line"),
-      ("x", num(x + @map.details_indent)),
-      ("y", num(top + i.to_double() * @map.code_line + @map.code_line / 2.0)),
+      ("x", @web.num(x + @map.details_indent)),
+      (
+        "y",
+        @web.num(top + i.to_double() * @map.code_line + @map.code_line / 2.0),
+      ),
     ])
     line.setTextContent(text)
     out.push(line)

@@ -25,11 +25,11 @@ pub struct CardPick {
 
 ///|
 pub fn CardPick::new(doc : @dom.Document) -> CardPick {
-  let el_ = el(doc, "g", [("class", "card-pick"), ("visibility", "hidden")])
-  let frame = el(doc, "rect", [("class", "frame")])
-  let delete = el(doc, "g", [("class", "delete")])
-  let circle = el(doc, "circle", [("r", num(hit_r))])
-  let strokes = [el(doc, "line", []), el(doc, "line", [])]
+  let el_ = @web.el(doc, "g", [("class", "card-pick"), ("visibility", "hidden")])
+  let frame = @web.el(doc, "rect", [("class", "frame")])
+  let delete = @web.el(doc, "g", [("class", "delete")])
+  let circle = @web.el(doc, "circle", [("r", @web.num(hit_r))])
+  let strokes = [@web.el(doc, "line", []), @web.el(doc, "line", [])]
   delete.append(circle.as_node())
   for s in strokes {
     delete.append(s.as_node())
@@ -44,24 +44,24 @@ pub fn CardPick::new(doc : @dom.Document) -> CardPick {
 /// 出す（当たり判定は座標から辿るため）
 pub fn CardPick::show(self : CardPick, id : Int, rect : @map.Rect) -> Unit {
   self.el.setAttribute("visibility", "visible")
-  self.frame.setAttribute("x", num(rect.x))
-  self.frame.setAttribute("y", num(rect.y))
-  self.frame.setAttribute("width", num(rect.w))
-  self.frame.setAttribute("height", num(rect.h))
+  self.frame.setAttribute("x", @web.num(rect.x))
+  self.frame.setAttribute("y", @web.num(rect.y))
+  self.frame.setAttribute("width", @web.num(rect.w))
+  self.frame.setAttribute("height", @web.num(rect.h))
   // × は角そのものに載せる。枠線がボタンの中心を通る位置
   let cx = rect.x + rect.w
   let cy = rect.y
   self.delete.setAttribute("data-delete", id.to_string())
-  self.circle.setAttribute("cx", num(cx))
-  self.circle.setAttribute("cy", num(cy))
+  self.circle.setAttribute("cx", @web.num(cx))
+  self.circle.setAttribute("cy", @web.num(cy))
   // × は文字ではなく線で引く。字だと書体で中心も太さも揺れる
   for i, d in [(1.0, 1.0), (1.0, -1.0)] {
     let (dx, dy) = d
     let line = self.strokes[i]
-    line.setAttribute("x1", num(cx - arm * dx))
-    line.setAttribute("y1", num(cy - arm * dy))
-    line.setAttribute("x2", num(cx + arm * dx))
-    line.setAttribute("y2", num(cy + arm * dy))
+    line.setAttribute("x1", @web.num(cx - arm * dx))
+    line.setAttribute("y1", @web.num(cy - arm * dy))
+    line.setAttribute("x2", @web.num(cx + arm * dx))
+    line.setAttribute("y2", @web.num(cy + arm * dy))
   }
 }
 

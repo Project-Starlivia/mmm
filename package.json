@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "lab": "pnpm run core && vite lab --port 13132 --strictPort",
     "test": "pnpm run core && node --test \"test/*.test.ts\"",
-    "test:core": "cd core && moon test -p mmm-app/core/tree -p mmm-app/core/view -p mmm-app/core/op -p mmm-app/core/edit -p mmm-app/core/map -p mmm-app/core/render -p mmm-app/core/read",
+    "test:core": "cd core && moon test -p mmm-app/core/tree -p mmm-app/core/view -p mmm-app/core/op -p mmm-app/core/edit -p mmm-app/core/map -p mmm-app/core/render -p mmm-app/core/parts -p mmm-app/core/read",
     "check": "tsc --noEmit && tsc -p test --noEmit && tsc -p lab --noEmit",
     "check:core": "cd core && moon check && moon fmt --check",
     "fixtures": "node test/tools/gen-load.ts",

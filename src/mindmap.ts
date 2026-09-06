@@ -1,17 +1,11 @@
 // マップのペインの配線。置く・描く・入力を判断して答えを出すのは core
 // （core/render/mindmap.mbt）。ここが持つのは、ブラウザでなければできないことだけ —
-// ペインの HTML の部品（白紙の言い出し・寄せるボタン）、右クリックの器（menu.ts）、
-// クリップボード、しらせ、字の実測と色分け。
+// クリップボード、字の実測と色分け、書き出し。
 
 import * as core from "./coreApi.ts";
 import { measure } from "./map/measure.ts";
 import { languageEpoch, tokenize, tokenizeBlock } from "./map/highlight.ts";
-import { ContextMenu, type MenuEntry } from "./map/menu.ts";
 import { mapToSvg } from "./map/toSvg.ts";
-import { icon, isIconName } from "./icons.ts";
-import { paneTool } from "./app/paneTool.ts";
-import { paneHint } from "./app/hint.ts";
-import { FAILED, type Failed, failed } from "./app/notice.ts";
 
 export interface MapHost {
   /** いまの文書（core の読みの持ち手。置くのに要る） */
@@ -46,51 +40,12 @@ export interface MapHost {
   draw(id: number): void;
 }
 
-/**
- * core の右クリックの行を、menu.ts が描ける形に写す。押せば `act` へ渡すだけで、
- * 意味はここに増やさない。沈む行は `why` を押せない理由として持ち、無ければただ沈む
- */
-export function menuOf(es: core.Entry[], act: (intent: core.Intent) => void): MenuEntry[] {
-  const one = (it: core.Item): MenuEntry => {
-    const disabled = it.intent === null ? (it.why ?? true) : false;
-    const run = (): void => {
-      if (it.intent) act(it.intent);
-    };
-    const mark = it.mark !== null && isIconName(it.mark) ? it.mark : undefined;
-    const key = it.key ?? undefined;
-    const items = it.items?.map(one);
-    return items
-      ? { label: it.label, key, mark, disabled, items, run }
-      : { label: it.label, key, mark, disabled, run };
-  };
-  return es.map((e) => (e === "sep" ? "sep" : one(e)));
-}
-
-/** core の言葉をしらせの表と突き合わせる。知らない言葉は綴りの食い違い — 壊れている */
-function asFailed(msg: string): Failed {
-  const hit = FAILED.find((f) => f === msg);
-  if (hit === undefined) throw new Error(`知らないしらせ: ${msg}`);
-  return hit;
-}
-
 export class Mindmap {
   private readonly pane: HTMLElement;
   private readonly handle: core.MapHandle;
-  /** 右クリック（と長押し）のメニュー */
-  private readonly menu = new ContextMenu();
 
   constructor(pane: HTMLElement, host: MapHost) {
     this.pane = pane;
-    // md からの始め方は md ペイン自身が同じ器で言う（app/hint.ts）
-    const hint = paneHint("map");
-    const tool = paneTool("map-center");
-    const center = document.createElement("button");
-    center.type = "button";
-    center.title = "Center the view — Home";
-    center.setAttribute("aria-label", "Center the view");
-    center.append(icon("crosshair"));
-    center.addEventListener("click", () => core.mapCenter(this.handle));
-    tool.append(center);
     this.handle = core.map(
       pane,
       {
@@ -113,16 +68,8 @@ export class Mindmap {
         tokens: tokenize,
         tokensBlock: tokenizeBlock,
         epoch: languageEpoch,
-        menu: (x, y, entries) => {
-          const es = core.entries(entries);
-          // 行が無い（箱の外）なら閉じるだけ
-          if (es.length === 0) this.menu.hide();
-          else this.menu.show(x, y, menuOf(es, (i) => core.mapAct(this.handle, i)));
-        },
-        failed: (msg) => failed(asFailed(msg)),
+        failed: core.failed,
       },
-      hint,
-      tool,
     );
   }
 

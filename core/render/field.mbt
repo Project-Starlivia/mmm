@@ -15,20 +15,20 @@ fn put(
   border : Double,
   line_height : Double?,
 ) -> Unit {
-  set_style(e, "left", px(p.left))
-  set_style(e, "top", px(p.top))
-  set_style(e, "width", px(p.width))
-  set_style(e, "height", px(p.height))
-  set_style(e, "font-size", px(p.font_size))
-  set_style(e, "border-width", px(border))
+  @web.set_style(e, "left", @web.px(p.left))
+  @web.set_style(e, "top", @web.px(p.top))
+  @web.set_style(e, "width", @web.px(p.width))
+  @web.set_style(e, "height", @web.px(p.height))
+  @web.set_style(e, "font-size", @web.px(p.font_size))
+  @web.set_style(e, "border-width", @web.px(border))
   match line_height {
     Some(lh) => {
-      set_style(e, "line-height", px(lh))
-      set_style(e, "padding", px(p.padding))
+      @web.set_style(e, "line-height", @web.px(lh))
+      @web.set_style(e, "padding", @web.px(p.padding))
     }
     None => {
-      set_style(e, "padding-left", px(p.padding))
-      set_style(e, "padding-right", px(p.padding))
+      @web.set_style(e, "padding-left", @web.px(p.padding))
+      @web.set_style(e, "padding-right", @web.px(p.padding))
     }
   }
 }
@@ -70,42 +70,42 @@ pub fn LabelField::new(
     composing: false,
     last: None,
   }
-  listen(input, "compositionstart", _ => f.composing = true)
-  listen(input, "compositionend", _ => {
+  @web.listen(input, "compositionstart", _ => f.composing = true)
+  @web.listen(input, "compositionend", _ => {
     f.composing = false
     f.write()
   })
-  listen(input, "input", e => {
+  @web.listen(input, "input", e => {
     // 欄は打った字の分だけ先に育つ。md へ書くかは別の話
     match f.last {
       Some((l, c)) => f.place(l, c)
       None => ()
     }
-    if f.composing || is_composing(e) {
+    if f.composing || @web.is_composing(e) {
       return
     }
     f.write()
   })
-  listen(input, "keydown", e => {
-    let k = keyboard(e)
+  @web.listen(input, "keydown", e => {
+    let k = @web.keyboard(e)
     if k.isComposing || k.keyCode == 229 {
       return
     }
     // 地図のキーへ流さない（Enter が「兄弟を足す」に化ける）
-    stop(e)
+    @web.stop(e)
     if k.key == "Escape" || k.key == "Enter" {
-      prevent(e)
+      @web.prevent(e)
       // キー由来の close だけ、地図へフォーカスを戻す。blur は既にフォーカスが
       // 行き先を持っている最中なので奪わない
       f.close()
       pane.focus()
     } else if k.key == "Tab" {
       // 編集中の Tab は無効（spec.md）
-      prevent(e)
+      @web.prevent(e)
     }
   })
   // 欄の外を押す・md 側に触る・Mod+/ で移る — フォーカスが抜けたら閉じる
-  listen(input, "blur", _ => f.close())
+  @web.listen(input, "blur", _ => f.close())
   f
 }
 
@@ -125,12 +125,12 @@ pub fn LabelField::open(
   seed : String?,
 ) -> Unit {
   self.id = Some(id)
-  set_value(self.input, seed.unwrap_or(label))
-  show(self.input, "block", true)
+  @web.set_value(self.input, seed.unwrap_or(label))
+  @web.show(self.input, "block", true)
   self.place(l, cam)
-  focus(self.input)
-  let end = value(self.input).length()
-  select_range(self.input, end, end)
+  @web.focus(self.input)
+  let end = @web.value(self.input).length()
+  @web.select_range(self.input, end, end)
   // 最初の字はもう欄に在るので、いまの値を md へ
   if seed is Some(_) {
     self.write()
@@ -153,7 +153,7 @@ pub fn LabelField::place(
   self.last = Some((l, cam))
   let w = (self.measure)(
     @map.label_font(@map.row_of(b.node)),
-    value(self.input),
+    @web.value(self.input),
   )
   put(self.input, @map.label_place(b, cam, w), @map.label_border, None)
 }
@@ -170,13 +170,13 @@ pub fn LabelField::close(self : LabelField) -> Unit {
   }
   self.id = None
   self.last = None
-  show(self.input, "block", false)
+  @web.show(self.input, "block", false)
 }
 
 ///|
 fn LabelField::write(self : LabelField) -> Unit {
   match self.id {
-    Some(id) => (self.rename)(id, value(self.input))
+    Some(id) => (self.rename)(id, @web.value(self.input))
     None => ()
   }
 }
@@ -216,7 +216,7 @@ pub fn CardField::new(
 ) -> CardField {
   let box = doc.createElement("div")
   box.setAttribute("class", "card-editor")
-  show(box, "block", false)
+  @web.show(box, "block", false)
   let highlight = doc.createElement("pre")
   highlight.setAttribute("class", "highlight")
   let textarea = doc.createElement("textarea")
@@ -236,30 +236,30 @@ pub fn CardField::new(
     id: None,
     last: None,
   }
-  listen(textarea, "input", _ => {
+  @web.listen(textarea, "input", _ => {
     f.paint()
     match f.last {
       Some((l, c)) => f.place(l, c)
       None => ()
     }
   })
-  listen(textarea, "keydown", e => {
+  @web.listen(textarea, "keydown", e => {
     // 地図のキーへ流さない（Delete がカードを消すに化ける）
-    stop(e)
-    let k = keyboard(e)
+    @web.stop(e)
+    let k = @web.keyboard(e)
     // 変換中の Esc / Enter は IME のもの
     if k.isComposing || k.keyCode == 229 {
       return
     }
     if k.key == "Escape" || (k.key == "Enter" && (k.ctrlKey || k.metaKey)) {
-      prevent(e)
+      @web.prevent(e)
       f.close()
       pane.focus()
     } else if k.key == "Tab" {
-      prevent(e)
+      @web.prevent(e)
     }
   })
-  listen(textarea, "blur", _ => f.close())
+  @web.listen(textarea, "blur", _ => f.close())
   f
 }
 
@@ -281,14 +281,14 @@ pub fn CardField::open(
 ) -> Unit {
   self.id = Some(id)
   self.opened = text
-  set_value(self.textarea, text)
-  show(self.box, "block", true)
+  @web.set_value(self.textarea, text)
+  @web.show(self.box, "block", true)
   self.paint()
   self.place(l, cam)
-  focus(self.textarea)
+  @web.focus(self.textarea)
   let end = text.length()
   let a = from.unwrap_or(end)
-  select_range(self.textarea, a, to.unwrap_or(a))
+  @web.select_range(self.textarea, a, to.unwrap_or(a))
 }
 
 ///|
@@ -304,7 +304,10 @@ pub fn CardField::place(
     return
   }
   self.last = Some((l, cam))
-  let lines = value(self.textarea).split("\n").map(x => x.to_owned()).collect()
+  let lines = @web.value(self.textarea)
+    .split("\n")
+    .map(x => x.to_owned())
+    .collect()
   let font : @map.Font = { px: @map.card_font_px.to_int(), mono: true, }
   let mut widest = 0.0
   for line in lines {
@@ -323,7 +326,7 @@ pub fn CardField::place(
 fn CardField::paint(self : CardField) -> Unit {
   guard self.highlight.ownerDocument() is Some(doc) else { return }
   self.highlight.replaceChildren([])
-  for line in (self.tokens)(value(self.textarea)) {
+  for line in (self.tokens)(@web.value(self.textarea)) {
     for t in line {
       let span = doc.createElement("span")
       if t.cls != "" {
@@ -341,10 +344,10 @@ fn CardField::paint(self : CardField) -> Unit {
 /// 閉じる。値が開いたときと違えば `commit` を 1 回。二重に閉じても何も起きない
 pub fn CardField::close(self : CardField) -> Unit {
   guard self.id is Some(id) else { return }
-  let v = value(self.textarea)
+  let v = @web.value(self.textarea)
   self.id = None
   self.last = None
-  show(self.box, "block", false)
+  @web.show(self.box, "block", false)
   if v != self.opened {
     (self.commit)(id, v)
   }

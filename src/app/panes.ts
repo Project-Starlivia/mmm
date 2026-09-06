@@ -16,8 +16,7 @@
 // 残すと、CSS が片方を隠して**状態が 2 つになり食い違う** — 矢印は行けない
 // 場所を指し、`disabled` は画面に無い世界を説明する。
 
-import { icon } from "../icons.ts";
-import { paneTool } from "./paneTool.ts";
+import { icon, paneTool } from "../coreApi.ts";
 
 /** 見えているペイン。**「両方消えた」は作らない** */
 export interface Vis {

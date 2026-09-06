@@ -1,4 +1,4 @@
-// SVG の要素を作る最小の道具。描画がここを通り、書き出し（ts の toSvg）は
+// SVG の要素を作る最小の道具。描画も部品もここを通り、書き出し（ts の toSvg）は
 // 出来た要素を写すだけなので、要素の形はここ 1 つ。
 
 ///|
@@ -20,9 +20,9 @@ pub fn el(
 }
 
 ///|
-/// 数の属性の綴り。JS の `String(n)` と同じ（`@map.num`）
+/// 数の属性の綴り。JS の `String(n)` そのもの
 pub fn num(v : Double) -> String {
-  @map.num(v)
+  @core.any(v).to_string()
 }
 
 ///|

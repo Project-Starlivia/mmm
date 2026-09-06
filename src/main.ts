@@ -10,6 +10,7 @@
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
 import type { EditorState } from "@codemirror/state";
 import * as core from "./coreApi.ts";
+import { blocked, failed, openOnClick } from "./coreApi.ts";
 import * as st from "./state.ts";
 import { MdEditor } from "./editor.ts";
 import { Mindmap, type MapHost } from "./mindmap.ts";
@@ -24,13 +25,11 @@ import { ask } from "./app/ask.ts";
 import { ASKS } from "./app/asks.ts";
 import { NOTHING_TO_RENAME, NO_FILE_ACCESS, NO_RENAME_HERE, filesMenu } from "./app/files.ts";
 import { moreMenu } from "./app/more.ts";
-import { blocked, failed } from "./app/notice.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { initDrop } from "./app/dnd.ts";
 import { showDrawing } from "./app/draw.ts";
 import { onLanguageReady } from "./map/highlight.ts";
-import { openOnClick } from "./map/menu.ts";
 
 /**
  * index.html の要素を、**その型であることを実際に確かめて**引く。

@@ -3,7 +3,7 @@
 // 並びは純粋な表（files.ts と同じ作り）。いまの状態を受けて行を返し、
 // 押されたら `Acts` を呼ぶだけ。
 
-import type { MenuEntry } from "../map/menu.ts";
+import type { MenuEntry } from "../coreApi.ts";
 
 /** リポジトリの行き先。ここ 1 か所 */
 export const REPO = "https://github.com/Project-Starlivia/mmm";

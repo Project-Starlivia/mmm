@@ -39,13 +39,16 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 Easy grab の広げ幅) / drop(ドラッグの落とし先) / keys(キー → Intent の表) /
                 context(右クリックの行) / camera(視点。world ↔ 画面、寄せ、ピンチ) /
                 indicator(画面外の根を指す針) / gesture(指の台帳) / place(欄を箱に重ねる算術)
-  render/       地図のペイン（js だけ。mizchi/js_browser の DOM の型で書く）。
-                svg(要素を作る) / card(Card 1 枚 → SVG) / render(Renderer。id → 要素、
+  web/          DOM の小さな道具（js だけ）。svg(要素を作る) / dom(style・矩形・捕捉・
+                欄の値・出来事の的・約束を 1 行ずつ包む。**他の package は `_get` / `_call` を書かない**)
+  parts/        部品（js だけ）。icons(絵の唯一の源。Lucide の綴り) / notice(しらせ。言葉の表も) /
+                hint(空のときの言い出し) / tool(ペインの隅に浮く道具の器) / menu(メニューの器。
+                行の形・入れ子・キーで辿る・外を押せば閉じる)。試験は happy-dom
+  render/       地図のペイン（js だけ）。card(Card 1 枚 → SVG) / render(Renderer。id → 要素、
                 transform / d のキャッシュ、並び直し、paint) / mindmap(器と入力。ホイール・
                 ポインタ・キー・右クリック・長押し・ドラッグを受けて map/ の判断に繋ぎ、
-                答えを host へ返す。輪・矩形・落とし先の印・針・視点) / field(ラベルと
-                カードの欄。<input> / <textarea> の器) / pick(選んでいるカードの枠と ×) /
-                dom(style・矩形・捕捉・欄の値の 1 行の道具) / host(外に頼るものの閉包)。
+                答えを host へ返す。輪・矩形・落とし先の印・針・視点・右クリックの器) /
+                field(ラベルとカードの欄) / pick(選んでいるカードの枠と ×) / host(外に頼るものの閉包)。
                 class と data-* は style.css との契約。試験は happy-dom
   read/         md を読んだもの（Survey = 木 + 地番 + 原文）と、木の判断。ts はこれを持ち手として
                 持ち、問い合わせで読む。survey(is_node / empty / find / blocks) / caret(md の
@@ -66,14 +69,12 @@ src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す�
                1 トランザクションを 1 回 onUpdate で外へ。薄塗りは state.ts の範囲から
                field で導く。フェンスの中は map/highlight.ts と同じ言語表で色を付ける)
   mindmap.ts   Mindmap 側の配線(core の地図に渡す host — 文書と選択の読み書き、クリップボード、
-               メニューの器、しらせ、字の実測と色分け — と、ペインの HTML の部品。入力・印・
-               視点・欄は core/render/mindmap.mbt)
-  icons.ts     ボタンとメニューの絵の唯一の源(線で引く / currentColor)
+               字の実測と色分け — と書き出し。入力・印・視点・欄・右クリックは core/render)
   style.css    全体のスタイル(部品ごとの塊。入れ子は CSS 自身の機能。色・影・輪の数字は
                `:root` のトークンだけが持ち、状態は `.selected` / `.on` / `aria-disabled` で言う)
   map/         ブラウザの都合（地図そのものは core/render）—
                measure(字の実測。core の Font に CSS の字の綴りを合わせて canvas で測る) /
-               highlight(コードの色分け。core の描画に閉包で渡す) / menu(メニューの器) /
+               highlight(コードの色分け。core の描画に閉包で渡す) /
                toSvg(1 枚の svg にする) / svg(要素を作る)
   main.ts      束ねる場所(1 トランザクション = 1 サイクルの出口 onUpdate、操作の入口 apply(op, edit)
                — focus を選ぶ — と write(op) — 選択に触らない、持ち主の focusin、
@@ -90,7 +91,6 @@ src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す�
                draw(その場で描く窓) / io(File System Access API の窓口) /
                handles(ハンドルを IndexedDB に置く層) / logo(ロゴの唯一の源) /
                shortcuts(全体のキー) / export(Mindmap を外へ出す) /
-               paneTool(隅に浮く道具の器) / hint(白紙の言い出し) / notice /
                ask(聞く器) / asks(聞くことの綴りの全部) /
                files(帯の Files の行。文書と画像フォルダ) / more(帯の ⋯ の行)
 test/   検証 — core に触らない純粋層(camera / geometry / gesture / highlight /
