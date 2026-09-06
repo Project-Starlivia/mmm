@@ -58,8 +58,8 @@ fn changed(doc : Doc, id : Int, how : Change) -> Doc {
       Relabel =>
         Some(
           match x {
-            HeadingNode(h) => HeadingNode({ ..h, label: h.label + "!" })
-            ListNode(l) => ListNode({ ..l, label: l.label + "!" })
+            HeadingNode(h) => HeadingNode({ ..h, label: h.label + "!", })
+            ListNode(l) => ListNode({ ..l, label: l.label + "!", })
             other => other
           },
         )
@@ -67,7 +67,7 @@ fn changed(doc : Doc, id : Int, how : Change) -> Doc {
       Adopt =>
         Some(with_children(x, children_of(x) + [newborn(x is ListNode(_))]))
       AddBlock =>
-        Some(with_body(x, body_of(x) + [{ id: 999, content: ThematicBreak }]))
+        Some(with_body(x, body_of(x) + [{ id: 999, content: ThematicBreak, }]))
       DropBlock =>
         if body_of(x).is_empty() {
           Some(x)
@@ -80,7 +80,7 @@ fn changed(doc : Doc, id : Int, how : Change) -> Doc {
             x,
             body_of(x).mapi((i, b) => {
               if i == 0 {
-                { id: b.id, content: Opaque("changed") }
+                { id: b.id, content: Opaque("changed"), }
               } else {
                 b
               }
@@ -178,9 +178,9 @@ fn grain(
 /// 新しいノード（id は読みが振る番号と被らない）。項目の子は項目。
 fn newborn(item : Bool) -> Node {
   if item {
-    ListNode({ id: 999, label: "new", fold: None, body: [], children: [] })
+    ListNode({ id: 999, label: "new", fold: None, body: [], children: [], })
   } else {
-    HeadingNode({ id: 999, label: "new", fold: None, body: [], children: [] })
+    HeadingNode({ id: 999, label: "new", fold: None, body: [], children: [], })
   }
 }
 
@@ -209,7 +209,7 @@ fn morph(doc : Doc, id : Int, f : (Node) -> Node?) -> Doc {
   for r in doc.roots {
     if id_of(r.node) == id {
       match f(r.node) {
-        Some(n) => roots.push(({ node: n, sides: fit(r.sides, n) } : Root))
+        Some(n) => roots.push(({ node: n, sides: fit(r.sides, n), } : Root))
         None => ()
       }
     } else {
@@ -217,7 +217,7 @@ fn morph(doc : Doc, id : Int, f : (Node) -> Node?) -> Doc {
       if r.node is ImplicitNode(_) && kids.is_empty() {
         continue
       }
-      roots.push(({ node: with_children(r.node, kids), sides } : Root))
+      roots.push(({ node: with_children(r.node, kids), sides, } : Root))
     }
   }
   { ..doc, roots, }
@@ -338,11 +338,11 @@ test "法則 — 根を足す・消す" {
     let (before, spans) = survey(md)
     let more : Doc = {
       ..before,
-      roots: before.roots + [{ node: newborn(false), sides: [] }],
+      roots: before.roots + [{ node: newborn(false), sides: [], }],
     }
     ignore(law(md, before, spans, more, "add root to \{md}"))
     if !before.roots.is_empty() {
-      let less : Doc = { ..before, roots: before.roots[1:].to_owned() }
+      let less : Doc = { ..before, roots: before.roots[1:].to_owned(), }
       ignore(law(md, before, spans, less, "drop root of \{md}"))
     }
   }

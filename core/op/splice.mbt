@@ -23,13 +23,13 @@ fn splice(
   id : Int,
   f : (@tree.Node) -> Array[@tree.Node],
 ) -> @tree.Doc? {
-  let s : Splice = { id, f, hit: false, bad: false }
+  let s : Splice = { id, f, hit: false, bad: false, }
   let roots : Array[@tree.Root] = []
   for r in doc.roots {
     if id_of(r.node) == id {
       s.hit = true
       for y in f(r.node) {
-        roots.push({ node: y, sides: sides_for(y, r) })
+        roots.push({ node: y, sides: sides_for(y, r), })
       }
     } else {
       roots.push(rebuild_root(s, r))
@@ -64,7 +64,7 @@ fn rebuild_root(s : Splice, r : @tree.Root) -> @tree.Root {
         h.children,
         r.sides,
       )
-      { node: HeadingNode({ ..h, children, }), sides }
+      { node: HeadingNode({ ..h, children, }), sides, }
     }
     ImplicitNode(g) => {
       let (children, sides) = rebuild_root_heading_children(
@@ -72,11 +72,11 @@ fn rebuild_root(s : Splice, r : @tree.Root) -> @tree.Root {
         g.children,
         r.sides,
       )
-      { node: ImplicitNode({ ..g, children, }), sides }
+      { node: ImplicitNode({ ..g, children, }), sides, }
     }
     ListNode(l) => {
       let (children, sides) = rebuild_root_item_children(s, l.children, r.sides)
-      { node: ListNode({ ..l, children, }), sides }
+      { node: ListNode({ ..l, children, }), sides, }
     }
   }
 }
@@ -141,10 +141,10 @@ fn rebuild_root_item_children(
 fn rebuild_node(s : Splice, x : @tree.Node) -> @tree.Node {
   match x {
     HeadingNode(h) =>
-      HeadingNode({ ..h, children: rebuild_heading_children(s, h.children) })
+      HeadingNode({ ..h, children: rebuild_heading_children(s, h.children), })
     ListNode(l) => ListNode(rebuild_item(s, l))
     ImplicitNode(g) =>
-      ImplicitNode({ ..g, children: rebuild_heading_children(s, g.children) })
+      ImplicitNode({ ..g, children: rebuild_heading_children(s, g.children), })
   }
 }
 
@@ -171,7 +171,7 @@ fn rebuild_heading_children(
 ///|
 /// 項目 1 つ。子の列を組み直す。
 fn rebuild_item(s : Splice, l : @tree.ListNode) -> @tree.ListNode {
-  { ..l, children: rebuild_item_children(s, l.children) }
+  { ..l, children: rebuild_item_children(s, l.children), }
 }
 
 ///|
@@ -202,9 +202,9 @@ fn rebuild_item_children(
 fn with_kids(n : @tree.Node, more : Array[@tree.Node]) -> @tree.Node? {
   match n {
     HeadingNode(h) =>
-      Some(HeadingNode({ ..h, children: [..h.children, ..more] }))
+      Some(HeadingNode({ ..h, children: [..h.children, ..more], }))
     ImplicitNode(g) =>
-      Some(ImplicitNode({ ..g, children: [..g.children, ..more] }))
+      Some(ImplicitNode({ ..g, children: [..g.children, ..more], }))
     ListNode(l) => {
       let children = l.children.copy()
       for y in more {
@@ -231,7 +231,7 @@ fn append(
   if node == @tree.doc_id {
     let roots = doc.roots.copy()
     for y in nodes {
-      roots.push({ node: y, sides: Array::make(kids(y).length(), @tree.Right) })
+      roots.push({ node: y, sides: Array::make(kids(y).length(), @tree.Right), })
     }
     return Some({ ..doc, roots, })
   }
@@ -251,7 +251,7 @@ fn append(
         sides.push(s)
       }
       let roots = doc.roots.copy()
-      roots[i] = { node: n, sides }
+      roots[i] = { node: n, sides, }
       return Some({ ..doc, roots, })
     }
   }
@@ -268,12 +268,12 @@ fn body(
   f : (Array[@tree.Block]) -> Array[@tree.Block],
 ) -> @tree.Doc? {
   if node == @tree.doc_id {
-    return Some({ ..doc, body: f(doc.body) })
+    return Some({ ..doc, body: f(doc.body), })
   }
   guard find(doc, node) is Some(n) else { return None }
   let m = match n {
-    HeadingNode(h) => @tree.HeadingNode({ ..h, body: f(h.body) })
-    ListNode(l) => @tree.ListNode({ ..l, body: f(l.body) })
+    HeadingNode(h) => @tree.HeadingNode({ ..h, body: f(h.body), })
+    ListNode(l) => @tree.ListNode({ ..l, body: f(l.body), })
     ImplicitNode(_) => return None
   }
   splice(doc, node, _ => [m])

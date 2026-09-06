@@ -6,12 +6,12 @@
 
 ///|
 fn doc(roots : Array[@tree.Root]) -> @tree.Doc {
-  { frontmatter: None, eol: Lf, body: [], roots }
+  { frontmatter: None, eol: Lf, body: [], roots, }
 }
 
 ///|
 fn root(node : @tree.Node, sides? : Array[@tree.Side] = []) -> @tree.Root {
-  { node, sides }
+  { node, sides, }
 }
 
 ///|
@@ -22,7 +22,7 @@ fn heading(
   body? : Array[@tree.Block] = [],
   fold? : @tree.Fold? = None,
 ) -> @tree.Node {
-  @tree.HeadingNode({ id, label, fold, body, children })
+  @tree.HeadingNode({ id, label, fold, body, children, })
 }
 
 ///|
@@ -33,12 +33,12 @@ fn item(
   body? : Array[@tree.Block] = [],
   fold? : @tree.Fold? = None,
 ) -> @tree.ListNode {
-  { id, label, fold, body, children }
+  { id, label, fold, body, children, }
 }
 
 ///|
 fn implicit(id : Int, children : Array[@tree.Node]) -> @tree.Node {
-  @tree.ImplicitNode({ id, children })
+  @tree.ImplicitNode({ id, children, })
 }
 
 ///|
@@ -112,12 +112,12 @@ test "項目も子の項目も同じノードになる" {
 ///|
 test "Opaque だけが落ちる。並びも id も保つ" {
   let body : Array[@tree.Block] = [
-    { id: 3, content: @tree.Image(alt="", src="p.png", title="") },
-    { id: 4, content: @tree.Opaque("prose") },
-    { id: 5, content: @tree.Link(text="t", href="u", title="") },
-    { id: 6, content: @tree.Code(info="js", text="1\n") },
-    { id: 7, content: @tree.Svg("<svg/>") },
-    { id: 8, content: @tree.ThematicBreak },
+    { id: 3, content: @tree.Image(alt="", src="p.png", title=""), },
+    { id: 4, content: @tree.Opaque("prose"), },
+    { id: 5, content: @tree.Link(text="t", href="u", title=""), },
+    { id: 6, content: @tree.Code(info="js", text="1\n"), },
+    { id: 7, content: @tree.Svg("<svg/>"), },
+    { id: 8, content: @tree.ThematicBreak, },
     {
       id: 9,
       content: @tree.Details(
@@ -164,7 +164,7 @@ test "Opaque だけが落ちる。並びも id も保つ" {
 
 ///|
 test "畳みはそのまま通る" {
-  let a = heading(2, "a", fold=Some({ open: true, summary: Some("a") }))
+  let a = heading(2, "a", fold=Some({ open: true, summary: Some("a"), }))
   json_inspect(project(doc([root(a)])), content={
     "roots": [
       {
@@ -229,8 +229,8 @@ test "frontmatter は通り、改行と散文は消える" {
     frontmatter: Some("k: v\n"),
     eol: Crlf,
     body: [
-      { id: 2, content: @tree.ThematicBreak },
-      { id: 3, content: @tree.Opaque("prose") },
+      { id: 2, content: @tree.ThematicBreak, },
+      { id: 3, content: @tree.Opaque("prose"), },
     ],
     roots: [root(heading(4, "a"))],
   }

@@ -53,7 +53,7 @@ pub fn mmm_unbuild_sig(md : String) -> String {
 #export_name("mmmSurvey")
 pub fn mmm_survey(md : String) -> String {
   let (doc, spots) = @tree.survey(md)
-  let out : Survey = { view: @view.project(doc), spots }
+  let out : Survey = { view: @view.project(doc), spots, }
   ToJson::to_json(out).stringify()
 }
 

@@ -32,7 +32,7 @@ jobs:
       # 上げるときは手元も一緒に上げて、整形し直したものを同じ commit で出す
       - name: Install MoonBit
         run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s 0.10.6+80dc50f24
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s 0.10.11+6ff76a5f9
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
       - run: moon version
 

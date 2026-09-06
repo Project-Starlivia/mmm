@@ -9,8 +9,8 @@
 /// id は割り付けの直前に文書順で振るので、ここでは 0 を置く。
 /// `from`・`to` はその中身の原文での範囲で、`to` は持ち主の地番もそこまで伸ばす。
 fn fill(b : Build, content : Content, from~ : Int, to~ : Int) -> Unit {
-  let block : Block = { id: 0, content }
-  let at : Spot = { from, label: None, to }
+  let block : Block = { id: 0, content, }
+  let at : Spot = { from, label: None, to, }
   if b.stack.is_empty() {
     b.body.push(block)
     b.body_at.push(at)
@@ -172,7 +172,7 @@ fn carve(md : String, from : Int, to : Int) -> String {
   if indent == 0 {
     return String::unsafe_substring(md, start=from, end=z)
   }
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let mut i = from
   let mut head = false
   while i < z {

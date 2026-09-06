@@ -221,10 +221,10 @@ fn tag_at(md : String, i : Int, to : Int) -> Tag? {
     guard z > 0 else { return None }
     let raw = slice(md, i, z)
     if shut {
-      return Some({ mark: Close, from: i, to: z, ok: raw == spelling(Close) })
+      return Some({ mark: Close, from: i, to: z, ok: raw == spelling(Close), })
     }
     let mark = Open(open=raw == spelling(Open(open=true)))
-    return Some({ mark, from: i, to: z, ok: raw == spelling(mark) })
+    return Some({ mark, from: i, to: z, ok: raw == spelling(mark), })
   }
   // 閉じの `</summary>` は開きと組で 1 つの綴りにするので、単独では拾わない
   if !shut && name_at(md, n, "summary", to) {
@@ -234,7 +234,7 @@ fn tag_at(md : String, i : Int, to : Int) -> Tag? {
     let b = z - 10
     guard has(md, b, "</summary>", to) else { return None }
     let mark = Name(slice(md, a, b))
-    return Some({ mark, from: i, to: z, ok: slice(md, i, z) == spelling(mark) })
+    return Some({ mark, from: i, to: z, ok: slice(md, i, z) == spelling(mark), })
   }
   None
 }
@@ -243,7 +243,7 @@ fn tag_at(md : String, i : Int, to : Int) -> Tag? {
 /// 塊を綴りとして読む。生の HTML の塊だけを見る
 /// （段落の中のタグは md が中身と言っているので、mmm は綴りにしない）。
 fn read_spell(md : String, b : @markdown.Block) -> Spell {
-  guard b is HtmlBlock(..) else { return { tags: [], writes: false } }
+  guard b is HtmlBlock(..) else { return { tags: [], writes: false, } }
   let s = block_span(b)
   let tags = []
   // **タグの間の空白は綴りではない。** 1 行に並べても行で分けても言っている
@@ -273,7 +273,7 @@ fn read_spell(md : String, b : @markdown.Block) -> Spell {
       }
     }
   }
-  { tags, writes: writes && tags.length() > 0 }
+  { tags, writes: writes && tags.length() > 0, }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -420,7 +420,7 @@ fn fold_of(s : Spell) -> Fold {
   } else {
     None
   }
-  { open, summary }
+  { open, summary, }
 }
 
 ///|
@@ -491,7 +491,7 @@ fn pieces(
   let spots = []
   for i in 0..<n {
     for t in spells[i].tags {
-      spots.push({ tag: t, block: i })
+      spots.push({ tag: t, block: i, })
     }
   }
   let ps = pairs(spots)

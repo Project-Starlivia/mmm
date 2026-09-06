@@ -414,21 +414,21 @@ test "setext の見出しは境界の先でも深さ 2" {
 /// 読み直せば文書順に振り直されるので、その番号を先に言えるようにする。
 test "number — 文書順に振り直したときの番号。中身も同じ列、先頭に足せば後ろがずれる" {
   fn leaf(id : Int, label : String) -> Node {
-    HeadingNode({ id, label, fold: None, body: [], children: [] })
+    HeadingNode({ id, label, fold: None, body: [], children: [], })
   }
 
   let d : Doc = {
     frontmatter: None,
     eol: Lf,
-    body: [{ id: 2, content: ThematicBreak }],
+    body: [{ id: 2, content: ThematicBreak, }],
     roots: [
-      { node: leaf(999, "n"), sides: [] },
+      { node: leaf(999, "n"), sides: [], },
       {
         node: HeadingNode({
           id: 3,
           label: "r",
           fold: None,
-          body: [{ id: 4, content: ThematicBreak }],
+          body: [{ id: 4, content: ThematicBreak, }],
           children: [leaf(5, "a"), leaf(998, "m")],
         }),
         sides: [Right, Right],

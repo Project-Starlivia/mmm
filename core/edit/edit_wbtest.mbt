@@ -15,7 +15,7 @@ test "Rename — 編集を当てれば名前が替わり、focus はそのノー
 
 ///|
 test "できない操作 — 編集は無く、focus も無い" {
-  assert_eq(edit("# a\n", Rename(id=9, label="b")), { edits: [], focus: None })
+  assert_eq(edit("# a\n", Rename(id=9, label="b")), { edits: [], focus: None, })
 }
 
 ///|
@@ -89,7 +89,7 @@ test "Graft — 貼り付けの見本" {
   // 文書へ中身は断る
   assert_eq(
     edit("# r\n", Graft(at=In(node=@tree.doc_id, side=None), md="![](q.png)\n")),
-    { edits: [], focus: None },
+    { edits: [], focus: None, },
   )
   // 途中の飛びを 6 段目へ — 飛びは空の項目 `- - - b`
   let six = "# 1\n\n## 2\n\n### 3\n\n#### 4\n\n##### 5\n\n###### t\n"
