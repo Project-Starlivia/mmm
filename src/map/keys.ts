@@ -131,7 +131,7 @@ export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
   if (k.key === "H" && k.shift && !k.mod) {
     if (anchor === null) return null;
     const node = L.boxes.get(anchor)?.node ?? null;
-    if (node === null || node.label === null) return null;
+    if (node === null) return null;
     return node.fold !== null
       ? { kind: "op", op: { kind: "unfold", id: anchor }, edit: false }
       : { kind: "op", op: { kind: "fold", id: anchor, open: false }, edit: false };
