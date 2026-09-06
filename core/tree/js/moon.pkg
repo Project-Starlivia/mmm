@@ -11,6 +11,7 @@ import {
   "mmm-app/core/edit",
   "mmm-app/core/map",
   "mmm-app/core/render",
+  "mmm-app/core/read",
 }
 
 supported_targets = "js"

@@ -19,7 +19,6 @@ import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language"
 import { oneDarkHighlightStyle, oneDarkTheme } from "@codemirror/theme-one-dark";
 import { paneHint } from "./app/hint.ts";
 import type * as core from "./coreApi.ts";
-import { type Anchors, type Holder } from "./caret.ts";
 import { choice, fields, focused, highlightRanges, holder, setAnchors, setHolder, tree } from "./state.ts";
 
 /**
@@ -82,7 +81,7 @@ export class MdEditor {
    * 戻らない）。**持ち主だけは持ち越す** — 文書が入れ替わってもフォーカスは動いておらず、
    * 持ち主が動く理由が無い（起動は md）
    */
-  private create(doc: string, held: Holder): EditorState {
+  private create(doc: string, held: core.Holder): EditorState {
     return EditorState.create({
       doc,
       extensions: [
@@ -142,12 +141,12 @@ export class MdEditor {
   }
 
   /** 地図で選び直した。位置は host が地番で写してから渡す */
-  select(a: Anchors): void {
+  select(a: core.Anchors): void {
     this.view.dispatch({ effects: setAnchors.of(a) });
   }
 
   /** フォーカスがペインに入った。md → map なら引き継ぐ位置も一緒に */
-  hold(h: Holder, a?: Anchors): void {
+  hold(h: core.Holder, a?: core.Anchors): void {
     this.view.dispatch({ effects: a === undefined ? [setHolder.of(h)] : [setHolder.of(h), setAnchors.of(a)] });
   }
 

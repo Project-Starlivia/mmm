@@ -1,8 +1,6 @@
 // core の出口と入口。**形を整えるだけ** — 意味は 1 つも足さない。
 //
-// 使う側は `import * as core` で `core.View` / `core.survey(md)` / `core.hit(layout, x, y)` と
-// 書く。フロントでは view は画面を意味し、`Node` は DOM のグローバル型と衝突するので、
-// 裸の名前を出さない（MoonBit 側の `@view.Root` と同じ形）。
+// 使う側は `import * as core` で `core.survey(md)` / `core.hit(layout, x, y)` と書く。
 //
 // 木も箱も core から出ない。境界は数・文字列・真偽・持ち手（MoonBit の値を**中を見ずに**
 // 持ち、core にそのまま返す）と、操作 1 回ぶんの小さな JSON（Intent・落とし先・
@@ -14,19 +12,6 @@ import * as mbt from "../core/_build/js/release/build/tree/js/js.js";
 
 export type Side = "Right" | "Left";
 
-/** 畳み。在ること自体が「畳まれている」 */
-export interface Fold {
-  open: boolean;
-  /** `<summary>` の中身。行が無ければ null */
-  summary: string | null;
-}
-
-/** ノードにぶら下がる中身 1 枚。id はノードと同じ列（文書順の通し番号） */
-export interface Block {
-  id: number;
-  content: Content;
-}
-
 /** 中身そのもの。カードかどうかは core/map の分類 */
 export type Content =
   | { kind: "image"; alt: string; src: string; title: string }
@@ -36,36 +21,8 @@ export type Content =
   | { kind: "thematicBreak" }
   /** `<details>`。open / summary / body は GitHub が描くのと同じ読み取り。text は原文 */
   | { kind: "details"; text: string; open: boolean; summary: string | null; body: string }
-  /** 読み解かない原文。View には来ない — その場編集が原文をそのまま書き戻すときに送る */
+  /** 読み解かない原文。その場編集が原文をそのまま書き戻すときに送る */
   | { kind: "opaque"; text: string };
-
-export interface Node {
-  id: number;
-  /** Implicit（綴られなかった見出し）は null。空の見出しは "" */
-  label: string | null;
-  fold: Fold | null;
-  /** 中身のうち、core が読み解いたもの。Opaque は来ない */
-  blocks: Block[];
-  children: Node[];
-}
-
-/** 根 1 つ。側は根の子と並走する（`sides[i]` が `node.children[i]` の側） */
-export interface Root {
-  node: Node;
-  sides: Side[];
-}
-
-export interface View {
-  frontmatter: string | null;
-  roots: Root[];
-}
-
-/** id がノードのものか（中身の id なら false）。木を辿って確かめる —
- *  ノードと中身は同じ通し番号を分け合うので、種類は木の形からしか読めない */
-export function isNode(view: View, id: number): boolean {
-  const under = (n: Node): boolean => n.id === id || n.children.some(under);
-  return view.roots.some((t) => under(t.node));
-}
 
 /** 地番。ノードが md のどこに書かれているか。label はラベルの頭（Implicit と文書の散文は null） */
 export interface Spot {
@@ -98,21 +55,137 @@ export interface Handle {
   readonly [brand]: never;
 }
 
-/** 打鍵 1 回ぶんの読み。View と地番と、View の持ち手（layout に渡す） */
+// ---- 読み ----
+//
+// 木も地番も core が持つ。ts は持ち手を渡して問い合わせ、返った数・字・真偽を使うだけ。
+
+declare const surveyBrand: unique symbol;
+/** 打鍵 1 回ぶんの読み（持ち手）。木と地番と原文は core にしか無い */
 export interface Survey {
-  view: View;
-  spots: Map<number, Spot>;
-  handle: Handle;
+  readonly [surveyBrand]: never;
 }
 
-/**
- * md を core に読ませ、View と地番を 1 度に受け取る。読みのサイクルの唯一の入口。
- * 選択の持ち越しは core に無い — 位置は ts が CodeMirror に預けて写す（state.ts）
- */
-export function survey(md: string): Survey {
-  const r = record(mbt.mmmSurvey(md));
-  return { ...decodeSurvey(JSON.parse(field(r, "json", str))), handle: handle(r, "view") };
+/** md を core に読ませる。読みのサイクルの唯一の入口 */
+export const survey = (md: string): Survey => Object(mbt.mmmSurvey(md));
+
+/** id がノードのものか（中身の id なら false） */
+export const isNode = (s: Survey, id: number): boolean => mbt.mmmIsNode(s, id);
+
+/** 木が 1 つも無い（白紙） */
+export const empty = (s: Survey): boolean => mbt.mmmEmpty(s);
+
+/** まだ保存していない文書の名前（拡張子なし）。最初の根の字から。無ければ "empty" */
+export const name = (s: Survey): string => mbt.mmmName(s);
+
+/** ラベルをファイル名にする。何も残らなければ "" */
+export const toFileName = (label: string): string => mbt.mmmToFileName(label);
+
+/** 頭（frontmatter の原文。`---` は含まない）。無ければ null */
+export const frontmatter = (s: Survey): string | null => mbt.mmmFrontmatter(s) ?? null;
+
+/** その id の地番。無い id は null */
+export const spot = (s: Survey, id: number): Spot | null =>
+  opt(mbt.mmmSpot(s, id), (v) => {
+    const [from, label, to] = nums(v, 3);
+    return { from, label: label < 0 ? null : label, to };
+  });
+
+/** その字のノード（文書順で最初）。見本の md から id を引く */
+export const find = (s: Survey, label: string): number | null => mbt.mmmFind(s, label) ?? null;
+
+/** そのノードの中身の id、文書順 */
+export const blocks = (s: Survey, id: number): number[] => [...mbt.mmmBlocks(s, id)];
+
+/** 選んだ部分木の原文（Mod+C / Mod+X）。何も選んでいなければ "" */
+export const copy = (s: Survey, ids: number[]): string => mbt.mmmCopy(s, ids);
+
+/** 頭が言っている画像フォルダ（綴りのまま）。無ければ null */
+export const imageFolder = (s: Survey): string | null => mbt.mmmImageFolder(s) ?? null;
+
+/** 画像フォルダの宣言を書き換える編集 1 つ */
+export const setImageFolder = (s: Survey, value: string): Edit => editOne(JSON.parse(mbt.mmmSetImageFolder(s, value)));
+
+/** 宣言フォルダの引っ越しに本文の画像を追従させる操作列 */
+export const retarget = (s: Survey, from: string, to: string): Op[] =>
+  list(JSON.parse(mbt.mmmRetarget(s, from, to)), (json) => ({ kind: "raw", json }));
+
+/** 宣言の綴りを揃える。空・絶対パス・URL は null */
+export const normalizePath = (value: string): string | null => mbt.mmmNormalizePath(value) ?? null;
+
+/** path が folder の下にあるなら、フォルダからの残り。外なら null */
+export const under = (path: string, folder: string): string | null => mbt.mmmUnder(path, folder) ?? null;
+
+/** 先頭の `./` を落とした形（md が書く `./x` とカードが持つ `x` を揃える） */
+export const barePath = (path: string): string => mbt.mmmBarePath(path);
+
+// ---- 選択 ----
+//
+// 選択の**値**。どう変わるか（クリック・矩形・矢印・当たり）は core が持ち、ts は聞いた値を持つだけ。
+
+/** 選んでいるノード（文書順）と、範囲選択・矢印の基点 */
+export interface Selection {
+  ids: number[];
+  anchor: number | null;
 }
+
+export const NONE: Selection = { ids: [], anchor: null };
+
+/** 何を選んでいるか — ノードの並びか、カード 1 枚か。片方だけ（spec.md「C カード」） */
+export type Choice = { kind: "nodes"; sel: Selection } | { kind: "card"; id: number };
+
+export const NOTHING: Choice = { kind: "nodes", sel: NONE };
+
+/** ノードの選択として見る。カードを選んでいれば空 */
+export const nodesOf = (c: Choice): Selection => (c.kind === "nodes" ? c.sel : NONE);
+
+/** カードの選択として見る。ノードを選んでいれば null */
+export const cardOf = (c: Choice): number | null => (c.kind === "card" ? c.id : null);
+
+/** 選択を持っている側。フォーカスが最後に入ったペイン */
+export type Holder = "md" | "map";
+
+/** md 側のカーソル 1 つ、または選択 1 つぶん（`from == to` なら点） */
+export interface Range {
+  from: number;
+  to: number;
+}
+
+/** md のカーソルぜんぶ。head は主カーソルの頭（anchor になる） */
+export interface Caret {
+  ranges: Range[];
+  head: number;
+}
+
+/** 地図の選択の位置。ノードはラベルの頭、カードは中身の原文の頭。CodeMirror が編集で写す。null は無し */
+export type Anchors = { kind: "nodes"; at: number[]; anchor: number | null } | { kind: "card"; at: number } | null;
+
+/** 選択。持ち主が決める — md が持つ間はカーソルから、地図が持つ間は位置から */
+export const chosen = (s: Survey, holder: Holder, caret: Caret, a: Anchors): Choice =>
+  choice(
+    JSON.parse(
+      mbt.mmmChosen(
+        s,
+        holder,
+        caret.ranges.flatMap((r) => [r.from, r.to]),
+        caret.head,
+        anchorsJson(a),
+      ),
+    ),
+  );
+
+/** focus の id をその木の地番で位置に。無ければ null */
+export const anchorsOf = (s: Survey, id: number | null): Anchors => maybe(mbt.mmmAnchorsOf(s, id ?? undefined), anchors);
+
+/** 選択をその木の地番で位置に。地図で選んだときの setAnchors の値 */
+export const anchorsFor = (s: Survey, c: Choice): Anchors => maybe(mbt.mmmAnchorsFor(s, choiceJson(c)), anchors);
+
+/** md 側で薄く塗る範囲。ノードは地番そのもの（子孫込み）、カードは中身の原文 */
+export const ranges = (s: Survey, c: Choice): Range[] => {
+  const flat = mbt.mmmRanges(s, choiceJson(c));
+  const out: Range[] = [];
+  for (let i = 0; i + 1 < flat.length; i += 2) out.push({ from: flat[i], to: flat[i + 1] });
+  return out;
+};
 
 // ---- 地図 ----
 //
@@ -133,8 +206,8 @@ export interface Font {
 /** 幅を測る。core の layout / render / 欄の重ねがこれを閉包で受ける */
 export type Measure = (font: Font, text: string) => number;
 
-/** View を置く。字の実測は canvas なので ts から渡す */
-export const layout = (s: Survey, measure: Measure): Layout => asLayout(mbt.mmmLayout(s.handle, measure));
+/** 読みを置く。字の実測は canvas なので ts から渡す */
+export const layout = (s: Survey, measure: Measure): Layout => asLayout(mbt.mmmLayout(s, measure));
 
 /** 位置と大きさだけの箱。x, y は左上 */
 export interface Rect {
@@ -160,12 +233,6 @@ export interface Camera {
 export interface Pane {
   width: number;
   height: number;
-}
-
-/** 選んでいるノード（文書順）と、範囲選択・矢印の基点 */
-export interface Selection {
-  ids: number[];
-  anchor: number | null;
 }
 
 export type Modifier = "none" | "shift" | "mod";
@@ -493,85 +560,40 @@ function tagged(v: unknown): [string, unknown] {
   return [str(v[0]), v[1]];
 }
 
-const side = (v: unknown): Side => (v === "Right" || v === "Left" ? v : bad("側でない"));
-
-const fold = (v: unknown): Fold => {
-  const o = record(v);
-  return { open: field(o, "open", bool), summary: option(o, "summary", str) };
-};
-
-function content(v: unknown): Content {
+/** Choice の JSON（`["Nodes", {sel}]` / `["Card", {id}]`） */
+function choice(v: unknown): Choice {
   const [tag, body] = tagged(v);
-  if (tag === "ThematicBreak") return { kind: "thematicBreak" };
-  if (tag === "Svg") return { kind: "svg", markup: str(body) };
-  if (tag !== "Image" && tag !== "Link" && tag !== "Code" && tag !== "Details") return bad(`知らない Content ${tag}`);
   const o = record(body);
-  switch (tag) {
-    case "Image":
-      return { kind: "image", alt: field(o, "alt", str), src: field(o, "src", str), title: field(o, "title", str) };
-    case "Link":
-      return { kind: "link", text: field(o, "text", str), href: field(o, "href", str), title: field(o, "title", str) };
-    case "Code":
-      return { kind: "code", info: field(o, "info", str), text: field(o, "text", str) };
-    case "Details":
-      return {
-        kind: "details",
-        text: field(o, "text", str),
-        open: field(o, "open", bool),
-        summary: option(o, "summary", str),
-        body: field(o, "body", str),
-      };
-    default:
-      return bad(`知らない Content ${tag}`);
+  if (tag === "Nodes") return { kind: "nodes", sel: field(o, "sel", selection) };
+  if (tag === "Card") return { kind: "card", id: field(o, "id", num) };
+  return bad(`知らない Choice ${tag}`);
+}
+
+/** Anchors の JSON（`["NodeAt", {at, anchor?}]` / `["CardAt", {at}]`） */
+function anchors(v: unknown): Anchors {
+  const [tag, body] = tagged(v);
+  const o = record(body);
+  if (tag === "NodeAt") {
+    return { kind: "nodes", at: field(o, "at", (x) => list(x, num)), anchor: option(o, "anchor", num) };
   }
+  if (tag === "CardAt") return { kind: "card", at: field(o, "at", num) };
+  return bad(`知らない Anchors ${tag}`);
 }
 
-const block = (v: unknown): Block => {
-  const o = record(v);
-  return { id: field(o, "id", num), content: field(o, "content", content) };
+/** 入口へ渡す Anchors。無ければ ""（MoonBit の None） */
+const anchorsJson = (a: Anchors): string => {
+  if (a === null) return "";
+  if (a.kind === "card") return JSON.stringify(["CardAt", { at: a.at }]);
+  return JSON.stringify(["NodeAt", a.anchor === null ? { at: a.at } : { at: a.at, anchor: a.anchor }]);
 };
 
-function node(v: unknown): Node {
-  const o = record(v);
-  return {
-    id: field(o, "id", num),
-    label: option(o, "label", str),
-    fold: option(o, "fold", fold),
-    blocks: field(o, "blocks", (b) => list(b, block)),
-    children: field(o, "children", (c) => list(c, node)),
-  };
-}
-
-const root = (v: unknown): Root => {
-  const o = record(v);
-  return { node: field(o, "node", node), sides: field(o, "sides", (s) => list(s, side)) };
-};
-
-/** core の JSON（`mmmViewJson` の出力）を View にする。試験はここを直接叩く */
-export function decode(json: unknown): View {
-  const o = record(json);
-  return {
-    frontmatter: option(o, "frontmatter", str),
-    roots: field(o, "roots", (r) => list(r, root)),
-  };
-}
-
-const spot = (v: unknown): Spot => {
-  const o = record(v);
-  return { from: field(o, "from", num), label: option(o, "label", num), to: field(o, "to", num) };
-};
-
-/** core の JSON（`mmmSurvey` の `json`）を View と地番にする。Map の鍵は文字列で来る */
-export function decodeSurvey(json: unknown): { view: View; spots: Map<number, Spot> } {
-  const o = record(json);
-  const spots = new Map<number, Spot>();
-  for (const [k, v] of Object.entries(field(o, "spots", record))) {
-    const id = Number(k);
-    if (!Number.isInteger(id)) bad(`spots の鍵 ${k}`);
-    spots.set(id, spot(v));
-  }
-  return { view: decode(field(o, "view", (v) => v)), spots };
-}
+/** 入口へ渡す Choice */
+const choiceJson = (c: Choice): string =>
+  JSON.stringify(
+    c.kind === "card"
+      ? ["Card", { id: c.id }]
+      : ["Nodes", { sel: c.sel.anchor === null ? { ids: c.sel.ids } : { ids: c.sel.ids, anchor: c.sel.anchor } }],
+  );
 
 /** Selection の JSON（`{ids, anchor?}`） */
 export function selection(v: unknown): Selection {

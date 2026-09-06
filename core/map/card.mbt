@@ -21,16 +21,6 @@ pub(all) enum Card {
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// 先頭の `./` を落とした形。`./x` と `x` は同じ場所を指すので、比べる前に
-/// 必ずこの形へ寄せる。**カードが持つのも、画像の鍵（app/assets.ts）になるのもこの形**
-pub fn bare(path : String) -> String {
-  match path.strip_prefix("./") {
-    Some(v) => v.to_owned()
-    None => path
-  }
-}
-
-///|
 /// コードのプレビューは何行まで。超えたら最後の行を `…` にする
 let code_max_lines = 6
 
@@ -78,7 +68,7 @@ fn host_of(href : String) -> String {
 /// scheme は 2 文字以上（1 文字は Windows のドライブ `C:\`）。
 fn image_card(src : String) -> Card? {
   guard scheme_len(src) <= 1 else { return None }
-  let path = bare(src)
+  let path = @tree.bare_path(src)
   guard path != "" else { return None }
   Some(Image(path~, name=last_segment(path)))
 }

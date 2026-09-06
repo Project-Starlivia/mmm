@@ -9,7 +9,7 @@
 pub(all) struct Selection {
   ids : Array[Int]
   anchor : Int?
-} derive(Eq, Debug, ToJson)
+} derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 pub let none : Selection = { ids: [], anchor: None, }

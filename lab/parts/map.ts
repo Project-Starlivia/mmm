@@ -3,10 +3,8 @@
 // 手で Box を組まないのは、それが嘘の置き方になるから。
 
 import * as core from "../../src/coreApi.ts";
-import { type Layout, type Node, type View, layout, survey } from "../../src/coreApi.ts";
 import { type MapHost, Mindmap } from "../../src/mindmap.ts";
 import { measure } from "../../src/map/measure.ts";
-import { NONE } from "../../src/map/select.ts";
 import type { Part } from "./kind.ts";
 
 const MD = `# mmm
@@ -49,7 +47,7 @@ interface Stand {
   el: HTMLDivElement;
   map: Mindmap;
   host: MapHost;
-  view: View;
+  s: core.Survey;
 }
 
 /**
@@ -61,8 +59,8 @@ interface Stand {
 function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
   const el = document.createElement("div");
   el.style.height = "100%"; // 枠いっぱいに（アプリでは #map-pane の flex が決める）
-  const s = survey(md);
-  let selection: core.Selection = NONE;
+  const s = core.survey(md);
+  let selection: core.Selection = core.NONE;
   let picked: number | null = null;
   const host: MapHost = {
     survey: () => s,
@@ -81,7 +79,7 @@ function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
       map.refreshSelection();
     },
     blockText: (id) => {
-      const sp = s.spots.get(id);
+      const sp = core.spot(s, id);
       return sp ? md.slice(sp.from, sp.to) : "";
     },
     apply: () => null,
@@ -95,32 +93,30 @@ function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
   const grown = new ResizeObserver(([e]) => {
     if (!e || e.contentRect.width === 0) return;
     grown.disconnect();
-    requestAnimationFrame(() => after({ el, map, host, view: s.view }));
+    requestAnimationFrame(() => after({ el, map, host, s }));
   });
   grown.observe(el);
   return el;
 }
 
 /** 見本の木と、その配置。右クリックメニューの見本が選択を渡すのに使う */
-export function sample(): { view: View; L: Layout } {
-  const s = survey(MD);
-  return { view: s.view, L: layout(s, measure) };
+export function sample(): { s: core.Survey; L: core.Layout } {
+  const s = core.survey(MD);
+  return { s, L: core.layout(s, measure) };
 }
 
-/** その名前のノード。無ければ例外（見本の md と食い違っている） */
-export function named(view: View, label: string): Node {
-  const find = (n: Node): Node | null =>
-    n.label === label ? n : (n.children.map(find).find((x) => x !== null) ?? null);
-  const hit = view.roots.map((r) => find(r.node)).find((x) => x !== null);
-  if (!hit) throw new Error(`ノード "${label}" が見本に無い`);
-  return hit;
+/** その名前のノードの id。無ければ例外（見本の md と食い違っている） */
+export function named(s: core.Survey, label: string): number {
+  const id = core.find(s, label);
+  if (id === null) throw new Error(`ノード "${label}" が見本に無い`);
+  return id;
 }
 
 /** そのノードの最初の中身の id */
-function firstBlock(view: View, label: string): number {
-  const b = named(view, label).blocks[0];
-  if (!b) throw new Error(`ノード "${label}" に中身が無い`);
-  return b.id;
+function firstBlock(s: core.Survey, label: string): number {
+  const b = core.blocks(s, named(s, label))[0];
+  if (b === undefined) throw new Error(`ノード "${label}" に中身が無い`);
+  return b;
 }
 
 const select = (host: MapHost, ids: number[]): void => host.setSelection({ ids, anchor: ids[0] ?? null }, false);
@@ -131,12 +127,11 @@ export const MAP: Part = {
   states: {
     plain: () => stand(),
     empty: () => stand(""),
-    selected: () => stand(MD, ({ view, host }) => select(host, [named(view, "Left").id])),
-    "selected-many": () =>
-      stand(MD, ({ view, host }) => select(host, ["Left", "one", "two"].map((l) => named(view, l).id))),
-    "label-editor": () => stand(MD, ({ view, map }) => map.beginEdit(named(view, "Left").id, null)),
-    "card-editor": () => stand(MD, ({ view, map }) => map.editCard(firstBlock(view, "Right"))),
-    "card-pick": () => stand(MD, ({ view, host }) => host.setPicked(firstBlock(view, "Right"))),
+    selected: () => stand(MD, ({ s, host }) => select(host, [named(s, "Left")])),
+    "selected-many": () => stand(MD, ({ s, host }) => select(host, ["Left", "one", "two"].map((l) => named(s, l)))),
+    "label-editor": () => stand(MD, ({ s, map }) => map.beginEdit(named(s, "Left"), null)),
+    "card-editor": () => stand(MD, ({ s, map }) => map.editCard(firstBlock(s, "Right"))),
+    "card-pick": () => stand(MD, ({ s, host }) => host.setPicked(firstBlock(s, "Right"))),
     indicator: () =>
       stand(MD, ({ el }) =>
         // 根が画面の外へ出るまでホイールで押しやる（本物と同じ入力）

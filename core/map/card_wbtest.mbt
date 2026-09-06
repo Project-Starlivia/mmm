@@ -92,8 +92,8 @@ test "コードは 6 行まで。末尾の改行は行にならず、空なら 1
 
 ///|
 test "bare は先頭の ./ だけを落とす" {
-  assert_eq(bare("./x/y"), "x/y")
-  assert_eq(bare("../x"), "../x")
+  assert_eq(@tree.bare_path("./x/y"), "x/y")
+  assert_eq(@tree.bare_path("../x"), "../x")
 }
 
 ///|

@@ -52,26 +52,194 @@ pub fn mmm_unbuild_sig(md : String) -> String {
 }
 
 ///|
-/// 打鍵 1 回ぶんの読み。`json` が View と地番（読みは打鍵ごとに 1 回に保つ）、
-/// `view` が View の持ち手（`mmmLayout` に渡す）。
-/// 選択の持ち越しは core に無い — 位置は ts が CodeMirror に預けて写す。
+/// 打鍵 1 回ぶんの読み。返るのは読み（木・地番・原文）の持ち手 — 木は出さない。
+/// 読むには下の問い合わせを使う。選択の持ち越しは core に無い — 位置は ts が
+/// CodeMirror に預けて写す
 #export_name("mmmSurvey")
 pub fn mmm_survey(md : String) -> @core.Any {
-  let (doc, spots) = @tree.survey(md)
-  let view = @view.project(doc)
-  let out : Survey = { view, spots, }
-  let o = @core.new_object()
-  o._set("json", @core.any(ToJson::to_json(out).stringify()))
-  o._set("view", @core.any(view))
-  o
+  @core.any(@read.survey(md))
 }
 
 ///|
-/// mmmSurvey の JSON の形
-priv struct Survey {
-  view : @view.View
-  spots : Map[Int, @tree.Spot]
-} derive(ToJson)
+fn read(handle : @core.Any) -> @read.Survey {
+  handle.cast()
+}
+
+///|
+/// id がノードのものか（中身の id なら false）
+#export_name("mmmIsNode")
+pub fn mmm_is_node(survey : @core.Any, id : Int) -> Bool {
+  read(survey).is_node(id)
+}
+
+///|
+/// 木が 1 つも無い（白紙）
+#export_name("mmmEmpty")
+pub fn mmm_empty(survey : @core.Any) -> Bool {
+  read(survey).empty()
+}
+
+///|
+/// まだ保存していない文書の名前（拡張子なし）。最初の根の字から
+#export_name("mmmName")
+pub fn mmm_name(survey : @core.Any) -> String {
+  read(survey).name()
+}
+
+///|
+/// ラベルをファイル名にする
+#export_name("mmmToFileName")
+pub fn mmm_to_file_name(label : String) -> String {
+  @read.to_file_name(label)
+}
+
+///|
+/// 頭（frontmatter の原文）。無ければ undefined
+#export_name("mmmFrontmatter")
+pub fn mmm_frontmatter(survey : @core.Any) -> String? {
+  read(survey).view.frontmatter
+}
+
+///|
+/// その id の地番（from, label, to）。label が無ければ -1。id が無ければ undefined
+#export_name("mmmSpot")
+pub fn mmm_spot(survey : @core.Any, id : Int) -> FixedArray[Int]? {
+  read(survey).spots.get(id).map(sp => [sp.from, sp.label.unwrap_or(-1), sp.to])
+}
+
+///|
+/// その字のノード（文書順で最初）。見本の md から id を引く
+#export_name("mmmFind")
+pub fn mmm_find(survey : @core.Any, label : String) -> Int? {
+  read(survey).find(label)
+}
+
+///|
+/// そのノードの中身の id、文書順
+#export_name("mmmBlocks")
+pub fn mmm_blocks(survey : @core.Any, id : Int) -> FixedArray[Int] {
+  fixed(read(survey).blocks(id))
+}
+
+///|
+/// 選択。持ち主（"md" / "map"）が決める — md が持つ間はカーソル（ranges は from, to の並び、
+/// head は主カーソルの頭）から、地図が持つ間は位置（anchors の JSON。無ければ ""）から。
+/// 返るのは Choice の JSON
+#export_name("mmmChosen")
+pub fn mmm_chosen(
+  survey : @core.Any,
+  holder : String,
+  ranges : FixedArray[Int],
+  head : Int,
+  anchors : String,
+) -> String {
+  let rs : Array[@read.Range] = []
+  let mut i = 0
+  while i + 1 < ranges.length() {
+    rs.push({ from: ranges[i], to: ranges[i + 1], })
+    i += 2
+  }
+  let a : @read.Anchors? = if anchors == "" {
+    None
+  } else {
+    Some(
+      @json.from_json(@json.parse(anchors)) catch {
+        e => abort("mmmChosen: Anchors の JSON が読めない — \{e}")
+      },
+    )
+  }
+  let h : @read.Holder = if holder == "md" { Md } else { Map }
+  json(@read.chosen(read(survey), h, { ranges: rs, head, }, a))
+}
+
+///|
+fn choice_of(s : String) -> @read.Choice {
+  @json.from_json(@json.parse(s)) catch {
+    e => abort("Choice の JSON が読めない — \{e}")
+  }
+}
+
+///|
+/// focus の id をその木の地番で位置に（Anchors の JSON。無ければ ""）
+#export_name("mmmAnchorsOf")
+pub fn mmm_anchors_of(survey : @core.Any, id : Int?) -> String {
+  match @read.anchors_of(read(survey), id) {
+    Some(a) => json(a)
+    None => ""
+  }
+}
+
+///|
+/// 選択（Choice の JSON）をその木の地番で位置に（Anchors の JSON。無ければ ""）
+#export_name("mmmAnchorsFor")
+pub fn mmm_anchors_for(survey : @core.Any, choice : String) -> String {
+  match @read.anchors_for(read(survey), choice_of(choice)) {
+    Some(a) => json(a)
+    None => ""
+  }
+}
+
+///|
+/// md 側で薄く塗る範囲（from, to の並び）
+#export_name("mmmRanges")
+pub fn mmm_ranges(survey : @core.Any, choice : String) -> FixedArray[Int] {
+  let out : Array[Int] = []
+  for r in @read.ranges(read(survey), choice_of(choice)) {
+    out.push(r.from)
+    out.push(r.to)
+  }
+  fixed(out)
+}
+
+///|
+/// 選んだ部分木の原文（Mod+C / Mod+X）
+#export_name("mmmCopy")
+pub fn mmm_copy(survey : @core.Any, ids : FixedArray[Int]) -> String {
+  read(survey).copy(ints(ids))
+}
+
+///|
+/// 頭が言っている画像フォルダ（綴りのまま）。無ければ undefined
+#export_name("mmmImageFolder")
+pub fn mmm_image_folder(survey : @core.Any) -> String? {
+  @read.image_folder(read(survey).view.frontmatter)
+}
+
+///|
+/// 画像フォルダの宣言を書き換える編集（Edit の JSON）
+#export_name("mmmSetImageFolder")
+pub fn mmm_set_image_folder(survey : @core.Any, value : String) -> String {
+  let s = read(survey)
+  json(@read.set_image_folder(s.md, s.view.frontmatter, value))
+}
+
+///|
+/// 宣言フォルダの引っ越しに本文の画像を追従させる操作列（Op の列の JSON）
+#export_name("mmmRetarget")
+pub fn mmm_retarget(survey : @core.Any, from : String, to : String) -> String {
+  json(@read.retarget(read(survey).view, from, to))
+}
+
+///|
+/// 宣言の綴りを揃える。読めなければ undefined
+#export_name("mmmNormalizePath")
+pub fn mmm_normalize_path(value : String) -> String? {
+  @read.normalize_path(value)
+}
+
+///|
+/// path が folder の下にあるなら、フォルダからの残り。外なら undefined
+#export_name("mmmUnder")
+pub fn mmm_under(path : String, folder : String) -> String? {
+  @read.under(path, folder)
+}
+
+///|
+/// 先頭の `./` を落とした形
+#export_name("mmmBarePath")
+pub fn mmm_bare_path(path : String) -> String {
+  @tree.bare_path(path)
+}
 
 ///|
 /// 操作を md に映す。op は `@op.Op` の JSON（ToJson の形そのまま）。
@@ -89,15 +257,14 @@ pub fn mmm_edit(md : String, op : String) -> String {
 // ---- 配置 ----
 
 ///|
-/// View を置く。`measure` は ts の canvas（Font, 字 → 幅）。返るのは Layout の持ち手 —
+/// 読み（mmmSurvey の持ち手）を置く。`measure` は ts の canvas（Font, 字 → 幅）。返るのは Layout の持ち手 —
 /// 箱は出さない。読むには下の問い合わせを使う
 #export_name("mmmLayout")
 pub fn mmm_layout(
-  view : @core.Any,
+  survey : @core.Any,
   measure : (@map.Font, String) -> Double,
 ) -> @core.Any {
-  let v : @view.View = view.cast()
-  @core.any(@map.layout(v.roots, @map.node_size(measure)))
+  @core.any(@map.layout(read(survey).view.roots, @map.node_size(measure)))
 }
 
 ///|

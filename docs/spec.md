@@ -43,16 +43,19 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 svg(要素を作る) / card(Card 1 枚 → SVG) / render(Renderer。id → 要素、
                 transform / d のキャッシュ、並び直し、paint)。class と data-* は
                 style.css と ts のハンドラとの契約。試験は happy-dom
+  read/         md を読んだもの（Survey = 木 + 地番 + 原文）と、木の判断。ts はこれを持ち手として
+                持ち、問い合わせで読む。survey(is_node / empty / find / blocks) / caret(md の
+                カーソル・地図の位置 → 選択。chosen が持ち主とそれらから導く。選択の規則はここだけ) /
+                copy(選んだ部分木の原文) / name(文書の名前。ファイル名の柵) / head(frontmatter の
+                画像フォルダの宣言を読む・書く、引っ越しの追従、綴りの正規化)
   tree/js/      browser への出口。mmmSurvey / mmmLayout / mmmRenderer / mmmDraw …。
-                データは JSON、MoonBit の値は不透明な持ち手で往復する
+                MoonBit の値は不透明な持ち手で往復し、操作 1 回ぶんの小さな JSON だけが渡る
 src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す・動かす・カードを扱う・
         貼る/落とす/描く。**
-  coreApi.ts   core の出口と入口。形を整える唯一の場所（survey が View・地番を受け、edit が Op を
-               送る。地図は持ち手を渡して問い合わせる — hit / click / keyed / drop / fit …）。
-               木も箱も core から出ない。TS では必ず `core.View` と書く
-  caret.ts     md のカーソル、または地図の選択の位置がどのノードに掛かるか（最も深いもの。
-               区間の重なりだけ）。derive が持ち主とそれらから選択を導く。選択の規則はここだけ
-  state.ts     文書から導けるものの置き場(EditorState の field: tree = core の答え、anchors = 地図の
+  coreApi.ts   core の出口と入口。形を整える唯一の場所（survey が持ち手を受け、edit が Op を
+               送る。木も地図も持ち手を渡して問い合わせる — spot / chosen / name / hit / click /
+               keyed / drop / fit …）。木も箱も core から出ない
+  state.ts     文書から導けるものの置き場(EditorState の field: tree = core の読みの持ち手、anchors = 地図の
                選択の位置、holder = 持ち主、choice = 選択。位置は CodeMirror が編集で写す。effect は
                setAnchors / focused / setHolder。DOM を知らない)
   editor.ts    Markdown 側(CodeMirror 6、履歴も CodeMirror。state.ts の field を載せ、
@@ -929,7 +932,7 @@ Markdown 無し   ←   両方   →   Mindmap 無し
 **md 側の薄塗りはテキスト選択ではない**（CodeMirror の装飾）。実選択にするとカーソルを
 奪う。地図が持つ間だけ出る。
 
-**どれに掛かるかは、そのノード自身の文に掛かっているかどうか、それだけ**（`src/caret.ts`）。
+**どれに掛かるかは、そのノード自身の文に掛かっているかどうか、それだけ**（`core/read/caret.mbt`）。
 自身の文とは骨格の行と、子に取られていない中身（あいだの空行も含む）。文書は隙間なく
 分かれるので、点でも範囲でも複数カーソルでも同じ 1 つの規則。文書の頭・最初の見出しより
 前の散文・区切り行には何も出ない。**子孫まで含む `to` で見てはいけない** — カーソル 1 つで
