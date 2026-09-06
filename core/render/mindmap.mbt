@@ -1120,11 +1120,9 @@ fn Mindmap::open_menu(self : Mindmap, x : Double, y : Double) -> Unit {
   if !sel.ids.contains(id) {
     (self.host.set_selection)({ ids: [id], anchor: Some(id), }, false)
   }
-  self.menu.show(
-    x,
-    y,
-    items_of(@map.items(self.layout, (self.host.selection)()), i => self.act(i)),
-  )
+  self.menu.show(x, y, () => {
+    items_of(@map.items(self.layout, (self.host.selection)()), i => self.act(i))
+  })
 }
 
 ///|

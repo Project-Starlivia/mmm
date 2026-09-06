@@ -37,8 +37,10 @@ pub fn more_menu(s : More, a : MoreActs) -> Array[@parts.Entry] {
     ),
     Sep,
     Run(@parts.row("Accent color", mark=Some("palette")), a.pick_color),
-    // 絵は「押すと何になるか」（切り替えた先）を言う。字と同じ向き
-    Run(
+    // 絵は「押すと何になるか」（切り替えた先）を言う。字と同じ向き。
+    // **閉じない**（`Flip`）— 変わったのは画面の見え方そのものなので、
+    // 押した場所から確かめられるし、行がその場で次の状態を名乗る
+    Flip(
       @parts.row(
         if s.light {
           "Dark theme"
@@ -50,7 +52,7 @@ pub fn more_menu(s : More, a : MoreActs) -> Array[@parts.Entry] {
       a.toggle_theme,
     ),
     // 見た目は変えず、叩ける範囲を箱の外まで広げる。絵も切り替えた先 — 広げるなら破線の箱、戻すなら照準
-    Run(
+    Flip(
       @parts.row(
         if s.grab {
           "Exact hit"
