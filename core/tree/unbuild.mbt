@@ -18,7 +18,7 @@ priv struct Unbuild {
 ///|
 /// 木を mdAst にする。
 pub fn unbuild(doc : Doc) -> @markdown.Document {
-  let u : Unbuild = { defs: [] }
+  let u : Unbuild = { defs: [], }
   let out = []
   for b in doc.body {
     content(u, out, b)
@@ -30,7 +30,7 @@ pub fn unbuild(doc : Doc) -> @markdown.Document {
     // serialize は frontmatter を自分で書く（本文との間に空行を置くため）。
     // ここで持つのは、指紋（ast_sig）が mdAst ぜんぶを見るため
     frontmatter: doc.frontmatter.map(raw => {
-      ({ raw, entries: [], span: nowhere } : @markdown.Frontmatter)
+      ({ raw, entries: [], span: nowhere, } : @markdown.Frontmatter)
     }),
     children: out,
     definitions: u.defs,
@@ -46,21 +46,21 @@ pub fn unbuild_node(
   depth : Int,
   sides : Array[Side],
 ) -> @markdown.Document {
-  let u : Unbuild = { defs: [] }
+  let u : Unbuild = { defs: [], }
   let out = []
   node(u, out, x, depth, sides)
-  { frontmatter: None, children: out, definitions: u.defs, span: nowhere }
+  { frontmatter: None, children: out, definitions: u.defs, span: nowhere, }
 }
 
 ///|
 /// 散文（骨格を持たない中身の列）を mdAst にする。
 pub fn unbuild_prose(body : Array[Block]) -> @markdown.Document {
-  let u : Unbuild = { defs: [] }
+  let u : Unbuild = { defs: [], }
   let out = []
   for b in body {
     content(u, out, b)
   }
-  { frontmatter: None, children: out, definitions: u.defs, span: nowhere }
+  { frontmatter: None, children: out, definitions: u.defs, span: nowhere, }
 }
 
 ///|
@@ -135,8 +135,8 @@ fn node(
 fn wrap(out : Array[@markdown.Block], fold : Fold?, inner : () -> Unit) -> Unit {
   match fold {
     None => inner()
-    Some({ open, summary }) => {
-      let head = StringBuilder::new()
+    Some({ open, summary, }) => {
+      let head = StringBuilder()
       head.write_string(spelling(Open(open~)))
       match summary {
         Some(s) => {

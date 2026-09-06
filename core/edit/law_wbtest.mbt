@@ -67,7 +67,7 @@ fn ids(doc : @tree.Doc) -> Array[Int] {
 ///|
 /// id の部分木（または中身）の、id を消した姿。focus が同じものを指すかを見る。
 fn bare(doc : @tree.Doc, id : Int) -> Json? {
-  let found : Ref[Json?] = { val: None }
+  let found : Ref[Json?] = { val: None, }
   fn blocks(bs : Array[@tree.Block]) {
     for b in bs {
       if b.id == id {
@@ -198,7 +198,7 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
           }
         }
         None =>
-          if r != { edits: [], focus: None } {
+          if r != { edits: [], focus: None, } {
             bad.push("\{what}: できない操作に編集がある")
           }
       }
@@ -212,7 +212,7 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
 ///|
 /// その中身の持ち主。ノードの id なら None
 fn owner_of(doc : @tree.Doc, block : Int) -> Int? {
-  let found : Ref[Int?] = { val: None }
+  let found : Ref[Int?] = { val: None, }
   fn blocks(owner : Int, bs : Array[@tree.Block]) {
     for b in bs {
       if b.id == block {
@@ -288,7 +288,7 @@ fn under_fold(doc : @tree.Doc, id : Int) -> Bool {
 ///|
 /// ノードの親の id。根なら doc_id。中身と知らない id は None
 fn parent_of(doc : @tree.Doc, id : Int) -> Int? {
-  let found : Ref[Int?] = { val: None }
+  let found : Ref[Int?] = { val: None, }
   fn list(l : @tree.ListNode, above : Int) {
     if l.id == id {
       found.val = Some(above)

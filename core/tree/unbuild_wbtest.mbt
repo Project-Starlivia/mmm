@@ -13,18 +13,18 @@ fn doc(
   frontmatter? : String? = None,
   eol? : Eol = Lf,
 ) -> Doc {
-  { frontmatter, eol, body: blocks(body), roots }
+  { frontmatter, eol, body: blocks(body), roots, }
 }
 
 ///|
 fn root(node : Node, sides? : Array[Side] = []) -> Root {
-  { node, sides }
+  { node, sides, }
 }
 
 ///|
 /// id は書きに関係しないので 0 のまま。
 fn blocks(body : Array[Content]) -> Array[Block] {
-  body.map(content => ({ id: 0, content } : Block))
+  body.map(content => ({ id: 0, content, } : Block))
 }
 
 ///|
@@ -34,7 +34,7 @@ fn h(
   body? : Array[Content] = [],
   fold? : Fold? = None,
 ) -> Node {
-  HeadingNode({ id: 0, label, fold, body: blocks(body), children })
+  HeadingNode({ id: 0, label, fold, body: blocks(body), children, })
 }
 
 ///|
@@ -44,7 +44,7 @@ fn li(
   body? : Array[Content] = [],
   fold? : Fold? = None,
 ) -> ListNode {
-  { id: 0, label, fold, body: blocks(body), children }
+  { id: 0, label, fold, body: blocks(body), children, }
 }
 
 ///|
@@ -59,7 +59,7 @@ fn item(
 
 ///|
 fn gap(children : Array[Node]) -> Node {
-  ImplicitNode({ id: 0, children })
+  ImplicitNode({ id: 0, children, })
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -605,7 +605,7 @@ test "見出しの畳み" {
       doc([
         root(
           h("r", children=[
-            h("h", fold=Some({ open: false, summary: Some("h") }), body=[
+            h("h", fold=Some({ open: false, summary: Some("h"), }), body=[
               Opaque("body"),
             ]),
           ]),
@@ -634,7 +634,7 @@ test "open と、名前の無い畳み" {
     serialize(
       doc([
         root(
-          h("r", children=[h("h", fold=Some({ open: true, summary: None }))]),
+          h("r", children=[h("h", fold=Some({ open: true, summary: None, }))]),
         ),
       ]),
     ),
@@ -658,8 +658,8 @@ test "入れ子の畳み" {
       doc([
         root(
           h("r", children=[
-            h("a", fold=Some({ open: false, summary: Some("a") }), children=[
-              h("a1", fold=Some({ open: false, summary: Some("a1") })),
+            h("a", fold=Some({ open: false, summary: Some("a"), }), children=[
+              h("a1", fold=Some({ open: false, summary: Some("a1"), })),
             ]),
           ]),
         ),
@@ -695,7 +695,7 @@ test "項目の畳みは列を割る" {
         root(
           h("r", children=[
             item("a"),
-            item("b", fold=Some({ open: false, summary: Some("b") })),
+            item("b", fold=Some({ open: false, summary: Some("b"), })),
             item("c"),
           ]),
         ),
@@ -728,7 +728,7 @@ test "入れ子項目の畳みは親の列に" {
       doc([
         root(
           item("a", children=[
-            li("b", fold=Some({ open: false, summary: None })),
+            li("b", fold=Some({ open: false, summary: None, })),
             li("c"),
           ]),
         ),
@@ -758,7 +758,7 @@ test "畳みと側" {
         root(
           h("r", children=[
             h("a"),
-            h("b", fold=Some({ open: false, summary: None })),
+            h("b", fold=Some({ open: false, summary: None, })),
           ]),
           sides=[Right, Left],
         ),

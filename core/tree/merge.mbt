@@ -39,7 +39,7 @@ pub fn merge(
   }
   match plan(md, before, spans, after) {
     Some(edits) if shape(parse(apply(md, edits))) == shape(after) => edits
-    _ => [{ from: 0, to: md.length(), insert: serialize(after) }]
+    _ => [{ from: 0, to: md.length(), insert: serialize(after), }]
   }
 }
 
@@ -349,7 +349,7 @@ fn merge_seq(r : Merge, q : Seq) -> Unit {
     } else {
       (r.gap.get(first).unwrap(), last)
     }
-    r.out.push({ from, to, insert: "" })
+    r.out.push({ from, to, insert: "", })
   }
   let body = (id : Int) => pad(q.col) + indent((q.make)(id), q.col)
   let pend : Array[Int] = []
@@ -505,7 +505,15 @@ fn merge_body(
   let make = (id : Int) => prose([now.get(id).unwrap()], r.eol)
   let gap = (id : Int) => r.theirs.get(id).unwrap_or(true)
   if !aligned(old_ids, new_ids) {
-    merge_seq(r, { olds: old_ids, news: [], own, col, gap, keep: _ => (), make })
+    merge_seq(r, {
+      olds: old_ids,
+      news: [],
+      own,
+      col,
+      gap,
+      keep: _ => (),
+      make,
+    })
     merge_seq(r, {
       olds: [],
       news: new_ids,
@@ -594,13 +602,13 @@ fn settle(r : Merge) -> Array[Edit] {
     let e = r.out[i]
     match out.last() {
       Some(p) if p.to == e.from =>
-        out[out.length() - 1] = { ..p, to: e.to, insert: p.insert + e.insert }
+        out[out.length() - 1] = { ..p, to: e.to, insert: p.insert + e.insert, }
       _ => out.push(e)
     }
   }
   out.map(e => {
     if e.insert != "" && mid_line(r.md, e.from) {
-      { ..e, insert: eol(r) + e.insert }
+      { ..e, insert: eol(r) + e.insert, }
     } else {
       e
     }
@@ -625,7 +633,7 @@ fn replace(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
 fn patch(r : Merge, id : Int, text : String) -> Edit {
   // 前の木に無い id はここへ来ない — 親の子 id 列が違うので親が書かれる
   let s = r.spans.get(id).unwrap()
-  { from: s.from, to: s.to, insert: indent(text, column(r.md, s.from)) }
+  { from: s.from, to: s.to, insert: indent(text, column(r.md, s.from)), }
 }
 
 ///|
@@ -635,7 +643,7 @@ fn indent(text : String, n : Int) -> String {
     return text
   }
   let pad = pad(n)
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let mut head = false
   for c in text {
     if head && c != '\n' && c != '\r' {
@@ -712,8 +720,8 @@ fn kind(x : Node) -> Int {
 ///|
 fn with_children(x : Node, kids : Array[Node]) -> Node {
   match x {
-    HeadingNode(h) => HeadingNode({ ..h, children: kids })
-    ImplicitNode(g) => ImplicitNode({ ..g, children: kids })
+    HeadingNode(h) => HeadingNode({ ..h, children: kids, })
+    ImplicitNode(g) => ImplicitNode({ ..g, children: kids, })
     ListNode(l) =>
       ListNode({
         ..l,
@@ -759,7 +767,7 @@ pub fn shape(doc : Doc) -> Doc {
     ..doc,
     eol: Lf,
     body: faceless(doc.body),
-    roots: doc.roots.map(r => { node: faceless_node(r.node), sides: r.sides }),
+    roots: doc.roots.map(r => { node: faceless_node(r.node), sides: r.sides, }),
   }
 }
 
@@ -775,7 +783,7 @@ fn faceless_node(x : Node) -> Node {
       })
     ListNode(l) => ListNode(faceless_list(l))
     ImplicitNode(g) =>
-      ImplicitNode({ id: 0, children: g.children.map(faceless_node) })
+      ImplicitNode({ id: 0, children: g.children.map(faceless_node), })
   }
 }
 
@@ -791,5 +799,5 @@ fn faceless_list(l : ListNode) -> ListNode {
 
 ///|
 fn faceless(body : Array[Block]) -> Array[Block] {
-  body.map(b => { id: 0, content: b.content })
+  body.map(b => { id: 0, content: b.content, })
 }

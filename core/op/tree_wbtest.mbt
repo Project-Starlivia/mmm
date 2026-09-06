@@ -3,12 +3,12 @@
 
 ///|
 fn doc(roots : Array[@tree.Root], body? : Array[@tree.Block] = []) -> @tree.Doc {
-  { frontmatter: None, eol: Lf, body, roots }
+  { frontmatter: None, eol: Lf, body, roots, }
 }
 
 ///|
 fn root(node : @tree.Node, sides? : Array[@tree.Side] = []) -> @tree.Root {
-  { node, sides }
+  { node, sides, }
 }
 
 ///|
@@ -19,7 +19,7 @@ fn h(
   body? : Array[@tree.Block] = [],
   fold? : @tree.Fold? = None,
 ) -> @tree.Node {
-  @tree.HeadingNode({ id, label, fold, body, children })
+  @tree.HeadingNode({ id, label, fold, body, children, })
 }
 
 ///|
@@ -30,7 +30,7 @@ fn li(
   body? : Array[@tree.Block] = [],
   fold? : @tree.Fold? = None,
 ) -> @tree.ListNode {
-  { id, label, fold, body, children }
+  { id, label, fold, body, children, }
 }
 
 ///|
@@ -46,15 +46,15 @@ fn item(
 
 ///|
 fn gap(id : Int, children : Array[@tree.Node]) -> @tree.Node {
-  @tree.ImplicitNode({ id, children })
+  @tree.ImplicitNode({ id, children, })
 }
 
 ///|
 fn pic(id : Int) -> @tree.Block {
-  { id, content: Image(alt="", src="p.png", title="") }
+  { id, content: Image(alt="", src="p.png", title=""), }
 }
 
 ///|
 fn code(id : Int) -> @tree.Block {
-  { id, content: Code(info="", text="x") }
+  { id, content: Code(info="", text="x"), }
 }

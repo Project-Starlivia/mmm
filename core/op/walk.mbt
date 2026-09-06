@@ -124,7 +124,7 @@ fn above(path : Array[Int]) -> Int {
 ///|
 /// その中身を body に持つノードの id。ノードの id には応えない。
 fn owner(doc : @tree.Doc, block~ : Int) -> Int? {
-  let found : Ref[Int?] = { val: None }
+  let found : Ref[Int?] = { val: None, }
   each(doc, fn(id, is_block, path) {
     if is_block && id == block {
       found.val = Some(above(path))
@@ -136,7 +136,7 @@ fn owner(doc : @tree.Doc, block~ : Int) -> Int? {
 ///|
 /// 親の id。根なら doc_id、中身なら持ち主。
 fn parent(doc : @tree.Doc, id : Int) -> Int? {
-  let found : Ref[Int?] = { val: None }
+  let found : Ref[Int?] = { val: None, }
   each(doc, fn(x, _, path) { if x == id { found.val = Some(above(path)) } })
   found.val
 }
@@ -161,7 +161,7 @@ fn pick(doc : @tree.Doc, ids : Array[Int]) -> Array[Int] {
 ///|
 /// id か、その祖先が ids に居るか。動かすものの中へ落とすのを止める。
 fn within(doc : @tree.Doc, id : Int, ids : Array[Int]) -> Bool {
-  let hit : Ref[Bool] = { val: false }
+  let hit : Ref[Bool] = { val: false, }
   each(doc, fn(x, _, path) {
     if x == id && (ids.contains(x) || path.any(a => ids.contains(a))) {
       hit.val = true
@@ -173,7 +173,7 @@ fn within(doc : @tree.Doc, id : Int, ids : Array[Int]) -> Bool {
 ///|
 /// 文書に無い id。最大 + 1。空の文書なら doc_id + 1。
 fn fresh(doc : @tree.Doc) -> Int {
-  let top : Ref[Int] = { val: @tree.doc_id }
+  let top : Ref[Int] = { val: @tree.doc_id, }
   each(doc, fn(id, _, _) { if id > top.val { top.val = id } })
   top.val + 1
 }
@@ -181,7 +181,7 @@ fn fresh(doc : @tree.Doc) -> Int {
 ///|
 /// ノードでも中身でも、その id が在るか。
 fn has(doc : @tree.Doc, id : Int) -> Bool {
-  let hit : Ref[Bool] = { val: false }
+  let hit : Ref[Bool] = { val: false, }
   each(doc, fn(x, _, _) { if x == id { hit.val = true } })
   hit.val
 }
@@ -203,7 +203,7 @@ fn siblings(doc : @tree.Doc, id : Int) -> Array[Int] {
 ///|
 /// 祖先の id、近いほうから。根なら空。中身なら持ち主から。
 fn ancestors(doc : @tree.Doc, id : Int) -> Array[Int] {
-  let found : Ref[Array[Int]] = { val: [] }
+  let found : Ref[Array[Int]] = { val: [], }
   each(doc, fn(x, _, path) { if x == id { found.val = path.rev() } })
   found.val
 }
