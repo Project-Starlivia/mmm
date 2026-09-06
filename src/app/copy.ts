@@ -1,5 +1,5 @@
-// 写す（Mod+C / Mod+X）。選んだ部分木の原文を地番で切り出す。paste.ts の対で、
-// 貼る側の graft が断片を parse して木として差すので、深さの付け直しはしない。
+// 写す（Mod+C / Mod+X）。選んだ部分木の原文を地番で切り出す。貼る側（main.ts の
+// paste → core の Graft）が断片を形として読み直すので、深さも綴りも付け直さない。
 
 import type * as core from "../coreApi.ts";
 
