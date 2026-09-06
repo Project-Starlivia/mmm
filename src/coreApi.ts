@@ -521,6 +521,70 @@ export const hasImages = (text: string): boolean => mbt.mmmHasImages(text);
 /** この長さを超えたら「一部のアプリでは切られるかも」と伝える */
 export const LINK_WARN_LENGTH: number = mbt.mmmLinkWarnLength();
 
+// ---- ファイル ----
+//
+// File System Access API の窓口と、札の台帳（core/file）。札は不透明なまま往復し、
+// ts はブラウザの型（FileSystemFileHandle / FileSystemDirectoryHandle）であることだけ確かめる
+
+/** 読んだ / 書いた文書。name はディスク上の名前 */
+export interface Doc {
+  name: string;
+  text: string;
+}
+
+const doc = (v: unknown): Doc => {
+  const o = record(v);
+  return { name: field(o, "name", str), text: field(o, "text", str) };
+};
+const docOrNull = (v: unknown): Doc | null => (v === null ? null : doc(v));
+const fileHandle = (v: unknown): FileSystemFileHandle =>
+  v instanceof FileSystemFileHandle ? v : bad("FileSystemFileHandle でない");
+const dirOrNull = (v: unknown): FileSystemDirectoryHandle | null =>
+  v === null ? null : v instanceof FileSystemDirectoryHandle ? v : bad("FileSystemDirectoryHandle でない");
+const done = (p: unknown): Promise<void> => Promise.resolve(p).then(() => undefined);
+
+export const io = {
+  /** このブラウザがファイルを開けるか。**スマホには無い** — フォールバックは持たない */
+  canOpen: (): boolean => mbt.mmmCanOpen(),
+  canSaveAs: (): boolean => mbt.mmmCanSaveAs(),
+  /** 改名（`move`）を持つか。Chromium だけ */
+  canRename: (): boolean => mbt.mmmCanRename(),
+  /** いま開いているファイル。無ければ null */
+  currentFile: (): FileSystemFileHandle | null => {
+    const v: unknown = mbt.mmmCurrentFile();
+    return v === null ? null : fileHandle(v);
+  },
+  /** いまのファイルを手放す（New file）。覚えている一覧はそのまま */
+  close: (): void => mbt.mmmCloseFile(),
+  /** 覚えている文書を開く。許可はここで取り直す。断られたら null */
+  openKnown: (file: FileSystemFileHandle): Promise<Doc | null> => Promise.resolve(mbt.mmmOpenKnown(file)).then(docOrNull),
+  /** ピッカーで開く。取り消しは null */
+  openDialog: (): Promise<Doc | null> => Promise.resolve(mbt.mmmOpenDialog()).then(docOrNull),
+  /** 札から開く（落とされたファイル） */
+  openHandle: (file: FileSystemFileHandle): Promise<Doc> => Promise.resolve(mbt.mmmOpenHandle(file)).then(doc),
+  /** いまのファイルに書く。無ければ reject */
+  save: (text: string): Promise<void> => done(mbt.mmmSaveFile(text)),
+  /** 別名で保存。取り消しは null */
+  saveAs: (suggested: string, text: string): Promise<Doc | null> =>
+    Promise.resolve(mbt.mmmSaveAs(suggested, text)).then(docOrNull),
+  /** いま開いているファイルそのものの名前を変える。できなければ null */
+  rename: (name: string): Promise<string | null> =>
+    Promise.resolve(mbt.mmmRenameFile(name)).then((v) => (v === null ? null : str(v))),
+  /** 覚えている文書。最後に触れた順で、いま開いているものは外す */
+  recent: (): Promise<FileSystemFileHandle[]> => Promise.resolve(mbt.mmmRecent()).then((v) => list(v, fileHandle)),
+};
+
+/** 札の台帳（IndexedDB）。文書ごとの画像フォルダ */
+export const handles = {
+  /** その文書の画像フォルダ。覚えていなければ null */
+  folderFor: (file: FileSystemFileHandle): Promise<FileSystemDirectoryHandle | null> =>
+    Promise.resolve(mbt.mmmFolderFor(file)).then(dirOrNull),
+  rememberFolder: (file: FileSystemFileHandle, directory: FileSystemDirectoryHandle): Promise<void> =>
+    done(mbt.mmmRememberFolder(file, directory)),
+  /** 画像フォルダだけ忘れる。行は残す */
+  forgetFolder: (file: FileSystemFileHandle): Promise<void> => done(mbt.mmmForgetFolder(file)),
+};
+
 // ---- 形を確かめながら整える ----
 
 const bad = (what: string): never => {

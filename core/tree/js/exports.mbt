@@ -907,3 +907,138 @@ pub fn mmm_has_images(text : String) -> Bool {
 pub fn mmm_link_warn_length() -> Int {
   @app.link_warn_length
 }
+
+// ---- ファイル ----
+//
+// File System Access API の窓口と、札の台帳（core/file）。札（FileSystemFileHandle /
+// FileSystemDirectoryHandle）は不透明な持ち手のまま往復し、非同期は JS の Promise で返す
+
+///|
+/// いま開いているファイルと札の台帳。アプリに 1 つ
+let disk : @file.Io = @file.Io::new(@file.Handles::new(@file.idb_store()))
+
+///|
+fn doc_obj(d : @file.Doc?) -> @core.Any {
+  match d {
+    Some(d) => {
+      let o = @core.new_object()
+      o._set("name", @core.any(d.name))
+      o._set("text", @core.any(d.text))
+      o
+    }
+    None => @core.null()
+  }
+}
+
+///|
+fn[T] promised(f : async () -> T) -> @js_async.Promise[T] {
+  @js_async.Promise::from_async(f)
+}
+
+///|
+#export_name("mmmCanOpen")
+pub fn mmm_can_open() -> Bool {
+  @web.can_open()
+}
+
+///|
+#export_name("mmmCanSaveAs")
+pub fn mmm_can_save_as() -> Bool {
+  @web.can_save_as()
+}
+
+///|
+#export_name("mmmCanRename")
+pub fn mmm_can_rename() -> Bool {
+  @web.can_rename()
+}
+
+///|
+/// いま開いているファイルの札。無ければ null
+#export_name("mmmCurrentFile")
+pub fn mmm_current_file() -> @core.Any {
+  @core.from_option(disk.current_file())
+}
+
+///|
+/// いまのファイルを手放す（New file）
+#export_name("mmmCloseFile")
+pub fn mmm_close_file() -> Unit {
+  disk.close()
+}
+
+///|
+/// 覚えている文書を開く。許可を取り直し、断られたら null。`{ name, text }`
+#export_name("mmmOpenKnown")
+pub fn mmm_open_known(file : @web.FileHandle) -> @js_async.Promise[@core.Any] {
+  promised(async fn() { doc_obj(disk.open_known(file)) })
+}
+
+///|
+/// ピッカーで開く。取り消しは null
+#export_name("mmmOpenDialog")
+pub fn mmm_open_dialog() -> @js_async.Promise[@core.Any] {
+  promised(async fn() { doc_obj(disk.open_dialog()) })
+}
+
+///|
+/// 札から開く（落とされたファイル）
+#export_name("mmmOpenHandle")
+pub fn mmm_open_handle(file : @web.FileHandle) -> @js_async.Promise[@core.Any] {
+  promised(async fn() { doc_obj(Some(disk.open_handle(file))) })
+}
+
+///|
+/// いまのファイルに書く。無ければ reject
+#export_name("mmmSaveFile")
+pub fn mmm_save_file(text : String) -> @js_async.Promise[Unit] {
+  promised(async fn() { disk.save(text) })
+}
+
+///|
+/// 別名で保存。取り消しは null
+#export_name("mmmSaveAs")
+pub fn mmm_save_as(
+  suggested : String,
+  text : String,
+) -> @js_async.Promise[@core.Any] {
+  promised(async fn() { doc_obj(disk.save_as(suggested, text)) })
+}
+
+///|
+/// いま開いているファイルの名前を変える。改名できなければ null、できたら新しい名前
+#export_name("mmmRenameFile")
+pub fn mmm_rename_file(name : String) -> @js_async.Promise[@core.Any] {
+  promised(async fn() { @core.from_option(disk.rename(name)) })
+}
+
+///|
+/// 覚えている文書の札。最後に触れた順で、いま開いているものは外す
+#export_name("mmmRecent")
+pub fn mmm_recent() -> @js_async.Promise[FixedArray[@web.FileHandle]] {
+  promised(async fn() { FixedArray::from_array(disk.recent()) })
+}
+
+///|
+/// その文書の画像フォルダの札。覚えていなければ null
+#export_name("mmmFolderFor")
+pub fn mmm_folder_for(file : @web.FileHandle) -> @js_async.Promise[@core.Any] {
+  promised(async fn() { @core.from_option(disk.handles.folder_for(file)) })
+}
+
+///|
+/// 画像フォルダを覚える
+#export_name("mmmRememberFolder")
+pub fn mmm_remember_folder(
+  file : @web.FileHandle,
+  directory : @web.DirHandle,
+) -> @js_async.Promise[Unit] {
+  promised(async fn() { disk.handles.remember_folder(file, directory) })
+}
+
+///|
+/// 画像フォルダだけ忘れる
+#export_name("mmmForgetFolder")
+pub fn mmm_forget_folder(file : @web.FileHandle) -> @js_async.Promise[Unit] {
+  promised(async fn() { disk.handles.forget_folder(file) })
+}
