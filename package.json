@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "lab": "pnpm run core && vite lab --port 13132 --strictPort",
     "test": "pnpm run core && node --test \"test/*.test.ts\"",
-    "test:core": "cd core && moon test -p mmm-app/core/tree -p mmm-app/core/view -p mmm-app/core/op -p mmm-app/core/edit -p mmm-app/core/map",
+    "test:core": "cd core && moon test -p mmm-app/core/tree -p mmm-app/core/view -p mmm-app/core/op -p mmm-app/core/edit -p mmm-app/core/map -p mmm-app/core/render",
     "check": "tsc --noEmit && tsc -p test --noEmit && tsc -p lab --noEmit",
     "check:core": "cd core && moon check && moon fmt --check",
     "fixtures": "node test/tools/gen-load.ts",
@@ -22,6 +22,7 @@
   "devDependencies": {
     "@lezer/markdown": "^1.7.2",
     "@types/node": "^26.2.0",
+    "happy-dom": "^20.14.0",
     "typescript": "^5.6.0",
     "vite": "^6.0.0",
     "wrangler": "^4.126.0"
