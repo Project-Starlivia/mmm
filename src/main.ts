@@ -730,7 +730,7 @@ initShortcuts({
   togglePaneVis,
   undo: () => editor.undo(),
   redo: () => editor.redo(),
-  export: () => exportApi.run(),
+  export: (choose) => (choose ? exportApi.choose() : exportApi.run()),
 });
 
 // ---------- boot ----------

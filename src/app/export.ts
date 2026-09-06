@@ -223,7 +223,7 @@ export function exportWays(deps: ExportDeps, header?: (way: Way) => void): MenuE
  */
 export function initExport(
   deps: ExportDeps & { button: HTMLButtonElement; wayButton: HTMLButtonElement },
-): { run: () => void; refresh: () => void } {
+): { run: () => void; choose: () => void; refresh: () => void } {
   deps.wayButton.replaceChildren(icon("chevron-down"));
   let way = wayOf(load(LS_WAY));
   const show = (): void => {
@@ -296,6 +296,9 @@ export function initExport(
 
   return {
     run: () => fire(way),
+    /** キー（Mod+Shift+E）から出し方を選び直す。`▾` の click を通すので、
+     *  沈んでいれば開かず、開いたメニューは先頭の行に焦点が乗る（detail 0） */
+    choose: () => deps.wayButton.click(),
     /** 文書が変わった。押せるかどうかを見直す（main.ts の onUpdate から呼ばれる） */
     refresh: show,
   };

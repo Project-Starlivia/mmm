@@ -31,8 +31,8 @@ export function initShortcuts(deps: {
   togglePaneVis: (which: "md" | "map") => void;
   undo: () => void;
   redo: () => void;
-  /** いまの出し方で即書き出し */
-  export: () => void;
+  /** いまの出し方で即書き出し。Shift なら出し方を選び直すメニューを開く */
+  export: (choose: boolean) => void;
 }): void {
   // capture で拾う。CodeMirror などが先に食べてしまう前に決める
   window.addEventListener(
@@ -56,7 +56,7 @@ export function initShortcuts(deps: {
         deps.togglePane();
       } else if (key === "e") {
         e.preventDefault();
-        deps.export();
+        deps.export(e.shiftKey); // Shift = 出し方を選び直す
       } else if ((key === "z" || key === "y") && !inField(e)) {
         e.preventDefault();
         e.stopPropagation();

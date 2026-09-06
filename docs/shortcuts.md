@@ -21,7 +21,7 @@
 | `Mod+S` | Save |
 | `Mod+Shift+S` | Save as |
 | `Mod+E` | Export（いまの出し方でそのまま） |
-| `Mod+Shift+E` | Export（ラジアルメニューで出し方を選び直す） |
+| `Mod+Shift+E` | Export（`▾` のメニューを開いて出し方を選び直す） |
 | `Mod+Z` | Undo |
 | `Mod+Shift+Z` / `Mod+Y` | Redo |
 | `Mod+/` | Markdown と Mindmap でフォーカスを移す |
