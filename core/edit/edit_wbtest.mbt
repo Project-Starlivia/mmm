@@ -27,6 +27,16 @@ test "Rename — 名前の字はそのまま md に置かれ、読み直して�
 }
 
 ///|
+/// 項目の名前 `---` は md では水平線。項目は無くなり、`a` の中身の水平線になる。
+/// 木と md の形が食い違うので focus は無い（番号のまま返すと別のノードを指す）
+test "Rename — 書いた md が別の形に読まれるなら focus は無い" {
+  assert_eq(
+    applied("# a\n\n- b\n", Rename(id=3, label="---")),
+    ("# a\n\n---\n", None),
+  )
+}
+
+///|
 test "できない操作 — 編集は無く、focus も無い" {
   assert_eq(edit("# a\n", Rename(id=9, label="b")), { edits: [], focus: None, })
 }

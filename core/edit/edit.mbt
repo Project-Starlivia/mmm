@@ -20,7 +20,15 @@ pub fn edit(md : String, op : @op.Op) -> Edited {
   match @op.apply(before, op) {
     Some(done) => {
       let edits = @tree.merge(md, before, spans, done.doc)
-      let focus = done.focus.bind(id => @tree.number(done.doc, id))
+      // 書いた md を読み直して形が合わなければ focus は無い — focus は文書順の
+      // 番号なので、形がずれたまま返すと別のノードを指す（`- ---` が水平線になる等）
+      let same = @tree.shape(@tree.parse(@tree.apply(md, edits))) ==
+        @tree.shape(done.doc)
+      let focus = if same {
+        done.focus.bind(id => @tree.number(done.doc, id))
+      } else {
+        None
+      }
       { edits, focus, }
     }
     None => { edits: [], focus: None, }

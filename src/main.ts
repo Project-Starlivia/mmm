@@ -148,6 +148,8 @@ function apply(op: core.Op, edit: boolean): number | null {
   }
   const before = selection().anchor;
   editor.apply([r.edits], r.focus);
+  // 木に無い focus（書いた md が別の形に読まれた）— 選ぶものが無い。
+  // 選択は上の apply が focused.of(null) を乗せた時点で解けている
   if (r.focus === null) return null;
   // 別のノードへ移ったときだけ md を寄せる（同じノードに留まる操作で手元を揺らさない）。
   // 寄せは編集とは別の、スクロールだけのトランザクション — undo の 1 手には入らない
