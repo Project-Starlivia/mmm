@@ -28,7 +28,14 @@ pub(all) enum Flaw {
   ListSide(Int)
   /// Implicit の直下の項目。項目は相対記法で深さが飛ばないので、飛びを綴れない
   GappedItem(Int)
+  /// 深さ 7 以上の見出し。`#` は `deepest` 本までで、7 本目からは段落に読まれる
+  TooDeep(Int)
 } derive(Eq, ToJson)
+
+///|
+/// 見出しの最も深い所。`#` は 6 本まで（CommonMark）。項目は相対記法なので、
+/// 見出しの下で何段深くても書ける — 階層に上限は無く、見出しにだけ在る。
+pub let deepest : Int = 6
 
 ///|
 /// 文書ぜんぶを見る。破れが無ければ空。
@@ -87,6 +94,7 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   /// `kids` は i 番目の子の列の側（根なら `Root.sides`、深ければ無い）
   fn nodes(
     xs : Array[Node],
+    depth : Int,
     sides : Array[Side],
     kids : (Int) -> Array[Side],
   ) -> Unit {
@@ -100,10 +108,13 @@ pub fn check(doc : Doc) -> Array[Flaw] {
       match x {
         HeadingNode(h) => {
           id(h.id)
+          if depth > deepest {
+            flaws.push(TooDeep(h.id))
+          }
           named(h.id, h.fold)
           blocks(h.body)
           border.val = trailing(h.body)
-          nodes(h.children, kids(i), _ => [])
+          nodes(h.children, depth + 1, kids(i), _ => [])
         }
         ListNode(l) => {
           id(l.id)
@@ -121,7 +132,7 @@ pub fn check(doc : Doc) -> Array[Flaw] {
               flaws.push(GappedItem(l.id))
             }
           }
-          nodes(g.children, kids(i), _ => [])
+          nodes(g.children, depth + 1, kids(i), _ => [])
         }
       }
     }
@@ -144,7 +155,7 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   }
   blocks(doc.body)
   border.val = trailing(doc.body)
-  nodes(doc.roots.map(r => r.node), [], i => doc.roots[i].sides)
+  nodes(doc.roots.map(r => r.node), 1, [], i => doc.roots[i].sides)
   flaws
 }
 

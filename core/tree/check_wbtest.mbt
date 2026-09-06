@@ -361,3 +361,66 @@ test "Implicit の直下の項目を見つける" {
   }
   json_inspect(check(doc), content=[["GappedItem", 4]])
 }
+
+///|
+/// `#` は 6 本まで。7 段目の見出しは書くと段落になる。項目は相対記法なので、
+/// 見出しの下で何段深くても書ける。
+test "深さ 7 以上の見出しを見つける" {
+  fn chain(depth : Int, tip : Node) -> Node {
+    let mut n = tip
+    for i in 0..<depth {
+      n = HeadingNode({
+        id: depth - i,
+        label: "h",
+        fold: None,
+        body: [],
+        children: [n],
+      })
+    }
+    n
+  }
+
+  let seven : Doc = {
+    frontmatter: None,
+    eol: Lf,
+    body: [],
+    roots: [{ node: chain(6, leaf(10, "g")), sides: [Right] }],
+  }
+  json_inspect(check(seven), content=[["TooDeep", 10]])
+  // 6 段目の下の項目と、6 段目までの飛び（Implicit）は書ける
+  let deep_item : Doc = {
+    frontmatter: None,
+    eol: Lf,
+    body: [],
+    roots: [
+      {
+        node: chain(
+          6,
+          ListNode({
+            id: 10,
+            label: "i",
+            fold: None,
+            body: [],
+            children: [
+              { id: 11, label: "j", fold: None, body: [], children: [] },
+            ],
+          }),
+        ),
+        sides: [Right],
+      },
+    ],
+  }
+  json_inspect(check(deep_item), content=[])
+  let gapped : Doc = {
+    frontmatter: None,
+    eol: Lf,
+    body: [],
+    roots: [
+      {
+        node: chain(4, ImplicitNode({ id: 9, children: [leaf(10, "f")] })),
+        sides: [Right],
+      },
+    ],
+  }
+  json_inspect(check(gapped), content=[])
+}

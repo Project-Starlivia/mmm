@@ -6,16 +6,79 @@
 ///|
 /// **md に書ける木しか返さない。** 何が書けないかは check が 1 つで言う
 /// （骨格の直前の水平線・見出しに飲み込まれる項目・項目の根の側）ので、
-/// 操作ごとに規則を写さず、組んだ結果を check に通す。Implicit を綴れば直る
-/// 破れは mend が繕い、残れば断る。
+/// 操作ごとに規則を写さず、組んだ結果を check に通す。見出しの深さは cap が
+/// 綴り替え、Implicit を綴れば直る破れは mend が繕い、残れば断る。
+/// cap が先 — 天井を越えた見出しは mend には直せない。
 pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
-  match attempt(doc, op) {
-    Some(d) =>
-      match mend(d.doc) {
-        Some(doc) => Some({ ..d, doc, })
-        None => None
+  guard attempt(doc, op) is Some(d) else { return None }
+  guard mend(cap(d.doc)) is Some(doc) else { return None }
+  Some({ doc, focus: d.focus.filter(f => has(doc, f)) })
+}
+
+///|
+/// 見出しの天井。`@tree.deepest` より深くに着いた見出しは部分木ごと項目に
+/// 綴り替える — 手で書くときも `######` の下は `- ` でしか続けられない。
+/// 天井より深い Implicit は、項目が飛びを綴れないので消え、子が繰り上がる
+/// （focus なら消える）。天井の Implicit は行を省いた空の見出しなので残す
+/// （子が項目になれば `GappedItem` — 綴れば読める）。上の段には触らないので、
+/// parse の出力には何もしない。
+fn cap(doc : @tree.Doc) -> @tree.Doc {
+  fn items(n : @tree.Node, out : Array[@tree.ListNode]) -> Unit {
+    match n {
+      ListNode(l) => out.push(l)
+      HeadingNode(h) => {
+        let children = []
+        for c in h.children {
+          items(c, children)
+        }
+        out.push({
+          id: h.id,
+          label: h.label,
+          fold: h.fold,
+          body: h.body,
+          children,
+        })
       }
-    None => None
+      ImplicitNode(g) =>
+        for c in g.children {
+          items(c, out)
+        }
+    }
+  }
+
+  fn node(n : @tree.Node, depth : Int, out : Array[@tree.Node]) -> Unit {
+    fn under(xs : Array[@tree.Node]) -> Array[@tree.Node] {
+      let children = []
+      for c in xs {
+        node(c, depth + 1, children)
+      }
+      children
+    }
+
+    match n {
+      HeadingNode(h) if depth <= @tree.deepest =>
+        out.push(@tree.HeadingNode({ ..h, children: under(h.children) }))
+      ImplicitNode(g) if depth <= @tree.deepest =>
+        out.push(@tree.ImplicitNode({ ..g, children: under(g.children) }))
+      ListNode(_) => out.push(n)
+      _ => {
+        let ls = []
+        items(n, ls)
+        for l in ls {
+          out.push(@tree.ListNode(l))
+        }
+      }
+    }
+  }
+
+  // 根は深さ 1 なので必ず 1 つ残り、根の子の数も変わらない（sides はそのまま）
+  {
+    ..doc,
+    roots: doc.roots.map(r => {
+      let out = []
+      node(r.node, 1, out)
+      { ..r, node: out[0] }
+    }),
   }
 }
 

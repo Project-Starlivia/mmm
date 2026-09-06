@@ -997,6 +997,96 @@ test "Graft は空・知らない id・項目の下に見出し、に None" {
 }
 
 ///|
+/// 見出しは 6 段まで（`@tree.deepest`）。7 段目に着地する見出しは項目に綴り替わる —
+/// 手で書くときも `######` の下は `- ` でしか続けられない。上の段には触らない。
+fn six(tail : Array[@tree.Node]) -> @tree.Doc {
+  doc([
+    root(
+      h(2, "a", children=[
+        h(3, "b", children=[
+          h(4, "c", children=[
+            h(5, "d", children=[h(6, "e", children=[h(7, "f", children=tail)])]),
+          ]),
+        ]),
+      ]),
+      sides=[Right],
+    ),
+  ])
+}
+
+///|
+test "AddNode は 6 段目の下なら項目で足す" {
+  assert_eq(
+    run(six([]), AddNode(at=NodePlace::In(node=7, side=None), labels=["g"])),
+    Some({ doc: six([item(8, "g")]), focus: Some(8) }),
+  )
+}
+
+///|
+test "Graft は 6 段目の下なら部分木ごと項目にする。途中の飛びは畳む" {
+  assert_eq(
+    run(
+      six([]),
+      Graft(at=NodePlace::In(node=7, side=None), md="# p\n\n## q\n\n- i\n"),
+    ),
+    Some({
+      doc: six([item(8, "p", children=[li(9, "q", children=[li(10, "i")])])]),
+      focus: Some(8),
+    }),
+  )
+  // `#` → `###` の飛びは Implicit だが、項目は飛びを綴れないので消える
+  assert_eq(
+    run(
+      six([]),
+      Graft(at=NodePlace::In(node=7, side=None), md="# p\n\n### q\n"),
+    ),
+    Some({ doc: six([item(8, "p", children=[li(10, "q")])]), focus: Some(8) }),
+  )
+}
+
+///|
+test "MoveNode は 6 段目の下へ落とせば見出しを項目にする。Implicit は消え、focus も消える" {
+  let d = six([])
+  let x = root(h(8, "x", body=[pic(9)], children=[h(10, "y")]), sides=[Right])
+  let e : @tree.Doc = { ..d, roots: [..d.roots, x] }
+  assert_eq(
+    run(e, MoveNode(ids=[8], at=NodePlace::In(node=7, side=None))),
+    Some({
+      doc: six([item(8, "x", body=[pic(9)], children=[li(10, "y")])]),
+      focus: Some(8),
+    }),
+  )
+  let g = root(gap(8, [h(9, "z")]), sides=[Right])
+  let f : @tree.Doc = { ..d, roots: [..d.roots, g] }
+  assert_eq(
+    run(f, MoveNode(ids=[8], at=NodePlace::In(node=7, side=None))),
+    Some({ doc: six([item(9, "z")]), focus: None }),
+  )
+}
+
+///|
+test "Wrap は 6 段目を包めば、包まれたほうが項目になる" {
+  let d = doc([
+    root(
+      h(2, "a", children=[
+        h(3, "b", children=[
+          h(4, "c", children=[
+            h(5, "d", children=[
+              h(6, "e", children=[h(8, "w", children=[item(7, "f")])]),
+            ]),
+          ]),
+        ]),
+      ]),
+      sides=[Right],
+    ),
+  ])
+  assert_eq(
+    run(six([]), Wrap(id=7, label="w")),
+    Some({ doc: d, focus: Some(8) }),
+  )
+}
+
+///|
 /// 代表的な木に、代表的な Op を総当たりで当て、Some ならその結果が
 /// check を通ることを見る。落ちた Op と破れを並べる。
 test "apply の結果は check を通る" {
