@@ -20,7 +20,17 @@ pub fn edit(md : String, op : @op.Op) -> Edited {
   match @op.apply(before, op) {
     Some(done) => {
       let edits = @tree.merge(md, before, spans, done.doc)
-      let focus = done.focus.bind(id => @tree.number(done.doc, id))
+      // 書いた md を読み直して枠（字を消した形）が合わなければ focus は無い —
+      // focus は文書順の番号なので、要素の並びがずれたまま返すと別のノードを指す
+      // （中身の尻の水平線に骨格が続く形は境界に読まれて要素が消える等。形は md が
+      // 決める）。字の正規化だけなら枠は変わらないので focus はそのまま
+      let same = @tree.frame(@tree.parse(@tree.apply(md, edits))) ==
+        @tree.frame(done.doc)
+      let focus = if same {
+        done.focus.bind(id => @tree.number(done.doc, id))
+      } else {
+        None
+      }
       { edits, focus, }
     }
     None => { edits: [], focus: None, }

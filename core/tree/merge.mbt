@@ -38,9 +38,19 @@ pub fn merge(
     return []
   }
   match plan(md, before, spans, after) {
-    Some(edits) if shape(parse(apply(md, edits))) == shape(after) => edits
+    Some(edits) if settled(md, edits, after) => edits
     _ => [{ from: 0, to: md.length(), insert: serialize(after), }]
   }
+}
+
+///|
+/// 編集を当てた md を読み直した形が、後の木と一致するか。**一致しなくても、後の木を
+/// 正規形に書いて読み直した形と一致すれば良い** — 木が md に書けない形（中身の尻の
+/// 水平線に骨格が続く `BorderBreak`）を持つとき、書いた md は境界として読まれる。
+/// それは正規形を書いても同じなので、全文に落とす理由が無い
+pub fn settled(md : String, edits : Array[Edit], after : Doc) -> Bool {
+  let read = shape(parse(apply(md, edits)))
+  read == shape(after) || read == shape(parse(serialize(after)))
 }
 
 ///|
@@ -768,6 +778,62 @@ pub fn shape(doc : Doc) -> Doc {
     eol: Lf,
     body: faceless(doc.body),
     roots: doc.roots.map(r => { node: faceless_node(r.node), sides: r.sides, }),
+  }
+}
+
+///|
+/// 枠 — 形から字も消したもの（ラベル・中身の字・畳みの名前）。要素の並びと入れ子だけが
+/// 残る。focus は文書順の番号なので、枠が同じなら番号が同じものを指す。字が正規化で
+/// 変わっても（表の桁揃え等）枠は変わらず、境界に読まれて要素が消えれば枠が変わる
+pub fn frame(doc : Doc) -> Doc {
+  fn blocks(bs : Array[Block]) -> Array[Block] {
+    bs.map(b => {
+      let content = match b.content {
+        Image(..) => Image(alt="", src="", title="")
+        Link(..) => Link(text="", href="", title="")
+        Code(..) => Code(info="", text="")
+        Svg(_) => Svg("")
+        ThematicBreak => ThematicBreak
+        Details(..) => Details(text="", open=false, summary=None, body="")
+        Opaque(_) => Opaque("")
+      }
+      ({ id: 0, content, } : Block)
+    })
+  }
+
+  fn list(l : ListNode) -> ListNode {
+    {
+      ..l,
+      id: 0,
+      label: "",
+      fold: l.fold.map(_ => ({ open: false, summary: None, } : Fold)),
+      body: blocks(l.body),
+      children: l.children.map(list),
+    }
+  }
+
+  fn node(x : Node) -> Node {
+    match x {
+      HeadingNode(h) =>
+        HeadingNode({
+          ..h,
+          id: 0,
+          label: "",
+          fold: h.fold.map(_ => ({ open: false, summary: None, } : Fold)),
+          body: blocks(h.body),
+          children: h.children.map(node),
+        })
+      ListNode(l) => ListNode(list(l))
+      ImplicitNode(g) =>
+        ImplicitNode({ id: 0, children: g.children.map(node), })
+    }
+  }
+
+  {
+    frontmatter: None,
+    eol: Lf,
+    body: blocks(doc.body),
+    roots: doc.roots.map(r => { node: node(r.node), sides: r.sides, }),
   }
 }
 

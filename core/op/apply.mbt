@@ -149,7 +149,15 @@ fn mend(doc : @tree.Doc) -> @tree.Doc? {
       }
     }
     if !fixed {
-      return None
+      // 中身の尻の水平線に骨格が続く形（`BorderBreak`）だけは通す — 書けば md が
+      // 境界と読む（深さ 2 なら側の反転、深ければ深さ 2 へ引き出して反対側）。
+      // 形は読み直しが決める。貼り付けの `---` も、md ペインで末尾に書いた
+      // `---` の後ろに足す操作も、同じ 1 つの解釈に落ちる
+      return if flaws.iter().all(f => f is BorderBreak(_)) {
+        Some(cur)
+      } else {
+        None
+      }
     }
   }
 }
@@ -641,7 +649,9 @@ fn shift(n : @tree.Node, by : Int) -> @tree.Node {
 ///|
 /// md を読んで形にし、席の綴りで差す。断片が持ち込むのは形（ラベル・中身・子・畳み・
 /// 飛び）だけで、`#` の本数・マーカー・字下げ・先頭の飛びは書き方なので捨てる。
-/// 一番外の段落は行ごとにノード、それ以外の中身は行き先の親の body 末尾へ
+/// 一番外は順に読み、段落は行ごとにノード、それ以外の中身は直前に生えたノードの中身へ
+/// （無ければ行き先の親の body 末尾へ）。`---` は md と同じ意味 — 断片の側は境界として
+/// 運び、書けば md が境界と読む（形は読み直しが決める）
 /// （行き先が文書なら断る — 文書の散文はマップに出ない）。
 /// 断片が `##` から始まると parse は根を Implicit で包む（深さ 1 の飛び）。
 /// それは切り出した場所の名残でしかないので剥がし、相対の形で差す。
@@ -657,42 +667,114 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
       p
     }
   }
-  // 一番外の中身を、行のノードになる段落と、body へ行く中身に分ける
-  let labels : Array[String] = []
-  let rest : Array[@tree.Block] = []
+  // 断片の側（`---`）は境界として運ぶ — 直前の子の部分木の最後の行の中身の尻に
+  // 水平線を置く。書けば md が境界と読む（席が深さ 2 なら側の反転、深ければ
+  // 深さ 2 へ引き出して反対側）。読み直しが形を決めるので、ここでは字の位置だけ
+  let sub = bordered(sub)
+  // 一番外は順に読む。段落は行ごとにノード、それ以外の中身は直前に生えたノードの
+  // 中身（無ければ貼り先の中身）。文書の読みと同じ — 骨格の行の後ろの中身はその行のもの
+  let pieces : Array[Piece] = []
+  let mut count = 0
   for b in sub.body {
     let ls = match b.content {
       Opaque(text) => @tree.lines(text)
       _ => None
     }
     match ls {
-      Some(ls) => labels.append(ls)
-      None => rest.push(b)
+      Some(ls) => {
+        pieces.push(Lines(ls))
+        count = count + ls.length()
+      }
+      None => pieces.push(Card(b))
     }
   }
   // 行のノードは文書に無い番号から、断片の id はその先へ寄せる
   let first = fresh(doc)
-  let by = first + labels.length() - (@tree.doc_id + 1)
-  let heads = labels.mapi((k, label) => make(sign, first + k, label))
-  let prose = rest.map(b => {
-    ({ id: b.id + by, content: b.content, } : @tree.Block)
-  })
+  let by = first + count - (@tree.doc_id + 1)
+  let heads : Array[@tree.Node] = []
+  let rest : Array[@tree.Block] = []
+  for p in pieces {
+    match p {
+      Lines(ls) =>
+        for label in ls {
+          heads.push(make(sign, first + heads.length(), label))
+        }
+      Card(b) => {
+        let blk : @tree.Block = { id: b.id + by, content: b.content, }
+        match heads.pop() {
+          Some(n) => heads.push(push_block(n, blk))
+          None => rest.push(blk)
+        }
+      }
+    }
+  }
   let subs = peel(sub.roots.map(r => r.node)).map(n => {
     respell(shift(n, by), sign)
   })
   let nodes = [..heads, ..subs]
   let mut cur = doc
-  if !prose.is_empty() {
+  if !rest.is_empty() {
     guard host != @tree.doc_id else { return None }
-    guard body(cur, node=host, bs => [..bs, ..prose]) is Some(d) else {
+    guard body(cur, node=host, bs => [..bs, ..rest]) is Some(d) else {
       return None
     }
     cur = d
   }
   if nodes.is_empty() {
-    return Some({ doc: cur, focus: Some(prose[0].id), })
+    return Some({ doc: cur, focus: Some(rest[0].id), })
   }
   done(place(cur, at, nodes), Some(id_of(nodes[0])))
+}
+
+///|
+/// 断片の一番外の 1 切れ。段落は行の列、それ以外は中身 1 枚。
+priv enum Piece {
+  Lines(Array[String])
+  Card(@tree.Block)
+}
+
+///|
+/// 中身を末尾に足す（Implicit は中身を持てないので来ない）。
+fn push_block(n : @tree.Node, b : @tree.Block) -> @tree.Node {
+  match n {
+    HeadingNode(h) => @tree.HeadingNode({ ..h, body: [..h.body, b], })
+    ListNode(l) => @tree.ListNode({ ..l, body: [..l.body, b], })
+    ImplicitNode(_) => n
+  }
+}
+
+///|
+/// 断片の根の子の側を、境界の水平線に戻す。側が変わる子の**手前の子の部分木の
+/// 最後の行**（文書順で境界の直前に書かれていた行）の中身の尻に置く。
+/// 側は根のものなので、席へ差せば消える — 字（`---`）として運べば md が決める
+fn bordered(sub : @tree.Doc) -> @tree.Doc {
+  let mut cur = sub
+  let mut next = fresh(sub)
+  for r in sub.roots {
+    let kids = children_of(r.node)
+    for i in 1..<kids.length() {
+      guard i < r.sides.length() && r.sides[i] != r.sides[i - 1] else {
+        continue
+      }
+      let at = last_line(kids[i - 1])
+      let rule : @tree.Block = { id: next, content: ThematicBreak, }
+      next = next + 1
+      match body(cur, node=at, bs => [..bs, rule]) {
+        Some(d) => cur = d
+        None => ()
+      }
+    }
+  }
+  cur
+}
+
+///|
+/// 部分木の中で文書順が最後の行（骨格を持つノード）。
+fn last_line(n : @tree.Node) -> Int {
+  match children_of(n).last() {
+    Some(k) => last_line(k)
+    None => id_of(n)
+  }
 }
 
 ///|

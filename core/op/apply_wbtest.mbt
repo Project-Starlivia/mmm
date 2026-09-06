@@ -929,7 +929,10 @@ test "MoveBlock は空・ノード混じり・知らない id・自分の隣へ�
 }
 
 ///|
-test "Graft は parse した根たちを差す。側は捨て、id は鋳直す" {
+/// 断片の側（`---`）は境界として運ぶ — 直前の子の中身の尻の水平線。書けば md が
+/// 境界と読む（席が深さ 2 なら側の反転、深ければ深さ 2 へ引き出して反対側）。
+/// apply が返す木は「書けば md が決める」形で、読み直しが形を決める
+test "Graft は parse した根たちを差す。側は境界として運び、id は鋳直す" {
   let d = doc([root(h(2, "r", children=[h(3, "a")]), sides=[Left])])
   assert_eq(
     run(
@@ -944,11 +947,81 @@ test "Graft は parse した根たちを差す。側は捨て、id は鋳直す"
         root(
           h(2, "r", children=[
             h(3, "a", children=[
-              h(4, "p", children=[h(5, "q"), h(6, "s")]),
+              h(4, "p", children=[
+                h(5, "q", body=[{ id: 8, content: ThematicBreak, }]),
+                h(6, "s"),
+              ]),
               h(7, "t"),
             ]),
           ]),
           sides=[Left],
+        ),
+      ]),
+      focus: Some(4),
+    }),
+  )
+}
+
+///|
+/// 一番外は順に読む。中身は直前に生えたノードの中身（無ければ貼り先の中身）。
+/// `---` も中身の 1 枚として直前のノードへ — 次にノードが来れば境界として読まれる
+test "Graft の一番外は順に読む — 中身は直前のノードへ、--- は境界として運ぶ" {
+  let d = doc([root(h(2, "r"))])
+  let table = "| p | q |\n|---|---|"
+  // 表 → 段落 → 表: 最初の表は貼り先へ、段落はノード、後ろの表はそのノードへ
+  assert_eq(
+    run(
+      d,
+      Graft(
+        at=NodePlace::In(node=2, side=None),
+        md=table + "\n\n説明\n\n" + table + "\n",
+      ),
+    ),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", body=[{ id: 4, content: Opaque(table), }], children=[
+            h(3, "説明", body=[{ id: 6, content: Opaque(table), }]),
+          ]),
+          sides=[Right],
+        ),
+      ]),
+      focus: Some(3),
+    }),
+  )
+  // 説明 → --- → 次: 水平線は説明の中身の尻。断らない（md が境界と読む）
+  assert_eq(
+    run(
+      d,
+      Graft(at=NodePlace::In(node=2, side=None), md="説明\n\n---\n\n次\n"),
+    ),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            h(3, "説明", body=[{ id: 6, content: ThematicBreak, }]),
+            h(4, "次"),
+          ]),
+          sides=[Right, Right],
+        ),
+      ]),
+      focus: Some(3),
+    }),
+  )
+  // 先頭の Implicit を剥がす断片でも、側は境界として運ぶ
+  assert_eq(
+    run(
+      d,
+      Graft(at=NodePlace::In(node=2, side=None), md="## q\n\n---\n\n## s\n"),
+    ),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            h(4, "q", body=[{ id: 6, content: ThematicBreak, }]),
+            h(5, "s"),
+          ]),
+          sides=[Right, Right],
         ),
       ]),
       focus: Some(4),
@@ -1246,7 +1319,9 @@ test "Wrap は 6 段目を包めば、包まれたほうが項目になる" {
 ///|
 /// 代表的な木に、代表的な Op を総当たりで当て、Some ならその結果が
 /// check を通ることを見る。落ちた Op と破れを並べる。
-test "apply の結果は check を通る" {
+/// **`BorderBreak` だけは通す** — 中身の尻の水平線に骨格が続く形は、書けば md が
+/// 境界と読む。形は読み直しが決める（apply の門の決め）
+test "apply の結果は check を通る（BorderBreak は md が決めるので除く）" {
   // 見出しの直後の項目・Implicit は飲み込まれるので、項目を先に置く（check が言う）
   let base = doc([
     root(item(11, "e"), sides=[]),
@@ -1291,7 +1366,7 @@ test "apply の結果は check を通る" {
     match apply(base, op) {
       Some(done) => {
         some = some + 1
-        let flaws = @tree.check(done.doc)
+        let flaws = @tree.check(done.doc).filter(f => !(f is BorderBreak(_)))
         if !flaws.is_empty() {
           bad.push((op, flaws))
         }
@@ -1300,6 +1375,7 @@ test "apply の結果は check を通る" {
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="512")
+  // 512 → 543: 中身の尻の水平線に骨格が続く形（BorderBreak）を断らなくなった分
+  inspect(some, content="543")
   json_inspect(bad, content=[])
 }

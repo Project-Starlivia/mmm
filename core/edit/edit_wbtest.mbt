@@ -113,6 +113,60 @@ test "Graft — 貼り付けの見本" {
 }
 
 ///|
+/// 貼った `---` は md と同じ意味。次にノードが来れば境界（深さ 2 なら側の反転、
+/// 深ければ深さ 2 へ引き出して反対側）、次が中身か終わりなら水平線。
+/// 形は md が決めるので focus は無い。順は崩れない（中身は直前のノードへ）
+test "Graft — 貼った --- は境界。md が形を決め、focus は無い" {
+  // 深さ 2 の席: 次が反対側に
+  assert_eq(
+    applied(
+      "# r\n\n## a\n",
+      Graft(at=In(node=2, side=None), md="説明\n\n---\n\n次\n"),
+    ),
+    ("# r\n\n## a\n\n## 説明\n\n---\n\n## 次\n", None),
+  )
+  // 深い席: 次は深さ 2 へ引き出されて反対側（md ペインに同じ字を打ったのと同じ）
+  assert_eq(
+    applied(
+      "# r\n\n## a\n\n### x\n",
+      Graft(at=In(node=4, side=None), md="説明\n\n---\n\n次\n"),
+    ),
+    ("# r\n\n## a\n\n### x\n\n#### 説明\n\n---\n\n#### 次\n", None),
+  )
+  // 断片の側も境界として運ぶ
+  assert_eq(
+    applied(
+      "# r\n",
+      Graft(at=In(node=2, side=None), md="## q\n\n---\n\n## s\n"),
+    ),
+    ("# r\n\n## q\n\n---\n\n## s\n", None),
+  )
+  // 表 → 段落 → 表: 順のまま。後ろの表は段落のノードの中身。字の正規化（表の
+  // 桁揃え。原文を返す段まで）では枠が変わらないので focus はそのまま
+  let table = "| p | q |\n|---|---|"
+  assert_eq(
+    applied(
+      "# r\n",
+      Graft(
+        at=In(node=2, side=None),
+        md=table + "\n\n説明\n\n" + table + "\n",
+      ),
+    ),
+    (
+      @tree.serialize(
+        @tree.parse("# r\n\n" + table + "\n\n## 説明\n\n" + table + "\n"),
+      ),
+      Some(4),
+    ),
+  )
+  // md ペインで末尾に --- を書いてから隣に足す操作も、同じ 1 つの解釈
+  assert_eq(
+    applied("# r\n\n## a\n\n---\n", AddNode(at=After(node=3), labels=["b"])),
+    ("# r\n\n## a\n\n---\n\n## b\n", None),
+  )
+}
+
+///|
 test "MoveNode — 項目を子が見出しの見出しへ動かせば見出しになる" {
   assert_eq(
     applied(

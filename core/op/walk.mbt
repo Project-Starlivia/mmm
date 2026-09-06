@@ -3,6 +3,16 @@
 // 自分で降りる。3 種のノードの違い（子の型・中身の有無）は id_of / kids / blocks_of で吸う。
 
 ///|
+/// 子の列。項目の子は Node に包む（型は項目のまま）。
+fn children_of(n : @tree.Node) -> Array[@tree.Node] {
+  match n {
+    HeadingNode(h) => h.children
+    ListNode(l) => l.children.map(c => @tree.ListNode(c))
+    ImplicitNode(g) => g.children
+  }
+}
+
+///|
 fn id_of(n : @tree.Node) -> Int {
   match n {
     HeadingNode(h) => h.id

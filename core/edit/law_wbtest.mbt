@@ -170,8 +170,12 @@ fn ops_for(all : Array[Int]) -> Array[@op.Op] {
 }
 
 ///|
-test "法則 — 読み直せば操作後の木と形が一致し、focus は同じ部分木を指す" {
+/// **形は md が決める。** 操作後の木が md に書けない形（中身の尻の水平線に骨格が続く
+/// `BorderBreak`）なら、読み直した形は木と違うが、木を正規形に書いて読み直した形とは
+/// 一致する。そのとき focus は無い（番号のまま返すと別のノードを指す）
+test "法則 — 読み直せば操作後の木と形が一致し（md が決めるなら正規形と一致し）、focus は同じ部分木を指す" {
   let mut some = 0
+  let mut decided = 0
   let bad : Array[String] = []
   for i, md in corpus {
     let before = @tree.parse(md)
@@ -182,9 +186,26 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
         Some(done) => {
           some = some + 1
           let after = @tree.parse(@tree.apply(md, r.edits))
-          if @tree.shape(after) != @tree.shape(done.doc) {
-            bad.push("\{what}: 形が違う")
+          // 枠（字を消した形）が同じなら要素の並びは同じで、focus は番号で追える。
+          // 枠が違えば md が形を決めた — 正規形を読み直した形と一致し、focus は無い
+          if @tree.frame(after) != @tree.frame(done.doc) {
+            let canon = @tree.shape(@tree.parse(@tree.serialize(done.doc)))
+            if @tree.shape(after) != canon {
+              bad.push("\{what}: 形が違う")
+            } else if r.focus != None {
+              bad.push("\{what}: md が形を決めたのに focus がある")
+            } else {
+              decided = decided + 1
+            }
             continue
+          }
+          if @tree.shape(after) != @tree.shape(done.doc) {
+            // 字の正規化だけ（枠は同じ）。形は正規形と一致していること
+            if @tree.shape(after) !=
+              @tree.shape(@tree.parse(@tree.serialize(done.doc))) {
+              bad.push("\{what}: 形が違う")
+              continue
+            }
           }
           match (done.focus, r.focus) {
             (None, None) => ()
@@ -206,7 +227,10 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
   }
   json_inspect(bad, content=[])
   // 全部 None に潰れる退化を落とすための下限チェック
-  inspect(some, content="1480")
+  // 1480 → 1587: BorderBreak を断らなくなった分
+  inspect(some, content="1587")
+  // md が形を決めた回数（BorderBreak）。0 なら法則の 2 つ目の道が死んでいる
+  inspect(decided, content="96")
 }
 
 ///|
@@ -427,7 +451,8 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   }
   json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
-  inspect(n, content="1438")
+  // 1438 → 1545: BorderBreak を断らなくなった分
+  inspect(n, content="1545")
 }
 
 ///|
