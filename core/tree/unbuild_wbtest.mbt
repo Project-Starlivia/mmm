@@ -135,6 +135,44 @@ test "項目は入れ子。兄弟は詰める" {
 }
 
 ///|
+/// ラベルの直後に空の項目が続けば、`-` 1 本が setext の下線に読まれてラベルが
+/// 消える。その列だけ loose にして空行で分ける — 正規形は並びで変わる。
+/// 空の項目でも直前が段落でなければ（前に兄弟が居る）詰めたまま。
+test "ラベルの直後の空の項目は空行で分ける" {
+  inspect(
+    serialize(doc([root(item("root", children=[li("a", children=[li("")])]))])),
+    content=(
+      #|- root
+      #|  - a
+      #|
+      #|    -
+      #|
+    ),
+  )
+  inspect(
+    serialize(doc([root(item("root", children=[li("a"), li("")]))])),
+    content=(
+      #|- root
+      #|  - a
+      #|  -
+      #|
+    ),
+  )
+  inspect(
+    serialize(
+      doc([root(item("root", children=[li("a", children=[li("x"), li("")])]))]),
+    ),
+    content=(
+      #|- root
+      #|  - a
+      #|    - x
+      #|    -
+      #|
+    ),
+  )
+}
+
+///|
 test "見出しの下の項目" {
   inspect(
     serialize(doc([root(h("r", children=[item("a"), item("b")]))])),

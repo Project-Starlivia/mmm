@@ -155,18 +155,30 @@ fn wrap(out : Array[@markdown.Block], fold : Fold?, inner : () -> Unit) -> Unit 
 ///|
 /// 項目の列 1 つ。**ラベルと入れ子の列だけの項目が並ぶときだけ tight。**
 /// 中身は空行で分けないと段落に飲み込まれ、畳まれた子の `<details>` は
-/// 空行で終わる塊なので、分けないと次の項目を飲み込む。
+/// 空行で終わる塊なので、分けないと次の項目を飲み込む。ラベルの直後の空の
+/// 項目も分ける（`underlined`）— 正規形は並びで変わる。
 fn bullets(u : Unbuild, run : Array[ListNode]) -> @markdown.Block {
   BulletList(
     marker=Dash,
     tight=run
       .iter()
-      .all(l => l.body.is_empty() && l.children.iter().all(c => c.fold is None)),
+      .all(l => {
+        l.body.is_empty() &&
+        l.children.iter().all(c => c.fold is None) &&
+        !underlined(l)
+      }),
     items=run.map(l => list_item(u, l)),
     span=nowhere,
     leading_trivia=@markdown.Trivia::empty(),
     trailing_trivia=@markdown.Trivia::empty(),
   )
+}
+
+///|
+/// ラベルの直後に空の項目が続く形。詰めて書くと `-` 1 本が段落の setext の
+/// 下線に読まれ、ラベルが消えて子も読まれない。空行で分ければ空の項目に読まれる。
+fn underlined(l : ListNode) -> Bool {
+  l.label != "" && l.children is [{ label: "", .. }, ..]
 }
 
 ///|
