@@ -98,8 +98,12 @@ pub fn notice(
 
 ///|
 /// body に 1 個。続けて呼べば中身が差し替わり、時計は打ち直す
-fn show(mark : String, msg : String, apologize : Bool) -> Unit {
-  let doc = @dom.document()
+fn show(
+  doc : @dom.Document,
+  mark : String,
+  msg : String,
+  apologize : Bool,
+) -> Unit {
   let next = notice(doc, mark, msg, apologize)
   let box = match shown.box {
     Some(b) => {
@@ -139,11 +143,11 @@ fn show(mark : String, msg : String, apologize : Bool) -> Unit {
 /// 字も人の言い方で言う（`Couldn't …`。`Could not` はログの口調）。頭には
 /// **詫びが 1 文**付く — 起きなかったのはこちらの都合なので、そう言う。
 /// 知らない言葉は綴りの食い違い — 壊れている
-pub fn failed(msg : String) -> Unit {
+pub fn failed(doc : @dom.Document, msg : String) -> Unit {
   guard failed_words.contains(msg) else {
     abort("知らないしらせ: " + msg)
   }
-  show("circle-alert", msg, true)
+  show(doc, "circle-alert", msg, true)
 }
 
 ///|
@@ -151,9 +155,9 @@ pub fn failed(msg : String) -> Unit {
 ///
 /// こちらは三角でいい — 読む人へ向けて言う形が、ここでは実際に正しい
 /// （動くのは相手）。触って読める言葉と同じものを出す
-pub fn blocked(msg : String) -> Unit {
+pub fn blocked(doc : @dom.Document, msg : String) -> Unit {
   guard blocked_words.contains(msg) else {
     abort("知らないしらせ: " + msg)
   }
-  show("triangle-alert", msg, false)
+  show(doc, "triangle-alert", msg, false)
 }
