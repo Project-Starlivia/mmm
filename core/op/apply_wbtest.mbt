@@ -82,13 +82,19 @@ test "Fold は定義ごと畳み、名前はラベル。畳み済みなら open 
 }
 
 ///|
-test "Fold は書けない名前なら名無しで畳む" {
+test "Fold の名前はラベルそのもの — `</summary>` が入っていても" {
   let d = doc([root(h(2, "a</summary>b"))])
   assert_eq(
     run(d, Fold(id=2, open=false)),
     Some({
       doc: doc([
-        root(h(2, "a</summary>b", fold=Some({ open: false, summary: None, }))),
+        root(
+          h(
+            2,
+            "a</summary>b",
+            fold=Some({ open: false, summary: Some("a</summary>b"), }),
+          ),
+        ),
       ]),
       focus: Some(2),
     }),

@@ -206,12 +206,12 @@ fn rename(doc : @tree.Doc, id : Int, label : String) -> Done? {
 }
 
 ///|
-/// 定義ごと畳む。名前はラベル（書けなければ名無し）。畳み済みなら open だけ替わる。
+/// 定義ごと畳む。名前はラベルそのもの。畳み済みなら open だけ替わる。
 /// Implicit は綴ってから畳む。
 fn fold(doc : @tree.Doc, id : Int, open : Bool) -> Done? {
   guard find(doc, id) is Some(n) else { return None }
   fn folding(label : String) -> @tree.Fold {
-    { open, summary: if @tree.writable(label) { Some(label) } else { None }, }
+    { open, summary: Some(label), }
   }
 
   fn next(fold : @tree.Fold?, label : String) -> @tree.Fold {

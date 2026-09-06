@@ -129,52 +129,31 @@ test "中身の id も一意さを見る" {
 }
 
 ///|
-/// `<summary>` の中身は最初の `</summary>` までなので、名前にそれが入って
-/// いると読み戻したとき別の名前になる。
-test "畳みの名前が summary に書けなければ見つける" {
-  let doc : Doc = {
-    frontmatter: None,
-    eol: Lf,
-    body: [],
-    roots: [
-      {
-        node: HeadingNode({
-          id: 2,
-          label: "x",
-          fold: Some({ open: false, summary: Some("a</summary>b"), }),
-          body: [],
-          children: [],
-        }),
-        sides: [],
-      },
-    ],
+/// 名前の字で畳みを断る規則は無い。`</summary>` も、生の HTML の塊を
+/// 終わらせる空行も、md が言うとおりに読まれるだけで破れではない。
+test "畳みの名前は何でも書ける — `</summary>` も空行も破れではない" {
+  let named = (s : String) => {
+    let doc : Doc = {
+      frontmatter: None,
+      eol: Lf,
+      body: [],
+      roots: [
+        {
+          node: HeadingNode({
+            id: 2,
+            label: "x",
+            fold: Some({ open: false, summary: Some(s), }),
+            body: [],
+            children: [],
+          }),
+          sides: [],
+        },
+      ],
+    }
+    check(doc)
   }
-  json_inspect(check(doc), content=[["UnwritableName", 2]])
-}
-
-///|
-/// 生の HTML の塊は空行で終わるので、名前に空行が入っていると `</summary>`
-/// が次の塊へ落ちて、読み戻したとき畳みごと消える。名前が変わるだけの
-/// `</summary>` より損が大きい。
-test "畳みの名前に空行が入っていれば見つける" {
-  let doc : Doc = {
-    frontmatter: None,
-    eol: Lf,
-    body: [],
-    roots: [
-      {
-        node: HeadingNode({
-          id: 2,
-          label: "x",
-          fold: Some({ open: false, summary: Some("a\n  \nb"), }),
-          body: [],
-          children: [],
-        }),
-        sides: [],
-      },
-    ],
-  }
-  json_inspect(check(doc), content=[["UnwritableName", 2]])
+  json_inspect(named("a</summary>b"), content=[])
+  json_inspect(named("a\n  \nb"), content=[])
 }
 
 ///|
