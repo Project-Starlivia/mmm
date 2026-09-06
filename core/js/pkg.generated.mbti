@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mmm-app/core/tree/js"
+package "mmm-app/core/js"
 
 import {
   "mizchi/js/core",
@@ -9,9 +9,9 @@ import {
 // Values
 pub fn md_ast_sig(String) -> String
 
-pub fn mmm_anchors_for(@core.Any, String) -> String
+pub fn mmm_anchors_json(@core.Any) -> String
 
-pub fn mmm_anchors_of(@core.Any, Int?) -> String
+pub fn mmm_anchors_of(@core.Any, Int?) -> @core.Any
 
 pub fn mmm_ask_form(String, @core.Any) -> @dom.Element
 
@@ -21,9 +21,15 @@ pub fn mmm_blocks(@core.Any, Int) -> FixedArray[Int]
 
 pub fn mmm_boot(@core.Any) -> Unit
 
+pub fn mmm_card(@core.Any) -> Int?
+
+pub fn mmm_card_at(Int) -> @core.Any
+
+pub fn mmm_carry(@core.Any, (Int) -> Int) -> @core.Any
+
 pub fn mmm_check(String) -> String
 
-pub fn mmm_chosen(@core.Any, String, FixedArray[Int], Int, String) -> String
+pub fn mmm_chosen(@core.Any, String, FixedArray[Int], Int, @core.Any) -> @core.Any
 
 pub fn mmm_context_menu(@core.Any, FixedArray[Int], Int?) -> @dom.Element
 
@@ -67,11 +73,19 @@ pub fn mmm_map_render(@core.Any) -> Unit
 
 pub fn mmm_more_rows(@core.Any, @core.Any) -> @dom.Element
 
+pub fn mmm_node_at(FixedArray[Int], Int?) -> @core.Any
+
+pub fn mmm_nothing() -> @core.Any
+
 pub fn mmm_notice(String, String, Bool) -> @dom.Element
 
 pub fn mmm_pane_hint(String) -> @dom.Element
 
-pub fn mmm_ranges(@core.Any, String) -> FixedArray[Int]
+pub fn mmm_ranges(@core.Any, @core.Any) -> FixedArray[Int]
+
+pub fn mmm_same_choice(@core.Any, @core.Any) -> Bool
+
+pub fn mmm_selection(@core.Any) -> @core.Any
 
 pub fn mmm_serialize(String) -> String
 

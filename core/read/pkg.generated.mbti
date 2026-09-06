@@ -20,6 +20,8 @@ pub fn buried(@view.View) -> @set.Set[Int]
 
 pub fn caret_ids(Survey, Array[Range]) -> Array[Int]
 
+pub fn carry(Anchors, (Int) -> Int) -> Anchors
+
 pub fn chosen(Survey, Holder, Caret, Anchors?) -> Choice
 
 pub fn each_node(@view.View, (@view.Node) -> Unit) -> Unit

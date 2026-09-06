@@ -224,3 +224,17 @@ test "anchors_of / anchors_for / ranges — id と位置の往復。カードは
   assert_eq(ranges(s, nodes([2], Some(2))), [{ from: 0, to: 21, }])
   assert_eq(ranges(s, Card(id=4)), [{ from: 11, to: 21, }])
 }
+
+///|
+test "carry — 位置を写す。点も並びも基点も同じ写像で" {
+  let shift = (p : Int) => p + 3
+  assert_eq(
+    carry(NodeAt(at=[8, 14], anchor=Some(14)), shift),
+    NodeAt(at=[11, 17], anchor=Some(17)),
+  )
+  assert_eq(
+    carry(NodeAt(at=[], anchor=None), shift),
+    NodeAt(at=[], anchor=None),
+  )
+  assert_eq(carry(CardAt(at=11), shift), CardAt(at=14))
+}

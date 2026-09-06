@@ -140,14 +140,14 @@ export class MdEditor {
     this.view.dispatch({ changes, effects: focus === undefined ? [] : [focused.of(focus)] });
   }
 
-  /** 地図で選び直した。位置は host が地番で写してから渡す */
-  select(a: core.Anchors): void {
+  /** 地図で選び直した。位置は core が地番で写してから渡す（無ければ null） */
+  select(a: core.Anchors | null): void {
     this.view.dispatch({ effects: setAnchors.of(a) });
   }
 
-  /** フォーカスがペインに入った。md → map なら引き継ぐ位置も一緒に */
-  hold(h: core.Holder, a?: core.Anchors): void {
-    this.view.dispatch({ effects: a === undefined ? [setHolder.of(h)] : [setHolder.of(h), setAnchors.of(a)] });
+  /** フォーカスがペインに入った。md → map なら引き継ぐ位置も一緒に（md へなら null で捨てる） */
+  hold(h: core.Holder, a: core.Anchors | null): void {
+    this.view.dispatch({ effects: [setHolder.of(h), setAnchors.of(a)] });
   }
 
   get state(): EditorState {

@@ -178,6 +178,15 @@ pub fn chosen(
 }
 
 ///|
+/// 位置を編集で写す。点の写し（CodeMirror の `changes.mapPos`）は呼ぶ側の閉包
+pub fn carry(a : Anchors, at : (Int) -> Int) -> Anchors {
+  match a {
+    CardAt(at=p) => CardAt(at=at(p))
+    NodeAt(at=ps, anchor~) => NodeAt(at=ps.map(at), anchor=anchor.map(at))
+  }
+}
+
+///|
 /// focus の id をその木の地番で位置に。ノードならラベルの頭、中身なら原文の頭。無ければ None
 pub fn anchors_of(s : Survey, id : Int?) -> Anchors? {
   guard id is Some(id) else { return None }
