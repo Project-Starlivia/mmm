@@ -46,7 +46,8 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 行の形・入れ子・キーで辿る・外を押せば閉じる)。試験は happy-dom
   app/          帯と枠（js だけ）。persist(持ち物。localStorage の綴りはここだけ) / panes(2 つの
                 出し分けと分割線) / shortcuts(全体のキー) / theme(テーマ・アクセントカラー・favicon) /
-                logo(ロゴの唯一の源) / ask(聞く器。<dialog>) / asks(聞くことの綴りの全部)。試験は happy-dom
+                logo(ロゴの唯一の源) / ask(聞く器。<dialog>) / asks(聞くことの綴りの全部) /
+                share(本文を URL に載せる。gzip → base64url。非同期は js_async の Promise)。試験は happy-dom
   render/       地図のペイン（js だけ）。card(Card 1 枚 → SVG) / render(Renderer。id → 要素、
                 transform / d のキャッシュ、並び直し、paint) / mindmap(器と入力。ホイール・
                 ポインタ・キー・右クリック・長押し・ドラッグを受けて map/ の判断に繋ぎ、
@@ -88,7 +89,7 @@ src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す�
                dnd(落ちたファイルの振り分け。.md は開く、画像はノードの上だけ受ける) /
                draw(その場で描く窓) / io(File System Access API の窓口) /
                handles(ハンドルを IndexedDB に置く層) / export(Mindmap を外へ出す) /
-               share(本文を URL に載せる) / files(帯の Files の行。文書と画像フォルダ) /
+               files(帯の Files の行。文書と画像フォルダ) /
                more(帯の ⋯ の行)。持ち物・ペイン・キー・テーマ・たずねは core/app
 test/   検証 — core に触らない純粋層(camera / geometry / gesture / highlight /
         indicator / panes / share / assets / metrics / head)と、core の出口(coreApi)・

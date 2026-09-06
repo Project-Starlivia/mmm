@@ -19,6 +19,10 @@ pub fn connect(String) -> Ask
 
 pub fn discard() -> Ask
 
+pub async fn from_hash(String) -> String?
+
+pub fn has_images(String) -> Bool
+
 pub fn hex_of(String) -> String?
 
 pub fn image_name(Array[Part], String) -> Ask
@@ -26,6 +30,8 @@ pub fn image_name(Array[Part], String) -> Ask
 pub fn init_shortcuts(@dom.Document, Shortcuts) -> Unit
 
 pub fn key_of(String) -> String
+
+pub let link_warn_length : Int
 
 pub fn load(String) -> String?
 
@@ -46,6 +52,8 @@ pub fn spots_for(Bool) -> Array[Vis]
 pub fn store(String, String) -> Unit
 
 pub fn sweep() -> Unit
+
+pub async fn to_hash(String) -> String
 
 pub fn toggled(Vis, Pane, Array[Vis]) -> Vis
 

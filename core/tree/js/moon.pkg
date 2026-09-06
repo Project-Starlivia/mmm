@@ -4,6 +4,7 @@ import {
   "moonbitlang/core/cmp",
   "moonbitlang/core/json",
   "mizchi/js/core",
+  "moonbitlang/async/js_async",
   "mizchi/js_browser/dom",
   "mmm-app/core/tree",
   "mmm-app/core/view",

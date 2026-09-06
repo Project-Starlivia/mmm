@@ -5,6 +5,7 @@ import {
   "mizchi/js/core",
   "mizchi/js_browser/dom",
   "mmm-app/core/map",
+  "moonbitlang/async/js_async",
 }
 
 // Values
@@ -48,7 +49,11 @@ pub fn mmm_failed_words() -> FixedArray[String]
 
 pub fn mmm_find(@core.Any, String) -> Int?
 
+pub fn mmm_from_hash(String) -> @js_async.Promise[@core.Any]
+
 pub fn mmm_frontmatter(@core.Any) -> String?
+
+pub fn mmm_has_images(String) -> Bool
 
 pub fn mmm_icon(String) -> @dom.Element
 
@@ -61,6 +66,8 @@ pub fn mmm_is_node(@core.Any, Int) -> Bool
 pub fn mmm_label(String, String, Bool) -> Array[@dom.Node]
 
 pub fn mmm_layout(@core.Any, (@map.Font, String) -> Double) -> @core.Any
+
+pub fn mmm_link_warn_length() -> Int
 
 pub fn mmm_load(String) -> String?
 
@@ -133,6 +140,8 @@ pub fn mmm_theme_set_dirty(@core.Any, Bool) -> Unit
 pub fn mmm_theme_toggle(@core.Any) -> Unit
 
 pub fn mmm_to_file_name(String) -> String
+
+pub fn mmm_to_hash(String) -> @js_async.Promise[String]
 
 pub fn mmm_toggle_pane(@core.Any) -> Unit
 

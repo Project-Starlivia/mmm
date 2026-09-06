@@ -402,7 +402,9 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
 - **app/** — 帯と枠。持ち物（`persist.mbt`。localStorage の綴りはここだけで、外は名前で言う）、
   ペインの出し分けと分割線（`panes.mbt`。居場所の算術は純粋で、試験は数だけ）、全体のキー、
   テーマとアクセントカラーと favicon（`theme.mbt` / `logo.mbt`。ロゴの形の源はここ 1 つで、
-  ビルド時の favicon も同じ関数から）、たずね（`ask.mbt` の器と `asks.mbt` の綴り）。
+  ビルド時の favicon も同じ関数から）、たずね（`ask.mbt` の器と `asks.mbt` の綴り）、
+  リンク（`share.mbt`。gzip → base64url。非同期は `moonbitlang/async/js_async` の Promise で出す —
+  作法は 2026-09-07-mbt-practice.md）。
   文書と選択の読み書きは ts の main.ts が閉包で渡す
 - **判断も map/** — 選択（当たり・矩形・矢印・親兄弟）、落とし先、キーの表（`Intent`）、
   右クリックの行、視点の算術、針、指の台帳、欄の重ね。全部純粋で、wbtest で固定する

@@ -16,4 +16,5 @@ import {
   "mizchi/markdown@0.8.3",
   "mizchi/js@0.12.2",
   "mizchi/js_browser@0.12.2",
+  "moonbitlang/async@0.20.5",
 }
