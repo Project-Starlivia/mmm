@@ -21,8 +21,8 @@ pub fn edit(md : String, op : @op.Op) -> Edited {
     Some(done) => {
       let edits = @tree.merge(md, before, spans, done.doc)
       let focus = done.focus.bind(id => @tree.number(done.doc, id))
-      { edits, focus }
+      { edits, focus, }
     }
-    None => { edits: [], focus: None }
+    None => { edits: [], focus: None, }
   }
 }

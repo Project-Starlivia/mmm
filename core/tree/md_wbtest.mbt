@@ -62,7 +62,7 @@ test "畳みと frontmatter" {
 /// `text` を挟んで見出しが後ろにあっても `0,1` のまま。build.mbt の label_of は
 /// この前提で中身の開始位置を自分で数えているので、崩れたらここが鳴る。
 test "インラインの span は中身に対する相対" {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for
     md in [
       "# a\n", "#   a\n", "# a **b**\n", "text\n\n# a\n", "# a #\n", "a\n=\n",

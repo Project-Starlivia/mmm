@@ -85,7 +85,7 @@ pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
   }
   // 行き先の見出し・項目が来ないまま終わった水平線は、その場の中身に落ちる
   spill(b)
-  let next = { val: doc_id + 1 }
+  let next = { val: doc_id + 1, }
   let roots = b.roots
   // 文書の中身は最初の見出し・項目より前にあるので、先に振る
   number_blocks(b.body, next)
@@ -267,7 +267,7 @@ fn depths(
     dry: true,
     owner: 0,
   }
-  let out = Array::make(blocks.length(), { top: deep, own: deep })
+  let out = Array::make(blocks.length(), { top: deep, own: deep, })
   for i, block in blocks {
     // 塊にならない中身（リンクの定義行）も中身なので、保留中の水平線は
     // そこで飾りに落ちる。本番と同じ前提で測らないと深さが食い違う
@@ -283,7 +283,7 @@ fn depths(
     b.top = deep
     b.own = deep
     take(b, block, nest)
-    out[i] = { top: b.top, own: b.own }
+    out[i] = { top: b.top, own: b.own, }
   }
   out
 }
@@ -732,7 +732,7 @@ pub fn number(doc : Doc, id : Int) -> Int? {
   if id == doc_id {
     return Some(doc_id)
   }
-  let next = { val: doc_id + 1 }
+  let next = { val: doc_id + 1, }
   fn blocks(body : Array[Block]) -> Int? {
     for b in body {
       if b.id == id {
@@ -784,7 +784,7 @@ pub fn number(doc : Doc, id : Int) -> Int? {
 /// 振るので、View が Opaque を落としても残りの番号は動かない。
 fn number_blocks(body : Array[Block], next : Counter) -> Unit {
   for i, x in body {
-    body[i] = { id: next.val, content: x.content }
+    body[i] = { id: next.val, content: x.content, }
     next.val = next.val + 1
   }
 }
@@ -792,18 +792,24 @@ fn number_blocks(body : Array[Block], next : Counter) -> Unit {
 ///|
 /// 森の 1 本を根にする。子の側は積むときに決まっている。
 fn to_root(f : Frame) -> Root {
-  { node: to_node(f), sides: f.kids.map(k => k.side) }
+  { node: to_node(f), sides: f.kids.map(k => k.side), }
 }
 
 ///|
 /// 枠をノードにする。項目だけは子も項目に畳む（単調性）。
 fn to_node(f : Frame) -> Node {
   match f.skel {
-    Gap => ImplicitNode({ id: f.id, children: f.kids.map(to_node) })
+    Gap => ImplicitNode({ id: f.id, children: f.kids.map(to_node), })
     Line(sign=Item, label~, fold~, body~) =>
-      ListNode({ id: f.id, label, fold, body, children: f.kids.map(to_list) })
+      ListNode({ id: f.id, label, fold, body, children: f.kids.map(to_list), })
     Line(label~, fold~, body~, ..) =>
-      HeadingNode({ id: f.id, label, fold, body, children: f.kids.map(to_node) })
+      HeadingNode({
+        id: f.id,
+        label,
+        fold,
+        body,
+        children: f.kids.map(to_node),
+      })
   }
 }
 
@@ -821,6 +827,6 @@ fn to_list(f : Frame) -> ListNode {
         children: f.kids.map(to_list),
       }
     Line(label~, fold~, body~, ..) =>
-      { id: f.id, label, fold, body, children: f.kids.map(to_list) }
+      { id: f.id, label, fold, body, children: f.kids.map(to_list), }
   }
 }

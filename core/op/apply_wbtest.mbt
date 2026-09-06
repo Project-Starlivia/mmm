@@ -30,7 +30,7 @@ test "Rename はラベルを替える。Implicit は見出しになる" {
   let e = doc([root(item(2, "a"))])
   assert_eq(
     run(e, Rename(id=2, label="b")),
-    Some({ doc: doc([root(item(2, "b"))]), focus: Some(2) }),
+    Some({ doc: doc([root(item(2, "b"))]), focus: Some(2), }),
   )
 }
 
@@ -46,7 +46,7 @@ test "Fold は定義ごと畳み、名前はラベル。畳み済みなら open 
   let d = doc([
     root(h(2, "r", children=[h(3, "a", children=[h(4, "x")])]), sides=[Right]),
   ])
-  let folded : @tree.Fold = { open: false, summary: Some("a") }
+  let folded : @tree.Fold = { open: false, summary: Some("a"), }
   assert_eq(
     run(d, Fold(id=3, open=false)),
     Some({
@@ -61,7 +61,7 @@ test "Fold は定義ごと畳み、名前はラベル。畳み済みなら open 
       focus: Some(3),
     }),
   )
-  let custom : @tree.Fold = { open: false, summary: Some("custom") }
+  let custom : @tree.Fold = { open: false, summary: Some("custom"), }
   let f = doc([
     root(h(2, "r", children=[h(3, "a", fold=Some(custom))]), sides=[Right]),
   ])
@@ -71,7 +71,7 @@ test "Fold は定義ごと畳み、名前はラベル。畳み済みなら open 
       doc: doc([
         root(
           h(2, "r", children=[
-            h(3, "a", fold=Some({ open: true, summary: Some("custom") })),
+            h(3, "a", fold=Some({ open: true, summary: Some("custom"), })),
           ]),
           sides=[Right],
         ),
@@ -88,7 +88,7 @@ test "Fold は書けない名前なら名無しで畳む" {
     run(d, Fold(id=2, open=false)),
     Some({
       doc: doc([
-        root(h(2, "a</summary>b", fold=Some({ open: false, summary: None }))),
+        root(h(2, "a</summary>b", fold=Some({ open: false, summary: None, }))),
       ]),
       focus: Some(2),
     }),
@@ -100,7 +100,7 @@ test "Fold は Implicit を綴ってから畳む。中身に None。Unfold は�
   let d = doc([
     root(h(2, "r", body=[pic(3)], children=[gap(4, [h(5, "x")])]), sides=[Right]),
   ])
-  let folded : @tree.Fold = { open: false, summary: Some("") }
+  let folded : @tree.Fold = { open: false, summary: Some(""), }
   assert_eq(
     run(d, Fold(id=4, open=false)),
     Some({
@@ -121,11 +121,11 @@ test "Fold は Implicit を綴ってから畳む。中身に None。Unfold は�
 
 ///|
 test "Unfold は畳みを外す" {
-  let folded : @tree.Fold = { open: false, summary: Some("a") }
+  let folded : @tree.Fold = { open: false, summary: Some("a"), }
   let d = doc([root(item(2, "a", fold=Some(folded)))])
   assert_eq(
     run(d, Unfold(id=2)),
-    Some({ doc: doc([root(item(2, "a"))]), focus: Some(2) }),
+    Some({ doc: doc([root(item(2, "a"))]), focus: Some(2), }),
   )
 }
 
@@ -140,7 +140,7 @@ test "Delete は部分木ごと。根の子なら side も、Implicit の掃除�
   // a の次の兄弟は Implicit 5 だが y ごと消えるので、親 r
   assert_eq(
     run(d, Delete(ids=[4, 6, 3])),
-    Some({ doc: doc([root(h(2, "r"), sides=[])]), focus: Some(2) }),
+    Some({ doc: doc([root(h(2, "r"), sides=[])]), focus: Some(2), }),
   )
 }
 
@@ -157,12 +157,15 @@ test "Delete は中身も 1 枚ずつ（持ち主が focus）。根も Root ご�
   // 持ち主ごと消せば、先頭は文書順で r（ノード）なので、次の根 s
   assert_eq(
     run(d, Delete(ids=[2, 3])),
-    Some({ doc: doc([root(h(5, "s"))]), focus: Some(5) }),
+    Some({ doc: doc([root(h(5, "s"))]), focus: Some(5), }),
   )
   // 末尾の根を消せば前の根
   assert_eq(
     run(d, Delete(ids=[5])),
-    Some({ doc: doc([root(h(2, "r", body=[pic(3), code(4)]))]), focus: Some(2) }),
+    Some({
+      doc: doc([root(h(2, "r", body=[pic(3), code(4)]))]),
+      focus: Some(2),
+    }),
   )
 }
 
@@ -198,7 +201,7 @@ test "Delete したノードの focus は次の兄弟 → 前の兄弟 → 親�
     Some(None),
   )
   // 前の兄弟が畳まれていれば、その兄弟そのもの（埋もれた子孫には落ちない）
-  let folded : @tree.Fold = { open: false, summary: Some("b") }
+  let folded : @tree.Fold = { open: false, summary: Some("b"), }
   let f = doc([
     root(
       h(2, "r", children=[
@@ -311,7 +314,7 @@ test "AddNode を doc_id にすれば新しい根。空の文書にも" {
       doc([]),
       AddNode(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["r"]),
     ),
-    Some({ doc: doc([root(h(2, "r"))]), focus: Some(2) }),
+    Some({ doc: doc([root(h(2, "r"))]), focus: Some(2), }),
   )
 }
 
@@ -323,7 +326,7 @@ test "AddNode を doc_id にすれば最後の根の綴りに従う" {
       d,
       AddNode(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["b"]),
     ),
-    Some({ doc: doc([root(item(2, "a")), root(item(3, "b"))]), focus: Some(3) }),
+    Some({ doc: doc([root(item(2, "a")), root(item(3, "b"))]), focus: Some(3), }),
   )
 }
 
@@ -434,11 +437,11 @@ test "MoveNode で子の下へ（indent）と親の後ろへ（outdent）" {
   ])
   assert_eq(
     run(d, MoveNode(ids=[4], at=NodePlace::In(node=3, side=None))),
-    Some({ doc: indented, focus: Some(4) }),
+    Some({ doc: indented, focus: Some(4), }),
   )
   assert_eq(
     run(indented, MoveNode(ids=[4], at=NodePlace::After(node=3))),
-    Some({ doc: d, focus: Some(4) }),
+    Some({ doc: d, focus: Some(4), }),
   )
 }
 
@@ -558,11 +561,11 @@ test "Implicit は見出しの直後に来れば綴られる" {
   ])
   assert_eq(
     run(d, MoveNode(ids=[6], at=Before(node=4))),
-    Some({ doc: spelled, focus: Some(6) }),
+    Some({ doc: spelled, focus: Some(6), }),
   )
   assert_eq(
     run(d, MoveNode(ids=[4], at=After(node=6))),
-    Some({ doc: spelled, focus: Some(4) }),
+    Some({ doc: spelled, focus: Some(4), }),
   )
   // 新しい隣も同じ
   assert_eq(
@@ -623,7 +626,7 @@ test "Implicit の唯一の子を、その Implicit の隣へ動かせる" {
   let e = doc([root(gap(2, [h(3, "a")]), sides=[Right]), root(h(4, "b"))])
   assert_eq(
     run(e, MoveNode(ids=[3], at=After(node=2))),
-    Some({ doc: doc([root(h(3, "a")), root(h(4, "b"))]), focus: Some(3) }),
+    Some({ doc: doc([root(h(3, "a")), root(h(4, "b"))]), focus: Some(3), }),
   )
 }
 
@@ -634,7 +637,7 @@ test "Implicit は項目を子に持てば綴られる" {
   // 項目は飛びを綴れないので、Implicit が綴られる
   let d = six([])
   let g = root(gap(8, [h(9, "z")]), sides=[Right])
-  let f : @tree.Doc = { ..d, roots: [..d.roots, g] }
+  let f : @tree.Doc = { ..d, roots: [..d.roots, g], }
   assert_eq(
     run(f, MoveNode(ids=[8], at=NodePlace::After(node=7))),
     Some({
@@ -879,7 +882,7 @@ test "SetBlock は中身を替え、id は保つ" {
   let d = doc([root(h(2, "r", body=[pic(3)]))])
   assert_eq(
     run(d, SetBlock(id=3, content=Code(info="", text="x"))),
-    Some({ doc: doc([root(h(2, "r", body=[code(3)]))]), focus: Some(3) }),
+    Some({ doc: doc([root(h(2, "r", body=[code(3)]))]), focus: Some(3), }),
   )
   assert_eq(run(d, SetBlock(id=2, content=Code(info="", text="x"))), None)
 }
@@ -1012,7 +1015,7 @@ test "Graft の一番外 — 段落は行ごとにノード、中身は親の bo
         root(
           h(2, "r", body=[
             pic(3),
-            { id: 4, content: Image(alt="", src="q.png", title="") },
+            { id: 4, content: Image(alt="", src="q.png", title=""), },
           ]),
         ),
       ]),
@@ -1115,7 +1118,7 @@ test "Graft は席の綴りで差す — 見出しの列では見出し、項目
   // 根が見出しの文書へ項目 — 最後の根に従って見出しの根
   assert_eq(
     run(f, Graft(at=NodePlace::In(node=@tree.doc_id, side=None), md="- b\n")),
-    Some({ doc: doc([root(h(2, "r")), root(h(3, "b"))]), focus: Some(3) }),
+    Some({ doc: doc([root(h(2, "r")), root(h(3, "b"))]), focus: Some(3), }),
   )
 }
 
@@ -1169,7 +1172,7 @@ fn six(tail : Array[@tree.Node]) -> @tree.Doc {
 test "AddNode は 6 段目の下なら項目で足す" {
   assert_eq(
     run(six([]), AddNode(at=NodePlace::In(node=7, side=None), labels=["g"])),
-    Some({ doc: six([item(8, "g")]), focus: Some(8) }),
+    Some({ doc: six([item(8, "g")]), focus: Some(8), }),
   )
 }
 
@@ -1202,7 +1205,7 @@ test "Graft は 6 段目の下なら部分木ごと項目にする。途中の�
 test "MoveNode は 6 段目の下へ落とせば見出しを項目にする。Implicit は空の項目になり、focus は残る" {
   let d = six([])
   let x = root(h(8, "x", body=[pic(9)], children=[h(10, "y")]), sides=[Right])
-  let e : @tree.Doc = { ..d, roots: [..d.roots, x] }
+  let e : @tree.Doc = { ..d, roots: [..d.roots, x], }
   assert_eq(
     run(e, MoveNode(ids=[8], at=NodePlace::In(node=7, side=None))),
     Some({
@@ -1211,10 +1214,10 @@ test "MoveNode は 6 段目の下へ落とせば見出しを項目にする。Im
     }),
   )
   let g = root(gap(8, [h(9, "z")]), sides=[Right])
-  let f : @tree.Doc = { ..d, roots: [..d.roots, g] }
+  let f : @tree.Doc = { ..d, roots: [..d.roots, g], }
   assert_eq(
     run(f, MoveNode(ids=[8], at=NodePlace::In(node=7, side=None))),
-    Some({ doc: six([item(8, "", children=[li(9, "z")])]), focus: Some(8) }),
+    Some({ doc: six([item(8, "", children=[li(9, "z")])]), focus: Some(8), }),
   )
 }
 
@@ -1236,7 +1239,7 @@ test "Wrap は 6 段目を包めば、包まれたほうが項目になる" {
   ])
   assert_eq(
     run(six([]), Wrap(id=7, label="w")),
-    Some({ doc: d, focus: Some(8) }),
+    Some({ doc: d, focus: Some(8), }),
   )
 }
 

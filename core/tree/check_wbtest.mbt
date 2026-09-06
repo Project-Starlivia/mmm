@@ -52,7 +52,10 @@ test "同じ id が 2 度出たら見つける" {
     eol: Lf,
     body: [],
     roots: [
-      { node: HeadingNode({ ..n, children: [HeadingNode(n)] }), sides: [Right] },
+      {
+        node: HeadingNode({ ..n, children: [HeadingNode(n)], }),
+        sides: [Right],
+      },
     ],
   }
   json_inspect(check(doc), content=[["DupeId", 7]])
@@ -65,7 +68,7 @@ test "子を持たない Implicit を見つける" {
     frontmatter: None,
     eol: Lf,
     body: [],
-    roots: [{ node: ImplicitNode({ id: 2, children: [] }), sides: [] }],
+    roots: [{ node: ImplicitNode({ id: 2, children: [], }), sides: [], }],
   }
   json_inspect(check(doc), content=[["BarrenImplicit", 2]])
 }
@@ -108,7 +111,7 @@ test "中身の id も一意さを見る" {
   let doc : Doc = {
     frontmatter: None,
     eol: Lf,
-    body: [{ id: 5, content: Opaque("a") }],
+    body: [{ id: 5, content: Opaque("a"), }],
     roots: [
       {
         node: HeadingNode({
@@ -138,7 +141,7 @@ test "畳みの名前が summary に書けなければ見つける" {
         node: HeadingNode({
           id: 2,
           label: "x",
-          fold: Some({ open: false, summary: Some("a</summary>b") }),
+          fold: Some({ open: false, summary: Some("a</summary>b"), }),
           body: [],
           children: [],
         }),
@@ -163,7 +166,7 @@ test "畳みの名前に空行が入っていれば見つける" {
         node: HeadingNode({
           id: 2,
           label: "x",
-          fold: Some({ open: false, summary: Some("a\n  \nb") }),
+          fold: Some({ open: false, summary: Some("a\n  \nb"), }),
           body: [],
           children: [],
         }),
@@ -187,7 +190,7 @@ test "改行だけの名前は書ける" {
         node: HeadingNode({
           id: 2,
           label: "x",
-          fold: Some({ open: false, summary: Some("a\nb\n") }),
+          fold: Some({ open: false, summary: Some("a\nb\n"), }),
           body: [],
           children: [],
         }),
@@ -200,12 +203,12 @@ test "改行だけの名前は書ける" {
 
 ///|
 fn tb(id : Int) -> Block {
-  { id, content: ThematicBreak }
+  { id, content: ThematicBreak, }
 }
 
 ///|
 fn leaf(id : Int, label : String, body? : Array[Block] = []) -> Node {
-  HeadingNode({ id, label, fold: None, body, children: [] })
+  HeadingNode({ id, label, fold: None, body, children: [], })
 }
 
 ///|
@@ -233,7 +236,7 @@ test "中身の尻の水平線に骨格が続けば見つける" {
               body: [tb(8)],
               children: [],
             }),
-            leaf(9, "b", body=[tb(10), { id: 11, content: Opaque("x") }]),
+            leaf(9, "b", body=[tb(10), { id: 11, content: Opaque("x"), }]),
             leaf(12, "c", body=[tb(13)]),
           ],
         }),
@@ -255,21 +258,21 @@ test "中身の尻の水平線に骨格が続けば見つける" {
 /// 項目の後ろなら何でも置ける（項目の枠は見出しの親になれず、落ちる）。
 test "見出しに境界なしで続く項目・Implicit を見つける" {
   let li = (id : Int, label : String) => {
-    ListNode({ id, label, fold: None, body: [], children: [] })
+    ListNode({ id, label, fold: None, body: [], children: [], })
   }
-  let gap = (id : Int, kid : Node) => ImplicitNode({ id, children: [kid] })
+  let gap = (id : Int, kid : Node) => ImplicitNode({ id, children: [kid], })
   let doc : Doc = {
     frontmatter: None,
     eol: Lf,
     body: [],
     roots: [
-      { node: gap(2, leaf(3, "x")), sides: [Right] },
-      { node: li(4, "i"), sides: [] },
-      { node: gap(5, leaf(6, "y")), sides: [Right] },
-      { node: li(7, "j"), sides: [] },
-      { node: leaf(8, "a"), sides: [] },
-      { node: li(9, "k"), sides: [] },
-      { node: gap(10, leaf(11, "z")), sides: [Right] },
+      { node: gap(2, leaf(3, "x")), sides: [Right], },
+      { node: li(4, "i"), sides: [], },
+      { node: gap(5, leaf(6, "y")), sides: [Right], },
+      { node: li(7, "j"), sides: [], },
+      { node: leaf(8, "a"), sides: [], },
+      { node: li(9, "k"), sides: [], },
+      { node: gap(10, leaf(11, "z")), sides: [Right], },
       {
         node: HeadingNode({
           id: 12,
@@ -314,8 +317,8 @@ test "項目の根の子の Left を見つける" {
           fold: None,
           body: [],
           children: [
-            { id: 3, label: "b", fold: None, body: [], children: [] },
-            { id: 4, label: "c", fold: None, body: [], children: [] },
+            { id: 3, label: "b", fold: None, body: [], children: [], },
+            { id: 4, label: "c", fold: None, body: [], children: [], },
           ],
         }),
         sides: [Right, Left],
@@ -384,7 +387,7 @@ test "深さ 7 以上の見出しを見つける" {
     frontmatter: None,
     eol: Lf,
     body: [],
-    roots: [{ node: chain(6, leaf(10, "g")), sides: [Right] }],
+    roots: [{ node: chain(6, leaf(10, "g")), sides: [Right], }],
   }
   json_inspect(check(seven), content=[["TooDeep", 10]])
   // 6 段目の下の項目と、6 段目までの飛び（Implicit）は書ける
@@ -402,7 +405,7 @@ test "深さ 7 以上の見出しを見つける" {
             fold: None,
             body: [],
             children: [
-              { id: 11, label: "j", fold: None, body: [], children: [] },
+              { id: 11, label: "j", fold: None, body: [], children: [], },
             ],
           }),
         ),
@@ -417,7 +420,7 @@ test "深さ 7 以上の見出しを見つける" {
     body: [],
     roots: [
       {
-        node: chain(4, ImplicitNode({ id: 9, children: [leaf(10, "f")] })),
+        node: chain(4, ImplicitNode({ id: 9, children: [leaf(10, "f")], })),
         sides: [Right],
       },
     ],

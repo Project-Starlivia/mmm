@@ -69,7 +69,7 @@ fn dialect(md : String, doc : @markdown.Document) -> @markdown.Document {
     // 止まる。改行の手前なら改行まで、もう改行の次なら据え置き
     definitions: doc.definitions.map(d => {
       ..d,
-      span: { from: d.span.from, to: after_newline(md, d.span.to) },
+      span: { from: d.span.from, to: after_newline(md, d.span.to), },
     }),
   }
 }
@@ -107,7 +107,7 @@ fn dialect_block(
 ) -> @markdown.Block {
   let inner = (bs : Array[@markdown.Block]) => dialect_blocks(md, openers, bs)
   let items = (xs : Array[@markdown.ListItem]) => {
-    xs.map(it => { ..it, children: inner(it.children) })
+    xs.map(it => { ..it, children: inner(it.children), })
   }
   match b {
     FencedCode(
@@ -171,7 +171,7 @@ fn dialect_block(
         meta~,
         children=kids,
         fence_length~,
-        span=closed(md, openers, ':', { from: span.from, to }),
+        span=closed(md, openers, ':', { from: span.from, to, }),
         leading_trivia~,
         trailing_trivia~,
       )
@@ -274,7 +274,7 @@ fn closed(
     i = i + 1
   }
   if i >= md.length() || md[i] == '\n' || md[i] == '\r' {
-    { from: span.from, to: line_end(md, i) }
+    { from: span.from, to: line_end(md, i), }
   } else {
     span
   }
@@ -294,7 +294,7 @@ fn after_newline(md : String, at : Int) -> Int {
 /// 木 → 正規形の md。mdAst に戻す（unbuild.mbt）のが我々の仕事で、
 /// 綴り（字下げ・フェンス・空行・エスケープ）はライブラリの仕事。
 pub fn serialize(doc : Doc) -> String {
-  let body = write(unbuild({ ..doc, frontmatter: None }), doc.eol)
+  let body = write(unbuild({ ..doc, frontmatter: None, }), doc.eol)
   match doc.frontmatter {
     None => body
     // frontmatter と本文の間は空行 1 つ。読みは frontmatter の後ろの空行を落とすので、書く側で置く
@@ -361,7 +361,7 @@ fn spell(md : String) -> String {
     rule(b)
   }
   // 区切り線の span の中の `*` は marker だけ（同じ長さの `-` に）
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut at = 0
   for s in rules {
     sb.write_string(slice(md, at, s.from))
@@ -439,7 +439,7 @@ pub fn md_ast_sig(md : String) -> String {
 ///|
 /// mdAst ぜんぶの指紋。frontmatter が在れば頭に付く。定義行は尻に `Def[from,to]`。
 pub fn ast_sig(doc : @markdown.Document) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   match doc.frontmatter {
     Some(f) => sb.write_string("Front\{at(f.span)} ")
     None => ()

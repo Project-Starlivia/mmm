@@ -9,7 +9,7 @@ test "深いラベルを替えると、根までの道が組み直る" {
   ])
   let got = splice(d, 4, n => {
     match n {
-      HeadingNode(x) => [@tree.HeadingNode({ ..x, label: "y" })]
+      HeadingNode(x) => [@tree.HeadingNode({ ..x, label: "y", })]
       _ => [n]
     }
   })
@@ -92,7 +92,7 @@ test "根を同じ id で替えれば sides は保つ" {
   assert_eq(
     splice(d, 2, n => {
       match n {
-        HeadingNode(x) => [@tree.HeadingNode({ ..x, label: "q" })]
+        HeadingNode(x) => [@tree.HeadingNode({ ..x, label: "q", })]
         _ => [n]
       }
     }),
