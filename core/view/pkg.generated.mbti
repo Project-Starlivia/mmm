@@ -1,0 +1,35 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm-app/core/view"
+
+import {
+  "mmm-app/core/tree",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn project(@tree.Doc) -> View
+
+// Errors
+
+// Types and methods
+pub(all) struct Node {
+  id : Int
+  label : String?
+  fold : @tree.Fold?
+  blocks : Array[@tree.Block]
+  children : Array[Node]
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Root {
+  node : Node
+  sides : Array[@tree.Side]
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct View {
+  frontmatter : String?
+  roots : Array[Root]
+} derive(Eq, ToJson, @debug.Debug)
+
+// Type aliases
+
+// Traits

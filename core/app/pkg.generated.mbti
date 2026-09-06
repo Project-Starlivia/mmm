@@ -1,0 +1,128 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm-app/core/app"
+
+import {
+  "mizchi/js_browser/dom",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn accent(@dom.Document) -> String?
+
+pub fn ask(@dom.Document, Ask, (Array[String]?) -> Unit) -> Unit
+
+pub fn ask_form(@dom.Document, Ask, () -> Unit) -> (@dom.Element, () -> Array[String])
+
+pub fn ask_of(String, String, note? : String?, cancel? : String?, parts? : Array[Part], preview? : String?) -> Ask
+
+pub fn connect(String) -> Ask
+
+pub fn discard() -> Ask
+
+pub fn hex_of(String) -> String?
+
+pub fn image_name(Array[Part], String) -> Ask
+
+pub fn init_shortcuts(@dom.Document, Shortcuts) -> Unit
+
+pub fn key_of(String) -> String
+
+pub fn load(String) -> String?
+
+pub fn logo_inner(String) -> String
+
+pub let logo_path : String
+
+pub fn logo_svg(String, Bool) -> String
+
+pub fn place() -> Ask
+
+pub fn project(Vis, Array[Vis]) -> Vis
+
+pub fn rename(String) -> Ask
+
+pub fn spots_for(Bool) -> Array[Vis]
+
+pub fn store(String, String) -> Unit
+
+pub fn sweep() -> Unit
+
+pub fn toggled(Vis, Pane, Array[Vis]) -> Vis
+
+// Errors
+
+// Types and methods
+pub(all) struct Ask {
+  title : String
+  note : String?
+  ok : String
+  cancel : String?
+  parts : Array[Part]
+  preview : String?
+}
+
+pub(all) struct Field {
+  value : String
+  check : ((String) -> String?)?
+}
+
+pub(all) enum Pane {
+  Md
+  Map
+} derive(Eq, @debug.Debug)
+
+pub struct Panes {
+  doc : @dom.Document
+  md_pane : @dom.Element
+  map_pane : @dom.Element
+  panes_el : @dom.Element
+  splitter : @dom.Element
+  focus_editor : () -> Unit
+  narrow : @dom.MediaQueryList
+  go_left : @dom.Element
+  go_right : @dom.Element
+  mut vis : Vis
+  mut dragging : Bool
+}
+pub fn Panes::new(@dom.Element, @dom.Element, @dom.Element, @dom.Element, () -> Unit) -> Self
+pub fn Panes::toggle(Self) -> Unit
+pub fn Panes::toggle_vis(Self, Pane) -> Unit
+
+pub(all) enum Part {
+  Text(String)
+  Blank(Field)
+}
+
+pub(all) struct Shortcuts {
+  save : (Bool) -> Unit
+  open : () -> Unit
+  create : () -> Unit
+  toggle_pane : () -> Unit
+  toggle_pane_vis : (Pane) -> Unit
+  undo : () -> Unit
+  redo : () -> Unit
+  export_map : (Bool) -> Unit
+}
+
+pub struct Theme {
+  doc : @dom.Document
+  set_editor_theme : (Bool) -> Unit
+  base : String
+  color_input : @dom.Element
+  mut favicon_color : String
+  mut favicon_dirty : Bool
+}
+pub fn Theme::is_light(Self) -> Bool
+pub fn Theme::new(@dom.Element, (Bool) -> Unit) -> Self
+pub fn Theme::pick_color(Self) -> Unit
+pub fn Theme::set_dirty(Self, Bool) -> Unit
+pub fn Theme::toggle(Self) -> Unit
+
+pub(all) struct Vis {
+  md : Bool
+  map : Bool
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

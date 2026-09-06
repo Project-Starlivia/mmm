@@ -1,0 +1,106 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm-app/core/web"
+
+import {
+  "mizchi/js/core",
+  "mizchi/js_browser/dom",
+}
+
+// Values
+pub fn after(@core.Any, (@core.Any) -> Unit) -> Unit
+
+pub fn attr_in(@core.Any, String, String) -> String?
+
+pub fn capture(@dom.Element, Int) -> Unit
+
+pub fn client_rect(@dom.Element) -> @dom.DOMRect
+
+pub fn close_dialog(@dom.Element) -> Unit
+
+pub fn css_var(@dom.Document, String) -> String
+
+pub fn delta(@core.Any) -> (Double, Double)
+
+pub fn detail(@core.Any) -> Int
+
+pub fn el(@dom.Document, String, Array[(String, String)]) -> @dom.Element
+
+pub fn event_type(@core.Any) -> String
+
+pub fn focus(@dom.Element) -> Unit
+
+pub fn has_class(@dom.Element, String) -> Bool
+
+pub fn head(@dom.Document) -> @dom.Element
+
+pub fn html(@dom.Document, String, String) -> @dom.HTMLElement
+
+pub fn inner_size(@dom.Document) -> (Double, Double)
+
+pub fn is_composing(@core.Any) -> Bool
+
+pub fn is_touch(@core.Any) -> Bool
+
+pub fn keyboard(@core.Any) -> @dom.KeyboardEvent
+
+pub fn listen(@dom.Element, String, (@core.Any) -> Unit, capture? : Bool) -> Unit
+
+pub fn match_media(@dom.Document, String) -> @dom.MediaQueryList
+
+pub fn matches(@dom.MediaQueryList) -> Bool
+
+pub fn mouse(@core.Any) -> @dom.MouseEvent
+
+pub fn num(Double) -> String
+
+pub fn observe_resize(@dom.Element, () -> Unit) -> Unit
+
+pub fn offset_size(@dom.Element) -> (Double, Double)
+
+pub fn on_window(@dom.Document, String, (@core.Any) -> Unit, capture? : Bool) -> Unit
+
+pub fn open_url(String) -> Unit
+
+pub fn pointer_id(@core.Any) -> Int
+
+pub fn prevent(@core.Any) -> Unit
+
+pub fn px(Double) -> String
+
+pub fn return_value(@dom.Element) -> String
+
+pub fn same(@dom.Element, @dom.Element) -> Bool
+
+pub fn select_all(@dom.Element) -> Unit
+
+pub fn select_range(@dom.Element, Int, Int) -> Unit
+
+pub fn set_disabled(@dom.Element, Bool) -> Unit
+
+pub fn set_style(@dom.Element, String, String) -> Unit
+
+pub fn set_value(@dom.Element, String) -> Unit
+
+pub fn show(@dom.Element, String, Bool) -> Unit
+
+pub fn show_modal(@dom.Element) -> Unit
+
+pub fn stop(@core.Any) -> Unit
+
+pub let svg_ns : String
+
+pub fn target_in(@core.Any, String) -> @dom.Element?
+
+pub fn toggle_class(@dom.Element, String, Bool) -> Unit
+
+pub fn value(@dom.Element) -> String
+
+pub fn window_of(@dom.Document) -> @core.Any
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

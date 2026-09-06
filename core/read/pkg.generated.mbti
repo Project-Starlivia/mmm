@@ -1,0 +1,91 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm-app/core/read"
+
+import {
+  "mmm-app/core/map",
+  "mmm-app/core/op",
+  "mmm-app/core/tree",
+  "mmm-app/core/view",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+  "moonbitlang/core/set",
+}
+
+// Values
+pub fn anchors_for(Survey, Choice) -> Anchors?
+
+pub fn anchors_of(Survey, Int?) -> Anchors?
+
+pub fn buried(@view.View) -> @set.Set[Int]
+
+pub fn caret_ids(Survey, Array[Range]) -> Array[Int]
+
+pub fn chosen(Survey, Holder, Caret, Anchors?) -> Choice
+
+pub fn each_node(@view.View, (@view.Node) -> Unit) -> Unit
+
+pub let empty_name : String
+
+pub fn image_folder(String?) -> String?
+
+pub let image_folder_key : String
+
+pub fn normalize_path(String) -> String?
+
+pub let nothing : Choice
+
+pub fn ranges(Survey, Choice) -> Array[Range]
+
+pub fn retarget(@view.View, String, String) -> Array[@op.Op]
+
+pub fn set_image_folder(String, String?, String) -> @tree.Edit
+
+pub fn survey(String) -> Survey
+
+pub fn to_file_name(String) -> String
+
+pub fn under(String, String) -> String?
+
+// Errors
+
+// Types and methods
+pub(all) enum Anchors {
+  NodeAt(at~ : Array[Int], anchor~ : Int?)
+  CardAt(at~ : Int)
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct Caret {
+  ranges : Array[Range]
+  head : Int
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Choice {
+  Nodes(sel~ : @map.Selection)
+  Card(id~ : Int)
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) enum Holder {
+  Md
+  Map
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Range {
+  from : Int
+  to : Int
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Survey {
+  md : String
+  view : @view.View
+  spots : Map[Int, @tree.Spot]
+}
+pub fn Survey::blocks(Self, Int) -> Array[Int]
+pub fn Survey::copy(Self, Array[Int]) -> String
+pub fn Survey::empty(Self) -> Bool
+pub fn Survey::find(Self, String) -> Int?
+pub fn Survey::is_node(Self, Int) -> Bool
+pub fn Survey::name(Self) -> String
+
+// Type aliases
+
+// Traits
