@@ -227,8 +227,8 @@ test "法則 — 読み直せば操作後の木と形が一致し（md が決め
   }
   json_inspect(bad, content=[])
   // 全部 None に潰れる退化を落とすための下限チェック
-  // 1480 → 1587: BorderBreak を断らなくなった分
-  inspect(some, content="1587")
+  // 1480 → 1587: BorderBreak、→ 1657: 文書へ中身を断らなくなった分
+  inspect(some, content="1657")
   // md が形を決めた回数（BorderBreak）。0 なら法則の 2 つ目の道が死んでいる
   inspect(decided, content="96")
 }
@@ -451,8 +451,8 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   }
   json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
-  // 1438 → 1545: BorderBreak を断らなくなった分
-  inspect(n, content="1545")
+  // 1438 → 1545: BorderBreak、→ 1615: 文書へ中身を断らなくなった分
+  inspect(n, content="1615")
 }
 
 ///|

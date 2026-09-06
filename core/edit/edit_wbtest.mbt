@@ -99,10 +99,13 @@ test "Graft — 貼り付けの見本" {
     applied("# r\n", Graft(at=In(node=2, side=None), md="![](q.png)\n")),
     ("# r\n\n![](q.png)\n", Some(3)),
   )
-  // 文書へ中身は断る
+  // 文書へ中身は文書の散文（最初の骨格より前）へ。手で頭に書いたのと同じ形
   assert_eq(
-    edit("# r\n", Graft(at=In(node=@tree.doc_id, side=None), md="![](q.png)\n")),
-    { edits: [], focus: None, },
+    applied(
+      "# r\n",
+      Graft(at=In(node=@tree.doc_id, side=None), md="![](q.png)\n"),
+    ),
+    ("![](q.png)\n\n# r\n", Some(2)),
   )
   // 途中の飛びを 6 段目へ — 飛びは空の項目 `- - - b`
   let six = "# 1\n\n## 2\n\n### 3\n\n#### 4\n\n##### 5\n\n###### t\n"

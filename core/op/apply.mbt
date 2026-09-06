@@ -652,7 +652,7 @@ fn shift(n : @tree.Node, by : Int) -> @tree.Node {
 /// 一番外は順に読み、段落は行ごとにノード、それ以外の中身は直前に生えたノードの中身へ
 /// （無ければ行き先の親の body 末尾へ）。`---` は md と同じ意味 — 断片の側は境界として
 /// 運び、書けば md が境界と読む（形は読み直しが決める）
-/// （行き先が文書なら断る — 文書の散文はマップに出ない）。
+/// （行き先が文書なら文書の散文へ。マップには出ないが、手で頭に書いたのと同じ）。
 /// 断片が `##` から始まると parse は根を Implicit で包む（深さ 1 の飛び）。
 /// それは切り出した場所の名残でしかないので剥がし、相対の形で差す。
 /// 決めは docs/superpowers/specs/2026-09-06-paste-design.md
@@ -713,8 +713,9 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   })
   let nodes = [..heads, ..subs]
   let mut cur = doc
+  // 貼り先が文書なら文書の散文（最初の骨格より前）へ。マップには出ないが、
+  // 手で md の頭に書いたのと同じ形 — 見えないことは地図の都合で、断る理由にしない
   if !rest.is_empty() {
-    guard host != @tree.doc_id else { return None }
     guard body(cur, node=host, bs => [..bs, ..rest]) is Some(d) else {
       return None
     }

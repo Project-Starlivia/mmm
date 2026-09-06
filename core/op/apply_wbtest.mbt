@@ -1113,7 +1113,8 @@ test "Graft の一番外 — 段落は行ごとにノード、中身は親の bo
       focus: Some(4),
     }),
   )
-  // 文書へ中身は断る
+  // 文書へ中身は文書の散文（最初の骨格より前）へ。マップには出ないが、手で頭に
+  // 書いたのと同じ形 — 見えないことは地図の都合で、断る理由にしない
   assert_eq(
     run(
       d,
@@ -1122,7 +1123,12 @@ test "Graft の一番外 — 段落は行ごとにノード、中身は親の bo
         md="![](q.png)\n\n# s\n",
       ),
     ),
-    None,
+    Some({
+      doc: doc([root(h(2, "r", body=[pic(3)])), root(h(5, "s"))], body=[
+        { id: 4, content: Image(alt="", src="q.png", title=""), },
+      ]),
+      focus: Some(5),
+    }),
   )
   // 混ざった断片 — 一番外の段落はノード、見出しの下の中身はその見出しのまま
   assert_eq(
@@ -1375,7 +1381,7 @@ test "apply の結果は check を通る（BorderBreak は md が決めるので
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  // 512 → 543: 中身の尻の水平線に骨格が続く形（BorderBreak）を断らなくなった分
-  inspect(some, content="543")
+  // 512 → 543: BorderBreak、→ 563: 文書へ中身を断らなくなった分
+  inspect(some, content="563")
   json_inspect(bad, content=[])
 }
