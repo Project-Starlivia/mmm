@@ -378,6 +378,135 @@ const div = (v: unknown): HTMLDivElement => (v instanceof HTMLDivElement ? v : b
 const svgSvg = (v: unknown): SVGSVGElement => (v instanceof SVGSVGElement ? v : bad("<svg> でない"));
 const node = (v: unknown): Node => (v instanceof Node ? v : bad("Node でない"));
 
+// ---- 帯と枠 ----
+//
+// 持ち物・ペインの出し分け・全体のキー・見た目の好み・たずね（core/app）。値は core が持ち、
+// ts は持ち手で頼む。閉包（保存する・開く・CodeMirror の焦点）だけを渡す。
+
+/** 持ち物の名前。綴り（`mmm.*`）は core/app/persist.mbt だけが知っている */
+export type Kept = "theme" | "color" | "way" | "grab";
+export const load = (name: Kept): string | null => mbt.mmmLoad(name) ?? null;
+export const store = (name: Kept, value: string): void => mbt.mmmStore(name, value);
+/** 役目を終えた localStorage のキーを捨てる */
+export const sweep = (): void => mbt.mmmSweep();
+
+declare const panesBrand: unique symbol;
+/** ペインの出し分けと分割線（持ち手） */
+export interface Panes {
+  readonly [panesBrand]: never;
+}
+
+export const panes = (args: {
+  mdPane: HTMLElement;
+  mapPane: HTMLElement;
+  panesEl: HTMLElement;
+  splitter: HTMLElement;
+  /** md 側のフォーカスは CodeMirror が持つので注入 */
+  focusEditor: () => void;
+}): Panes =>
+  Object(
+    mbt.mmmPanes(args.mdPane, args.mapPane, args.panesEl, args.splitter, () => {
+      args.focusEditor();
+      return undefined;
+    }),
+  );
+
+/** Mod+/: もう片方のペインへ。隠れていれば出す */
+export const togglePane = (p: Panes): void => mbt.mmmTogglePane(p);
+/** そのペインの表示 / 非表示 */
+export const togglePaneVis = (p: Panes, which: "md" | "map"): void => mbt.mmmTogglePaneVis(p, which);
+
+/** アプリ全体のキー（どこにフォーカスがあっても効くもの） */
+export const shortcuts = (deps: {
+  save: (asNew: boolean) => void;
+  open: () => void;
+  create: () => void;
+  togglePane: () => void;
+  togglePaneVis: (which: "md" | "map") => void;
+  undo: () => void;
+  redo: () => void;
+  /** いまの出し方で即書き出し。Shift なら出し方を選び直すメニューを開く */
+  export: (choose: boolean) => void;
+}): void => mbt.mmmShortcuts(deps);
+
+/** いまのアクセントカラー（`#rrggbb`）。綴りの源は style.css の `--accent`。読めなければ null */
+export const accent = (): string | null => mbt.mmmAccent() ?? null;
+
+declare const themeBrand: unique symbol;
+/** 見た目の好み（持ち手）: アクセントカラーとライト / ダーク */
+export interface Theme {
+  readonly [themeBrand]: never;
+}
+
+/** カラーとテーマの配線と、保存値の復元。logo は topbar の `<svg id="logo">` */
+export const theme = (logo: SVGSVGElement, setEditorTheme: (dark: boolean) => void): Theme =>
+  Object(
+    mbt.mmmTheme(logo, (dark) => {
+      setEditorTheme(dark);
+      return undefined;
+    }),
+  );
+export const themeToggle = (t: Theme): void => mbt.mmmThemeToggle(t);
+export const themeIsLight = (t: Theme): boolean => mbt.mmmThemeIsLight(t);
+export const themePickColor = (t: Theme): void => mbt.mmmThemePickColor(t);
+/** 未保存かどうかが変わった。タブの印を描き直す */
+export const themeSetDirty = (t: Theme, dirty: boolean): void => mbt.mmmThemeSetDirty(t, dirty);
+
+/** 打てる欄。`check` はその値では進めない理由（進めるなら null）。打つそばから効く */
+export interface Field {
+  value: string;
+  check?: (value: string) => string | null;
+}
+/** 並べるもの。ただの字か、打てる欄か */
+export type Part = string | Field;
+
+export interface Ask {
+  /** 何を聞いているか。1 行で言い切る */
+  title: string;
+  /** 補足。要るときだけ */
+  note?: string;
+  /** 進む側のボタンの名前 */
+  ok: string;
+  /** 断る側の名前。既定は Cancel */
+  cancel?: string;
+  /** 字と欄の並び。空なら はい/いいえ */
+  parts?: Part[];
+  /** 何の話をしているかを見せる絵 */
+  preview?: string;
+}
+
+/** 答えを受ける。null は断り */
+const answered = (resolve: (v: string[] | null) => void) => (v: unknown): undefined => {
+  resolve(v === null ? null : list(v, str));
+  return undefined;
+};
+
+/** たずねる。欄の値を並び順で返す。断られたら null */
+export const ask = (a: Ask): Promise<string[] | null> => new Promise((resolve) => mbt.mmmAsk(a, answered(resolve)));
+
+const named = (kind: string, args: unknown): Promise<string[] | null> =>
+  new Promise((resolve) => mbt.mmmAskNamed(kind, args, answered(resolve)));
+
+/** アプリが聞くことの全部。並べ方は core/app/asks.mbt */
+export const asks = {
+  /** 未保存の文書を捨てて先へ進むか */
+  discard: (): Promise<string[] | null> => named("discard", null),
+  /** 画像を置く前に .md を保存してもらう */
+  place: (): Promise<string[] | null> => named("place", null),
+  /** 開いた文書に画像があり、まだフォルダを握っていない */
+  connect: (where: string): Promise<string[] | null> => named("connect", where),
+  /** ディスク上のファイルの名前を変える */
+  rename: (name: string): Promise<string[] | null> => named("rename", name),
+  /** 貼る画像の名前。shape は「分かっているところは字、分からないところだけ欄」の並び */
+  imageName: (shape: Part[], shot: string): Promise<string[] | null> => named("imageName", { shape, shot }),
+};
+
+/** たずねの中身（form）だけ。並べて見るため */
+export const askForm = (kind: "discard" | "place" | "connect" | "rename" | "imageName", args: unknown = null): HTMLFormElement =>
+  form(mbt.mmmAskForm(kind, args));
+
+const form = (v: unknown): HTMLFormElement => (v instanceof HTMLFormElement ? v : bad("<form> でない"));
+
 // ---- 形を確かめながら整える ----
 
 const bad = (what: string): never => {

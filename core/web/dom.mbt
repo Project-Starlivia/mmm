@@ -213,7 +213,63 @@ pub fn on_window(
   doc : @dom.Document,
   name : String,
   f : (@core.Any) -> Unit,
+  capture? : Bool = false,
 ) -> Unit {
   let t : @event.EventTarget = window_of(doc).cast()
-  t.addEventListener(name, f)
+  t.addEventListener(name, f, capture~)
+}
+
+///|
+/// 押せる / 押せない（`disabled` は属性ではなく性質）
+pub fn set_disabled(e : @dom.Element, off : Bool) -> Unit {
+  e.as_any()._set("disabled", @core.any(off))
+}
+
+///|
+/// 文書の根に効いている CSS 変数の値（空白は落とす）
+pub fn css_var(doc : @dom.Document, name : String) -> String {
+  let v : String = window_of(doc)
+    ._call("getComputedStyle", [@core.any(doc.documentElement())])
+    ._call("getPropertyValue", [@core.any(name)])
+    .cast()
+  v.trim(chars=" \t\r\n").to_owned()
+}
+
+///|
+pub fn head(doc : @dom.Document) -> @dom.Element {
+  doc.as_any()._get("head").cast()
+}
+
+///|
+/// メディアクエリ。`matches` で今の答え
+pub fn match_media(doc : @dom.Document, query : String) -> @dom.MediaQueryList {
+  window_of(doc)._call("matchMedia", [@core.any(query)]).cast()
+}
+
+///|
+pub fn matches(m : @dom.MediaQueryList) -> Bool {
+  m.as_any()._get("matches").cast()
+}
+
+///|
+/// `<dialog>` を塞いで開く
+pub fn show_modal(dialog : @dom.Element) -> Unit {
+  dialog.as_any()._call("showModal", []) |> ignore
+}
+
+///|
+pub fn close_dialog(dialog : @dom.Element) -> Unit {
+  dialog.as_any()._call("close", []) |> ignore
+}
+
+///|
+/// `<dialog>` が閉じたときの答え（送信したボタンの value。断りは ""）
+pub fn return_value(dialog : @dom.Element) -> String {
+  dialog.as_any()._get("returnValue").cast()
+}
+
+///|
+/// 欄の字を全部選ぶ
+pub fn select_all(e : @dom.Element) -> Unit {
+  e.as_any()._call("select", []) |> ignore
 }

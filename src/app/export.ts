@@ -14,10 +14,11 @@ import {
   type MenuEntry,
   icon,
   label,
+  load,
   nod,
   openOnClick,
+  store,
 } from "../coreApi.ts";
-import { LS_WAY, load, store } from "./persist.ts";
 
 /**
  * ラスタの倍率。**選ばせない** — 書き出したものは画面で見えている通りで
@@ -232,7 +233,7 @@ export function initExport(
   deps: ExportDeps & { button: HTMLButtonElement; wayButton: HTMLButtonElement },
 ): { run: () => void; choose: () => void; refresh: () => void } {
   deps.wayButton.replaceChildren(icon("chevron-down"));
-  let way = wayOf(load(LS_WAY));
+  let way = wayOf(load("way"));
   const show = (): void => {
     // 形式が文字、行き先が絵。押す前に何が起きるかが見えている
     deps.button.replaceChildren(...label(way.short, way.mark, true));
@@ -252,7 +253,7 @@ export function initExport(
 
   const remember = (chosen: Way): void => {
     way = chosen;
-    store(LS_WAY, chosen.id);
+    store("way", chosen.id);
     show();
   };
 
