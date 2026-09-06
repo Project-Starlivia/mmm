@@ -557,6 +557,76 @@ test "項目の中の見出しは子 — 飛びは埋めない" {
 }
 
 ///|
+/// `- k` は開いている `# a` の子。同じ深さの `# b` は `a` を閉じるので、
+/// 持ち主は項目 `x` に戻り `a` の兄弟になる（x > [a > [k], b]）。
+test "項目の中の見出しは子 — 見出しを閉じれば、続く見出しは元の項目の子" {
+  json_inspect(parse("- x\n  # a\n  - k\n  # b\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "x",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "body": [],
+                "children": [
+                  { "id": 4, "label": "k", "body": [], "children": [] },
+                ],
+              },
+              { "id": 5, "label": "b", "body": [], "children": [] },
+            ],
+          },
+        ],
+        "sides": ["Right", "Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// 項目を出れば積みも持ち主も戻る。`# b` は前の項目の `## a` に引きずられず、
+/// 2 つ目の項目の子（名前の無い項目 2 つが、それぞれ子を 1 つ持つ）。
+test "項目の中の見出しは子 — 見出しの積みは項目ごと" {
+  json_inspect(parse("- ## a\n- # b\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "",
+            "body": [],
+            "children": [{ "id": 3, "label": "a", "body": [], "children": [] }],
+          },
+        ],
+        "sides": ["Right"],
+      },
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 4,
+            "label": "",
+            "body": [],
+            "children": [{ "id": 5, "label": "b", "body": [], "children": [] }],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
 /// `# b` は `## a` より浅いので兄弟
 test "項目の中の見出しは子 — 浅く戻れば兄弟" {
   json_inspect(parse("- ## a\n  # b\n"), content={

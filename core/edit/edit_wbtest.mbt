@@ -37,6 +37,23 @@ test "Rename — 書いた md が別の形に読まれるなら focus は無い"
 }
 
 ///|
+/// 根の子の隙間に落ちれば、水平線は側の変わり目。項目 `c` は木から消え、
+/// `d` の側が右から左へ変わる。
+test "Rename — 項目が根の子なら、`---` は側の変わり目になる" {
+  assert_eq(
+    applied("# a\n\n## b\n\n- c\n\n## d\n", Rename(id=4, label="---")),
+    ("# a\n\n## b\n\n---\n\n## d\n", None),
+  )
+}
+
+///|
+/// 閉じの `#` は飾りなので、`# foo ##` は `foo` に読まれる。木と md の形が
+/// 食い違うので focus は無い。
+test "Rename — 閉じの `#` は飾りなので、書けば読みは変わり focus は無い" {
+  assert_eq(applied("# a\n", Rename(id=2, label="foo ##")), ("# foo\n", None))
+}
+
+///|
 test "できない操作 — 編集は無く、focus も無い" {
   assert_eq(edit("# a\n", Rename(id=9, label="b")), { edits: [], focus: None, })
 }

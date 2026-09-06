@@ -210,14 +210,10 @@ fn rename(doc : @tree.Doc, id : Int, label : String) -> Done? {
 /// Implicit は綴ってから畳む。
 fn fold(doc : @tree.Doc, id : Int, open : Bool) -> Done? {
   guard find(doc, id) is Some(n) else { return None }
-  fn folding(label : String) -> @tree.Fold {
-    { open, summary: Some(label), }
-  }
-
   fn next(fold : @tree.Fold?, label : String) -> @tree.Fold {
     match fold {
       Some(f) => { ..f, open, }
-      None => folding(label)
+      None => { open, summary: Some(label), }
     }
   }
 

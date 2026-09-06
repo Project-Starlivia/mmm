@@ -326,39 +326,31 @@ fn take(
   fold? : Fold? = None,
 ) -> Unit {
   match block {
-    // **項目の中身は文書と同じ規則で読む。** 中の見出しは項目の子（型が「項目の
-    // 子孫は項目」なので綴りは項目）。`#` の本数は入れ子の相対だけを決め、飛びは
-    // 埋めない。見出しの後ろの中身と入れ子はその見出しのもの（owner を進める）
-    Heading(level~, style~, children~, span~, ..) if nest > 0 => {
-      // 持ち主は**項目の深さ + 開いている見出しの数**。同じか浅い見出しは
-      // 開いている見出しを閉じるので、その数だけ浅い所へ戻る
-      let item_level = b.owner - b.hl.length()
-      while b.hl.length() > 0 && b.hl[b.hl.length() - 1] >= level {
-        ignore(b.hl.unsafe_pop())
+    Heading(level~, style~, children~, span~, ..) => {
+      let (sign, depth) : (Sign, Int) = if nest > 0 {
+        // **項目の中身は文書と同じ規則で読む。** 中の見出しは項目の子（型が「項目の
+        // 子孫は項目」なので綴りは項目）。`#` の本数は入れ子の相対だけを決め、飛びは
+        // 埋めない。見出しの後ろの中身と入れ子はその見出しのもの（owner を進める）。
+        // 持ち主は**項目の深さ + 開いている見出しの数**。同じか浅い見出しは
+        // 開いている見出しを閉じるので、その数だけ浅い所へ戻る
+        let item_level = b.owner - b.hl.length()
+        while b.hl.length() > 0 && b.hl[b.hl.length() - 1] >= level {
+          ignore(b.hl.unsafe_pop())
+        }
+        b.hl.push(level)
+        b.owner = item_level + b.hl.length()
+        (Item, b.owner)
+      } else {
+        (Heading, level)
       }
-      b.hl.push(level)
-      b.owner = item_level + b.hl.length()
       put(
         b,
-        b.owner,
-        Line(sign=Item, label=head_label(b.md, span, style, children), fold~, body=[]),
+        depth,
+        Line(sign~, label=head_label(b.md, span, style, children), fold~, body=[]),
         at=span,
         label=head_start(b.md, span, style),
       )
     }
-    Heading(level~, style~, children~, span~, ..) =>
-      put(
-        b,
-        level,
-        Line(
-          sign=Heading,
-          label=head_label(b.md, span, style, children),
-          fold~,
-          body=[],
-        ),
-        at=span,
-        label=head_start(b.md, span, style),
-      )
     BulletList(items~, ..) => items_take(b, items, nest, fold~)
     OrderedList(items~, ..) => items_take(b, items, nest, fold~)
     // 区切りは**根の領土の隙間**でだけ側の変わり目になる。項目の中は中身なので

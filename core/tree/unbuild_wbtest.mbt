@@ -792,9 +792,17 @@ test "名前の字はそのまま — 逃がさず、強調にも直さない" {
   inspect(serialize(doc([root(h("__init__"))])), content="# __init__\n")
   inspect(serialize(doc([root(h("a\\_b"))])), content="# a\\_b\n")
   inspect(serialize(doc([root(h("# node"))])), content="# # node\n")
+  inspect(serialize(doc([root(h("foo ##"))])), content="# foo ##\n")
+  inspect(serialize(doc([root(h("a</summary>b"))])), content="# a</summary>b\n")
   inspect(serialize(doc([root(item("foo_bar"))])), content="- foo_bar\n")
   inspect(serialize(doc([root(item("__init__"))])), content="- __init__\n")
+  inspect(serialize(doc([root(item("a\\_b"))])), content="- a\\_b\n")
   inspect(serialize(doc([root(item("# node"))])), content="- # node\n")
+  inspect(serialize(doc([root(item("foo ##"))])), content="- foo ##\n")
+  inspect(
+    serialize(doc([root(item("a</summary>b"))])),
+    content="- a</summary>b\n",
+  )
 }
 
 ///|
