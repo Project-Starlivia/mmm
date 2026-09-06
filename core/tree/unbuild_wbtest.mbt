@@ -538,8 +538,9 @@ test "項目の中のコードは塊ごと字下げ" {
 }
 
 ///|
-/// 項目の中の見出しは骨格にならず中身（単調性）。書いても項目の中に居る。
-test "項目の中の見出しは中身のまま" {
+/// 木が中身として持っているなら、見出しの形の行でも中身。読みは項目の子に
+/// するが、書きは木が言うとおりに字下げして置くだけ。
+test "中身の見出しの形の行は、字下げした中身のまま" {
   inspect(
     serialize(doc([root(item("a", body=[Opaque("# x")]))])),
     content=(
@@ -803,5 +804,15 @@ test "名前の字はそのまま — 子と中身を持っても行は変わら
       doc([root(h("a_b", children=[item("c*d", children=[li("e_f")])]))]),
     ),
     content="# a_b\n\n- c*d\n  - e_f\n",
+  )
+}
+
+///|
+/// `- # node` は空の項目の子 `node`。書き戻せば `- - node`（現状の正規形）
+test "項目の中の見出しは、書き戻せば入れ子の項目" {
+  inspect(serialize(parse("- # node\n")), content="- - node\n")
+  inspect(
+    serialize(parse("- x\n  # n\n  ## s\n")),
+    content="- x\n  - n\n    - s\n",
   )
 }

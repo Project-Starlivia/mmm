@@ -324,7 +324,32 @@ test "項目にも中身が付く" {
 /// 中身ではない。剥がさないと切り出しの列がずれ、深い入れ子では読み直したときに
 /// 字下げコードへ化ける。
 test "項目の中の切り出しは列 0 に揃う" {
-  json_inspect(parse("- a\n\n  <details>\n\n  ## h\n\n  </details>\n"), content=({"eol":"Lf","body":[],"roots":[{"node":["ListNode",{"id":2,"label":"a","body":[],"children":[{"id":3,"label":"h","fold":{"open":false},"body":[],"children":[]}]}],"sides":["Right"]}]}))
+  json_inspect(parse("- a\n\n  <details>\n\n  ## h\n\n  </details>\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "a",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "h",
+                "fold": { "open": false },
+                "body": [],
+                "children": [],
+              },
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
 }
 
 ///|
@@ -332,7 +357,39 @@ test "項目の中の切り出しは列 0 に揃う" {
 test "入れ子の項目でも列 0 に揃う" {
   json_inspect(
     parse("- a\n  - b\n\n    <details>\n\n    ## h\n\n    </details>\n"),
-    content=({"eol":"Lf","body":[],"roots":[{"node":["ListNode",{"id":2,"label":"a","body":[],"children":[{"id":3,"label":"b","body":[],"children":[{"id":4,"label":"h","fold":{"open":false},"body":[],"children":[]}]}]}],"sides":["Right"]}]}),
+    content={
+      "eol": "Lf",
+      "body": [],
+      "roots": [
+        {
+          "node": [
+            "ListNode",
+            {
+              "id": 2,
+              "label": "a",
+              "body": [],
+              "children": [
+                {
+                  "id": 3,
+                  "label": "b",
+                  "body": [],
+                  "children": [
+                    {
+                      "id": 4,
+                      "label": "h",
+                      "fold": { "open": false },
+                      "body": [],
+                      "children": [],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          "sides": ["Right"],
+        },
+      ],
+    },
   )
 }
 

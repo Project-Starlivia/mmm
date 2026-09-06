@@ -1,11 +1,28 @@
 // 構造の規則を固定する。
 //
-//   単調性 — 項目の子孫は項目。項目の領土の見出しは骨格にならない
+//   単調性 — 項目の子孫は項目。項目の領土の見出しは項目として子になる（綴りは席が決める）
 //   順序法則 — 兄弟は項目が先、見出しが後
 
 ///|
-test "単調性 — 項目の中の見出しは原文のまま中身になる" {
-  json_inspect(parse("- a\n  # x\n"), content=({"eol":"Lf","body":[],"roots":[{"node":["ListNode",{"id":2,"label":"a","body":[],"children":[{"id":3,"label":"x","body":[],"children":[]}]}],"sides":["Right"]}]}))
+test "単調性 — 項目の中の見出しは項目として子になる" {
+  json_inspect(parse("- a\n  # x\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "a",
+            "body": [],
+            "children": [{ "id": 3, "label": "x", "body": [], "children": [] }],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
 }
 
 ///|
@@ -388,17 +405,17 @@ test "意味 — 綴りにならなかった文字は消えない" {
 }
 
 ///|
-/// **単調性の下では畳みが立たない。** 項目の領土の見出しは骨格にならないので、
-/// ノードでない以上「そのノードを覆う」対象が無い。綴りを落とすと書き戻せない
-/// 木になるので、領域まるごと原文のまま持つ。
-test "単調性 — 項目の中の見出しを包んだ畳みは原文のまま" {
+/// **項目の中の見出しも項目なので、畳みが立つ。** 覆う対象のノードが在る以上、
+/// 綴り（`<details>` `<summary>`）は構造とフラグが引き受け、名前だけが木に残る。
+test "単調性 — 項目の中の見出しを包んだ畳みは、そのノードの畳み" {
   let with_fold = parse(
     "- item\n\n  <details>\n  <summary>h</summary>\n\n  ## h\n\n  </details>\n",
   )
   let without = parse("- item\n\n  ## h\n")
   // 畳みを書いた md と書いていない md が同じ木になってはいけない
   assert_not_eq(with_fold, without)
-  assert_eq(tally(written(with_fold), "<summary>h</summary>"), 1)
+  // 残る字は項目の名前・見出しの名前・畳みの名前だけ（綴りは 1 つも残らない）
+  assert_eq(written(with_fold), "item\nh\nh")
 }
 
 ///|

@@ -452,28 +452,132 @@ test "number — 文書順に振り直したときの番号。中身も同じ列
 ///|
 /// 空の項目の子に `n`。`- - n` と同じ木
 test "項目の中の見出しは子 — 名前の無い項目の子になる" {
-  json_inspect(parse("- # n\n"), content=({"eol":"Lf","body":[],"roots":[{"node":["ListNode",{"id":2,"label":"","body":[],"children":[{"id":3,"label":"n","body":[],"children":[]}]}],"sides":["Right"]}]}))
+  json_inspect(parse("- # n\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "",
+            "body": [],
+            "children": [{ "id": 3, "label": "n", "body": [], "children": [] }],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
 }
 
 ///|
 test "項目の中の見出しは子 — 名前のある項目の子にもなる" {
-  json_inspect(parse("- x\n  # n\n"), content=({"eol":"Lf","body":[],"roots":[{"node":["ListNode",{"id":2,"label":"x","body":[],"children":[{"id":3,"label":"n","body":[],"children":[]}]}],"sides":["Right"]}]}))
+  json_inspect(parse("- x\n  # n\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "x",
+            "body": [],
+            "children": [{ "id": 3, "label": "n", "body": [], "children": [] }],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
 }
 
 ///|
 /// n > s（中身 text）> k。文書と同じ規則
 test "項目の中の見出しは子 — 見出しの後ろは文書と同じく中身と子" {
-  json_inspect(parse("- # n\n  ## s\n  text\n  - k\n"), content=({"eol":"Lf","body":[],"roots":[{"node":["ListNode",{"id":2,"label":"","body":[],"children":[{"id":3,"label":"n","body":[],"children":[{"id":4,"label":"s","body":[{"id":5,"content":["Opaque","text"]}],"children":[{"id":6,"label":"k","body":[],"children":[]}]}]}]}],"sides":["Right"]}]}))
+  json_inspect(parse("- # n\n  ## s\n  text\n  - k\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "n",
+                "body": [],
+                "children": [
+                  {
+                    "id": 4,
+                    "label": "s",
+                    "body": [{ "id": 5, "content": ["Opaque", "text"] }],
+                    "children": [
+                      { "id": 6, "label": "k", "body": [], "children": [] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
 }
 
 ///|
 /// 飛びは埋めない（項目は相対記法）。`###` でも直の子
 test "項目の中の見出しは子 — 飛びは埋めない" {
-  json_inspect(parse("- ### a\n"), content=({"eol":"Lf","body":[],"roots":[{"node":["ListNode",{"id":2,"label":"","body":[],"children":[{"id":3,"label":"a","body":[],"children":[]}]}],"sides":["Right"]}]}))
+  json_inspect(parse("- ### a\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "",
+            "body": [],
+            "children": [{ "id": 3, "label": "a", "body": [], "children": [] }],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
 }
 
 ///|
 /// `# b` は `## a` より浅いので兄弟
 test "項目の中の見出しは子 — 浅く戻れば兄弟" {
-  json_inspect(parse("- ## a\n  # b\n"), content=({"eol":"Lf","body":[],"roots":[{"node":["ListNode",{"id":2,"label":"","body":[],"children":[{"id":3,"label":"a","body":[],"children":[]},{"id":4,"label":"b","body":[],"children":[]}]}],"sides":["Right","Right"]}]}))
+  json_inspect(parse("- ## a\n  # b\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "",
+            "body": [],
+            "children": [
+              { "id": 3, "label": "a", "body": [], "children": [] },
+              { "id": 4, "label": "b", "body": [], "children": [] },
+            ],
+          },
+        ],
+        "sides": ["Right", "Right"],
+      },
+    ],
+  })
 }

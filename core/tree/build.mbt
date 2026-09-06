@@ -332,21 +332,16 @@ fn take(
     Heading(level~, style~, children~, span~, ..) if nest > 0 => {
       // 持ち主は**項目の深さ + 開いている見出しの数**。同じか浅い見出しは
       // 開いている見出しを閉じるので、その数だけ浅い所へ戻る
-      let item = b.owner - b.hl.length()
+      let item_level = b.owner - b.hl.length()
       while b.hl.length() > 0 && b.hl[b.hl.length() - 1] >= level {
         ignore(b.hl.unsafe_pop())
       }
       b.hl.push(level)
-      b.owner = item + b.hl.length()
+      b.owner = item_level + b.hl.length()
       put(
         b,
         b.owner,
-        Line(
-          sign=Item,
-          label=head_label(b.md, span, style, children),
-          fold~,
-          body=[],
-        ),
+        Line(sign=Item, label=head_label(b.md, span, style, children), fold~, body=[]),
         at=span,
         label=head_start(b.md, span, style),
       )
