@@ -886,9 +886,25 @@ html, body {
   fill: var(--tok-type); color: var(--tok-type);
 }
 
-/* ========== しらせ / たずね ==========
-   どちらも「アプリが自分で答えを知っている問い」の器。ブラウザの持ち場
-   （ファイルのピッカー・権限・離脱の引き止め）には手を出さない。 */
+/* ========== 浮くもの ==========
+   本文の上に出てくる器は 4 つ — しらせ・たずね・メニュー・吹き出し。
+   **佇まいはここ 1 つ**（浮いた面の色・縁の線・影）。同じ 3 行を 4 か所が
+   持っていて、`.tip` に至っては「器はメニューと同じ佇まい」と言葉で書いた
+   うえで数字をもう一度書いていた。器が 1 つ増えるたびに 3 行増える形。
+
+   **丸みはここに来ない。** 角は入れ子で決まる（外 = 内 + 隙間）ので、
+   どれだけ丸いかは器ごとの都合。本文の上に出るもの（しらせ・たずね・
+   メニュー）は 10、メニューの行の中に出る吹き出しは 6。
+
+   しらせとたずねは、どちらも「アプリが自分で答えを知っている問い」の器。
+   ブラウザの持ち場（ファイルのピッカー・権限・離脱の引き止め）には
+   手を出さない。 */
+
+:is(.notice, .ask, .menu, .tip) {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
 
 /* 答えを待たない。帯の下・中央に出て、勝手に消える。**押せない** —
    触れるものだと思わせない（消し方を覚えさせるほどの中身は載らない） */
@@ -901,10 +917,7 @@ html, body {
   z-index: 200;
   max-width: min(420px, calc(100vw - 32px));
   padding: 6px 12px;
-  border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
   /* **字はメニューの行と同じ 13px。** 12px だった頃は、同じ 14px の絵の下で
      字の見えている帯だけが小さく、絵が浮いて見えていた（絵の張り出しが
      上に 3px・下に 1px と釣り合わない）。器も中身も浮いた 1 行なのだから、
@@ -959,11 +972,8 @@ html, body {
    お絵描き（下の `.draw`）もこの器に載る — 答えを待つ窓は 1 種類 */
 .ask {
   padding: 0;
-  border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--panel);
   color: var(--ink);
-  box-shadow: var(--shadow);
   font-family: var(--font);
 
   &::backdrop { background: var(--veil); }
@@ -1153,10 +1163,7 @@ html, body {
   position: fixed;
   z-index: 100;
   min-width: 180px;
-  background: var(--panel);
-  border: 1px solid var(--line);
   border-radius: 10px;
-  box-shadow: var(--shadow);
   padding: 4px;
   user-select: none;
 
@@ -1167,12 +1174,12 @@ html, body {
     cursor: pointer;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-
-    /* 行の頭の絵。字より控えめに座らせる（絵の無い行も、同じ大きさの
-       空欄（.icon だが中身が無い）を置くので頭出しが揃う） */
-    & > .icon { margin-right: -10px; color: var(--ink-dim); flex: none; }
+    /* **隙間は、離す当人が持つ。** `gap` を 16 にして絵だけ負の margin で
+       戻していた頃は、絵と字の間（6）がどこにも書かれておらず、16 と −10 の
+       引き算だった。絵は字を 6 離して座り、キーと但し書きは 16 離れる。
+       絵の側が持つのは、絵の無い行があるから — 字に左の余白を持たせると、
+       絵を 1 つも持たないメニュー（Add の子）で頭が下がる */
+    & > .icon { margin-right: 6px; color: var(--ink-dim); flex: none; }
     /* 済んだ行。絵がチェックに差し替わる（menu.ts）。**色は増やさず**、
        淡さをやめるだけで「いま起きた」と言う — 並びの中で 1 行だけ濃い */
     & > .icon.drawn { color: var(--ink); }
@@ -1181,23 +1188,27 @@ html, body {
        器の広さの計算に持ち込まない）、器を広げる側に決着しない */
     & > span:not(.key):not(.icon) { flex: 1; white-space: nowrap; }
 
-    & .key { color: var(--ink-dim); font-size: 11px; white-space: nowrap; }
+    & .key { margin-left: 16px; color: var(--ink-dim); font-size: 11px; white-space: nowrap; }
     /* 押す前の但し書き。**1 つにつき印 1 つ**を右端に並べる。
        行の頭の絵より小さく、淡く — 主役は label で、これは添え物 */
     & .note-box {
       position: relative;
       display: inline-flex;
       flex: none;
+      margin-left: 16px;
 
+      /* **絵を小さくするときは、隣の字と同じ背丈**。ここの隣は見出しでは
+         なく 13px の label だが、これは添え物なので小さいほうの尺（11）を
+         取る — 12 だった頃は見出しの絵（11）と 1px しか違わず、見分けの
+         つかない差が尺に 1 つ増えていた */
       & .icon.note {
-        width: 12px;
-        height: 12px;
-        margin-right: 0;
+        width: 11px;
+        height: 11px;
         color: var(--ink-dim);
       }
       /* 吹き出しは**触れた瞬間に出る**。`title` はブラウザ任せで一拍
          待たされ、その一拍のあいだ印は「何かある」としか言えていない。
-         器はメニューと同じ佇まい（浮くものの色・丸み・影） */
+         佇まいは浮くもののひと括り（上）。丸みだけは行の中に出るので 6 */
       & .tip {
         position: absolute;
         bottom: calc(100% + 6px);
@@ -1207,10 +1218,7 @@ html, body {
         max-width: 220px;
         width: max-content;
         padding: 4px 8px;
-        border: 1px solid var(--line);
         border-radius: 6px;
-        background: var(--panel);
-        box-shadow: var(--shadow);
         color: var(--ink);
         font-size: 11px;
         white-space: normal;
