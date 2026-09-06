@@ -5,24 +5,7 @@
 
 ///|
 test "単調性 — 項目の中の見出しは原文のまま中身になる" {
-  json_inspect(parse("- a\n  # x\n"), content={
-    "eol": "Lf",
-    "body": [],
-    "roots": [
-      {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "body": [{ "id": 3, "content": ["Opaque", "# x"] }],
-            "children": [],
-          },
-        ],
-        "sides": [],
-      },
-    ],
-  })
+  json_inspect(parse("- a\n  # x\n"), content=({"eol":"Lf","body":[],"roots":[{"node":["ListNode",{"id":2,"label":"a","body":[],"children":[{"id":3,"label":"x","body":[],"children":[]}]}],"sides":["Right"]}]}))
 }
 
 ///|
