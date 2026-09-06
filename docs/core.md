@@ -382,15 +382,18 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
   `metric.mbt` が**唯一の定義**で、字の実測だけ `Measure = (Font, String) -> Double` で
   外から受ける（`Font { px, mono }`。大きさは core、綴りは ts の CSS）。試験は数だけで書く
 - **render/** — `Renderer::draw(scene)` が Layout を `<g>` の中の SVG に差分で写す。
-  要素の class と `data-*` は style.css と ts のハンドラとの契約。画像の URL・
-  コードの色分け（CodeMirror の言語表）は `Scene` の閉包で受ける。js だけ
-  （`supported_targets = "js"`）で、試験は happy-dom
+  要素の class と `data-*` は style.css との契約。画像の URL・コードの色分け
+  （CodeMirror の言語表）は `Scene` の閉包で受ける。`Mindmap::new(pane, host, …)` が
+  ペインを地図の器にし、ホイール・ポインタ・キー・右クリック・長押し・ドラッグを受けて
+  map/ の判断に繋ぎ、選択・操作・カードの選択を `Host` の閉包で ts へ返す（値は
+  EditorState に居る）。輪・矩形・落とし先の印・針・欄（`field.mbt`）・カードの枠
+  （`pick.mbt`）もここ。js だけ（`supported_targets = "js"`）で、試験は happy-dom
 - **判断も map/** — 選択（当たり・矩形・矢印・親兄弟）、落とし先、キーの表（`Intent`）、
   右クリックの行、視点の算術、針、指の台帳、欄の重ね。全部純粋で、wbtest で固定する
-- **出口** — `mmmSurvey(md) -> { json, view }` / `mmmLayout(view, measure) -> 持ち手` /
-  `mmmHit` / `mmmClick` / `mmmRubber` / `mmmKeyed` / `mmmContext` / `mmmDrop` / `mmmFit` /
-  `mmmCenter` / `mmmShow` / `mmmIndicator` / `mmmLabelPlace` / `mmmRects` … /
-  `mmmRenderer()` / `mmmDraw(handle, layout, …)` / `mmmPaint` / `mmmNodeEl`。
+- **出口** — `mmmSurvey(md) -> 持ち手` と木の問い合わせ（`mmmSpot` / `mmmChosen` /
+  `mmmName` …）、`mmmMap(pane, host, hint, tool) -> 持ち手` と `mmmMapRender` /
+  `mmmMapFit` / `mmmMapBeginEdit` / `mmmMapAct` / `mmmMapSvgParts` …、`mmmEdit(md, op)`。
+  `mmmLayout` / `mmmContext` は見本（lab）が右クリックの行を引くためだけに残る。
   **木も箱も core から出ない。** 境界は数・文字列・真偽・持ち手と、操作 1 回ぶんの小さな
   JSON（Intent・落とし先・メニューの行・選択）。数の組は `FixedArray[Double]` で渡す —
   **タプルは JS では object になる**（`.d.ts` は配列と書くが嘘）。決めは

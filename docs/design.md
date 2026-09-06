@@ -15,7 +15,7 @@
 | Intent の表 | キー・右クリック・ドラッグ・貼り付けを純粋な表で Intent にし、`apply` 1 本へ | エディタの keymap → command |
 | 状態と拍（state.ts） | doc・カーソル・履歴と並べて、core の読み（持ち手）・地図の選択の位置・持ち主・選択を EditorState の field に置く。1 トランザクション = 1 サイクル。位置は CodeMirror が編集で写す | Lezer の `syntaxTree`（構文木が StateField）。Redux 型の単一 store |
 | 選択の持ち主（core/read の chosen） | 持ち主（フォーカスのあるペイン）が決める。md が持つ間はカーソルから、地図が持つ間は位置から導く値。地図は塗るだけ | VS Code / Obsidian のアウトライン（カーソル追従）+ CodeMirror の選択（位置を編集で写す） |
-| 配置と描画（core/map・core/render） | View + 寸法 → Layout → SVG の差分。字の実測・画像の URL・色分けは閉包で外から受け、MoonBit の値は持ち手で往復する。入力側は Layout の数を読むだけ | keyed diff（id → 要素）。依存の注入（measure）。opaque handle |
+| 配置と描画と入力（core/map・core/render） | View + 寸法 → Layout → SVG の差分。ペインの出来事も core が受け、判断して host の閉包へ答える。字の実測・画像の URL・色分け・文書と選択の読み書き・ブラウザの API は閉包で外から受け、MoonBit の値は持ち手で往復する | keyed diff（id → 要素）。依存の注入（measure / host）。opaque handle |
 
 ### なぜ CodeMirror 6 か
 

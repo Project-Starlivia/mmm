@@ -39,41 +39,41 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 Easy grab の広げ幅) / drop(ドラッグの落とし先) / keys(キー → Intent の表) /
                 context(右クリックの行) / camera(視点。world ↔ 画面、寄せ、ピンチ) /
                 indicator(画面外の根を指す針) / gesture(指の台帳) / place(欄を箱に重ねる算術)
-  render/       Layout → SVG の差分更新（js だけ。mizchi/js_browser の DOM の型で書く）。
+  render/       地図のペイン（js だけ。mizchi/js_browser の DOM の型で書く）。
                 svg(要素を作る) / card(Card 1 枚 → SVG) / render(Renderer。id → 要素、
-                transform / d のキャッシュ、並び直し、paint)。class と data-* は
-                style.css と ts のハンドラとの契約。試験は happy-dom
+                transform / d のキャッシュ、並び直し、paint) / mindmap(器と入力。ホイール・
+                ポインタ・キー・右クリック・長押し・ドラッグを受けて map/ の判断に繋ぎ、
+                答えを host へ返す。輪・矩形・落とし先の印・針・視点) / field(ラベルと
+                カードの欄。<input> / <textarea> の器) / pick(選んでいるカードの枠と ×) /
+                dom(style・矩形・捕捉・欄の値の 1 行の道具) / host(外に頼るものの閉包)。
+                class と data-* は style.css との契約。試験は happy-dom
   read/         md を読んだもの（Survey = 木 + 地番 + 原文）と、木の判断。ts はこれを持ち手として
                 持ち、問い合わせで読む。survey(is_node / empty / find / blocks) / caret(md の
                 カーソル・地図の位置 → 選択。chosen が持ち主とそれらから導く。選択の規則はここだけ) /
                 copy(選んだ部分木の原文) / name(文書の名前。ファイル名の柵) / head(frontmatter の
                 画像フォルダの宣言を読む・書く、引っ越しの追従、綴りの正規化)
-  tree/js/      browser への出口。mmmSurvey / mmmLayout / mmmRenderer / mmmDraw …。
+  tree/js/      browser への出口。mmmSurvey / mmmMap / mmmEdit …。
                 MoonBit の値は不透明な持ち手で往復し、操作 1 回ぶんの小さな JSON だけが渡る
 src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す・動かす・カードを扱う・
         貼る/落とす/描く。**
   coreApi.ts   core の出口と入口。形を整える唯一の場所（survey が持ち手を受け、edit が Op を
-               送る。木も地図も持ち手を渡して問い合わせる — spot / chosen / name / hit / click /
-               keyed / drop / fit …）。木も箱も core から出ない
+               送る。木は持ち手を渡して問い合わせる — spot / chosen / name …。地図は map(pane, host)
+               で core に置かせ、render / fit / beginEdit … を持ち手で頼む）。木も箱も core から出ない
   state.ts     文書から導けるものの置き場(EditorState の field: tree = core の読みの持ち手、anchors = 地図の
                選択の位置、holder = 持ち主、choice = 選択。位置は CodeMirror が編集で写す。effect は
                setAnchors / focused / setHolder。DOM を知らない)
   editor.ts    Markdown 側(CodeMirror 6、履歴も CodeMirror。state.ts の field を載せ、
                1 トランザクションを 1 回 onUpdate で外へ。薄塗りは state.ts の範囲から
                field で導く。フェンスの中は map/highlight.ts と同じ言語表で色を付ける)
-  mindmap.ts   Mindmap 側の配線(叩く・矩形・矢印・右クリック・長押し・ドラッグ・キーを core に
-               渡し、返った選択と Intent を実行する。選択を輪（md が持つ間）か枠（地図が持つ間）で
-               塗る。カードの選択とその場編集、ファイルの投下の予告。視点の値と、パン・ズーム・
-               ピンチ・寄せ・針・書き出し — 算術は core)
+  mindmap.ts   Mindmap 側の配線(core の地図に渡す host — 文書と選択の読み書き、クリップボード、
+               メニューの器、しらせ、字の実測と色分け — と、ペインの HTML の部品。入力・印・
+               視点・欄は core/render/mindmap.mbt)
   icons.ts     ボタンとメニューの絵の唯一の源(線で引く / currentColor)
   style.css    全体のスタイル(部品ごとの塊。入れ子は CSS 自身の機能。色・影・輪の数字は
                `:root` のトークンだけが持ち、状態は `.selected` / `.on` / `aria-disabled` で言う)
-  map/         地図の器（判断は core/map、配置と描画は core/map・core/render）—
+  map/         ブラウザの都合（地図そのものは core/render）—
                measure(字の実測。core の Font に CSS の字の綴りを合わせて canvas で測る) /
-               highlight(コードの色分け。core の描画に閉包で渡す) /
-               select(選択の**値**。ノードの並びかカード 1 枚か) / pick(選んでいるカードの枠と ×) /
-               label(ラベルのその場編集。<input> の器。置き場は core に聞く) /
-               card(カードのその場編集の器。同じ) / menu(メニューの器) /
+               highlight(コードの色分け。core の描画に閉包で渡す) / menu(メニューの器) /
                toSvg(1 枚の svg にする) / svg(要素を作る)
   main.ts      束ねる場所(1 トランザクション = 1 サイクルの出口 onUpdate、操作の入口 apply(op, edit)
                — focus を選ぶ — と write(op) — 選択に触らない、持ち主の focusin、
