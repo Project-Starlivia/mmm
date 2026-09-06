@@ -20,9 +20,11 @@ pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
 }
 
 ///|
-/// check の破れのうち、Implicit を綴れば直るものを綴って通し直す。見出しの直後に
-/// 来た Implicit（`Swallowed`）と、項目を子に持った Implicit（`GappedItem` の親）。
-/// 綴るたびに Implicit は減るので止まる。残った破れは None。
+/// check の破れのうち、Implicit で直るものを直して通し直す。子が尽きた Implicit
+/// （`BarrenImplicit`）は消す — 道具は途中で席が消えないように残しておくので、
+/// 掃除はここ。見出しの直後に来た Implicit（`Swallowed`）と、項目を子に持った
+/// Implicit（`GappedItem` の親）は綴る。消すものは綴らないので、消す回は綴らない。
+/// 一回ごとに Implicit は減るので止まる。残った破れは None。
 fn mend(doc : @tree.Doc) -> @tree.Doc? {
   let mut cur = doc
   for ;; {
@@ -30,22 +32,33 @@ fn mend(doc : @tree.Doc) -> @tree.Doc? {
     if flaws.is_empty() {
       return Some(cur)
     }
+    let barren = []
     let ids = []
     for f in flaws {
       match f {
+        BarrenImplicit(id) => barren.push(id)
         Swallowed(id) => ids.push(id)
         GappedItem(id) => ids.push(parent(cur, id).unwrap())
         _ => ()
       }
     }
-    let mut spelled = false
-    for id in ids {
-      guard find(cur, id) is Some(ImplicitNode(g)) else { continue }
-      guard splice(cur, id, _ => [spell(g, "")]) is Some(d) else { return None }
+    let mut fixed = false
+    for id in barren {
+      guard splice(cur, id, _ => []) is Some(d) else { return None }
       cur = d
-      spelled = true
+      fixed = true
     }
-    if !spelled {
+    if barren.is_empty() {
+      for id in ids {
+        guard find(cur, id) is Some(ImplicitNode(g)) else { continue }
+        guard splice(cur, id, _ => [spell(g, "")]) is Some(d) else {
+          return None
+        }
+        cur = d
+        fixed = true
+      }
+    }
+    if !fixed {
       return None
     }
   }
@@ -356,20 +369,7 @@ fn flip(doc : @tree.Doc, id : Int) -> Done? {
           next = next + 1
         }
       }
-      let root_id = id_of(r.node)
-      // 根の Implicit は引き出す相手しか持たないことがある。掃除で消えた根は、
-      // 引き出したものを子に置き直す。
-      match find(rest, root_id) {
-        Some(_) => done(append(rest, node=root_id, side~, [wrapped]), Some(id))
-        None => {
-          let roots = rest.roots.copy()
-          roots.insert(path[0], {
-            node: @tree.ImplicitNode({ id: root_id, children: [wrapped] }),
-            sides: [side],
-          })
-          Some({ doc: { ..rest, roots, }, focus: Some(id) })
-        }
-      }
+      done(append(rest, node=id_of(r.node), side~, [wrapped]), Some(id))
     }
   }
 }
