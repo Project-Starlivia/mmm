@@ -4,32 +4,13 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type * as core from "../src/coreApi.ts";
-import { type Layout, type SizeOf, layoutMap } from "../src/map/layout.ts";
 import { type Key, keyed, keyedCard } from "../src/map/keys.ts";
 import { NONE } from "../src/map/select.ts";
+import { place } from "./tools/place.ts";
 
-/** 全部 100 × 30 */
-const size: SizeOf = () => ({ w: 100, h: 30 });
-
-const node = (
-  id: number,
-  label: string | null,
-  children: core.Node[] = [],
-  blocks: core.Block[] = [],
-): core.Node => ({
-  id,
-  label,
-  fold: null,
-  blocks,
-  children,
-});
-
-const root = (n: core.Node, sides: core.Side[] = []): core.Root => ({ node: n, sides });
-
-/** r(2) → a(3), 空(4)。空は label "" */
-const L: Layout = layoutMap([root(node(2, "r", [node(3, "a"), node(4, "")]), ["Right", "Right"])], size);
-const empty: Layout = layoutMap([], size);
+/** r(2) → a(3), 空(4)。空は label ""（`## ` の空の見出し） */
+const L = place("# r\n\n## a\n\n## \n");
+const empty = place("");
 
 const k = (key: string, mods: Partial<Key> = {}): Key => ({ key, shift: false, mod: false, alt: false, ...mods });
 const one = (id: number) => ({ ids: [id], anchor: id });
@@ -182,10 +163,8 @@ test("Alt+↑↓ は塊を前の兄弟の前 / 次の兄弟の後ろへ。端で
 });
 
 test("複数選択の Tab は先頭の前の兄弟の子へ、Shift+Tab は先頭の親の後ろへ", () => {
-  const M: Layout = layoutMap(
-    [root(node(2, "r", [node(3, "a"), node(4, "b", [node(5, "c"), node(6, "d")])]), ["Right", "Right"])],
-    size,
-  );
+  // r(2) → a(3), b(4) → c(5), d(6)
+  const M = place("# r\n\n## a\n\n## b\n\n### c\n\n### d\n");
   assert.deepEqual(keyed(M, { ids: [5, 6], anchor: 6 }, k("Tab", { shift: true })), {
     kind: "op",
     op: { kind: "moveNode", ids: [5, 6], at: { kind: "after", node: 4 } },
@@ -202,21 +181,12 @@ test("複数選択の Tab は先頭の前の兄弟の子へ、Shift+Tab は先�
 });
 
 test("Shift+H は畳む / 畳みを外す。Implicit も畳む（core が綴る）。無選択は拾わない", () => {
-  const F: Layout = layoutMap(
-    [
-      root(
-        node(2, "r", [
-          { id: 3, label: "a", fold: { open: false, summary: "a" }, blocks: [], children: [] },
-          node(4, null, [node(5, "x")]),
-        ]),
-        ["Right", "Right"],
-      ),
-    ],
-    size,
-  );
+  // r(2) → Implicit(3) → x(4), a(5。summary a で畳んである。散文 6 は View に来ない)。
+  // x を先に置くのは、`### x` が `## a` の後ろに来ると a の子になって畳みの形が崩れるため
+  const F = place("# r\n\n### x\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n</details>\n");
   assert.deepEqual(keyed(F, one(2), k("H", { shift: true })), { kind: "op", op: { kind: "fold", id: 2, open: false }, edit: false });
-  assert.deepEqual(keyed(F, one(3), k("H", { shift: true })), { kind: "op", op: { kind: "unfold", id: 3 }, edit: false });
-  assert.deepEqual(keyed(F, one(4), k("H", { shift: true })), { kind: "op", op: { kind: "fold", id: 4, open: false }, edit: false });
+  assert.deepEqual(keyed(F, one(5), k("H", { shift: true })), { kind: "op", op: { kind: "unfold", id: 5 }, edit: false });
+  assert.deepEqual(keyed(F, one(3), k("H", { shift: true })), { kind: "op", op: { kind: "fold", id: 3, open: false }, edit: false });
   assert.equal(keyed(F, NONE, k("H", { shift: true })), null);
 });
 
@@ -239,17 +209,7 @@ test("Mod+V は貼り付け。anchor が無くても拾う", () => {
 
 // ---- keyedCard — カードを選んでいるときの表 ----
 // r(2) に blocks [{ id: 3, thematicBreak }, { id: 4, code }]。持ち主は 2、隣は 3 と 4。
-const C: Layout = layoutMap(
-  [
-    root(
-      node(2, "r", [], [
-        { id: 3, content: { kind: "thematicBreak" } },
-        { id: 4, content: { kind: "code", info: "", text: "x" } },
-      ]),
-    ),
-  ],
-  size,
-);
+const C = place("# r\n\n---\n\n```\nx\n```\n");
 
 test("keyedCard: Delete / Backspace はそのカードを消す（持ち主を選ぶのは core の focus）", () => {
   assert.deepEqual(keyedCard(C, 3, k("Delete")), {

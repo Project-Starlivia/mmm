@@ -97,6 +97,8 @@ TS では必ず持ち主を付けて `core.View` / `core.Node` と書く（`impo
 合流   md + 前の Doc + 地番 + 後の Doc ──merge──> 編集リスト ──> CodeMirror
 操作   Doc ──apply(op)──> Doc
 境界   md + Op ──edit──> 編集リスト + focus        // survey → apply → merge（edit/）
+配置   View + 寸法(SizeOf) ──layout──> Layout      // map/。字の実測は ts の canvas を閉包で受ける
+描画   Layout + 場面(Scene) ──draw──> SVG の差分   // render/。js だけ
 ```
 
 **サイクルは 1 本**。md が変わったら必ず 読み → project → 描画。無限ループしないのは
@@ -366,10 +368,30 @@ focus           = number(done.doc, done.focus) // 読み直したときの id
 これが操作 × 合流の結合そのもので、UI を通さずに固定できる。
 md に書けない並び（check）と、項目の中の 2 つ目の列の深さは、この法則が見つけた。
 
-**browser への出口は `core/tree/js` の `mmmEdit(md, opJson) -> json`** 1 つ。
+**browser への出口は `core/tree/js`** — 操作は `mmmEdit(md, opJson) -> json`。
 `Op` と `Content` を JSON から起こす（FromJson）のはここで、形は ToJson と同じ
 （`["Rename", {id, label}]`。`None` の鍵は無い）。ts 側は `coreApi.ts` の
 `edit(md, op)` で、`kind` を構築子名に読み替えるのはそこ 1 か所。
+
+## 配置と描画 — map/ と render/
+
+Mindmap の「どこに置くか」と「SVG をどう組むか」も core が持つ（決めは
+docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を持つ md 側と
+違い、map 側の SVG は全部自作なので、core が描いてよい。
+
+- **map/** — DOM を知らない。`layout(roots, size) -> Layout { order, boxes }` が View の木を
+  そのまま歩き、幾何と畳みの埋没とカード（`Card`。Block の分類）を足す。寸法は
+  `metric.mbt` が**唯一の定義**で、字の実測だけ `Measure = (Font, String) -> Double` で
+  外から受ける（`Font { px, mono }`。大きさは core、綴りは ts の CSS）。試験は数だけで書く
+- **render/** — `Renderer::draw(scene)` が Layout を `<g>` の中の SVG に差分で写す。
+  要素の class と `data-*` は style.css と ts のハンドラとの契約。画像の URL・
+  コードの色分け（CodeMirror の言語表）は `Scene` の閉包で受ける。js だけ
+  （`supported_targets = "js"`）で、試験は happy-dom
+- **出口** — `mmmSurvey(md) -> { json, view }` / `mmmLayout(view, measure) -> { json, layout }` /
+  `mmmRenderer()` / `mmmDraw(handle, layout, …)` / `mmmPaint` / `mmmNodeEl` / `mmmMetrics`。
+  データは JSON（ts の coreApi が形を確かめる）、MoonBit の値は不透明な持ち手で往復する —
+  JSON を 2 度組まない、2 度 parse しない。入力側（選択・落とし先・入力欄）が読む数は
+  Layout の JSON（箱とカードの矩形）と `mmmMetrics`（隙間・ラベル行）で、ts は数えない
 
 ## 決まっていないこと
 
