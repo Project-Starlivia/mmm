@@ -11,10 +11,18 @@
 | 方言（md.mbt） | ライブラリの mdAst を mmm の決めに揃える層。読みは `dialect ∘ parse`、書きは `spell ∘ serialize`。癖を知るのはここだけ | 腐敗防止層（anti-corruption layer）。アダプタ |
 | Op → apply → check | 操作は値。木に当てるのは純粋関数。書けない木は check が断る | Command + 不変条件で弾く |
 | merge | 正規形を base にした 3-way merge。base → theirs（操作の差）だけを ours（原文）に写し、流儀の差は写さない。要素は手前の隙間を持つ。最後に読み直して形を検証 | 3-way merge（git）。recast（変わっていないノードは元の原文を再利用）。React の keyed diff |
-| follow（目印） | ラベルの頭の位置を編集列で写し、同一性を保つ | エディタのマーカー（CodeMirror の `mapPos`、Emacs の marker） |
-| focus | 操作が「次に選ぶもの」を返す | ProseMirror の transaction が selection を運ぶ |
+| focus | 操作が「次に選ぶもの」を返す。ノードを消せば次の兄弟 → 前の兄弟 → 親 | ProseMirror の transaction が selection を運ぶ。Lexical の `$removeNode` |
 | Intent の表 | キー・右クリック・ドラッグ・貼り付けを純粋な表で Intent にし、`apply` 1 本へ | エディタの keymap → command |
-| 選択 | 1 つの値 Choice（ノードの並びかカード 1 枚か）。地図は塗るだけ | 単一の状態と派生の見方 |
+| 状態と拍（state.ts） | doc・カーソル・履歴と並べて、core の答え（View + 地番）・地図の選択の位置・持ち主・選択を EditorState の field に置く。1 トランザクション = 1 サイクル。位置は CodeMirror が編集で写す | Lezer の `syntaxTree`（構文木が StateField）。Redux 型の単一 store |
+| 選択の持ち主（derive） | 持ち主（フォーカスのあるペイン）が決める。md が持つ間はカーソルから、地図が持つ間は位置から導く値。地図は塗るだけ | VS Code / Obsidian のアウトライン（カーソル追従）+ CodeMirror の選択（位置を編集で写す） |
+
+### なぜ CodeMirror 6 か
+
+md のプレーンテキストが真実なので、候補はプレーンテキストのエディタ（CodeMirror 6 / Monaco）に
+絞られる。Monaco はタッチ非対応で大きい。ProseMirror / Lexical 系は自前の木が真実で「md が真実」と
+衝突する。CodeMirror 6 は状態が不変値 + トランザクションで、位置の写しと履歴が同じ拍に在り、
+`@codemirror/state` は DOM 無しで動く（node で試験できる）。Lezer の markdown がフェンスの色を
+map と同じ表から出す。棚卸しは [ai-docs/codemirror.md](../ai-docs/codemirror.md)。
 
 ## 段の間の法則
 
@@ -22,14 +30,21 @@
 段をまたぐ前提は、頼る側の段の試験に書く。
 
 - **行の不可侵**（merge） — 行（ラベル・畳み・種類）が同じノードの行は、どの編集の範囲にも入らない。
-  目印はこれに頼る
+  地図の選択の位置（ラベルの頭）はこれに頼る
 - **隙間の保存**（merge / edit） — 編集を当てた md に、元に無かった連続空行と頭の空行は無い。
   merge の変え方と、edit の全操作の両方で回す
-- **目印の生存**（edit） — 中身だけを変える操作の後、持ち主のラベルの目印は同じノードに着く
 - **形の一致**（edit） — edit の編集を md に当てて読み直せば、apply の後の木と形が一致する
 - **focus**（edit） — 読み替えた focus は、後の木で focus だったのと同じ部分木を指す
+- **Delete の focus**（edit） — 消した後の focus は消えていない兄弟か祖先（中身なら持ち主）で、
+  畳みの中に埋もれていない。無いのは最後の根と文書の散文を消したときだけ
+- **id の順 = 文書順**（ts） — 読みは文書順に番号を振るので、id の大小がそのまま文書順。
+  select.ts の並べ替えと `Layout.order` はこれに頼る
+- **中身は子より前に書かれる**（ts） — ノードの自身の文は地番の頭から最初の子の頭まで。caret.ts はこれに頼る
+- **選択に居るのは箱のあるものだけ**（derive） — 畳まれて埋もれたノードは選択に入らない
+- **選択を書くのは持ち主の操作だけ**（main.ts） — `apply` は focus を選ぶ。`write`（投下・宣言・
+  画像の保存）は md を書くだけで選択に触らない
 
-## 同一性は 2 系統
+## 同一性は focus 1 本
 
-新しいもの・操作の結果は **focus**（core が返す）。残るものは **目印**（follow）。
-境目は「合流は変わっていない行を触らない」— 上の法則で固定してある。
+操作の結果は **focus**（core が返す）。それ以外は同一性を持たず、位置（テキストの中の場所）から
+毎サイクル導く。位置は CodeMirror が編集で写す。サイクルを越えて持つ id は無い。

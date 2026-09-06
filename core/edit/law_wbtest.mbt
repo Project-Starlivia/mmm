@@ -3,7 +3,8 @@
 //   法則 — edit の編集を md に当てて読み直せば、apply の後の木と形が一致する
 //   focus — 読み替えた focus は、後の木で focus だったのと同じ部分木を指す
 //   できない操作 — 編集も focus も無い
-//   目印の生存 — 中身だけを変える操作の後、持ち主のラベルの目印は同じノードに着く
+//   Delete の focus — 消した後の focus は消えていない兄弟か祖先（中身なら持ち主）で、
+//              畳みの中に埋もれていない。無いのは最後の根と文書の散文を消したときだけ
 //   隙間の保存 — どの操作の後も、元に無かった連続空行と頭の空行は生まれない。
 //              足すだけの操作（AddNode / AddBlock / Graft）で空行の数は減らない
 //
@@ -281,81 +282,106 @@ fn under_fold(doc : @tree.Doc, id : Int) -> Bool {
 }
 
 ///|
-/// 中身だけを変える操作で、目印を置いておきたい持ち主のノード。
-fn owners_of(doc : @tree.Doc, op : @op.Op) -> Array[Int] {
-  let out : Array[Int] = []
-  let push = (o : Int?) => {
-    match o {
-      Some(id) => if id != @tree.doc_id { out.push(id) }
-      None => ()
+/// ノードの親の id。根なら doc_id。中身と知らない id は None
+fn parent_of(doc : @tree.Doc, id : Int) -> Int? {
+  let found : Ref[Int?] = { val: None }
+  fn list(l : @tree.ListNode, above : Int) {
+    if l.id == id {
+      found.val = Some(above)
+    }
+    for k in l.children {
+      list(k, l.id)
     }
   }
-  match op {
-    AddBlock(at=In(node~), ..) => push(Some(node))
-    AddBlock(at=Before(block~), ..) | AddBlock(at=After(block~), ..) =>
-      push(owner_of(doc, block))
-    SetBlock(id~, ..) => push(owner_of(doc, id))
-    MoveBlock(ids~, at~) => {
-      for id in ids {
-        push(owner_of(doc, id))
+
+  fn node(x : @tree.Node, above : Int) {
+    let (mine, kids) = match x {
+      HeadingNode(h) => (h.id, h.children)
+      ListNode(l) => {
+        list(l, above)
+        return
       }
-      match at {
-        In(node~) => push(Some(node))
-        Before(block~) | After(block~) => push(owner_of(doc, block))
-      }
+      ImplicitNode(g) => (g.id, g.children)
     }
-    Delete(ids~) =>
-      for id in ids {
-        push(owner_of(doc, id))
-      }
-    _ => ()
+    if mine == id {
+      found.val = Some(above)
+    }
+    for k in kids {
+      node(k, mine)
+    }
   }
-  out
+
+  for r in doc.roots {
+    node(r.node, @tree.doc_id)
+  }
+  found.val
 }
 
 ///|
-test "法則 — 目印の生存。中身だけを変えれば、持ち主のラベルの目印は同じノードに着く" {
+/// f が id の祖先か（親も含む。doc_id は祖先に数えない）
+fn is_ancestor(doc : @tree.Doc, f : Int, id : Int) -> Bool {
+  let mut cur = parent_of(doc, id)
+  while cur is Some(p) && p != @tree.doc_id {
+    if p == f {
+      return true
+    }
+    cur = parent_of(doc, p)
+  }
+  false
+}
+
+///|
+test "法則 — Delete の focus は消えていない兄弟か祖先（中身なら持ち主）で、畳みの中に埋もれていない" {
   let bad : Array[String] = []
-  let mut seen = 0
+  let mut n = 0
   for i, md in corpus {
-    let (before, spots) = @tree.survey(md)
-    for op in ops_for(ids(before)) {
-      let owners = owners_of(before, op)
-      if owners.is_empty() {
-        continue
-      }
-      guard @op.apply(before, op) is Some(done) else { continue }
-      let what = "\{i} \{op.to_json().stringify()}"
-      let r = edit(md, op)
-      let marks : Array[@tree.Mark] = []
-      let expect : Array[Int?] = []
-      for o in owners {
-        // 畳みの中は丸ごと書かれる。持ち主ごと消えるなら着く先は無い
-        guard spots.get(o) is Some(s) && s.label is Some(label) else {
-          continue
+    let before = @tree.parse(md)
+    for id in ids(before) {
+      guard @op.apply(before, Delete(ids=[id])) is Some(done) else { continue }
+      let what = "\{i} Delete \{id}"
+      let block_owner = owner_of(before, id)
+      match done.focus {
+        None => {
+          let sole_root = before.roots.length() == 1 &&
+            parent_of(before, id) == Some(@tree.doc_id)
+          if !sole_root && block_owner != Some(@tree.doc_id) {
+            bad.push("\{what}: focus が無い")
+          }
         }
-        if under_fold(before, o) {
-          continue
-        }
-        marks.push({ from: s.from, label })
-        expect.push(@tree.number(done.doc, o))
-      }
-      seen = seen + marks.length()
-      // 目印は編集列で写し、編集を当てた md の地番で誰かを決める（mmmSurvey と同じ）
-      let (_, later) = @tree.survey(@tree.apply(md, r.edits))
-      for k, t in @tree.follow(later, r.edits, marks) {
-        let got = t.bind(x => x.id)
-        if got != expect[k] {
-          bad.push(
-            "\{what}: 目印 \{k} が \{expect[k].to_json().stringify()} でなく \{got.to_json().stringify()} に着く",
-          )
+        Some(f) => {
+          n = n + 1
+          if !ids(done.doc).contains(f) {
+            bad.push("\{what}: focus \{f} が後の木に無い")
+            continue
+          }
+          let near = match block_owner {
+            Some(o) => o == f || is_ancestor(before, f, o)
+            None =>
+              parent_of(before, f) == parent_of(before, id) ||
+              is_ancestor(before, f, id)
+          }
+          if !near {
+            bad.push("\{what}: focus \{f} は兄弟でも祖先でもない")
+          }
+          // under_fold は自分自身も数えるので、親に聞けば「埋もれている」だけが出る
+          // （focus 自身が畳まれているのは埋もれていない）
+          match parent_of(done.doc, f) {
+            Some(p) if p != @tree.doc_id && under_fold(done.doc, p) =>
+              bad.push("\{what}: focus \{f} は埋もれている")
+            _ => ()
+          }
         }
       }
     }
   }
   json_inspect(bad, content=[])
-  // 網の広さ。corpus か ops_for を触れば動く
-  inspect(seen, content="158")
+  // 網の広さ。corpus を触れば動く
+  inspect(
+    n,
+    content=(
+      #|45
+    ),
+  )
 }
 
 ///|

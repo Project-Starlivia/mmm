@@ -61,7 +61,7 @@ interface Stand {
 function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
   const el = document.createElement("div");
   el.style.height = "100%"; // 枠いっぱいに（アプリでは #map-pane の flex が決める）
-  const s = survey(md, [], []);
+  const s = survey(md);
   let selection: Selection = NONE;
   let picked: number | null = null;
   const host: MapHost = {
@@ -69,6 +69,7 @@ function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
     imageUrl: () => null,
     imageHint: () => "click to connect",
     connectAssets: () => {},
+    holder: () => "map", // 見本は地図の枠（selected）で塗る
     selection: () => selection,
     setSelection: (sel) => {
       selection = sel;
@@ -102,7 +103,7 @@ function stand(md = MD, after: (s: Stand) => void = () => {}): HTMLDivElement {
 
 /** 見本の木と、その配置。右クリックメニューの見本が選択を渡すのに使う */
 export function sample(): { view: View; L: Layout } {
-  const view = survey(MD, [], []).view;
+  const view = survey(MD).view;
   return { view, L: layoutMap(view.roots, nodeSize) };
 }
 

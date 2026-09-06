@@ -43,7 +43,7 @@ pub fn parse(md : String) -> Doc {
 
 ///|
 /// 地番。ノードが原文のどこに書かれているか。`label` はラベルの頭（マーカーの後ろ）で、
-/// 選択が md の打鍵をまたいで同じノードを指し続けるための目印（follow.mbt）。
+/// 地図の選択の位置（ts の anchors）に使うラベルの頭。位置は CodeMirror が編集で写す。
 /// Implicit と文書の散文は行を持たないので None。
 pub(all) struct Spot {
   from : Int
