@@ -6,12 +6,61 @@
 ///|
 /// **md に書ける木しか返さない。** 何が書けないかは check が 1 つで言う
 /// （骨格の直前の水平線・見出しに飲み込まれる項目・項目の根の側）ので、
-/// 操作ごとに規則を写さず、組んだ結果を check に通して断る。
+/// 操作ごとに規則を写さず、組んだ結果を check に通す。Implicit を綴れば直る
+/// 破れは mend が繕い、残れば断る。
 pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
   match attempt(doc, op) {
-    Some(d) if @tree.check(d.doc).is_empty() => Some(d)
-    _ => None
+    Some(d) =>
+      match mend(d.doc) {
+        Some(doc) => Some({ ..d, doc, })
+        None => None
+      }
+    None => None
   }
+}
+
+///|
+/// check の破れのうち、Implicit を綴れば直るものを綴って通し直す。見出しの直後に
+/// 来た Implicit（`Swallowed`）と、項目を子に持った Implicit（`GappedItem` の親）。
+/// 綴るたびに Implicit は減るので止まる。残った破れは None。
+fn mend(doc : @tree.Doc) -> @tree.Doc? {
+  let mut cur = doc
+  for ;; {
+    let flaws = @tree.check(cur)
+    if flaws.is_empty() {
+      return Some(cur)
+    }
+    let ids = []
+    for f in flaws {
+      match f {
+        Swallowed(id) => ids.push(id)
+        GappedItem(id) => ids.push(parent(cur, id).unwrap())
+        _ => ()
+      }
+    }
+    let mut spelled = false
+    for id in ids {
+      guard find(cur, id) is Some(ImplicitNode(g)) else { continue }
+      guard splice(cur, id, _ => [spell(g, "")]) is Some(d) else { return None }
+      cur = d
+      spelled = true
+    }
+    if !spelled {
+      return None
+    }
+  }
+}
+
+///|
+/// Implicit を綴る。行を省いた空の見出しなので、名を付ければ見出しそのもの。
+fn spell(g : @tree.ImplicitNode, label : String) -> @tree.Node {
+  @tree.HeadingNode({
+    id: g.id,
+    label,
+    fold: None,
+    body: [],
+    children: g.children,
+  })
 }
 
 ///|
@@ -48,20 +97,14 @@ fn rename(doc : @tree.Doc, id : Int, label : String) -> Done? {
   let m = match n {
     HeadingNode(h) => @tree.HeadingNode({ ..h, label, })
     ListNode(l) => @tree.ListNode({ ..l, label, })
-    ImplicitNode(g) =>
-      @tree.HeadingNode({
-        id: g.id,
-        label,
-        fold: None,
-        body: [],
-        children: g.children,
-      })
+    ImplicitNode(g) => spell(g, label)
   }
   done(splice(doc, id, _ => [m]), Some(id))
 }
 
 ///|
 /// 定義ごと畳む。名前はラベル（書けなければ名無し）。畳み済みなら open だけ替わる。
+/// Implicit は綴ってから畳む。
 fn fold(doc : @tree.Doc, id : Int, open : Bool) -> Done? {
   guard find(doc, id) is Some(n) else { return None }
   fn folding(label : String) -> @tree.Fold {
@@ -79,7 +122,10 @@ fn fold(doc : @tree.Doc, id : Int, open : Bool) -> Done? {
     HeadingNode(h) =>
       @tree.HeadingNode({ ..h, fold: Some(next(h.fold, h.label)) })
     ListNode(l) => @tree.ListNode({ ..l, fold: Some(next(l.fold, l.label)) })
-    ImplicitNode(_) => return None
+    ImplicitNode(g) => {
+      guard splice(doc, id, _ => [spell(g, "")]) is Some(d) else { return None }
+      return fold(d, id, open)
+    }
   }
   done(splice(doc, id, _ => [m]), Some(id))
 }
