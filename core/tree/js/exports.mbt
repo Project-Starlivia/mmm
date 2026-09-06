@@ -534,77 +534,11 @@ pub fn mmm_draw_form() -> @dom.Element {
 
 // ---- 部品 ----
 //
-// 絵・しらせ・言い出し・道具の器・メニューの器（core/parts）。ts は作ってもらって置くだけ。
-// メニューの行は ts の object（label / key / mark / note / disabled / run / done / items /
-// caption、または "sep"）で受け、ここで Entry にする
+// 絵・しらせ・言い出し・道具の器（core/parts）。ts は作ってもらって置くだけ
 
 ///|
 fn defined(v : @core.Any) -> Bool {
   !@core.is_nullish(v)
-}
-
-///|
-/// ts の行 1 つを Entry に
-fn entry_of(v : @core.Any) -> @parts.Entry {
-  if @core.typeof_(v) == "string" {
-    return Sep
-  }
-  let caption = v._get("caption")
-  if defined(caption) {
-    return Caption(caption.cast(), str_opt(v._get("mark")))
-  }
-  let d = v._get("disabled")
-  let disabled : @parts.Disabled = if !defined(d) {
-    No
-  } else if @core.typeof_(d) == "string" {
-    Why(d.cast())
-  } else if d.cast() {
-    Yes
-  } else {
-    No
-  }
-  let note = v._get("note")
-  let row = @parts.row(
-    v._get("label").cast(),
-    key=str_opt(v._get("key")),
-    mark=str_opt(v._get("mark")),
-    note=if defined(note) {
-      Some(k => {
-        if @core.is_array(note) {
-          k(note.cast())
-        } else {
-          @web.after(note, texts => k(texts.cast()))
-        }
-      })
-    } else {
-      None
-    },
-    disabled~,
-  )
-  let run = v._get("run")
-  let go = () => run._invoke([]) |> ignore
-  let items = v._get("items")
-  if defined(items) {
-    return Sub(
-      row,
-      @core.array_from(items).map(entry_of),
-      if defined(run) {
-        Some(go)
-      } else {
-        None
-      },
-    )
-  }
-  let done = v._get("done")
-  if defined(done) {
-    return Done(row, k => @web.after(done._invoke([]), ok => k(ok.cast())))
-  }
-  Run(row, go)
-}
-
-///|
-fn entries_of(v : @core.Any) -> Array[@parts.Entry] {
-  @core.array_from(v).map(entry_of)
 }
 
 ///|
@@ -619,28 +553,6 @@ pub fn mmm_icon(name : String) -> @dom.Element {
 #export_name("mmmIconNames")
 pub fn mmm_icon_names() -> FixedArray[String] {
   FixedArray::from_array(@parts.names())
-}
-
-///|
-/// 字と絵を並べたボタンの中身
-#export_name("mmmLabel")
-pub fn mmm_label(
-  text : String,
-  name : String,
-  after : Bool,
-) -> Array[@dom.Node] {
-  @parts.label(@dom.document(), text, name, after)
-}
-
-///|
-/// 押した場所で答える。`work` は Promise[Bool]、済めば `k(ok)`
-#export_name("mmmNod")
-pub fn mmm_nod(
-  work : @core.Any,
-  put : (String) -> Unit,
-  k : (Bool) -> Unit,
-) -> Unit {
-  @parts.nod(kk => @web.after(work, ok => kk(ok.cast())), put, k)
 }
 
 ///|
@@ -688,21 +600,125 @@ pub fn mmm_pane_tool(name : String) -> @dom.Element {
   @parts.pane_tool(@dom.document(), name)
 }
 
+// ---- 帯の並び ----
+//
+// Files と ⋯ の行の表は core/app（files.mbt / more.mbt）。ts は**いまの状態**を閉包で渡し
+//（開くたびに読む — 押した瞬間の文書に合わせるため）、押されたら走るものを object で渡す
+
 ///|
-/// そのボタンでメニューを開く。並びは開くたびに `items()` で作る
-#export_name("mmmOpenOnClick")
-pub fn mmm_open_on_click(
-  button : @dom.Element,
-  items : () -> @core.Any,
-) -> Unit {
-  @parts.open_on_click(button, () => entries_of(items()))
+fn strings_of(v : @core.Any) -> Array[String] {
+  @core.array_from(v).map(x => x.cast())
 }
 
 ///|
-/// 行だけのメニュー（並べて見るため）
-#export_name("mmmMenuRows")
-pub fn mmm_menu_rows(items : @core.Any) -> @dom.Element {
-  @parts.rows(@dom.document(), entries_of(items))
+fn files_of(v : @core.Any) -> @app.Files {
+  {
+    saved_name: str_opt(v._get("savedName")),
+    recent: strings_of(v._get("recent")),
+    can_open: v._get("canOpen").cast(),
+    can_save: v._get("canSave").cast(),
+    can_rename: v._get("canRename").cast(),
+    can_choose_folder: v._get("canChooseFolder").cast(),
+    folder: v._get("folder").cast(),
+  }
+}
+
+///|
+fn file_acts_of(v : @core.Any) -> @app.FileActs {
+  let call = (name : String, args : Array[@core.Any]) => {
+    v._call(name, args) |> ignore
+  }
+  {
+    new_file: () => call("newFile", []),
+    open: () => call("open", []),
+    open_recent: i => call("openRecent", [@core.any(i)]),
+    save: () => call("save", []),
+    save_as: () => call("saveAs", []),
+    rename: () => call("rename", []),
+    choose_folder: () => call("chooseFolder", []),
+  }
+}
+
+///|
+/// 帯の Files。ボタンを押すたびに状態を読んで並べる
+#export_name("mmmFilesMenu")
+pub fn mmm_files_menu(
+  button : @dom.Element,
+  state : () -> @core.Any,
+  acts : @core.Any,
+) -> Unit {
+  let a = file_acts_of(acts)
+  @parts.open_on_click(button, () => @app.files_menu(files_of(state()), a))
+}
+
+///|
+/// Files の行だけ（並べて見るため）
+#export_name("mmmFilesRows")
+pub fn mmm_files_rows(state : @core.Any, acts : @core.Any) -> @dom.Element {
+  @parts.rows(
+    @dom.document(),
+    @app.files_menu(files_of(state), file_acts_of(acts)),
+  )
+}
+
+///|
+/// 改名できない理由（帯の名乗りの title。Files の Rename の行と同じ言葉）。できれば undefined
+#export_name("mmmRenameProblem")
+pub fn mmm_rename_problem(saved : Bool) -> String? {
+  @app.rename_problem(@web.can_rename(), saved)
+}
+
+///|
+/// ファイルを扱えない環境の理由（ショートカットから来たときに ts が言う）
+#export_name("mmmNoFileAccess")
+pub fn mmm_no_file_access() -> String {
+  @parts.no_file_access
+}
+
+///|
+fn more_of(v : @core.Any) -> @app.More {
+  {
+    light: v._get("light").cast(),
+    grab: v._get("grab").cast(),
+    link_note: k => {
+      @web.after(v._get("linkNote"), texts => k(strings_of(texts)))
+    },
+  }
+}
+
+///|
+fn more_acts_of(v : @core.Any) -> @app.MoreActs {
+  let call = (name : String, args : Array[@core.Any]) => v._call(name, args)
+  {
+    undo: () => call("undo", []) |> ignore,
+    redo: () => call("redo", []) |> ignore,
+    pick_color: () => call("pickColor", []) |> ignore,
+    toggle_theme: () => call("toggleTheme", []) |> ignore,
+    toggle_grab: () => call("toggleGrab", []) |> ignore,
+    copy_link: k => @web.after(call("copyLink", []), ok => k(ok.cast())),
+  }
+}
+
+///|
+/// 帯の ⋯。ボタンを押すたびに状態を読んで並べる
+#export_name("mmmMoreMenu")
+pub fn mmm_more_menu(
+  button : @dom.Element,
+  state : () -> @core.Any,
+  acts : @core.Any,
+) -> Unit {
+  let a = more_acts_of(acts)
+  @parts.open_on_click(button, () => @app.more_menu(more_of(state()), a))
+}
+
+///|
+/// ⋯ の行だけ（並べて見るため）
+#export_name("mmmMoreRows")
+pub fn mmm_more_rows(state : @core.Any, acts : @core.Any) -> @dom.Element {
+  @parts.rows(
+    @dom.document(),
+    @app.more_menu(more_of(state), more_acts_of(acts)),
+  )
 }
 
 // ---- 帯と枠 ----
@@ -800,13 +816,6 @@ pub fn mmm_shortcuts(deps : @core.Any) -> Unit {
     redo: () => call("redo", []),
     export_map: choose => call("export", [@core.any(choose)]),
   })
-}
-
-///|
-/// いまのアクセントカラー（`#rrggbb`）。読めなければ undefined
-#export_name("mmmAccent")
-pub fn mmm_accent() -> String? {
-  @app.accent(@dom.document())
 }
 
 ///|

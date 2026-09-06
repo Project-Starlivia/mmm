@@ -327,28 +327,6 @@ export const icon = (name: IconName): SVGSVGElement => svgSvg(mbt.mmmIcon(name))
 /** 絵の名前の全部（並べて見るため） */
 export const iconNames = (): IconName[] => [...mbt.mmmIconNames()];
 
-/** 絵と文字を並べたボタンの中身にする（絵が先か後かは呼ぶ側が決める） */
-export const label = (text: string, name: IconName, after = false): Node[] => list(mbt.mmmLabel(text, name, after), node);
-
-/**
- * 押した場所で答える。走っているあいだ回し、済んだらチェックを引く。`put` はその絵を
- * いまの場所に出す。しくじったら何も出さない — 戻す係は呼ぶ側
- */
-export const nod = (work: Promise<boolean>, put: (name: IconName) => void): Promise<boolean> =>
-  new Promise((resolve) =>
-    mbt.mmmNod(
-      work,
-      (name) => {
-        put(name);
-        return undefined;
-      },
-      (ok) => {
-        resolve(ok);
-        return undefined;
-      },
-    ),
-  );
-
 /** しらせの言葉。表は core/parts/notice.mbt（failedWords / blockedWords） */
 export type Failed = string;
 export type Blocked = string;
@@ -368,35 +346,67 @@ export const paneHint = (pane: "md" | "map"): HTMLDivElement => div(mbt.mmmPaneH
 /** ペインの隅に浮く小さな道具の器。押しても下へ抜けない */
 export const paneTool = (name: string): HTMLDivElement => div(mbt.mmmPaneTool(name));
 
-/**
- * メニューの 1 行。`sep` は区切り線、`items` を持つ行は入れ子、`caption` は見出し。
- * `disabled` に文字列を渡せば、それが押せない理由として hover に出る。
- * `note` は押す前に知っておくとよいこと（約束でもよい — 届いた時点でその行に印が付く）。
- * `run` は閉じて走る。`done` は閉じずに走り、済んだらその行の絵がチェックになる
- * （できたかを返す）。決めは core/parts/menu.mbt
- */
-type Disabled = boolean | string;
-type Note = string[] | Promise<string[]>;
-interface Row {
-  label: string;
-  key?: string;
-  mark?: IconName;
-  note?: Note;
-  disabled?: Disabled;
+// ---- 帯の並び ----
+//
+// Files と ⋯ の行の表は core/app（files.mbt / more.mbt）。ts は状態を閉包で渡し
+//（開くたびに読む）、押されたら走るものを渡す。並べて見る道具は好きな状態で行だけを引く
+
+export interface Files {
+  /** ディスク上の名前。まだ無ければ null */
+  savedName: string | null;
+  /** 覚えている文書の名前。いま開いているものは含まない */
+  recent: string[];
+  canOpen: boolean;
+  canSave: boolean;
+  canRename: boolean;
+  canChooseFolder: boolean;
+  /** 画像フォルダの状態の一言 */
+  folder: string;
 }
-type Act = { run: () => void; done?: never } | { done: () => Promise<boolean>; run?: never };
-export type MenuEntry =
-  | (Row & Act)
-  | (Row & { items: MenuEntry[]; run?: () => void })
-  | { caption: string; mark?: IconName }
-  | "sep";
 
-/** そのボタンでメニューを開く。並びは開くたびに作る（押した瞬間の文書に合わせるため） */
-export const openOnClick = (button: HTMLButtonElement, items: () => MenuEntry[]): void =>
-  mbt.mmmOpenOnClick(button, items);
+export interface FileActs {
+  newFile(): void;
+  open(): void;
+  openRecent(index: number): void;
+  save(): void;
+  saveAs(): void;
+  rename(): void;
+  chooseFolder(): void;
+}
 
-/** 行だけのメニュー。位置も開閉も持たない — 並べて見るためのもの */
-export const menu = (items: MenuEntry[]): HTMLDivElement => div(mbt.mmmMenuRows(items));
+/** 帯の Files。ボタンを押すたびに `state` を読んで並べる */
+export const filesMenu = (button: HTMLButtonElement, state: () => Files, acts: FileActs): void =>
+  mbt.mmmFilesMenu(button, state, acts);
+/** Files の行だけ（並べて見るため） */
+export const filesRows = (state: Files, acts: FileActs): HTMLDivElement => div(mbt.mmmFilesRows(state, acts));
+/** 改名できない理由（帯の名乗りの title。Files の Rename の行と同じ言葉）。できれば null */
+export const renameProblem = (saved: boolean): string | null => mbt.mmmRenameProblem(saved) ?? null;
+/** File System Access API が無いブラウザで、ショートカットから来たときに言う理由 */
+export const NO_FILE_ACCESS: Failed = mbt.mmmNoFileAccess();
+
+export interface More {
+  light: boolean;
+  /** 掴みやすさ（Easy grab）が入っているか */
+  grab: boolean;
+  /** リンクにまつわる押す前の但し書き。届いたら行に付く */
+  linkNote: Promise<string[]>;
+}
+
+export interface MoreActs {
+  undo(): void;
+  redo(): void;
+  pickColor(): void;
+  toggleTheme(): void;
+  toggleGrab(): void;
+  /** 写せたか。写せたことは押した行の絵が言う */
+  copyLink(): Promise<boolean>;
+}
+
+/** 帯の ⋯。ボタンを押すたびに `state` を読んで並べる */
+export const moreMenu = (button: HTMLButtonElement, state: () => More, acts: MoreActs): void =>
+  mbt.mmmMoreMenu(button, state, acts);
+/** ⋯ の行だけ（並べて見るため） */
+export const moreRows = (state: More, acts: MoreActs): HTMLDivElement => div(mbt.mmmMoreRows(state, acts));
 
 /** 右クリックの行（並べて見るため。地図そのものは core が開く） */
 export const contextMenu = (l: Layout, sel: Selection): HTMLDivElement =>
@@ -404,7 +414,6 @@ export const contextMenu = (l: Layout, sel: Selection): HTMLDivElement =>
 
 const div = (v: unknown): HTMLDivElement => (v instanceof HTMLDivElement ? v : bad("<div> でない"));
 const svgSvg = (v: unknown): SVGSVGElement => (v instanceof SVGSVGElement ? v : bad("<svg> でない"));
-const node = (v: unknown): Node => (v instanceof Node ? v : bad("Node でない"));
 
 // ---- 帯と枠 ----
 //
@@ -456,9 +465,6 @@ export const shortcuts = (deps: {
   /** いまの出し方で即書き出し。Shift なら出し方を選び直すメニューを開く */
   export: (choose: boolean) => void;
 }): void => mbt.mmmShortcuts(deps);
-
-/** いまのアクセントカラー（`#rrggbb`）。綴りの源は style.css の `--accent`。読めなければ null */
-export const accent = (): string | null => mbt.mmmAccent() ?? null;
 
 declare const themeBrand: unique symbol;
 /** 見た目の好み（持ち手）: アクセントカラーとライト / ダーク */

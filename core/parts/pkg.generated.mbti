@@ -26,6 +26,8 @@ pub fn label(@dom.Document, String, String, Bool) -> Array[@dom.Node]
 
 pub fn names() -> Array[String]
 
+pub let no_file_access : String
+
 pub fn nod(((Bool) -> Unit) -> Unit, (String) -> Unit, (Bool) -> Unit) -> Unit
 
 pub fn notice(@dom.Document, String, String, Bool) -> @dom.Element

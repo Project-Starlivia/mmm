@@ -1,14 +1,12 @@
 // 部品 × 状態の表。**見本の値は core と src の表から引く** — 絵の名前・しらせの言葉・
 // 言い出し・たずね（core/parts・core/app）、メニューの並び（core/map/context.mbt /
-// files.ts / more.ts / core/app/export.mbt）。ここが持つのは「どの状態で呼ぶか」だけで、
+// core/app の files / more / export）。ここが持つのは「どの状態で呼ぶか」だけで、
 // 綴りも並びも持たない。
 //
 // テーマは部品の話ではないので、ここには無い（index.ts が枠に振る）。
 
 import * as core from "../../src/coreApi.ts";
-import { askForm, icon, menu, notice, paneHint } from "../../src/coreApi.ts";
-import { type Files, filesMenu } from "../../src/app/files.ts";
-import { moreMenu } from "../../src/app/more.ts";
+import { askForm, icon, notice, paneHint } from "../../src/coreApi.ts";
 import type { Part } from "./kind.ts";
 import { MAP, named, sample } from "./map.ts";
 
@@ -52,7 +50,7 @@ function context(label: string | null): HTMLDivElement {
   return core.contextMenu(L, sel);
 }
 
-const SAVED: Files = {
+const SAVED: core.Files = {
   savedName: "notes.md",
   recent: ["ideas.md", "todo.md"],
   canOpen: true,
@@ -61,7 +59,7 @@ const SAVED: Files = {
   canChooseFolder: true,
   folder: "pics",
 };
-const FILES_ACTS = {
+const FILES_ACTS: core.FileActs = {
   newFile: nothing,
   open: nothing,
   openRecent: nothing,
@@ -70,14 +68,13 @@ const FILES_ACTS = {
   rename: nothing,
   chooseFolder: nothing,
 };
-const MORE_ACTS = {
+const MORE_ACTS: core.MoreActs = {
   undo: nothing,
   redo: nothing,
   pickColor: nothing,
   toggleTheme: nothing,
   toggleGrab: nothing,
   copyLink: () => Promise.resolve(true),
-  open: nothing,
 };
 /** 書き出しの並びが要るもの。出すもの以外は使われない */
 const exportDeps = (empty: boolean): core.ExportDeps => ({
@@ -146,23 +143,18 @@ export const PARTS: Part[] = [
       "context-root": () => context("mmm"),
       "context-folded": () => context("hidden"),
       "context-none": () => context(null),
-      "files-saved": () => menu(filesMenu(SAVED, FILES_ACTS)),
-      "files-unsaved": () =>
-        menu(filesMenu({ ...SAVED, savedName: null, recent: [], folder: "no folder" }, FILES_ACTS)),
+      "files-saved": () => core.filesRows(SAVED, FILES_ACTS),
+      "files-unsaved": () => core.filesRows({ ...SAVED, savedName: null, recent: [], folder: "no folder" }, FILES_ACTS),
       "files-no-access": () =>
-        menu(
-          filesMenu(
-            { ...SAVED, savedName: null, canOpen: false, canSave: false, canRename: false, canChooseFolder: false },
-            FILES_ACTS,
-          ),
+        core.filesRows(
+          { ...SAVED, savedName: null, canOpen: false, canSave: false, canRename: false, canChooseFolder: false },
+          FILES_ACTS,
         ),
-      "more-dark": () => menu(moreMenu({ light: false, grab: false, linkNote: Promise.resolve([]) }, MORE_ACTS)),
+      "more-dark": () => core.moreRows({ light: false, grab: false, linkNote: Promise.resolve([]) }, MORE_ACTS),
       "more-light-noted": () =>
-        menu(
-          moreMenu(
-            { light: true, grab: true, linkNote: Promise.resolve(["Images won't travel", "Long link — may be cut"]) },
-            MORE_ACTS,
-          ),
+        core.moreRows(
+          { light: true, grab: true, linkNote: Promise.resolve(["Images won't travel", "Long link — may be cut"]) },
+          MORE_ACTS,
         ),
       "export-ways": () => core.exportWays(exportDeps(false)),
       "export-empty": () => core.exportWays(exportDeps(true)),
