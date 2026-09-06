@@ -1,7 +1,7 @@
 // 寸法の規則。字の実測は「1 文字 7px」の物差しで置き換えて、数だけを固定する。
 
 ///|
-fn node(label : String?, fold? : @tree.Fold? = None) -> @view.Node {
+fn leaf(label : String?, fold? : @tree.Fold? = None) -> @view.Node {
   { id: 1, label, fold, blocks: [], children: [], }
 }
 
@@ -14,23 +14,23 @@ fn seven(_font : Font, text : String) -> Double {
 ///|
 test "畳んだノードの字は summary > ラベル" {
   assert_eq(
-    fold_name(node(Some("a"), fold=Some({ open: false, summary: Some("s"), }))),
+    fold_name(leaf(Some("a"), fold=Some({ open: false, summary: Some("s"), }))),
     "s",
   )
   assert_eq(
-    fold_name(node(Some("a"), fold=Some({ open: false, summary: None, }))),
+    fold_name(leaf(Some("a"), fold=Some({ open: false, summary: None, }))),
     "a",
   )
   assert_eq(
-    fold_name(node(Some(""), fold=Some({ open: false, summary: None, }))),
+    fold_name(leaf(Some(""), fold=Some({ open: false, summary: None, }))),
     "",
   )
 }
 
 ///|
 test "Implicit の字は空" {
-  assert_eq(label_of(node(None)), "")
-  assert_eq(label_of(node(Some(""))), "")
+  assert_eq(label_of(leaf(None)), "")
+  assert_eq(label_of(leaf(Some(""))), "")
 }
 
 ///|
@@ -60,23 +60,23 @@ test "row_top は i 枚目の上端。i = 枚数なら箱の高さ" {
 ///|
 test "箱の幅はいちばん広い行の実測 + 左右の余白、高さはラベル行 + カード行" {
   let size = node_size(seven)
-  assert_eq(size(node(Some("ab")), [], 0), { w: 38, h: 30, })
+  assert_eq(size(leaf(Some("ab")), [], 0), { w: 38, h: 30, })
   assert_eq(
     size(
-      node(Some("ab")),
+      leaf(Some("ab")),
       [Link(title="t", url="u"), Code(lang="", lines=["x", "y"])],
       0,
     ),
     { w: 53, h: 102, },
   )
   // 画像は最低幅を持つ。空のラベルはプレースホルダの幅
-  assert_eq(size(node(Some("")), [Svg(markup="")], 0), { w: 224, h: 106, })
-  assert_eq(size(node(Some("")), [], 0).w, 7.0 * 7.0 + 24.0)
+  assert_eq(size(leaf(Some("")), [Svg(markup="")], 0), { w: 224, h: 106, })
+  assert_eq(size(leaf(Some("")), [], 0).w, 7.0 * 7.0 + 24.0)
 }
 
 ///|
 test "畳んだノードは字を幅で詰め、バッジは詰めない" {
-  let n = node(
+  let n = leaf(
     Some("abcdefghijklmnopqrstuvwxyz"),
     fold=Some({ open: false, summary: None, }),
   )
@@ -85,7 +85,7 @@ test "畳んだノードは字を幅で詰め、バッジは詰めない" {
   // 収まるなら詰めない
   assert_eq(
     hidden_label(
-      node(Some("ab"), fold=Some({ open: false, summary: None, })),
+      leaf(Some("ab"), fold=Some({ open: false, summary: None, })),
       0,
       seven,
     ),

@@ -2,21 +2,21 @@
 // ドロップ判定（ts の drop.test.ts）が立つ土台として固定しておく。
 
 ///|
-let box : Rect = { x: 10, y: 20, w: 100, h: 40, }
+let rect : Rect = { x: 10, y: 20, w: 100, h: 40, }
 
 ///|
 test "箱の中心と、線が触れる左右の辺の中点" {
-  assert_eq(box.center(), { x: 60, y: 40, })
-  assert_eq(box.right(), { x: 110, y: 40, })
-  assert_eq(box.left(), { x: 10, y: 40, })
+  assert_eq(rect.center(), { x: 60, y: 40, })
+  assert_eq(rect.right(), { x: 110, y: 40, })
+  assert_eq(rect.left(), { x: 10, y: 40, })
 }
 
 ///|
 test "育つ辺と入る辺は、枝の向きで左右が入れ替わる" {
-  assert_eq(box.growth_edge(1), box.right())
-  assert_eq(box.entry_edge(1), box.left())
-  assert_eq(box.growth_edge(-1), box.left())
-  assert_eq(box.entry_edge(-1), box.right())
+  assert_eq(rect.growth_edge(1), rect.right())
+  assert_eq(rect.entry_edge(1), rect.left())
+  assert_eq(rect.growth_edge(-1), rect.left())
+  assert_eq(rect.entry_edge(-1), rect.right())
   assert_eq(dir(Right), 1)
   assert_eq(dir(Left), -1)
 }
