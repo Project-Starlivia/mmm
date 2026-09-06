@@ -5,10 +5,12 @@
 //   done            = apply(before, op)           None なら編集は無い
 //   edits           = merge(md, before, spans, done.doc)
 //   focus           = done.focus を、読み直したときの番号に読み替える
+//                     読み直した形が操作の後の木と合えば。合わなければ無い
 
 ///|
 /// 操作を md に映した結果。edits は CodeMirror の changes の形。
-/// focus は編集を当てて読み直した木での id（ノードを消せば隣、中身を消せば持ち主。最後の根か文書の散文を消した後は None）。
+/// focus は編集を当てて読み直した木での id（ノードを消せば隣、中身を消せば持ち主。最後の根か文書の散文を消した後、
+/// および書いた md が別の形に読まれたときは None）。
 pub(all) struct Edited {
   edits : Array[@tree.Edit]
   focus : Int?
