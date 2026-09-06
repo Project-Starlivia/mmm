@@ -1,0 +1,95 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm-app/core/parts"
+
+import {
+  "mizchi/js/core",
+  "mizchi/js_browser/dom",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn blocked(String) -> Unit
+
+pub let blocked_words : Array[String]
+
+pub fn failed(String) -> Unit
+
+pub let failed_words : Array[String]
+
+pub fn fill(@dom.Element, Array[Entry], Ways) -> Array[(@dom.Element, () -> Unit)]
+
+pub fn icon(@dom.Document, String) -> @dom.Element
+
+pub fn is_icon(String) -> Bool
+
+pub fn label(@dom.Document, String, String, Bool) -> Array[@dom.Node]
+
+pub fn names() -> Array[String]
+
+pub fn nod(((Bool) -> Unit) -> Unit, (String) -> Unit, (Bool) -> Unit) -> Unit
+
+pub fn notice(@dom.Document, String, String, Bool) -> @dom.Element
+
+pub fn open_on_click(@dom.Element, () -> Array[Entry]) -> Unit
+
+pub fn pane_hint(@dom.Document, String) -> @dom.Element
+
+pub fn pane_tool(@dom.Document, String) -> @dom.Element
+
+pub fn row(String, key? : String?, mark? : String?, note? : (((Array[String]) -> Unit) -> Unit)?, disabled? : Disabled) -> Row
+
+pub fn rows(@dom.Document, Array[Entry]) -> @dom.Element
+
+// Errors
+
+// Types and methods
+pub(all) enum Disabled {
+  No
+  Yes
+  Why(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Entry {
+  Run(Row, () -> Unit)
+  Done(Row, ((Bool) -> Unit) -> Unit)
+  Sub(Row, Array[Entry], (() -> Unit)?)
+  Caption(String, String?)
+  Sep
+}
+
+pub struct Menu {
+  doc : @dom.Document
+  el : @dom.Element
+  mut sub : Menu?
+  mut parent : Menu?
+  mut opener_row : @dom.Element?
+  mut opener : @dom.Element?
+  mut openers : Array[(@dom.Element, () -> Unit)]
+}
+pub fn Menu::close(Self, Bool) -> Unit
+pub fn Menu::close_sub(Self) -> Unit
+pub fn Menu::contains(Self, @core.Any) -> Bool
+pub fn Menu::focus_first(Self, Bool) -> Unit
+pub fn Menu::hide(Self, Bool) -> Unit
+pub fn Menu::is_open(Self) -> Bool
+pub fn Menu::new(@dom.Document) -> Self
+pub fn Menu::open_sub(Self, @dom.Element, Array[Entry]) -> Unit
+pub fn Menu::show(Self, Double, Double, Array[Entry]) -> Unit
+
+pub(all) struct Row {
+  label : String
+  key : String?
+  mark : String?
+  note : (((Array[String]) -> Unit) -> Unit)?
+  disabled : Disabled
+}
+
+pub(all) struct Ways {
+  open_sub : (@dom.Element, Array[Entry]) -> Unit
+  close_sub : () -> Unit
+  close : () -> Unit
+}
+
+// Type aliases
+
+// Traits

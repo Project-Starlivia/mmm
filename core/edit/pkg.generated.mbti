@@ -1,0 +1,23 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm-app/core/edit"
+
+import {
+  "mmm-app/core/op",
+  "mmm-app/core/tree",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn edit(String, @op.Op) -> Edited
+
+// Errors
+
+// Types and methods
+pub(all) struct Edited {
+  edits : Array[@tree.Edit]
+  focus : Int?
+} derive(Eq, ToJson, @debug.Debug)
+
+// Type aliases
+
+// Traits

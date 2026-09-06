@@ -1,0 +1,50 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm-app/core/op"
+
+import {
+  "mmm-app/core/tree",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+}
+
+// Values
+pub fn apply(@tree.Doc, Op) -> Done?
+
+// Errors
+
+// Types and methods
+pub(all) enum BlockPlace {
+  Before(block~ : Int)
+  After(block~ : Int)
+  In(node~ : Int)
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct Done {
+  doc : @tree.Doc
+  focus : Int?
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) enum NodePlace {
+  Before(node~ : Int)
+  After(node~ : Int)
+  In(node~ : Int, side~ : @tree.Side?)
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) enum Op {
+  AddNode(at~ : NodePlace, labels~ : Array[String])
+  AddBlock(at~ : BlockPlace, content~ : @tree.Content)
+  Rename(id~ : Int, label~ : String)
+  SetBlock(id~ : Int, content~ : @tree.Content)
+  MoveNode(ids~ : Array[Int], at~ : NodePlace)
+  MoveBlock(ids~ : Array[Int], at~ : BlockPlace)
+  Delete(ids~ : Array[Int])
+  Wrap(id~ : Int, label~ : String)
+  FlipSide(id~ : Int)
+  Fold(id~ : Int, open~ : Bool)
+  Unfold(id~ : Int)
+  Graft(at~ : NodePlace, md~ : String)
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+// Type aliases
+
+// Traits

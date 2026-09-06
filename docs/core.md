@@ -245,6 +245,12 @@ core が持つ同一性は操作の focus だけ。選択の持ち越しは core
 しか通じず、ts は位置（ラベルの頭）を CodeMirror に預けて編集で写す（`src/state.ts`、
 design.md「状態と拍」）。打鍵ごとの core 呼び出しは `mmmSurvey(md)` の 1 回で、読みの持ち手を返す。
 
+## 公開 API の一覧
+
+科ごとの `pkg.generated.mbti` が公開 API の一覧（`moon info` が吐く。`check:core` が古さを
+止める）。何が外から見えるかは、ソースより先にここを読む。作法（境界の型・非同期・
+エラー・予約語・道具）は docs/superpowers/specs/2026-09-07-mbt-practice.md。
+
 ## パスの積み方
 
 **結合テストは単体テストが終わってから。** 最後まで作ってから回すと、落ちた

@@ -1,0 +1,155 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm-app/core/tree/js"
+
+import {
+  "mizchi/js/core",
+  "mizchi/js_browser/dom",
+  "mmm-app/core/map",
+}
+
+// Values
+pub fn md_ast_sig(String) -> String
+
+pub fn mmm_accent() -> String?
+
+pub fn mmm_anchors_for(@core.Any, String) -> String
+
+pub fn mmm_anchors_of(@core.Any, Int?) -> String
+
+pub fn mmm_ask(@core.Any, (@core.Any) -> Unit) -> Unit
+
+pub fn mmm_ask_form(String, @core.Any) -> @dom.Element
+
+pub fn mmm_ask_named(String, @core.Any, (@core.Any) -> Unit) -> Unit
+
+pub fn mmm_bare_path(String) -> String
+
+pub fn mmm_blocked(String) -> Unit
+
+pub fn mmm_blocked_words() -> FixedArray[String]
+
+pub fn mmm_blocks(@core.Any, Int) -> FixedArray[Int]
+
+pub fn mmm_check(String) -> String
+
+pub fn mmm_chosen(@core.Any, String, FixedArray[Int], Int, String) -> String
+
+pub fn mmm_context_menu(@core.Any, FixedArray[Int], Int?) -> @dom.Element
+
+pub fn mmm_copy(@core.Any, FixedArray[Int]) -> String
+
+pub fn mmm_edit(String, String) -> String
+
+pub fn mmm_empty(@core.Any) -> Bool
+
+pub fn mmm_failed(String) -> Unit
+
+pub fn mmm_failed_words() -> FixedArray[String]
+
+pub fn mmm_find(@core.Any, String) -> Int?
+
+pub fn mmm_frontmatter(@core.Any) -> String?
+
+pub fn mmm_icon(String) -> @dom.Element
+
+pub fn mmm_icon_names() -> FixedArray[String]
+
+pub fn mmm_image_folder(@core.Any) -> String?
+
+pub fn mmm_is_node(@core.Any, Int) -> Bool
+
+pub fn mmm_label(String, String, Bool) -> Array[@dom.Node]
+
+pub fn mmm_layout(@core.Any, (@map.Font, String) -> Double) -> @core.Any
+
+pub fn mmm_load(String) -> String?
+
+pub fn mmm_logo_svg(String, Bool) -> String
+
+pub fn mmm_map(@dom.HTMLElement, @core.Any) -> @core.Any
+
+pub fn mmm_map_begin_edit(@core.Any, Int, String?) -> Bool
+
+pub fn mmm_map_center(@core.Any) -> Unit
+
+pub fn mmm_map_edit_card(@core.Any, Int) -> Unit
+
+pub fn mmm_map_file_drop(@core.Any, Double, Double, Bool) -> Int?
+
+pub fn mmm_map_fit(@core.Any) -> Unit
+
+pub fn mmm_map_refresh(@core.Any) -> Unit
+
+pub fn mmm_map_render(@core.Any) -> Unit
+
+pub fn mmm_map_set_grab(@core.Any, Bool) -> Unit
+
+pub fn mmm_map_svg_parts(@core.Any) -> @core.Any
+
+pub fn mmm_menu_rows(@core.Any) -> @dom.Element
+
+pub fn mmm_name(@core.Any) -> String
+
+pub fn mmm_nod(@core.Any, (String) -> Unit, (Bool) -> Unit) -> Unit
+
+pub fn mmm_normalize_path(String) -> String?
+
+pub fn mmm_notice(String, String, Bool) -> @dom.Element
+
+pub fn mmm_open_on_click(@dom.Element, () -> @core.Any) -> Unit
+
+pub fn mmm_pane_hint(String) -> @dom.Element
+
+pub fn mmm_pane_tool(String) -> @dom.Element
+
+pub fn mmm_panes(@dom.Element, @dom.Element, @dom.Element, @dom.Element, () -> Unit) -> @core.Any
+
+pub fn mmm_ranges(@core.Any, String) -> FixedArray[Int]
+
+pub fn mmm_retarget(@core.Any, String, String) -> String
+
+pub fn mmm_serialize(String) -> String
+
+pub fn mmm_set_image_folder(@core.Any, String) -> String
+
+pub fn mmm_shortcuts(@core.Any) -> Unit
+
+pub fn mmm_spot(@core.Any, Int) -> FixedArray[Int]?
+
+pub fn mmm_store(String, String) -> Unit
+
+pub fn mmm_survey(String) -> @core.Any
+
+pub fn mmm_sweep() -> Unit
+
+pub fn mmm_theme(@dom.Element, (Bool) -> Unit) -> @core.Any
+
+pub fn mmm_theme_is_light(@core.Any) -> Bool
+
+pub fn mmm_theme_pick_color(@core.Any) -> Unit
+
+pub fn mmm_theme_set_dirty(@core.Any, Bool) -> Unit
+
+pub fn mmm_theme_toggle(@core.Any) -> Unit
+
+pub fn mmm_to_file_name(String) -> String
+
+pub fn mmm_toggle_pane(@core.Any) -> Unit
+
+pub fn mmm_toggle_pane_vis(@core.Any, String) -> Unit
+
+pub fn mmm_tree_json(String) -> String
+
+pub fn mmm_unbuild_sig(String) -> String
+
+pub fn mmm_under(String, String) -> String?
+
+pub fn mmm_view_json(String) -> String
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

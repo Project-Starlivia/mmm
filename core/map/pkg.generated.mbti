@@ -1,0 +1,369 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm-app/core/map"
+
+import {
+  "mmm-app/core/op",
+  "mmm-app/core/tree",
+  "mmm-app/core/view",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+  "moonbitlang/core/set",
+}
+
+// Values
+pub fn all(Layout) -> Selection
+
+pub fn arrow(Layout, Int?, Arrow) -> Int?
+
+pub fn arrow_of(String) -> Arrow?
+
+pub fn card_bleed(Card) -> Double
+
+pub let card_border : Double
+
+pub let card_font : Font
+
+pub let card_font_px : Double
+
+pub fn card_inset(Card) -> Double
+
+pub let card_pad : Double
+
+pub fn card_place(Rect, Camera, Int, Double) -> Placement
+
+pub fn card_rect(Box, Int) -> Rect?
+
+pub fn cards(Array[@tree.Block]) -> Array[Card]
+
+pub fn center_on(Camera, Rect, Pane) -> Camera
+
+pub fn click(Selection, Int, Modifier, Array[Int]) -> Selection
+
+pub fn clip_label(String, Font, Double, (Font, String) -> Double) -> String
+
+pub let code_line : Double
+
+pub let code_pad : Double
+
+pub fn collapsed_badge(Int) -> String
+
+pub let details_indent : Double
+
+pub let details_name : String
+
+pub let details_row : Double
+
+pub fn dir(@tree.Side) -> Int
+
+pub fn display_label(String) -> String
+
+pub fn dist_to_seg(Pt, Pt, Pt) -> Double
+
+pub fn drop_op(Drop, Array[Int]) -> @op.Op
+
+pub fn edge_ends(Layout, Int) -> (Pt, Pt)?
+
+pub fn edge_path(Pt, Pt) -> String
+
+pub fn edge_segs(Double, Double) -> Array[Seg]
+
+pub let empty_label : String
+
+pub let exact : Reach
+
+pub fn extend_to(Selection, Int) -> Selection
+
+pub fn fit(Array[Rect], Pane, Double) -> Camera?
+
+pub fn flatten(Array[Seg], Int) -> Array[Pt]
+
+pub fn fold_name(@view.Node) -> String
+
+pub let gap : Gap
+
+pub let grab : Reach
+
+pub let hidden : Row
+
+pub fn hidden_label(@view.Node, Int, (Font, String) -> Double) -> String
+
+pub let hidden_max_w : Double
+
+pub fn hit(Layout, Double, Double, Reach) -> Int?
+
+pub let img_min_w : Double
+
+pub fn indicator_for(Rect, Camera, Pane) -> Indicator
+
+pub fn is_lost(Array[Rect], Camera, Pane) -> Bool
+
+pub fn is_visible(Rect, Camera, Pane) -> Bool
+
+pub fn items(Layout, Selection) -> Array[Entry]
+
+pub fn keyed(Layout, Selection, Key) -> Intent?
+
+pub fn keyed_card(Layout, Int, Key) -> Intent?
+
+pub let label_border : Double
+
+pub fn label_font(Row) -> Font
+
+pub let label_min_pad : Double
+
+pub fn label_of(@view.Node) -> String
+
+pub fn label_place(Box, Camera, Double) -> Placement
+
+pub fn layout(Array[@view.Root], (@view.Node, Array[Card], Int) -> Size) -> Layout
+
+pub let max_zoom : Double
+
+pub fn mid_of_polyline(Array[Pt]) -> Pt
+
+pub let min_zoom : Double
+
+pub let mono_font : Font
+
+pub fn nearest(Array[Rect], Camera, Pane) -> Rect?
+
+pub fn next_sibling(Layout, Int) -> Int?
+
+pub fn node_size((Font, String) -> Double) -> (@view.Node, Array[Card], Int) -> Size
+
+pub let none : Selection
+
+pub let normal : Row
+
+pub fn num(Double) -> String
+
+pub fn owner_of(Layout, Int) -> (Box, Int)?
+
+pub fn pan_by(Camera, Double, Double) -> Camera
+
+pub fn pan_to_show(Camera, Rect, Pane, Double) -> Camera
+
+pub fn parent_of(Layout, Int) -> Int?
+
+pub fn pinch(Camera, Span, Span) -> Camera
+
+pub fn prev_sibling(Layout, Int) -> Int?
+
+pub fn reach_of(Box, Reach, @set.Set[Int]) -> (Rect, Rect)
+
+pub fn resolve(Layout, Pt, Array[Int]) -> Drop?
+
+pub fn root_box(Layout) -> Box?
+
+pub fn round2(Double) -> Double
+
+pub fn row_h(Card) -> Double
+
+pub fn row_of(@view.Node) -> Row
+
+pub fn row_top(Array[Card], Int) -> Double
+
+pub fn rubber(Layout, Rect) -> Selection
+
+pub fn segs_to_d(Array[Seg], Pt) -> String
+
+pub fn solo(Selection) -> Int?
+
+pub fn to_world(Camera, Double, Double) -> Pt
+
+pub fn union(Array[Rect]) -> Rect?
+
+pub fn zoom_at(Camera, Double, Double, Double) -> Camera
+
+pub fn zoom_to(Camera, Double, Double, Double) -> Camera
+
+// Errors
+
+// Types and methods
+pub(all) enum Arrow {
+  Up
+  Down
+  Left
+  Right
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Box {
+  node : @view.Node
+  parent : Edge?
+  buried : Int
+  mut fan : Double
+  x : Double
+  mut y : Double
+  w : Double
+  h : Double
+  cards : Array[Card]
+} derive(@debug.Debug)
+pub fn Box::rect(Self) -> Rect
+
+pub(all) struct Camera {
+  k : Double
+  tx : Double
+  ty : Double
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Card {
+  Link(title~ : String, url~ : String)
+  Image(path~ : String, name~ : String)
+  Svg(markup~ : String)
+  Code(lang~ : String, lines~ : Array[String])
+  Break
+  Details(open~ : Bool, summary~ : String?, lines~ : Array[String])
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) enum Drop {
+  Node(id~ : Int, pos~ : Int)
+  Side(root~ : Int, left~ : Bool)
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct Edge {
+  id : Int
+  side : @tree.Side
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) enum Entry {
+  Item(Item)
+  Sep
+} derive(Eq, ToJson, @debug.Debug)
+
+pub struct Fingers {
+  at : Map[Int, Pt]
+  mut pair : (Int, Int)?
+}
+pub fn Fingers::down(Self, Int, Double, Double) -> Unit
+pub fn Fingers::moved(Self, Int, Double, Double) -> (Span, Span)?
+pub fn Fingers::new() -> Self
+pub fn Fingers::only(Self) -> Pt?
+pub fn Fingers::pinching(Self) -> Bool
+pub fn Fingers::up(Self, Int) -> Unit
+
+pub(all) struct Font {
+  px : Int
+  mono : Bool
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Gap {
+  x : Double
+  y : Double
+  root : Double
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Indicator {
+  x : Double
+  y : Double
+  angle : Double
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Intent {
+  Op(op~ : @op.Op, edit~ : Bool)
+  Edit(id~ : Int, seed~ : String?)
+  Select(sel~ : Selection, reveal~ : Bool)
+  Center
+  Pick(id~ : Int?)
+  EditCard(id~ : Int)
+  AddLink(id~ : Int)
+  AddCode(id~ : Int)
+  Draw(id~ : Int)
+  Paste
+  Copy(cut~ : Intent?)
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct Item {
+  label : String
+  key : String?
+  mark : String?
+  intent : Intent?
+  why : String?
+  items : Array[Item]?
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Key {
+  key : String
+  shift : Bool
+  mod : Bool
+  alt : Bool
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Layout {
+  order : Array[Int]
+  boxes : Map[Int, Box]
+} derive(@debug.Debug)
+
+pub(all) enum Modifier {
+  Plain
+  Shift
+  Mod
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Pane {
+  width : Double
+  height : Double
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Placement {
+  left : Double
+  top : Double
+  width : Double
+  height : Double
+  font_size : Double
+  padding : Double
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Pt {
+  x : Double
+  y : Double
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Reach {
+  pad : Double
+  edge : Double
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Rect {
+  x : Double
+  y : Double
+  w : Double
+  h : Double
+} derive(Eq, ToJson, @debug.Debug)
+pub fn Rect::center(Self) -> Pt
+pub fn Rect::entry_edge(Self, Int) -> Pt
+pub fn Rect::growth_edge(Self, Int) -> Pt
+pub fn Rect::left(Self) -> Pt
+pub fn Rect::right(Self) -> Pt
+
+pub(all) struct Row {
+  px : Int
+  pad : Double
+  h : Double
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) enum Seg {
+  L(Double, Double)
+  C(Double, Double, Double, Double, Double, Double)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Selection {
+  ids : Array[Int]
+  anchor : Int?
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct Size {
+  w : Double
+  h : Double
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Span {
+  a : Pt
+  b : Pt
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+pub type Measure = (Font, String) -> Double
+
+pub type SizeOf = (@view.Node, Array[Card], Int) -> Size
+
+// Traits
