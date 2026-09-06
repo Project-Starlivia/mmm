@@ -548,6 +548,24 @@ test "Implicit は見出しの直後に来れば綴られる" {
 }
 
 ///|
+/// 抜き取りで子が尽きた Implicit は操作の後で消える（掃除は門の仕事）ので、
+/// その隣を席にできる。根まで登れば Root ごと消える
+test "Implicit の唯一の子を、その Implicit の隣へ動かせる" {
+  let d = doc([root(h(2, "r", children=[gap(3, [h(4, "a")])]), sides=[Right])])
+  let out = Some({
+    doc: doc([root(h(2, "r", children=[h(4, "a")]), sides=[Right])]),
+    focus: Some(4),
+  })
+  assert_eq(run(d, MoveNode(ids=[4], at=Before(node=3))), out)
+  assert_eq(run(d, MoveNode(ids=[4], at=After(node=3))), out)
+  let e = doc([root(gap(2, [h(3, "a")]), sides=[Right]), root(h(4, "b"))])
+  assert_eq(
+    run(e, MoveNode(ids=[3], at=After(node=2))),
+    Some({ doc: doc([root(h(3, "a")), root(h(4, "b"))]), focus: Some(3) }),
+  )
+}
+
+///|
 test "Implicit は項目を子に持てば綴られる" {
   let d = doc([
     root(h(2, "r", children=[gap(3, [h(4, "x", children=[item(5, "i")])])]), sides=[
@@ -959,6 +977,6 @@ test "apply の結果は check を通る" {
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="305")
+  inspect(some, content="308")
   json_inspect(bad, content=[])
 }
