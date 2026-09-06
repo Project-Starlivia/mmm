@@ -31,6 +31,16 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
   edit/         境界。edit(md, op) が survey → apply → merge を繋ぎ、編集列と
                 読み直した木での focus を返す。law_wbtest.mbt が操作 × 合流の結合を
                 総当たりで固定する。決めは core.md「境界」
+  map/          Mindmap の配置。DOM を知らない — geometry(座標系。側 → 符号はここだけ) /
+                card(Block → Card。分類だけ) / metric(寸法の唯一の定義。字の実測は
+                Measure で外から受ける) / layout(View → Layout。畳みの埋没と sides の zip、
+                付け根の配り、card_rect / owner_of / edge_ends) / edge(線の形。d 属性)
+  render/       Layout → SVG の差分更新（js だけ。mizchi/js_browser の DOM の型で書く）。
+                svg(要素を作る) / card(Card 1 枚 → SVG) / render(Renderer。id → 要素、
+                transform / d のキャッシュ、並び直し、paint)。class と data-* は
+                style.css と ts のハンドラとの契約。試験は happy-dom
+  tree/js/      browser への出口。mmmSurvey / mmmLayout / mmmRenderer / mmmDraw …。
+                データは JSON、MoonBit の値は不透明な持ち手で往復する
 src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す・動かす・カードを扱う・
         貼る/落とす/描く。**
   coreApi.ts   core の出口と入口。JSON の形を整える唯一の場所（survey が View・地番を受け、
@@ -50,14 +60,12 @@ src/    TypeScript — UI。**描いて、選んで、名前を打つ・消す�
   icons.ts     ボタンとメニューの絵の唯一の源(線で引く / currentColor)
   style.css    全体のスタイル(部品ごとの塊。入れ子は CSS 自身の機能。色・影・輪の数字は
                `:root` のトークンだけが持ち、状態は `.selected` / `.on` / `aria-disabled` で言う)
-  map/         その純粋層 — geometry(座標系。側 → 符号はここだけ) / camera(視点。
-               world ↔ 画面) / edge(線の形) / cards(Block → カード行。分類だけ) /
-               drawCard(カード 1 行 → SVG) / metrics(寸法の唯一の場所) /
-               layout(View の木 → 箱。畳みの埋没と sides の zip もここ。ownerOf で
-               中身の持ち主も引く) /
-               render(SVG の差分更新) / highlight(コードの色分け) /
+  map/         入力側の純粋層（配置と描画は core/map・core/render）— geometry(入力側の
+               算術。側 → 符号は ts ではここだけ) / camera(視点。world ↔ 画面) /
+               measure(字の実測。core の Font に CSS の字の綴りを合わせて canvas で測る) /
+               highlight(コードの色分け。core の描画に閉包で渡す) /
                select(選択の値と、入力でどう変わるか。矩形・矢印・点の当たり・
-               親兄弟と隣) / context(右クリックメニューの行。純粋な表) /
+               親兄弟と隣。Easy grab の広げ幅 GRAB) / context(右クリックメニューの行。純粋な表) /
                drop(ドラッグの落とし先の判定。純粋) / pick(選んでいるカードの枠と ×) /
                card(カードのその場編集の器と配置) /
                toSvg(1 枚の svg にする) / svg(要素を作る) / indicator(画面外の
@@ -441,9 +449,9 @@ base64url。保存の有無を問わない — まだ保存していない文書
 
 選んだノードの周りに `+` が出て、子はその枝が**育つ辺**に、親はその枝が
 **入ってくる辺**に、上下が兄弟(`Tab` / `Shift+Tab` / `Enter` / `Shift+Enter`
-と同じ)。左右どちらが子でどちらが親かは**その枝の向き**(`layout.ts` の
-`dirOf`)で決まる — 左右の入れ替え(鏡映)を書いてよいのは `geometry.ts` の
-`growthEdgeOf` / `entryEdgeOf` だけで、`addButtons.ts` は向きを渡して結果を
+と同じ)。左右どちらが子でどちらが親かは**その枝の向き**(core/map の
+`dir`)で決まる — 左右の入れ替え(鏡映)を書いてよいのは core/map/geometry.mbt の
+`growth_edge` / `entry_edge` だけで、`addButtons.ts` は向きを渡して結果を
 そのまま使うだけ。ルートは深さ 1 の見出しを親で包めないので、その口は
 出ない。上下は左右と置き方が違う — 左右(子・親)は縁の外へ 26px 離すが、
 上下(兄弟)は縁ちょうどに置く。兄弟どうしの縦の間隔は 10px しかなく、横と
@@ -584,7 +592,7 @@ Mindmap からの追加・編集(`Tab` / rename / D&D / 段の上下)が書く�
 **箱の当たりは既定で見た目どおり**(Figma 等の図形ツールと同じ)。`⋯` の **Easy grab**
 を入れると、見た目は変えずに**当たりだけ箱の外へ広がる** — 四方に 41、子の見えない
 端のノードは枝の伸びる向きにさらに 63(world px。ズームと一緒に伸び縮みする。数字は
-`metrics.ts`)。縁を狙って外れて選択が解ける、を無くすための好みで、localStorage に持つ。
+`select.ts` の `GRAB`)。縁を狙って外れて選択が解ける、を無くすための好みで、localStorage に持つ。
 帯が被れば見た目の箱に直線距離で近い方。ただし端の伸びだけで届く箱が居るときは行で
 読む — y の近さ、同じなら x の近さ(端の伸びは横に長く、直線距離では隣の行の箱に
 負けてしまうため)。同じ近さなら文書順の後ろ。選んでいる数では変えない。

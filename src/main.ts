@@ -185,7 +185,7 @@ function write(op: core.Op): void {
 const editor = new MdEditor(mdPane, onUpdate);
 
 const host: MapHost = {
-  doc,
+  survey: () => state().field(st.tree),
   imageUrl: (path) => assets.imageUrl(path),
   imageHint: () => (assets.readable() ? null : "click to connect"),
   connectAssets: () =>

@@ -4,9 +4,9 @@
 // （右に置いたのに兄弟になる、近くの子の帯に吸われて狙った子と違う所に落ちる）。
 // だから見た目を塗る仕事から切り離して、ここだけを単体で試せるようにしてある。
 
-import type * as core from "../coreApi.ts";
+import * as core from "../coreApi.ts";
 import { type Pt, centerOf, dirOf } from "./geometry.ts";
-import { type Box, type Layout, GAP } from "./layout.ts";
+
 
 /**
  * ノード相手の落とし先（内部の刻み）。
@@ -29,7 +29,7 @@ export type Drop = { kind: "node"; id: number; pos: 0 | 1 | 2 } | { kind: "side"
 export interface DropScene {
   /** ポインタの位置 */
   at: Pt;
-  layout: Layout;
+  layout: core.Layout;
   /** いま掴んでいる部分木。落とし先から外す */
   dragging: Set<number>;
 }
@@ -37,12 +37,12 @@ export interface DropScene {
 const SLOP = 16; // 箱の左右へのはみ出しをどこまで箱の内と見るか
 const BAND = 40; // 前後への挿入を狙える帯の広さ
 const OPEN = BAND * 5; // 開いている側では同じ帯をここまで広げる
-const REACH = GAP.x * 4 + 16; // 「子にする」外側ゾーンを成長軸方向にどこまで伸ばすか
+const REACH = core.metrics.gap.x * 4 + 16; // 「子にする」外側ゾーンを成長軸方向にどこまで伸ばすか
 // 子を優先するのは**親と子の列のあいだの通路**まで。次の列に入ったら、そこは
 // その列の住人（前後への挿入）のもの。通路より広く取っていたころは、列 N の
 // ノードが列 N+1 の兄弟挿入を横取りし、「下の兄弟にしたいのに隣の枝の子になる」
 // が起きていた（`f` の下の空きを、隣に並ぶ `b` が丸ごと持っていく）
-const NEAR = GAP.x;
+const NEAR = core.metrics.gap.x;
 const SLACK = 18; // 外側ゾーンが兄弟軸方向に箱からはみ出してよい量
 
 /**
@@ -50,7 +50,7 @@ const SLACK = 18; // 外側ゾーンが兄弟軸方向に箱からはみ出し�
  * `du` は**その枝が伸びる向き**を正とする（左の枝では左が正）ので、
  * 外側ゾーンの式を左右で書き分けなくてよい。
  */
-function local(at: Pt, b: Box) {
+function local(at: Pt, b: core.Box) {
   const c = centerOf(b);
   return {
     du: (at.x - c.x) * dirOf(b.parent?.side ?? "Right"),
@@ -72,8 +72,8 @@ function local(at: Pt, b: Box) {
  * ままなので、見た目の上下端は動かない。
  */
 function openEnds(scene: DropScene): { up: Set<number>; down: Set<number> } {
-  const first = new Map<string, Box>();
-  const last = new Map<string, Box>();
+  const first = new Map<string, core.Box>();
+  const last = new Map<string, core.Box>();
   for (const id of scene.layout.order) {
     const b = scene.layout.boxes.get(id);
     if (!b || b.parent === null) continue; // 根に兄弟は無い
@@ -158,7 +158,7 @@ function findOpenEnd(scene: DropScene): DropTarget | null {
  */
 export function resolveDrop(scene: DropScene): Drop | null {
   // ポインタがその箱の中心より左か。**側を決めるのはここだけ**
-  const sideOf = (b: Box): boolean => scene.at.x < centerOf(b).x;
+  const sideOf = (b: core.Box): boolean => scene.at.x < centerOf(b).x;
 
   // 帯は隣の兄弟と重なるので、最初に見つかった相手ではなく「いちばん近い」
   // 相手を選ぶ。文書順で決めていたころは、親が違う子スタックの境目で

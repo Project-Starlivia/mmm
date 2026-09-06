@@ -4,7 +4,7 @@
 import type * as core from "../coreApi.ts";
 import type { IconName } from "../icons.ts";
 import { type Intent, keyed } from "./keys.ts";
-import type { Layout } from "./layout.ts";
+
 import { type Selection, parentOf, solo } from "./select.ts";
 import type { MenuEntry } from "./menu.ts";
 
@@ -21,10 +21,10 @@ export type Entry = Item | "sep";
 
 const ONE = "Select one node";
 
-const press = (L: Layout, sel: Selection, key: string, shift = false, mod = false): Intent | null =>
+const press = (L: core.Layout, sel: Selection, key: string, shift = false, mod = false): Intent | null =>
   keyed(L, sel, { key, shift, mod, alt: false });
 
-export function contextItems(L: Layout, sel: Selection): Entry[] {
+export function contextItems(L: core.Layout, sel: Selection): Entry[] {
   const id = solo(sel);
   const node = sel.anchor === null ? null : (L.boxes.get(sel.anchor)?.node ?? null);
   /** 宛先が 1 つに決まらないと沈む行の intent / why */

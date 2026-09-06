@@ -6,7 +6,7 @@
 // host の値を塗るだけ。値は EditorState の field（state.ts）。あるのは
 // 選択、その場編集、消す・並べ替え・畳み・側の操作・カードの選択とその場編集。
 
-import type * as core from "./coreApi.ts";
+import * as core from "./coreApi.ts";
 import type { Holder } from "./caret.ts";
 import { type Camera, type Pane, centerOn, fitToPane, panBy, panToShow, pinch, toWorld, zoomAt } from "./map/camera.ts";
 import { CardEditor } from "./map/card.ts";
@@ -17,12 +17,13 @@ import { Fingers } from "./map/gesture.ts";
 import { indicatorFor, isLost, nearest } from "./map/indicator.ts";
 import { type Intent, type Key, keyed, keyedCard } from "./map/keys.ts";
 import { LabelEditor } from "./map/label.ts";
-import { type Layout, cardRect, layoutMap, ownerOf, rootBox } from "./map/layout.ts";
-import { HIT_EDGE, HIT_PAD, labelOf, nodeSize } from "./map/metrics.ts";
+
+import { measure } from "./map/measure.ts";
+import { languageEpoch, tokenize } from "./map/highlight.ts";
 import { ContextMenu } from "./map/menu.ts";
 import { CardPick } from "./map/pick.ts";
-import { MapRenderer } from "./map/render.ts";
-import { EXACT, NONE, type Selection, click, hit, rubber } from "./map/select.ts";
+
+import { EXACT, GRAB, NONE, type Selection, click, hit, rubber } from "./map/select.ts";
 import { svgEl } from "./map/svg.ts";
 import { mapToSvg } from "./map/toSvg.ts";
 import { icon } from "./icons.ts";
@@ -31,8 +32,8 @@ import { paneHint } from "./app/hint.ts";
 import { failed } from "./app/notice.ts";
 
 export interface MapHost {
-  /** いまの文書（core が読んだ View） */
-  doc(): core.View;
+  /** いまの文書（core が読んだ View と地番。持ち手ごと — 置くのに要る） */
+  survey(): core.Survey;
   /** ローカル画像の objectURL。読めていない / 握っていないあいだは null */
   imageUrl(path: string): string | null;
   /** 読めていない場所取りに添える字。握っていないときだけ（他は null） */
@@ -80,11 +81,11 @@ export class Mindmap {
   private host: MapHost;
   /** world 座標の層。Camera の変換はこれに掛ける */
   private world: SVGGElement;
-  private renderer = new MapRenderer();
+  private renderer = new core.Renderer();
   private hint: HTMLDivElement;
   private indicatorEl: HTMLDivElement;
   private camera: Camera = { k: 1, tx: 60, ty: 60 };
-  private layout: Layout = { order: [], boxes: new Map() };
+  private layout: core.Layout;
   /** 2 本目の指。1 本のあいだは何も言わない */
   private fingers = new Fingers();
   private panning: { px: number; py: number; ox: number; oy: number } | null = null;
@@ -131,6 +132,7 @@ export class Mindmap {
   constructor(pane: HTMLElement, host: MapHost) {
     this.pane = pane;
     this.host = host;
+    this.layout = core.layout(host.survey(), measure);
     // この pane はマップの器になった。見た目（style.css の `.map-pane`）はここで付く
     pane.classList.add("map-pane");
 
@@ -238,9 +240,9 @@ export class Mindmap {
   /** カードの置かれている場所（world 座標）。積み方は数えない —
    *  cardRect が描画と共通の唯一の出所で、ここは箱の位置ぶん動かすだけ */
   private cardRectOf(id: number): Rect | null {
-    const o = ownerOf(this.layout, id);
+    const o = core.ownerOf(this.layout, id);
     if (!o) return null;
-    const r = cardRect(o.box, o.index);
+    const r = o.box.cards[o.index] ?? null;
     return r === null ? null : { ...r, x: o.box.x + r.x, y: o.box.y + r.y };
   }
 
@@ -261,13 +263,16 @@ export class Mindmap {
   // ---------- layout & render ----------
 
   render(): void {
-    const doc = this.host.doc();
-    this.hint.style.display = doc.roots.length === 0 ? "flex" : "none";
-    this.layout = layoutMap(doc.roots, nodeSize);
+    const s = this.host.survey();
+    this.hint.style.display = s.view.roots.length === 0 ? "flex" : "none";
+    this.layout = core.layout(s, measure);
     this.renderer.draw({
       layout: this.layout,
+      measure,
       imageUrl: (path) => this.host.imageUrl(path),
       imageHint: this.host.imageHint(),
+      tokens: tokenize,
+      epoch: languageEpoch(),
     });
     this.paintChoice();
     this.followLabel();
@@ -297,7 +302,7 @@ export class Mindmap {
 
   /** 選択（無ければ根）を画面の中心へ。拡大率は変えない */
   centerOnTarget(): void {
-    const target = unionRect(this.selectedBoxes()) ?? rootBox(this.layout);
+    const target = unionRect(this.selectedBoxes()) ?? core.rootBox(this.layout);
     if (target) this.setCamera(centerOn(this.camera, target, this.paneSize()));
   }
 
@@ -319,7 +324,7 @@ export class Mindmap {
   beginEdit(id: number, seed: string | null): boolean {
     const b = this.layout.boxes.get(id);
     if (!b) return false;
-    this.label.open(id, b, this.camera, labelOf(b.node), seed);
+    this.label.open(id, b, this.camera, core.labelOf(b.node), seed);
     return true;
   }
 
@@ -375,7 +380,7 @@ export class Mindmap {
   private paintChoice(): void {
     const ids = this.host.selection().ids;
     const md = this.host.holder() === "md";
-    this.renderer.paintSelection(new Set(md ? [] : ids));
+    this.renderer.paint(md ? [] : ids);
     this.ring(md ? ids : []);
   }
 
@@ -408,7 +413,7 @@ export class Mindmap {
   private nodeAt(clientX: number, clientY: number): number | null {
     const p = this.local(clientX, clientY);
     const w = toWorld(this.camera, p.x, p.y);
-    return hit(this.layout, w.x, w.y, this.grab ? { pad: HIT_PAD, edge: HIT_EDGE } : EXACT);
+    return hit(this.layout, w.x, w.y, this.grab ? GRAB : EXACT);
   }
 
   /** 掴みやすさ（⋯ の Easy grab）。見た目は変えず、叩ける範囲だけ広げる */
@@ -427,7 +432,7 @@ export class Mindmap {
       ? null
       : sel.length > 0
         ? nearest(sel, this.camera, pane)
-        : rootBox(this.layout);
+        : core.rootBox(this.layout);
     if (!target) {
       this.indicatorEl.style.display = "none";
       return;

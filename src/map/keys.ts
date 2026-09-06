@@ -3,7 +3,7 @@
 // 決めは docs/superpowers/specs/2026-09-04-label-design.md と shortcuts.md「Mindmap」。
 
 import * as core from "../coreApi.ts";
-import { type Layout, ownerOf } from "./layout.ts";
+
 import { NONE, type Selection, all, arrow, extend, isArrowKey, nextSibling, parentOf, prevSibling, solo } from "./select.ts";
 
 /** 押されたキー。mod は Ctrl / Cmd のどちらか */
@@ -66,7 +66,7 @@ function copied(k: Key, cut: () => Intent | null): Intent | null {
  * - ノードが 1 つも無ければ、Enter は最初の根
  * - Tab / Shift+Tab は 1 つなら足す・包む、複数なら段下げ・上げ（先頭の前の兄弟の子へ / 先頭の親の後ろへ）
  */
-export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
+export function keyed(L: core.Layout, sel: Selection, k: Key): Intent | null {
   // Alt が意味を持つのは Alt+↑↓（並べ替え）だけ。それ以外の Alt の組は拾わない。
   // ここで先に他のキーだけ弾く — Alt+↑↓ 自身の判断は後ろの専用の行に任せる
   // （Alt を真っ先に全部捨てると、並べ替えが書けなくなる）
@@ -152,10 +152,10 @@ export function keyed(L: Layout, sel: Selection, k: Key): Intent | null {
  * 隣はその `blocks` を文書順（= 配列順）に見た前後。持ち主が見つからなければ
  * （箱が無い = 畳まれて埋もれた）null。
  */
-export function keyedCard(L: Layout, picked: number, k: Key): Intent | null {
+export function keyedCard(L: core.Layout, picked: number, k: Key): Intent | null {
   // 外すのに持ち主は要らない（畳まれて箱が無くても、ここから抜けられる）
   if (k.key === "Escape") return { kind: "pick", id: null };
-  const o = ownerOf(L, picked);
+  const o = core.ownerOf(L, picked);
   if (o === null) return null;
   const owner = o.box.node;
   const blocks = owner.blocks;
