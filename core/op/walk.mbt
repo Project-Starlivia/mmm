@@ -185,3 +185,25 @@ fn has(doc : @tree.Doc, id : Int) -> Bool {
   each(doc, fn(x, _, _) { if x == id { hit.val = true } })
   hit.val
 }
+
+///|
+/// 同じ親の子の id、文書順。根なら根どうし。中身には応えない（空）。
+fn siblings(doc : @tree.Doc, id : Int) -> Array[Int] {
+  match parent(doc, id) {
+    Some(p) if p != @tree.doc_id =>
+      match find(doc, p) {
+        Some(n) => kids(n).map(id_of)
+        None => []
+      }
+    Some(_) => doc.roots.map(r => id_of(r.node))
+    None => []
+  }
+}
+
+///|
+/// 祖先の id、近いほうから。根なら空。中身なら持ち主から。
+fn ancestors(doc : @tree.Doc, id : Int) -> Array[Int] {
+  let found : Ref[Array[Int]] = { val: [] }
+  each(doc, fn(x, _, path) { if x == id { found.val = path.rev() } })
+  found.val
+}

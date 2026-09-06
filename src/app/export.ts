@@ -296,7 +296,7 @@ export function initExport(
 
   return {
     run: () => fire(way),
-    /** 文書が変わった。押せるかどうかを見直す（sync から呼ばれる） */
+    /** 文書が変わった。押せるかどうかを見直す（main.ts の onUpdate から呼ばれる） */
     refresh: show,
   };
 }
