@@ -5,7 +5,8 @@
 // dark と light は別々の源を持つので、組も 2 つ。書き込み先は `<style>` 1 枚で、
 // `:root { … }` と `.light { … }` を丸ごと出し直す。
 
-import type { Theme } from "../../src/app/theme.ts";
+/** ライト / ダーク。見本の枠に振るだけの語 */
+type Theme = "light" | "dark";
 
 /** 源。3 色 */
 const COLORS = ["bg", "ink", "accent"] as const;

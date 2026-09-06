@@ -393,6 +393,11 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
   （`menu.mbt`。行の形・入れ子・キーで辿る・外を押せば閉じる）。ts は作ってもらって置くだけ
 - **web/** — DOM の小さな道具。js_browser に型の無い呼び出しを 1 行ずつ包み、他の package は
   `_get` / `_call` を書かない
+- **app/** — 帯と枠。持ち物（`persist.mbt`。localStorage の綴りはここだけで、外は名前で言う）、
+  ペインの出し分けと分割線（`panes.mbt`。居場所の算術は純粋で、試験は数だけ）、全体のキー、
+  テーマとアクセントカラーと favicon（`theme.mbt` / `logo.mbt`。ロゴの形の源はここ 1 つで、
+  ビルド時の favicon も同じ関数から）、たずね（`ask.mbt` の器と `asks.mbt` の綴り）。
+  文書と選択の読み書きは ts の main.ts が閉包で渡す
 - **判断も map/** — 選択（当たり・矩形・矢印・親兄弟）、落とし先、キーの表（`Intent`）、
   右クリックの行、視点の算術、針、指の台帳、欄の重ね。全部純粋で、wbtest で固定する
 - **出口** — `mmmSurvey(md) -> 持ち手` と木の問い合わせ（`mmmSpot` / `mmmChosen` /

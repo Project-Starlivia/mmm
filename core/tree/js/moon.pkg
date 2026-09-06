@@ -13,6 +13,7 @@ import {
   "mmm-app/core/web",
   "mmm-app/core/parts",
   "mmm-app/core/render",
+  "mmm-app/core/app",
   "mmm-app/core/read",
 }
 

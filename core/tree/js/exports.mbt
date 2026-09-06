@@ -636,3 +636,240 @@ pub fn mmm_open_on_click(
 pub fn mmm_menu_rows(items : @core.Any) -> @dom.Element {
   @parts.rows(@dom.document(), entries_of(items))
 }
+
+// ---- 帯と枠 ----
+//
+// 持ち物（localStorage）・ペインの出し分け・全体のキー・見た目の好み・たずね（core/app）。
+// 閉包は ts の関数をそのまま受け、たずねの並びは ts の object で受ける
+
+///|
+/// 持ち物を読む（名前は theme / color / way / grab）。無ければ undefined
+#export_name("mmmLoad")
+pub fn mmm_load(name : String) -> String? {
+  @app.load(name)
+}
+
+///|
+#export_name("mmmStore")
+pub fn mmm_store(name : String, value : String) -> Unit {
+  @app.store(name, value)
+}
+
+///|
+/// 役目を終えた localStorage のキーを捨てる
+#export_name("mmmSweep")
+pub fn mmm_sweep() -> Unit {
+  @app.sweep()
+}
+
+///|
+fn pane_of(which : String) -> @app.Pane {
+  match which {
+    "md" => Md
+    "map" => Map
+    _ => abort("知らないペイン: " + which)
+  }
+}
+
+///|
+/// ペインの出し分けと分割線。返るのは持ち手
+#export_name("mmmPanes")
+pub fn mmm_panes(
+  md_pane : @dom.Element,
+  map_pane : @dom.Element,
+  panes_el : @dom.Element,
+  splitter : @dom.Element,
+  focus_editor : () -> Unit,
+) -> @core.Any {
+  @core.any(
+    @app.Panes::new(md_pane, map_pane, panes_el, splitter, focus_editor),
+  )
+}
+
+///|
+fn panes_of(handle : @core.Any) -> @app.Panes {
+  handle.cast()
+}
+
+///|
+/// Mod+/: もう片方のペインへ。隠れていれば出す
+#export_name("mmmTogglePane")
+pub fn mmm_toggle_pane(panes : @core.Any) -> Unit {
+  panes_of(panes).toggle()
+}
+
+///|
+/// そのペイン（"md" / "map"）の表示 / 非表示
+#export_name("mmmTogglePaneVis")
+pub fn mmm_toggle_pane_vis(panes : @core.Any, which : String) -> Unit {
+  panes_of(panes).toggle_vis(pane_of(which))
+}
+
+///|
+/// アプリ全体のキー。`deps` は関数の入った object（save / open / create / togglePane /
+/// togglePaneVis / undo / redo / export）
+#export_name("mmmShortcuts")
+pub fn mmm_shortcuts(deps : @core.Any) -> Unit {
+  let call = (name : String, args : Array[@core.Any]) => {
+    deps._call(name, args) |> ignore
+  }
+  @app.init_shortcuts(@dom.document(), {
+    save: as_new => call("save", [@core.any(as_new)]),
+    open: () => call("open", []),
+    create: () => call("create", []),
+    toggle_pane: () => call("togglePane", []),
+    toggle_pane_vis: p => {
+      call("togglePaneVis", [
+        @core.any(
+          match p {
+            Md => "md"
+            Map => "map"
+          },
+        ),
+      ])
+    },
+    undo: () => call("undo", []),
+    redo: () => call("redo", []),
+    export_map: choose => call("export", [@core.any(choose)]),
+  })
+}
+
+///|
+/// いまのアクセントカラー（`#rrggbb`）。読めなければ undefined
+#export_name("mmmAccent")
+pub fn mmm_accent() -> String? {
+  @app.accent(@dom.document())
+}
+
+///|
+/// ロゴの SVG（favicon の源。ビルド時にも呼ぶ）
+#export_name("mmmLogoSvg")
+pub fn mmm_logo_svg(fill : String, dirty : Bool) -> String {
+  @app.logo_svg(fill, dirty)
+}
+
+///|
+/// カラーとテーマの配線と、保存値の復元。返るのは持ち手
+#export_name("mmmTheme")
+pub fn mmm_theme(
+  logo : @dom.Element,
+  set_editor_theme : (Bool) -> Unit,
+) -> @core.Any {
+  @core.any(@app.Theme::new(logo, set_editor_theme))
+}
+
+///|
+fn theme_of(handle : @core.Any) -> @app.Theme {
+  handle.cast()
+}
+
+///|
+#export_name("mmmThemeToggle")
+pub fn mmm_theme_toggle(theme : @core.Any) -> Unit {
+  theme_of(theme).toggle()
+}
+
+///|
+#export_name("mmmThemeIsLight")
+pub fn mmm_theme_is_light(theme : @core.Any) -> Bool {
+  theme_of(theme).is_light()
+}
+
+///|
+#export_name("mmmThemePickColor")
+pub fn mmm_theme_pick_color(theme : @core.Any) -> Unit {
+  theme_of(theme).pick_color()
+}
+
+///|
+/// 未保存かどうかが変わった。タブの印を描き直す
+#export_name("mmmThemeSetDirty")
+pub fn mmm_theme_set_dirty(theme : @core.Any, dirty : Bool) -> Unit {
+  theme_of(theme).set_dirty(dirty)
+}
+
+///|
+/// ts の並び（字か `{ value, check? }`）を Part に
+fn parts_of(v : @core.Any) -> Array[@app.Part] {
+  @core.array_from(v).map(x => {
+    if @core.typeof_(x) == "string" {
+      @app.Text(x.cast())
+    } else {
+      let check = x._get("check")
+      @app.Blank({
+        value: x._get("value").cast(),
+        check: if defined(check) {
+          Some(value => str_opt(check._invoke([@core.any(value)])))
+        } else {
+          None
+        },
+      })
+    }
+  })
+}
+
+///|
+/// ts のたずね（title / note? / ok / cancel? / parts? / preview?）を Ask に
+fn ask_of(v : @core.Any) -> @app.Ask {
+  let parts = v._get("parts")
+  @app.ask_of(
+    v._get("title").cast(),
+    v._get("ok").cast(),
+    note=str_opt(v._get("note")),
+    cancel=str_opt(v._get("cancel")),
+    parts=if defined(parts) { parts_of(parts) } else { [] },
+    preview=str_opt(v._get("preview")),
+  )
+}
+
+///|
+/// 名前で引くたずね。args は名前ごと（connect / rename は字、imageName は { shape, shot }）
+fn named_ask(kind : String, args : @core.Any) -> @app.Ask {
+  match kind {
+    "discard" => @app.discard()
+    "place" => @app.place()
+    "connect" => @app.connect(args.cast())
+    "rename" => @app.rename(args.cast())
+    "imageName" =>
+      @app.image_name(parts_of(args._get("shape")), args._get("shot").cast())
+    _ => abort("知らないたずね: " + kind)
+  }
+}
+
+///|
+/// 欄の値の並び（断りは null）を続きに
+fn answer(k : (@core.Any) -> Unit) -> (Array[String]?) -> Unit {
+  out => {
+    k(
+      match out {
+        Some(values) => @core.any(values)
+        None => @core.null()
+      },
+    )
+  }
+}
+
+///|
+/// たずねる。続きには欄の値の並び（断られたら null）
+#export_name("mmmAsk")
+pub fn mmm_ask(a : @core.Any, k : (@core.Any) -> Unit) -> Unit {
+  @app.ask(@dom.document(), ask_of(a), answer(k))
+}
+
+///|
+/// 名前で引くたずね
+#export_name("mmmAskNamed")
+pub fn mmm_ask_named(
+  kind : String,
+  args : @core.Any,
+  k : (@core.Any) -> Unit,
+) -> Unit {
+  @app.ask(@dom.document(), named_ask(kind, args), answer(k))
+}
+
+///|
+/// たずねの中身（form）だけ（並べて見るため）
+#export_name("mmmAskForm")
+pub fn mmm_ask_form(kind : String, args : @core.Any) -> @dom.Element {
+  @app.ask_form(@dom.document(), named_ask(kind, args), () => ()).0
+}

@@ -10,12 +10,10 @@
 // 計算できたとき（`resolve`）と、人が箱で確定したときだけ。書き込みそのものは
 // md への操作なので `deps.declare` に渡す（main.ts）。
 
-import { type Field, type Part, ask } from "./ask.ts";
-import { ASKS } from "./asks.ts";
 import { handles } from "./handles.ts";
 import { io } from "./io.ts";
 import * as core from "../coreApi.ts";
-import type { Failed } from "../coreApi.ts";
+import { type Failed, type Field, type Part, ask } from "../coreApi.ts";
 
 export interface Assets {
   imageUrl(path: string): string | null;
@@ -510,7 +508,7 @@ export function initAssets(deps: {
       const shape: Part[] = ["![](", folder ?? declaredPath(), name, ".webp)"];
       let out: string[] | null;
       try {
-        out = await ask(ASKS.imageName(shape, shot));
+        out = await core.asks.imageName(shape, shot);
       } finally {
         URL.revokeObjectURL(shot);
       }

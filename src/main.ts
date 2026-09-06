@@ -18,15 +18,9 @@ import { handles } from "./app/handles.ts";
 import { io, type Doc } from "./app/io.ts";
 import { initAssets } from "./app/assets.ts";
 import { initExport } from "./app/export.ts";
-import { initPanes } from "./app/panes.ts";
-import { initTheme } from "./app/theme.ts";
-import { LS_GRAB, load, store, sweep } from "./app/persist.ts";
-import { ask } from "./app/ask.ts";
-import { ASKS } from "./app/asks.ts";
 import { NOTHING_TO_RENAME, NO_FILE_ACCESS, NO_RENAME_HERE, filesMenu } from "./app/files.ts";
 import { moreMenu } from "./app/more.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
-import { initShortcuts } from "./app/shortcuts.ts";
 import { initDrop } from "./app/dnd.ts";
 import { showDrawing } from "./app/draw.ts";
 import { onLanguageReady } from "./map/highlight.ts";
@@ -220,7 +214,7 @@ mapPane.addEventListener("focusin", () => {
 function updateDirty(): void {
   const dirty = text() !== savedText;
   elDirty.hidden = !dirty;
-  theme.setDirty(dirty);
+  core.themeSetDirty(theme, dirty);
 }
 
 /** いまの文書の名前。保存済みならそのファイル名、まだなら本文から導く */
@@ -285,7 +279,7 @@ async function offerConnect(): Promise<void> {
   if (await assets.connected()) return;
   if (gen !== docGen) return;
   const where = declaredFolder() ?? "./";
-  const go = await ask(ASKS.connect(where));
+  const go = await core.asks.connect(where);
   // 箱を読んでいるあいだに移っていることもある。**繋ぐ直前にもう一度見る**
   if (go !== null && gen === docGen) await assets.connect();
 }
@@ -309,7 +303,7 @@ async function openFile(): Promise<void> {
 /** いま開いているファイル**そのもの**の名前を変える。本文の見出しから導く名前とは別の話 */
 async function renameFile(): Promise<void> {
   if (savedName === null) return;
-  const typed = (await ask(ASKS.rename(savedName)))?.[0];
+  const typed = (await core.asks.rename(savedName))?.[0];
   if (typed === undefined) return;
   const name = typed.trim();
   if (name === "" || name === savedName) return;
@@ -402,7 +396,7 @@ async function copyLink(): Promise<boolean> {
 
 async function confirmDiscard(): Promise<boolean> {
   if (text() === savedText) return true;
-  return (await ask(ASKS.discard)) !== null;
+  return (await core.asks.discard()) !== null;
 }
 
 // ---------- 画像（ローカルファースト） ----------
@@ -438,7 +432,7 @@ const assets = initAssets({
  */
 async function ensurePlace(): Promise<boolean> {
   if (savedName !== null) return true;
-  if ((await ask(ASKS.place)) === null) return false;
+  if ((await core.asks.place()) === null) return false;
   await saveFile(true);
   return savedName !== null;
 }
@@ -593,22 +587,22 @@ openOnClick(elFiles, () =>
 );
 
 // 掴みやすさ。見た目の好みと同じく localStorage に持つ（"on" 以外は既定の見た目どおり）
-let grab = load(LS_GRAB) === "on";
+let grab = core.load("grab") === "on";
 const setGrab = (on: boolean): void => {
   grab = on;
   map.setGrab(on);
-  store(LS_GRAB, on ? "on" : "off");
+  core.store("grab", on ? "on" : "off");
 };
 map.setGrab(grab);
 
 openOnClick(elMore, () =>
   moreMenu(
-    { light: theme.isLight(), grab, linkNote: linkNote() },
+    { light: core.themeIsLight(theme), grab, linkNote: linkNote() },
     {
       undo: () => editor.undo(),
       redo: () => editor.redo(),
-      pickColor: () => theme.pickColor(),
-      toggleTheme: () => theme.toggle(),
+      pickColor: () => core.themePickColor(theme),
+      toggleTheme: () => core.themeToggle(theme),
       toggleGrab: () => setGrab(!grab),
       copyLink,
       open: openExternal,
@@ -648,7 +642,7 @@ function openKnown(file: FileSystemFileHandle): void {
 
 // **名前を押したら、名前を変える。** 押せなさは `renameFile` 自身が持つ
 elFilename.addEventListener("click", () => void renameFile());
-// <span role="button"> なので Enter / Space を自分で出す（app/theme.ts のロゴと同じ）
+// <span role="button"> なので Enter / Space を自分で出す（core/app/theme.mbt のロゴと同じ）
 elFilename.addEventListener("keydown", (e) => {
   if (e.key !== "Enter" && e.key !== " ") return;
   e.preventDefault();
@@ -675,9 +669,9 @@ initDrop({
   },
 });
 
-// ---------- ペイン / 書き出し / テーマ / キー（実装は app/ 配下） ----------
+// ---------- ペイン / 書き出し / テーマ / キー（実装は core/app と app/export.ts） ----------
 
-const { togglePane, togglePaneVis } = initPanes({
+const panes = core.panes({
   mdPane,
   mapPane,
   panesEl: el("panes", HTMLElement),
@@ -695,14 +689,14 @@ const exportApi = initExport({
   wayButton: el("export-way", HTMLButtonElement),
 });
 
-const theme = initTheme({ logo: elLogo, setEditorTheme: (dark) => editor.setTheme(dark) });
+const theme = core.theme(elLogo, (dark) => editor.setTheme(dark));
 
-initShortcuts({
+core.shortcuts({
   save: (asNew) => void saveFile(asNew),
   open: () => void openFile(),
   create: () => void newFile(),
-  togglePane,
-  togglePaneVis,
+  togglePane: () => core.togglePane(panes),
+  togglePaneVis: (which) => core.togglePaneVis(panes, which),
   undo: () => editor.undo(),
   redo: () => editor.redo(),
   export: (choose) => (choose ? exportApi.choose() : exportApi.run()),
@@ -713,7 +707,7 @@ initShortcuts({
 // 本文の控えは持たない。IndexedDB に置くのはハンドルだけで、
 // **起動時に勝手に開き直すことはしない** — 立ち上げたら常に空から始まる。
 {
-  sweep(); // 役目を終えた localStorage のキーを捨てる
+  core.sweep(); // 役目を終えた localStorage のキーを捨てる
   loadText("", null); // 空 = まだ何も無い。dirty も立たない
   void refreshRecent();
   const bootGen = docGen;

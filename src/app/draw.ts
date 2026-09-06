@@ -16,8 +16,7 @@
 // ピッカーは**主役にはしない**が、筆の丸をダブルクリックか右クリックすれば
 // 出て、その筆の色を差し替えられる — 並びは 2 本のまま、色だけ好きに。
 
-import { icon } from "../coreApi.ts";
-import { accent } from "./theme.ts";
+import { accent, icon } from "../coreApi.ts";
 
 /** 世界ではなくキャンバスの中の座標（CSS ピクセル） */
 interface Pt {
