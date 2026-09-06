@@ -158,10 +158,14 @@ fn ops_for(all : Array[Int]) -> Array[@op.Op] {
       ops.push(AddNode(at=After(node=to), labels=["n"]))
       ops.push(AddBlock(at=In(node=to), content=ThematicBreak))
       ops.push(Graft(at=In(node=to, side=None), md="# g\n\n- i\n"))
+      ops.push(Graft(at=In(node=to, side=None), md="- i\n  - j\n"))
+      ops.push(Graft(at=After(node=to), md="![](q.png)\n\ntext\n"))
     }
   }
   ops.push(AddNode(at=In(node=@tree.doc_id, side=None), labels=["n"]))
   ops.push(AddBlock(at=In(node=@tree.doc_id), content=ThematicBreak))
+  ops.push(Graft(at=In(node=@tree.doc_id, side=None), md="- i\n"))
+  ops.push(Graft(at=In(node=@tree.doc_id, side=None), md="text\n"))
   ops
 }
 
@@ -202,7 +206,7 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
   }
   json_inspect(bad, content=[])
   // 全部 None に潰れる退化を落とすための下限チェック
-  inspect(some, content="1050")
+  inspect(some, content="1480")
 }
 
 ///|
@@ -423,7 +427,7 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   }
   json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
-  inspect(n, content="1007")
+  inspect(n, content="1438")
 }
 
 ///|

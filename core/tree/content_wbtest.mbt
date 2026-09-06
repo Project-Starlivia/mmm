@@ -784,3 +784,16 @@ test "素の URL とオートリンク" {
     ],
   )
 }
+
+///|
+/// 貼り付けは一番外の段落だけを行ごとにノードにする。段落かどうかは mdAst が言う。
+test "lines — 段落なら行の列、それ以外の中身は None" {
+  assert_eq(lines("a\nb\n"), Some(["a", "b"]))
+  assert_eq(lines("  a  \r\n\r\n"), Some(["a"]))
+  assert_eq(lines("**a** and [b](c)\n"), Some(["**a** and [b](c)"]))
+  assert_eq(lines("| a | b |\n|---|---|\n| 1 | 2 |\n"), None)
+  assert_eq(lines("> q\n"), None)
+  assert_eq(lines("<div>x</div>\n"), None)
+  assert_eq(lines("```\nx\n```\n"), None)
+  assert_eq(lines(""), None)
+}

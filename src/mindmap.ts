@@ -337,8 +337,8 @@ export class Mindmap {
 
   /**
    * クリップボードの URL をリンクカードにして足し、題（`[]` の中）を打つ。
-   * URL として読めなければ `failed`（core にも聞かない — 貼り付けの判定
-   * （app/paste.ts は骨格の有無を core に読ませるが、ここは「URL か否か」だけの単純な形）
+   * URL として読めなければ `failed`（core にも聞かない — Mod+V は raw を core に
+   * 読ませるが、ここは「URL か否か」だけを見て、違えば言う）
    */
   private async addLink(id: number): Promise<void> {
     let url = "";

@@ -66,3 +66,46 @@ test "Op は JSON から起こせる — 席の side の None は鍵ごと落ち
     ),
   )
 }
+
+///|
+/// 貼り付けは Graft そのもの（TS は raw を送るだけ）。断片が持ち込むのは形で、綴りは席。
+/// 見本は docs/superpowers/specs/2026-09-06-paste-design.md の例
+test "Graft — 貼り付けの見本" {
+  // 項目を、子が見出しの見出しへ → 見出し
+  assert_eq(
+    applied("# r\n\n## a\n", Graft(at=In(node=2, side=None), md="- b\n")),
+    ("# r\n\n## a\n\n## b\n", Some(4)),
+  )
+  // 見出し + 項目を、子が項目の見出しへ → 項目
+  assert_eq(
+    applied("# r\n\n- a\n", Graft(at=In(node=2, side=None), md="## b\n\n- c\n")),
+    ("# r\n\n- a\n- b\n  - c\n", Some(4)),
+  )
+  // カード 1 枚は中身
+  assert_eq(
+    applied("# r\n", Graft(at=In(node=2, side=None), md="![](q.png)\n")),
+    ("# r\n\n![](q.png)\n", Some(3)),
+  )
+  // 文書へ中身は断る
+  assert_eq(
+    edit("# r\n", Graft(at=In(node=@tree.doc_id, side=None), md="![](q.png)\n")),
+    { edits: [], focus: None },
+  )
+  // 途中の飛びを 6 段目へ — 飛びは空の項目 `- - - b`
+  let six = "# 1\n\n## 2\n\n### 3\n\n#### 4\n\n##### 5\n\n###### t\n"
+  assert_eq(
+    applied(six, Graft(at=In(node=7, side=None), md="# a\n\n#### b\n")),
+    (six + "\n- a\n\n  - - - b\n", Some(8)),
+  )
+}
+
+///|
+test "MoveNode — 項目を子が見出しの見出しへ動かせば見出しになる" {
+  assert_eq(
+    applied(
+      "# r\n\n## a\n\n# s\n\n- b\n",
+      MoveNode(ids=[5], at=In(node=2, side=None)),
+    ),
+    ("# r\n\n## a\n\n## b\n\n# s\n", Some(4)),
+  )
+}

@@ -107,6 +107,23 @@ fn bare(text : String) -> Content? {
 }
 
 ///|
+/// 原文のまま持つ中身（Opaque）が段落 1 つなら、その行の列（前後の空白と `\r` を
+/// 除き、空の行は落とす）。表・引用・HTML など段落でなければ None。
+/// 貼るとき、一番外の段落だけを「行ごとにノード」にするための問い —
+/// 段落かどうかは mdAst しか知らないので、ここで読み直す（unbuild の splice と同じ手）。
+pub fn lines(text : String) -> Array[String]? {
+  let blocks = read(text).children.filter(b => !(b is BlankLines(..)))
+  guard blocks is [Paragraph(..)] else { return None }
+  Some(
+    text
+    .split("\n")
+    .map(l => l.trim(chars=" \t\r").to_owned())
+    .filter(l => !l.is_empty())
+    .collect(),
+  )
+}
+
+///|
 /// インラインの列が原文で占めている範囲。span は中身に対する相対なので、
 /// 段落の開始位置を足して絶対に直す。
 fn inline_text(

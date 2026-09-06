@@ -32,7 +32,6 @@ import { blocked, failed } from "./app/notice.ts";
 import { fromHash, hasImages, LINK_WARN_LENGTH, toHash } from "./app/share.ts";
 import { initShortcuts } from "./app/shortcuts.ts";
 import { copyText } from "./app/copy.ts";
-import { decidePaste } from "./app/paste.ts";
 import { initDrop } from "./app/dnd.ts";
 import { showDrawing } from "./app/draw.ts";
 import { onLanguageReady } from "./map/highlight.ts";
@@ -509,8 +508,10 @@ async function copy(): Promise<boolean> {
 
 /**
  * クリップボードを貼る（Mod+V）。画像はテキストより優先し、選んでいる
- * ノード（anchor）へ足す。字は `decidePaste` の判定で振り分ける — 骨格
- * （見出し・項目）があるかは core に読ませ、TS では `#` を見ない。
+ * ノード（anchor）へ足す。字は raw のまま `Graft` へ — 何を貼るか（見出し・項目は
+ * 形だけ運んで綴りは貼り先に従う、段落は行ごとに子、それ以外の中身はカード）は
+ * core が読んで決める。TS は `#` も URL も見ない。
+ * 決めは docs/superpowers/specs/2026-09-06-paste-design.md
  */
 function paste(): void {
   const anchor = selection().anchor;
@@ -545,28 +546,9 @@ function paste(): void {
     }
     const clip = await navigator.clipboard.readText();
     if (gen !== docGen) return;
-    const hasSkeleton = (md: string): boolean => core.survey(md).view.roots.length > 0;
-    const action = decidePaste(clip, hasSkeleton);
-    switch (action.kind) {
-      case "noop":
-        return;
-      case "link":
-        if (anchor === null) {
-          failed("Select a node to paste a link into");
-          return;
-        }
-        apply(
-          { kind: "addBlock", at: { kind: "in", node: anchor }, content: { kind: "link", text: "", href: action.url, title: "" } },
-          false,
-        );
-        return;
-      case "labels":
-        apply({ kind: "addNode", at: { kind: "in", node: anchor ?? core.DOC_ID, side: null }, labels: action.labels }, false);
-        return;
-      case "md":
-        apply({ kind: "graft", at: { kind: "in", node: anchor ?? core.DOC_ID, side: null }, md: action.md }, false);
-        return;
-    }
+    // 空はしくじりではなく「何も無い」なので黙る
+    if (clip.trim() === "") return;
+    apply({ kind: "graft", at: { kind: "in", node: anchor ?? core.DOC_ID, side: null }, md: clip }, false);
   })().catch((error: unknown) => {
     console.error("paste failed:", error);
     failed("Couldn't paste");

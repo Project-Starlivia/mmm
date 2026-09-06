@@ -483,32 +483,54 @@ test "MoveNode で根の間へ行けば新しい根、根を子にすれば側�
 }
 
 ///|
-test "MoveNode は綴りを保つ。項目は見出しの下に置け、見出しは項目の下に置けない" {
+test "MoveNode は形だけ運び、綴りは席が決める" {
   // 見出しの直後の項目は境界（側の変わり目）が無いと飲み込まれる
   let d = doc([
     root(h(2, "r", children=[h(3, "a"), item(4, "b")]), sides=[Right, Left]),
   ])
+  // 子の無い見出しの下へ項目 — 親に従って見出し
   assert_eq(
     run(d, MoveNode(ids=[4], at=NodePlace::In(node=3, side=None))),
     Some({
       doc: doc([
-        root(h(2, "r", children=[h(3, "a", children=[item(4, "b")])]), sides=[
+        root(h(2, "r", children=[h(3, "a", children=[h(4, "b")])]), sides=[
           Right,
         ]),
       ]),
       focus: Some(4),
     }),
   )
+  // 項目の下へ見出し — 項目
   assert_eq(
     run(d, MoveNode(ids=[3], at=NodePlace::In(node=4, side=None))),
-    None,
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[item(4, "b", children=[li(3, "a")])]), sides=[
+          Left,
+        ]),
+      ]),
+      focus: Some(3),
+    }),
   )
-  // 見出しは項目の後ろに置ける（項目の枠は見出しの親になれず、落ちる）。側は隣のもの
+  // 見出しの後ろへ項目 — 隣に従って見出し（今まで Swallowed で断られていた席）
+  assert_eq(
+    run(d, MoveNode(ids=[4], at=NodePlace::After(node=3))),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(3, "a"), h(4, "b")]), sides=[Right, Right]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  // 項目の後ろへ見出し — 隣に従って項目。側は隣のもの
   assert_eq(
     run(d, MoveNode(ids=[3], at=NodePlace::After(node=4))),
     Some({
       doc: doc([
-        root(h(2, "r", children=[item(4, "b"), h(3, "a")]), sides=[Left, Left]),
+        root(h(2, "r", children=[item(4, "b"), item(3, "a")]), sides=[
+          Left,
+          Left,
+        ]),
       ]),
       focus: Some(3),
     }),
@@ -607,21 +629,33 @@ test "Implicit の唯一の子を、その Implicit の隣へ動かせる" {
 
 ///|
 test "Implicit は項目を子に持てば綴られる" {
-  let d = doc([
-    root(h(2, "r", children=[gap(3, [h(4, "x", children=[item(5, "i")])])]), sides=[
-      Right,
-    ]),
-  ])
+  // 見出しの列に来た項目は見出しになる（隣に従う）ので、項目が Implicit の子に
+  // なるのは天井だけ — 6 段目の隣へ飛びを動かすと、子は 7 段目で項目になる（cap）。
+  // 項目は飛びを綴れないので、Implicit が綴られる
+  let d = six([])
+  let g = root(gap(8, [h(9, "z")]), sides=[Right])
+  let f : @tree.Doc = { ..d, roots: [..d.roots, g] }
   assert_eq(
-    run(d, MoveNode(ids=[5], at=Before(node=4))),
+    run(f, MoveNode(ids=[8], at=NodePlace::After(node=7))),
     Some({
       doc: doc([
         root(
-          h(2, "r", children=[h(3, "", children=[item(5, "i"), h(4, "x")])]),
+          h(2, "a", children=[
+            h(3, "b", children=[
+              h(4, "c", children=[
+                h(5, "d", children=[
+                  h(6, "e", children=[
+                    h(7, "f"),
+                    h(8, "", children=[item(9, "z")]),
+                  ]),
+                ]),
+              ]),
+            ]),
+          ]),
           sides=[Right],
         ),
       ]),
-      focus: Some(5),
+      focus: Some(8),
     }),
   )
 }
@@ -954,8 +988,56 @@ test "Graft は断片の先頭の Implicit を剥がして差す。途中の飛�
 }
 
 ///|
-test "Graft は根の間にも差せる。先頭の散文は行き先の親の body 末尾へ" {
+/// 断片の一番外の段落は行ごとにノード、それ以外の中身は行き先の親の body の末尾。
+/// 文書（anchor 無し）へ中身は断る — 文書の散文はマップに出ない。
+test "Graft の一番外 — 段落は行ごとにノード、中身は親の body、文書へ中身は None" {
   let d = doc([root(h(2, "r", body=[pic(3)]))])
+  // 根の隣に段落 2 行 → 最後の根に従って見出しの根 2 つ
+  assert_eq(
+    run(d, Graft(at=NodePlace::After(node=2), md="text\nmore\n")),
+    Some({
+      doc: doc([
+        root(h(2, "r", body=[pic(3)])),
+        root(h(4, "text")),
+        root(h(5, "more")),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  // 中身 1 枚は親の body の末尾。focus はその中身
+  assert_eq(
+    run(d, Graft(at=NodePlace::In(node=2, side=None), md="![](q.png)\n")),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", body=[
+            pic(3),
+            { id: 4, content: Image(alt="", src="q.png", title="") },
+          ]),
+        ),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  // URL 1 行は読みがリンクと読むので中身（特別扱いは無い）
+  assert_eq(
+    run(d, Graft(at=NodePlace::In(node=2, side=None), md="https://x\n")),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", body=[
+            pic(3),
+            {
+              id: 4,
+              content: Link(text="https://x", href="https://x", title=""),
+            },
+          ]),
+        ),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  // 文書へ中身は断る
   assert_eq(
     run(
       d,
@@ -964,35 +1046,104 @@ test "Graft は根の間にも差せる。先頭の散文は行き先の親の b
         md="![](q.png)\n\n# s\n",
       ),
     ),
-    Some({
-      doc: doc([root(h(2, "r", body=[pic(3)])), root(h(5, "s"))], body=[
-        { id: 4, content: Image(alt="", src="q.png", title="") },
-      ]),
-      focus: Some(5),
-    }),
+    None,
   )
+  // 混ざった断片 — 一番外の段落はノード、見出しの下の中身はその見出しのまま
   assert_eq(
-    run(d, Graft(at=NodePlace::After(node=2), md="text\n")),
+    run(
+      d,
+      Graft(
+        at=NodePlace::In(node=2, side=None),
+        md="intro\n\n# a\n\n![](p.png)\n\n- b\n",
+      ),
+    ),
     Some({
-      doc: doc([root(h(2, "r", body=[pic(3)]))], body=[
-        { id: 4, content: Opaque("text") },
+      doc: doc([
+        root(
+          h(2, "r", body=[pic(3)], children=[
+            h(4, "intro"),
+            h(6, "a", body=[pic(7)], children=[h(8, "b")]),
+          ]),
+          sides=[Right, Right],
+        ),
       ]),
-      focus: None,
+      focus: Some(4),
     }),
   )
 }
 
 ///|
-test "Graft は空・知らない id・項目の下に見出し、に None" {
+/// 断片が持ち込むのは形だけ。綴りは席が決める（`sign_at`）。
+test "Graft は席の綴りで差す — 見出しの列では見出し、項目の列では項目" {
+  // 子が見出しの見出しへ項目 — 見出しの直後の項目は飲み込まれるので、綴り替えないと書けない
+  let d = doc([root(h(2, "r", children=[h(3, "a")]), sides=[Right])])
+  assert_eq(
+    run(d, Graft(at=NodePlace::In(node=2, side=None), md="- b\n  - c\n")),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(3, "a"), h(4, "b", children=[h(5, "c")])]), sides=[
+          Right,
+          Right,
+        ]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  // 子が項目の見出しへ見出し（`##` 始まりの飛びは剥がす。Implicit の id 1 つが飛ぶ）
+  let e = doc([root(h(2, "r", children=[item(3, "a")]), sides=[Right])])
+  assert_eq(
+    run(e, Graft(at=NodePlace::In(node=2, side=None), md="## b\n\n- c\n")),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[item(3, "a"), item(5, "b", children=[li(6, "c")])]),
+          sides=[Right, Right],
+        ),
+      ]),
+      focus: Some(5),
+    }),
+  )
+  // 子の無い見出しへ項目 — 隣がいないので親に従い見出し（Tab と同じ答え）
+  let f = doc([root(h(2, "r"))])
+  assert_eq(
+    run(f, Graft(at=NodePlace::In(node=2, side=None), md="- b\n")),
+    Some({
+      doc: doc([root(h(2, "r", children=[h(3, "b")]), sides=[Right])]),
+      focus: Some(3),
+    }),
+  )
+  // 根が見出しの文書へ項目 — 最後の根に従って見出しの根
+  assert_eq(
+    run(f, Graft(at=NodePlace::In(node=@tree.doc_id, side=None), md="- b\n")),
+    Some({ doc: doc([root(h(2, "r")), root(h(3, "b"))]), focus: Some(3) }),
+  )
+}
+
+///|
+test "Graft は空・知らない id に None。項目の下の見出しは項目になる" {
   let d = doc([root(h(2, "r", children=[item(3, "a")]), sides=[Right])])
   assert_eq(run(d, Graft(at=NodePlace::In(node=2, side=None), md="")), None)
+  assert_eq(
+    run(d, Graft(at=NodePlace::In(node=2, side=None), md="  \n\n")),
+    None,
+  )
   assert_eq(
     run(d, Graft(at=NodePlace::In(node=9, side=None), md="# p\n")),
     None,
   )
   assert_eq(
-    run(d, Graft(at=NodePlace::In(node=3, side=None), md="# p\n")),
-    None,
+    run(d, Graft(at=NodePlace::In(node=3, side=None), md="# p\n\n## q\n")),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            item(3, "a", children=[li(4, "p", children=[li(5, "q")])]),
+          ]),
+          sides=[Right],
+        ),
+      ]),
+      focus: Some(4),
+    }),
   )
 }
 
@@ -1023,7 +1174,7 @@ test "AddNode は 6 段目の下なら項目で足す" {
 }
 
 ///|
-test "Graft は 6 段目の下なら部分木ごと項目にする。途中の飛びは畳む" {
+test "Graft は 6 段目の下なら部分木ごと項目にする。途中の飛びは空の項目" {
   assert_eq(
     run(
       six([]),
@@ -1034,18 +1185,21 @@ test "Graft は 6 段目の下なら部分木ごと項目にする。途中の�
       focus: Some(8),
     }),
   )
-  // `#` → `###` の飛びは Implicit だが、項目は飛びを綴れないので消える
+  // `#` → `###` の飛びは Implicit。項目は行を省けないので、空の項目として綴る（形は保つ）
   assert_eq(
     run(
       six([]),
       Graft(at=NodePlace::In(node=7, side=None), md="# p\n\n### q\n"),
     ),
-    Some({ doc: six([item(8, "p", children=[li(10, "q")])]), focus: Some(8) }),
+    Some({
+      doc: six([item(8, "p", children=[li(9, "", children=[li(10, "q")])])]),
+      focus: Some(8),
+    }),
   )
 }
 
 ///|
-test "MoveNode は 6 段目の下へ落とせば見出しを項目にする。Implicit は消え、focus も消える" {
+test "MoveNode は 6 段目の下へ落とせば見出しを項目にする。Implicit は空の項目になり、focus は残る" {
   let d = six([])
   let x = root(h(8, "x", body=[pic(9)], children=[h(10, "y")]), sides=[Right])
   let e : @tree.Doc = { ..d, roots: [..d.roots, x] }
@@ -1060,7 +1214,7 @@ test "MoveNode は 6 段目の下へ落とせば見出しを項目にする。Im
   let f : @tree.Doc = { ..d, roots: [..d.roots, g] }
   assert_eq(
     run(f, MoveNode(ids=[8], at=NodePlace::In(node=7, side=None))),
-    Some({ doc: six([item(9, "z")]), focus: None }),
+    Some({ doc: six([item(8, "", children=[li(9, "z")])]), focus: Some(8) }),
   )
 }
 
@@ -1124,6 +1278,8 @@ test "apply の結果は check を通る" {
       ops.push(AddNode(at=NodePlace::After(node=to), labels=["n"]))
       ops.push(AddBlock(at=BlockPlace::In(node=to), content=ThematicBreak))
       ops.push(Graft(at=NodePlace::In(node=to, side=None), md="# g\n\n- i\n"))
+      ops.push(Graft(at=NodePlace::In(node=to, side=None), md="- i\n  - j\n"))
+      ops.push(Graft(at=NodePlace::After(node=to), md="![](q.png)\n\ntext\n"))
     }
   }
   let bad = []
@@ -1141,6 +1297,6 @@ test "apply の結果は check を通る" {
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="308")
+  inspect(some, content="512")
   json_inspect(bad, content=[])
 }

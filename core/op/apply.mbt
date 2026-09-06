@@ -16,36 +16,69 @@ pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
 }
 
 ///|
+/// 部分木をその綴りで書き直す。形（ラベル・中身・子・畳み・飛び）は保ち、綴りだけ替える。
+/// 項目にするとき、飛び（Implicit）は行を省けないので空の項目として綴る（`- - b`）。
+/// 見出しにするとき、Implicit はそのまま — 省いたままで読めない席かは check と mend が見る。
+/// 決めは docs/superpowers/specs/2026-09-06-paste-design.md
+fn respell(n : @tree.Node, sign : @tree.Sign) -> @tree.Node {
+  match sign {
+    Item => @tree.ListNode(as_item(n))
+    Heading =>
+      match n {
+        HeadingNode(h) =>
+          @tree.HeadingNode({
+            ..h,
+            children: h.children.map(c => respell(c, Heading)),
+          })
+        ImplicitNode(g) =>
+          @tree.ImplicitNode({
+            ..g,
+            children: g.children.map(c => respell(c, Heading)),
+          })
+        ListNode(l) =>
+          @tree.HeadingNode({
+            id: l.id,
+            label: l.label,
+            fold: l.fold,
+            body: l.body,
+            children: l.children.map(c => respell(@tree.ListNode(c), Heading)),
+          })
+      }
+  }
+}
+
+///|
+/// 部分木を項目で書く。型が「項目の子孫は項目」なので、下は全部項目になる。
+fn as_item(n : @tree.Node) -> @tree.ListNode {
+  match n {
+    ListNode(l) => l
+    HeadingNode(h) =>
+      {
+        id: h.id,
+        label: h.label,
+        fold: h.fold,
+        body: h.body,
+        children: h.children.map(as_item),
+      }
+    ImplicitNode(g) =>
+      {
+        id: g.id,
+        label: "",
+        fold: None,
+        body: [],
+        children: g.children.map(as_item),
+      }
+  }
+}
+
+///|
 /// 見出しの天井。`@tree.deepest` より深くに着いた見出しは部分木ごと項目に
 /// 綴り替える — 手で書くときも `######` の下は `- ` でしか続けられない。
-/// 天井より深い Implicit は、項目が飛びを綴れないので消え、子が繰り上がる
-/// （focus なら消える）。天井の Implicit は行を省いた空の見出しなので残す
+/// 天井より深い Implicit は空の項目として綴る（飛びは形なので運ぶ。`- - b`）。
+/// 天井の Implicit は行を省いた空の見出しなので残す
 /// （子が項目になれば `GappedItem` — 綴れば読める）。上の段には触らないので、
 /// parse の出力には何もしない。
 fn cap(doc : @tree.Doc) -> @tree.Doc {
-  fn items(n : @tree.Node, out : Array[@tree.ListNode]) -> Unit {
-    match n {
-      ListNode(l) => out.push(l)
-      HeadingNode(h) => {
-        let children = []
-        for c in h.children {
-          items(c, children)
-        }
-        out.push({
-          id: h.id,
-          label: h.label,
-          fold: h.fold,
-          body: h.body,
-          children,
-        })
-      }
-      ImplicitNode(g) =>
-        for c in g.children {
-          items(c, out)
-        }
-    }
-  }
-
   fn node(n : @tree.Node, depth : Int, out : Array[@tree.Node]) -> Unit {
     fn under(xs : Array[@tree.Node]) -> Array[@tree.Node] {
       let children = []
@@ -61,13 +94,7 @@ fn cap(doc : @tree.Doc) -> @tree.Doc {
       ImplicitNode(g) if depth <= @tree.deepest =>
         out.push(@tree.ImplicitNode({ ..g, children: under(g.children) }))
       ListNode(_) => out.push(n)
-      _ => {
-        let ls = []
-        items(n, ls)
-        for l in ls {
-          out.push(@tree.ListNode(l))
-        }
-      }
+      _ => out.push(respell(n, Item))
     }
   }
 
@@ -314,6 +341,28 @@ fn sign_in(n : @tree.Node) -> @tree.Sign {
 }
 
 ///|
+/// 席の綴り。新しく差すもの・運ぶものはこれに従う（「綴りは席が決める」）。
+/// Before / After は隣の綴り、In は末尾の子の綴り、子が無ければ親（項目なら項目、
+/// それ以外は見出し）、In(doc_id) は最後の根（無ければ見出し）。席が無ければ None。
+fn sign_at(doc : @tree.Doc, at : NodePlace) -> @tree.Sign? {
+  match at {
+    Before(node~) => find(doc, node).map(sign_of)
+    After(node~) => find(doc, node).map(sign_of)
+    In(node~, ..) =>
+      if node == @tree.doc_id {
+        Some(
+          match doc.roots.last() {
+            Some(r) => sign_of(r.node)
+            None => @tree.Heading
+          },
+        )
+      } else {
+        find(doc, node).map(sign_in)
+      }
+  }
+}
+
+///|
 /// 席が指している id。
 fn anchor(at : NodePlace) -> Int {
   match at {
@@ -324,35 +373,13 @@ fn anchor(at : NodePlace) -> Int {
 }
 
 ///|
-/// 新しいノードを差す。綴りは隣に従う。根の隣（`In(doc_id)`）は最後の根に従う。
+/// 新しいノードを差す。綴りは席が決める（`sign_at`）。
 fn add_node(doc : @tree.Doc, at : NodePlace, labels : Array[String]) -> Done? {
   guard !labels.is_empty() else { return None }
+  guard sign_at(doc, at) is Some(sign) else { return None }
   let first = fresh(doc)
-  fn news(sign : @tree.Sign) -> Array[@tree.Node] {
-    labels.mapi((k, label) => make(sign, first + k, label))
-  }
-
-  let sign = match at {
-    Before(node~) => {
-      guard find(doc, node) is Some(n) else { return None }
-      sign_of(n)
-    }
-    After(node~) => {
-      guard find(doc, node) is Some(n) else { return None }
-      sign_of(n)
-    }
-    In(node~, ..) =>
-      if node == @tree.doc_id {
-        match doc.roots.last() {
-          Some(r) => sign_of(r.node)
-          None => @tree.Heading
-        }
-      } else {
-        guard find(doc, node) is Some(n) else { return None }
-        sign_in(n)
-      }
-  }
-  done(place(doc, at, news(sign)), Some(first))
+  let news = labels.mapi((k, label) => make(sign, first + k, label))
+  done(place(doc, at, news), Some(first))
 }
 
 ///|
@@ -405,7 +432,7 @@ fn place(
 }
 
 ///|
-/// 動かす。文書順を保って抜き、席に差す。側は行き先が決め、綴りは保つ。
+/// 動かす。文書順を保って抜き、席に差す。側は行き先が決め、綴りも席が決める（`respell`）。
 fn move_node(doc : @tree.Doc, ids : Array[Int], at : NodePlace) -> Done? {
   guard !ids.is_empty() else { return None }
   for id in ids {
@@ -415,7 +442,8 @@ fn move_node(doc : @tree.Doc, ids : Array[Int], at : NodePlace) -> Done? {
   guard !within(doc, anchor(at), picked) else { return None }
   let taken = []
   guard take(doc, picked, taken) is Some(rest) else { return None }
-  done(place(rest, at, taken), Some(picked[0]))
+  guard sign_at(rest, at) is Some(sign) else { return None }
+  done(place(rest, at, taken.map(n => respell(n, sign))), Some(picked[0]))
 }
 
 ///|
@@ -606,18 +634,17 @@ fn shift(n : @tree.Node, by : Int) -> @tree.Node {
 }
 
 ///|
-/// md を読んで、根たちを席に差す。側は捨て、綴りは読んだまま。
-/// 先頭の散文は行き先の親の body 末尾へ（In なら node 自身、根の間なら doc の散文）。
+/// md を読んで形にし、席の綴りで差す。断片が持ち込むのは形（ラベル・中身・子・畳み・
+/// 飛び）だけで、`#` の本数・マーカー・字下げ・先頭の飛びは書き方なので捨てる。
+/// 一番外の段落は行ごとにノード、それ以外の中身は行き先の親の body 末尾へ
+/// （行き先が文書なら断る — 文書の散文はマップに出ない）。
 /// 断片が `##` から始まると parse は根を Implicit で包む（深さ 1 の飛び）。
 /// それは切り出した場所の名残でしかないので剥がし、相対の形で差す。
+/// 決めは docs/superpowers/specs/2026-09-06-paste-design.md
 fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   let sub = @tree.parse(md)
   guard !(sub.roots.is_empty() && sub.body.is_empty()) else { return None }
-  let by = fresh(doc) - (@tree.doc_id + 1)
-  let prose = sub.body.map(b => {
-    ({ id: b.id + by, content: b.content } : @tree.Block)
-  })
-  let subs = peel(sub.roots.map(r => r.node)).map(n => shift(n, by))
+  guard sign_at(doc, at) is Some(sign) else { return None }
   let host = match at {
     In(node~, ..) => node
     _ => {
@@ -625,17 +652,42 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
       p
     }
   }
+  // 一番外の中身を、行のノードになる段落と、body へ行く中身に分ける
+  let labels : Array[String] = []
+  let rest : Array[@tree.Block] = []
+  for b in sub.body {
+    let ls = match b.content {
+      Opaque(text) => @tree.lines(text)
+      _ => None
+    }
+    match ls {
+      Some(ls) => labels.append(ls)
+      None => rest.push(b)
+    }
+  }
+  // 行のノードは文書に無い番号から、断片の id はその先へ寄せる
+  let first = fresh(doc)
+  let by = first + labels.length() - (@tree.doc_id + 1)
+  let heads = labels.mapi((k, label) => make(sign, first + k, label))
+  let prose = rest.map(b => {
+    ({ id: b.id + by, content: b.content } : @tree.Block)
+  })
+  let subs = peel(sub.roots.map(r => r.node)).map(n => {
+    respell(shift(n, by), sign)
+  })
+  let nodes = [..heads, ..subs]
   let mut cur = doc
   if !prose.is_empty() {
+    guard host != @tree.doc_id else { return None }
     guard body(cur, node=host, bs => [..bs, ..prose]) is Some(d) else {
       return None
     }
     cur = d
   }
-  if subs.is_empty() {
-    return Some({ doc: cur, focus: None })
+  if nodes.is_empty() {
+    return Some({ doc: cur, focus: Some(prose[0].id) })
   }
-  done(place(cur, at, subs), Some(id_of(subs[0])))
+  done(place(cur, at, nodes), Some(id_of(nodes[0])))
 }
 
 ///|
