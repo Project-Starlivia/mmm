@@ -203,3 +203,14 @@ pub fn ask(doc : @dom.Document, a : Ask, k : (Array[String]?) -> Unit) -> Unit {
     None => ()
   }
 }
+
+///|
+/// たずねて待つ（async の中から）。断られたら None
+pub async fn asked(doc : @dom.Document, a : Ask) -> Array[String]? {
+  let v = @web.promise_of(k => ask(doc, a, out => k(@core.from_option(out)))).wait()
+  if @core.is_null(v) {
+    None
+  } else {
+    Some(v.cast())
+  }
+}

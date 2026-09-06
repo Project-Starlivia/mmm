@@ -585,6 +585,48 @@ export const handles = {
   forgetFolder: (file: FileSystemFileHandle): Promise<void> => done(mbt.mmmForgetFolder(file)),
 };
 
+// ---- 画像 ----
+//
+// Markdown からの相対パスで画像を読み書きする（core/file/assets.mbt）。宣言は md の頭が持ち、
+// 許可は札。ts が渡すのは、しらせ・描き直し・宣言の読み書きの 4 つ
+
+declare const assetsBrand: unique symbol;
+/** 画像の握り（持ち手） */
+export interface Assets {
+  readonly [assetsBrand]: never;
+}
+
+export const assets = (deps: {
+  /** 果たせなかった */
+  failed: (msg: Failed) => void;
+  /** 絵を引き直したので描き直す */
+  refresh: () => void;
+  /** いま頭が言っている宣言（正規化済み）。無ければ null */
+  declared: () => string | null;
+  /** 宣言を頭に書く（md への操作。本文の画像もそれに追従する） */
+  declare: (value: string) => void;
+}): Assets => Object(mbt.mmmAssets(deps));
+
+/** ローカル画像の objectURL。まだ読めていなければ null（引きに行く） */
+export const imageUrl = (a: Assets, path: string): string | null => mbt.mmmImageUrl(a, path) ?? null;
+/** 文書が入れ替わった。絵も握りも捨てる */
+export const assetsClear = (a: Assets): void => mbt.mmmAssetsClear(a);
+/** いま結び付いている画像フォルダの名前。未設定なら null */
+export const folderName = (a: Assets): string | null => mbt.mmmFolderName(a) ?? null;
+/** いま画像が読めているか。同期で答える */
+export const readable = (a: Assets): boolean => mbt.mmmReadable(a);
+/** このブラウザがフォルダを選べるか */
+export const canChooseFolder = (): boolean => mbt.mmmCanChooseFolder();
+/** 札を引き直し、許可まで見て、読める状態か */
+export const connected = (a: Assets): Promise<boolean> => Promise.resolve(mbt.mmmConnected(a)).then(Boolean);
+/** 繋ぎ直す。札があれば許可を聞くだけ、無ければ指してもらう */
+export const connect = (a: Assets): Promise<void> => done(mbt.mmmConnect(a));
+/** フォルダを指してもらう。記録が無ければ宣言を決め、食い違えば直すか聞く */
+export const chooseFolder = (a: Assets): Promise<void> => done(mbt.mmmChooseFolder(a));
+/** 画像を置き、md に書く相対パスを返す。取りやめ / 失敗は null */
+export const saveImage = (a: Assets, blob: Blob): Promise<string | null> =>
+  Promise.resolve(mbt.mmmSaveImage(a, blob)).then((v) => (v === null ? null : str(v)));
+
 // ---- 形を確かめながら整える ----
 
 const bad = (what: string): never => {

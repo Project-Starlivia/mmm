@@ -146,3 +146,106 @@ pub extern "js" fn idb_close(db : @core.Any) -> Unit =
 /// 今の時刻（ms）
 pub extern "js" fn now() -> Double =
   #| () => Date.now()
+
+///|
+pub fn DirHandle::name(self : DirHandle) -> String {
+  self.as_any()._get("name").cast()
+}
+
+///|
+/// このブラウザがフォルダを選べるか（触る道具では持たないことがある）
+pub extern "js" fn can_choose_folder() -> Bool =
+  #| () => typeof window !== "undefined" && typeof window.showDirectoryPicker === "function"
+
+///|
+/// フォルダを指してもらう。取り消しは null。`start` は開く場所の札
+pub extern "js" fn pick_directory(
+  start : @core.Any,
+  mode : String,
+) -> @js_async.Promise[@core.Any] =
+  #| (startIn, mode) => window.showDirectoryPicker({ startIn, mode })
+  #|   .catch((e) => (e && e.name === "AbortError" ? null : Promise.reject(e)))
+
+///|
+pub extern "js" fn get_dir(
+  d : DirHandle,
+  name : String,
+  create : Bool,
+) -> @js_async.Promise[DirHandle] =
+  #| (d, name, create) => d.getDirectoryHandle(name, { create })
+
+///|
+pub extern "js" fn get_file(
+  d : DirHandle,
+  name : String,
+  create : Bool,
+) -> @js_async.Promise[FileHandle] =
+  #| (d, name, create) => d.getFileHandle(name, { create })
+
+///|
+/// フォルダから見た f の断片（`["notes", "a.md"]`）。含まなければ null
+pub extern "js" fn resolve_path(
+  d : DirHandle,
+  f : FileHandle,
+) -> @js_async.Promise[@core.Any] =
+  #| (d, f) => d.resolve(f)
+
+///|
+/// フォルダの中身。`[name, dirHandle | null]` の並び（null は ファイル）
+pub extern "js" fn list_entries(d : DirHandle) -> @js_async.Promise[@core.Any] =
+  #| async (d) => { const out = []; for await (const [name, h] of d.entries()) out.push([name, h.kind === "directory" ? h : null]); return out; }
+
+///|
+/// ファイルを読んで objectURL に（種類は名前から決めたもの）
+pub extern "js" fn read_url(
+  f : FileHandle,
+  mime : String,
+) -> @js_async.Promise[String] =
+  #| (f, type) => f.getFile().then((b) => b.arrayBuffer()).then((buf) => URL.createObjectURL(new Blob([buf], { type })))
+
+///|
+pub extern "js" fn object_url(blob : @core.Any) -> String =
+  #| (blob) => URL.createObjectURL(blob)
+
+///|
+pub extern "js" fn revoke_url(url : String) -> Unit =
+  #| (url) => URL.revokeObjectURL(url)
+
+///|
+pub extern "js" fn blob_type(blob : @core.Any) -> String =
+  #| (blob) => blob.type
+
+///|
+/// 絵を webp に（もう webp ならそのまま）
+pub extern "js" fn to_webp(blob : @core.Any) -> @js_async.Promise[@core.Any] =
+  #| async (blob) => {
+  #|   if (blob.type === "image/webp") return blob;
+  #|   const bitmap = await createImageBitmap(blob);
+  #|   try {
+  #|     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  #|     canvas.getContext("2d").drawImage(bitmap, 0, 0);
+  #|     const out = await canvas.convertToBlob({ type: "image/webp", quality: 0.92 });
+  #|     if (out.type !== "image/webp") throw new Error("webp conversion failed");
+  #|     return out;
+  #|   } finally { bitmap.close(); }
+  #| }
+
+///|
+pub extern "js" fn write_blob(
+  f : FileHandle,
+  blob : @core.Any,
+) -> @js_async.Promise[Unit] =
+  #| (f, blob) => f.createWritable().then(async (s) => { try { await s.write(blob); } finally { await s.close(); } })
+
+///|
+/// いまの時刻の綴り（`2026-09-07-153012`）
+pub extern "js" fn stamp() -> String =
+  #| () => { const d = new Date(), two = (v) => String(v).padStart(2, "0");
+  #|   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}-${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`; }
+
+///|
+/// 続きで答えるもの（callback）を Promise に
+pub extern "js" fn promise_of(
+  f : ((@core.Any) -> Unit) -> Unit,
+) -> @js_async.Promise[@core.Any] =
+  #| (f) => new Promise((ok) => f(ok))

@@ -24,6 +24,10 @@ pub fn mmm_ask_form(String, @core.Any) -> @dom.Element
 
 pub fn mmm_ask_named(String, @core.Any, (@core.Any) -> Unit) -> Unit
 
+pub fn mmm_assets(@core.Any) -> @core.Any
+
+pub fn mmm_assets_clear(@core.Any) -> Unit
+
 pub fn mmm_bare_path(String) -> String
 
 pub fn mmm_blocked(String) -> Unit
@@ -31,6 +35,8 @@ pub fn mmm_blocked(String) -> Unit
 pub fn mmm_blocked_words() -> FixedArray[String]
 
 pub fn mmm_blocks(@core.Any, Int) -> FixedArray[Int]
+
+pub fn mmm_can_choose_folder() -> Bool
 
 pub fn mmm_can_open() -> Bool
 
@@ -40,9 +46,15 @@ pub fn mmm_can_save_as() -> Bool
 
 pub fn mmm_check(String) -> String
 
+pub fn mmm_choose_folder(@core.Any) -> @js_async.Promise[Unit]
+
 pub fn mmm_chosen(@core.Any, String, FixedArray[Int], Int, String) -> String
 
 pub fn mmm_close_file() -> Unit
+
+pub fn mmm_connect(@core.Any) -> @js_async.Promise[Unit]
+
+pub fn mmm_connected(@core.Any) -> @js_async.Promise[Bool]
 
 pub fn mmm_context_menu(@core.Any, FixedArray[Int], Int?) -> @dom.Element
 
@@ -62,6 +74,8 @@ pub fn mmm_find(@core.Any, String) -> Int?
 
 pub fn mmm_folder_for(@web.FileHandle) -> @js_async.Promise[@core.Any]
 
+pub fn mmm_folder_name(@core.Any) -> String?
+
 pub fn mmm_forget_folder(@web.FileHandle) -> @js_async.Promise[Unit]
 
 pub fn mmm_from_hash(String) -> @js_async.Promise[@core.Any]
@@ -75,6 +89,8 @@ pub fn mmm_icon(String) -> @dom.Element
 pub fn mmm_icon_names() -> FixedArray[String]
 
 pub fn mmm_image_folder(@core.Any) -> String?
+
+pub fn mmm_image_url(@core.Any, String) -> String?
 
 pub fn mmm_is_node(@core.Any, Int) -> Bool
 
@@ -134,6 +150,8 @@ pub fn mmm_panes(@dom.Element, @dom.Element, @dom.Element, @dom.Element, () -> U
 
 pub fn mmm_ranges(@core.Any, String) -> FixedArray[Int]
 
+pub fn mmm_readable(@core.Any) -> Bool
+
 pub fn mmm_recent() -> @js_async.Promise[FixedArray[@web.FileHandle]]
 
 pub fn mmm_remember_folder(@web.FileHandle, @web.DirHandle) -> @js_async.Promise[Unit]
@@ -145,6 +163,8 @@ pub fn mmm_retarget(@core.Any, String, String) -> String
 pub fn mmm_save_as(String, String) -> @js_async.Promise[@core.Any]
 
 pub fn mmm_save_file(String) -> @js_async.Promise[Unit]
+
+pub fn mmm_save_image(@core.Any, @core.Any) -> @js_async.Promise[@core.Any]
 
 pub fn mmm_serialize(String) -> String
 

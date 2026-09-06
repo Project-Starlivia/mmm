@@ -3,15 +3,61 @@ package "mmm-app/core/file"
 
 import {
   "mizchi/js/core",
+  "mizchi/js_browser/dom",
   "mmm-app/core/web",
 }
 
 // Values
+pub fn asset_target(String, String) -> Array[String]?
+
+pub fn folder_from_doc(Array[String]) -> String
+
+pub fn folder_problem(String, String?) -> String?
+
 pub fn idb_store() -> Store
+
+pub fn image_type(String) -> String?
+
+pub fn md_path(String) -> String
+
+pub fn name_parts(String) -> Array[String]
+
+pub fn name_problem(String) -> String?
 
 // Errors
 
 // Types and methods
+pub(all) struct AssetDeps {
+  failed : (String) -> Unit
+  refresh : () -> Unit
+  declared : () -> String?
+  set_declared : (String) -> Unit
+}
+
+pub struct Assets {
+  doc : @dom.Document
+  io : Io
+  deps : AssetDeps
+  urls : Map[String, String?]
+  mut cached : Binding?
+  mut cached_known : Bool
+  mut live : Bool
+}
+pub async fn Assets::choose_folder(Self) -> Unit
+pub fn Assets::clear(Self) -> Unit
+pub async fn Assets::connect(Self) -> Unit
+pub async fn Assets::connected(Self) -> Bool
+pub fn Assets::folder_name(Self) -> String?
+pub fn Assets::image_url(Self, String) -> String?
+pub fn Assets::new(@dom.Document, Io, AssetDeps) -> Self
+pub fn Assets::readable(Self) -> Bool
+pub async fn Assets::save_to_disk(Self, @core.Any) -> String?
+
+pub(all) struct Binding {
+  doc : @web.FileHandle
+  directory : @web.DirHandle
+}
+
 pub(all) struct Doc {
   name : String
   text : String

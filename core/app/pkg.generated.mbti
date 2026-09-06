@@ -15,6 +15,8 @@ pub fn ask_form(@dom.Document, Ask, () -> Unit) -> (@dom.Element, () -> Array[St
 
 pub fn ask_of(String, String, note? : String?, cancel? : String?, parts? : Array[Part], preview? : String?) -> Ask
 
+pub async fn asked(@dom.Document, Ask) -> Array[String]?
+
 pub fn connect(String) -> Ask
 
 pub fn discard() -> Ask
