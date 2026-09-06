@@ -483,32 +483,54 @@ test "MoveNode で根の間へ行けば新しい根、根を子にすれば側�
 }
 
 ///|
-test "MoveNode は綴りを保つ。項目は見出しの下に置け、見出しは項目の下に置けない" {
+test "MoveNode は形だけ運び、綴りは席が決める" {
   // 見出しの直後の項目は境界（側の変わり目）が無いと飲み込まれる
   let d = doc([
     root(h(2, "r", children=[h(3, "a"), item(4, "b")]), sides=[Right, Left]),
   ])
+  // 子の無い見出しの下へ項目 — 親に従って見出し
   assert_eq(
     run(d, MoveNode(ids=[4], at=NodePlace::In(node=3, side=None))),
     Some({
       doc: doc([
-        root(h(2, "r", children=[h(3, "a", children=[item(4, "b")])]), sides=[
+        root(h(2, "r", children=[h(3, "a", children=[h(4, "b")])]), sides=[
           Right,
         ]),
       ]),
       focus: Some(4),
     }),
   )
+  // 項目の下へ見出し — 項目
   assert_eq(
     run(d, MoveNode(ids=[3], at=NodePlace::In(node=4, side=None))),
-    None,
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[item(4, "b", children=[li(3, "a")])]), sides=[
+          Left,
+        ]),
+      ]),
+      focus: Some(3),
+    }),
   )
-  // 見出しは項目の後ろに置ける（項目の枠は見出しの親になれず、落ちる）。側は隣のもの
+  // 見出しの後ろへ項目 — 隣に従って見出し（今まで Swallowed で断られていた席）
+  assert_eq(
+    run(d, MoveNode(ids=[4], at=NodePlace::After(node=3))),
+    Some({
+      doc: doc([
+        root(h(2, "r", children=[h(3, "a"), h(4, "b")]), sides=[Right, Right]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  // 項目の後ろへ見出し — 隣に従って項目。側は隣のもの
   assert_eq(
     run(d, MoveNode(ids=[3], at=NodePlace::After(node=4))),
     Some({
       doc: doc([
-        root(h(2, "r", children=[item(4, "b"), h(3, "a")]), sides=[Left, Left]),
+        root(h(2, "r", children=[item(4, "b"), item(3, "a")]), sides=[
+          Left,
+          Left,
+        ]),
       ]),
       focus: Some(3),
     }),
@@ -607,21 +629,33 @@ test "Implicit の唯一の子を、その Implicit の隣へ動かせる" {
 
 ///|
 test "Implicit は項目を子に持てば綴られる" {
-  let d = doc([
-    root(h(2, "r", children=[gap(3, [h(4, "x", children=[item(5, "i")])])]), sides=[
-      Right,
-    ]),
-  ])
+  // 見出しの列に来た項目は見出しになる（隣に従う）ので、項目が Implicit の子に
+  // なるのは天井だけ — 6 段目の隣へ飛びを動かすと、子は 7 段目で項目になる（cap）。
+  // 項目は飛びを綴れないので、Implicit が綴られる
+  let d = six([])
+  let g = root(gap(8, [h(9, "z")]), sides=[Right])
+  let f : @tree.Doc = { ..d, roots: [..d.roots, g] }
   assert_eq(
-    run(d, MoveNode(ids=[5], at=Before(node=4))),
+    run(f, MoveNode(ids=[8], at=NodePlace::After(node=7))),
     Some({
       doc: doc([
         root(
-          h(2, "r", children=[h(3, "", children=[item(5, "i"), h(4, "x")])]),
+          h(2, "a", children=[
+            h(3, "b", children=[
+              h(4, "c", children=[
+                h(5, "d", children=[
+                  h(6, "e", children=[
+                    h(7, "f"),
+                    h(8, "", children=[item(9, "z")]),
+                  ]),
+                ]),
+              ]),
+            ]),
+          ]),
           sides=[Right],
         ),
       ]),
-      focus: Some(5),
+      focus: Some(8),
     }),
   )
 }
@@ -1261,6 +1295,6 @@ test "apply の結果は check を通る" {
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="338")
+  inspect(some, content="382")
   json_inspect(bad, content=[])
 }

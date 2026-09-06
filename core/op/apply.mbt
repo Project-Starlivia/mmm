@@ -432,7 +432,7 @@ fn place(
 }
 
 ///|
-/// 動かす。文書順を保って抜き、席に差す。側は行き先が決め、綴りは保つ。
+/// 動かす。文書順を保って抜き、席に差す。側は行き先が決め、綴りも席が決める（`respell`）。
 fn move_node(doc : @tree.Doc, ids : Array[Int], at : NodePlace) -> Done? {
   guard !ids.is_empty() else { return None }
   for id in ids {
@@ -442,7 +442,8 @@ fn move_node(doc : @tree.Doc, ids : Array[Int], at : NodePlace) -> Done? {
   guard !within(doc, anchor(at), picked) else { return None }
   let taken = []
   guard take(doc, picked, taken) is Some(rest) else { return None }
-  done(place(rest, at, taken), Some(picked[0]))
+  guard sign_at(rest, at) is Some(sign) else { return None }
+  done(place(rest, at, taken.map(n => respell(n, sign))), Some(picked[0]))
 }
 
 ///|

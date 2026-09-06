@@ -202,7 +202,9 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
   }
   json_inspect(bad, content=[])
   // 全部 None に潰れる退化を落とすための下限チェック
-  inspect(some, content="1050")
+  inspect(some, content=(
+    #|1117
+  ))
 }
 
 ///|
@@ -423,7 +425,9 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   }
   json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
-  inspect(n, content="1007")
+  inspect(n, content=(
+    #|1075
+  ))
 }
 
 ///|
