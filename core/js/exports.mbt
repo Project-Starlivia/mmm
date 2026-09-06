@@ -2,7 +2,7 @@
 // 試験できる本体と、試験できないここで規則が二重になる）。
 //
 // 木も箱も core から出ない。境界は数・文字列・真偽・持ち手（MoonBit の値を
-// そのまま JS へ渡し、そのまま受け取る）と、操作 1 回ぶんの小さな JSON（選択の位置）。
+// そのまま JS へ渡し、そのまま受け取る）だけ — 読みも選択もその位置も持ち手で往復する。
 //
 // アプリそのものは `mmmMain` が組む（core/main）。ts に残るのは CodeMirror（md ペイン）で、
 // その読み書きを閉包で渡す。それ以外の出口は、見本（lab）と EditorState の field
@@ -52,10 +52,10 @@ pub fn mmm_unbuild_sig(md : String) -> String {
   @tree.ast_sig(@tree.unbuild(@tree.parse(md)))
 }
 
-// ---- 読み ----
+// ---- 読みと選択 ----
 //
-// 打鍵 1 回ぶんの読みは持ち手で往復する。EditorState の field（state.ts）が持ち、
-// 選択の位置の写しに要る問い合わせだけがここに残る
+// 読み・選択・その位置は持ち手で往復する。EditorState の field（state.ts）が持ち、
+// 1 トランザクションごとに写す・導くのに要る問い合わせだけがここに残る
 
 ///|
 /// 打鍵 1 回ぶんの読み。返るのは読み（木・地番・原文）の持ち手 — 木は出さない
@@ -114,80 +114,120 @@ fn holder_of(holder : String) -> @read.Holder {
 }
 
 ///|
-/// Anchors の JSON（無ければ ""）
-fn anchors_json(a : @read.Anchors?) -> String {
-  match a {
-    Some(a) => json(a)
-    None => ""
-  }
+/// 位置（持ち手。無ければ null）
+fn anchors_opt(v : @core.Any) -> @read.Anchors? {
+  @core.identity_option(v)
 }
 
 ///|
-fn anchors_of(s : String) -> @read.Anchors? {
-  if s == "" {
-    None
-  } else {
-    Some(
-      @json.from_json(@json.parse(s)) catch {
-        e => abort("Anchors の JSON が読めない — \{e}")
-      },
-    )
-  }
+fn choice_of(v : @core.Any) -> @read.Choice {
+  v.cast()
 }
 
 ///|
 /// 選択。持ち主（"md" / "map"）が決める — md が持つ間はカーソル（ranges は from, to の並び、
-/// head は主カーソルの頭）から、地図が持つ間は位置（anchors の JSON。無ければ ""）から。
-/// 返るのは Choice の JSON
+/// head は主カーソルの頭）から、地図が持つ間は位置（持ち手。無ければ null）から。返るのは選択の持ち手
 #export_name("mmmChosen")
 pub fn mmm_chosen(
   survey : @core.Any,
   holder : String,
   ranges : FixedArray[Int],
   head : Int,
-  anchors : String,
-) -> String {
+  anchors : @core.Any,
+) -> @core.Any {
   let rs : Array[@read.Range] = []
   let mut i = 0
   while i + 1 < ranges.length() {
     rs.push({ from: ranges[i], to: ranges[i + 1], })
     i += 2
   }
-  json(
+  @core.any(
     @read.chosen(
       read(survey),
       holder_of(holder),
       { ranges: rs, head, },
-      anchors_of(anchors),
+      anchors_opt(anchors),
     ),
   )
 }
 
 ///|
-fn choice_of(s : String) -> @read.Choice {
-  @json.from_json(@json.parse(s)) catch {
-    e => abort("Choice の JSON が読めない — \{e}")
+/// 何も選んでいない
+#export_name("mmmNothing")
+pub fn mmm_nothing() -> @core.Any {
+  @core.any(@read.nothing)
+}
+
+///|
+/// 同じものを選んでいるか
+#export_name("mmmSameChoice")
+pub fn mmm_same_choice(a : @core.Any, b : @core.Any) -> Bool {
+  choice_of(a) == choice_of(b)
+}
+
+///|
+/// ノードの選択として見る（`{ ids, anchor | null }`）。カードを選んでいれば空
+#export_name("mmmSelection")
+pub fn mmm_selection(choice : @core.Any) -> @core.Any {
+  selection_obj(
+    match choice_of(choice) {
+      Nodes(sel~) => sel
+      Card(_) => @map.none
+    },
+  )
+}
+
+///|
+/// カードの選択として見る。ノードを選んでいれば undefined
+#export_name("mmmCard")
+pub fn mmm_card(choice : @core.Any) -> Int? {
+  match choice_of(choice) {
+    Card(id~) => Some(id)
+    Nodes(_) => None
   }
 }
 
 ///|
-/// focus の id をその木の地番で位置に（Anchors の JSON。無ければ ""）
+/// focus の id をその木の地番で位置に（持ち手。無ければ null）
 #export_name("mmmAnchorsOf")
-pub fn mmm_anchors_of(survey : @core.Any, id : Int?) -> String {
-  anchors_json(@read.anchors_of(read(survey), id))
+pub fn mmm_anchors_of(survey : @core.Any, id : Int?) -> @core.Any {
+  @core.from_option(@read.anchors_of(read(survey), id))
 }
 
 ///|
-/// 選択（Choice の JSON）をその木の地番で位置に（Anchors の JSON。無ければ ""）
-#export_name("mmmAnchorsFor")
-pub fn mmm_anchors_for(survey : @core.Any, choice : String) -> String {
-  anchors_json(@read.anchors_for(read(survey), choice_of(choice)))
+/// 位置を編集で写す。`at` は点の写し（CodeMirror の `changes.mapPos`）
+#export_name("mmmCarry")
+pub fn mmm_carry(anchors : @core.Any, at : (Int) -> Int) -> @core.Any {
+  let a : @read.Anchors = anchors.cast()
+  @core.any(@read.carry(a, at))
+}
+
+///|
+/// ノードの位置（並びと基点）。見本と試験が組む
+#export_name("mmmNodeAt")
+pub fn mmm_node_at(at : FixedArray[Int], anchor : Int?) -> @core.Any {
+  @core.any((@read.NodeAt(at=ints(at), anchor~) : @read.Anchors))
+}
+
+///|
+/// カードの位置
+#export_name("mmmCardAt")
+pub fn mmm_card_at(at : Int) -> @core.Any {
+  @core.any((@read.CardAt(at~) : @read.Anchors))
+}
+
+///|
+/// 位置の綴り（`["NodeAt",{at,anchor?}]` / `["CardAt",{at}]`）。試験が読む
+#export_name("mmmAnchorsJson")
+pub fn mmm_anchors_json(anchors : @core.Any) -> String {
+  let a : @read.Anchors = anchors.cast()
+  json(a)
 }
 
 ///|
 /// md 側で薄く塗る範囲（from, to の並び）
 #export_name("mmmRanges")
-pub fn mmm_ranges(survey : @core.Any, choice : String) -> FixedArray[Int] {
+pub fn mmm_ranges(survey : @core.Any, choice : @core.Any) -> FixedArray[Int] {
   let out : Array[Int] = []
   for r in @read.ranges(read(survey), choice_of(choice)) {
     out.push(r.from)
@@ -243,7 +283,7 @@ fn selection_of(o : @core.Any) -> @map.Selection {
 // ---- アプリ ----
 //
 // 束ねる場所（core/main）。ts が渡すのは CodeMirror の読み書き（`Editor`）だけ。
-// 編集列は素の object（`{ from, to, insert }`）の並びで渡り、位置（Anchors）は JSON
+// 編集列は素の object（`{ from, to, insert }`）の並びで渡る
 
 ///|
 fn editor_of(e : @core.Any) -> @main.Editor {
@@ -263,11 +303,11 @@ fn editor_of(e : @core.Any) -> @main.Editor {
       call("apply", [@core.any(sets), @core.any(held), @core.from_option(focus)])
       |> ignore
     },
-    select: a => call("select", [@core.any(anchors_json(a))]) |> ignore,
+    select: a => call("select", [@core.from_option(a)]) |> ignore,
     hold: (h, a) => {
       call("hold", [
         @core.any(if h == Md { "md" } else { "map" }),
-        @core.any(anchors_json(a)),
+        @core.from_option(a),
       ])
       |> ignore
     },

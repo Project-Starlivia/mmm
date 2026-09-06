@@ -9,7 +9,7 @@
 // None を鍵ごと落とし、enum を `["NodeAt", {…}]` の形で出す。その形を整えるのはここ 1 か所。
 // 信頼境界もここだけ — 型は名乗らせず確かめる。
 
-import * as mbt from "../core/_build/js/release/build/tree/js/js.js";
+import * as mbt from "../core/_build/js/release/build/js/js.js";
 
 // ---- 読み ----
 
@@ -50,7 +50,8 @@ export const blocks = (s: Survey, id: number): number[] => [...mbt.mmmBlocks(s, 
 
 // ---- 選択 ----
 //
-// 選択の**値**。どう変わるかは core が持ち、EditorState の field が聞いた値を持つだけ。
+// 選択（`Choice`）とその位置（`Anchors`）は持ち手。EditorState の field が持ち、
+// 1 トランザクションごとに写す（carry）・導く（chosen）。どう変わるかは core が持つ
 
 /** 選んでいるノード（文書順）と、範囲選択・矢印の基点 */
 export interface Selection {
@@ -60,16 +61,22 @@ export interface Selection {
 
 export const NONE: Selection = { ids: [], anchor: null };
 
-/** 何を選んでいるか — ノードの並びか、カード 1 枚か。片方だけ（spec.md「C カード」） */
-export type Choice = { kind: "nodes"; sel: Selection } | { kind: "card"; id: number };
+declare const choiceBrand: unique symbol;
+/** 何を選んでいるか — ノードの並びか、カード 1 枚か（持ち手） */
+export interface Choice {
+  readonly [choiceBrand]: never;
+}
 
-export const NOTHING: Choice = { kind: "nodes", sel: NONE };
+export const NOTHING: Choice = Object(mbt.mmmNothing());
+
+/** 同じものを選んでいるか */
+export const sameChoice = (a: Choice, b: Choice): boolean => mbt.mmmSameChoice(a, b);
 
 /** ノードの選択として見る。カードを選んでいれば空 */
-export const nodesOf = (c: Choice): Selection => (c.kind === "nodes" ? c.sel : NONE);
+export const selection = (c: Choice): Selection => selectionOf(mbt.mmmSelection(c));
 
 /** カードの選択として見る。ノードを選んでいれば null */
-export const cardOf = (c: Choice): number | null => (c.kind === "card" ? c.id : null);
+export const card = (c: Choice): number | null => mbt.mmmCard(c) ?? null;
 
 /** 選択を持っている側。フォーカスが最後に入ったペイン */
 export type Holder = "md" | "map";
@@ -86,32 +93,50 @@ export interface Caret {
   head: number;
 }
 
-/** 地図の選択の位置。ノードはラベルの頭、カードは中身の原文の頭。CodeMirror が編集で写す。null は無し */
-export type Anchors = { kind: "nodes"; at: number[]; anchor: number | null } | { kind: "card"; at: number } | null;
+declare const anchorsBrand: unique symbol;
+/** 地図の選択の位置（持ち手）。ノードはラベルの頭、カードは中身の原文の頭。CodeMirror が編集で写す */
+export interface Anchors {
+  readonly [anchorsBrand]: never;
+}
 
 /** 選択。持ち主が決める — md が持つ間はカーソルから、地図が持つ間は位置から */
-export const chosen = (s: Survey, holder: Holder, caret: Caret, a: Anchors): Choice =>
-  choice(
-    JSON.parse(
-      mbt.mmmChosen(
-        s,
-        holder,
-        caret.ranges.flatMap((r) => [r.from, r.to]),
-        caret.head,
-        anchorsJson(a),
-      ),
+export const chosen = (s: Survey, holder: Holder, caret: Caret, a: Anchors | null): Choice =>
+  Object(
+    mbt.mmmChosen(
+      s,
+      holder,
+      caret.ranges.flatMap((r) => [r.from, r.to]),
+      caret.head,
+      a,
     ),
   );
 
 /** focus の id をその木の地番で位置に。無ければ null */
-export const anchorsOf = (s: Survey, id: number | null): Anchors => maybe(mbt.mmmAnchorsOf(s, id ?? undefined), anchors);
+export const anchorsOf = (s: Survey, id: number | null): Anchors | null => handle(mbt.mmmAnchorsOf(s, id ?? undefined));
 
-/** 選択をその木の地番で位置に。地図で選んだときの setAnchors の値 */
-export const anchorsFor = (s: Survey, c: Choice): Anchors => maybe(mbt.mmmAnchorsFor(s, choiceJson(c)), anchors);
+/** 位置を編集で写す。`at` は点の写し（CodeMirror の `changes.mapPos`） */
+export const carry = (a: Anchors, at: (p: number) => number): Anchors => Object(mbt.mmmCarry(a, at));
+
+/** ノードの位置（並びと基点）。見本と試験が組む */
+export const nodeAt = (at: number[], anchor: number | null): Anchors => Object(mbt.mmmNodeAt(at, anchor ?? undefined));
+/** カードの位置 */
+export const cardAt = (at: number): Anchors => Object(mbt.mmmCardAt(at));
+
+/** 位置の中身。試験が読む */
+export type AnchorsAt = { kind: "nodes"; at: number[]; anchor: number | null } | { kind: "card"; at: number };
+export const anchorsAt = (a: Anchors): AnchorsAt => {
+  const [tag, body] = tagged(JSON.parse(mbt.mmmAnchorsJson(a)));
+  const o = record(body);
+  if (tag === "NodeAt") {
+    return { kind: "nodes", at: field(o, "at", (x) => list(x, num)), anchor: option(o, "anchor", num) };
+  }
+  if (tag === "CardAt") return { kind: "card", at: field(o, "at", num) };
+  return bad(`知らない Anchors ${tag}`);
+};
 
 /** md 側で薄く塗る範囲。ノードは地番そのもの（子孫込み）、カードは中身の原文 */
 export const ranges = (s: Survey, c: Choice): Range[] => {
-  const flat = mbt.mmmRanges(s, choiceJson(c));
+  const flat = mbt.mmmRanges(s, c);
   const out: Range[] = [];
   for (let i = 0; i + 1 < flat.length; i += 2) out.push({ from: flat[i], to: flat[i + 1] });
   return out;
@@ -147,10 +172,10 @@ export interface Editor {
   setText(text: string): void;
   /** 編集列を順に当てる（undo は 1 手）。`held` なら同じトランザクションで focus の effect が乗る */
   apply(sets: Edit[][], held: boolean, focus: number | null): void;
-  /** 地図で選び直した。位置は地番で写してある */
-  select(a: Anchors): void;
-  /** フォーカスがペインに入った。md → map なら引き継ぐ位置も一緒に */
-  hold(h: Holder, a: Anchors): void;
+  /** 地図で選び直した。位置は地番で写してある（無ければ null） */
+  select(a: Anchors | null): void;
+  /** フォーカスがペインに入った。md → map なら引き継ぐ位置も一緒に（md へなら null） */
+  hold(h: Holder, a: Anchors | null): void;
   reveal(pos: number): void;
   undo(): void;
   redo(): void;
@@ -177,17 +202,17 @@ export const main = (editor: Editor): App =>
     mbt.mmmMain({
       ...editor,
       // MoonBit の閉包は返り値の無い関数を `undefined` を返すものとして受ける。
-      // 位置は JSON で来るので、ここで形に戻す。編集列は素の object のままで、形だけ確かめる
+      // 編集列は素の object のままで、形だけ確かめる。位置は持ち手（無ければ null）
       apply: (sets: unknown, held: boolean, focus: number | null): undefined => {
         editor.apply(list(sets, (set) => list(set, editOne)), held, focus);
         return undefined;
       },
-      select: (json: string): undefined => {
-        editor.select(maybe(json, anchors));
+      select: (a: unknown): undefined => {
+        editor.select(handle(a));
         return undefined;
       },
-      hold: (h: Holder, json: string): undefined => {
-        editor.hold(h, maybe(json, anchors));
+      hold: (h: Holder, a: unknown): undefined => {
+        editor.hold(h, handle(a));
         return undefined;
       },
       setText: (t: string): undefined => {
@@ -392,9 +417,6 @@ const option = <T>(o: Record<string, unknown>, key: string, read: (v: unknown) =
 /** 出口の `T?`（`T | undefined`）を読む */
 const opt = <A, B>(v: A | undefined, read: (a: A) => B): B | null => (v === undefined ? null : read(v));
 
-/** 出口の「無ければ空文字」の JSON を読む */
-const maybe = <T>(json: string, read: (v: unknown) => T): T | null => (json === "" ? null : read(JSON.parse(json)));
-
 /** 出口の数の列。長さが違えば壊れている（タプルは JS では object になるので、数の列で渡す） */
 const nums = (v: number[], n: number): number[] => (v.length === n ? v : bad(`数が ${n} 個でない`));
 
@@ -405,45 +427,13 @@ function tagged(v: unknown): [string, unknown] {
   return [str(v[0]), v[1]];
 }
 
-/** Choice の JSON（`["Nodes", {sel}]` / `["Card", {id}]`） */
-function choice(v: unknown): Choice {
-  const [tag, body] = tagged(v);
-  const o = record(body);
-  if (tag === "Nodes") return { kind: "nodes", sel: field(o, "sel", selection) };
-  if (tag === "Card") return { kind: "card", id: field(o, "id", num) };
-  return bad(`知らない Choice ${tag}`);
-}
+/** 出口の持ち手（無ければ null）。MoonBit の値は中を見ずに持つ */
+const handle = <T>(v: unknown): T | null => (v === null || v === undefined ? null : (Object(v) as T));
 
-/** Anchors の JSON（`["NodeAt", {at, anchor?}]` / `["CardAt", {at}]`） */
-function anchors(v: unknown): Anchors {
-  const [tag, body] = tagged(v);
-  const o = record(body);
-  if (tag === "NodeAt") {
-    return { kind: "nodes", at: field(o, "at", (x) => list(x, num)), anchor: option(o, "anchor", num) };
-  }
-  if (tag === "CardAt") return { kind: "card", at: field(o, "at", num) };
-  return bad(`知らない Anchors ${tag}`);
-}
-
-/** 入口へ渡す Anchors。無ければ ""（MoonBit の None） */
-const anchorsJson = (a: Anchors): string => {
-  if (a === null) return "";
-  if (a.kind === "card") return JSON.stringify(["CardAt", { at: a.at }]);
-  return JSON.stringify(["NodeAt", a.anchor === null ? { at: a.at } : { at: a.at, anchor: a.anchor }]);
-};
-
-/** 入口へ渡す Choice */
-const choiceJson = (c: Choice): string =>
-  JSON.stringify(
-    c.kind === "card"
-      ? ["Card", { id: c.id }]
-      : ["Nodes", { sel: c.sel.anchor === null ? { ids: c.sel.ids } : { ids: c.sel.ids, anchor: c.sel.anchor } }],
-  );
-
-/** Selection の JSON（`{ids, anchor?}`） */
-export function selection(v: unknown): Selection {
+/** Selection の object（`{ ids, anchor | null }`） */
+function selectionOf(v: unknown): Selection {
   const o = record(v);
-  return { ids: field(o, "ids", (x) => list(x, num)), anchor: option(o, "anchor", num) };
+  return { ids: field(o, "ids", (x) => list(x, num)), anchor: field(o, "anchor", (x) => (x === null ? null : num(x))) };
 }
 
 const editOne = (v: unknown): Edit => {

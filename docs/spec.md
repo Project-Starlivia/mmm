@@ -75,9 +75,9 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 貼り付け・投下・描いた絵の保存、ファイル I/O、帯。文書から導く値は持たない — 持つのは
                 ファイルの状態だけ。CodeMirror の読み書きは Editor の閉包で受ける。試験は happy-dom と
                 md 1 本の写し)
-  tree/js/      browser への出口。mmmMain / mmmCycle と、EditorState の field が読む問い合わせ
-                （mmmSurvey / mmmChosen …）、見本（lab）が置く部品。MoonBit の値は不透明な持ち手で往復し、
-                選択の位置の小さな JSON だけが渡る
+  js/           browser への出口。mmmMain / mmmCycle と、EditorState の field が読む問い合わせ
+                （mmmSurvey / mmmChosen / mmmCarry …）、見本（lab）が置く部品。読みも選択もその位置も
+                不透明な持ち手で往復し、渡るのは数・字・真偽と編集列だけ
 src/    TypeScript — **CodeMirror（md ペイン）だけ。** 文書の真実はその中の文字列
   coreApi.ts   core の出口と入口。形を整える唯一の場所（main(editor) が CodeMirror の読み書きを
                閉包で渡し、cycle がサイクルを回す。木は持ち手を渡して問い合わせる — spot / chosen …）。

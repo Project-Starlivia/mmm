@@ -97,7 +97,7 @@ pub fn mmm_open(p : @js_async.Promise[String]) -> @js_async.Promise[String] {
 
 - 科（package）: `tree`（読み・書き戻し）/ `view` / `op` / `edit` / `map`（配置と判断。
   DOM を知らない）/ `read`（読みの持ち手と木の判断）/ `web`（DOM の道具）/ `parts`
-  （部品）/ `render`（地図のペイン）/ `app`（帯と枠）/ `tree/js`（出口）。
+  （部品）/ `render`（地図のペイン）/ `app`（帯と枠）/ `main`（束ねる場所）/ `js`（出口）。
   DOM を知る科は `supported_targets = "js"`
 - 見せ方: 持ち手になる struct は `pub struct`（欄は外から見えない）、値は
   `pub(all) struct`。`priv` は同じ科の中だけ
