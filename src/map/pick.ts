@@ -6,7 +6,7 @@
 // 落とし先の線（drop-line）と同じく、world 座標に浮かぶ 1 個の印にすれば、
 // 描画はカードの選択を知らなくてよくなる。
 
-import type { Rect } from "./geometry.ts";
+import type * as core from "../coreApi.ts";
 import { svgEl } from "./svg.ts";
 
 /** × の中心からの腕の長さと、その当たり判定の半径 */
@@ -32,7 +32,7 @@ export class CardPick {
    * `data-delete` として出す（当たり判定は座標から辿るため）。
    * `rect` が null なら隠す（畳まれた・範囲外）。
    */
-  show(id: number, rect: Rect | null): void {
+  show(id: number, rect: core.Rect | null): void {
     if (!rect) {
       this.hide();
       return;

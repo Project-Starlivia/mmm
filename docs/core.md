@@ -387,11 +387,16 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
   要素の class と `data-*` は style.css と ts のハンドラとの契約。画像の URL・
   コードの色分け（CodeMirror の言語表）は `Scene` の閉包で受ける。js だけ
   （`supported_targets = "js"`）で、試験は happy-dom
-- **出口** — `mmmSurvey(md) -> { json, view }` / `mmmLayout(view, measure) -> { json, layout }` /
-  `mmmRenderer()` / `mmmDraw(handle, layout, …)` / `mmmPaint` / `mmmNodeEl` / `mmmMetrics`。
-  データは JSON（ts の coreApi が形を確かめる）、MoonBit の値は不透明な持ち手で往復する —
-  JSON を 2 度組まない、2 度 parse しない。入力側（選択・落とし先・入力欄）が読む数は
-  Layout の JSON（箱とカードの矩形）と `mmmMetrics`（隙間・ラベル行）で、ts は数えない
+- **判断も map/** — 選択（当たり・矩形・矢印・親兄弟）、落とし先、キーの表（`Intent`）、
+  右クリックの行、視点の算術、針、指の台帳、欄の重ね。全部純粋で、wbtest で固定する
+- **出口** — `mmmSurvey(md) -> { json, view }` / `mmmLayout(view, measure) -> 持ち手` /
+  `mmmHit` / `mmmClick` / `mmmRubber` / `mmmKeyed` / `mmmContext` / `mmmDrop` / `mmmFit` /
+  `mmmCenter` / `mmmShow` / `mmmIndicator` / `mmmLabelPlace` / `mmmRects` … /
+  `mmmRenderer()` / `mmmDraw(handle, layout, …)` / `mmmPaint` / `mmmNodeEl`。
+  **木も箱も core から出ない。** 境界は数・文字列・真偽・持ち手と、操作 1 回ぶんの小さな
+  JSON（Intent・落とし先・メニューの行・選択）。数の組は `FixedArray[Double]` で渡す —
+  **タプルは JS では object になる**（`.d.ts` は配列と書くが嘘）。決めは
+  docs/superpowers/specs/2026-09-06-mbt-design.md
 
 ## 決まっていないこと
 

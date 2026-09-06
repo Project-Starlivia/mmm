@@ -1,6 +1,7 @@
 pkgtype(kind: "foreign_library")
 
 import {
+  "moonbitlang/core/cmp",
   "moonbitlang/core/json",
   "mizchi/js/core",
   "mizchi/js_browser/dom",

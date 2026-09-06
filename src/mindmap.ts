@@ -1,32 +1,24 @@
-// マップのペイン。core の View を layout で箱にし、render で SVG に写す。
+// マップのペイン。core が置いて描く。ここは入力を core に渡し、返った答えを実行する配線。
 //
 // 持っているのは視点（Camera）と、それを動かす入力（ホイール・ドラッグ・
 // ピンチ・クリック・矩形・矢印・右クリック・長押し）と、見失った先を指す針
-// だけ。**選択の値は持たない** — 入力を map/select.ts の値にして host へ渡し、
+// だけ。**選択の値は持たない** — 入力を core に渡して選択の値にし、host へ渡して、
 // host の値を塗るだけ。値は EditorState の field（state.ts）。あるのは
 // 選択、その場編集、消す・並べ替え・畳み・側の操作・カードの選択とその場編集。
+// 判断（当たり・落とし先・キーの表・矢印・寄せ・針）は全部 core/map。
 
 import * as core from "./coreApi.ts";
 import type { Holder } from "./caret.ts";
-import { type Camera, type Pane, centerOn, fitToPane, panBy, panToShow, pinch, toWorld, zoomAt } from "./map/camera.ts";
 import { CardEditor } from "./map/card.ts";
-import { contextItems, menuOf } from "./map/context.ts";
-import { type Drop, dropOp, resolveDrop } from "./map/drop.ts";
-import { type Rect, unionRect } from "./map/geometry.ts";
-import { Fingers } from "./map/gesture.ts";
-import { indicatorFor, isLost, nearest } from "./map/indicator.ts";
-import { type Intent, type Key, keyed, keyedCard } from "./map/keys.ts";
 import { LabelEditor } from "./map/label.ts";
-
 import { measure } from "./map/measure.ts";
 import { languageEpoch, tokenize } from "./map/highlight.ts";
-import { ContextMenu } from "./map/menu.ts";
+import { ContextMenu, type MenuEntry } from "./map/menu.ts";
 import { CardPick } from "./map/pick.ts";
-
-import { EXACT, GRAB, NONE, type Selection, click, hit, rubber } from "./map/select.ts";
+import { NONE } from "./map/select.ts";
 import { svgEl } from "./map/svg.ts";
 import { mapToSvg } from "./map/toSvg.ts";
-import { icon } from "./icons.ts";
+import { icon, isIconName } from "./icons.ts";
 import { paneTool } from "./app/paneTool.ts";
 import { paneHint } from "./app/hint.ts";
 import { failed } from "./app/notice.ts";
@@ -43,9 +35,9 @@ export interface MapHost {
   /** 選択を持っている側。md なら輪（内側）、map なら枠（selected）で塗る */
   holder(): Holder;
   /** いま選んでいるもの */
-  selection(): Selection;
+  selection(): core.Selection;
   /** 地図で選び直した。reveal は md 側をその頭へスクロールするか */
-  setSelection(sel: Selection, reveal: boolean): void;
+  setSelection(sel: core.Selection, reveal: boolean): void;
   /** 選んでいるカードの中身の id */
   picked(): number | null;
   /** カードを選び直した（null で外す） */
@@ -76,6 +68,26 @@ function targetIn(e: Event, selector: string): Element | null {
   return e.target instanceof Element ? e.target.closest(selector) : null;
 }
 
+/**
+ * core の右クリックの行を、menu.ts が描ける形に写す。押せば `act` へ渡すだけで、
+ * 意味はここに増やさない。沈む行は `why` を押せない理由として持ち、無ければただ沈む
+ */
+export function menuOf(es: core.Entry[], act: (intent: core.Intent) => void): MenuEntry[] {
+  const one = (it: core.Item): MenuEntry => {
+    const disabled = it.intent === null ? (it.why ?? true) : false;
+    const run = (): void => {
+      if (it.intent) act(it.intent);
+    };
+    const mark = it.mark !== null && isIconName(it.mark) ? it.mark : undefined;
+    const key = it.key ?? undefined;
+    const items = it.items?.map(one);
+    return items
+      ? { label: it.label, key, mark, disabled, items, run }
+      : { label: it.label, key, mark, disabled, run };
+  };
+  return es.map((e) => (e === "sep" ? "sep" : one(e)));
+}
+
 export class Mindmap {
   private pane: HTMLElement;
   private host: MapHost;
@@ -84,10 +96,10 @@ export class Mindmap {
   private renderer = new core.Renderer();
   private hint: HTMLDivElement;
   private indicatorEl: HTMLDivElement;
-  private camera: Camera = { k: 1, tx: 60, ty: 60 };
+  private camera: core.Camera = { k: 1, tx: 60, ty: 60 };
   private layout: core.Layout;
   /** 2 本目の指。1 本のあいだは何も言わない */
-  private fingers = new Fingers();
+  private fingers = new core.Fingers();
   private panning: { px: number; py: number; ox: number; oy: number } | null = null;
   private fitPending = false;
   /** ペインの画面上の矩形。null なら次に読む。resize でしか変わらない（アプリは
@@ -121,9 +133,9 @@ export class Mindmap {
   /** マウスで掴んだ候補。slop を越えたら startDrag へ化ける */
   private dragCand: { id: number; x: number; y: number } | null = null;
   /** 動かしているノード。ids は選んだ全部（文書順）、subtree はその子孫込み（落とし先から外す） */
-  private dragging: { ids: number[]; subtree: Set<number> } | null = null;
+  private dragging: { ids: number[]; subtree: number[] } | null = null;
   /** 今の落とし先の予告。無ければ離しても何もしない */
-  private drop: Drop | null = null;
+  private drop: core.Drop | null = null;
   /** 予告で drop-parent を付けている箱の id。次の予告や後片付けで外す */
   private dropParentId: number | null = null;
   /** 兄弟へ挿入する予告の線。world に浮かぶ */
@@ -192,18 +204,18 @@ export class Mindmap {
     return (this.rect ??= this.pane.getBoundingClientRect());
   }
 
-  /** ペインの左上から測った画面 px（camera.ts が使う座標系） */
+  /** ペインの左上から測った画面 px（core の視点が使う座標系） */
   private local(clientX: number, clientY: number): { x: number; y: number } {
     const r = this.paneRect();
     return { x: clientX - r.left, y: clientY - r.top };
   }
 
-  private paneSize(): Pane {
+  private paneSize(): core.Pane {
     const r = this.paneRect();
     return { width: r.width, height: r.height };
   }
 
-  private setCamera(c: Camera): void {
+  private setCamera(c: core.Camera): void {
     this.camera = c;
     this.applyCamera();
     this.followLabel();
@@ -212,13 +224,9 @@ export class Mindmap {
   }
 
   /** 編集中の欄を箱に追従させる。書くたび・視点を動かすたびに呼ぶ。
-   *  箱が消えていれば（畳まれて埋もれた）閉じる */
+   *  箱が消えていれば（畳まれて埋もれた）欄が自分で閉じる */
   private followLabel(): void {
-    const editing = this.label.editing();
-    if (editing === null) return;
-    const b = this.layout.boxes.get(editing);
-    if (b) this.label.place(b, this.camera);
-    else this.label.close();
+    this.label.place(this.layout, this.camera);
   }
 
   /** 選んでいるカードの印と、開いている入力欄を今のレイアウト・視点に合わせる。
@@ -226,30 +234,17 @@ export class Mindmap {
   private followCard(): void {
     // 持ち主が畳まれて箱を失えば外す — 見えないカードを選んだままにしない
     const picked = this.host.picked();
-    const at = picked === null ? null : this.cardRectOf(picked);
+    const at = picked === null ? null : core.cardRect(this.layout, picked);
     if (picked !== null && at === null) this.host.setPicked(null);
     if (picked === null || at === null) this.pick.hide();
     else this.pick.show(picked, at);
-    const editing = this.card.editing();
-    if (editing === null) return;
-    const rect = this.cardRectOf(editing);
-    if (rect) this.card.place(rect, this.camera);
-    else this.card.close();
-  }
-
-  /** カードの置かれている場所（world 座標）。積み方は数えない —
-   *  cardRect が描画と共通の唯一の出所で、ここは箱の位置ぶん動かすだけ */
-  private cardRectOf(id: number): Rect | null {
-    const o = core.ownerOf(this.layout, id);
-    if (!o) return null;
-    const r = o.box.cards[o.index] ?? null;
-    return r === null ? null : { ...r, x: o.box.x + r.x, y: o.box.y + r.y };
+    this.card.place(this.layout, this.camera);
   }
 
   /** data-card の「ノードの id, 何枚目」から中身の id */
   private blockAt(spot: string): number | null {
     const [node, index] = spot.split(",").map(Number);
-    return this.layout.boxes.get(node)?.node.blocks[index]?.id ?? null;
+    return node === undefined || index === undefined ? null : core.blockAt(this.layout, node, index);
   }
 
   private applyCamera(): void {
@@ -288,28 +283,20 @@ export class Mindmap {
       return;
     }
     this.fitPending = false;
-    const c = fitToPane(this.layout.boxes.values(), pane, FIT_MARGIN);
+    const c = core.fit(this.layout, pane, FIT_MARGIN);
     if (c) this.setCamera(c);
-  }
-
-  /** 選ばれている箱。畳まれて箱を失ったものは数えない */
-  private selectedBoxes(): Rect[] {
-    return this.host.selection().ids.flatMap((id) => {
-      const b = this.layout.boxes.get(id);
-      return b ? [b] : [];
-    });
   }
 
   /** 選択（無ければ根）を画面の中心へ。拡大率は変えない */
   centerOnTarget(): void {
-    const target = unionRect(this.selectedBoxes()) ?? core.rootBox(this.layout);
-    if (target) this.setCamera(centerOn(this.camera, target, this.paneSize()));
+    const c = core.center(this.layout, this.host.selection().ids, this.camera, this.paneSize());
+    if (c) this.setCamera(c);
   }
 
   /** その箱が画面に入るまでだけ寄せる（矢印で選び直したとき） */
   ensureVisible(id: number): void {
-    const b = this.layout.boxes.get(id);
-    if (b) this.setCamera(panToShow(this.camera, b, this.paneSize(), SHOW_MARGIN));
+    const c = core.show(this.layout, id, this.camera, this.paneSize(), SHOW_MARGIN);
+    if (c) this.setCamera(c);
   }
 
   /** 選択の塗り直し。レイアウトは見直さない */
@@ -322,22 +309,21 @@ export class Mindmap {
   /** その場編集に入る。seed は最初の字。箱が無い（畳まれて埋もれた）ノードは
    *  開けない — 戻り値はそれを呼び出し側（main.ts の apply）に言うためのもの */
   beginEdit(id: number, seed: string | null): boolean {
-    const b = this.layout.boxes.get(id);
-    if (!b) return false;
-    this.label.open(id, b, this.camera, core.labelOf(b.node), seed);
+    const label = core.label(this.layout, id);
+    if (label === null) return false;
+    this.label.open(id, this.layout, this.camera, label, seed);
     return true;
   }
 
   /** カードをその場で開く。畳まれて埋もれている（箱が無い）ときは断る。
    *  `text` は欄に載せる字（省略すれば md の原文）— 変えずに閉じれば書かない */
   editCard(id: number, from?: number, to?: number, text = this.host.blockText(id).replace(/\n$/, "")): void {
-    const rect = this.cardRectOf(id);
-    if (rect === null) {
+    if (core.cardRect(this.layout, id) === null) {
       failed("Couldn't open that card");
       return;
     }
     this.host.setPicked(id);
-    this.card.open(id, rect, this.camera, text, from, to);
+    this.card.open(id, this.layout, this.camera, text, from, to);
   }
 
   /**
@@ -389,10 +375,7 @@ export class Mindmap {
    * ノードには出さない。本数が変わったときだけ作り足す/捨てる
    */
   private ring(ids: number[]): void {
-    const boxes = ids.flatMap((id) => {
-      const b = this.layout.boxes.get(id);
-      return b ? [b] : [];
-    });
+    const boxes = core.rects(this.layout, ids);
     while (this.caretRings.length > boxes.length) this.caretRings.pop()?.remove();
     while (this.caretRings.length < boxes.length) {
       const ring = svgEl("rect", { class: "caret-ring" });
@@ -409,11 +392,11 @@ export class Mindmap {
     });
   }
 
-  /** 画面の点がどの箱に居るか。Easy grab なら箱の外まで当たる（select.ts の hit）。無ければ null */
+  /** 画面の点がどの箱に居るか。Easy grab なら箱の外まで当たる（core の hit）。無ければ null */
   private nodeAt(clientX: number, clientY: number): number | null {
     const p = this.local(clientX, clientY);
-    const w = toWorld(this.camera, p.x, p.y);
-    return hit(this.layout, w.x, w.y, this.grab ? GRAB : EXACT);
+    const w = core.toWorld(this.camera, p.x, p.y);
+    return core.hit(this.layout, w.x, w.y, this.grab);
   }
 
   /** 掴みやすさ（⋯ の Easy grab）。見た目は変えず、叩ける範囲だけ広げる */
@@ -421,23 +404,13 @@ export class Mindmap {
     this.grab = on;
   }
 
-  /** 見失った選択（無ければ根）を控えめな針で指す。決めは indicator.ts が持つ */
+  /** 見失った選択（無ければ根）を控えめな針で指す。決めは core/map/indicator.mbt が持つ */
   private updateIndicator(): void {
-    const pane = this.paneSize();
-    const sel = this.selectedBoxes();
-    // 見失ったかは、選択があれば選択の話。無ければ文書の話
-    const watched = sel.length > 0 ? sel : [...this.layout.boxes.values()];
-    // 指す先は、選択ならいちばん近いやつ。無ければ根 — 帰る場所は 1 つでいい
-    const target = !isLost(watched, this.camera, pane)
-      ? null
-      : sel.length > 0
-        ? nearest(sel, this.camera, pane)
-        : core.rootBox(this.layout);
-    if (!target) {
+    const ind = core.indicator(this.layout, this.host.selection().ids, this.camera, this.paneSize());
+    if (!ind) {
       this.indicatorEl.style.display = "none";
       return;
     }
-    const ind = indicatorFor(target, this.camera, pane);
     this.indicatorEl.style.display = "block";
     this.indicatorEl.style.left = `${ind.x}px`;
     this.indicatorEl.style.top = `${ind.y}px`;
@@ -446,20 +419,21 @@ export class Mindmap {
 
   /** 書き出し用の SVG。全体。空なら null */
   exportSvg(): Promise<SVGSVGElement | null> {
+    const order = core.order(this.layout);
     const nodes: SVGGElement[] = [];
     const edges: SVGPathElement[] = [];
-    for (const id of this.layout.order) {
+    for (const id of order) {
       const el = this.renderer.nodeEl(id);
       if (el) nodes.push(el);
       const edge = this.renderer.edgeEl(id);
       if (edge) edges.push(edge);
     }
-    return mapToSvg({ boxes: this.layout.boxes.values(), edges, nodes, pane: this.pane });
+    return mapToSvg({ boxes: core.rects(this.layout, order), edges, nodes, pane: this.pane });
   }
 
   // ---------- input ----------
 
-  /** 見え方を変える入力（ホイールのズームとスクロール）。動かし方そのものは map/camera.ts */
+  /** 見え方を変える入力（ホイールのズームとスクロール）。動かし方そのものは core/map/camera.mbt */
   private bindWheel(): void {
     this.pane.addEventListener(
       "wheel",
@@ -467,12 +441,12 @@ export class Mindmap {
         e.preventDefault();
         if (e.ctrlKey || e.metaKey) {
           const p = this.local(e.clientX, e.clientY);
-          this.setCamera(zoomAt(this.camera, p.x, p.y, e.deltaY));
+          this.setCamera(core.zoomAt(this.camera, p.x, p.y, e.deltaY));
         } else if (e.shiftKey) {
           // Shift+ホイールは横スクロール（縦の目盛りしか出さないマウス用）
-          this.setCamera(panBy(this.camera, -(e.deltaY || e.deltaX), 0));
+          this.setCamera(core.panBy(this.camera, -(e.deltaY || e.deltaX), 0));
         } else {
-          this.setCamera(panBy(this.camera, -e.deltaX, -e.deltaY));
+          this.setCamera(core.panBy(this.camera, -e.deltaX, -e.deltaY));
         }
       },
       { passive: false },
@@ -539,13 +513,13 @@ export class Mindmap {
         return;
       }
       if (id !== null) {
-        const mod = e.shiftKey ? "shift" : e.ctrlKey || e.metaKey ? "mod" : "none";
+        const mod: core.Modifier = e.shiftKey ? "shift" : e.ctrlKey || e.metaKey ? "mod" : "none";
         // 選んでいる箱をそのまま押したなら、1 つに畳むのは離したとき（指と同じ）。
         // 押した瞬間に畳むと、複数選択を掴んで動かす手が無くなる
         if (mod === "none" && this.host.selection().ids.includes(id)) {
           this.tapped = { id, x: e.clientX, y: e.clientY };
         } else {
-          this.host.setSelection(click(this.host.selection(), id, mod, this.layout.order), true);
+          this.host.setSelection(core.click(this.layout, this.host.selection(), id, mod), true);
           this.dragCand = { id, x: e.clientX, y: e.clientY };
         }
         pane.setPointerCapture(e.pointerId);
@@ -560,9 +534,9 @@ export class Mindmap {
     pane.addEventListener("pointermove", (e) => {
       if (e.pointerType === "touch") {
         const p = this.local(e.clientX, e.clientY);
-        const g = this.fingers.move(e.pointerId, p.x, p.y);
+        const g = this.fingers.moved(e.pointerId, p.x, p.y);
         if (g) {
-          this.setCamera(pinch(this.camera, g.from, g.to));
+          this.setCamera(core.pinch(this.camera, g.from, g.to));
           return;
         }
         // 2 本乗っているあいだは、1 本ぶんの続きを進めない
@@ -591,9 +565,9 @@ export class Mindmap {
         const w = Math.abs(p.x - this.rubberStart.x);
         const h = Math.abs(p.y - this.rubberStart.y);
         Object.assign(this.rubber.style, { display: "block", left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
-        const a = toWorld(this.camera, x, y);
-        const b = toWorld(this.camera, x + w, y + h);
-        this.host.setSelection(rubber(this.layout, { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y }), false);
+        const a = core.toWorld(this.camera, x, y);
+        const b = core.toWorld(this.camera, x + w, y + h);
+        this.host.setSelection(core.rubber(this.layout, { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y }), false);
         return;
       }
       if (!this.panning) return;
@@ -607,13 +581,13 @@ export class Mindmap {
       this.dropHold();
       if (this.dragging) {
         // cancel は取り消しなので、印だけ消して Op は投げない
-        if (this.drop && e.type === "pointerup") this.host.apply(dropOp(this.drop, this.dragging.ids), false);
+        if (this.drop && e.type === "pointerup") this.host.apply(core.dropOp(this.drop, this.dragging.ids), false);
         this.endDrag();
       } else {
         this.dragCand = null;
         // 選ぶのは離したとき（pointerup）だけ。cancel は取り消しなので選ばずに捨てる
         if (this.tapped && e.type === "pointerup") {
-          this.host.setSelection(click(this.host.selection(), this.tapped.id, "none", this.layout.order), true);
+          this.host.setSelection(core.click(this.layout, this.host.selection(), this.tapped.id, "none"), true);
         }
         this.tapped = null;
         if (this.rubberStart) {
@@ -664,14 +638,7 @@ export class Mindmap {
       sel = { ids: [id], anchor: id };
       this.host.setSelection(sel, false);
     }
-    // layout.order は親が子より先（layoutMap の文書順）なので、前から 1 回
-    // なめれば「親が部分木に居るか」だけで子の判定が決まる
-    const subtree = new Set(sel.ids);
-    for (const nid of this.layout.order) {
-      const p = this.layout.boxes.get(nid)?.parent ?? null;
-      if (p && subtree.has(p.id)) subtree.add(nid);
-    }
-    this.dragging = { ids: sel.ids, subtree };
+    this.dragging = { ids: sel.ids, subtree: core.subtree(this.layout, sel.ids) };
     for (const nid of sel.ids) this.renderer.nodeEl(nid)?.classList.add("dragging");
     this.updateDrop(clientX, clientY);
   }
@@ -680,8 +647,8 @@ export class Mindmap {
   private updateDrop(clientX: number, clientY: number): void {
     if (!this.dragging) return;
     const p = this.local(clientX, clientY);
-    const at = toWorld(this.camera, p.x, p.y);
-    this.drop = resolveDrop({ at, layout: this.layout, dragging: this.dragging.subtree });
+    const at = core.toWorld(this.camera, p.x, p.y);
+    this.drop = core.drop(this.layout, at, this.dragging.subtree);
     this.paintDrop();
   }
 
@@ -698,7 +665,7 @@ export class Mindmap {
       this.markDropParent(d.id);
       return;
     }
-    const b = this.layout.boxes.get(d.id);
+    const b = core.rects(this.layout, [d.id])[0];
     if (!b) return;
     const y = d.pos === 1 ? b.y : b.y + b.h;
     this.dropLine.setAttribute("x1", String(b.x));
@@ -725,7 +692,7 @@ export class Mindmap {
   /**
    * ファイルのドラッグ中、その画面の点に落ちる先を予告する（app/dnd.ts）。
    * `null` は予告を消す合図。当たった先のノードの id（無ければ null）を返す —
-   * ドラッグ中はノードの部分木を弾く理由が無いので、`resolveDrop` は使わず
+   * ドラッグ中はノードの部分木を弾く理由が無いので、落とし先の判定は使わず
    * `nodeAt` だけで決める。
    */
   markFileDrop(at: { x: number; y: number } | null): number | null {
@@ -814,7 +781,7 @@ export class Mindmap {
     }
     const sel = this.host.selection();
     if (!sel.ids.includes(id)) this.host.setSelection({ ids: [id], anchor: id }, false);
-    this.menu.show(x, y, menuOf(contextItems(this.layout, this.host.selection()), (i) => this.act(i)));
+    this.menu.show(x, y, menuOf(core.context(this.layout, this.host.selection()), (i) => this.act(i)));
   }
 
   /** 右クリック。触った箱が選ばれていなければそれへ選び直してから開く。長押しが
@@ -831,8 +798,8 @@ export class Mindmap {
     });
   }
 
-  /** keys.ts が言った「何をするか」を実行する。意味はあちらが持ち、ここは配線だけ */
-  private act(intent: Intent): void {
+  /** core が言った「何をするか」を実行する。意味はあちらが持ち、ここは配線だけ */
+  private act(intent: core.Intent): void {
     switch (intent.kind) {
       case "op":
         this.host.apply(intent.op, intent.edit);
@@ -892,9 +859,10 @@ export class Mindmap {
         e.preventDefault();
         return;
       }
-      const key: Key = { key: e.key, shift: e.shiftKey, mod: e.ctrlKey || e.metaKey, alt: e.altKey };
+      const key: core.Key = { key: e.key, shift: e.shiftKey, mod: e.ctrlKey || e.metaKey, alt: e.altKey };
       const picked = this.host.picked();
-      const intent = picked !== null ? keyedCard(this.layout, picked, key) : keyed(this.layout, this.host.selection(), key);
+      const intent =
+        picked !== null ? core.keyedCard(this.layout, picked, key) : core.keyed(this.layout, this.host.selection(), key);
       if (intent === null) {
         // 表が断った Tab（選んでいない・前の兄弟が無い）でも、地図から焦点を逃がさない
         if (e.key === "Tab") e.preventDefault();

@@ -3,7 +3,9 @@ pkgtype(kind: "library")
 import {
   "moonbitlang/core/cmp",
   "moonbitlang/core/double",
+  "moonbitlang/core/json",
   "moonbitlang/core/math",
   "mmm-app/core/tree",
   "mmm-app/core/view",
+  "mmm-app/core/op",
 }

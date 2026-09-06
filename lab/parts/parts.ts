@@ -11,7 +11,8 @@ import { paneHint } from "../../src/app/hint.ts";
 import { type Ask, askForm } from "../../src/app/ask.ts";
 import { ASKS } from "../../src/app/asks.ts";
 import { menu } from "../../src/map/menu.ts";
-import { contextItems, menuOf } from "../../src/map/context.ts";
+import * as core from "../../src/coreApi.ts";
+import { menuOf } from "../../src/mindmap.ts";
 import { type Files, filesMenu } from "../../src/app/files.ts";
 import { moreMenu } from "../../src/app/more.ts";
 import { exportWays } from "../../src/app/export.ts";
@@ -57,7 +58,7 @@ function context(label: string | null): HTMLDivElement {
   const { view, L } = sample();
   const id = label === null ? null : named(view, label).id;
   const sel = id === null ? NONE : { ids: [id], anchor: id };
-  return menu(menuOf(contextItems(L, sel), nothing));
+  return menu(menuOf(core.context(L, sel), nothing));
 }
 
 const SAVED: Files = {
