@@ -117,7 +117,7 @@ pub fn lines(text : String) -> Array[String]? {
   Some(
     text
     .split("\n")
-    .map(l => l.trim(chars=" \t\r").to_string())
+    .map(l => l.trim(chars=" \t\r").to_owned())
     .filter(l => !l.is_empty())
     .collect(),
   )
