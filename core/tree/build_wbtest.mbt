@@ -517,7 +517,7 @@ test "項目の中の見出しは子 — 見出しの後ろは文書と同じく
                   {
                     "id": 4,
                     "label": "s",
-                    "body": [{ "id": 5, "content": ["Opaque", "text"] }],
+                    "body": [{ "id": 5, "content": ["Raw", "text"] }],
                     "children": [
                       { "id": 6, "label": "k", "body": [], "children": [] },
                     ],

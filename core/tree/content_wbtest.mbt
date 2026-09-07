@@ -1,6 +1,6 @@
 // 骨格でないものが、いま積んでいるノードの中身になることを固定する。
 //
-// 絵になるのは 4 つだけで、疑わしきは Opaque（原文のまま）。
+// 絵になるのは 4 つだけで、疑わしきは Raw（原文のまま）。
 
 ///|
 test "散文はノードの中身になる" {
@@ -14,7 +14,7 @@ test "散文はノードの中身になる" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Opaque", "hello"] }],
+            "body": [{ "id": 3, "content": ["Raw", "hello"] }],
             "children": [],
           },
         ],
@@ -37,8 +37,8 @@ test "中身は文書順に並ぶ" {
             "id": 2,
             "label": "a",
             "body": [
-              { "id": 3, "content": ["Opaque", "hello"] },
-              { "id": 4, "content": ["Opaque", "world"] },
+              { "id": 3, "content": ["Raw", "hello"] },
+              { "id": 4, "content": ["Raw", "world"] },
             ],
             "children": [],
           },
@@ -61,14 +61,14 @@ test "中身は深さで振り分けられる" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Opaque", "x"] }],
+            "body": [{ "id": 3, "content": ["Raw", "x"] }],
             "children": [
               [
                 "HeadingNode",
                 {
                   "id": 4,
                   "label": "b",
-                  "body": [{ "id": 5, "content": ["Opaque", "y"] }],
+                  "body": [{ "id": 5, "content": ["Raw", "y"] }],
                   "children": [],
                 },
               ],
@@ -85,7 +85,7 @@ test "中身は深さで振り分けられる" {
 test "最初の骨格より前の散文は文書のもの" {
   json_inspect(parse("intro\n\n# a\n"), content={
     "eol": "Lf",
-    "body": [{ "id": 2, "content": ["Opaque", "intro"] }],
+    "body": [{ "id": 2, "content": ["Raw", "intro"] }],
     "roots": [
       {
         "node": [
@@ -170,7 +170,7 @@ test "混ざった段落は切り分けない" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Opaque", "see ![alt](x.png)"] }],
+            "body": [{ "id": 3, "content": ["Raw", "see ![alt](x.png)"] }],
             "children": [],
           },
         ],
@@ -287,7 +287,7 @@ test "引用と表は原文のまま" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Opaque", "> quote"] }],
+            "body": [{ "id": 3, "content": ["Raw", "> quote"] }],
             "children": [],
           },
         ],
@@ -309,7 +309,7 @@ test "項目にも中身が付く" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Opaque", "hello"] }],
+            "body": [{ "id": 3, "content": ["Raw", "hello"] }],
             "children": [],
           },
         ],
@@ -394,8 +394,8 @@ test "入れ子の項目でも、畳みは包んだ見出しに乗る" {
 }
 
 ///|
-/// Opaque も同じ規則で切る。
-test "項目の中の Opaque も列 0 に揃う" {
+/// Raw も同じ規則で切る。
+test "項目の中の Raw も列 0 に揃う" {
   json_inspect(parse("- a\n\n  <!-- x\n  y -->\n"), content={
     "eol": "Lf",
     "body": [],
@@ -406,7 +406,7 @@ test "項目の中の Opaque も列 0 に揃う" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Opaque", "<!-- x\ny -->"] }],
+            "body": [{ "id": 3, "content": ["Raw", "<!-- x\ny -->"] }],
             "children": [],
           },
         ],
@@ -470,7 +470,7 @@ test "リンクの定義行は位置ごと残る" {
           {
             "id": 2,
             "label": "r",
-            "body": [{ "id": 3, "content": ["Opaque", "[a]: b \"c\""] }],
+            "body": [{ "id": 3, "content": ["Raw", "[a]: b \"c\""] }],
             "children": [
               [
                 "HeadingNode",
@@ -504,7 +504,7 @@ test "定義行が文末にあっても残る" {
                 {
                   "id": 3,
                   "label": "h",
-                  "body": [{ "id": 4, "content": ["Opaque", "[a]: b"] }],
+                  "body": [{ "id": 4, "content": ["Raw", "[a]: b"] }],
                   "children": [],
                 },
               ],
@@ -567,8 +567,8 @@ test "数式とディレクティブの閉じは残る" {
             "id": 2,
             "label": "r",
             "body": [
-              { "id": 3, "content": ["Opaque", "$$\nx\n$$"] },
-              { "id": 4, "content": ["Opaque", ":::note\ny\n:::"] },
+              { "id": 3, "content": ["Raw", "$$\nx\n$$"] },
+              { "id": 4, "content": ["Raw", ":::note\ny\n:::"] },
             ],
             "children": [],
           },
@@ -599,7 +599,7 @@ test "項目の中の定義行は項目の中に残る" {
               {
                 "id": 3,
                 "label": "b",
-                "body": [{ "id": 4, "content": ["Opaque", "[q]: /r"] }],
+                "body": [{ "id": 4, "content": ["Raw", "[q]: /r"] }],
                 "children": [],
               },
             ],
@@ -710,7 +710,7 @@ test "定義行は保留中の水平線を飾りに落とす" {
                   "label": "a",
                   "body": [
                     { "id": 4, "content": "ThematicBreak" },
-                    { "id": 5, "content": ["Opaque", "[q]: /r"] },
+                    { "id": 5, "content": ["Raw", "[q]: /r"] },
                   ],
                   "children": [],
                 },
@@ -731,7 +731,7 @@ test "定義行は保留中の水平線を飾りに落とす" {
 ///|
 /// 素の URL の行と `<URL>` は、書き方が違うだけの同じリンク。
 /// **見える字が URL そのもの**なので `text` は URL になる。
-/// 開ける先だけ（`http(s)`）で、字が混ざれば Opaque。
+/// 開ける先だけ（`http(s)`）で、字が混ざれば Raw。
 test "素の URL とオートリンク" {
   fn body(md : String) -> Json {
     match parse("# a\n\n" + md + "\n").roots[0].node {
@@ -769,10 +769,10 @@ test "素の URL とオートリンク" {
           { "text": "http://e.com", "href": "http://e.com", "title": "" },
         ],
       ],
-      [["Opaque", "see https://e.com/x"]],
-      [["Opaque", "https://e.com/x y"]],
-      [["Opaque", "ftp://e.com/x"]],
-      [["Opaque", "<mailto:a@e.com>"]],
+      [["Raw", "see https://e.com/x"]],
+      [["Raw", "https://e.com/x y"]],
+      [["Raw", "ftp://e.com/x"]],
+      [["Raw", "<mailto:a@e.com>"]],
     ],
   )
 }

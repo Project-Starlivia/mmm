@@ -28,7 +28,7 @@ test "形が揃えば、そのノードの畳み" {
                     "id": 3,
                     "label": "h",
                     "fold": { "open": false, "summary": "h" },
-                    "body": [{ "id": 4, "content": ["Opaque", "body"] }],
+                    "body": [{ "id": 4, "content": ["Raw", "body"] }],
                     "children": [],
                   },
                 ],
@@ -275,7 +275,7 @@ test "閉じの無い開きはただの文字" {
           {
             "id": 2,
             "label": "r",
-            "body": [{ "id": 3, "content": ["Opaque", "<details>"] }],
+            "body": [{ "id": 3, "content": ["Raw", "<details>"] }],
             "children": [
               [
                 "HeadingNode",
@@ -302,7 +302,7 @@ test "相手の居ない閉じもただの文字" {
           {
             "id": 2,
             "label": "r",
-            "body": [{ "id": 3, "content": ["Opaque", "</details>"] }],
+            "body": [{ "id": 3, "content": ["Raw", "</details>"] }],
             "children": [],
           },
         ],
@@ -1074,14 +1074,14 @@ test "名前が違うタグは畳みの開きではない" {
           {
             "id": 2,
             "label": "r",
-            "body": [{ "id": 3, "content": ["Opaque", "<details-x>"] }],
+            "body": [{ "id": 3, "content": ["Raw", "<details-x>"] }],
             "children": [
               [
                 "HeadingNode",
                 {
                   "id": 4,
                   "label": "a",
-                  "body": [{ "id": 5, "content": ["Opaque", "</details>"] }],
+                  "body": [{ "id": 5, "content": ["Raw", "</details>"] }],
                   "children": [],
                 },
               ],
@@ -1205,7 +1205,7 @@ test "項目の畳みも領域の後ろを見る" {
                     },
                   ],
                 },
-                { "id": 4, "content": ["Opaque", "x"] },
+                { "id": 4, "content": ["Raw", "x"] },
               ],
               "children": [],
             },
@@ -1247,7 +1247,7 @@ test "script の中の閉じは綴りではない" {
                       {
                         "id": 4,
                         "content": [
-                          "Opaque", "<script>\nvar x = \"</details>\";\n</script>",
+                          "Raw", "<script>\nvar x = \"</details>\";\n</script>",
                         ],
                       },
                     ],
@@ -1290,7 +1290,7 @@ test "コメントの中の閉じは綴りではない" {
                     "label": "a",
                     "fold": { "open": false, "summary": "a" },
                     "body": [
-                      { "id": 4, "content": ["Opaque", "<!-- </details> -->"] },
+                      { "id": 4, "content": ["Raw", "<!-- </details> -->"] },
                     ],
                     "children": [],
                   },
@@ -1374,7 +1374,7 @@ test "飾りの水平線が領域の中なら畳み" {
                     "label": "a",
                     "fold": { "open": false, "summary": "a" },
                     "body": [
-                      { "id": 4, "content": ["Opaque", "body"] },
+                      { "id": 4, "content": ["Raw", "body"] },
                       { "id": 5, "content": "ThematicBreak" },
                     ],
                     "children": [],
@@ -1464,7 +1464,7 @@ test "飾りの水平線が閉じの直後なら中身" {
                   ],
                 },
                 { "id": 4, "content": "ThematicBreak" },
-                { "id": 5, "content": ["Opaque", "some text"] },
+                { "id": 5, "content": ["Raw", "some text"] },
               ],
               "children": [],
             },
@@ -1616,7 +1616,7 @@ test "後ろの迷子のタグは跨がない" {
                     },
                   ],
                 },
-                { "id": 4, "content": ["Opaque", "<details>"] },
+                { "id": 4, "content": ["Raw", "<details>"] },
               ],
               "children": [
                 [
@@ -1789,7 +1789,7 @@ test "擬似コメントの中の閉じは綴りではない" {
                     "label": "h",
                     "fold": { "open": false, "summary": "h" },
                     "body": [
-                      { "id": 4, "content": ["Opaque", "<?x </details> ?>"] },
+                      { "id": 4, "content": ["Raw", "<?x </details> ?>"] },
                     ],
                     "children": [],
                   },
@@ -1825,7 +1825,7 @@ test "pre は生テキストではない" {
               "body": [
                 {
                   "id": 3,
-                  "content": ["Opaque", "<details>\n<summary>h</summary>"],
+                  "content": ["Raw", "<details>\n<summary>h</summary>"],
                 },
               ],
               "children": [

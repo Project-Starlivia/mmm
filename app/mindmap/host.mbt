@@ -45,4 +45,7 @@ pub(all) struct Host {
   epoch : () -> Int
   /// しらせ（app/notice.ts の言葉）
   failed : (String) -> Unit
+  /// ペインから帯へ抜ける（Escape）。Tab は子を足すのに使うので、キーボードだけで
+  /// 帯やブラウザへ戻る道はこれ 1 つ
+  leave : () -> Unit
 }

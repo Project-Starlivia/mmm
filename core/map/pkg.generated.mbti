@@ -270,6 +270,7 @@ pub(all) enum Intent {
   Draw(id~ : Int)
   Paste
   Copy(cut~ : Intent?)
+  Leave
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 
 pub(all) struct Item {

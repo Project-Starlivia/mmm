@@ -143,5 +143,6 @@ pub fn Mindmap::act(self : Mindmap, intent : @map.Intent) -> Unit {
           _ => ()
         }
       })
+    Leave => (self.host.leave)()
   }
 }

@@ -275,7 +275,7 @@ fn written(doc : Doc) -> String {
         Svg(s) => bag.push(s)
         ThematicBreak => ()
         Details(text=s, ..) => bag.push(s)
-        Opaque(s) => bag.push(s)
+        Raw(s) => bag.push(s)
       }
     }
   }

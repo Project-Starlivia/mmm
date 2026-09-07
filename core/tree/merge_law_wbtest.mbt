@@ -80,7 +80,7 @@ fn changed(doc : Doc, id : Int, how : Change) -> Doc {
             x,
             body_of(x).mapi((i, b) => {
               if i == 0 {
-                { id: b.id, content: Opaque("changed"), }
+                { id: b.id, content: Raw("changed"), }
               } else {
                 b
               }

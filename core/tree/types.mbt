@@ -107,8 +107,8 @@ pub(all) struct Block {
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// 中身そのもの。**解釈の包みは作らない** —
-/// 「解釈できた / できなかった」は Opaque という名前が担う。
+/// 中身そのもの。**解釈の包みは作らない** — 読み解けたかどうかで型は分けず、
+/// 読み解かなかったものは Raw が原文のまま持つ。
 /// カードかどうかは描画側の分類で、core は意味だけを持つ。
 pub(all) enum Content {
   Image(alt~ : String, src~ : String, title~ : String)
@@ -122,6 +122,6 @@ pub(all) enum Content {
   /// open / summary / body は読み取り（GitHub が描くのと同じもの）で、導出はしない。
   /// body は開き（と summary）の後ろから閉じの手前までの原文
   Details(text~ : String, open~ : Bool, summary~ : String?, body~ : String)
-  /// 読み解かない原文。コメントもここ
-  Opaque(String)
+  /// 原文のまま。読み解いていないものは全部ここ（コメント・表・引用も）
+  Raw(String)
 } derive(Eq, Debug, ToJson, FromJson)

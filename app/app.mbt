@@ -141,6 +141,7 @@ pub fn App::new(
       tokens_block: ed.tokens_block,
       epoch: ed.epoch,
       failed: msg => @parts.failed(doc, msg),
+      leave: () => focus_bar(doc),
     },
   )
   let theme = @bar.Theme::new(el(doc, "logo"), ed.set_theme)
