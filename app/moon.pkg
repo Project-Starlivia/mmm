@@ -1,0 +1,30 @@
+pkgtype(kind: "library")
+
+import {
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/string",
+  "moonbitlang/async/js_async",
+  "mizchi/js/core",
+  "mizchi/js/builtins/global",
+  "mizchi/js/builtins/arraybuffer",
+  "mizchi/js/web/encoding",
+  "mizchi/js/web/streams",
+  "mizchi/js_browser/dom",
+  "mmm/core/tree",
+  "mmm/core/op",
+  "mmm/core/map",
+  "mmm/core/read",
+  "mmm/app/web",
+  "mmm/app/parts",
+  "mmm/app/prefs",
+  "mmm/app/bar",
+  "mmm/app/disk",
+  "mmm/app/mindmap",
+}
+
+import {
+  "moonbitlang/async",
+  "mizchi/js_browser/test_utils",
+} for "wbtest"
+
+supported_targets = "js"

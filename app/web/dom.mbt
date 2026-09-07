@@ -168,12 +168,6 @@ pub fn open_url(url : String) -> Unit {
 }
 
 ///|
-/// 約束（Promise）が済んだら続きを呼ぶ
-pub fn after(promise : @core.Any, k : (@core.Any) -> Unit) -> Unit {
-  promise._call("then", [@core.from_fn1(k)]) |> ignore
-}
-
-///|
 /// 出来事の細部（click なら押した回数。キーで押した click は 0）
 pub fn detail(e : @core.Any) -> Int {
   e._get("detail").cast()

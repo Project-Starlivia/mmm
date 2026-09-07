@@ -188,6 +188,8 @@ pub fn show(@dom.Element, String, Bool) -> Unit
 
 pub fn show_modal(@dom.Element) -> Unit
 
+pub fn spawn(async () -> Unit) -> Unit
+
 pub fn stamp() -> String
 
 pub fn stop(@core.Any) -> Unit

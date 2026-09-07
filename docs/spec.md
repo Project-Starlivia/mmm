@@ -45,43 +45,45 @@ core/   MoonBit — module `mmm/core`。文書モデルと地図の判断。**DO
                 copy(選んだ部分木の原文) / name(文書の名前。ファイル名の柵) / head(frontmatter の
                 画像フォルダの宣言を読む・書く、引っ越しの追従、綴りの正規化)
 app/    MoonBit — module `mmm/app`。core に依存し、DOM を触る。試験は happy-dom。moon.work が 2 つを 1 つの
-        workspace にし、build は `_build/js/release/build/mmm/app/js/js.js` に出る
-  web/          DOM の小さな道具（js だけ）。svg(要素を作る) / dom(style・矩形・捕捉・
-                欄の値・出来事の的・約束を 1 行ずつ包む) / disk(File System Access・IndexedDB・Blob) /
-                canvas(紙。2d の文脈と手) / out(直列化・ラスタ化・ダウンロード・クリップボード・埋め込み) /
-                drag(ファイルのドラッグ)。**他の package は `_get` / `_call` を書かない**
-  parts/        部品（js だけ）。icons(絵の唯一の源。Lucide の綴り) / notice(しらせ。言葉の表も) /
-                hint(空のときの言い出し) / tool(ペインの隅に浮く道具の器) / menu(メニューの器。
-                行の形・入れ子・キーで辿る・外を押せば閉じる)。試験は happy-dom
-  app/          帯と枠（js だけ）。persist(持ち物。localStorage の綴りはここだけ) / panes(2 つの
-                出し分けと分割線) / shortcuts(全体のキー) / theme(テーマ・アクセントカラー・favicon) /
-                logo(ロゴの唯一の源) / ask(聞く器。<dialog>) / asks(聞くことの綴りの全部) /
-                share(本文を URL に載せる。gzip → base64url。非同期は js_async の Promise) /
-                export(Mindmap を外へ出す。出し方 4 通りの表・ヘッダのボタン・出し口) /
-                draw(その場で描く窓。紙は手の並びの写像) / files(帯の Files の行。文書と画像フォルダ) /
-                more(帯の ⋯ の行)。試験は happy-dom
-  file/         ディスク（js だけ）。io(File System Access API の窓口。開く・保存・改名・覚えている文書) /
-                handles(札を IndexedDB に置く台帳。置き場は閉包で受け、試験は手元の表) /
-                assets(画像の読み書き。宣言は md の頭、許可は札。宣言を決める / 直すのは settle で、
-                md に書くのは app/main の set_declared。置く名前の柵と宣言の柵は純粋で試験する) /
-                dnd(落ちたファイルの振り分け。.md は開く、画像はノードの上だけ受ける)。札は不透明な持ち手
-  render/       地図のペイン（js だけ）。card(Card 1 枚 → SVG) / render(Renderer。id → 要素、
-                transform / d のキャッシュ、並び直し、paint) / mindmap(器と入力。ホイール・
-                ポインタ・キー・右クリック・長押し・ドラッグを受けて map/ の判断に繋ぎ、
-                答えを host へ返す。輪・矩形・落とし先の印・針・視点・右クリックの器) /
-                field(ラベルとカードの欄) / pick(選んでいるカードの枠と ×) / host(外に頼るものの閉包) /
-                export(全体を 1 枚の svg に。計算済みスタイルを焼き込み、透かしを付ける)。
-                class と data-* は style.css との契約。試験は happy-dom
-  main/         束ねる場所（js だけ）。app(1 トランザクション = 1 サイクルの出口 cycle、操作の入口
-                apply(op, edit) — focus を選ぶ — と write(op) — 選択に触らない、持ち主の focusin、
-                貼り付け・投下・描いた絵の保存、ファイル I/O、帯。文書から導く値は持たない — 持つのは
-                ファイルの状態だけ。CodeMirror の読み書きは Editor の閉包で受ける。試験は happy-dom と
-                md 1 本の写し)
+        workspace にし、build は `_build/js/release/build/mmm/app/js/js.js` に出る。
+        科の決めは docs/superpowers/specs/2026-09-07-modules-design.md — 型の周りに置く、層で割らない、
+        package の名は提供するもの 1 語、中のファイルは持つ型の名
+  app.mbt       App — 束ねる場所。1 トランザクション = 1 サイクルの出口 cycle、操作の入口 apply(op, edit)
+                — focus を選ぶ — と write(op) — 選択に触らない、持ち主の focusin、貼り付け・投下・描いた絵の
+                保存、ファイル I/O、帯、起動。文書から導く値は持たない — 持つのはファイルの状態だけ。
+                CodeMirror の読み書きは Editor の閉包で受ける。試験は md 1 本の写し
+  panes.mbt     枠。2 つのペインの出し分けと分割線（居場所の算術は純粋で、試験は数だけ）
+  shortcuts.mbt 全体のキー
+  link.mbt      本文を URL に載せる / 戻す（gzip → base64url。非同期は js_async の Promise）
+  prefs/        持ち物（theme / color / way / grab）。localStorage の綴りはここだけ
+  bar/          帯（index.html の `#bar`）。files(Files の並び) / more(⋯ の並び) / export(書き出し —
+                ボタンと出し方 4 通り・出し口) / theme(ロゴ・アクセントカラー・ライト/ダーク・favicon) /
+                name(名乗り — ファイル名と改名の入口、未保存の印)。並びは純粋な表で、状態を受けて行を返す
+  disk/         ディスク。disk(Disk — File System Access API の窓口。開く・保存・改名) /
+                recent(覚えている文書と画像フォルダ。札を IndexedDB に置く台帳。置き場は閉包で受け、試験は手元の表) /
+                images(画像の読み書き。宣言は md の頭、許可は札。宣言を決める / 直すのは settle で、
+                md に書くのは App の set_declared。置く名前の柵と宣言の柵は純粋で試験する) /
+                drop(落ちたファイルの振り分け。.md は開く、画像はノードの上だけ受ける)。札は不透明な持ち手
+  mindmap/      地図のペイン。mindmap(Mindmap そのもの — 器・寸法・視点の当て方・render / fit / center /
+                refresh。判断は core/map) / input(入ってくるもの — ホイール・ポインタ・掴んで落とす・クリック・
+                長押し・キー・右クリックを判断に繋ぐ) / act(出ていくもの — Intent → host の操作、右クリックの行) /
+                marks(印 — 選択の塗り・輪・針・落とし先の線) / render(Renderer。Layout → SVG の差分) /
+                card(Card 1 枚 → SVG) / field(ラベルとカードの欄) / pick(選んでいるカードの枠と ×) /
+                host(外に頼るものの閉包) / measure(字の実測。canvas) / svg(全体を 1 枚の svg に写す)。
+                class と data-* は style.css との契約
+  parts/        器 — 文書を知らず、値を返す。icons(絵の唯一の源。Lucide の綴り) / notice(しらせ。言葉の表も) /
+                hint(空のときの言い出し) / tool(ペインの隅に浮く道具の器) / menu(メニューの器。行の形・入れ子・
+                キーで辿る・外を押せば閉じる) / ask(聞く器。<dialog>) / asks(聞くことの綴りの全部) /
+                draw(お絵描きの窓。紙は手の並びの写像) / color(アクセントカラーの読み。綴りの源は style.css)
+  web/          browser の API を 1 行ずつ包む。svg(要素を作る) / dom(style・矩形・捕捉・欄の値・出来事の的・
+                約束) / fs(File System Access・IndexedDB・Blob) / async(約束の糊。spawn / after / settled) / canvas(紙。2d の文脈と手) /
+                out(直列化・ラスタ化・ダウンロード・クリップボード・埋め込み) / drag(ファイルのドラッグ) /
+                clip(クリップボード・アドレス・字の幅)。**他の package は `_get` / `_call` を書かない**
   js/           browser への出口。mmmMain / mmmCycle と、EditorState の field が読む問い合わせ
                 （mmmSurvey / mmmChosen / mmmCarry …）、見本（lab）が置く部品。読みも選択もその位置も
                 不透明な持ち手で往復し、渡るのは数・字・真偽と編集列だけ
 src/    TypeScript — **CodeMirror（md ペイン）だけ。** 文書の真実はその中の文字列
-  coreApi.ts   core の出口と入口。形を整える唯一の場所（main(editor) が CodeMirror の読み書きを
+  app.ts       core の出口と入口（app/js）。形を整える唯一の場所（main(editor) が CodeMirror の読み書きを
                閉包で渡し、cycle がサイクルを回す。木は持ち手を渡して問い合わせる — spot / chosen …）。
                木も箱も core から出ない
   state.ts     文書から導けるものの置き場(EditorState の field: tree = core の読みの持ち手、anchors = 地図の
@@ -89,14 +91,14 @@ src/    TypeScript — **CodeMirror（md ペイン）だけ。** 文書の真実
                setAnchors / focused / setHolder。DOM を知らない)
   editor.ts    Markdown 側(CodeMirror 6、履歴も CodeMirror。state.ts の field を載せ、
                1 トランザクションを 1 回 onUpdate で外へ。薄塗りは state.ts の範囲から
-               field で導く。フェンスの中は map/highlight.ts と同じ言語表で色を付ける)
+               field で導く。フェンスの中は highlight.ts と同じ言語表で色を付ける)
   style.css    全体のスタイル(部品ごとの塊。入れ子は CSS 自身の機能。色・影・輪の数字は
                `:root` のトークンだけが持ち、状態は `.selected` / `.on` / `aria-disabled` で言う)
-  map/         highlight(コードの色分け。CodeMirror の言語表を借りる。core の描画に閉包で渡す)
-  main.ts      入口。CodeMirror を立て、その読み書きを app/main に閉包で渡し、
+  highlight.ts コードの色分け。CodeMirror の言語表を借りる。core の描画に閉包で渡す
+  main.ts      入口。CodeMirror を立て、その読み書きを app（App）に閉包で渡し、
                1 トランザクションごとに cycle を呼ぶだけ
 test/   検証 — core に触らない純粋層(camera / geometry / gesture / highlight /
-        indicator / panes / share / assets / metrics / head)と、core の出口(coreApi)・
+        indicator / panes / share / assets / metrics / head)と、core の出口(app)・
         分類(cards)・配置(layout)・select / caret / keys / label / context / drop /
         card / copy / paste。tools/(負荷サンプル生成)、fixtures/(負荷サンプル)
 lab/    見るための道具（`pnpm run lab`）。index.html は md がどう読まれるか（mdAst /
@@ -952,7 +954,7 @@ Markdown 無し   ←   両方   →   Mindmap 無し
 focus** — ノードを消せば次の兄弟 → 前の兄弟 → 親（core.md「操作」）。
 
 **選択を書くのは持ち主の操作だけ。** ファイルの投下・宣言の書き換え・画像の保存は md を
-書くだけで、選択に触らない（app/main の `write`）。
+書くだけで、選択に触らない（App の `write`）。
 
 複数選択は任意の集合。md 側は範囲・複数カーソルが掛かる全部、地図側は `Mod+クリック` /
 矩形 / `Shift+矢印`。
@@ -974,7 +976,7 @@ focus** — ノードを消せば次の兄弟 → 前の兄弟 → 親（core.md
 書き出せば畳んだ姿が出る。どちらも一時的な UI 状態(選択・ドロップ印)は
 含まれない。
 
-**出し方はどちらも同じ 4 つ**で、並びの定義は `app/app/export.mbt` の 1 か所。
+**出し方はどちらも同じ 4 つ**で、並びの定義は `app/bar/export.mbt` の 1 か所。
 
 | | |
 |---|---|

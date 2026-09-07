@@ -11,7 +11,7 @@
 // 決めは docs/superpowers/specs/2026-09-05-holder-design.md。
 
 import { type EditorState, type Extension, StateEffect, StateField, type Transaction } from "@codemirror/state";
-import * as core from "./coreApi.ts";
+import * as core from "./app.ts";
 
 /** core が読んだ木と地番（持ち手）。doc が変わったときだけ読み直す */
 export const tree = StateField.define<core.Survey>({

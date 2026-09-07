@@ -1,0 +1,211 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm/app/mindmap"
+
+import {
+  "mizchi/js/builtins/global",
+  "mizchi/js_browser/dom",
+  "mmm/app/parts",
+  "mmm/core/map",
+  "mmm/core/op",
+  "mmm/core/read",
+  "moonbitlang/core/set",
+}
+
+// Values
+pub fn card_rect_of(@map.Layout, Int) -> @map.Rect?
+
+pub fn draw_card(@dom.Document, @map.Card, Spot, Scene) -> Array[@dom.Element]
+
+pub fn items_of(Array[@map.Entry], (@map.Intent) -> Unit) -> Array[@parts.Entry]
+
+pub fn measure(@dom.Document) -> (@map.Font, String) -> Double
+
+// Errors
+
+// Types and methods
+pub struct CardField {
+  box : @dom.Element
+  highlight : @dom.Element
+  textarea : @dom.Element
+  pane : @dom.HTMLElement
+  measure : (@map.Font, String) -> Double
+  tokens : (String) -> Array[Array[Token]]
+  commit : (Int, String) -> Unit
+  mut opened : String
+  mut id : Int?
+  mut last : (@map.Layout, @map.Camera)?
+}
+pub fn CardField::close(Self) -> Unit
+pub fn CardField::editing(Self) -> Int?
+pub fn CardField::new(@dom.Document, @dom.HTMLElement, (@map.Font, String) -> Double, (String) -> Array[Array[Token]], (Int, String) -> Unit) -> Self
+pub fn CardField::open(Self, Int, @map.Layout, @map.Camera, String, Int?, Int?) -> Unit
+pub fn CardField::place(Self, @map.Layout, @map.Camera) -> Unit
+
+pub struct CardPick {
+  el : @dom.Element
+  frame : @dom.Element
+  delete : @dom.Element
+  circle : @dom.Element
+  strokes : Array[@dom.Element]
+}
+pub fn CardPick::hide(Self) -> Unit
+pub fn CardPick::new(@dom.Document) -> Self
+pub fn CardPick::show(Self, Int, @map.Rect) -> Unit
+
+pub struct Dragging {
+  ids : Array[Int]
+  subtree : Array[Int]
+}
+
+pub(all) struct Host {
+  survey : () -> @read.Survey
+  measure : (@map.Font, String) -> Double
+  image_url : (String) -> String?
+  image_hint : () -> String?
+  connect_assets : () -> Unit
+  holder : () -> @read.Holder
+  selection : () -> @map.Selection
+  set_selection : (@map.Selection, Bool) -> Unit
+  picked : () -> Int?
+  set_picked : (Int?) -> Unit
+  block_text : (Int) -> String
+  apply : (@op.Op, Bool) -> Int?
+  paste : () -> Unit
+  copy : ((Bool) -> Unit) -> Unit
+  draw : (Int) -> Unit
+  read_clipboard : ((String) -> Unit) -> Unit
+  tokens : (Array[String], String) -> Array[Array[Token]]
+  tokens_block : (String) -> Array[Array[Token]]
+  epoch : () -> Int
+  failed : (String) -> Unit
+}
+
+pub struct LabelField {
+  input : @dom.Element
+  pane : @dom.HTMLElement
+  measure : (@map.Font, String) -> Double
+  rename : (Int, String) -> Unit
+  mut id : Int?
+  mut composing : Bool
+  mut last : (@map.Layout, @map.Camera)?
+}
+pub fn LabelField::close(Self) -> Unit
+pub fn LabelField::editing(Self) -> Int?
+pub fn LabelField::new(@dom.Document, @dom.HTMLElement, (@map.Font, String) -> Double, (Int, String) -> Unit) -> Self
+pub fn LabelField::open(Self, Int, @map.Layout, @map.Camera, String, String?) -> Unit
+pub fn LabelField::place(Self, @map.Layout, @map.Camera) -> Unit
+
+pub struct Mindmap {
+  pane : @dom.HTMLElement
+  host : Host
+  world : @dom.Element
+  renderer : Renderer
+  hint : @dom.Element
+  indicator_el : @dom.Element
+  mut camera : @map.Camera
+  mut layout : @map.Layout
+  fingers : @map.Fingers
+  mut panning : Panning?
+  mut fit_pending : Bool
+  mut rect : @dom.DOMRect?
+  caret_layer : @dom.Element
+  caret_rings : Array[@dom.Element]
+  rubber : @dom.Element
+  mut rubber_start : @map.Pt?
+  mut rubber_size : (Double, Double)
+  mut tapped : Press?
+  mut grab : Bool
+  mut space_held : Bool
+  label : LabelField
+  card : CardField
+  pick : CardPick
+  mut hold : @global.Timer?
+  mut hold_at : @map.Pt?
+  mut menu_by_hold : Bool
+  mut drag_cand : Press?
+  mut dragging : Dragging?
+  mut drop : @map.Drop?
+  mut drop_parent : Int?
+  drop_line : @dom.Element
+  menu : @parts.Menu
+}
+pub fn Mindmap::act(Self, @map.Intent) -> Unit
+pub fn Mindmap::begin_edit(Self, Int, String?) -> Bool
+pub fn Mindmap::center_on_target(Self) -> Unit
+pub fn Mindmap::edit_card(Self, Int, from? : Int?, to? : Int?, text? : String?) -> Unit
+pub fn Mindmap::fit_view(Self) -> Unit
+pub fn Mindmap::mark_file_drop(Self, @map.Pt?) -> Int?
+pub fn Mindmap::new(@dom.HTMLElement, Host) -> Self
+pub fn Mindmap::refresh_selection(Self) -> Unit
+pub fn Mindmap::render(Self) -> Unit
+pub fn Mindmap::set_grab(Self, Bool) -> Unit
+pub fn Mindmap::svg_parts(Self) -> (Array[@map.Rect], Array[@dom.Element], Array[@dom.Element])
+pub async fn Mindmap::to_svg(Self) -> @dom.Element?
+
+pub struct Panning {
+  px : Double
+  py : Double
+  ox : Double
+  oy : Double
+}
+
+pub struct Press {
+  id : Int
+  x : Double
+  y : Double
+}
+
+pub struct Renderer {
+  doc : @dom.Document
+  edge_layer : @dom.Element
+  node_layer : @dom.Element
+  node_els : Map[Int, @dom.Element]
+  edge_els : Map[Int, @dom.Element]
+  shapes : Map[Int, Shape]
+  node_tf : Map[Int, String]
+  edge_d : Map[Int, String]
+  mut order_sig : String
+  mut selected : @set.Set[Int]
+}
+pub fn Renderer::draw(Self, Scene) -> Unit
+pub fn Renderer::edge_el(Self, Int) -> @dom.Element?
+pub fn Renderer::new(@dom.Document) -> Self
+pub fn Renderer::node_el(Self, Int) -> @dom.Element?
+pub fn Renderer::paint(Self, Array[Int]) -> Unit
+
+pub(all) struct Scene {
+  layout : @map.Layout
+  measure : (@map.Font, String) -> Double
+  image_url : (String) -> String?
+  image_hint : String?
+  tokens : (Array[String], String) -> Array[Array[Token]]
+  epoch : Int
+}
+
+pub struct Shape {
+  w : Double
+  h : Double
+  folded : Bool
+  buried : Int
+  epoch : Int
+  label : String
+  cards : Array[@map.Card]
+  urls : Array[String?]
+  hint : String?
+} derive(Eq)
+
+pub(all) struct Spot {
+  rect : @map.Rect
+  row_y : Double
+  box_w : Double
+  spot : String
+}
+
+pub(all) struct Token {
+  text : String
+  cls : String
+}
+
+// Type aliases
+
+// Traits
