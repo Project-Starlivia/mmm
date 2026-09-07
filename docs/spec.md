@@ -15,7 +15,8 @@
 操作が戻るときに戻す）
 
 ```
-core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内部は core.md)
+core/   MoonBit — module `mmm/core`。文書モデルと地図の判断。**DOM を知らない**（import は mizchi/markdown だけ。
+        `check:core` の pure.ts が見張る）。意味は下の「文書モデル」、内部は core.md
   tree/         md.mbt が md との境界（read / serialize / fragment）、build.mbt が
                 mdAst → 木と地番、unbuild.mbt が木 → mdAst、merge.mbt が前後の木の
                 差を原文 md への編集列にする。md_wbtest.mbt が
@@ -27,10 +28,9 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 （`View { frontmatter, roots }`。frontmatter は画像フォルダの宣言のため）
   op/           操作。apply(doc, op) が Doc を Doc にする。席は隣の id で言う
                 （NodePlace / BlockPlace）。道具（splice / append / body）が
-                型の異種性を幽閉する。決めは core.md「操作」
-  edit/         境界。edit(md, op) が survey → apply → merge を繋ぎ、編集列と
-                読み直した木での focus を返す。law_wbtest.mbt が操作 × 合流の結合を
-                総当たりで固定する。決めは core.md「境界」
+                型の異種性を幽閉する。決めは core.md「操作」。edit.mbt が境界 —
+                edit(md, op) が survey → apply → merge を繋ぎ、編集列と読み直した木での
+                focus を返す。law_wbtest.mbt が操作 × 合流の結合を総当たりで固定する
   map/          Mindmap の配置と判断。DOM を知らない — geometry(座標系。側 → 符号はここだけ) /
                 card(Block → Card。分類だけ) / metric(寸法の唯一の定義。字の実測は
                 Measure で外から受ける) / layout(View → Layout。畳みの埋没と sides の zip、
@@ -39,6 +39,13 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 Easy grab の広げ幅) / drop(ドラッグの落とし先) / keys(キー → Intent の表) /
                 context(右クリックの行) / camera(視点。world ↔ 画面、寄せ、ピンチ) /
                 indicator(画面外の根を指す針) / gesture(指の台帳) / place(欄を箱に重ねる算術)
+  read/         md を読んだもの（Survey = 木 + 地番 + 原文）と、木の判断。ts はこれを持ち手として
+                持ち、問い合わせで読む。survey(is_node / empty / find / blocks) / caret(md の
+                カーソル・地図の位置 → 選択。chosen が持ち主とそれらから導く。選択の規則はここだけ) /
+                copy(選んだ部分木の原文) / name(文書の名前。ファイル名の柵) / head(frontmatter の
+                画像フォルダの宣言を読む・書く、引っ越しの追従、綴りの正規化)
+app/    MoonBit — module `mmm/app`。core に依存し、DOM を触る。試験は happy-dom。moon.work が 2 つを 1 つの
+        workspace にし、build は `_build/js/release/build/mmm/app/js/js.js` に出る
   web/          DOM の小さな道具（js だけ）。svg(要素を作る) / dom(style・矩形・捕捉・
                 欄の値・出来事の的・約束を 1 行ずつ包む) / disk(File System Access・IndexedDB・Blob) /
                 canvas(紙。2d の文脈と手) / out(直列化・ラスタ化・ダウンロード・クリップボード・埋め込み) /
@@ -56,7 +63,7 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
   file/         ディスク（js だけ）。io(File System Access API の窓口。開く・保存・改名・覚えている文書) /
                 handles(札を IndexedDB に置く台帳。置き場は閉包で受け、試験は手元の表) /
                 assets(画像の読み書き。宣言は md の頭、許可は札。宣言を決める / 直すのは settle で、
-                md に書くのは core/main の set_declared。置く名前の柵と宣言の柵は純粋で試験する) /
+                md に書くのは app/main の set_declared。置く名前の柵と宣言の柵は純粋で試験する) /
                 dnd(落ちたファイルの振り分け。.md は開く、画像はノードの上だけ受ける)。札は不透明な持ち手
   render/       地図のペイン（js だけ）。card(Card 1 枚 → SVG) / render(Renderer。id → 要素、
                 transform / d のキャッシュ、並び直し、paint) / mindmap(器と入力。ホイール・
@@ -65,11 +72,6 @@ core/   MoonBit — 文書モデル(意味は下の「文書モデル」、内�
                 field(ラベルとカードの欄) / pick(選んでいるカードの枠と ×) / host(外に頼るものの閉包) /
                 export(全体を 1 枚の svg に。計算済みスタイルを焼き込み、透かしを付ける)。
                 class と data-* は style.css との契約。試験は happy-dom
-  read/         md を読んだもの（Survey = 木 + 地番 + 原文）と、木の判断。ts はこれを持ち手として
-                持ち、問い合わせで読む。survey(is_node / empty / find / blocks) / caret(md の
-                カーソル・地図の位置 → 選択。chosen が持ち主とそれらから導く。選択の規則はここだけ) /
-                copy(選んだ部分木の原文) / name(文書の名前。ファイル名の柵) / head(frontmatter の
-                画像フォルダの宣言を読む・書く、引っ越しの追従、綴りの正規化)
   main/         束ねる場所（js だけ）。app(1 トランザクション = 1 サイクルの出口 cycle、操作の入口
                 apply(op, edit) — focus を選ぶ — と write(op) — 選択に触らない、持ち主の focusin、
                 貼り付け・投下・描いた絵の保存、ファイル I/O、帯。文書から導く値は持たない — 持つのは
@@ -91,7 +93,7 @@ src/    TypeScript — **CodeMirror（md ペイン）だけ。** 文書の真実
   style.css    全体のスタイル(部品ごとの塊。入れ子は CSS 自身の機能。色・影・輪の数字は
                `:root` のトークンだけが持ち、状態は `.selected` / `.on` / `aria-disabled` で言う)
   map/         highlight(コードの色分け。CodeMirror の言語表を借りる。core の描画に閉包で渡す)
-  main.ts      入口。CodeMirror を立て、その読み書きを core/main に閉包で渡し、
+  main.ts      入口。CodeMirror を立て、その読み書きを app/main に閉包で渡し、
                1 トランザクションごとに cycle を呼ぶだけ
 test/   検証 — core に触らない純粋層(camera / geometry / gesture / highlight /
         indicator / panes / share / assets / metrics / head)と、core の出口(coreApi)・
@@ -950,7 +952,7 @@ Markdown 無し   ←   両方   →   Mindmap 無し
 focus** — ノードを消せば次の兄弟 → 前の兄弟 → 親（core.md「操作」）。
 
 **選択を書くのは持ち主の操作だけ。** ファイルの投下・宣言の書き換え・画像の保存は md を
-書くだけで、選択に触らない（core/main の `write`）。
+書くだけで、選択に触らない（app/main の `write`）。
 
 複数選択は任意の集合。md 側は範囲・複数カーソルが掛かる全部、地図側は `Mod+クリック` /
 矩形 / `Shift+矢印`。
@@ -972,7 +974,7 @@ focus** — ノードを消せば次の兄弟 → 前の兄弟 → 親（core.md
 書き出せば畳んだ姿が出る。どちらも一時的な UI 状態(選択・ドロップ印)は
 含まれない。
 
-**出し方はどちらも同じ 4 つ**で、並びの定義は `core/app/export.mbt` の 1 か所。
+**出し方はどちらも同じ 4 つ**で、並びの定義は `app/app/export.mbt` の 1 か所。
 
 | | |
 |---|---|

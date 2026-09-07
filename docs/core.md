@@ -372,10 +372,8 @@ focus           = number(done.doc, done.focus) // 読み直したときの id
 これが操作 × 合流の結合そのもので、UI を通さずに固定できる。
 md に書けない並び（check）と、項目の中の 2 つ目の列の深さは、この法則が見つけた。
 
-**browser への出口は `core/js`** — 操作は main/ の `App::apply` が core の中で映す。
-`Op` と `Content` を JSON から起こす（FromJson）のはここで、形は ToJson と同じ
-（`["Rename", {id, label}]`。`None` の鍵は無い）。ts 側は `coreApi.ts` の
-`edit(md, op)` で、`kind` を構築子名に読み替えるのはそこ 1 か所。
+**操作は core から出ない。** app/main の `App::apply` が `@op.edit(md, op)` を呼び、編集列を
+CodeMirror に当てる。ts は Op を組まない（右クリックの行もキーの表も core が Intent で持つ）。
 
 ## 配置と描画 — map/ と render/
 

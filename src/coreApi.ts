@@ -9,7 +9,7 @@
 // None を鍵ごと落とし、enum を `["NodeAt", {…}]` の形で出す。その形を整えるのはここ 1 か所。
 // 信頼境界もここだけ — 型は名乗らせず確かめる。
 
-import * as mbt from "../core/_build/js/release/build/js/js.js";
+import * as mbt from "../_build/js/release/build/mmm/app/js/js.js";
 
 // ---- 読み ----
 

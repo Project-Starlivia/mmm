@@ -1,11 +1,11 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mmm-app/core/read"
+package "mmm/core/read"
 
 import {
-  "mmm-app/core/map",
-  "mmm-app/core/op",
-  "mmm-app/core/tree",
-  "mmm-app/core/view",
+  "mmm/core/map",
+  "mmm/core/op",
+  "mmm/core/tree",
+  "mmm/core/view",
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
   "moonbitlang/core/set",

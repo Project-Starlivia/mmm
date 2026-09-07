@@ -1,14 +1,16 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mmm-app/core/op"
+package "mmm/core/op"
 
 import {
-  "mmm-app/core/tree",
+  "mmm/core/tree",
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
 }
 
 // Values
 pub fn apply(@tree.Doc, Op) -> Done?
+
+pub fn edit(String, Op) -> Edited
 
 // Errors
 
@@ -21,6 +23,11 @@ pub(all) enum BlockPlace {
 
 pub(all) struct Done {
   doc : @tree.Doc
+  focus : Int?
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Edited {
+  edits : Array[@tree.Edit]
   focus : Int?
 } derive(Eq, ToJson, @debug.Debug)
 

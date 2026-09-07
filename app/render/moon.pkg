@@ -9,13 +9,13 @@ import {
   "mizchi/js/core",
   "mizchi/js/builtins/global",
   "mizchi/js_browser/dom",
-  "mmm-app/core/tree",
-  "mmm-app/core/view",
-  "mmm-app/core/op",
-  "mmm-app/core/map",
-  "mmm-app/core/read",
-  "mmm-app/core/web",
-  "mmm-app/core/parts",
+  "mmm/core/tree",
+  "mmm/core/view",
+  "mmm/core/op",
+  "mmm/core/map",
+  "mmm/core/read",
+  "mmm/app/web",
+  "mmm/app/parts",
 }
 
 import {
