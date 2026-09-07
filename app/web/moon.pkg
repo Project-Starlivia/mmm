@@ -1,0 +1,10 @@
+pkgtype(kind: "library")
+
+import {
+  "moonbitlang/async/js_async",
+  "mizchi/js/core",
+  "mizchi/js/web/event",
+  "mizchi/js_browser/dom",
+}
+
+supported_targets = "js"

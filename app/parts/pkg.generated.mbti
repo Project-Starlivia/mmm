@@ -1,0 +1,195 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm/app/parts"
+
+import {
+  "mizchi/js/core",
+  "mizchi/js_browser/dom",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn accent(@dom.Document) -> String?
+
+pub fn ask(@dom.Document, Ask, (Array[String]?) -> Unit) -> Unit
+
+pub fn ask_form(@dom.Document, Ask, () -> Unit) -> (@dom.Element, () -> Array[String])
+
+pub fn ask_of(String, String, note? : String?, cancel? : String?, parts? : Array[Part], preview? : String?) -> Ask
+
+pub async fn asked(@dom.Document, Ask) -> Array[String]?
+
+pub fn blocked(@dom.Document, String) -> Unit
+
+pub let blocked_words : Array[String]
+
+pub fn canvas_paint(@core.Any) -> Paint
+
+pub fn connect(String) -> Ask
+
+pub fn discard() -> Ask
+
+pub fn draw_form(@dom.Document, () -> Unit, (Board) -> Unit, paint? : ((@dom.Element) -> Paint)?) -> (@dom.Element, Board)
+
+pub fn failed(@dom.Document, String) -> Unit
+
+pub let failed_words : Array[String]
+
+pub fn fill(@dom.Element, Array[Entry], Ways) -> Array[(@dom.Element, () -> Unit)]
+
+pub let height : Double
+
+pub fn hex_of(String) -> String?
+
+pub fn icon(@dom.Document, String) -> @dom.Element
+
+pub fn image_name(Array[Part], String) -> Ask
+
+pub fn is_icon(String) -> Bool
+
+pub fn label(@dom.Document, String, String, Bool) -> Array[@dom.Node]
+
+pub fn names() -> Array[String]
+
+pub fn nibs_of(Ink) -> Array[Double]
+
+pub let no_file_access : String
+
+pub fn nod(((Bool) -> Unit) -> Unit, (String) -> Unit, (Bool) -> Unit) -> Unit
+
+pub fn notice(@dom.Document, String, String, Bool) -> @dom.Element
+
+pub fn open_on_click(@dom.Element, () -> Array[Entry]) -> Unit
+
+pub fn pane_hint(@dom.Document, String) -> @dom.Element
+
+pub fn pane_tool(@dom.Document, String) -> @dom.Element
+
+pub fn place() -> Ask
+
+pub fn rename(String) -> Ask
+
+pub fn row(String, key? : String?, mark? : String?, note? : (((Array[String]) -> Unit) -> Unit)?, disabled? : Disabled) -> Row
+
+pub fn rows(@dom.Document, Array[Entry]) -> @dom.Element
+
+pub async fn show_drawing(@dom.Document) -> @core.Any?
+
+pub let width : Double
+
+// Errors
+
+// Types and methods
+pub(all) struct Ask {
+  title : String
+  note : String?
+  ok : String
+  cancel : String?
+  parts : Array[Part]
+  preview : String?
+}
+
+pub struct Board {
+  el : @dom.Element
+  canvas : @dom.Element
+  sheet : Sheet
+}
+pub fn Board::new(@dom.Document, paint? : (@dom.Element) -> Paint) -> Self
+pub async fn Board::picture(Self) -> @core.Any?
+pub fn Board::undo(Self) -> Unit
+
+pub(all) enum Disabled {
+  No
+  Yes
+  Why(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Entry {
+  Run(Row, () -> Unit)
+  Done(Row, ((Bool) -> Unit) -> Unit)
+  Sub(Row, Array[Entry], (() -> Unit)?)
+  Caption(String, String?)
+  Sep
+}
+
+pub(all) struct Field {
+  value : String
+  check : ((String) -> String?)?
+}
+
+pub enum Ink {
+  Pen(Pen)
+  Eraser
+}
+
+pub struct Menu {
+  doc : @dom.Document
+  el : @dom.Element
+  mut sub : Menu?
+  mut parent : Menu?
+  mut opener_row : @dom.Element?
+  mut opener : @dom.Element?
+  mut openers : Array[(@dom.Element, () -> Unit)]
+}
+pub fn Menu::close(Self, Bool) -> Unit
+pub fn Menu::close_sub(Self) -> Unit
+pub fn Menu::contains(Self, @core.Any) -> Bool
+pub fn Menu::focus_first(Self, Bool) -> Unit
+pub fn Menu::hide(Self, Bool) -> Unit
+pub fn Menu::is_open(Self) -> Bool
+pub fn Menu::new(@dom.Document) -> Self
+pub fn Menu::open_sub(Self, @dom.Element, Array[Entry]) -> Unit
+pub fn Menu::show(Self, Double, Double, Array[Entry]) -> Unit
+
+pub(all) struct Paint {
+  fill : () -> Unit
+  line : (String, Double, Array[Pt]) -> Unit
+}
+
+pub(all) enum Part {
+  Text(String)
+  Blank(Field)
+}
+
+pub struct Pen {
+  mut color : String
+}
+
+pub(all) struct Pt {
+  x : Double
+  y : Double
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Row {
+  label : String
+  key : String?
+  mark : String?
+  note : (((Array[String]) -> Unit) -> Unit)?
+  disabled : Disabled
+}
+
+pub struct Sheet {
+  strokes : Array[Stroke]
+  paint : Paint
+  mut drawing : Array[Pt]?
+}
+pub fn Sheet::begin(Self, Pt, String, Double) -> Unit
+pub fn Sheet::clear(Self) -> Unit
+pub fn Sheet::draw_to(Self, Pt) -> Unit
+pub fn Sheet::end(Self) -> Unit
+pub fn Sheet::new(Paint) -> Self
+pub fn Sheet::undo(Self) -> Unit
+
+pub(all) enum Stroke {
+  Line(Array[Pt], String, Double)
+  Clear
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Ways {
+  open_sub : (@dom.Element, Array[Entry]) -> Unit
+  close_sub : () -> Unit
+  close : () -> Unit
+}
+
+// Type aliases
+
+// Traits

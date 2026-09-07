@@ -1,0 +1,26 @@
+pkgtype(kind: "library")
+
+import {
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/double",
+  "moonbitlang/core/math",
+  "moonbitlang/core/string",
+  "moonbitlang/async/js_async",
+  "mizchi/js/core",
+  "mizchi/js/builtins/global",
+  "mizchi/js_browser/dom",
+  "mmm/core/tree",
+  "mmm/core/view",
+  "mmm/core/op",
+  "mmm/core/map",
+  "mmm/core/read",
+  "mmm/app/web",
+  "mmm/app/parts",
+}
+
+import {
+  "moonbitlang/async",
+  "mizchi/js_browser/test_utils",
+} for "wbtest"
+
+supported_targets = "js"

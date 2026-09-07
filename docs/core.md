@@ -98,7 +98,7 @@ Node { id, label: String?, fold: Fold?, blocks: [Block], children: [Node] }
 操作   Doc ──apply(op)──> Doc
 境界   md + Op ──edit──> 編集リスト + focus        // survey → apply → merge（edit/）
 配置   View + 寸法(SizeOf) ──layout──> Layout      // map/。字の実測は ts の canvas を閉包で受ける
-描画   Layout + 場面(Scene) ──draw──> SVG の差分   // render/。js だけ
+描画   Layout + 場面(Scene) ──draw──> SVG の差分   // app/mindmap。js だけ
 ```
 
 **サイクルは 1 本**。md が変わったら必ず 読み → project → 描画。無限ループしないのは
@@ -251,6 +251,12 @@ core が持つ同一性は操作の focus だけ。選択の持ち越しは core
 しか通じず、ts は位置（ラベルの頭）を CodeMirror に預けて編集で写す（`src/state.ts`、
 design.md「状態と拍」）。打鍵ごとの core 呼び出しは `mmmSurvey(md)` の 1 回で、読みの持ち手を返す。
 
+## 公開 API の一覧
+
+科ごとの `pkg.generated.mbti` が公開 API の一覧（`moon info` が吐く。`check:core` が古さを
+止める）。何が外から見えるかは、ソースより先にここを読む。作法（境界の型・非同期・
+エラー・予約語・道具）は docs/superpowers/specs/2026-09-07-mbt-practice.md。
+
 ## パスの積み方
 
 **結合テストは単体テストが終わってから。** 最後まで作ってから回すと、落ちた
@@ -380,12 +386,10 @@ focus           = number(done.doc, done.focus) // 読み直したときの id
 これが操作 × 合流の結合そのもので、UI を通さずに固定できる。
 md に書けない並び（check）と、項目の中の 2 つ目の列の深さは、この法則が見つけた。
 
-**browser への出口は `core/tree/js`** — 操作は `mmmEdit(md, opJson) -> json`。
-`Op` と `Content` を JSON から起こす（FromJson）のはここで、形は ToJson と同じ
-（`["Rename", {id, label}]`。`None` の鍵は無い）。ts 側は `coreApi.ts` の
-`edit(md, op)` で、`kind` を構築子名に読み替えるのはそこ 1 か所。
+**操作は core から出ない。** app の `App::apply` が `@op.edit(md, op)` を呼び、編集列を
+CodeMirror に当てる。ts は Op を組まない（右クリックの行もキーの表も core が Intent で持つ）。
 
-## 配置と描画 — map/ と render/
+## 配置と描画 — map/ と app/mindmap
 
 Mindmap の「どこに置くか」と「SVG をどう組むか」も core が持つ（決めは
 docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を持つ md 側と
@@ -395,19 +399,49 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
   そのまま歩き、幾何と畳みの埋没とカード（`Card`。Block の分類）を足す。寸法は
   `metric.mbt` が**唯一の定義**で、字の実測だけ `Measure = (Font, String) -> Double` で
   外から受ける（`Font { px, mono }`。大きさは core、綴りは ts の CSS）。試験は数だけで書く
-- **render/** — `Renderer::draw(scene)` が Layout を `<g>` の中の SVG に差分で写す。
+- **app/mindmap** — `Renderer::draw(scene)` が Layout を `<g>` の中の SVG に差分で写す。
   要素の class と `data-*` は style.css との契約。画像の URL・コードの色分け
   （CodeMirror の言語表）は `Scene` の閉包で受ける。`Mindmap::new(pane, host, …)` が
   ペインを地図の器にし、ホイール・ポインタ・キー・右クリック・長押し・ドラッグを受けて
   map/ の判断に繋ぎ、選択・操作・カードの選択を `Host` の閉包で ts へ返す（値は
   EditorState に居る）。輪・矩形・落とし先の印・針・欄（`field.mbt`）・カードの枠
-  （`pick.mbt`）もここ。js だけ（`supported_targets = "js"`）で、試験は happy-dom
+  （`pick.mbt`）もここ。右クリックの器は parts/ の `Menu`。書き出し（`export.mbt`。`Mindmap::to_svg` が
+  全体を 1 枚の svg に写す — 選択の印を外し、計算済みスタイルを焼き込み、`blob:` を埋め直し、透かしを付ける）。
+  js だけ（`supported_targets = "js"`）で、試験は happy-dom
+- **parts/** — 帯と地図が共に使う部品。絵（`icons.mbt`。Lucide の綴りが唯一の表）、しらせ
+  （`notice.mbt`。言葉の表もここで、知らない言葉は止める）、言い出し、道具の器、メニューの器
+  （`menu.mbt`。行の形・入れ子・キーで辿る・外を押せば閉じる）。ts は作ってもらって置くだけ
+- **app/disk** — ディスク。`Disk`（File System Access API の窓口。いま開いているファイル、
+  開く・保存・改名）と `Recent`（覚えている文書と画像フォルダ。札を IndexedDB に置く台帳。置き場 `Store` は
+  閉包で受け、試験は手元の表で回す）、`Images`（画像の読み書き。宣言は md の頭が持ち、許可は
+  札。フォルダを指してもらい、宣言を決める / 直す `settle`、置く名前の柵、webp への変換と書き込み）。
+  落とされたファイルの振り分け（`drop.mbt`。ドラッグ中は種類だけで受ける / 断るを言い、`.md` は開き、
+  画像はノードの上だけ）。札（`FileHandle` / `DirHandle`）は `#external` の持ち手で、
+  中は覗かない。**置き場に入れる行は素の object に組み直す** — MoonBit の Option は JS の値ではない
+- **web/** — DOM の小さな道具。js_browser に型の無い呼び出しを 1 行ずつ包み、他の package は
+  `_get` / `_call` を書かない。結び付けの無い API（File System Access・IndexedDB・canvas の 2d・
+  直列化・ラスタ化・クリップボード・ドラッグ）は `extern "js"` の 1 行で、Promise は js_async の型
+- **app/** — 帯と枠。持ち物（`persist.mbt`。localStorage の綴りはここだけで、外は名前で言う）、
+  ペインの出し分けと分割線（`panes.mbt`。居場所の算術は純粋で、試験は数だけ）、全体のキー、
+  テーマとアクセントカラーと favicon（`theme.mbt` / `logo.mbt`。ロゴの形の源はここ 1 つで、
+  ビルド時の favicon も同じ関数から）、たずね（`ask.mbt` の器と `asks.mbt` の綴り）、
+  リンク（`share.mbt`。gzip → base64url。非同期は `moonbitlang/async/js_async` の Promise で出す —
+  作法は 2026-09-07-mbt-practice.md）、書き出し（`export.mbt`。出し方 4 通りの表と、ヘッダのボタンの
+  言い分・頷き。出す口は web/ の 1 行）、お絵描き（`draw.mbt`。紙は手の並びの写像 `Sheet` で、
+  載せ先 `Paint` は canvas の 2d か試験の記録）、帯の並び（`files.mbt` / `more.mbt`。純粋な表 —
+  いまの状態を受けて行を返し、押されたら閉包を呼ぶだけ。ts は状態を開くたびに読ませる）。
+  文書と選択の読み書きは App が持つ
+- **app（root）** — 束ねる場所（`app.mbt`）。1 トランザクション = 1 サイクルの出口 `cycle`（木が変われば描き直し、
+  でなければ塗り直し）、操作の入口 `apply`（持ち主の操作。focus を選ぶ）と `write`（それ以外。選択に
+  触らない）、持ち主の focusin、貼り付け・投下・描いた絵の保存、ファイル I/O、リンク、帯。文書から導く値は
+  持たず、持つのはファイルの状態（世代・保存した本文と名前・覚えている文書）だけ。CodeMirror の読み書きは
+  `Editor` の閉包で受け、試験は happy-dom と md 1 本の写しで回す。字の実測は mindmap/ の `measure`
+  （canvas。綴りは style.css の `--font` / `--mono`）
 - **判断も map/** — 選択（当たり・矩形・矢印・親兄弟）、落とし先、キーの表（`Intent`）、
   右クリックの行、視点の算術、針、指の台帳、欄の重ね。全部純粋で、wbtest で固定する
-- **出口** — `mmmSurvey(md) -> 持ち手` と木の問い合わせ（`mmmSpot` / `mmmChosen` /
-  `mmmName` …）、`mmmMap(pane, host, hint, tool) -> 持ち手` と `mmmMapRender` /
-  `mmmMapFit` / `mmmMapBeginEdit` / `mmmMapAct` / `mmmMapSvgParts` …、`mmmEdit(md, op)`。
-  `mmmLayout` / `mmmContext` は見本（lab）が右クリックの行を引くためだけに残る。
+- **出口** — `mmmMain(editor) -> 持ち手` / `mmmBoot` / `mmmCycle` がアプリそのもの。ほかは
+  EditorState の field が読む問い合わせ（`mmmSurvey` / `mmmSpot` / `mmmChosen` / `mmmAnchorsOf` …）と、
+  見本（lab）が置く部品（`mmmMap` / `mmmLayout` / `mmmContextMenu` / `mmmFilesRows` …）だけ。
   **木も箱も core から出ない。** 境界は数・文字列・真偽・持ち手と、操作 1 回ぶんの小さな
   JSON（Intent・落とし先・メニューの行・選択）。数の組は `FixedArray[Double]` で渡す —
   **タプルは JS では object になる**（`.d.ts` は配列と書くが嘘）。決めは

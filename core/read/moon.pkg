@@ -2,8 +2,8 @@ pkgtype(kind: "library")
 
 import {
   "moonbitlang/core/json",
-  "mmm-app/core/tree",
-  "mmm-app/core/view",
-  "mmm-app/core/op",
-  "mmm-app/core/map",
+  "mmm/core/tree",
+  "mmm/core/view",
+  "mmm/core/op",
+  "mmm/core/map",
 }

@@ -14,11 +14,11 @@ import {
   undo as cmUndo,
 } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { languages } from "./map/highlight.ts";
+import { languages } from "./highlight.ts";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { oneDarkHighlightStyle, oneDarkTheme } from "@codemirror/theme-one-dark";
-import { paneHint } from "./app/hint.ts";
-import type * as core from "./coreApi.ts";
+import type * as core from "./app.ts";
+import { paneHint } from "./app.ts";
 import { choice, fields, focused, highlightRanges, holder, setAnchors, setHolder, tree } from "./state.ts";
 
 /**
@@ -67,7 +67,7 @@ export class MdEditor {
 
   constructor(parent: HTMLElement, onUpdate: (state: EditorState, prev: EditorState | null) => void) {
     this.onUpdate = onUpdate;
-    // 空のときの言い出し。**マップと同じ器**（app/hint.ts）を、同じように
+    // 空のときの言い出し。**マップと同じ器**（core/parts/hint.mbt）を、同じように
     // ペインの真ん中へ浮かべる — CodeMirror の `placeholder` は 1 行目の
     // 頭に出るので、対のもう片方（マップの中央）と上下も寄せも揃わない。
     // 見えるのはこちらで、読み上げには下の `aria-placeholder` が答える
@@ -140,14 +140,14 @@ export class MdEditor {
     this.view.dispatch({ changes, effects: focus === undefined ? [] : [focused.of(focus)] });
   }
 
-  /** 地図で選び直した。位置は host が地番で写してから渡す */
-  select(a: core.Anchors): void {
+  /** 地図で選び直した。位置は core が地番で写してから渡す（無ければ null） */
+  select(a: core.Anchors | null): void {
     this.view.dispatch({ effects: setAnchors.of(a) });
   }
 
-  /** フォーカスがペインに入った。md → map なら引き継ぐ位置も一緒に */
-  hold(h: core.Holder, a?: core.Anchors): void {
-    this.view.dispatch({ effects: a === undefined ? [setHolder.of(h)] : [setHolder.of(h), setAnchors.of(a)] });
+  /** フォーカスがペインに入った。md → map なら引き継ぐ位置も一緒に（md へなら null で捨てる） */
+  hold(h: core.Holder, a: core.Anchors | null): void {
+    this.view.dispatch({ effects: [setHolder.of(h), setAnchors.of(a)] });
   }
 
   get state(): EditorState {

@@ -1,0 +1,162 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm/core/tree"
+
+import {
+  "mizchi/markdown",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+}
+
+// Values
+pub fn apply(String, Array[Edit]) -> String
+
+pub fn ast_sig(@markdown.Document) -> String
+
+pub fn bare_path(String) -> String
+
+pub fn build(String, @markdown.Document) -> (Doc, Map[Int, Spot])
+
+pub fn check(Doc) -> Array[Flaw]
+
+pub let deepest : Int
+
+pub let doc_id : Int
+
+pub fn fragment(Node, Int, Array[Side], Eol) -> String
+
+pub fn lines(String) -> Array[String]?
+
+pub fn md_ast_sig(String) -> String
+
+pub fn merge(String, Doc, Map[Int, Spot], Doc) -> Array[Edit]
+
+pub fn number(Doc, Int) -> Int?
+
+pub fn parse(String) -> Doc
+
+pub fn patched(String, Array[Edit]) -> String
+
+pub fn prose(Array[Block], Eol) -> String
+
+pub fn read(String) -> @markdown.Document
+
+pub fn serialize(Doc) -> String
+
+pub fn shape(Doc) -> Doc
+
+pub fn spans_sig(String) -> String
+
+pub fn survey(String) -> (Doc, Map[Int, Spot])
+
+pub fn unbuild(Doc) -> @markdown.Document
+
+pub fn unbuild_node(Node, Int, Array[Side]) -> @markdown.Document
+
+pub fn unbuild_prose(Array[Block]) -> @markdown.Document
+
+pub fn writable(String) -> Bool
+
+// Errors
+
+// Types and methods
+pub(all) struct Block {
+  id : Int
+  content : Content
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) enum Content {
+  Image(alt~ : String, src~ : String, title~ : String)
+  Link(text~ : String, href~ : String, title~ : String)
+  Code(info~ : String, text~ : String)
+  Svg(String)
+  ThematicBreak
+  Details(text~ : String, open~ : Bool, summary~ : String?, body~ : String)
+  Opaque(String)
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct Doc {
+  frontmatter : String?
+  eol : Eol
+  body : Array[Block]
+  roots : Array[Root]
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Edit {
+  from : Int
+  to : Int
+  insert : String
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) enum Eol {
+  Lf
+  Crlf
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) enum Flaw {
+  DupeId(Int)
+  BarrenImplicit(Int)
+  SideCount(root~ : Int, sides~ : Int, children~ : Int)
+  UnwritableName(Int)
+  BorderBreak(Int)
+  Swallowed(Int)
+  ListSide(Int)
+  GappedItem(Int)
+  TooDeep(Int)
+} derive(Eq, ToJson)
+
+pub(all) struct Fold {
+  open : Bool
+  summary : String?
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct HeadingNode {
+  id : Int
+  label : String
+  fold : Fold?
+  body : Array[Block]
+  children : Array[Node]
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct ImplicitNode {
+  id : Int
+  children : Array[Node]
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct ListNode {
+  id : Int
+  label : String
+  fold : Fold?
+  body : Array[Block]
+  children : Array[ListNode]
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) enum Node {
+  HeadingNode(HeadingNode)
+  ListNode(ListNode)
+  ImplicitNode(ImplicitNode)
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Root {
+  node : Node
+  sides : Array[Side]
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) enum Side {
+  Right
+  Left
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) enum Sign {
+  Heading
+  Item
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Spot {
+  from : Int
+  label : Int?
+  to : Int
+} derive(Eq, ToJson, @debug.Debug)
+
+// Type aliases
+
+// Traits

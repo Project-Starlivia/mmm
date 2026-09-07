@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm/app/prefs"
+
+// Values
+pub fn key_of(String) -> String
+
+pub fn load(String) -> String?
+
+pub fn store(String, String) -> Unit
+
+pub fn sweep() -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
