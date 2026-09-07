@@ -14,11 +14,11 @@ import {
   undo as cmUndo,
 } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { languages } from "./map/highlight.ts";
+import { languages } from "./highlight.ts";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { oneDarkHighlightStyle, oneDarkTheme } from "@codemirror/theme-one-dark";
-import type * as core from "./coreApi.ts";
-import { paneHint } from "./coreApi.ts";
+import type * as core from "./app.ts";
+import { paneHint } from "./app.ts";
 import { choice, fields, focused, highlightRanges, holder, setAnchors, setHolder, tree } from "./state.ts";
 
 /**

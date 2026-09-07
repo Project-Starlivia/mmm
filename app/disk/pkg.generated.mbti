@@ -1,0 +1,118 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm/app/disk"
+
+import {
+  "mizchi/js/core",
+  "mizchi/js_browser/dom",
+  "mmm/app/web",
+}
+
+// Values
+pub fn asset_target(String, String) -> Array[String]?
+
+pub fn folder_from_doc(Array[String]) -> String
+
+pub fn folder_problem(String, String?) -> String?
+
+pub fn idb_store() -> Store
+
+pub fn image_type(String) -> String?
+
+pub fn init_drop(@dom.Document, Drop) -> Unit
+
+pub fn md_path(String) -> String
+
+pub fn name_parts(String) -> Array[String]
+
+pub fn name_problem(String) -> String?
+
+// Errors
+
+// Types and methods
+pub(all) struct Binding {
+  doc : @web.FileHandle
+  directory : @web.DirHandle
+}
+
+pub struct Disk {
+  handles : Recent
+  mut current : @web.FileHandle?
+}
+pub fn Disk::close(Self) -> Unit
+pub fn Disk::current_file(Self) -> @web.FileHandle?
+pub fn Disk::new(Recent) -> Self
+pub async fn Disk::open_dialog(Self) -> Doc?
+pub async fn Disk::open_handle(Self, @web.FileHandle) -> Doc
+pub async fn Disk::open_known(Self, @web.FileHandle) -> Doc?
+pub async fn Disk::recent(Self) -> Array[@web.FileHandle]
+pub async fn Disk::rename(Self, String) -> String?
+pub async fn Disk::save(Self, String) -> Unit
+pub async fn Disk::save_as(Self, String, String) -> Doc?
+
+pub(all) struct Doc {
+  name : String
+  text : String
+}
+
+pub(all) struct Drop {
+  open_markdown : async (@web.FileHandle) -> Unit
+  add_image : async (@core.Any, Int) -> Unit
+  mark_drop : ((Double, Double)?) -> Int?
+  failed : (String) -> Unit
+}
+
+pub(all) struct ImageDeps {
+  failed : (String) -> Unit
+  refresh : () -> Unit
+  declared : () -> String?
+  set_declared : (String) -> Unit
+}
+
+pub struct Images {
+  doc : @dom.Document
+  io : Disk
+  deps : ImageDeps
+  urls : Map[String, String?]
+  mut cached : Binding?
+  mut cached_known : Bool
+  mut live : Bool
+}
+pub async fn Images::choose_folder(Self) -> Unit
+pub fn Images::clear(Self) -> Unit
+pub async fn Images::connect(Self) -> Unit
+pub async fn Images::connected(Self) -> Bool
+pub fn Images::folder_name(Self) -> String?
+pub fn Images::image_url(Self, String) -> String?
+pub fn Images::new(@dom.Document, Disk, ImageDeps) -> Self
+pub fn Images::readable(Self) -> Bool
+pub async fn Images::save_to_disk(Self, @core.Any) -> String?
+
+pub(all) struct Known {
+  doc : @web.FileHandle
+  directory : @web.DirHandle?
+  seen : Double
+}
+
+pub struct Recent {
+  store : Store
+  mut inherited : Bool
+}
+pub async fn Recent::folder_for(Self, @web.FileHandle) -> @web.DirHandle?
+pub async fn Recent::forget_folder(Self, @web.FileHandle) -> Unit
+pub async fn Recent::list(Self) -> Array[Known]
+pub fn Recent::new(Store) -> Self
+pub async fn Recent::opened(Self, @web.FileHandle) -> Unit
+pub async fn Recent::remember_folder(Self, @web.FileHandle, @web.DirHandle) -> Unit
+
+pub(all) struct Store {
+  read : async (String) -> @core.Any
+  write : async (String, @core.Any) -> Unit
+  remove : async (String) -> Unit
+  same : async (@core.Any, @core.Any) -> Bool
+  is_file : (@core.Any) -> Bool
+  is_dir : (@core.Any) -> Bool
+}
+
+// Type aliases
+
+// Traits

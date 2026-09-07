@@ -16,6 +16,8 @@ pub fn anchors_for(Survey, Choice) -> Anchors?
 
 pub fn anchors_of(Survey, Int?) -> Anchors?
 
+pub fn bare(String) -> String
+
 pub fn buried(@view.View) -> @set.Set[Int]
 
 pub fn caret_ids(Survey, Array[Range]) -> Array[Int]
@@ -31,6 +33,10 @@ pub let empty_name : String
 pub fn image_folder(String?) -> String?
 
 pub let image_folder_key : String
+
+pub fn is_markdown(String) -> Bool
+
+pub let md_exts : Array[String]
 
 pub fn normalize_path(String) -> String?
 

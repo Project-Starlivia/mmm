@@ -5,8 +5,8 @@
 //
 // テーマは部品の話ではないので、ここには無い（index.ts が枠に振る）。
 
-import * as core from "../../src/coreApi.ts";
-import { askForm, icon, notice, paneHint } from "../../src/coreApi.ts";
+import * as core from "../../src/app.ts";
+import { askForm, icon, notice, paneHint } from "../../src/app.ts";
 import type { Part } from "./kind.ts";
 import { MAP, named, sample } from "./map.ts";
 

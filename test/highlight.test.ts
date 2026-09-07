@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { touchesFence } from "../src/map/highlight.ts";
+import { touchesFence } from "../src/highlight.ts";
 
 const BLOCK = "```ts\nconst a = 1;\n```";
 //             0123456789...

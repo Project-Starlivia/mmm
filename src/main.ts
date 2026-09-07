@@ -4,10 +4,10 @@
 // 閉包で渡し、1 トランザクションごとにサイクルを回すだけ。
 
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
-import * as core from "./coreApi.ts";
+import * as core from "./app.ts";
 import * as st from "./state.ts";
 import { MdEditor } from "./editor.ts";
-import { languageEpoch, onLanguageReady, tokenize, tokenizeBlock } from "./map/highlight.ts";
+import { languageEpoch, onLanguageReady, tokenize, tokenizeBlock } from "./highlight.ts";
 
 const pane = document.getElementById("md-pane");
 if (!(pane instanceof HTMLElement)) throw new Error("#md-pane が無い");

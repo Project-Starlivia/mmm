@@ -1,0 +1,130 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm/app/bar"
+
+import {
+  "mizchi/js/builtins/global",
+  "mizchi/js_browser/dom",
+  "mmm/app/parts",
+}
+
+// Values
+pub fn export_ways(ExportDeps, ((Way) -> Unit)?) -> Array[@parts.Entry]
+
+pub fn files_menu(Files, FileActs) -> Array[@parts.Entry]
+
+pub fn logo_inner(String) -> String
+
+pub let logo_path : String
+
+pub fn logo_svg(String, Bool) -> String
+
+pub fn more_menu(More, MoreActs) -> Array[@parts.Entry]
+
+pub let no_rename_here : String
+
+pub let nothing_to_rename : String
+
+pub fn rename_problem(Bool, Bool) -> String?
+
+pub let repo : String
+
+pub async fn run(ExportDeps, Way) -> Bool
+
+pub fn way_of(String?) -> Way
+
+pub let ways : Array[Way]
+
+// Errors
+
+// Types and methods
+pub struct Export {
+  doc : @dom.Document
+  deps : ExportDeps
+  button : @dom.Element
+  way_button : @dom.Element
+  mut way : Way
+  mut back : @global.Timer?
+}
+pub fn Export::choose(Self) -> Unit
+pub fn Export::new(@dom.Document, ExportDeps, @dom.Element, @dom.Element) -> Self
+pub fn Export::refresh(Self) -> Unit
+pub fn Export::run(Self) -> Unit
+
+pub(all) struct ExportDeps {
+  svg : async () -> @dom.Element?
+  name : () -> String
+  failed : (String) -> Unit
+  blocked : (String) -> Unit
+  empty : () -> Bool
+}
+
+pub(all) struct FileActs {
+  new_file : () -> Unit
+  open : () -> Unit
+  open_recent : (Int) -> Unit
+  save : () -> Unit
+  save_as : () -> Unit
+  rename : () -> Unit
+  choose_folder : () -> Unit
+}
+
+pub(all) struct Files {
+  saved_name : String?
+  recent : Array[String]
+  can_open : Bool
+  can_save : Bool
+  can_rename : Bool
+  can_choose_folder : Bool
+  folder : String
+}
+
+pub(all) struct More {
+  light : Bool
+  grab : Bool
+  link_note : ((Array[String]) -> Unit) -> Unit
+}
+
+pub(all) struct MoreActs {
+  undo : () -> Unit
+  redo : () -> Unit
+  pick_color : () -> Unit
+  toggle_theme : () -> Unit
+  toggle_grab : () -> Unit
+  copy_link : ((Bool) -> Unit) -> Unit
+}
+
+pub struct Name {
+  doc : @dom.Document
+  filename : @dom.Element
+  dirty : @dom.Element
+  theme : Theme
+}
+pub fn Name::new(@dom.Document, @dom.Element, @dom.Element, Theme, () -> Unit) -> Self
+pub fn Name::set_dirty(Self, Bool) -> Unit
+pub fn Name::show(Self, String, Bool, Bool) -> Unit
+
+pub struct Theme {
+  doc : @dom.Document
+  set_editor_theme : (Bool) -> Unit
+  base : String
+  color_input : @dom.Element
+  mut favicon_color : String
+  mut favicon_dirty : Bool
+}
+pub fn Theme::is_light(Self) -> Bool
+pub fn Theme::new(@dom.Element, (Bool) -> Unit) -> Self
+pub fn Theme::pick_color(Self) -> Unit
+pub fn Theme::set_dirty(Self, Bool) -> Unit
+pub fn Theme::toggle(Self) -> Unit
+
+pub(all) struct Way {
+  id : String
+  short : String
+  mark : String
+  label : String
+  out : async (@dom.Element, String) -> Unit
+}
+
+// Type aliases
+
+// Traits
