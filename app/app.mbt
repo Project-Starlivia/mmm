@@ -35,8 +35,8 @@ pub(all) struct Editor {
   /// 白紙の言い出しを出す / 引っ込める
   show_hint : (Bool) -> Unit
   /// コードの色分け（CodeMirror の言語表）
-  tokens : (Array[String], String) -> Array[Array[@render.Token]]
-  tokens_block : (String) -> Array[Array[@render.Token]]
+  tokens : (Array[String], String) -> Array[Array[@mindmap.Token]]
+  tokens_block : (String) -> Array[Array[@mindmap.Token]]
   epoch : () -> Int
   /// 言語が後から読み込まれたら呼ばれる（描き直す）
   on_language_ready : (() -> Unit) -> Unit
@@ -46,15 +46,15 @@ pub(all) struct Editor {
 pub struct App {
   doc : @dom.Document
   ed : Editor
-  io : @file.Io
-  map : @render.Mindmap
-  assets : @file.Assets
-  theme : @app.Theme
-  exporter : @app.Export
+  io : @disk.Io
+  map : @mindmap.Mindmap
+  assets : @disk.Assets
+  theme : @bar.Theme
+  exporter : @bar.Export
   md_pane : @dom.Element
   map_pane : @dom.Element
-  filename : @dom.Element
-  dirty : @dom.Element
+  /// 帯の名乗り（ファイル名・改名の入口・未保存の印）
+  name : @bar.Name
   /// set_text のたびに進む世代。**文書を跨いだ非同期は、必ずこれを見てから物を言う** —
   /// 待っているあいだに New / Open で別の文書へ移っていることがある
   mut gen : Int
@@ -90,8 +90,8 @@ fn el(doc : @dom.Document, id : String) -> @dom.Element {
 pub fn App::new(
   doc : @dom.Document,
   ed : Editor,
-  io : @file.Io,
-  measure? : @map.Measure = @render.measure(doc),
+  io : @disk.Io,
+  measure? : @map.Measure = @mindmap.measure(doc),
 ) -> App {
   let md_pane = el(doc, "md-pane")
   let map_pane = el(doc, "map-pane")
@@ -99,13 +99,13 @@ pub fn App::new(
   // 組み上がってから動くものなので、後から入る自分を通して呼ぶ
   let late : Ref[App?] = { val: None, }
   let app = () => late.val.unwrap()
-  let assets = @file.Assets::new(doc, io, {
+  let assets = @disk.Assets::new(doc, io, {
     failed: msg => @parts.failed(doc, msg),
     refresh: () => app().map.render(),
     declared: () => app().declared_folder(),
     set_declared: value => app().set_declared(value),
   })
-  let map = @render.Mindmap::new(
+  let map = @mindmap.Mindmap::new(
     @dom.HTMLElement::cast_from_element(map_pane),
     {
       survey: ed.survey,
@@ -148,8 +148,8 @@ pub fn App::new(
       failed: msg => @parts.failed(doc, msg),
     },
   )
-  let theme = @app.Theme::new(el(doc, "logo"), ed.set_theme)
-  let exporter = @app.Export::new(
+  let theme = @bar.Theme::new(el(doc, "logo"), ed.set_theme)
+  let exporter = @bar.Export::new(
     doc,
     {
       svg: async fn() { map.to_svg() },
@@ -171,14 +171,15 @@ pub fn App::new(
     exporter,
     md_pane,
     map_pane,
-    filename: el(doc, "filename"),
-    dirty: el(doc, "dirty"),
+    name: @bar.Name::new(doc, el(doc, "filename"), el(doc, "dirty"), theme, () => {
+      spawn(async fn() { app().rename_file() })
+    }),
     gen: 0,
     saved_text: "",
     saved_name: None,
     recent: [],
     drawing_open: false,
-    grab: @app.load("grab") == Some("on"),
+    grab: @prefs.load("grab") == Some("on"),
   }
   late.val = Some(self)
   self.wire()
@@ -334,13 +335,7 @@ fn App::write(self : App, op : @op.Op) -> Unit {
 /// 未保存の印。**判定はここ 1 つ**で、帯の `●` とタブの favicon の両方が
 /// 同じ答えを見る（別々に数えると、片方だけ古い状態のまま残る）
 fn App::update_dirty(self : App) -> Unit {
-  let dirty = self.text() != self.saved_text
-  if dirty {
-    self.dirty.removeAttribute("hidden")
-  } else {
-    self.dirty.setAttribute("hidden", "")
-  }
-  self.theme.set_dirty(dirty)
+  self.name.set_dirty(self.text() != self.saved_text)
 }
 
 ///|
@@ -348,29 +343,7 @@ fn App::update_dirty(self : App) -> Unit {
 /// タブは名前を持つ文書のときだけ名乗る（`filename.md - mmm`）
 fn App::show_name(self : App) -> Unit {
   let named = self.saved_name is Some(_) || !self.survey().empty()
-  let title = if named { self.doc_name() + " - mmm" } else { "mmm" }
-  // 打鍵のたびに呼ばれるので、変わっていないなら DOM に触らない
-  if self.doc.title() != title {
-    self.doc.setTitle(title)
-  }
-  let shown = self.doc_name()
-  if self.filename.textContent() != shown {
-    self.filename.setTextContent(shown)
-  }
-  // **押せるときだけ押せる顔をする。** 理由は Files の Rename の行と同じものを使う。
-  // 押せなさは `aria-disabled` の 1 つで言う（見た目も読み上げも同じ源）
-  match @app.rename_problem(@web.can_rename(), self.saved_name is Some(_)) {
-    Some(why) => {
-      self.filename.setAttribute("title", why)
-      self.filename.setAttribute("aria-disabled", "true")
-      self.filename.removeAttribute("tabindex")
-    }
-    None => {
-      self.filename.setAttribute("title", "Rename — click")
-      self.filename.removeAttribute("aria-disabled")
-      self.filename.setAttribute("tabindex", "0")
-    }
-  }
+  self.name.show(self.doc_name(), named, self.saved_name is Some(_))
 }
 
 ///|
@@ -389,7 +362,7 @@ fn App::load_text(self : App, next : String, name : String?) -> Unit {
 
 ///|
 /// 開いた文書を UI に載せる
-fn App::apply_doc(self : App, opened : @file.Doc) -> Unit {
+fn App::apply_doc(self : App, opened : @disk.Doc) -> Unit {
   self.saved_text = opened.text
   self.load_text(opened.text, Some(opened.name))
   spawn(async fn() { self.offer_connect() })
@@ -403,16 +376,14 @@ fn App::apply_doc(self : App, opened : @file.Doc) -> Unit {
 /// ブラウザはクリックの直後にしかピッカーを開けないので、**箱のボタンが
 /// その 1 回**になる。自動で繋ぎに行くことはできない
 async fn App::offer_connect(self : App) -> Unit {
-  guard self.saved_name is Some(_) && @app.has_images(self.text()) else {
-    return
-  }
+  guard self.saved_name is Some(_) && has_images(self.text()) else { return }
   // 許可を確かめるあいだに別の文書へ移っていたら、もうこの文書の話ではない
   let gen = self.gen
   if self.assets.connected() || gen != self.gen {
     return
   }
   let folder = self.declared_folder().unwrap_or("./")
-  let go = @app.asked(self.doc, @app.connect(folder))
+  let go = @parts.asked(self.doc, @parts.connect(folder))
   // 箱を読んでいるあいだに移っていることもある。**繋ぐ直前にもう一度見る**
   if go is Some(_) && gen == self.gen {
     self.assets.connect()
@@ -422,7 +393,7 @@ async fn App::offer_connect(self : App) -> Unit {
 ///|
 async fn App::confirm_discard(self : App) -> Bool {
   self.text() == self.saved_text ||
-  @app.asked(self.doc, @app.discard()) is Some(_)
+  @parts.asked(self.doc, @parts.discard()) is Some(_)
 }
 
 ///|
@@ -458,7 +429,7 @@ async fn App::open_known(self : App, file : @web.FileHandle) -> Unit {
 /// いま開いているファイル**そのもの**の名前を変える。本文の見出しから導く名前とは別の話
 async fn App::rename_file(self : App) -> Unit {
   guard self.saved_name is Some(current) else { return }
-  guard @app.asked(self.doc, @app.rename(current)) is Some(typed) else {
+  guard @parts.asked(self.doc, @parts.rename(current)) is Some(typed) else {
     return
   }
   let name = typed[0].trim(chars=" \t\r\n").to_owned()
@@ -527,7 +498,7 @@ async fn App::refresh_recent(self : App) -> Unit {
 ///|
 /// 本文へのリンクの綴り。作るのも測るのもこの 1 か所
 async fn App::link(self : App) -> String {
-  @web.address(self.doc) + @app.to_hash(self.text())
+  @web.address(self.doc) + to_hash(self.text())
 }
 
 ///|
@@ -535,10 +506,10 @@ async fn App::link(self : App) -> String {
 /// 長さは gzip してからでないと分からないので、開くたびに本当に測る（1ms 弱）
 async fn App::link_note(self : App) -> Array[String] {
   let notes = []
-  if @app.has_images(self.text()) {
+  if has_images(self.text()) {
     notes.push("Images won't travel")
   }
-  if self.link().length() > @app.link_warn_length {
+  if self.link().length() > link_warn_length {
     notes.push("Long link — may be cut")
   }
   notes
@@ -590,7 +561,7 @@ async fn App::ensure_place(self : App) -> Bool {
   if self.saved_name is Some(_) {
     return true
   }
-  guard @app.asked(self.doc, @app.place()) is Some(_) else { return false }
+  guard @parts.asked(self.doc, @parts.place()) is Some(_) else { return false }
   self.save_file(true)
   self.saved_name is Some(_)
 }
@@ -620,7 +591,7 @@ fn App::draw(self : App, id : Int) -> Unit {
   self.drawing_open = true
   spawn(async fn() {
     (async fn() -> Unit {
-      match @app.show_drawing(self.doc) {
+      match @parts.show_drawing(self.doc) {
         Some(blob) => self.attach_image(id, blob)
         None => ()
       }
@@ -708,7 +679,7 @@ fn App::folder_caption(self : App) -> String {
 fn App::set_grab(self : App, on : Bool) -> Unit {
   self.grab = on
   self.map.set_grab(on)
-  @app.store("grab", if on { "on" } else { "off" })
+  @prefs.store("grab", if on { "on" } else { "off" })
 }
 
 ///|
@@ -731,7 +702,7 @@ fn App::wire(self : App) -> Unit {
 
   // 帯のメニュー。並びは app の files.mbt / more.mbt の表。ここは状態を写して、押されたら走らせる
   @parts.open_on_click(el(doc, "files"), () => {
-    @app.files_menu(
+    @bar.files_menu(
       {
         saved_name: self.saved_name,
         recent: self.recent.map(f => f.name()),
@@ -765,7 +736,7 @@ fn App::wire(self : App) -> Unit {
   })
   self.map.set_grab(self.grab)
   @parts.open_on_click(el(doc, "more"), () => {
-    @app.more_menu(
+    @bar.more_menu(
       {
         light: self.theme.is_light(),
         grab: self.grab,
@@ -782,17 +753,6 @@ fn App::wire(self : App) -> Unit {
     )
   })
 
-  // **名前を押したら、名前を変える。** 押せなさは `rename_file` 自身が持つ。
-  // `<span role="button">` なので Enter / Space を自分で出す（app/theme.mbt のロゴと同じ）
-  @web.listen(self.filename, "click", _ => {
-    spawn(async fn() { self.rename_file() })
-  })
-  @web.listen(self.filename, "keydown", e => {
-    let k = @web.keyboard(e)
-    guard k.key == "Enter" || k.key == " " else { return }
-    @web.prevent(e)
-    spawn(async fn() { self.rename_file() })
-  })
   @web.on_window(doc, "beforeunload", e => {
     if self.text() != self.saved_text {
       @web.warn_unload(e)
@@ -800,7 +760,7 @@ fn App::wire(self : App) -> Unit {
   })
 
   // 落とされたファイル（file/dnd.mbt）
-  @file.init_drop(doc, {
+  @disk.init_drop(doc, {
     open_markdown: async fn(file) {
       guard self.confirm_discard() else { return }
       self.apply_doc(self.io.open_handle(file))
@@ -813,14 +773,14 @@ fn App::wire(self : App) -> Unit {
   })
 
   // ペインと全体のキー（app）
-  let panes = @app.Panes::new(
+  let panes = Panes::new(
     self.md_pane,
     self.map_pane,
     el(doc, "panes"),
     el(doc, "splitter"),
     self.ed.focus,
   )
-  @app.init_shortcuts(doc, {
+  init_shortcuts(doc, {
     save: as_new => spawn(async fn() { self.save_file(as_new) }),
     open: () => spawn(async fn() { self.open_file() }),
     create: () => spawn(async fn() { self.new_file() }),
@@ -843,12 +803,12 @@ fn App::wire(self : App) -> Unit {
 /// 本文の控えは持たない。IndexedDB に置くのはハンドルだけで、
 /// **起動時に勝手に開き直すことはしない** — 立ち上げたら常に空から始まる
 pub fn App::boot(self : App) -> Unit {
-  @app.sweep() // 役目を終えた localStorage のキーを捨てる
+  @prefs.sweep() // 役目を終えた localStorage のキーを捨てる
   self.load_text("", None) // 空 = まだ何も無い。dirty も立たない
   let boot_gen = self.gen
   let hash = @web.hash(self.doc)
   spawn(async fn() {
-    guard @app.from_hash(hash) is Some(shared) else { return }
+    guard from_hash(hash) is Some(shared) else { return }
     // リンクで開いた。ハッシュはその場で消す — 文書の身元はあくまで
     // ファイルハンドル 1 つで、リンクは入口でしかない
     @web.drop_hash(self.doc)

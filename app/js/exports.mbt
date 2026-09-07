@@ -286,10 +286,10 @@ fn selection_of(o : @core.Any) -> @map.Selection {
 // 編集列は素の object（`{ from, to, insert }`）の並びで渡る
 
 ///|
-fn editor_of(e : @core.Any) -> @main.Editor {
+fn editor_of(e : @core.Any) -> @app.Editor {
   let call = (name : String, args : Array[@core.Any]) => e._call(name, args)
   // 打鍵ごとに何千回も呼ぶものは、関数そのものを取って直に呼ぶ
-  let tokens : (Array[String], String) -> Array[Array[@render.Token]] = e
+  let tokens : (Array[String], String) -> Array[Array[@mindmap.Token]] = e
     ._get("tokens")
     .cast()
   {
@@ -329,16 +329,16 @@ fn editor_of(e : @core.Any) -> @main.Editor {
 #export_name("mmmMain")
 pub fn mmm_main(editor : @core.Any) -> @core.Any {
   @core.any(
-    @main.App::new(
+    @app.App::new(
       @dom.document(),
       editor_of(editor),
-      @file.Io::new(@file.Handles::new(@file.idb_store())),
+      @disk.Io::new(@disk.Handles::new(@disk.idb_store())),
     ),
   )
 }
 
 ///|
-fn app_of(handle : @core.Any) -> @main.App {
+fn app_of(handle : @core.Any) -> @app.App {
   handle.cast()
 }
 
@@ -378,7 +378,7 @@ pub fn mmm_layout(survey : @core.Any) -> @core.Any {
   @core.any(
     @map.layout(
       read(survey).view.roots,
-      @map.node_size(@render.measure(@dom.document())),
+      @map.node_size(@mindmap.measure(@dom.document())),
     ),
   )
 }
@@ -394,21 +394,21 @@ pub fn mmm_context_menu(
   let l : @map.Layout = layout.cast()
   @parts.rows(
     @dom.document(),
-    @render.items_of(@map.items(l, { ids: ints(ids), anchor, }), _ => ()),
+    @mindmap.items_of(@map.items(l, { ids: ints(ids), anchor, }), _ => ()),
   )
 }
 
 ///|
 /// ts の host を Host に。字の実測・クリップボード・しらせは core が持つ
-fn host_of(h : @core.Any) -> @render.Host {
+fn host_of(h : @core.Any) -> @mindmap.Host {
   let doc = @dom.document()
   let call = (name : String, args : Array[@core.Any]) => h._call(name, args)
-  let tokens : (Array[String], String) -> Array[Array[@render.Token]] = h
+  let tokens : (Array[String], String) -> Array[Array[@mindmap.Token]] = h
     ._get("tokens")
     .cast()
   {
     survey: () => call("survey", []).cast(),
-    measure: @render.measure(doc),
+    measure: @mindmap.measure(doc),
     image_url: p => str_opt(call("imageUrl", [@core.any(p)])),
     image_hint: () => str_opt(call("imageHint", [])),
     connect_assets: () => call("connectAssets", []) |> ignore,
@@ -441,11 +441,11 @@ fn host_of(h : @core.Any) -> @render.Host {
 /// ペインを地図の器にする。返るのは地図の持ち手
 #export_name("mmmMap")
 pub fn mmm_map(pane : @dom.HTMLElement, host : @core.Any) -> @core.Any {
-  @core.any(@render.Mindmap::new(pane, host_of(host)))
+  @core.any(@mindmap.Mindmap::new(pane, host_of(host)))
 }
 
 ///|
-fn map_of(handle : @core.Any) -> @render.Mindmap {
+fn map_of(handle : @core.Any) -> @mindmap.Mindmap {
   handle.cast()
 }
 
@@ -530,7 +530,7 @@ fn strings_of(v : @core.Any) -> Array[String] {
 }
 
 ///|
-fn files_of(v : @core.Any) -> @app.Files {
+fn files_of(v : @core.Any) -> @bar.Files {
   {
     saved_name: str_opt(v._get("savedName")),
     recent: strings_of(v._get("recent")),
@@ -543,7 +543,7 @@ fn files_of(v : @core.Any) -> @app.Files {
 }
 
 ///|
-fn file_acts_of(v : @core.Any) -> @app.FileActs {
+fn file_acts_of(v : @core.Any) -> @bar.FileActs {
   let call = (name : String, args : Array[@core.Any]) => {
     v._call(name, args) |> ignore
   }
@@ -564,12 +564,12 @@ fn file_acts_of(v : @core.Any) -> @app.FileActs {
 pub fn mmm_files_rows(state : @core.Any, acts : @core.Any) -> @dom.Element {
   @parts.rows(
     @dom.document(),
-    @app.files_menu(files_of(state), file_acts_of(acts)),
+    @bar.files_menu(files_of(state), file_acts_of(acts)),
   )
 }
 
 ///|
-fn more_of(v : @core.Any) -> @app.More {
+fn more_of(v : @core.Any) -> @bar.More {
   {
     light: v._get("light").cast(),
     grab: v._get("grab").cast(),
@@ -580,7 +580,7 @@ fn more_of(v : @core.Any) -> @app.More {
 }
 
 ///|
-fn more_acts_of(v : @core.Any) -> @app.MoreActs {
+fn more_acts_of(v : @core.Any) -> @bar.MoreActs {
   let call = (name : String, args : Array[@core.Any]) => v._call(name, args)
   {
     undo: () => call("undo", []) |> ignore,
@@ -598,7 +598,7 @@ fn more_acts_of(v : @core.Any) -> @app.MoreActs {
 pub fn mmm_more_rows(state : @core.Any, acts : @core.Any) -> @dom.Element {
   @parts.rows(
     @dom.document(),
-    @app.more_menu(more_of(state), more_acts_of(acts)),
+    @bar.more_menu(more_of(state), more_acts_of(acts)),
   )
 }
 
@@ -609,7 +609,7 @@ pub fn mmm_export_ways(empty : Bool) -> @dom.Element {
   let doc = @dom.document()
   @parts.rows(
     doc,
-    @app.export_ways(
+    @bar.export_ways(
       {
         svg: fn() { None },
         name: () => "mmm",
@@ -626,18 +626,18 @@ pub fn mmm_export_ways(empty : Bool) -> @dom.Element {
 /// お絵描きの form（押しても何も起きない）
 #export_name("mmmDrawForm")
 pub fn mmm_draw_form() -> @dom.Element {
-  @app.draw_form(@dom.document(), () => (), _ => ()).0
+  @parts.draw_form(@dom.document(), () => (), _ => ()).0
 }
 
 ///|
 /// ts の並び（字か `{ value, check? }`）を Part に
-fn parts_of(v : @core.Any) -> Array[@app.Part] {
+fn parts_of(v : @core.Any) -> Array[@parts.Part] {
   @core.array_from(v).map(x => {
     if @core.typeof_(x) == "string" {
-      @app.Text(x.cast())
+      @parts.Text(x.cast())
     } else {
       let check = x._get("check")
-      @app.Blank({
+      @parts.Blank({
         value: x._get("value").cast(),
         check: if defined(check) {
           Some(value => str_opt(check._invoke([@core.any(value)])))
@@ -651,14 +651,14 @@ fn parts_of(v : @core.Any) -> Array[@app.Part] {
 
 ///|
 /// 名前で引くたずね。args は名前ごと（connect / rename は字、imageName は { shape, shot }）
-fn named_ask(kind : String, args : @core.Any) -> @app.Ask {
+fn named_ask(kind : String, args : @core.Any) -> @parts.Ask {
   match kind {
-    "discard" => @app.discard()
-    "place" => @app.place()
-    "connect" => @app.connect(args.cast())
-    "rename" => @app.rename(args.cast())
+    "discard" => @parts.discard()
+    "place" => @parts.place()
+    "connect" => @parts.connect(args.cast())
+    "rename" => @parts.rename(args.cast())
     "imageName" =>
-      @app.image_name(parts_of(args._get("shape")), args._get("shot").cast())
+      @parts.image_name(parts_of(args._get("shape")), args._get("shot").cast())
     _ => abort("知らないたずね: " + kind)
   }
 }
@@ -667,12 +667,12 @@ fn named_ask(kind : String, args : @core.Any) -> @app.Ask {
 /// たずねの中身（form）だけ
 #export_name("mmmAskForm")
 pub fn mmm_ask_form(kind : String, args : @core.Any) -> @dom.Element {
-  @app.ask_form(@dom.document(), named_ask(kind, args), () => ()).0
+  @parts.ask_form(@dom.document(), named_ask(kind, args), () => ()).0
 }
 
 ///|
 /// ロゴの SVG（favicon の源。ビルド時にも呼ぶ）
 #export_name("mmmLogoSvg")
 pub fn mmm_logo_svg(fill : String, dirty : Bool) -> String {
-  @app.logo_svg(fill, dirty)
+  @bar.logo_svg(fill, dirty)
 }

@@ -1,0 +1,122 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mmm/app"
+
+import {
+  "mizchi/js_browser/dom",
+  "mmm/app/bar",
+  "mmm/app/disk",
+  "mmm/app/mindmap",
+  "mmm/app/web",
+  "mmm/core/map",
+  "mmm/core/op",
+  "mmm/core/read",
+  "mmm/core/tree",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub async fn from_hash(String) -> String?
+
+pub fn has_images(String) -> Bool
+
+pub fn init_shortcuts(@dom.Document, Shortcuts) -> Unit
+
+pub let link_warn_length : Int
+
+pub fn project(Vis, Array[Vis]) -> Vis
+
+pub fn spots_for(Bool) -> Array[Vis]
+
+pub async fn to_hash(String) -> String
+
+pub fn toggled(Vis, Pane, Array[Vis]) -> Vis
+
+// Errors
+
+// Types and methods
+pub struct App {
+  doc : @dom.Document
+  ed : Editor
+  io : @disk.Io
+  map : @mindmap.Mindmap
+  assets : @disk.Assets
+  theme : @bar.Theme
+  exporter : @bar.Export
+  md_pane : @dom.Element
+  map_pane : @dom.Element
+  name : @bar.Name
+  mut gen : Int
+  mut saved_text : String
+  mut saved_name : String?
+  mut recent : Array[@web.FileHandle]
+  mut drawing_open : Bool
+  mut grab : Bool
+}
+pub fn App::apply(Self, @op.Op, Bool) -> Int?
+pub fn App::boot(Self) -> Unit
+pub fn App::cycle(Self, @read.Survey?, Bool) -> Unit
+pub fn App::new(@dom.Document, Editor, @disk.Io, measure? : (@map.Font, String) -> Double) -> Self
+
+pub(all) struct Editor {
+  text : () -> String
+  survey : () -> @read.Survey
+  holder : () -> @read.Holder
+  selection : () -> @map.Selection
+  picked : () -> Int?
+  set_text : (String) -> Unit
+  apply : (Array[Array[@tree.Edit]], Bool, Int?) -> Unit
+  select : (@read.Anchors?) -> Unit
+  hold : (@read.Holder, @read.Anchors?) -> Unit
+  reveal : (Int) -> Unit
+  undo : () -> Unit
+  redo : () -> Unit
+  focus : () -> Unit
+  set_theme : (Bool) -> Unit
+  show_hint : (Bool) -> Unit
+  tokens : (Array[String], String) -> Array[Array[@mindmap.Token]]
+  tokens_block : (String) -> Array[Array[@mindmap.Token]]
+  epoch : () -> Int
+  on_language_ready : (() -> Unit) -> Unit
+}
+
+pub(all) enum Pane {
+  Md
+  Map
+} derive(Eq, @debug.Debug)
+
+pub struct Panes {
+  doc : @dom.Document
+  md_pane : @dom.Element
+  map_pane : @dom.Element
+  panes_el : @dom.Element
+  splitter : @dom.Element
+  focus_editor : () -> Unit
+  narrow : @dom.MediaQueryList
+  go_left : @dom.Element
+  go_right : @dom.Element
+  mut vis : Vis
+  mut dragging : Bool
+}
+pub fn Panes::new(@dom.Element, @dom.Element, @dom.Element, @dom.Element, () -> Unit) -> Self
+pub fn Panes::toggle(Self) -> Unit
+pub fn Panes::toggle_vis(Self, Pane) -> Unit
+
+pub(all) struct Shortcuts {
+  save : (Bool) -> Unit
+  open : () -> Unit
+  create : () -> Unit
+  toggle_pane : () -> Unit
+  toggle_pane_vis : (Pane) -> Unit
+  undo : () -> Unit
+  redo : () -> Unit
+  export_map : (Bool) -> Unit
+}
+
+pub(all) struct Vis {
+  md : Bool
+  map : Bool
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

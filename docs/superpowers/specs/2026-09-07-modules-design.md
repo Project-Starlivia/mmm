@@ -30,7 +30,7 @@ core/   module mmm/core — DOM を知らない。mizchi/js* も moonbitlang/asy
 app/    module mmm/app — DOM。core に依存し、試験は happy-dom
   app.mbt        App — 束ねる場所（1 トランザクション = 1 サイクルの出口、操作の入口、起動）
   panes.mbt      枠。2 つのペインと分割線
-  prefs.mbt      持ち物（theme / color / way / grab）
+  prefs/         持ち物（theme / color / way / grab）。bar（theme / export）も読むので root には置けず、小さな package
   shortcuts.mbt  全体のキー
   link.mbt       本文を URL に載せる / 戻す
   bar/           帯（index.html の `#bar`）
@@ -53,7 +53,7 @@ app/    module mmm/app — DOM。core に依存し、試験は happy-dom
     card.mbt / field.mbt / pick.mbt / host.mbt / measure.mbt
     svg.mbt      1 枚の svg に写す
   parts/         器 — 文書を知らず、値を返す
-    icons / notice / hint / tool / menu / ask / asks / draw
+    icons / notice / hint / tool / menu / ask / asks / draw / color（アクセントカラーの読み。theme と draw が共に読む）
   web/           browser の API を 1 行ずつ包む。`_get` / `_call` と extern はここにしか書かない
     dom / svg / fs / canvas / out / drag / clip
   js/            browser への出口（foreign_library。ts が import する）

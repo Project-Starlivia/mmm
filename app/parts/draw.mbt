@@ -235,7 +235,7 @@ fn ink_face(doc : @dom.Document, ink : Ink) -> @dom.Element {
       b.setAttribute("class", "ink eraser")
       b.setAttribute("title", "Eraser")
       b.setAttribute("aria-label", "Eraser")
-      b.append(@parts.icon(doc, "eraser").as_node())
+      b.append(icon(doc, "eraser").as_node())
     }
     Pen(pen) => {
       b.setAttribute("class", "ink")

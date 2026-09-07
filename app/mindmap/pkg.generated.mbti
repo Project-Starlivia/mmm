@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mmm/app/render"
+package "mmm/app/mindmap"
 
 import {
   "mizchi/js/builtins/global",

@@ -33,3 +33,15 @@ test "name: 最初の根の字。Implicit と空は empty" {
   assert_eq(survey("### x\n").name(), "empty")
   assert_eq(survey("# ///\n").name(), "empty")
 }
+
+///|
+test "bare / is_markdown: 文書の拡張子だけ落とす。大文字も。空なら mmm" {
+  assert_eq(bare("Notes.MD"), "Notes")
+  assert_eq(bare("a.markdown"), "a")
+  assert_eq(bare("a.txt.md"), "a.txt")
+  assert_eq(bare("a.png"), "a.png")
+  assert_eq(bare(".md"), "mmm")
+  assert_eq(bare(""), "mmm")
+  assert_true(is_markdown("x.TXT"))
+  assert_false(is_markdown("x.png"))
+}
