@@ -166,7 +166,9 @@ test "方言 — 定義行の尻は改行込み（生は改行の手前で止ま
 }
 
 ///|
-test "綴り — 区切り線は ---（ライブラリは *** と書く）。コードの中の *** は触らない" {
+/// 境界の `***` は `Root.rules`、飾りの `***` は中身の原文（`Block.source`）、
+/// コードの中の `***` はコードの中身。どれも読んだ字のまま返る。
+test "綴り — 水平線は読んだ字のまま。境界も飾りもコードの中も" {
   let d = parse("# r\n\n## a\n\n***\n\n## b\n\n***\n\n```\n***\n```\n")
   inspect(
     serialize(d),
@@ -175,11 +177,11 @@ test "綴り — 区切り線は ---（ライブラリは *** と書く）。コ
       #|
       #|## a
       #|
-      #|---
+      #|***
       #|
       #|## b
       #|
-      #|---
+      #|***
       #|
       #|```
       #|***
@@ -193,11 +195,22 @@ test "綴り — 区切り線は ---（ライブラリは *** と書く）。コ
     content=(
       #|- a
       #|
-      #|  ---
+      #|  ***
       #|
       #|  - b
       #|
     ),
+  )
+}
+
+///|
+/// 読みは CRLF を含む md も受けるが（`方言 — CRLF でも…`）、書きは LF だけ。
+/// 塊の中身は読んだ原文なので、その中の CRLF だけが残る。
+test "綴り — 書き戻しの改行は LF だけ" {
+  inspect(serialize(parse("# a\r\n\r\n## b\r\n")), content="# a\n\n## b\n")
+  inspect(
+    serialize(parse("# a\r\n\r\n```\r\nx\r\n```\r\n")),
+    content="# a\n\n```\r\nx\r\n```\n",
   )
 }
 
@@ -303,7 +316,7 @@ test "方言 — 閉じの無いフェンスは空行の先のフェンスを掴
 }
 
 ///|
-test "綴り — 段落の直後の線は *** のまま（--- だと setext の下線になる）。冪等" {
+test "綴り — 引用の中の線は原文のまま。冪等" {
   let quote = "# r\n\n> a\n>\n> ---\n"
   let once = serialize(parse(quote))
   inspect(
@@ -312,7 +325,8 @@ test "綴り — 段落の直後の線は *** のまま（--- だと setext の�
       #|# r
       #|
       #|> a
-      #|> ***
+      #|>
+      #|> ---
       #|
     ),
   )
@@ -329,5 +343,46 @@ test "綴り — 段落の直後の線は *** のまま（--- だと setext の�
       #|
     ),
   )
+  inspect(serialize(parse(again)) == again, content="true")
+}
+
+///|
+/// #84 — 詰め（`loose`）は**項目と項目の間の空行**。ライブラリの `tight` は
+/// 列のどこかに空行があれば偽なので、項目の中の空行でも偽になる。それで書き戻すと
+/// 空行が項目の間へ移り、触っていない字が変わる（冪等でもなくなる）
+test "綴り — 項目の中の空行は項目の間に移らない。冪等" {
+  let inner = "# h\n\n- b\n\n  text\n- c\n"
+  let once = serialize(parse(inner))
+  inspect(
+    once,
+    content=(
+      #|# h
+      #|
+      #|- b
+      #|
+      #|  text
+      #|- c
+      #|
+    ),
+  )
+  inspect(once == inner, content="true")
+  inspect(serialize(parse(once)) == once, content="true")
+  let fenced = "# h\n\n- b\n\n  ```\n  x\n  ```\n- c\n"
+  let again = serialize(parse(fenced))
+  inspect(
+    again,
+    content=(
+      #|# h
+      #|
+      #|- b
+      #|
+      #|  ```
+      #|  x
+      #|  ```
+      #|- c
+      #|
+    ),
+  )
+  inspect(again == fenced, content="true")
   inspect(serialize(parse(again)) == again, content="true")
 }

@@ -8,6 +8,7 @@
 //              畳みの中に埋もれていない。無いのは最後の根と文書の散文を消したときだけ
 //   隙間の保存 — どの操作の後も、元に無かった連続空行と頭の空行は生まれない。
 //              足すだけの操作（AddNode / AddBlock / Graft）で空行の数は減らない
+//   原文の保存 — 触っていない字は変わらない
 //
 // 見本 × 全 id × Op の作り方で回す。Op の作り方は op の check の法則と同じ。
 
@@ -118,14 +119,17 @@ fn bare(doc : @tree.Doc, id : Int) -> Json? {
 }
 
 ///|
-/// 部分木の JSON から id を消す。
+/// 部分木の JSON から id と綴りを消す（`@tree.shape` と同じ「形」の見方）。
+/// **綴りは形ではない** — 詰め（`loose`）は列 1 本のもので、操作が列を割れば
+/// 1 つの項目に空行は書けず、読み直しは詰まった列になる。
 fn strip(x : @tree.Node) -> Json {
+  let spelling = ["id", "setext", "closing", "marker", "offset", "loose"]
   fn go(j : Json) -> Json {
     match j {
       Object(o) => {
         let out : Map[String, Json] = Map([])
         for k, v in o {
-          if k != "id" {
+          if !spelling.contains(k) {
             out[k] = go(v)
           }
         }
@@ -437,6 +441,75 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
   inspect(n, content="1486")
+}
+
+///|
+/// 1 ノードの Rename で変わるのは、そのノードの名前の行だけ。ほかの字は 1 つも
+/// 変わらない — 表の桁も、フェンスも、素の URL も、定義行の位置も
+test "法則 — 触っていない字は変わらない" {
+  let md =
+    #|# a
+    #|
+    #|| x | 日本語 |
+    #||---|---|
+    #|| 1 | 2 |
+    #|
+    #|~~~
+    #|code
+    #|~~~
+    #|
+    #|https://e.com/x
+    #|
+    #|[r]: https://e.com/r
+    #|
+    #|* b
+    #|* c
+    #|
+  let r = edit(md, Rename(id=2, label="A"))
+  let out = @tree.apply(md, r.edits)
+  // 名前の行を元に戻せば、原文そのもの
+  assert_eq(out.replace(old="# A\n", new="# a\n"), md)
+  // 見本ぜんぶ × 名前の行を持つ全ノードでも同じ。編集は 1 つ残らずその行の中
+  let bad : Array[String] = []
+  let mut n = 0
+  for i, doc in corpus {
+    let (before, spans) = @tree.survey(doc)
+    for id in ids(before) {
+      // 名前の行を持たないもの（中身と Implicit）は地番が言う。Rename が
+      // Implicit を綴れば行が 1 本増えるので、そこに「触っていない」は無い
+      guard spans.get(id) is Some({ label: Some(at), .. }) else { continue }
+      // 畳みは `<details>` が部分木を包むので、名前が変われば塊ごと書き直す
+      guard !under_fold(before, id) else { continue }
+      let edits = edit(doc, Rename(id~, label="z")).edits
+      guard !edits.is_empty() else { continue }
+      n = n + 1
+      let (head, tail) = line_of(doc, at)
+      for e in edits {
+        if e.from < head || e.to > tail {
+          bad.push(
+            "\{i} Rename \{id}: 名前の行 [\{head},\{tail}) の外に \{e.to_json().stringify()}",
+          )
+        }
+      }
+    }
+  }
+  json_inspect(bad, content=[])
+  // 網の広さ。corpus を触れば動く
+  inspect(n, content="40")
+}
+
+///|
+/// その位置の行の頭と尻（改行の次。末尾に改行が無ければ文書の尻）。
+fn line_of(md : String, at : Int) -> (Int, Int) {
+  let mut head = at
+  while head > 0 && md[head - 1] != '\n' {
+    head = head - 1
+  }
+  let mut tail = at
+  while tail < md.length() && md[tail] != '\n' {
+    tail = tail + 1
+  }
+  (head, if tail < md.length() { tail + 1 } else { tail })
 }
 
 ///|

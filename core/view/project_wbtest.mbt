@@ -6,12 +6,12 @@
 
 ///|
 fn doc(roots : Array[@tree.Root]) -> @tree.Doc {
-  { frontmatter: None, eol: Lf, body: [], roots, }
+  { frontmatter: None, body: [], roots, }
 }
 
 ///|
 fn root(node : @tree.Node, sides? : Array[@tree.Side] = []) -> @tree.Root {
-  { node, sides, }
+  { node, sides, rules: [], }
 }
 
 ///|
@@ -22,7 +22,15 @@ fn heading(
   body? : Array[@tree.Block] = [],
   fold? : @tree.Fold? = None,
 ) -> @tree.Node {
-  @tree.HeadingNode({ id, label, fold, body, children, })
+  @tree.HeadingNode({
+    id,
+    label,
+    fold,
+    body,
+    setext: false,
+    closing: 0,
+    children,
+  })
 }
 
 ///|
@@ -32,8 +40,11 @@ fn item(
   children? : Array[@tree.ListNode] = [],
   body? : Array[@tree.Block] = [],
   fold? : @tree.Fold? = None,
+  marker? : String = "-",
+  offset? : Int = 2,
+  loose? : Bool = false,
 ) -> @tree.ListNode {
-  { id, label, fold, body, children, }
+  { id, label, fold, body, marker, offset, loose, children, }
 }
 
 ///|
@@ -112,14 +123,19 @@ test "項目も子の項目も同じノードになる" {
 ///|
 test "Raw だけが落ちる。並びも id も保つ" {
   let body : Array[@tree.Block] = [
-    { id: 3, content: @tree.Image(alt="", src="p.png", title=""), },
-    { id: 4, content: @tree.Raw("prose"), },
-    { id: 5, content: @tree.Link(text="t", href="u", title=""), },
-    { id: 6, content: @tree.Code(info="js", text="1\n"), },
-    { id: 7, content: @tree.Svg("<svg/>"), },
-    { id: 8, content: @tree.ThematicBreak, },
+    {
+      id: 3,
+      source: None,
+      content: @tree.Image(alt="", src="p.png", title=""),
+    },
+    { id: 4, source: None, content: @tree.Raw("prose"), },
+    { id: 5, source: None, content: @tree.Link(text="t", href="u", title=""), },
+    { id: 6, source: None, content: @tree.Code(info="js", text="1\n"), },
+    { id: 7, source: None, content: @tree.Svg("<svg/>"), },
+    { id: 8, source: None, content: @tree.ThematicBreak, },
     {
       id: 9,
+      source: None,
       content: @tree.Details(
         text="<details>x</details>",
         open=false,
@@ -224,13 +240,12 @@ test "木は本数のまま" {
 }
 
 ///|
-test "frontmatter は通り、改行と散文は消える" {
+test "frontmatter は通り、散文は消える" {
   let d : @tree.Doc = {
     frontmatter: Some("k: v\n"),
-    eol: Crlf,
     body: [
-      { id: 2, content: @tree.ThematicBreak, },
-      { id: 3, content: @tree.Raw("prose"), },
+      { id: 2, source: None, content: @tree.ThematicBreak, },
+      { id: 3, source: None, content: @tree.Raw("prose"), },
     ],
     roots: [root(heading(4, "a"))],
   }

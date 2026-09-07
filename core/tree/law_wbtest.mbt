@@ -6,7 +6,6 @@
 ///|
 test "単調性 — 項目の中の見出しは項目として子になる" {
   json_inspect(parse("- a\n  # x\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -16,10 +15,24 @@ test "単調性 — 項目の中の見出しは項目として子になる" {
             "id": 2,
             "label": "a",
             "body": [],
-            "children": [{ "id": 3, "label": "x", "body": [], "children": [] }],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
+            "children": [
+              {
+                "id": 3,
+                "label": "x",
+                "body": [],
+                "marker": "-",
+                "offset": 2,
+                "loose": false,
+                "children": [],
+              },
+            ],
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -29,22 +42,38 @@ test "単調性 — 項目の中の見出しは項目として子になる" {
 /// 列 0 へ出れば項目が閉じるので、これは中身ではなく別の木（C17）。
 test "単調性 — 列 0 の見出しは項目を閉じる" {
   json_inspect(parse("- a\n\n# x\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "a", "body": [], "children": [] },
+          {
+            "id": 2,
+            "label": "a",
+            "body": [],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
       {
         "node": [
           "HeadingNode",
-          { "id": 3, "label": "x", "body": [], "children": [] },
+          {
+            "id": 3,
+            "label": "x",
+            "body": [],
+            "setext": false,
+            "closing": 0,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -55,7 +84,6 @@ test "単調性 — 列 0 の見出しは項目を閉じる" {
 /// 自動的にそうなるので、並べ替えは要らない。
 test "順序法則 — 項目のあとの見出しは兄弟になる" {
   json_inspect(parse("# r\n\n- b\n\n## a\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -65,19 +93,37 @@ test "順序法則 — 項目のあとの見出しは兄弟になる" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "ListNode",
-                { "id": 3, "label": "b", "body": [], "children": [] },
+                {
+                  "id": 3,
+                  "label": "b",
+                  "body": [],
+                  "marker": "-",
+                  "offset": 2,
+                  "loose": false,
+                  "children": [],
+                },
               ],
               [
                 "HeadingNode",
-                { "id": 4, "label": "a", "body": [], "children": [] },
+                {
+                  "id": 4,
+                  "label": "a",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
             ],
           },
         ],
         "sides": ["Right", "Right"],
+        "rules": ["", ""],
       },
     ],
   })
@@ -88,7 +134,6 @@ test "順序法則 — 項目のあとの見出しは兄弟になる" {
 /// だから [見出し, 項目] の並びは作られない。
 test "順序法則 — 見出しのあとの項目は子になる" {
   json_inspect(parse("# r\n\n## a\n\n- b\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -98,6 +143,8 @@ test "順序法則 — 見出しのあとの項目は子になる" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
@@ -105,10 +152,20 @@ test "順序法則 — 見出しのあとの項目は子になる" {
                   "id": 3,
                   "label": "a",
                   "body": [],
+                  "setext": false,
+                  "closing": 0,
                   "children": [
                     [
                       "ListNode",
-                      { "id": 4, "label": "b", "body": [], "children": [] },
+                      {
+                        "id": 4,
+                        "label": "b",
+                        "body": [],
+                        "marker": "-",
+                        "offset": 2,
+                        "loose": false,
+                        "children": [],
+                      },
                     ],
                   ],
                 },
@@ -117,6 +174,7 @@ test "順序法則 — 見出しのあとの項目は子になる" {
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -128,7 +186,6 @@ test "順序法則 — 見出しのあとの項目は子になる" {
 /// 深さへ広げたもの。
 test "単調性 — 深い見出しも項目の下へ潜らない" {
   json_inspect(parse("# r\n\n- b\n\n### x\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -138,10 +195,20 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "ListNode",
-                { "id": 3, "label": "b", "body": [], "children": [] },
+                {
+                  "id": 3,
+                  "label": "b",
+                  "body": [],
+                  "marker": "-",
+                  "offset": 2,
+                  "loose": false,
+                  "children": [],
+                },
               ],
               [
                 "ImplicitNode",
@@ -150,7 +217,14 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
                   "children": [
                     [
                       "HeadingNode",
-                      { "id": 5, "label": "x", "body": [], "children": [] },
+                      {
+                        "id": 5,
+                        "label": "x",
+                        "body": [],
+                        "setext": false,
+                        "closing": 0,
+                        "children": [],
+                      },
                     ],
                   ],
                 },
@@ -159,6 +233,7 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
           },
         ],
         "sides": ["Right", "Right"],
+        "rules": ["", ""],
       },
     ],
   })
@@ -167,15 +242,23 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
 ///|
 test "単調性 — 項目の根の下にも潜らない" {
   json_inspect(parse("- a\n\n### x\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "a", "body": [], "children": [] },
+          {
+            "id": 2,
+            "label": "a",
+            "body": [],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
       {
         "node": [
@@ -190,7 +273,14 @@ test "単調性 — 項目の根の下にも潜らない" {
                   "children": [
                     [
                       "HeadingNode",
-                      { "id": 5, "label": "x", "body": [], "children": [] },
+                      {
+                        "id": 5,
+                        "label": "x",
+                        "body": [],
+                        "setext": false,
+                        "closing": 0,
+                        "children": [],
+                      },
                     ],
                   ],
                 },
@@ -199,6 +289,7 @@ test "単調性 — 項目の根の下にも潜らない" {
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -207,7 +298,6 @@ test "単調性 — 項目の根の下にも潜らない" {
 ///|
 test "単調性 — 入れ子項目の後ろでも潜らない" {
   json_inspect(parse("# r\n\n- b\n\n  - c\n\n### x\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -217,6 +307,8 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "ListNode",
@@ -224,8 +316,19 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
                   "id": 3,
                   "label": "b",
                   "body": [],
+                  "marker": "-",
+                  "offset": 2,
+                  "loose": false,
                   "children": [
-                    { "id": 4, "label": "c", "body": [], "children": [] },
+                    {
+                      "id": 4,
+                      "label": "c",
+                      "body": [],
+                      "marker": "-",
+                      "offset": 2,
+                      "loose": false,
+                      "children": [],
+                    },
                   ],
                 },
               ],
@@ -236,7 +339,14 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
                   "children": [
                     [
                       "HeadingNode",
-                      { "id": 6, "label": "x", "body": [], "children": [] },
+                      {
+                        "id": 6,
+                        "label": "x",
+                        "body": [],
+                        "setext": false,
+                        "closing": 0,
+                        "children": [],
+                      },
                     ],
                   ],
                 },
@@ -245,6 +355,7 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
           },
         ],
         "sides": ["Right", "Right"],
+        "rules": ["", ""],
       },
     ],
   })

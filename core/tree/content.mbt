@@ -8,8 +8,15 @@
 /// 中身を、いま積んでいるノードに足す。骨格がまだ無ければ文書の散文になる。
 /// id は割り付けの直前に文書順で振るので、ここでは 0 を置く。
 /// `from`・`to` はその中身の原文での範囲で、`to` は持ち主の地番もそこまで伸ばす。
-fn fill(b : Build, content : Content, from~ : Int, to~ : Int) -> Unit {
-  let block : Block = { id: 0, content, }
+/// `source` は読んだ原文 — 書き戻しはこれをそのまま返す。
+fn fill(
+  b : Build,
+  content : Content,
+  from~ : Int,
+  to~ : Int,
+  source~ : String?,
+) -> Unit {
+  let block : Block = { id: 0, content, source, }
   let at : Spot = { from, label: None, to, }
   if b.stack.is_empty() {
     b.body.push(block)
@@ -84,8 +91,9 @@ fn sole(
 /// なので text も URL になる。字が混ざる行や開けない scheme は None（疑わしきは Raw）。
 ///
 /// **読みは寛容に、書きは CommonMark に。** 素の URL は CommonMark ではただの字で、
-/// リンクとして描くのは GFM の方言。読む側はそれに合わせるが、正規形は `[URL](URL)`
-/// のまま — 素の URL を書き戻すと、他所ではリンクでなくなる。
+/// リンクとして描くのは GFM の方言。読む側はそれに合わせる。読んだ素の URL は
+/// 原文のまま返る（`Block.source`）。`[URL](URL)` に綴るのは mmm が Link を
+/// 新しく作るときだけ。
 fn bare(text : String) -> Content? {
   let scheme = if text.has_prefix("https://") {
     8
@@ -110,7 +118,7 @@ fn bare(text : String) -> Content? {
 /// 原文のまま持つ中身（Raw）が段落 1 つなら、その行の列（前後の空白と `\r` を
 /// 除き、空の行は落とす）。表・引用・HTML など段落でなければ None。
 /// 貼るとき、一番外の段落だけを「行ごとにノード」にするための問い —
-/// 段落かどうかは mdAst しか知らないので、ここで読み直す（unbuild の splice と同じ手）。
+/// 段落かどうかは mdAst しか知らないので、ここで読み直す。
 pub fn lines(text : String) -> Array[String]? {
   let blocks = read(text).children.filter(b => !(b is BlankLines(..)))
   guard blocks is [Paragraph(..)] else { return None }
@@ -221,6 +229,21 @@ fn line_end(md : String, at : Int) -> Int {
   } else {
     i
   }
+}
+
+///|
+/// 行頭 `at` の手前に続く空行の頭。空行が無ければその位置のまま。
+/// 空行は「改行までが空白だけの行」— 読みが空行と見るのと同じ。改行は `\n`（CRLF の
+/// `\r` は行の中身ではない）。
+fn blank_start(md : String, at : Int) -> Int {
+  let mut p = at
+  while p > 0 && md[p - 1] == '\n' {
+    let nl = if p >= 2 && md[p - 2] == '\r' { p - 2 } else { p - 1 }
+    let head = line_start(md, nl)
+    guard skip_blank(md, head, nl) == nl else { break }
+    p = head
+  }
+  p
 }
 
 ///|

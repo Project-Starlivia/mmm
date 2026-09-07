@@ -6,15 +6,23 @@
 ///|
 test "項目だけの木" {
   json_inspect(parse("- root\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "root", "body": [], "children": [] },
+          {
+            "id": 2,
+            "label": "root",
+            "body": [],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -23,7 +31,6 @@ test "項目だけの木" {
 ///|
 test "入れ子は深くなる" {
   json_inspect(parse("- root\n  - a\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -33,10 +40,24 @@ test "入れ子は深くなる" {
             "id": 2,
             "label": "root",
             "body": [],
-            "children": [{ "id": 3, "label": "a", "body": [], "children": [] }],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "body": [],
+                "marker": "-",
+                "offset": 2,
+                "loose": false,
+                "children": [],
+              },
+            ],
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -45,7 +66,6 @@ test "入れ子は深くなる" {
 ///|
 test "兄弟は並ぶ" {
   json_inspect(parse("- root\n  - a\n  - b\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -55,13 +75,33 @@ test "兄弟は並ぶ" {
             "id": 2,
             "label": "root",
             "body": [],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
             "children": [
-              { "id": 3, "label": "a", "body": [], "children": [] },
-              { "id": 4, "label": "b", "body": [], "children": [] },
+              {
+                "id": 3,
+                "label": "a",
+                "body": [],
+                "marker": "-",
+                "offset": 2,
+                "loose": false,
+                "children": [],
+              },
+              {
+                "id": 4,
+                "label": "b",
+                "body": [],
+                "marker": "-",
+                "offset": 2,
+                "loose": false,
+                "children": [],
+              },
             ],
           },
         ],
         "sides": ["Right", "Right"],
+        "rules": ["", ""],
       },
     ],
   })
@@ -70,7 +110,6 @@ test "兄弟は並ぶ" {
 ///|
 test "見出しの下の項目は 1 つ深い" {
   json_inspect(parse("# r\n\n- a\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -80,15 +119,26 @@ test "見出しの下の項目は 1 つ深い" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "ListNode",
-                { "id": 3, "label": "a", "body": [], "children": [] },
+                {
+                  "id": 3,
+                  "label": "a",
+                  "body": [],
+                  "marker": "-",
+                  "offset": 2,
+                  "loose": false,
+                  "children": [],
+                },
               ],
             ],
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -97,7 +147,6 @@ test "見出しの下の項目は 1 つ深い" {
 ///|
 test "見出しは入れ子をリセットする" {
   json_inspect(parse("# r\n\n## s\n\n- a\n  - b\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -107,6 +156,8 @@ test "見出しは入れ子をリセットする" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
@@ -114,6 +165,8 @@ test "見出しは入れ子をリセットする" {
                   "id": 3,
                   "label": "s",
                   "body": [],
+                  "setext": false,
+                  "closing": 0,
                   "children": [
                     [
                       "ListNode",
@@ -121,8 +174,19 @@ test "見出しは入れ子をリセットする" {
                         "id": 4,
                         "label": "a",
                         "body": [],
+                        "marker": "-",
+                        "offset": 2,
+                        "loose": false,
                         "children": [
-                          { "id": 5, "label": "b", "body": [], "children": [] },
+                          {
+                            "id": 5,
+                            "label": "b",
+                            "body": [],
+                            "marker": "-",
+                            "offset": 2,
+                            "loose": false,
+                            "children": [],
+                          },
                         ],
                       },
                     ],
@@ -133,6 +197,7 @@ test "見出しは入れ子をリセットする" {
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -141,28 +206,44 @@ test "見出しは入れ子をリセットする" {
 ///|
 test "マーカーの銘柄は構造に影響しない" {
   json_inspect(parse("* a\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "a", "body": [], "children": [] },
+          {
+            "id": 2,
+            "label": "a",
+            "body": [],
+            "marker": "*",
+            "offset": 2,
+            "loose": false,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
   json_inspect(parse("+ a\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "a", "body": [], "children": [] },
+          {
+            "id": 2,
+            "label": "a",
+            "body": [],
+            "marker": "+",
+            "offset": 2,
+            "loose": false,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -171,22 +252,39 @@ test "マーカーの銘柄は構造に影響しない" {
 ///|
 test "順序リストも項目として読む" {
   json_inspect(parse("1. a\n2. b\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "a", "body": [], "children": [] },
+          {
+            "id": 2,
+            "label": "a",
+            "body": [],
+            "marker": "1.",
+            "offset": 3,
+            "loose": false,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
       {
         "node": [
           "ListNode",
-          { "id": 3, "label": "b", "body": [], "children": [] },
+          {
+            "id": 3,
+            "label": "b",
+            "body": [],
+            "marker": "2.",
+            "offset": 3,
+            "loose": false,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -195,15 +293,23 @@ test "順序リストも項目として読む" {
 ///|
 test "ラベルは原文のまま" {
   json_inspect(parse("- a **b**\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "a **b**", "body": [], "children": [] },
+          {
+            "id": 2,
+            "label": "a **b**",
+            "body": [],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -214,7 +320,6 @@ test "ラベルは原文のまま" {
 /// 中身の両方に出る（切り出しはブロックの範囲でやるので）。
 test "1 行目が段落でなければラベルは無い" {
   json_inspect(parse("- ```\n  code\n  ```\n\n  x\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -224,13 +329,21 @@ test "1 行目が段落でなければラベルは無い" {
             "id": 2,
             "label": "",
             "body": [
-              { "id": 3, "content": ["Code", { "info": "", "text": "code\n" }] },
-              { "id": 4, "content": ["Raw", "x"] },
+              {
+                "id": 3,
+                "content": ["Code", { "info": "", "text": "code\n" }],
+                "source": "```\ncode\n```",
+              },
+              { "id": 4, "content": ["Raw", "x"], "source": "x" },
             ],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -241,7 +354,6 @@ test "途中の段落はラベルにならない" {
   json_inspect(
     parse("- <details>\n  <summary>a</summary>\n\n  x\n\n  </details>\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -262,12 +374,17 @@ test "途中の段落はラベルにならない" {
                       "body": "x",
                     },
                   ],
+                  "source": "<details>\n<summary>a</summary>\n\nx\n\n</details>",
                 },
               ],
+              "marker": "-",
+              "offset": 2,
+              "loose": false,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -279,15 +396,23 @@ test "途中の段落はラベルにならない" {
 /// 行ごとの字下げと `\r` の総量ぶん手前で切れる。ラベルの末尾が消えていた。
 test "続きの行があるラベルは末尾まで残る" {
   json_inspect(parse("- aaa\n  bbb\n  ccc\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "aaa\nbbb\nccc", "body": [], "children": [] },
+          {
+            "id": 2,
+            "label": "aaa\nbbb\nccc",
+            "body": [],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -296,15 +421,23 @@ test "続きの行があるラベルは末尾まで残る" {
 ///|
 test "CRLF でもラベルは末尾まで残る" {
   json_inspect(parse("- aaa\r\n  bbb\r\n"), content={
-    "eol": "Crlf",
     "body": [],
     "roots": [
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "aaa\r\nbbb", "body": [], "children": [] },
+          {
+            "id": 2,
+            "label": "aaa\r\nbbb",
+            "body": [],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -317,15 +450,23 @@ test "CRLF でもラベルは末尾まで残る" {
 /// ラベルが抱えているので、中身として重ねて出さない。
 test "定義行に見える 1 行目でもラベルは全部残る" {
   json_inspect(parse("- [q]: /r\n  ZZZ\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
         "node": [
           "ListNode",
-          { "id": 2, "label": "[q]: /r\nZZZ", "body": [], "children": [] },
+          {
+            "id": 2,
+            "label": "[q]: /r\nZZZ",
+            "body": [],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -337,7 +478,6 @@ test "定義行に見える 1 行目でもラベルは全部残る" {
 /// 間に綴られていない項目が生える（項目は相対記法なので飛びは存在しない）。
 test "境界のあとの入れ子項目に空の項目が生えない" {
   json_inspect(parse("# r\n\n## h\n\n---\n\n- a\n  - b\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -347,10 +487,19 @@ test "境界のあとの入れ子項目に空の項目が生えない" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
-                { "id": 3, "label": "h", "body": [], "children": [] },
+                {
+                  "id": 3,
+                  "label": "h",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
               [
                 "ListNode",
@@ -358,8 +507,19 @@ test "境界のあとの入れ子項目に空の項目が生えない" {
                   "id": 4,
                   "label": "a",
                   "body": [],
+                  "marker": "-",
+                  "offset": 2,
+                  "loose": false,
                   "children": [
-                    { "id": 5, "label": "b", "body": [], "children": [] },
+                    {
+                      "id": 5,
+                      "label": "b",
+                      "body": [],
+                      "marker": "-",
+                      "offset": 2,
+                      "loose": false,
+                      "children": [],
+                    },
                   ],
                 },
               ],
@@ -367,6 +527,7 @@ test "境界のあとの入れ子項目に空の項目が生えない" {
           },
         ],
         "sides": ["Right", "Left"],
+        "rules": ["", "---"],
       },
     ],
   })
@@ -376,7 +537,6 @@ test "境界のあとの入れ子項目に空の項目が生えない" {
 /// 同じ経路で、後ろの見出しが項目に化けていた。
 test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
   json_inspect(parse("# r\n\n## h\n\n### x\n\n---\n\n- a\n  - b\n\n### t\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -386,6 +546,8 @@ test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
@@ -393,10 +555,19 @@ test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
                   "id": 3,
                   "label": "h",
                   "body": [],
+                  "setext": false,
+                  "closing": 0,
                   "children": [
                     [
                       "HeadingNode",
-                      { "id": 4, "label": "x", "body": [], "children": [] },
+                      {
+                        "id": 4,
+                        "label": "x",
+                        "body": [],
+                        "setext": false,
+                        "closing": 0,
+                        "children": [],
+                      },
                     ],
                   ],
                 },
@@ -407,8 +578,19 @@ test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
                   "id": 5,
                   "label": "a",
                   "body": [],
+                  "marker": "-",
+                  "offset": 2,
+                  "loose": false,
                   "children": [
-                    { "id": 6, "label": "b", "body": [], "children": [] },
+                    {
+                      "id": 6,
+                      "label": "b",
+                      "body": [],
+                      "marker": "-",
+                      "offset": 2,
+                      "loose": false,
+                      "children": [],
+                    },
                   ],
                 },
               ],
@@ -419,7 +601,14 @@ test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
                   "children": [
                     [
                       "HeadingNode",
-                      { "id": 8, "label": "t", "body": [], "children": [] },
+                      {
+                        "id": 8,
+                        "label": "t",
+                        "body": [],
+                        "setext": false,
+                        "closing": 0,
+                        "children": [],
+                      },
                     ],
                   ],
                 },
@@ -428,6 +617,7 @@ test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
           },
         ],
         "sides": ["Right", "Left", "Left"],
+        "rules": ["", "---", ""],
       },
     ],
   })
@@ -438,7 +628,6 @@ test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
 /// 引き出された先に並ぶ。見出し（`## b` `## c`）と同じ形になる。
 test "境界のあとの兄弟項目は同じ深さに並ぶ" {
   json_inspect(parse("# r\n\n## a\n\n---\n\n- b\n\n- c\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -448,23 +637,49 @@ test "境界のあとの兄弟項目は同じ深さに並ぶ" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
-                { "id": 3, "label": "a", "body": [], "children": [] },
+                {
+                  "id": 3,
+                  "label": "a",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
               [
                 "ListNode",
-                { "id": 4, "label": "b", "body": [], "children": [] },
+                {
+                  "id": 4,
+                  "label": "b",
+                  "body": [],
+                  "marker": "-",
+                  "offset": 2,
+                  "loose": true,
+                  "children": [],
+                },
               ],
               [
                 "ListNode",
-                { "id": 5, "label": "c", "body": [], "children": [] },
+                {
+                  "id": 5,
+                  "label": "c",
+                  "body": [],
+                  "marker": "-",
+                  "offset": 2,
+                  "loose": true,
+                  "children": [],
+                },
               ],
             ],
           },
         ],
         "sides": ["Right", "Left", "Left"],
+        "rules": ["", "---", ""],
       },
     ],
   })
@@ -475,7 +690,6 @@ test "境界のあとの兄弟項目は同じ深さに並ぶ" {
 /// （間に中身が挟まれば列は割れる）、2 つ目は前の列の子ではなく兄弟。
 test "項目の中の 2 つ目の列は前の列の兄弟" {
   json_inspect(parse("- a\n\n  - b\n\n  text\n\n  - c\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -485,18 +699,35 @@ test "項目の中の 2 つ目の列は前の列の兄弟" {
             "id": 2,
             "label": "a",
             "body": [],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
             "children": [
               {
                 "id": 3,
                 "label": "b",
-                "body": [{ "id": 4, "content": ["Raw", "text"] }],
+                "body": [
+                  { "id": 4, "content": ["Raw", "text"], "source": "text" },
+                ],
+                "marker": "-",
+                "offset": 2,
+                "loose": false,
                 "children": [],
               },
-              { "id": 5, "label": "c", "body": [], "children": [] },
+              {
+                "id": 5,
+                "label": "c",
+                "body": [],
+                "marker": "-",
+                "offset": 2,
+                "loose": false,
+                "children": [],
+              },
             ],
           },
         ],
         "sides": ["Right", "Right"],
+        "rules": ["", ""],
       },
     ],
   })

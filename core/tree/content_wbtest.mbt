@@ -5,29 +5,6 @@
 ///|
 test "散文はノードの中身になる" {
   json_inspect(parse("# a\n\nhello\n"), content={
-    "eol": "Lf",
-    "body": [],
-    "roots": [
-      {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "a",
-            "body": [{ "id": 3, "content": ["Raw", "hello"] }],
-            "children": [],
-          },
-        ],
-        "sides": [],
-      },
-    ],
-  })
-}
-
-///|
-test "中身は文書順に並ぶ" {
-  json_inspect(parse("# a\n\nhello\n\nworld\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -37,22 +14,23 @@ test "中身は文書順に並ぶ" {
             "id": 2,
             "label": "a",
             "body": [
-              { "id": 3, "content": ["Raw", "hello"] },
-              { "id": 4, "content": ["Raw", "world"] },
+              { "id": 3, "content": ["Raw", "hello"], "source": "hello" },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
 }
 
 ///|
-test "中身は深さで振り分けられる" {
-  json_inspect(parse("# a\n\nx\n\n## b\n\ny\n"), content={
-    "eol": "Lf",
+test "中身は文書順に並ぶ" {
+  json_inspect(parse("# a\n\nhello\n\nworld\n"), content={
     "body": [],
     "roots": [
       {
@@ -61,14 +39,45 @@ test "中身は深さで振り分けられる" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Raw", "x"] }],
+            "body": [
+              { "id": 3, "content": ["Raw", "hello"], "source": "hello" },
+              { "id": 4, "content": ["Raw", "world"], "source": "world" },
+            ],
+            "setext": false,
+            "closing": 0,
+            "children": [],
+          },
+        ],
+        "sides": [],
+        "rules": [],
+      },
+    ],
+  })
+}
+
+///|
+test "中身は深さで振り分けられる" {
+  json_inspect(parse("# a\n\nx\n\n## b\n\ny\n"), content={
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "HeadingNode",
+          {
+            "id": 2,
+            "label": "a",
+            "body": [{ "id": 3, "content": ["Raw", "x"], "source": "x" }],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
                 {
                   "id": 4,
                   "label": "b",
-                  "body": [{ "id": 5, "content": ["Raw", "y"] }],
+                  "body": [{ "id": 5, "content": ["Raw", "y"], "source": "y" }],
+                  "setext": false,
+                  "closing": 0,
                   "children": [],
                 },
               ],
@@ -76,6 +85,7 @@ test "中身は深さで振り分けられる" {
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -84,15 +94,22 @@ test "中身は深さで振り分けられる" {
 ///|
 test "最初の骨格より前の散文は文書のもの" {
   json_inspect(parse("intro\n\n# a\n"), content={
-    "eol": "Lf",
-    "body": [{ "id": 2, "content": ["Raw", "intro"] }],
+    "body": [{ "id": 2, "content": ["Raw", "intro"], "source": "intro" }],
     "roots": [
       {
         "node": [
           "HeadingNode",
-          { "id": 3, "label": "a", "body": [], "children": [] },
+          {
+            "id": 3,
+            "label": "a",
+            "body": [],
+            "setext": false,
+            "closing": 0,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -101,7 +118,6 @@ test "最初の骨格より前の散文は文書のもの" {
 ///|
 test "画像" {
   json_inspect(parse("# a\n\n![alt](x.png)\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -117,12 +133,16 @@ test "画像" {
                   "Image",
                   { "alt": "alt", "src": "x.png", "title": "" },
                 ],
+                "source": "![alt](x.png)",
               },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -131,7 +151,6 @@ test "画像" {
 ///|
 test "リンク" {
   json_inspect(parse("# a\n\n[text](https://e.com)\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -147,12 +166,16 @@ test "リンク" {
                   "Link",
                   { "text": "text", "href": "https://e.com", "title": "" },
                 ],
+                "source": "[text](https://e.com)",
               },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -161,7 +184,6 @@ test "リンク" {
 ///|
 test "混ざった段落は切り分けない" {
   json_inspect(parse("# a\n\nsee ![alt](x.png)\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -170,11 +192,20 @@ test "混ざった段落は切り分けない" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Raw", "see ![alt](x.png)"] }],
+            "body": [
+              {
+                "id": 3,
+                "content": ["Raw", "see ![alt](x.png)"],
+                "source": "see ![alt](x.png)",
+              },
+            ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -183,7 +214,6 @@ test "混ざった段落は切り分けない" {
 ///|
 test "フェンスのコード" {
   json_inspect(parse("# a\n\n```js\nlet x = 1\n```\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -196,12 +226,16 @@ test "フェンスのコード" {
               {
                 "id": 3,
                 "content": ["Code", { "info": "js", "text": "let x = 1\n" }],
+                "source": "```js\nlet x = 1\n```",
               },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -210,7 +244,6 @@ test "フェンスのコード" {
 ///|
 test "インデントコードも読む（書くのはフェンス）" {
   json_inspect(parse("# a\n\n    code\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -220,12 +253,19 @@ test "インデントコードも読む（書くのはフェンス）" {
             "id": 2,
             "label": "a",
             "body": [
-              { "id": 3, "content": ["Code", { "info": "", "text": "code\n" }] },
+              {
+                "id": 3,
+                "content": ["Code", { "info": "", "text": "code\n" }],
+                "source": "code",
+              },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -234,7 +274,6 @@ test "インデントコードも読む（書くのはフェンス）" {
 ///|
 test "SVG" {
   json_inspect(parse("# a\n\n<svg><rect/></svg>\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -243,11 +282,20 @@ test "SVG" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Svg", "<svg><rect/></svg>\n"] }],
+            "body": [
+              {
+                "id": 3,
+                "content": ["Svg", "<svg><rect/></svg>\n"],
+                "source": "<svg><rect/></svg>",
+              },
+            ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -256,7 +304,6 @@ test "SVG" {
 ///|
 test "飾りの水平線は Rule" {
   json_inspect(parse("# a\n\n***\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -265,11 +312,14 @@ test "飾りの水平線は Rule" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": "ThematicBreak" }],
+            "body": [{ "id": 3, "content": "ThematicBreak", "source": "***" }],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -278,7 +328,6 @@ test "飾りの水平線は Rule" {
 ///|
 test "引用と表は原文のまま" {
   json_inspect(parse("# a\n\n> quote\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -287,11 +336,16 @@ test "引用と表は原文のまま" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Raw", "> quote"] }],
+            "body": [
+              { "id": 3, "content": ["Raw", "> quote"], "source": "> quote" },
+            ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -300,7 +354,6 @@ test "引用と表は原文のまま" {
 ///|
 test "項目にも中身が付く" {
   json_inspect(parse("- a\n\n  hello\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -309,11 +362,17 @@ test "項目にも中身が付く" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Raw", "hello"] }],
+            "body": [
+              { "id": 3, "content": ["Raw", "hello"], "source": "hello" },
+            ],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -325,7 +384,6 @@ test "項目にも中身が付く" {
 /// 包まれた `## h` は項目の子になり、畳みはその見出しに乗る。
 test "項目の中の畳みは、包んだ見出しに乗る" {
   json_inspect(parse("- a\n\n  <details>\n\n  ## h\n\n  </details>\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -335,18 +393,25 @@ test "項目の中の畳みは、包んだ見出しに乗る" {
             "id": 2,
             "label": "a",
             "body": [],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
             "children": [
               {
                 "id": 3,
                 "label": "h",
                 "fold": { "open": false },
                 "body": [],
+                "marker": "-",
+                "offset": 2,
+                "loose": false,
                 "children": [],
               },
             ],
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -358,7 +423,6 @@ test "入れ子の項目でも、畳みは包んだ見出しに乗る" {
   json_inspect(
     parse("- a\n  - b\n\n    <details>\n\n    ## h\n\n    </details>\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -368,17 +432,26 @@ test "入れ子の項目でも、畳みは包んだ見出しに乗る" {
               "id": 2,
               "label": "a",
               "body": [],
+              "marker": "-",
+              "offset": 2,
+              "loose": false,
               "children": [
                 {
                   "id": 3,
                   "label": "b",
                   "body": [],
+                  "marker": "-",
+                  "offset": 2,
+                  "loose": false,
                   "children": [
                     {
                       "id": 4,
                       "label": "h",
                       "fold": { "open": false },
                       "body": [],
+                      "marker": "-",
+                      "offset": 2,
+                      "loose": false,
                       "children": [],
                     },
                   ],
@@ -387,6 +460,7 @@ test "入れ子の項目でも、畳みは包んだ見出しに乗る" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -397,7 +471,6 @@ test "入れ子の項目でも、畳みは包んだ見出しに乗る" {
 /// Raw も同じ規則で切る。
 test "項目の中の Raw も列 0 に揃う" {
   json_inspect(parse("- a\n\n  <!-- x\n  y -->\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -406,23 +479,32 @@ test "項目の中の Raw も列 0 に揃う" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Raw", "<!-- x\ny -->"] }],
+            "body": [
+              {
+                "id": 3,
+                "content": ["Raw", "<!-- x\ny -->"],
+                "source": "<!-- x\ny -->",
+              },
+            ],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
 }
 
 ///|
-/// 改行の流儀は切り出しの中でも保つ（`Doc.eol` は書き戻すときの流儀）。
+/// 読んだ原文は切り出しの中でも字のまま（書き足す改行は LF だけ）。
 test "CRLF は切り出しの中でも保たれる" {
   json_inspect(
     parse("# r\r\n\r\n<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>\r\n"),
     content={
-      "eol": "Crlf",
       "body": [],
       "roots": [
         {
@@ -442,12 +524,16 @@ test "CRLF は切り出しの中でも保たれる" {
                       "body": "## h",
                     },
                   ],
+                  "source": "<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -461,7 +547,6 @@ test "CRLF は切り出しの中でも保たれる" {
 /// 触っていない場所が動く。
 test "リンクの定義行は位置ごと残る" {
   json_inspect(parse("# r\n\n[a]: b \"c\"\n\n## h\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -470,16 +555,32 @@ test "リンクの定義行は位置ごと残る" {
           {
             "id": 2,
             "label": "r",
-            "body": [{ "id": 3, "content": ["Raw", "[a]: b \"c\""] }],
+            "body": [
+              {
+                "id": 3,
+                "content": ["Raw", "[a]: b \"c\""],
+                "source": "[a]: b \"c\"",
+              },
+            ],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
-                { "id": 4, "label": "h", "body": [], "children": [] },
+                {
+                  "id": 4,
+                  "label": "h",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
             ],
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -488,7 +589,6 @@ test "リンクの定義行は位置ごと残る" {
 ///|
 test "定義行が文末にあっても残る" {
   json_inspect(parse("# r\n\n## h\n\n[a]: b\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -498,13 +598,23 @@ test "定義行が文末にあっても残る" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
                 {
                   "id": 3,
                   "label": "h",
-                  "body": [{ "id": 4, "content": ["Raw", "[a]: b"] }],
+                  "body": [
+                    {
+                      "id": 4,
+                      "content": ["Raw", "[a]: b"],
+                      "source": "[a]: b",
+                    },
+                  ],
+                  "setext": false,
+                  "closing": 0,
                   "children": [],
                 },
               ],
@@ -512,6 +622,7 @@ test "定義行が文末にあっても残る" {
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -521,7 +632,6 @@ test "定義行が文末にあっても残る" {
 /// タイトルは中身なので落とさない。木の形と renderer の props は別でよい。
 test "画像とリンクのタイトルは残る" {
   json_inspect(parse("# r\n\n![a](b.png \"t1\")\n\n[c](d \"t2\")\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -537,16 +647,21 @@ test "画像とリンクのタイトルは残る" {
                   "Image",
                   { "alt": "a", "src": "b.png", "title": "t1" },
                 ],
+                "source": "![a](b.png \"t1\")",
               },
               {
                 "id": 4,
                 "content": ["Link", { "text": "c", "href": "d", "title": "t2" }],
+                "source": "[c](d \"t2\")",
               },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -557,7 +672,6 @@ test "画像とリンクのタイトルは残る" {
 /// フェンスのコードは `Block::Code` として綴りごと持つので、こちらは要らない。
 test "数式とディレクティブの閉じは残る" {
   json_inspect(parse("# r\n\n$$\nx\n$$\n\n:::note\ny\n:::\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -567,13 +681,24 @@ test "数式とディレクティブの閉じは残る" {
             "id": 2,
             "label": "r",
             "body": [
-              { "id": 3, "content": ["Raw", "$$\nx\n$$"] },
-              { "id": 4, "content": ["Raw", ":::note\ny\n:::"] },
+              {
+                "id": 3,
+                "content": ["Raw", "$$\nx\n$$"],
+                "source": "$$\nx\n$$",
+              },
+              {
+                "id": 4,
+                "content": ["Raw", ":::note\ny\n:::"],
+                "source": ":::note\ny\n:::",
+              },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -585,7 +710,6 @@ test "数式とディレクティブの閉じは残る" {
 /// 触っていない場所が動く。
 test "項目の中の定義行は項目の中に残る" {
   json_inspect(parse("- a\n  - b\n\n    [q]: /r\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -595,17 +719,30 @@ test "項目の中の定義行は項目の中に残る" {
             "id": 2,
             "label": "a",
             "body": [],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
             "children": [
               {
                 "id": 3,
                 "label": "b",
-                "body": [{ "id": 4, "content": ["Raw", "[q]: /r"] }],
+                "body": [
+                  {
+                    "id": 4,
+                    "content": ["Raw", "[q]: /r"],
+                    "source": "[q]: /r",
+                  },
+                ],
+                "marker": "-",
+                "offset": 2,
+                "loose": false,
                 "children": [],
               },
             ],
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -618,7 +755,6 @@ test "原文のまま持つ領域の中の定義行は重ねない" {
   json_inspect(
     parse("# r\n\n<details>\njunk\n\n[q]: /r\n\n## a\n\n</details>\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -638,12 +774,16 @@ test "原文のまま持つ領域の中の定義行は重ねない" {
                       "body": "junk\n\n[q]: /r\n\n## a",
                     },
                   ],
+                  "source": "<details>\njunk\n\n[q]: /r\n\n## a\n\n</details>",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -656,7 +796,6 @@ test "原文のまま持つ領域の中の定義行は重ねない" {
 /// 消えるので、書き戻したとき定義行が領域の外へ出る）。
 test "開きとノードの間の定義行があれば中身" {
   json_inspect(parse("# r\n\n<details>\n\n[q]: /r\n\n## a\n\n</details>\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -676,12 +815,16 @@ test "開きとノードの間の定義行があれば中身" {
                     "body": "[q]: /r\n\n## a",
                   },
                 ],
+                "source": "<details>\n\n[q]: /r\n\n## a\n\n</details>",
               },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -692,7 +835,6 @@ test "開きとノードの間の定義行があれば中身" {
 /// 後ろの見出しは境界の先ではなく普通の子になる。
 test "定義行は保留中の水平線を飾りに落とす" {
   json_inspect(parse("# r\n\n## a\n\n---\n\n[q]: /r\n\n## b\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -702,6 +844,8 @@ test "定義行は保留中の水平線を飾りに落とす" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
@@ -709,20 +853,34 @@ test "定義行は保留中の水平線を飾りに落とす" {
                   "id": 3,
                   "label": "a",
                   "body": [
-                    { "id": 4, "content": "ThematicBreak" },
-                    { "id": 5, "content": ["Raw", "[q]: /r"] },
+                    { "id": 4, "content": "ThematicBreak", "source": "---" },
+                    {
+                      "id": 5,
+                      "content": ["Raw", "[q]: /r"],
+                      "source": "[q]: /r",
+                    },
                   ],
+                  "setext": false,
+                  "closing": 0,
                   "children": [],
                 },
               ],
               [
                 "HeadingNode",
-                { "id": 6, "label": "b", "body": [], "children": [] },
+                {
+                  "id": 6,
+                  "label": "b",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
             ],
           },
         ],
         "sides": ["Right", "Right"],
+        "rules": ["", ""],
       },
     ],
   })

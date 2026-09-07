@@ -41,6 +41,8 @@ fn respell(n : @tree.Node, sign : @tree.Sign) -> @tree.Node {
             label: l.label,
             fold: l.fold,
             body: l.body,
+            setext: false,
+            closing: 0,
             children: l.children.map(c => respell(@tree.ListNode(c), Heading)),
           })
       }
@@ -58,6 +60,9 @@ fn as_item(n : @tree.Node) -> @tree.ListNode {
         label: h.label,
         fold: h.fold,
         body: h.body,
+        marker: "-",
+        offset: 2,
+        loose: false,
         children: h.children.map(as_item),
       }
     ImplicitNode(g) =>
@@ -66,6 +71,9 @@ fn as_item(n : @tree.Node) -> @tree.ListNode {
         label: "",
         fold: None,
         body: [],
+        marker: "-",
+        offset: 2,
+        loose: false,
         children: g.children.map(as_item),
       }
   }
@@ -162,6 +170,8 @@ fn spell(g : @tree.ImplicitNode, label : String) -> @tree.Node {
     label,
     fold: None,
     body: [],
+    setext: false,
+    closing: 0,
     children: g.children,
   })
 }
@@ -309,12 +319,30 @@ fn delete(doc : @tree.Doc, ids : Array[Int]) -> Done? {
 }
 
 ///|
-/// その綴りで空のノードを作る。
+/// その綴りで空のノードを作る。項目の綴りは既定で、席のものは `spelled` が当てる。
 fn make(sign : @tree.Sign, id : Int, label : String) -> @tree.Node {
   match sign {
     Heading =>
-      @tree.HeadingNode({ id, label, fold: None, body: [], children: [], })
-    Item => @tree.ListNode({ id, label, fold: None, body: [], children: [], })
+      @tree.HeadingNode({
+        id,
+        label,
+        fold: None,
+        body: [],
+        setext: false,
+        closing: 0,
+        children: [],
+      })
+    Item =>
+      @tree.ListNode({
+        id,
+        label,
+        fold: None,
+        body: [],
+        marker: "-",
+        offset: 2,
+        loose: false,
+        children: [],
+      })
   }
 }
 
@@ -359,6 +387,57 @@ fn sign_at(doc : @tree.Doc, at : NodePlace) -> @tree.Sign? {
 }
 
 ///|
+/// 席の項目の綴り（マーカー・字下げ幅・詰め）。`sign_at` と同じ席の見方で、
+/// Before / After は隣、In は末尾の子、In(doc_id) は最後の根。
+/// 項目が居なければ既定（`-` / 2 / 詰まった列）。
+fn spell_at(doc : @tree.Doc, at : NodePlace) -> (String, Int, Bool) {
+  let near = match at {
+    Before(node~) | After(node~) => find(doc, node)
+    In(node~, ..) =>
+      if node == @tree.doc_id {
+        doc.roots.last().map(r => r.node)
+      } else {
+        find(doc, node).bind(n => kids(n).last())
+      }
+  }
+  match near {
+    Some(ListNode(l)) => (l.marker, l.offset, l.loose)
+    _ => ("-", 2, false)
+  }
+}
+
+///|
+/// マーカーを n だけ進める。番号付きなら数字を足し（`3.` の 1 つ先は `4.`）、
+/// 箇条の字はそのまま。
+fn step(marker : String, n : Int) -> String {
+  let mut d = 0
+  let mut num = 0
+  while d < marker.length() && marker[d] >= '0' && marker[d] <= '9' {
+    num = num * 10 + (marker[d].to_int() - '0'.to_int())
+    d = d + 1
+  }
+  if d == 0 {
+    return marker
+  }
+  (num + n).to_string() + marker[d:].to_owned()
+}
+
+///|
+/// その席に座る項目の綴り。k 番目の新入りは番号を k + 1 だけ進める。
+fn spelled(n : @tree.Node, spell : (String, Int, Bool), k : Int) -> @tree.Node {
+  match n {
+    ListNode(l) =>
+      @tree.ListNode({
+        ..l,
+        marker: step(spell.0, k + 1),
+        offset: spell.1,
+        loose: spell.2,
+      })
+    _ => n
+  }
+}
+
+///|
 /// 席が指している id。
 fn anchor(at : NodePlace) -> Int {
   match at {
@@ -369,12 +448,15 @@ fn anchor(at : NodePlace) -> Int {
 }
 
 ///|
-/// 新しいノードを差す。綴りは席が決める（`sign_at`）。
+/// 新しいノードを差す。綴りは席が決める（`sign_at` / `spell_at`）。
 fn add_node(doc : @tree.Doc, at : NodePlace, labels : Array[String]) -> Done? {
   guard !labels.is_empty() else { return None }
   guard sign_at(doc, at) is Some(sign) else { return None }
+  let spell = spell_at(doc, at)
   let first = fresh(doc)
-  let news = labels.mapi((k, label) => make(sign, first + k, label))
+  let news = labels.mapi((k, label) => {
+    spelled(make(sign, first + k, label), spell, k)
+  })
   done(place(doc, at, news), Some(first))
 }
 
@@ -385,9 +467,27 @@ fn wrap(doc : @tree.Doc, id : Int, label : String) -> Done? {
   let nid = fresh(doc)
   let w = match n {
     ListNode(l) =>
-      @tree.ListNode({ id: nid, label, fold: None, body: [], children: [l], })
+      @tree.ListNode({
+        id: nid,
+        label,
+        fold: None,
+        body: [],
+        // id の席に座るので、綴りも id のもの
+        marker: l.marker,
+        offset: l.offset,
+        loose: l.loose,
+        children: [l],
+      })
     _ =>
-      @tree.HeadingNode({ id: nid, label, fold: None, body: [], children: [n], })
+      @tree.HeadingNode({
+        id: nid,
+        label,
+        fold: None,
+        body: [],
+        setext: false,
+        closing: 0,
+        children: [n],
+      })
   }
   done(splice(doc, id, _ => [w]), Some(nid))
 }
@@ -439,7 +539,11 @@ fn move_node(doc : @tree.Doc, ids : Array[Int], at : NodePlace) -> Done? {
   let taken = []
   guard take(doc, picked, taken) is Some(rest) else { return None }
   guard sign_at(rest, at) is Some(sign) else { return None }
-  done(place(rest, at, taken.map(n => respell(n, sign))), Some(picked[0]))
+  let spell = spell_at(rest, at)
+  done(
+    place(rest, at, taken.mapi((k, n) => spelled(respell(n, sign), spell, k))),
+    Some(picked[0]),
+  )
 }
 
 ///|
@@ -543,16 +647,18 @@ fn add_block(
   content : @tree.Content,
 ) -> Done? {
   guard holder(doc, at) is Some(o) else { return None }
-  let b : @tree.Block = { id: fresh(doc), content, }
+  let b : @tree.Block = { id: fresh(doc), content, source: None, }
   done(body(doc, node=o, bs => put(bs, at, [b])), Some(b.id))
 }
 
 ///|
+/// 中身を入れ替える。**原文は捨てる** — 新しい中身は mmm が作ったものなので、
+/// 種類ごとに綴られる。
 fn set_block(doc : @tree.Doc, id : Int, content : @tree.Content) -> Done? {
   guard owner(doc, block=id) is Some(o) else { return None }
   done(
     body(doc, node=o, bs => {
-      bs.map(b => if b.id == id { { id, content, } } else { b })
+      bs.map(b => if b.id == id { { id, content, source: None, } } else { b })
     }),
     Some(id),
   )
@@ -605,7 +711,7 @@ fn anchor_block(at : BlockPlace) -> Int {
 /// 部分木の id をまとめてずらす。parse が振った番号を、いまの木に無い番号へ。
 fn shift(n : @tree.Node, by : Int) -> @tree.Node {
   fn blocks(bs : Array[@tree.Block]) -> Array[@tree.Block] {
-    bs.map(b => { id: b.id + by, content: b.content, })
+    bs.map(b => { id: b.id + by, content: b.content, source: b.source, })
   }
 
   fn list(l : @tree.ListNode) -> @tree.ListNode {
@@ -669,14 +775,15 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   // 行のノードは文書に無い番号から、断片の id はその先へ寄せる
   let first = fresh(doc)
   let by = first + labels.length() - (@tree.doc_id + 1)
+  let spell = spell_at(doc, at)
   let heads = labels.mapi((k, label) => make(sign, first + k, label))
   let prose = rest.map(b => {
-    ({ id: b.id + by, content: b.content, } : @tree.Block)
+    ({ id: b.id + by, content: b.content, source: b.source, } : @tree.Block)
   })
   let subs = peel(sub.roots.map(r => r.node)).map(n => {
     respell(shift(n, by), sign)
   })
-  let nodes = [..heads, ..subs]
+  let nodes = [..heads, ..subs].mapi((k, n) => spelled(n, spell, k))
   let mut cur = doc
   if !prose.is_empty() {
     guard host != @tree.doc_id else { return None }

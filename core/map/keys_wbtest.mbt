@@ -290,8 +290,8 @@ fn keys_c() -> Layout {
     [
       root(
         node(2, "r", blocks=[
-          { id: 3, content: ThematicBreak, },
-          { id: 4, content: Code(info="", text="x"), },
+          { id: 3, source: None, content: ThematicBreak, },
+          { id: 4, source: None, content: Code(info="", text="x"), },
         ]),
       ),
     ],

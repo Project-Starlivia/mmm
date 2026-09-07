@@ -171,7 +171,11 @@ test "derive — 地図が持つ間は位置から。点はラベルの頭、カ
   // 無ければ何も選んでいない
   assert_eq(chosen(d, Map, caret(1), None), nothing)
   // カード: a(3) の中身 code(4) が [10, 18) に書かれている（地番は手で組む）
-  let card : @tree.Block = { id: 4, content: Code(info="", text="x"), }
+  let card : @tree.Block = {
+    id: 4,
+    source: None,
+    content: Code(info="", text="x"),
+  }
   let card_at = spots([
     (1, 0, None, 0),
     (2, 0, Some(2), 18),

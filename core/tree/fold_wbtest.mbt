@@ -11,7 +11,6 @@ test "形が揃えば、そのノードの畳み" {
       "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\nbody\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -21,6 +20,8 @@ test "形が揃えば、そのノードの畳み" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -28,7 +29,11 @@ test "形が揃えば、そのノードの畳み" {
                     "id": 3,
                     "label": "h",
                     "fold": { "open": false, "summary": "h" },
-                    "body": [{ "id": 4, "content": ["Raw", "body"] }],
+                    "body": [
+                      { "id": 4, "content": ["Raw", "body"], "source": "body" },
+                    ],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -36,6 +41,7 @@ test "形が揃えば、そのノードの畳み" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -46,7 +52,6 @@ test "形が揃えば、そのノードの畳み" {
 /// 名前は持ち主を決めていない。決めているのは範囲のほう。
 test "summary が無くても畳み" {
   json_inspect(parse("# r\n\n<details>\n\n## h\n\n</details>\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -56,6 +61,8 @@ test "summary が無くても畳み" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
@@ -64,6 +71,8 @@ test "summary が無くても畳み" {
                   "label": "h",
                   "fold": { "open": false },
                   "body": [],
+                  "setext": false,
+                  "closing": 0,
                   "children": [],
                 },
               ],
@@ -71,6 +80,7 @@ test "summary が無くても畳み" {
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -82,7 +92,6 @@ test "summary はラベルと違ってもよい" {
   json_inspect(
     parse("# r\n\n<details>\n<summary>x</summary>\n\n## h\n\n</details>\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -92,6 +101,8 @@ test "summary はラベルと違ってもよい" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -100,6 +111,8 @@ test "summary はラベルと違ってもよい" {
                     "label": "h",
                     "fold": { "open": false, "summary": "x" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -107,6 +120,7 @@ test "summary はラベルと違ってもよい" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -117,7 +131,6 @@ test "summary はラベルと違ってもよい" {
 /// 見出しの行が領域の外にあるので、包んでいるのは中身だけ。
 test "中身だけ包んでいれば中身の 1 枚" {
   json_inspect(parse("# r\n\n## h\n\n<details>\n\nbody\n\n</details>\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -127,6 +140,8 @@ test "中身だけ包んでいれば中身の 1 枚" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
@@ -144,8 +159,11 @@ test "中身だけ包んでいれば中身の 1 枚" {
                           "body": "body",
                         },
                       ],
+                      "source": "<details>\n\nbody\n\n</details>",
                     },
                   ],
+                  "setext": false,
+                  "closing": 0,
                   "children": [],
                 },
               ],
@@ -153,6 +171,7 @@ test "中身だけ包んでいれば中身の 1 枚" {
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -162,7 +181,6 @@ test "中身だけ包んでいれば中身の 1 枚" {
 /// h の部分木より広いので、ちょうど覆っていない。
 test "2 ノード分を包んでいれば中身" {
   json_inspect(parse("# r\n\n<details>\n\n## h\n\n## h2\n\n</details>\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -182,12 +200,16 @@ test "2 ノード分を包んでいれば中身" {
                     "body": "## h\n\n## h2",
                   },
                 ],
+                "source": "<details>\n\n## h\n\n## h2\n\n</details>",
               },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -196,7 +218,6 @@ test "2 ノード分を包んでいれば中身" {
 ///|
 test "最初が段落なら中身" {
   json_inspect(parse("# r\n\n<details>\n\nbodya\n\n# head\n\n</details>\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -216,12 +237,16 @@ test "最初が段落なら中身" {
                     "body": "bodya\n\n# head",
                   },
                 ],
+                "source": "<details>\n\nbodya\n\n# head\n\n</details>",
               },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -231,7 +256,6 @@ test "最初が段落なら中身" {
 /// 空行を挟まないと md は 1 つの Html に潰すので、中の見出しが見出しにならない。
 test "空行なしで 1 塊なら中身" {
   json_inspect(parse("# r\n\n<details>\n## h\n</details>\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -251,12 +275,16 @@ test "空行なしで 1 塊なら中身" {
                     "body": "## h",
                   },
                 ],
+                "source": "<details>\n## h\n</details>",
               },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -266,7 +294,6 @@ test "空行なしで 1 塊なら中身" {
 /// 打っている途中に文書の残りが吸い込まれないよう、片割れは畳まない。
 test "閉じの無い開きはただの文字" {
   json_inspect(parse("# r\n\n<details>\n\n## h\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -275,16 +302,32 @@ test "閉じの無い開きはただの文字" {
           {
             "id": 2,
             "label": "r",
-            "body": [{ "id": 3, "content": ["Raw", "<details>"] }],
+            "body": [
+              {
+                "id": 3,
+                "content": ["Raw", "<details>"],
+                "source": "<details>",
+              },
+            ],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
-                { "id": 4, "label": "h", "body": [], "children": [] },
+                {
+                  "id": 4,
+                  "label": "h",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
             ],
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -293,7 +336,6 @@ test "閉じの無い開きはただの文字" {
 ///|
 test "相手の居ない閉じもただの文字" {
   json_inspect(parse("# r\n\n</details>\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -302,11 +344,20 @@ test "相手の居ない閉じもただの文字" {
           {
             "id": 2,
             "label": "r",
-            "body": [{ "id": 3, "content": ["Raw", "</details>"] }],
+            "body": [
+              {
+                "id": 3,
+                "content": ["Raw", "</details>"],
+                "source": "</details>",
+              },
+            ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -320,7 +371,6 @@ test "畳みの後ろは元の深さに戻る" {
       "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n## b\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -330,6 +380,8 @@ test "畳みの後ろは元の深さに戻る" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -338,17 +390,27 @@ test "畳みの後ろは元の深さに戻る" {
                     "label": "h",
                     "fold": { "open": false, "summary": "h" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
                 [
                   "HeadingNode",
-                  { "id": 4, "label": "b", "body": [], "children": [] },
+                  {
+                    "id": 4,
+                    "label": "b",
+                    "body": [],
+                    "setext": false,
+                    "closing": 0,
+                    "children": [],
+                  },
                 ],
               ],
             },
           ],
           "sides": ["Right", "Right"],
+          "rules": ["", ""],
         },
       ],
     },
@@ -360,7 +422,6 @@ test "項目も定義ごと包める" {
   json_inspect(
     parse("# r\n\n<details>\n<summary>a</summary>\n\n- a\n\n</details>\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -370,6 +431,8 @@ test "項目も定義ごと包める" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "ListNode",
@@ -378,6 +441,9 @@ test "項目も定義ごと包める" {
                     "label": "a",
                     "fold": { "open": false, "summary": "a" },
                     "body": [],
+                    "marker": "-",
+                    "offset": 2,
+                    "loose": false,
                     "children": [],
                   },
                 ],
@@ -385,6 +451,7 @@ test "項目も定義ごと包める" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -397,7 +464,6 @@ test "項目も定義ごと包める" {
 /// **意味を 1 ビットも失わない**の帰結。
 test "開きに飲み込まれた行があれば中身" {
   json_inspect(parse("# r\n\n<details>\n### x\n\n## y\n</details>\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -417,12 +483,16 @@ test "開きに飲み込まれた行があれば中身" {
                     "body": "### x\n\n## y",
                   },
                 ],
+                "source": "<details>\n### x\n\n## y\n</details>",
               },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -445,7 +515,6 @@ test "入れ子の畳みも畳み" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<details>\n<summary>a1</summary>\n\n### a1\n\n</details>\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -455,6 +524,8 @@ test "入れ子の畳みも畳み" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -463,6 +534,8 @@ test "入れ子の畳みも畳み" {
                     "label": "a",
                     "fold": { "open": false, "summary": "a" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [
                       [
                         "HeadingNode",
@@ -471,6 +544,8 @@ test "入れ子の畳みも畳み" {
                           "label": "a1",
                           "fold": { "open": false, "summary": "a1" },
                           "body": [],
+                          "setext": false,
+                          "closing": 0,
                           "children": [],
                         },
                       ],
@@ -481,6 +556,7 @@ test "入れ子の畳みも畳み" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -497,7 +573,6 @@ test "重なった閉じはほどいて読む" {
       "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n</details>\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -507,6 +582,8 @@ test "重なった閉じはほどいて読む" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -515,6 +592,8 @@ test "重なった閉じはほどいて読む" {
                     "label": "x",
                     "fold": { "open": false, "summary": "x" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [
                       [
                         "HeadingNode",
@@ -523,6 +602,8 @@ test "重なった閉じはほどいて読む" {
                           "label": "y",
                           "fold": { "open": false, "summary": "y" },
                           "body": [],
+                          "setext": false,
+                          "closing": 0,
                           "children": [],
                         },
                       ],
@@ -533,6 +614,7 @@ test "重なった閉じはほどいて読む" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -546,7 +628,6 @@ test "open は畳みに持つ" {
   json_inspect(
     parse("# r\n\n<details open>\n<summary>h</summary>\n\n## h\n\n</details>\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -556,6 +637,8 @@ test "open は畳みに持つ" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -564,6 +647,8 @@ test "open は畳みに持つ" {
                     "label": "h",
                     "fold": { "open": true, "summary": "h" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -571,6 +656,7 @@ test "open は畳みに持つ" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -586,7 +672,6 @@ test "知らない属性が付いていれば中身" {
       "# r\n\n<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -607,12 +692,16 @@ test "知らない属性が付いていれば中身" {
                       "body": "## h",
                     },
                   ],
+                  "source": "<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -628,7 +717,6 @@ test "重なった開きは中身" {
       "# r\n\n<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -648,12 +736,16 @@ test "重なった開きは中身" {
                       "body": "<details>\n<summary>h</summary>\n\n## h\n\n</details>",
                     },
                   ],
+                  "source": "<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -666,7 +758,6 @@ test "項目の畳みにも open が付く" {
   json_inspect(
     parse("# r\n\n<details open>\n<summary>a</summary>\n\n- a\n\n</details>\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -676,6 +767,8 @@ test "項目の畳みにも open が付く" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "ListNode",
@@ -684,6 +777,9 @@ test "項目の畳みにも open が付く" {
                     "label": "a",
                     "fold": { "open": true, "summary": "a" },
                     "body": [],
+                    "marker": "-",
+                    "offset": 2,
+                    "loose": false,
                     "children": [],
                   },
                 ],
@@ -691,6 +787,7 @@ test "項目の畳みにも open が付く" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -705,7 +802,6 @@ test "内側だけ open" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<details open>\n<summary>a1</summary>\n\n### a1\n\n</details>\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -715,6 +811,8 @@ test "内側だけ open" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -723,6 +821,8 @@ test "内側だけ open" {
                     "label": "a",
                     "fold": { "open": false, "summary": "a" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [
                       [
                         "HeadingNode",
@@ -731,6 +831,8 @@ test "内側だけ open" {
                           "label": "a1",
                           "fold": { "open": true, "summary": "a1" },
                           "body": [],
+                          "setext": false,
+                          "closing": 0,
                           "children": [],
                         },
                       ],
@@ -741,6 +843,7 @@ test "内側だけ open" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -755,7 +858,6 @@ test "同じ行に重なった閉じもほどく" {
       "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n</details></details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -765,6 +867,8 @@ test "同じ行に重なった閉じもほどく" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -773,6 +877,8 @@ test "同じ行に重なった閉じもほどく" {
                     "label": "x",
                     "fold": { "open": false, "summary": "x" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [
                       [
                         "HeadingNode",
@@ -781,6 +887,8 @@ test "同じ行に重なった閉じもほどく" {
                           "label": "y",
                           "fold": { "open": false, "summary": "y" },
                           "body": [],
+                          "setext": false,
+                          "closing": 0,
                           "children": [],
                         },
                       ],
@@ -791,6 +899,7 @@ test "同じ行に重なった閉じもほどく" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -804,7 +913,6 @@ test "3 段の重なりもほどく" {
       "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n\n<details>\n<summary>z</summary>\n\n#### z\n</details>\n</details>\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -814,6 +922,8 @@ test "3 段の重なりもほどく" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -822,6 +932,8 @@ test "3 段の重なりもほどく" {
                     "label": "x",
                     "fold": { "open": false, "summary": "x" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [
                       [
                         "HeadingNode",
@@ -830,6 +942,8 @@ test "3 段の重なりもほどく" {
                           "label": "y",
                           "fold": { "open": false, "summary": "y" },
                           "body": [],
+                          "setext": false,
+                          "closing": 0,
                           "children": [
                             [
                               "HeadingNode",
@@ -838,6 +952,8 @@ test "3 段の重なりもほどく" {
                                 "label": "z",
                                 "fold": { "open": false, "summary": "z" },
                                 "body": [],
+                                "setext": false,
+                                "closing": 0,
                                 "children": [],
                               },
                             ],
@@ -851,6 +967,7 @@ test "3 段の重なりもほどく" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -866,7 +983,6 @@ test "落とせない閉じに頼る畳みは立たない" {
       "# r\n\n<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -887,12 +1003,16 @@ test "落とせない閉じに頼る畳みは立たない" {
                       "body": "## y",
                     },
                   ],
+                  "source": "<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -907,7 +1027,6 @@ test "summary は原文のまま持つ" {
       "# r\n\n<details>\n<summary>**h**</summary>\n\n## **h**\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -917,6 +1036,8 @@ test "summary は原文のまま持つ" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -925,6 +1046,8 @@ test "summary は原文のまま持つ" {
                     "label": "**h**",
                     "fold": { "open": false, "summary": "**h**" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -932,6 +1055,7 @@ test "summary は原文のまま持つ" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -943,7 +1067,6 @@ test "記法つきのラベルと違う summary も持つ" {
   json_inspect(
     parse("# r\n\n<details>\n<summary>h</summary>\n\n## **h**\n\n</details>\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -953,6 +1076,8 @@ test "記法つきのラベルと違う summary も持つ" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -961,6 +1086,8 @@ test "記法つきのラベルと違う summary も持つ" {
                     "label": "**h**",
                     "fold": { "open": false, "summary": "h" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -968,6 +1095,7 @@ test "記法つきのラベルと違う summary も持つ" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -980,7 +1108,6 @@ test "1 行に書いた開きと名前も畳み" {
   json_inspect(
     parse("# r\n\n<details><summary>a</summary>\n\n## a\n\n</details>\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -990,6 +1117,8 @@ test "1 行に書いた開きと名前も畳み" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -998,6 +1127,8 @@ test "1 行に書いた開きと名前も畳み" {
                     "label": "a",
                     "fold": { "open": false, "summary": "a" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -1005,6 +1136,7 @@ test "1 行に書いた開きと名前も畳み" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -1019,7 +1151,6 @@ test "兄弟の畳みは両方立つ" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1029,6 +1160,8 @@ test "兄弟の畳みは両方立つ" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -1037,6 +1170,8 @@ test "兄弟の畳みは両方立つ" {
                     "label": "a",
                     "fold": { "open": false, "summary": "a" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -1047,6 +1182,8 @@ test "兄弟の畳みは両方立つ" {
                     "label": "b",
                     "fold": { "open": false, "summary": "b" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -1054,6 +1191,7 @@ test "兄弟の畳みは両方立つ" {
             },
           ],
           "sides": ["Right", "Right"],
+          "rules": ["", ""],
         },
       ],
     },
@@ -1065,7 +1203,6 @@ test "兄弟の畳みは両方立つ" {
 /// 名前の直後が空白・`>`・`/` でなければタグとして読まない。
 test "名前が違うタグは畳みの開きではない" {
   json_inspect(parse("# r\n\n<details-x>\n\n## a\n\n</details>\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -1074,14 +1211,30 @@ test "名前が違うタグは畳みの開きではない" {
           {
             "id": 2,
             "label": "r",
-            "body": [{ "id": 3, "content": ["Raw", "<details-x>"] }],
+            "body": [
+              {
+                "id": 3,
+                "content": ["Raw", "<details-x>"],
+                "source": "<details-x>",
+              },
+            ],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
                 {
                   "id": 4,
                   "label": "a",
-                  "body": [{ "id": 5, "content": ["Raw", "</details>"] }],
+                  "body": [
+                    {
+                      "id": 5,
+                      "content": ["Raw", "</details>"],
+                      "source": "</details>",
+                    },
+                  ],
+                  "setext": false,
+                  "closing": 0,
                   "children": [],
                 },
               ],
@@ -1089,6 +1242,7 @@ test "名前が違うタグは畳みの開きではない" {
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -1103,7 +1257,6 @@ test "summary が 2 枚なら中身" {
       "# r\n\n<details>\n<summary>h</summary>\n<summary>ZZZ</summary>\n\n## h\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1124,12 +1277,16 @@ test "summary が 2 枚なら中身" {
                       "body": "<summary>ZZZ</summary>\n\n## h",
                     },
                   ],
+                  "source": "<details>\n<summary>h</summary>\n<summary>ZZZ</summary>\n\n## h\n\n</details>",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -1144,7 +1301,6 @@ test "閉じの塊に地の文が続けば中身" {
       "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\ntail\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1165,12 +1321,16 @@ test "閉じの塊に地の文が続けば中身" {
                       "body": "## h",
                     },
                   ],
+                  "source": "<details>\n<summary>h</summary>\n\n## h\n\n</details>\ntail",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -1183,7 +1343,6 @@ test "項目の畳みも領域の後ろを見る" {
   json_inspect(
     parse("# r\n\n<details>\n<summary>a</summary>\n\n- a\n\n</details>\n\nx\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1204,13 +1363,17 @@ test "項目の畳みも領域の後ろを見る" {
                       "body": "- a",
                     },
                   ],
+                  "source": "<details>\n<summary>a</summary>\n\n- a\n\n</details>",
                 },
-                { "id": 4, "content": ["Raw", "x"] },
+                { "id": 4, "content": ["Raw", "x"], "source": "x" },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -1226,7 +1389,6 @@ test "script の中の閉じは綴りではない" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<script>\nvar x = \"</details>\";\n</script>\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1236,6 +1398,8 @@ test "script の中の閉じは綴りではない" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -1249,8 +1413,11 @@ test "script の中の閉じは綴りではない" {
                         "content": [
                           "Raw", "<script>\nvar x = \"</details>\";\n</script>",
                         ],
+                        "source": "<script>\nvar x = \"</details>\";\n</script>",
                       },
                     ],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -1258,6 +1425,7 @@ test "script の中の閉じは綴りではない" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -1272,7 +1440,6 @@ test "コメントの中の閉じは綴りではない" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<!-- </details> -->\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1282,6 +1449,8 @@ test "コメントの中の閉じは綴りではない" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -1290,8 +1459,14 @@ test "コメントの中の閉じは綴りではない" {
                     "label": "a",
                     "fold": { "open": false, "summary": "a" },
                     "body": [
-                      { "id": 4, "content": ["Raw", "<!-- </details> -->"] },
+                      {
+                        "id": 4,
+                        "content": ["Raw", "<!-- </details> -->"],
+                        "source": "<!-- </details> -->",
+                      },
                     ],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -1299,6 +1474,7 @@ test "コメントの中の閉じは綴りではない" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -1315,7 +1491,6 @@ test "境界の水平線が領域の中にあれば中身" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n---\n\n### x\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1336,12 +1511,16 @@ test "境界の水平線が領域の中にあれば中身" {
                       "body": "## a\n\n---\n\n### x",
                     },
                   ],
+                  "source": "<details>\n<summary>a</summary>\n\n## a\n\n---\n\n### x\n\n</details>",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -1356,7 +1535,6 @@ test "飾りの水平線が領域の中なら畳み" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n---\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1366,6 +1544,8 @@ test "飾りの水平線が領域の中なら畳み" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -1374,9 +1554,11 @@ test "飾りの水平線が領域の中なら畳み" {
                     "label": "a",
                     "fold": { "open": false, "summary": "a" },
                     "body": [
-                      { "id": 4, "content": ["Raw", "body"] },
-                      { "id": 5, "content": "ThematicBreak" },
+                      { "id": 4, "content": ["Raw", "body"], "source": "body" },
+                      { "id": 5, "content": "ThematicBreak", "source": "---" },
                     ],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -1384,6 +1566,7 @@ test "飾りの水平線が領域の中なら畳み" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -1398,7 +1581,6 @@ test "境界の水平線が閉じの直後なら畳み" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n---\n\n## b\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1408,6 +1590,8 @@ test "境界の水平線が閉じの直後なら畳み" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -1416,17 +1600,27 @@ test "境界の水平線が閉じの直後なら畳み" {
                     "label": "a",
                     "fold": { "open": false, "summary": "a" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
                 [
                   "HeadingNode",
-                  { "id": 4, "label": "b", "body": [], "children": [] },
+                  {
+                    "id": 4,
+                    "label": "b",
+                    "body": [],
+                    "setext": false,
+                    "closing": 0,
+                    "children": [],
+                  },
                 ],
               ],
             },
           ],
           "sides": ["Right", "Left"],
+          "rules": ["", "---"],
         },
       ],
     },
@@ -1441,7 +1635,6 @@ test "飾りの水平線が閉じの直後なら中身" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n---\n\nsome text\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1462,14 +1655,22 @@ test "飾りの水平線が閉じの直後なら中身" {
                       "body": "## a",
                     },
                   ],
+                  "source": "<details>\n<summary>a</summary>\n\n## a\n\n</details>",
                 },
-                { "id": 4, "content": "ThematicBreak" },
-                { "id": 5, "content": ["Raw", "some text"] },
+                { "id": 4, "content": "ThematicBreak", "source": "---" },
+                {
+                  "id": 5,
+                  "content": ["Raw", "some text"],
+                  "source": "some text",
+                },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -1484,7 +1685,6 @@ test "飛びが領域の中でも畳み" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n#### deep\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1494,6 +1694,8 @@ test "飛びが領域の中でも畳み" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -1502,6 +1704,8 @@ test "飛びが領域の中でも畳み" {
                     "label": "a",
                     "fold": { "open": false, "summary": "a" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [
                       [
                         "ImplicitNode",
@@ -1514,6 +1718,8 @@ test "飛びが領域の中でも畳み" {
                                 "id": 5,
                                 "label": "deep",
                                 "body": [],
+                                "setext": false,
+                                "closing": 0,
                                 "children": [],
                               },
                             ],
@@ -1527,6 +1733,7 @@ test "飛びが領域の中でも畳み" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -1542,7 +1749,6 @@ test "後ろの領域が立たなければ跨がない" {
       "# a\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n\n<details class=\"z\">\n<summary>c</summary>\n\n## c\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1563,6 +1769,7 @@ test "後ろの領域が立たなければ跨がない" {
                       "body": "## b",
                     },
                   ],
+                  "source": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
                 },
                 {
                   "id": 4,
@@ -1575,12 +1782,16 @@ test "後ろの領域が立たなければ跨がない" {
                       "body": "## c",
                     },
                   ],
+                  "source": "<details class=\"z\">\n<summary>c</summary>\n\n## c\n\n</details>",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -1594,7 +1805,6 @@ test "後ろの迷子のタグは跨がない" {
       "# a\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n\n<details>\n\n## c\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1615,18 +1825,33 @@ test "後ろの迷子のタグは跨がない" {
                       "body": "## b",
                     },
                   ],
+                  "source": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
                 },
-                { "id": 4, "content": ["Raw", "<details>"] },
+                {
+                  "id": 4,
+                  "content": ["Raw", "<details>"],
+                  "source": "<details>",
+                },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
-                  { "id": 5, "label": "c", "body": [], "children": [] },
+                  {
+                    "id": 5,
+                    "label": "c",
+                    "body": [],
+                    "setext": false,
+                    "closing": 0,
+                    "children": [],
+                  },
                 ],
               ],
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -1642,7 +1867,6 @@ test "末尾の飾りの水平線は跨がない" {
       "# a\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n\n---\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1663,13 +1887,17 @@ test "末尾の飾りの水平線は跨がない" {
                       "body": "## b",
                     },
                   ],
+                  "source": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
                 },
-                { "id": 4, "content": "ThematicBreak" },
+                { "id": 4, "content": "ThematicBreak", "source": "---" },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -1685,7 +1913,6 @@ test "畳みの前の境界は空打ちでも境界のまま" {
       "# r\n\n## a\n\n---\n\n<details>\n<summary>c</summary>\n\n- c\n\n</details>\n\n- e\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1695,10 +1922,19 @@ test "畳みの前の境界は空打ちでも境界のまま" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
-                  { "id": 3, "label": "a", "body": [], "children": [] },
+                  {
+                    "id": 3,
+                    "label": "a",
+                    "body": [],
+                    "setext": false,
+                    "closing": 0,
+                    "children": [],
+                  },
                 ],
                 [
                   "ListNode",
@@ -1707,17 +1943,29 @@ test "畳みの前の境界は空打ちでも境界のまま" {
                     "label": "c",
                     "fold": { "open": false, "summary": "c" },
                     "body": [],
+                    "marker": "-",
+                    "offset": 2,
+                    "loose": false,
                     "children": [],
                   },
                 ],
                 [
                   "ListNode",
-                  { "id": 5, "label": "e", "body": [], "children": [] },
+                  {
+                    "id": 5,
+                    "label": "e",
+                    "body": [],
+                    "marker": "-",
+                    "offset": 2,
+                    "loose": false,
+                    "children": [],
+                  },
                 ],
               ],
             },
           ],
           "sides": ["Right", "Left", "Left"],
+          "rules": ["", "---", ""],
         },
       ],
     },
@@ -1729,7 +1977,6 @@ test "畳みの前の境界は空打ちでも境界のまま" {
 /// ないので数えない（数えると SVG のカードが畳みの中身に化ける）。
 test "svg の中のタグは綴りではない" {
   json_inspect(parse("# r\n\n## h\n\n<svg><details>a</details></svg>\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -1739,6 +1986,8 @@ test "svg の中のタグは綴りではない" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
@@ -1749,8 +1998,11 @@ test "svg の中のタグは綴りではない" {
                     {
                       "id": 4,
                       "content": ["Svg", "<svg><details>a</details></svg>\n"],
+                      "source": "<svg><details>a</details></svg>",
                     },
                   ],
+                  "setext": false,
+                  "closing": 0,
                   "children": [],
                 },
               ],
@@ -1758,6 +2010,7 @@ test "svg の中のタグは綴りではない" {
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -1771,7 +2024,6 @@ test "擬似コメントの中の閉じは綴りではない" {
       "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n<?x </details> ?>\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1781,6 +2033,8 @@ test "擬似コメントの中の閉じは綴りではない" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -1789,8 +2043,14 @@ test "擬似コメントの中の閉じは綴りではない" {
                     "label": "h",
                     "fold": { "open": false, "summary": "h" },
                     "body": [
-                      { "id": 4, "content": ["Raw", "<?x </details> ?>"] },
+                      {
+                        "id": 4,
+                        "content": ["Raw", "<?x </details> ?>"],
+                        "source": "<?x </details> ?>",
+                      },
                     ],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -1798,6 +2058,7 @@ test "擬似コメントの中の閉じは綴りではない" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -1813,7 +2074,6 @@ test "pre は生テキストではない" {
       "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n<pre><details></pre>\n\n</details>\n\n## h2\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1826,8 +2086,11 @@ test "pre は生テキストではない" {
                 {
                   "id": 3,
                   "content": ["Raw", "<details>\n<summary>h</summary>"],
+                  "source": "<details>\n<summary>h</summary>",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -1845,19 +2108,30 @@ test "pre は生テキストではない" {
                             "body": "</pre>",
                           },
                         ],
+                        "source": "<pre><details></pre>\n\n</details>",
                       },
                     ],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
                 [
                   "HeadingNode",
-                  { "id": 6, "label": "h2", "body": [], "children": [] },
+                  {
+                    "id": 6,
+                    "label": "h2",
+                    "body": [],
+                    "setext": false,
+                    "closing": 0,
+                    "children": [],
+                  },
                 ],
               ],
             },
           ],
           "sides": ["Right", "Right"],
+          "rules": ["", ""],
         },
       ],
     },
@@ -1871,7 +2145,6 @@ test "= の後ろでない引用符は囲みを始めない" {
   json_inspect(
     parse("# r\n\n<details \"x>\n<summary>h</summary>\n\n## h\n\n</details>\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1892,12 +2165,16 @@ test "= の後ろでない引用符は囲みを始めない" {
                       "body": "## h",
                     },
                   ],
+                  "source": "<details \"x>\n<summary>h</summary>\n\n## h\n\n</details>",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [],
             },
           ],
           "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -1915,7 +2192,6 @@ test "落ちない綴りの塊は深さでも跨がない" {
       "# r\n\n<details>\n\n## s\n\n---\n\n<summary>z</summary>\n\n</details>\n\n### a\n\n### b\n\n## t\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1936,8 +2212,11 @@ test "落ちない綴りの塊は深さでも跨がない" {
                       "body": "",
                     },
                   ],
+                  "source": "<details>\n\n## s\n\n---\n\n<summary>z</summary>\n\n</details>",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "ImplicitNode",
@@ -1946,23 +2225,45 @@ test "落ちない綴りの塊は深さでも跨がない" {
                     "children": [
                       [
                         "HeadingNode",
-                        { "id": 5, "label": "a", "body": [], "children": [] },
+                        {
+                          "id": 5,
+                          "label": "a",
+                          "body": [],
+                          "setext": false,
+                          "closing": 0,
+                          "children": [],
+                        },
                       ],
                       [
                         "HeadingNode",
-                        { "id": 6, "label": "b", "body": [], "children": [] },
+                        {
+                          "id": 6,
+                          "label": "b",
+                          "body": [],
+                          "setext": false,
+                          "closing": 0,
+                          "children": [],
+                        },
                       ],
                     ],
                   },
                 ],
                 [
                   "HeadingNode",
-                  { "id": 7, "label": "t", "body": [], "children": [] },
+                  {
+                    "id": 7,
+                    "label": "t",
+                    "body": [],
+                    "setext": false,
+                    "closing": 0,
+                    "children": [],
+                  },
                 ],
               ],
             },
           ],
           "sides": ["Right", "Right"],
+          "rules": ["", ""],
         },
       ],
     },
@@ -1979,7 +2280,6 @@ test "入れ子項目を含む塊でも、持ち主の深さで測る" {
       "# r\n\n## h\n\n---\n\n<details>\n\n- a\n  - b\n\n</details>\n\n- c\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -1989,10 +2289,19 @@ test "入れ子項目を含む塊でも、持ち主の深さで測る" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
-                  { "id": 3, "label": "h", "body": [], "children": [] },
+                  {
+                    "id": 3,
+                    "label": "h",
+                    "body": [],
+                    "setext": false,
+                    "closing": 0,
+                    "children": [],
+                  },
                 ],
                 [
                   "ListNode",
@@ -2001,19 +2310,39 @@ test "入れ子項目を含む塊でも、持ち主の深さで測る" {
                     "label": "a",
                     "fold": { "open": false },
                     "body": [],
+                    "marker": "-",
+                    "offset": 2,
+                    "loose": false,
                     "children": [
-                      { "id": 5, "label": "b", "body": [], "children": [] },
+                      {
+                        "id": 5,
+                        "label": "b",
+                        "body": [],
+                        "marker": "-",
+                        "offset": 2,
+                        "loose": false,
+                        "children": [],
+                      },
                     ],
                   },
                 ],
                 [
                   "ListNode",
-                  { "id": 6, "label": "c", "body": [], "children": [] },
+                  {
+                    "id": 6,
+                    "label": "c",
+                    "body": [],
+                    "marker": "-",
+                    "offset": 2,
+                    "loose": false,
+                    "children": [],
+                  },
                 ],
               ],
             },
           ],
           "sides": ["Right", "Left", "Left"],
+          "rules": ["", "---", ""],
         },
       ],
     },
@@ -2028,7 +2357,6 @@ test "領域の中の境界が外の骨格を引き出せば中身" {
   json_inspect(
     parse("# r\n\n<details>\n\n## a\n\n---\n\n</details>\n\n## b\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -2048,17 +2376,28 @@ test "領域の中の境界が外の骨格を引き出せば中身" {
                       "body": "## a\n\n---",
                     },
                   ],
+                  "source": "<details>\n\n## a\n\n---\n\n</details>",
                 },
               ],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
-                  { "id": 4, "label": "b", "body": [], "children": [] },
+                  {
+                    "id": 4,
+                    "label": "b",
+                    "body": [],
+                    "setext": false,
+                    "closing": 0,
+                    "children": [],
+                  },
                 ],
               ],
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -2074,7 +2413,6 @@ test "閉じの直後の水平線が続いても境界" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n---\n\n---\n\n## b\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -2084,6 +2422,8 @@ test "閉じの直後の水平線が続いても境界" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -2092,17 +2432,27 @@ test "閉じの直後の水平線が続いても境界" {
                     "label": "a",
                     "fold": { "open": false, "summary": "a" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
                 [
                   "HeadingNode",
-                  { "id": 4, "label": "b", "body": [], "children": [] },
+                  {
+                    "id": 4,
+                    "label": "b",
+                    "body": [],
+                    "setext": false,
+                    "closing": 0,
+                    "children": [],
+                  },
                 ],
               ],
             },
           ],
           "sides": ["Right", "Left"],
+          "rules": ["", "---"],
         },
       ],
     },
@@ -2116,7 +2466,6 @@ test "タブで繋いだ開きと名前も畳み" {
   json_inspect(
     parse("# r\n\n<details>	<summary>s</summary>\n\n## a\n\n</details>\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -2126,6 +2475,8 @@ test "タブで繋いだ開きと名前も畳み" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -2134,6 +2485,8 @@ test "タブで繋いだ開きと名前も畳み" {
                     "label": "a",
                     "fold": { "open": false, "summary": "s" },
                     "body": [],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -2141,6 +2494,7 @@ test "タブで繋いだ開きと名前も畳み" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -2156,7 +2510,6 @@ test "中身の Details は open と summary と中身を読む" {
       "# r\n\n## h\n\n<details open>\n<summary>s</summary>\n\nbody\n\nmore\n\n</details>\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -2166,6 +2519,8 @@ test "中身の Details は open と summary と中身を読む" {
               "id": 2,
               "label": "r",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
@@ -2184,8 +2539,11 @@ test "中身の Details は open と summary と中身を読む" {
                             "body": "body\n\nmore",
                           },
                         ],
+                        "source": "<details open>\n<summary>s</summary>\n\nbody\n\nmore\n\n</details>",
                       },
                     ],
+                    "setext": false,
+                    "closing": 0,
                     "children": [],
                   },
                 ],
@@ -2193,6 +2551,7 @@ test "中身の Details は open と summary と中身を読む" {
             },
           ],
           "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -2208,7 +2567,6 @@ test "項目の中の畳みは、兄弟の項目が続いても立つ" {
       "- a\n\n  <details>\n  <summary>b</summary>\n\n  - b\n\n  </details>\n\n  - c\n",
     ),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -2218,19 +2576,34 @@ test "項目の中の畳みは、兄弟の項目が続いても立つ" {
               "id": 2,
               "label": "a",
               "body": [],
+              "marker": "-",
+              "offset": 2,
+              "loose": false,
               "children": [
                 {
                   "id": 3,
                   "label": "b",
                   "fold": { "open": false, "summary": "b" },
                   "body": [],
+                  "marker": "-",
+                  "offset": 2,
+                  "loose": false,
                   "children": [],
                 },
-                { "id": 4, "label": "c", "body": [], "children": [] },
+                {
+                  "id": 4,
+                  "label": "c",
+                  "body": [],
+                  "marker": "-",
+                  "offset": 2,
+                  "loose": false,
+                  "children": [],
+                },
               ],
             },
           ],
           "sides": ["Right", "Right"],
+          "rules": ["", ""],
         },
       ],
     },
