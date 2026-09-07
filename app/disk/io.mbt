@@ -23,7 +23,7 @@ pub fn Io::new(handles : Handles) -> Io {
 /// ピッカーの受け付ける種類（Markdown）
 fn markdown_types() -> @core.Any {
   let accept = @core.new_object()
-  accept._set("text/markdown", @core.any(@app.md_exts))
+  accept._set("text/markdown", @core.any(@read.md_exts))
   let kind = @core.new_object()
   kind._set("description", @core.any("Markdown"))
   kind._set("accept", accept)

@@ -296,7 +296,7 @@ async fn Assets::pick(self : Assets) -> Picked? {
 ///|
 /// 指してもらった結果を打てる欄にする。計算できていればそれが値で、実名の
 /// 照合は無い。できていなければ当て推量が値で、末尾を実名と照合する
-fn field_of(p : Picked) -> @app.Field {
+fn field_of(p : Picked) -> @parts.Field {
   let dir_name = if p.computed is None {
     Some(p.binding.directory.name())
   } else {
@@ -315,16 +315,16 @@ async fn Assets::ask_declaration(
   p : Picked,
   was : String?,
 ) -> String? {
-  let parts : Array[@app.Part] = [Text("image-folder:"), Blank(field_of(p))]
+  let parts : Array[@parts.Part] = [Text("image-folder:"), Blank(field_of(p))]
   let a = match was {
     None =>
-      @app.ask_of(
+      @parts.ask_of(
         "Where is \{p.binding.directory.name()}, seen from the .md?",
         "Save",
         parts~,
       )
     Some(_) =>
-      @app.ask_of(
+      @parts.ask_of(
         "The folder changed — update the declaration?",
         "Update",
         note=Some("Image paths in the document will follow."),
@@ -332,7 +332,7 @@ async fn Assets::ask_declaration(
         parts~,
       )
   }
-  @app.asked(self.doc, a).bind(out => out.get(0))
+  @parts.asked(self.doc, a).bind(out => out.get(0))
 }
 
 ///|
@@ -356,7 +356,7 @@ async fn Assets::settle(
   self : Assets,
   p : Picked,
   inline : Bool,
-) -> @app.Field? {
+) -> @parts.Field? {
   match (self.deps.declared)() {
     None => {
       if p.computed is Some(c) {
@@ -419,7 +419,7 @@ async fn allowed(h : @web.DirHandle, mode : String) -> Bool {
 ///|
 /// 書けるフォルダを用意する。握っていればそれ、無ければ指してもらう。
 /// 返すのは「呼ぶ側のフォームに載せる位置の欄」（要らなければ None）。取りやめは None
-async fn Assets::ensure_binding(self : Assets) -> (Binding, @app.Field?)? {
+async fn Assets::ensure_binding(self : Assets) -> (Binding, @parts.Field?)? {
   match self.stored_binding() {
     Some(binding) => {
       if allowed(binding.directory, "readwrite") {
@@ -600,7 +600,7 @@ pub async fn Assets::save_to_disk(self : Assets, blob : @core.Any) -> String? {
   // ときは、字だけでは区別が付かない
   let shot = @web.object_url(blob)
   let here = taken(binding.directory)
-  let name : @app.Field = {
+  let name : @parts.Field = {
     value: @web.stamp(),
     check: Some(typed => {
       match name_problem(typed) {
@@ -621,17 +621,17 @@ pub async fn Assets::save_to_disk(self : Assets, blob : @core.Any) -> String? {
   }
   // **分かっているところは字、分からないところだけ欄。** 位置が決まって
   // いれば（宣言、または計算できた）`./pics/` はただの字で、打てるのは名前だけ
-  let place : @app.Part = match folder {
+  let place : @parts.Part = match folder {
     Some(f) => Blank(f)
     None => Text(self.declared_path())
   }
-  let shape : Array[@app.Part] = [
+  let shape : Array[@parts.Part] = [
     Text("![]("),
     place,
     Blank(name),
     Text(".webp)"),
   ]
-  let out = @app.asked(self.doc, @app.image_name(shape, shot))
+  let out = @parts.asked(self.doc, @parts.image_name(shape, shot))
   @web.revoke_url(shot)
   guard out is Some(values) else { return None }
   // 欄の並び順は `shape` の並び順。位置の欄があるなら先に居る

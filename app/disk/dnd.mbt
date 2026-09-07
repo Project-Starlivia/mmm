@@ -63,7 +63,7 @@ pub fn init_drop(doc : @dom.Document, deps : Drop) -> Unit {
     @js_async.Promise::from_async(async fn() {
       (async fn() -> Unit {
         let list = Array::from_fixed_array(files.wait())
-        match list.search_by(f => @app.is_markdown(f.name())) {
+        match list.search_by(f => @read.is_markdown(f.name())) {
           Some(i) => {
             (deps.open_markdown)(list[i])
             return

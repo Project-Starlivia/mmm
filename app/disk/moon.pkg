@@ -1,18 +1,14 @@
 pkgtype(kind: "library")
 
 import {
+  "mmm/app/parts",
+  "moonbitlang/core/cmp",
   "moonbitlang/async/js_async",
   "mizchi/js/core",
   "mizchi/js_browser/dom",
-  "mmm/core/tree",
-  "mmm/core/op",
-  "mmm/core/map",
-  "mmm/core/read",
   "mmm/app/web",
-  "mmm/app/parts",
-  "mmm/app/render",
-  "mmm/app/app",
-  "mmm/app/file",
+  "mmm/core/tree",
+  "mmm/core/read",
 }
 
 import {

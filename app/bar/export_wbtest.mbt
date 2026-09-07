@@ -18,18 +18,6 @@ fn deps(
 }
 
 ///|
-test "bare / is_markdown: 文書の拡張子だけ落とす。大文字も。空なら mmm" {
-  assert_eq(bare("Notes.MD"), "Notes")
-  assert_eq(bare("a.markdown"), "a")
-  assert_eq(bare("a.txt.md"), "a.txt")
-  assert_eq(bare("a.png"), "a.png")
-  assert_eq(bare(".md"), "mmm")
-  assert_eq(bare(""), "mmm")
-  assert_true(is_markdown("x.TXT"))
-  assert_false(is_markdown("x.png"))
-}
-
-///|
 test "way_of: 覚えていた出し方。知らなければ既定（SVG を落とす）" {
   assert_eq(way_of(Some("png-copy")).label, "Copy PNG")
   assert_eq(way_of(Some("nope")).id, "svg-file")

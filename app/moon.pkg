@@ -10,8 +10,16 @@ import {
   "mizchi/js/web/encoding",
   "mizchi/js/web/streams",
   "mizchi/js_browser/dom",
+  "mmm/core/tree",
+  "mmm/core/op",
+  "mmm/core/map",
+  "mmm/core/read",
   "mmm/app/web",
   "mmm/app/parts",
+  "mmm/app/prefs",
+  "mmm/app/bar",
+  "mmm/app/disk",
+  "mmm/app/mindmap",
 }
 
 import {

@@ -8,35 +8,6 @@
 // 選択が戻ったときに右クリックへ）。
 
 ///|
-/// 文書の拡張子。開く・保存の絞り込みと、ダウンロード名の元を作るところが共に使う
-pub let md_exts : Array[String] = [".md", ".markdown", ".txt"]
-
-///|
-/// 文書の名前か（拡張子で見る。大文字小文字は問わない）
-pub fn is_markdown(name : String) -> Bool {
-  let lower = name.to_lower()
-  md_exts.any(ext => lower.has_suffix(ext))
-}
-
-///|
-/// 拡張子を落とした名前。落として空なら `mmm`
-pub fn bare(name : String) -> String {
-  let lower = name.to_lower()
-  for ext in md_exts {
-    if lower.has_suffix(ext) {
-      let cut = name.char_length() - ext.char_length()
-      let out = String::unsafe_substring(name, start=0, end=cut)
-      return if out == "" { "mmm" } else { out }
-    }
-  }
-  if name == "" {
-    "mmm"
-  } else {
-    name
-  }
-}
-
-///|
 /// ラスタの倍率。**選ばせない** — 書き出したものは画面で見えている通りで
 /// あるべきで、選ばせるほど何が出るか分からなくなる。貼り先で粗く見えない
 /// 下限として 2 倍だけ取る
@@ -174,7 +145,7 @@ pub async fn run(deps : ExportDeps, way : Way) -> Bool {
       (deps.blocked)(nothing)
       return false
     }
-    (way.out)(svg, bare((deps.name)()))
+    (way.out)(svg, @read.bare((deps.name)()))
     true
   })() catch {
     _ => {
@@ -251,7 +222,7 @@ pub fn Export::new(
     deps,
     button,
     way_button,
-    way: way_of(load("way")),
+    way: way_of(@prefs.load("way")),
     back: None,
   }
   self.refresh()
@@ -333,7 +304,7 @@ fn Export::fire(self : Export, chosen : Way) -> Unit {
 /// 選び直して出す。次からの既定にもなる
 fn Export::pick(self : Export, chosen : Way) -> Unit {
   self.way = chosen
-  store("way", chosen.id)
+  @prefs.store("way", chosen.id)
   self.refresh()
   self.fire(chosen)
 }

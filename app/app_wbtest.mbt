@@ -88,7 +88,7 @@ fn Fake::editor(self : Fake) -> Editor {
     tokens_block: text => {
       text
       .split("\n")
-      .map(l => ([{ text: l.to_owned(), cls: "", }] : Array[@render.Token]))
+      .map(l => ([{ text: l.to_owned(), cls: "", }] : Array[@mindmap.Token]))
       .collect()
     },
     epoch: () => 0,
@@ -98,10 +98,10 @@ fn Fake::editor(self : Fake) -> Editor {
 
 ///|
 /// 手元の置き場（ディスクの代わり）。何も覚えていない
-fn memo_io() -> @file.Io {
+fn memo_io() -> @disk.Io {
   let table : Map[String, @core.Any] = Map([])
-  @file.Io::new(
-    @file.Handles::new({
+  @disk.Io::new(
+    @disk.Handles::new({
       read: fn(key) { table.get(key).unwrap_or(@core.null()) },
       write: fn(key, value) { table[key] = value },
       remove: fn(key) { table.remove(key) },
@@ -193,7 +193,7 @@ test "立ち上がりは空。名乗りは mmm / empty.md、言い出しが出�
   // Node には改名の口が無いので、名乗りはその理由で沈む
   assert_eq(
     s.doc.getElementById("filename").unwrap().getAttribute("title"),
-    Some(@app.no_rename_here),
+    Some(@bar.no_rename_here),
   )
   assert_eq(s.fake.log[1:], ["set_text", "focus"])
 }
