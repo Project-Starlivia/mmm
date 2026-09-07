@@ -1,30 +1,23 @@
 // mmmTree → mdAst。build の逆。
 //
 // 我々の写像は**骨格だけ** — 深さを `#` の数に、側の変わり目を水平線に、
-// 畳みを `<details>` の塊にする。ラベルは原文の 1 行を生の行として渡す
-// （md として読み直さない）。中身は md として読み直す（PR 2 で原文に揃える）。
+// 畳みを `<details>` の塊にする。ラベルも中身も原文の字を生のまま渡す
+// （md として読み直さない）。
 //
-// 字下げ・フェンスの長さ・空行・エスケープ・定義行の置き場は
-// ライブラリの serializer が持ち、ここには文字列の規則が 1 つも無い。
-// その正規化（`_em_` → `*em*`、定義行の末尾への移動、setext → ATX）は
-// **この段では素直に受ける**。補正するなら合流の段。
-
-///|
-/// 組み立て中。定義行は文書ぜんぶで 1 列なので、中身から拾ったものを集める。
-priv struct Unbuild {
-  defs : Array[@markdown.LinkDefinition]
-}
+// **読んだ原文はそのまま返す。** ライブラリが担うのはブロックの並びと前後の空行
+// だけ。綴るのは mmm が新しく作ったものだけ。項目の列は、マーカー・ラベルの桁・
+// 詰めを読める者がライブラリに居ないので、列 1 本ぶんの字を mmm が組む
+// （中身はライブラリに綴らせて桁ぶん字下げする）。
 
 ///|
 /// 木を mdAst にする。
 pub fn unbuild(doc : Doc) -> @markdown.Document {
-  let u : Unbuild = { defs: [], }
   let out = []
   for b in doc.body {
-    content(u, out, b)
+    content(out, b)
   }
   for r in doc.roots {
-    node(u, out, r.node, 1, r.sides)
+    node(out, r.node, 1, r.sides, r.rules)
   }
   {
     // serialize は frontmatter を自分で書く（本文との間に空行を置くため）。
@@ -33,34 +26,33 @@ pub fn unbuild(doc : Doc) -> @markdown.Document {
       ({ raw, entries: [], span: nowhere, } : @markdown.Frontmatter)
     }),
     children: out,
-    definitions: u.defs,
+    definitions: [],
     span: nowhere,
   }
 }
 
 ///|
 /// 部分木 1 つを mdAst にする（断片）。`depth` はその根の見出しの深さ、
-/// `sides` は Doc の根のときだけ在る。定義行は断片の中に留まる。
+/// `sides` と `rules` は Doc の根のときだけ在る。
 pub fn unbuild_node(
   x : Node,
   depth : Int,
   sides : Array[Side],
+  rules : Array[String],
 ) -> @markdown.Document {
-  let u : Unbuild = { defs: [], }
   let out = []
-  node(u, out, x, depth, sides)
-  { frontmatter: None, children: out, definitions: u.defs, span: nowhere, }
+  node(out, x, depth, sides, rules)
+  { frontmatter: None, children: out, definitions: [], span: nowhere, }
 }
 
 ///|
 /// 散文（骨格を持たない中身の列）を mdAst にする。
 pub fn unbuild_prose(body : Array[Block]) -> @markdown.Document {
-  let u : Unbuild = { defs: [], }
   let out = []
   for b in body {
-    content(u, out, b)
+    content(out, b)
   }
-  { frontmatter: None, children: out, definitions: u.defs, span: nowhere, }
+  { frontmatter: None, children: out, definitions: [], span: nowhere, }
 }
 
 ///|
@@ -68,21 +60,23 @@ pub fn unbuild_prose(body : Array[Block]) -> @markdown.Document {
 let nowhere : @markdown.Span = @markdown.Span::empty()
 
 ///|
-/// 兄弟の列を書く。`sides` は根の子のときだけ来る（深い所の側は型に無い）。
+/// 兄弟の列を書く。`sides` と `rules` は根の子のときだけ来る（深い所の側は型に無い）。
 ///
 /// **続く項目は 1 つの列にまとめる**（兄弟は詰める）。列が割れるのは、側が
-/// 変わるとき（間に `---`）と、畳まれた項目（自分の `<details>` に包まれる）。
+/// 変わるとき（間に水平線）と、畳まれた項目（自分の `<details>` に包まれる）と、
+/// マーカーの種類が変わるとき（md でもそこで別の列になる）。
+/// 水平線は読んだ綴りをそのまま。無ければ（操作が作った境界）`---`。
 fn nodes(
-  u : Unbuild,
   out : Array[@markdown.Block],
   xs : Array[Node],
   depth : Int,
   sides : Array[Side],
+  rules : Array[String],
 ) -> Unit {
   let run : Array[ListNode] = []
   fn flush() {
     if !run.is_empty() {
-      out.push(bullets(u, run))
+      out.push(bullets(run))
       run.clear()
     }
   }
@@ -92,14 +86,20 @@ fn nodes(
     let side = if i < sides.length() { sides[i] } else { prev }
     if side != prev {
       flush()
-      out.push(rule())
+      let rule = if i < rules.length() { rules[i] } else { "" }
+      out.push(html(if rule == "" { "---" } else { rule }))
       prev = side
     }
     match x {
-      ListNode(l) if l.fold is None => run.push(l)
+      ListNode(l) if l.fold is None => {
+        if run is [first, ..] && kind_of(first.marker) != kind_of(l.marker) {
+          flush()
+        }
+        run.push(l)
+      }
       _ => {
         flush()
-        node(u, out, x, depth, [])
+        node(out, x, depth, [], [])
       }
     }
   }
@@ -107,26 +107,26 @@ fn nodes(
 }
 
 ///|
-/// ノード 1 つと、その部分木。`sides` はその子に効く（根のときだけ在る）。
-/// 項目の根に側は書けない — 項目の中の `---` は中身なので、側は落ちる。
+/// ノード 1 つと、その部分木。`sides` と `rules` はその子に効く（根のときだけ在る）。
+/// 項目の根に側は書けない — 項目の中の水平線は中身なので、側は落ちる。
 fn node(
-  u : Unbuild,
   out : Array[@markdown.Block],
   x : Node,
   depth : Int,
   sides : Array[Side],
+  rules : Array[String],
 ) -> Unit {
   match x {
-    ListNode(l) => wrap(out, l.fold, () => out.push(bullets(u, [l])))
+    ListNode(l) => wrap(out, l.fold, () => out.push(bullets([l])))
     HeadingNode(n) =>
       wrap(out, n.fold, () => {
-        out.push(heading(depth, n.label))
+        out.push(heading(depth, n.label, n.setext, n.closing))
         for b in n.body {
-          content(u, out, b)
+          content(out, b)
         }
-        nodes(u, out, n.children, depth + 1, sides)
+        nodes(out, n.children, depth + 1, sides, rules)
       })
-    ImplicitNode(g) => nodes(u, out, g.children, depth + 1, sides)
+    ImplicitNode(g) => nodes(out, g.children, depth + 1, sides, rules)
   }
 }
 
@@ -153,25 +153,47 @@ fn wrap(out : Array[@markdown.Block], fold : Fold?, inner : () -> Unit) -> Unit 
 }
 
 ///|
-/// 項目の列 1 つ。**ラベルと入れ子の列だけの項目が並ぶときだけ tight。**
-/// 中身は空行で分けないと段落に飲み込まれ、畳まれた子の `<details>` は
-/// 空行で終わる塊なので、分けないと次の項目を飲み込む。ラベルの直後の空の
-/// 項目も分ける（`underlined`）— 正規形は並びで変わる。
-fn bullets(u : Unbuild, run : Array[ListNode]) -> @markdown.Block {
-  BulletList(
-    marker=Dash,
-    tight=run
-      .iter()
-      .all(l => {
-        l.body.is_empty() &&
-        l.children.iter().all(c => c.fold is None) &&
-        !underlined(l)
-      }),
-    items=run.map(l => list_item(u, l)),
-    span=nowhere,
-    leading_trivia=@markdown.Trivia::empty(),
-    trailing_trivia=@markdown.Trivia::empty(),
-  )
+/// 項目の列 1 つ。**列の字は mmm が組む** — マーカー・ラベルの桁・項目の間の
+/// 詰めを読める者がライブラリに居ないので、包み（`HtmlBlock`）の中だけ自分で
+/// 綴る。文書の中での並びと前後の空行はライブラリのまま。
+///
+/// 空行は 2 か所に要る。**項目と項目の間**は、読んだ列が loose だったとき。
+/// **ラベルと中身の間**は、ラベルと入れ子の列だけの項目が並ぶとき以外（`tight`）—
+/// 中身は空行で分けないと段落に飲み込まれ、畳まれた子の `<details>` は空行で
+/// 終わる塊なので、分けないと次の項目を飲み込む。ラベルの直後の空の項目も
+/// 分ける（`underlined`）— 正規形は並びで変わる。
+fn bullets(run : Array[ListNode]) -> @markdown.Block {
+  let tight = run
+    .iter()
+    .all(l => {
+      l.body.is_empty() &&
+      l.children.iter().all(c => c.fold is None) &&
+      !underlined(l)
+    })
+  let loose = run.iter().any(l => l.loose)
+  let sb = StringBuilder()
+  for i, l in run {
+    if i > 0 && loose {
+      sb.write_char('\n')
+    }
+    sb.write_string(list_item(l, tight))
+  }
+  html(sb.to_string())
+}
+
+///|
+/// マーカーの種類。番号なら尻の 1 字（`.` か `)`）、でなければマーカーそのもの。
+/// 種類が変われば md でもそこで列が割れるので、書くときも割る。
+fn kind_of(marker : String) -> String {
+  if marker.length() > 0 && marker[0] >= '0' && marker[0] <= '9' {
+    String::unsafe_substring(
+      marker,
+      start=marker.length() - 1,
+      end=marker.length(),
+    )
+  } else {
+    marker
+  }
 }
 
 ///|
@@ -182,78 +204,111 @@ fn underlined(l : ListNode) -> Bool {
 }
 
 ///|
-/// 項目 1 つ。ラベルは 1 行目の段落。無ければ段落も無い。
-fn list_item(u : Unbuild, l : ListNode) -> @markdown.ListItem {
+/// 項目 1 つ。1 行目はマーカーとラベル、続きは中身と入れ子の列 —
+/// **その字はライブラリに綴らせ**、ラベルの桁ぶん字下げしてぶら下げる。
+/// ラベルも中身も無ければマーカーだけの行。
+fn list_item(l : ListNode, tight : Bool) -> String {
   let kids = []
-  if l.label != "" {
-    kids.push(paragraph([verbatim_inline(l.label)]))
-  }
   for b in l.body {
-    content(u, kids, b)
+    content(kids, b)
   }
-  nodes(u, kids, l.children.map(c => ListNode(c)), 0, [])
-  {
-    children: kids,
-    checked: None,
-    marker_offset: 0,
-    content_offset: 2,
-    span: nowhere,
+  nodes(kids, l.children.map(c => ListNode(c)), 0, [], [])
+  let inner = StringBuilder()
+  if l.label != "" {
+    inner.write_string(l.label)
+    inner.write_char('\n')
   }
-}
-
-///|
-/// 中身 1 枚。絵の 4 つは mdAst の形に、原文で持つものは md として読み直す。
-fn content(u : Unbuild, out : Array[@markdown.Block], b : Block) -> Unit {
-  match b.content {
-    Image(alt~, src~, title~) =>
-      out.push(paragraph([Image(alt~, url=src, title~, span=nowhere)]))
-    Link(text~, href~, title~) =>
-      out.push(
-        paragraph([
-          Link(children=[verbatim_inline(text)], url=href, title~, span=nowhere),
-        ]),
-      )
-    Code(info~, text~) =>
-      out.push(
-        FencedCode(
-          fence_marker=Backtick,
-          fence_length=3,
-          info~,
-          code=text,
-          indent=0,
-          span=nowhere,
-          leading_trivia=@markdown.Trivia::empty(),
-          trailing_trivia=@markdown.Trivia::empty(),
-        ),
-      )
-    Svg(s) => out.push(html(s))
-    ThematicBreak => out.push(rule())
-    Details(text~, ..) => splice(u, out, text)
-    Raw(text) => splice(u, out, text)
-  }
-}
-
-///|
-/// 原文のまま持っていたものを md として読み直し、塊をそのまま並べる。
-/// 空行は記法なので落とす。定義行は文書の列へ集める。
-fn splice(u : Unbuild, out : Array[@markdown.Block], text : String) -> Unit {
-  let d = read(text)
-  for b in d.children {
-    if b is BlankLines(..) {
-      continue
+  if !kids.is_empty() {
+    if l.label != "" && !tight {
+      inner.write_char('\n')
     }
-    out.push(b)
+    inner.write_string(
+      write({
+        frontmatter: None,
+        children: kids,
+        definitions: [],
+        span: nowhere,
+      }),
+    )
   }
-  u.defs.append(d.definitions)
+  let text = inner.to_string()
+  if text == "" {
+    return l.marker + "\n"
+  }
+  // ラベルの桁は読んだ幅。マーカーで埋まっていれば空白 1 つ
+  let width = if l.offset > l.marker.length() {
+    l.offset
+  } else {
+    l.marker.length() + 1
+  }
+  l.marker + pad(width - l.marker.length()) + indent(text, width)
+}
+
+///|
+/// 中身 1 枚。**読んだ原文はそのまま返す。** mmm が作った中身（source が無い）だけ、
+/// 種類ごとに綴る — 絵の 3 つは mdAst の形で、原文で持つものは生の塊で。
+fn content(out : Array[@markdown.Block], b : Block) -> Unit {
+  match b.source {
+    Some(source) => out.push(html(source))
+    None =>
+      match b.content {
+        Image(alt~, src~, title~) =>
+          out.push(paragraph([Image(alt~, url=src, title~, span=nowhere)]))
+        Link(text~, href~, title~) =>
+          out.push(
+            paragraph([
+              Link(
+                children=[verbatim_inline(text)],
+                url=href,
+                title~,
+                span=nowhere,
+              ),
+            ]),
+          )
+        Code(info~, text~) =>
+          out.push(
+            FencedCode(
+              fence_marker=Backtick,
+              fence_length=3,
+              info~,
+              code=text,
+              indent=0,
+              span=nowhere,
+              leading_trivia=@markdown.Trivia::empty(),
+              trailing_trivia=@markdown.Trivia::empty(),
+            ),
+          )
+        Svg(s) => out.push(html(s))
+        ThematicBreak => out.push(html("---"))
+        Details(text~, ..) => out.push(html(text))
+        Raw(text) => out.push(html(text))
+      }
+  }
 }
 
 ///|
 /// 見出しの行。**名前は md の 1 行の原文**なので、ライブラリに読み直させず
 /// 生の行として渡す（`HtmlBlock` は中身を逃がさずそのまま書く）。
 /// 空の名前は `##` だけ（Implicit を綴った空の見出しと同じ）。
-fn heading(level : Int, label : String) -> @markdown.Block {
-  let line = String::make(level, '#')
-  html(if label == "" { line } else { line + " " + label })
+///
+/// setext は深さ 2 までしか無いので、深ければ ATX。名前が空でも ATX —
+/// 下線だけの行は下線にならず、見出しごと段落に落ちる。閉じの `#` は読んだ数。
+///
+/// **改行を含む名前は setext でしか書けない**ので、読んだ綴りが setext でなくても
+/// setext で綴る（ATX に落とすと 2 行目が名前から千切れる）。書けない深さは check が断る。
+fn heading(
+  depth : Int,
+  label : String,
+  setext : Bool,
+  closing : Int,
+) -> @markdown.Block {
+  if (setext || label.contains("\n")) && depth <= 2 && label != "" {
+    let line = String::make(3, if depth == 1 { '=' } else { '-' })
+    return html(label + "\n" + line)
+  }
+  let sharps = String::make(depth, '#')
+  let tail = if closing > 0 { " " + String::make(closing, '#') } else { "" }
+  html(if label == "" { sharps } else { sharps + " " + label + tail })
 }
 
 ///|
@@ -276,17 +331,6 @@ fn paragraph(children : Array[@markdown.Inline]) -> @markdown.Block {
 fn html(s : String) -> @markdown.Block {
   HtmlBlock(
     html=s,
-    span=nowhere,
-    leading_trivia=@markdown.Trivia::empty(),
-    trailing_trivia=@markdown.Trivia::empty(),
-  )
-}
-
-///|
-fn rule() -> @markdown.Block {
-  ThematicBreak(
-    marker='-',
-    count=3,
     span=nowhere,
     leading_trivia=@markdown.Trivia::empty(),
     trailing_trivia=@markdown.Trivia::empty(),

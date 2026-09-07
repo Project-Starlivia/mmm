@@ -8,19 +8,25 @@ md が何を意味するか（方言の裁定）は [spec.md](spec.md) の「md 
 ## 型
 
 ```
-Doc  { frontmatter: String?, eol: Eol, body: [Block], roots: [Root] }
-Root { node: Node, sides: [Side] }          // 側を持つ唯一の型。根の子と並走
+Doc  { frontmatter: String?, body: [Block], roots: [Root] }
+Root { node: Node, sides: [Side], rules: [String] }   // 側を持つ唯一の型。根の子と並走
+                                            // rules は側を変えた行の原文。無い所は空
 
 Node = HeadingNode | ListNode | ImplicitNode   // 構築子は型名と同じ。タグに意味は無い
 
-HeadingNode  { id, label, fold: Fold?, body: [Block], children: [Node] }
+HeadingNode  { id, label, fold: Fold?, body: [Block],
+               setext, closing, children: [Node] }  // setext / closing は読んだ書き方。
+                                            // 新しく作るときは ATX で閉じ無し
 Fold         { open, summary: String? }        // 在ること自体が「畳まれている」
-ListNode     { id, label, fold: Fold?, body: [Block], children: [ListNode] }
+ListNode     { id, label, fold: Fold?, body: [Block],
+               marker, offset, loose, children: [ListNode] }  // marker / offset / loose は
+                                            // 読んだ綴り（`*` `3.` / ラベルの桁 / 列の詰め）。
+                                            // 新しく作るときは `-` / 2 / 詰める
 ImplicitNode { id, children: [Node] }       // 記法を持たない
 
 Side  = Right | Left
-Eol   = Lf | Crlf
-Block   { id, content: Content }            // 中身 1 枚。id はノードと同じ列
+Block   { id, content: Content, source: String? }  // 中身 1 枚。id はノードと同じ列。source は
+                                            // 読んだ原文。書き戻しはこれを返し、無ければ種類ごとに綴る
 Content = Image | Link | Code | Svg         // 解釈の包みは無い
         | ThematicBreak                     // 境界にならなかった水平線
         | Details(text, open, summary, body) // <details>。text は領域の原文で、書き戻しはこれだけ。
@@ -53,7 +59,7 @@ check が見るもの — id 一意（ノードも中身も） / Implicit は子
 **md に書けない並びが無い**。**`open` と名前が畳みのときだけ在ることは
 型が殺す**（`fold : Fold?` に括ってあるので、畳みでなければ持ちようがない）。
 
-md に書けない並びは 5 つ。読みが前後の行から意味を決めるので、木としては組めても
+md に書けない並びは 6 つ。読みが前後の行から意味を決めるので、木としては組めても
 書いて読み直すと別の木になる。
 - 中身の尻の水平線に骨格が続く（`BorderBreak`）— 境界（側の変わり目）に読まれる
 - 見出し（綴られた・綴られない）に境界なしで続く項目・Implicit（`Swallowed`）—
@@ -64,6 +70,8 @@ md に書けない並びは 5 つ。読みが前後の行から意味を決め�
   飛びを綴れない（書くと Implicit が消え、項目は 1 つ浅く読まれる）
 - 深さ 7 以上の見出し（`TooDeep`）— `#` は 6 本まで（`deepest`）で、7 本目からは
   段落に読まれる。項目は相対記法なので、階層そのものに上限は無い
+- 深さ 3 以上で名前に改行（`DeepSetext`）— setext は深さ 2 までで、ATX は 1 行しか
+  持てない
 
 ### View — map が見る木
 
@@ -83,7 +91,7 @@ Node { id, label: String?, fold: Fold?, blocks: [Block], children: [Node] }
   型で区別が付く。旗も種類も要らない
 - **`blocks` は body から Raw を落としたもの。** core が「読み解かない」と
   裁定したものだけが map に届かない。何がカードかは描く側の分類のまま
-- 書き戻すためだけの欄（eol・散文の body）は無い。**frontmatter だけは残す** —
+- 書き戻すためだけの欄（散文の body・境界の綴り）は無い。**frontmatter だけは残す** —
   画像フォルダの宣言がそこに書かれていて、描くのに要る
 - **id は Doc のまま。** 読みが文書順に振った通し番号で、Raw にも振ってある
   ので、落としても残りの番号は動かない（View の添字を body の添字へ読み替える
@@ -93,7 +101,7 @@ Node { id, label: String?, fold: Fold?, blocks: [Block], children: [Node] }
 
 ```
 読み   md ──mizchi/markdown──> mdAst ──方言(dialect)──> mdAst ──build──> Doc + 地番 ──project──> View
-書き   Doc ──unbuild──> mdAst ──mizchi/markdown──> 字 ──綴り(spell)──> 正規形の md
+書き   Doc ──unbuild──> mdAst ──mizchi/markdown──> md   // 読んだ原文は生の塊で通す
 合流   md + 前の Doc + 地番 + 後の Doc ──merge──> 編集リスト ──> CodeMirror
 操作   Doc ──apply(op)──> Doc
 境界   md + Op ──edit──> 編集リスト + focus        // survey → apply → merge（edit/）
@@ -121,10 +129,13 @@ build / content / fold / merge は方言の mdAst だけを見る。
   中身に対する相対、はライブラリの決めとしてそのまま使う
 - `Blank` は使わない — 入れ子の項目の周りで範囲が壊れている。隙間は原文の字で測る（合流）
 
-書き `spell` — 書いた字を読み直して span で当てる（コードの中の同じ字は触らない）:
+書き — 書く側はライブラリにブロックの並びと字下げだけを任せる。名前・中身・境界は読んだ原文を
+生の塊で渡す。改行は LF だけ。
 
-- 区切り線は `---`（ライブラリは marker に関わらず `***` と書く）。ただし**段落の直後に立つ線は
-  `***` のまま** — `---` は setext 見出しの下線になる（引用と詰まった項目でライブラリが空行を落とす所）
+- 項目の列も mmm が包む。マーカー・ラベルの桁・列の詰めは読んだ綴りなので、その 3 つを読める者が
+  ライブラリの書き手に居ない（印は `-`、桁は 2、項目の間は常に詰めで固定）。列 1 本を生の塊に
+  組み、項目の中身はライブラリに綴らせてラベルの桁へ字下げする
+
 - frontmatter と本文の間は空行 1 つ（読みは後ろの空行を落とし、ライブラリは置かない）
 
 `md_wbtest.mbt` が癖ごとに「生の指紋 → 方言の指紋」を並べる。ライブラリの版が上がって
@@ -201,9 +212,14 @@ base → theirs の差（操作の差）だけを ours に写す。base と ours
    — 頭の要素が消えても、頭に要素が増えても、詰めて書いた列は詰めたまま（頭の要素が
    文書の頭になる / 文書の頭が来るときだけ、境目ごと）。頭を触らずに容器の中身だけが
    変わったときは、正規形どおりに列の手前を空ける（列が空いたと見る）
-4. 出来た文章を**読み直して、形が一致するか検証**する。形（`shape`）は id と改行を
+4. 出来た文章を**読み直して、形が一致するか検証**する。形（`shape`）は id と綴りを
    消した木 — 読みは id を振り直し、後の木の新しいノードは別の id を持ち、
-   空になった文書に改行の流儀は無い。違えば全文を正規形に落とす
+   操作が作った境界は綴りを持たない（書けば `---` として読み直される）。
+   見出しの綴り（`setext` / `closing`）も項目の綴り（`marker` / `offset` / `loose`）も
+   席が決めるので見ない — 深さ 3 に setext は無く、名前が空なら下線も引けないので、
+   そこでは ATX に落ちる。詰めは列 1 本のもので、列が割れれば 1 つの項目に空行は書けない。
+   違えば全文を正規形に落とす。原文を持つので、表や `~~~` があっても正規形は
+   原文と同じ塊になり、この安全網は開かない（#94）
 5. 編集リストを 1 トランザクションで渡す。カーソルと undo は CodeMirror の仕事
 
 正しさは 4 の検証が持つ。だから 1〜3 がどれだけ雑でも壊れない。
@@ -214,13 +230,14 @@ base → theirs の差（操作の差）だけを ours に写す。base と ours
 親で「消えた子」、行き先の親で「増えた子」になり、断片は後の木から出る。
 
 **全文の正規形と現在の md をテキストで diff する案は採らない。**
-serialize(parse(md)) は恒等ではない（`*` と `-`、見出しの書き方、空行の数）ので、
-触っていない箇所の「ずれ」まで差分に出て、操作のたびに文書全体が正規化される。
+serialize(parse(md)) は恒等ではない（列 0 の項目の間の空行、ラベルと中身の間の
+空行、行頭の飾りの空白）ので、触っていない箇所の「ずれ」まで差分に出て、操作の
+たびに文書全体が正規化される。
 地番で dirty の範囲だけ置き換えるのは、まさにそれを避けるため。
 
 断片で書けず、広く書き直すもの:
 
-- **frontmatter と改行の流儀が変われば全文**
+- **frontmatter が変われば全文**
 - **子の並べ替えは容器ごと。** 残った子の順が前後で違えば、その容器を丸ごと
 - **根の側が変われば根ごと。** 側は根のもので、`---` は隙間に書かれる。
   子の増減で長さが変わるだけ（前後とも全部 Right）なら同じと見る
@@ -267,11 +284,11 @@ design.md「状態と拍」）。打鍵ごとの core 呼び出しは `mmmSurvey
 - `lab/` が mdAst と mmmTree を並べて出すのも、どの段で壊れたかを切り分けるため
 - **serialize のテストは木を手で組む。`parse` で作らない** — `serialize(parse(md))`
   と書くと、書きのテスト全部が読みに依存する
-- **書きで我々が持つのは骨格だけ**（深さ → `#`、側の変わり目 → 水平線、畳み → `<details>`）。
-  中身とラベルは md として読み直して mdAst に戻す。字下げ・フェンス長・空行・
-  エスケープ・定義行の置き場はライブラリの serializer の仕事で、その正規化
-  （`_em_` → `*em*`、定義行は末尾へ、setext → ATX）は**この段では素直に受ける**。
-  mmm の綴りに直すもの（水平線は `---`）は `md.mbt` の方言
+- **書きで我々が持つのは骨格と、読んだ綴り。** 名前・中身・境界・項目の列は
+  原文の字（`source` / `rules` / `marker` / `offset` / `loose`）で mmm が組み、生の塊として
+  ライブラリに渡す。ライブラリの仕事はブロックの並びと前後の空行だけ。
+  綴るのは mmm が新しく作った中身（コード・画像・リンク）だけで、そこは
+  ライブラリの形（mdAst）で渡す
 - 往復(法則 1)・冪等(法則 2)は、両側の単体が揃ってからの別パス。
   合流の総当たりは merge_law_wbtest.mbt
 
@@ -308,8 +325,9 @@ Done = { doc, focus: Int? }       // 操作後の木と、そこで選ぶべき 
   兄弟がいればその sign、いなければ親が項目なら項目、それ以外は見出し。根の隣
   （`In(doc_id)`）は最後の根に従う。部分木の下は、親が項目なら全部項目（型）、
   親が見出しなら見出しで続けて天井で `cap` が項目にする（`respell`）。見出しを
-  項目の下へ落とせば項目になる。モードは Reform と一緒に来る。決めは
-  `superpowers/specs/2026-09-06-paste-design.md`
+  項目の下へ落とせば項目になる。マーカー（`-` `*` `+` `1.`）とラベルの桁も隣の項目に従う
+  （`spell_at`。番号付きの隣なら 1 つ進める）。読んだ列の綴りは保つ。モードは Reform と
+  一緒に来る。決めは `superpowers/specs/2026-09-06-paste-design.md`
 - **見出しの天井だけは断らずに綴り替える（`cap`）。** 7 段目に着地した見出しは
   部分木ごと項目になる — 手で書くときも `######` の下は `- ` でしか続けられない。
   断ると 6 段目で足す・貼る・落とす・包むが全部できなくなる。天井より深い Implicit
@@ -451,10 +469,6 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
 
 - **「消す」(`<!-- -->`)の入口。** `Shift+H` は畳みに割り当てたので、
   コメントアウトを呼ぶ手が無い(右クリックメニューか、別のキーか)
-- **改行。** spec の「文字コードと改行」は LF だけと言い、`Doc.eol` は書き戻すと言う。
-  今の serialize は `Doc.eol` に従う。CodeMirror は内部を常に LF で持つので、
-  合流が CRLF の座標で編集を作ると位置がずれる — 合流は LF の文字列に対して
-  行い、CRLF は I/O の仕事に寄せるのが素直
 - **旧方言で書かれた既存文書の移行。** コメント畳み・`---` トグル・本数の意味は
   もう読まれない。開いたときにどう案内するか
 - **Reform（モード）と綴りの変換。** 開いたときの自動判定も core の読み関数として
@@ -466,3 +480,7 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
   O(n) の全複製なのは承知で、理論値は平らが勝つが、読みのサイクルが同じイベントで O(n) 走る
   ので体感に出ない。型で殺している 3 つを取って今の入れ子のまま。splice の行き先が 4 を超えた
   ときに「op の中だけ flatten / unflatten」から考え直す
+- **`Opaque`（main では `Raw`）の `content` と `source` は同じ字を 2 回持つ。** 読み解かない
+  中身は、種類（`Opaque`/`Raw`）自体が原文をそのまま抱え、`Block.source` にも同じ字が乗る。
+  `content` を `Content?` にして読み解けなければ `None`、字は `source` だけ、という形も
+  あり得るが、`content` も `source` も無い無意味な形が作れてしまう。改名とは別の設計の話として残す

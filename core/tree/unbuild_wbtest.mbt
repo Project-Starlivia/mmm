@@ -1,30 +1,39 @@
 // mmmTree → md を固定する。**木は手で組む** — `parse` で作ると、書きの
 // テスト全部が読みに依存する（往復・冪等は両側が揃ってからの別段）。
 //
-// 見ているのは serialize の文字列。字下げ・フェンス長・空行・エスケープの
-// 流儀はライブラリのもので、ここで固定するのは「我々の骨格がどう綴られるか」。
-// ライブラリの正規化（`_em_` → `*em*`、定義行の移動、setext → ATX）は
-// **この段では素直に受ける**。補正するなら合流の段。
+// 見ているのは serialize の文字列。ブロックの並びと字下げはライブラリのもので、
+// ここで固定するのは「我々の骨格がどう綴られるか」。
+//
+// 中身の字はライブラリに渡さない — 読んだ原文（`Block.source`）はそのまま返り、
+// 綴るのは mmm が新しく作ったものだけ。
 
 ///|
 fn doc(
   roots : Array[Root],
   body? : Array[Content] = [],
   frontmatter? : String? = None,
-  eol? : Eol = Lf,
 ) -> Doc {
-  { frontmatter, eol, body: blocks(body), roots, }
+  { frontmatter, body: blocks(body), roots, }
 }
 
 ///|
-fn root(node : Node, sides? : Array[Side] = []) -> Root {
-  { node, sides, }
+fn root(
+  node : Node,
+  sides? : Array[Side] = [],
+  rules? : Array[String] = [],
+) -> Root {
+  { node, sides, rules, }
 }
 
 ///|
-/// id は書きに関係しないので 0 のまま。
+/// id は書きに関係しないので 0 のまま。source は「読んだ原文」— 手で組む木では None
 fn blocks(body : Array[Content]) -> Array[Block] {
-  body.map(content => ({ id: 0, content, } : Block))
+  body.map(content => ({ id: 0, content, source: None, } : Block))
+}
+
+///|
+fn read_block(content : Content, source : String) -> Block {
+  { id: 0, content, source: Some(source), }
 }
 
 ///|
@@ -33,8 +42,18 @@ fn h(
   children? : Array[Node] = [],
   body? : Array[Content] = [],
   fold? : Fold? = None,
+  setext? : Bool = false,
+  closing? : Int = 0,
 ) -> Node {
-  HeadingNode({ id: 0, label, fold, body: blocks(body), children, })
+  HeadingNode({
+    id: 0,
+    label,
+    fold,
+    body: blocks(body),
+    setext,
+    closing,
+    children,
+  })
 }
 
 ///|
@@ -43,8 +62,11 @@ fn li(
   children? : Array[ListNode] = [],
   body? : Array[Content] = [],
   fold? : Fold? = None,
+  marker? : String = "-",
+  offset? : Int = 2,
+  loose? : Bool = false,
 ) -> ListNode {
-  { id: 0, label, fold, body: blocks(body), children, }
+  { id: 0, label, fold, body: blocks(body), marker, offset, loose, children, }
 }
 
 ///|
@@ -53,8 +75,11 @@ fn item(
   children? : Array[ListNode] = [],
   body? : Array[Content] = [],
   fold? : Fold? = None,
+  marker? : String = "-",
+  offset? : Int = 2,
+  loose? : Bool = false,
 ) -> Node {
-  ListNode(li(label, children~, body~, fold~))
+  ListNode(li(label, children~, body~, fold~, marker~, offset~, loose~))
 }
 
 ///|
@@ -135,6 +160,70 @@ test "項目は入れ子。兄弟は詰める" {
 }
 
 ///|
+/// #84 — マーカーは項目が持つ。種類が変われば md でも別の列なので、そこで割る。
+test "項目のマーカーは読んだ綴り — 列ごとに 1 つ、違えば別の列" {
+  inspect(
+    serialize(
+      doc([
+        root(h("a", children=[item("b", marker="*"), item("c", marker="*")])),
+      ]),
+    ),
+    content="# a\n\n* b\n* c\n",
+  )
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("a", children=[
+            item("b", marker="1.", offset=3),
+            item("c", marker="2.", offset=3),
+          ]),
+        ),
+      ]),
+    ),
+    content="# a\n\n1. b\n2. c\n",
+  )
+  inspect(
+    serialize(
+      doc([
+        root(h("a", children=[item("b", marker="-"), item("c", marker="+")])),
+      ]),
+    ),
+    content="# a\n\n- b\n\n+ c\n",
+  )
+}
+
+///|
+/// #84 — 詰めは列のもの。loose なら項目の間に空行が入る。
+test "項目の詰めは読んだ綴り — loose なら空行" {
+  inspect(
+    serialize(
+      doc([
+        root(h("a", children=[item("b", loose=true), item("c", loose=true)])),
+      ]),
+    ),
+    content="# a\n\n- b\n\n- c\n",
+  )
+}
+
+///|
+/// #84 — 字下げ幅も項目のもの。ラベルの桁に中身も入れ子も座る。
+test "項目の字下げは読んだ綴り — 入れ子はその桁から" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          item("a", marker="*", offset=3, children=[
+            li("b", marker="*", offset=3),
+          ]),
+        ),
+      ]),
+    ),
+    content="*  a\n   *  b\n",
+  )
+}
+
+///|
 /// ラベルの直後に空の項目が続けば、`-` 1 本が setext の下線に読まれてラベルが
 /// 消える。その列だけ loose にして空行で分ける — 正規形は並びで変わる。
 /// 空の項目でも直前が段落でなければ（前に兄弟が居る）詰めたまま。
@@ -203,17 +292,30 @@ test "項目と見出しの兄弟" {
 }
 
 ///|
-/// ライブラリは setext を書かない。2 行目は段落に落ちる — **この段では受ける**
-/// （spec の「改行が在る見出しは setext」は合流の段か上流で）。
-test "改行入りの見出しラベルは ATX のまま" {
+/// #85 — 書き方は木が持つ。setext は深さ 1〜2 でだけ書けるので、深ければ ATX。
+/// 閉じの `#` は読んだ本数。
+test "見出しの書き方は読んだ綴り — setext と閉じの #" {
+  inspect(serialize(doc([root(h("a", setext=true))])), content="a\n===\n")
   inspect(
-    serialize(doc([root(h("a\nb"))])),
-    content=(
-      #|# a
-      #|b
-      #|
-    ),
+    serialize(doc([root(h("a", children=[h("b", setext=true)]))])),
+    content="# a\n\nb\n---\n",
   )
+  inspect(serialize(doc([root(h("a", closing=2))])), content="# a ##\n")
+  // 深さ 3 は setext を書けない → ATX
+  inspect(
+    serialize(
+      doc([root(h("a", children=[h("b", children=[h("c", setext=true)])]))]),
+    ),
+    content="# a\n\n## b\n\n### c\n",
+  )
+}
+
+///|
+/// #85 — 改行を含む名前は setext でしか書けない（深さ 1〜2）ので、読んだ綴りが
+/// setext でなくても setext で書く。深さ 3 以上では書けないので check が `DeepSetext` で断る
+test "改行を含む名前は setext で書く" {
+  inspect(serialize(doc([root(h("a\nb", setext=true))])), content="a\nb\n===\n")
+  inspect(serialize(doc([root(h("a\nb"))])), content="a\nb\n===\n")
 }
 
 ///|
@@ -244,8 +346,23 @@ test "空のラベル" {
 
 // ══════════════════════════════════════════════════════════════════
 // 側 — 根の子の側が直前の兄弟と違えば、その直前に水平線
-// （ライブラリは `***` で書く。読みは記法を差別しないので、そのまま受ける）
+// （読んだ綴りが `rules` に在ればそれ。無ければ `---`）
 // ══════════════════════════════════════════════════════════════════
+
+///|
+test "境界は読んだ綴りで返す — 無ければ ---" {
+  let kids = [h("b"), h("c"), h("d")]
+  inspect(
+    serialize(
+      doc([
+        root(h("a", children=kids), sides=[Right, Left, Right], rules=[
+          "", "***", "",
+        ]),
+      ]),
+    ),
+    content="# a\n\n## b\n\n***\n\n## c\n\n---\n\n## d\n",
+  )
+}
 
 ///|
 test "側の変わり目に ---" {
@@ -361,8 +478,51 @@ test "項目の側" {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// 中身 — 絵の 4 つは md の形に、原文で持つものは読み直して並べる
+// 中身 — 読んだ原文はそのまま返す。綴るのは mmm が作ったものだけ
 // ══════════════════════════════════════════════════════════════════
+
+///|
+test "読んだ中身は原文のまま — 表の桁は揃えず、フェンスも変えない" {
+  let table = "| a | 日本語 |\n|---|---|\n| 1 | 2 |"
+  let doc : Doc = {
+    frontmatter: None,
+    body: [],
+    roots: [
+      root(
+        HeadingNode({
+          id: 0,
+          label: "a",
+          fold: None,
+          body: [
+            read_block(Raw(table), table),
+            read_block(Code(info="", text="x\n"), "~~~\nx\n~~~"),
+          ],
+          setext: false,
+          closing: 0,
+          children: [],
+        }),
+      ),
+    ],
+  }
+  inspect(serialize(doc), content="# a\n\n" + table + "\n\n~~~\nx\n~~~\n")
+}
+
+///|
+test "mmm が作った中身は既定で綴る — source が無ければ種類ごと" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("a", body=[
+            Code(info="js", text="1\n"),
+            Image(alt="", src="p.png", title=""),
+          ]),
+        ),
+      ]),
+    ),
+    content="# a\n\n```js\n1\n```\n\n![](p.png)\n",
+  )
+}
 
 ///|
 test "中身は文書順に、塊ごとに空行を挟んで" {
@@ -440,37 +600,37 @@ test "最初の骨格より前の中身は文書のもの" {
 }
 
 ///|
-/// 原文は md として読み直すので、ライブラリの正規化を受ける。
-test "Raw は正規化される" {
+/// Raw は生の塊のまま置く。読み直さないので、強調の綴りも変わらない。
+test "Raw の字はそのまま — 強調の綴りも直さない" {
   inspect(
     serialize(doc([root(h("a", body=[Raw("_em_ と *x*")]))])),
     content=(
       #|# a
       #|
-      #|*em* と *x*
+      #|_em_ と *x*
       #|
     ),
   )
 }
 
 ///|
-/// 定義行は文書ぜんぶで 1 列。ライブラリは末尾に集める。
-test "定義行は末尾へ" {
+/// 定義行は原文の中に居るので、書かれた場所に残る。
+test "定義行は書かれた場所に残る" {
   inspect(
     serialize(doc([root(h("a", body=[Raw("[q]: /r")], children=[h("b")]))])),
     content=(
       #|# a
       #|
-      #|## b
-      #|
       #|[q]: /r
+      #|
+      #|## b
       #|
     ),
   )
 }
 
 ///|
-/// 畳みに立たなかった `<details>` は領域ごと原文。読み直しても形は同じ。
+/// 畳みに立たなかった `<details>` は領域ごと原文。そのまま置く。
 test "Details はそのまま" {
   inspect(
     serialize(
@@ -584,14 +744,6 @@ test "frontmatter は頭に。本文との間は空行 1 つ" {
       #|# a
       #|
     ),
-  )
-}
-
-///|
-test "CRLF の文書は CRLF で" {
-  inspect(
-    serialize(doc([root(h("a", children=[h("b")]))], eol=Crlf)),
-    content="# a\r\n\r\n## b\r\n",
   )
 }
 

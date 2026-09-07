@@ -1,7 +1,7 @@
 // 合流 — 前後の木を比べ、変わった所だけを原文 md に映す。
 //
-// 受け取るのは原文・前の Doc とその地番・後の Doc の 4 つで、返すのは編集列だけ。
-// 後の Doc が誰にどう作られたか（操作・undo のスナップショット）は知らない。
+// 受け取るのは原文・前の Doc とその地番・後の Doc の 4 つで、返すのは編集列と
+// その検証の答え。後の Doc が誰にどう作られたか（操作・undo のスナップショット）は知らない。
 //
 // 形は**正規形を base にした 3-way merge**（recast と同じ）:
 //
@@ -15,7 +15,8 @@
 // 増えるときは theirs の隙間を連れてきて、残る要素の隙間は theirs で変わったときだけ
 // 書き換える。隙間そのものは原文の字で測る（空白だけの行 = 空行。読みと同じ）。
 // 出来た文章を読み直して後の木と形が一致しなければ全文を正規形に落とす —
-// **正しさはこの検証が持つ**ので、比較がどれだけ雑でも壊れない。
+// **正しさはこの検証が持つ**ので、比較がどれだけ雑でも壊れない。答えは返り値に
+// 載せる（`same`）— 呼ぶ側も同じことを知りたいので、二度読み直さない。
 // 決めは docs/core.md「合流」。
 
 ///|
@@ -42,20 +43,42 @@ pub fn patched(md : String, edits : Array[Edit]) -> String {
 }
 
 ///|
-/// 後の木を映す編集列。from 順で、範囲は重ならない。
+/// 合流の結果。
+pub(all) struct Merged {
+  /// 後の木を映す編集列。from 順で、範囲は重ならない
+  edits : Array[Edit]
+  /// 当てて読み直した形が後の木と同じか。書けない木のときだけ偽で、
+  /// そのとき文書順の番号（focus）は別のものを指す
+  same : Bool
+} derive(Eq, Debug, ToJson)
+
+///|
+/// 後の木を映す編集列と、その検証。断片で書けなければ全文を正規形に落とす。
 pub fn merge(
   md : String,
   before : Doc,
   spans : Map[Int, Spot],
   after : Doc,
-) -> Array[Edit] {
-  if before == after {
-    return []
+) -> Merged {
+  let planned = if before == after {
+    Some([])
+  } else {
+    plan(md, before, spans, after)
   }
-  match plan(md, before, spans, after) {
-    Some(edits) if shape(parse(apply(md, edits))) == shape(after) => edits
-    _ => [{ from: 0, to: md.length(), insert: serialize(after), }]
+  match planned {
+    Some(edits) if verified(md, edits, after) => { edits, same: true, }
+    // 全文の正規形は断片と字が違うので、検証もやり直す
+    _ => {
+      let edits = [{ from: 0, to: md.length(), insert: serialize(after), }]
+      { edits, same: verified(md, edits, after), }
+    }
   }
+}
+
+///|
+/// 編集を当てて読み直した形が、後の木と同じか。**合流の正しさはこれが持つ。**
+fn verified(md : String, edits : Array[Edit], after : Doc) -> Bool {
+  shape(parse(apply(md, edits))) == shape(after)
 }
 
 ///|
@@ -74,7 +97,6 @@ pub fn apply(md : String, edits : Array[Edit]) -> String {
 priv struct Merge {
   md : String
   spans : Map[Int, Spot]
-  eol : Eol
   /// 前の木のノードを id で引く
   old : Map[Int, Node]
   /// ours — 要素の手前の隙間の頭（空行が無ければ行頭）。前の木の id で引く
@@ -87,7 +109,7 @@ priv struct Merge {
 }
 
 ///|
-/// 触った所だけの編集列。断片で書けない変化（frontmatter・改行・根の並べ替え）
+/// 触った所だけの編集列。断片で書けない変化（frontmatter・根の並べ替え）
 /// は None — 全文へ落ちる。
 fn plan(
   md : String,
@@ -95,9 +117,7 @@ fn plan(
   spans : Map[Int, Spot],
   after : Doc,
 ) -> Array[Edit]? {
-  guard before.frontmatter == after.frontmatter && before.eol == after.eol else {
-    return None
-  }
+  guard before.frontmatter == after.frontmatter else { return None }
   // 木だけで分かる落ちは先に（正規形を書いて読み直す前に）
   let olds_n = before.roots.map(x => x.node)
   let news_n = after.roots.map(x => x.node)
@@ -108,7 +128,6 @@ fn plan(
   let r : Merge = {
     md,
     spans,
-    eol: before.eol,
     old: Map([]),
     gap: gaps(md, spans),
     base,
@@ -123,6 +142,7 @@ fn plan(
   // 側は根のもの。変われば根が丸ごと（子の増減で長さが変わるだけ — 全部 Right — は同じ）
   let olds = Map::from_array(before.roots.map(x => (id_of(x.node), x.sides)))
   let sides = Map::from_array(after.roots.map(x => (id_of(x.node), x.sides)))
+  let rules = Map::from_array(after.roots.map(x => (id_of(x.node), x.rules)))
   for x in after.roots {
     match olds.get(id_of(x.node)) {
       Some(was) if !(was == x.sides || (plain(was) && plain(x.sides))) =>
@@ -130,7 +150,16 @@ fn plan(
       _ => ()
     }
   }
-  merge_children(r, spans.get(doc_id).unwrap().to, 0, olds_n, news_n, 1, sides)
+  merge_children(
+    r,
+    spans.get(doc_id).unwrap().to,
+    0,
+    olds_n,
+    news_n,
+    1,
+    sides,
+    rules,
+  )
   Some(settle(r))
 }
 
@@ -235,7 +264,13 @@ fn canon_gaps(doc : Doc) -> Map[Int, Bool]? {
 /// 前の木の同じ id と比べる。種類・畳み・子の並びが変わっていれば部分木ごと書く。
 /// そうでなければ、行（ラベル）・中身・子の 3 つの列をそれぞれ差分にする —
 /// 行が同じなら行には触らない（そこに選択の目印が在る）。
-fn merge_node(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
+fn merge_node(
+  r : Merge,
+  x : Node,
+  depth : Int,
+  sides : Array[Side],
+  rules : Array[String],
+) -> Unit {
   match r.old.get(id_of(x)) {
     // 畳みは `<details>` が部分木を包むので、自分か子列が変わればそこから丸ごと
     Some(old) if kind(old) == kind(x) &&
@@ -245,8 +280,11 @@ fn merge_node(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
         (same(old, x) && ids(children_of(old)) == ids(children_of(x)))
       ) => {
       let s = r.spans.get(id_of(x)).unwrap()
-      // 項目の中身と子は容器の中身の桁（マーカーの 2 つ右）に居る
-      let col = if x is ListNode(_) { column(r.md, s.from) + 2 } else { 0 }
+      // 項目の中身と子は容器のラベルの桁（読んだ字下げ幅の右）に居る
+      let col = match x {
+        ListNode(l) => column(r.md, s.from) + l.offset
+        _ => 0
+      }
       // Implicit は行も中身も持たない（範囲は子の和）
       match x {
         ImplicitNode(_) => ()
@@ -257,7 +295,7 @@ fn merge_node(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
               from: s.from,
               to: line_to,
               insert: indent(
-                fragment(with_children(with_body(x, []), []), depth, [], r.eol),
+                fragment(with_children(with_body(x, []), []), depth, [], []),
                 column(r.md, s.from),
               ),
             })
@@ -273,9 +311,10 @@ fn merge_node(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
         children_of(x),
         depth + 1,
         Map([]),
+        Map([]),
       )
     }
-    _ => replace(r, x, depth, sides)
+    _ => replace(r, x, depth, sides, rules)
   }
 }
 
@@ -323,7 +362,7 @@ fn merge_seq(r : Merge, q : Seq) -> Unit {
   let now = Map::from_array(q.news.map(id => (id, ())))
   let was = Map::from_array(q.olds.map(id => (id, ())))
   let at = (id : Int) => r.spans.get(id).unwrap()
-  let gap_text = (id : Int) => if (q.gap)(id) { eol(r) } else { "" }
+  let gap_text = (id : Int) => if (q.gap)(id) { "\n" } else { "" }
   // 列の頭に新しい物が来るか（頭の並びを消すとき、境目を残すかに要る）
   // 列ごと消えるとき、生まれ直すなら境目を残す（全部消えたなら news の頭は必ず新しい）
   let head_born = !q.news.is_empty()
@@ -408,7 +447,7 @@ fn merge_seq(r : Merge, q : Seq) -> Unit {
             from: r.gap.get(id).unwrap(),
             to: line_start(r.md, at(id).from),
             insert: if has {
-              eol(r)
+              "\n"
             } else {
               ""
             },
@@ -464,6 +503,7 @@ fn merge_children(
   news : Array[Node],
   depth : Int,
   sides : Map[Int, Array[Side]],
+  rules : Map[Int, Array[String]],
 ) -> Unit {
   let now = Map::from_array(news.map(x => (id_of(x), x)))
   let item = news.get(0) is Some(ListNode(_))
@@ -492,10 +532,21 @@ fn merge_children(
       }
     },
     keep: id => {
-      merge_node(r, now.get(id).unwrap(), depth, sides.get(id).unwrap_or([]))
+      merge_node(
+        r,
+        now.get(id).unwrap(),
+        depth,
+        sides.get(id).unwrap_or([]),
+        rules.get(id).unwrap_or([]),
+      )
     },
     make: id => {
-      fragment(now.get(id).unwrap(), depth, sides.get(id).unwrap_or([]), r.eol)
+      fragment(
+        now.get(id).unwrap(),
+        depth,
+        sides.get(id).unwrap_or([]),
+        rules.get(id).unwrap_or([]),
+      )
     },
   })
 }
@@ -517,7 +568,7 @@ fn merge_body(
   let now = Map::from_array(news.map(b => (b.id, b)))
   let old_ids = olds.map(b => b.id)
   let new_ids = news.map(b => b.id)
-  let make = (id : Int) => prose([now.get(id).unwrap()], r.eol)
+  let make = (id : Int) => prose([now.get(id).unwrap()])
   let gap = (id : Int) => r.theirs.get(id).unwrap_or(true)
   if !aligned(old_ids, new_ids) {
     merge_seq(r, {
@@ -562,33 +613,10 @@ fn merge_body(
 }
 
 ///|
-fn eol(r : Merge) -> String {
-  match r.eol {
-    Lf => "\n"
-    Crlf => "\r\n"
-  }
-}
-
-///|
 /// 前の木のノードの、自分の尻。元から子の無い容器に差すときだけ使い、そのとき
 /// 地番の尻は自分の尻そのもの（setext の 2 行目も含む）。
 fn own_end(r : Merge, old : Node) -> Int {
   r.spans.get(id_of(old)).unwrap().to
-}
-
-///|
-/// 行頭 `at` の手前に続く空行の頭。空行が無ければその位置のまま。
-/// 空行は「改行までが空白だけの行」— 読みが空行と見るのと同じ。改行は `\n`（CRLF の
-/// `\r` は行の中身ではない）。
-fn blank_start(md : String, at : Int) -> Int {
-  let mut p = at
-  while p > 0 && md[p - 1] == '\n' {
-    let nl = if p >= 2 && md[p - 2] == '\r' { p - 2 } else { p - 1 }
-    let head = line_start(md, nl)
-    guard skip_blank(md, head, nl) == nl else { break }
-    p = head
-  }
-  p
 }
 
 ///|
@@ -623,7 +651,7 @@ fn settle(r : Merge) -> Array[Edit] {
   }
   out.map(e => {
     if e.insert != "" && mid_line(r.md, e.from) {
-      { ..e, insert: eol(r) + e.insert, }
+      { ..e, insert: "\n" + e.insert, }
     } else {
       e
     }
@@ -638,8 +666,14 @@ fn mid_line(md : String, at : Int) -> Bool {
 
 ///|
 /// 部分木ごと断片にして、地番に差す。
-fn replace(r : Merge, x : Node, depth : Int, sides : Array[Side]) -> Unit {
-  r.out.push(patch(r, id_of(x), fragment(x, depth, sides, r.eol)))
+fn replace(
+  r : Merge,
+  x : Node,
+  depth : Int,
+  sides : Array[Side],
+  rules : Array[String],
+) -> Unit {
+  r.out.push(patch(r, id_of(x), fragment(x, depth, sides, rules)))
 }
 
 ///|
@@ -774,15 +808,19 @@ fn ids(xs : Array[Node]) -> Array[Int] {
 }
 
 ///|
-/// 木の形。id と改行を消したもの — 読みは id を振り直し、後の木の新しい
-/// ノードは別の id を持つ。改行は原文から推し量るもので、空になった文書には
-/// 流儀が無い。edit が focus の要否を見るのにも使う。
+/// 木の形。id と綴りを消したもの — 読みは id を振り直し、後の木の新しい
+/// ノードは別の id を持つ。境界の綴り（`rules`）は原文から来るもので、
+/// 操作が作った境界は綴りを持たない（書けば `---` として読み直される）。
+/// edit が focus の要否を見るのにも使う。
 pub fn shape(doc : Doc) -> Doc {
   {
     ..doc,
-    eol: Lf,
     body: faceless(doc.body),
-    roots: doc.roots.map(r => { node: faceless_node(r.node), sides: r.sides, }),
+    roots: doc.roots.map(r => {
+      node: faceless_node(r.node),
+      sides: r.sides,
+      rules: [],
+    }),
   }
 }
 
@@ -793,6 +831,10 @@ fn faceless_node(x : Node) -> Node {
       HeadingNode({
         ..h,
         id: 0,
+        // 見出しの綴り（setext・閉じの `#`）は原文から来るもので、席が変われば
+        // 綴り直される（深さ 3 に setext は無い）。形は綴りを見ない
+        setext: false,
+        closing: 0,
         body: faceless(h.body),
         children: h.children.map(faceless_node),
       })
@@ -807,12 +849,19 @@ fn faceless_list(l : ListNode) -> ListNode {
   {
     ..l,
     id: 0,
+    // 項目の綴り（マーカー・字下げ幅・詰め）も原文から来るもので、席が変われば
+    // 隣に従う。見出しの setext と同じく、形は綴りを見ない
+    marker: "-",
+    offset: 2,
+    loose: false,
     body: faceless(l.body),
     children: l.children.map(faceless_list),
   }
 }
 
 ///|
+/// **形の比較は原文を見ない** — 書いた原文と読み直した原文は、改行の剥ぎ方で
+/// 違い得る。意味が同じなら同じ形。
 fn faceless(body : Array[Block]) -> Array[Block] {
-  body.map(b => { id: 0, content: b.content, })
+  body.map(b => { id: 0, content: b.content, source: None, })
 }

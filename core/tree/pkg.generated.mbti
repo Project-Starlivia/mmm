@@ -22,13 +22,13 @@ pub let deepest : Int
 
 pub let doc_id : Int
 
-pub fn fragment(Node, Int, Array[Side], Eol) -> String
+pub fn fragment(Node, Int, Array[Side], Array[String]) -> String
 
 pub fn lines(String) -> Array[String]?
 
 pub fn md_ast_sig(String) -> String
 
-pub fn merge(String, Doc, Map[Int, Spot], Doc) -> Array[Edit]
+pub fn merge(String, Doc, Map[Int, Spot], Doc) -> Merged
 
 pub fn number(Doc, Int) -> Int?
 
@@ -36,7 +36,7 @@ pub fn parse(String) -> Doc
 
 pub fn patched(String, Array[Edit]) -> String
 
-pub fn prose(Array[Block], Eol) -> String
+pub fn prose(Array[Block]) -> String
 
 pub fn read(String) -> @markdown.Document
 
@@ -50,7 +50,7 @@ pub fn survey(String) -> (Doc, Map[Int, Spot])
 
 pub fn unbuild(Doc) -> @markdown.Document
 
-pub fn unbuild_node(Node, Int, Array[Side]) -> @markdown.Document
+pub fn unbuild_node(Node, Int, Array[Side], Array[String]) -> @markdown.Document
 
 pub fn unbuild_prose(Array[Block]) -> @markdown.Document
 
@@ -60,6 +60,7 @@ pub fn unbuild_prose(Array[Block]) -> @markdown.Document
 pub(all) struct Block {
   id : Int
   content : Content
+  source : String?
 } derive(Eq, ToJson, @debug.Debug)
 
 pub(all) enum Content {
@@ -74,7 +75,6 @@ pub(all) enum Content {
 
 pub(all) struct Doc {
   frontmatter : String?
-  eol : Eol
   body : Array[Block]
   roots : Array[Root]
 } derive(Eq, ToJson, @debug.Debug)
@@ -85,11 +85,6 @@ pub(all) struct Edit {
   insert : String
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 
-pub(all) enum Eol {
-  Lf
-  Crlf
-} derive(Eq, ToJson, @debug.Debug)
-
 pub(all) enum Flaw {
   DupeId(Int)
   BarrenImplicit(Int)
@@ -99,6 +94,7 @@ pub(all) enum Flaw {
   ListSide(Int)
   GappedItem(Int)
   TooDeep(Int)
+  DeepSetext(Int)
 } derive(Eq, ToJson)
 
 pub(all) struct Fold {
@@ -111,6 +107,8 @@ pub(all) struct HeadingNode {
   label : String
   fold : Fold?
   body : Array[Block]
+  setext : Bool
+  closing : Int
   children : Array[Node]
 } derive(Eq, ToJson, @debug.Debug)
 
@@ -124,7 +122,15 @@ pub(all) struct ListNode {
   label : String
   fold : Fold?
   body : Array[Block]
+  marker : String
+  offset : Int
+  loose : Bool
   children : Array[ListNode]
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Merged {
+  edits : Array[Edit]
+  same : Bool
 } derive(Eq, ToJson, @debug.Debug)
 
 pub(all) enum Node {
@@ -136,6 +142,7 @@ pub(all) enum Node {
 pub(all) struct Root {
   node : Node
   sides : Array[Side]
+  rules : Array[String]
 } derive(Eq, ToJson, @debug.Debug)
 
 pub(all) enum Side {

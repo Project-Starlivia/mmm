@@ -67,7 +67,12 @@ fn changed(doc : Doc, id : Int, how : Change) -> Doc {
       Adopt =>
         Some(with_children(x, children_of(x) + [newborn(x is ListNode(_))]))
       AddBlock =>
-        Some(with_body(x, body_of(x) + [{ id: 999, content: ThematicBreak, }]))
+        Some(
+          with_body(
+            x,
+            body_of(x) + [{ id: 999, source: None, content: ThematicBreak, }],
+          ),
+        )
       DropBlock =>
         if body_of(x).is_empty() {
           Some(x)
@@ -80,7 +85,7 @@ fn changed(doc : Doc, id : Int, how : Change) -> Doc {
             x,
             body_of(x).mapi((i, b) => {
               if i == 0 {
-                { id: b.id, content: Raw("changed"), }
+                { id: b.id, source: None, content: Raw("changed"), }
               } else {
                 b
               }
@@ -178,9 +183,26 @@ fn grain(
 /// 新しいノード（id は読みが振る番号と被らない）。項目の子は項目。
 fn newborn(item : Bool) -> Node {
   if item {
-    ListNode({ id: 999, label: "new", fold: None, body: [], children: [], })
+    ListNode({
+      id: 999,
+      label: "new",
+      fold: None,
+      body: [],
+      marker: "-",
+      offset: 2,
+      loose: false,
+      children: [],
+    })
   } else {
-    HeadingNode({ id: 999, label: "new", fold: None, body: [], children: [], })
+    HeadingNode({
+      id: 999,
+      label: "new",
+      fold: None,
+      body: [],
+      setext: false,
+      closing: 0,
+      children: [],
+    })
   }
 }
 
@@ -202,22 +224,36 @@ fn all_ids(doc : Doc) -> Array[Int] {
 }
 
 ///|
-/// id のノードを f で置き換えた Doc。None なら消す。根の側は子と並走を保ち、
-/// 子を失った Implicit は在り得ない（check が言う）ので一緒に消える。
+/// id のノードを f で置き換えた Doc。None なら消す。根の側と境界の綴りは子と
+/// 並走を保ち、子を失った Implicit は在り得ない（check が言う）ので一緒に消える。
 fn morph(doc : Doc, id : Int, f : (Node) -> Node?) -> Doc {
   let roots = []
   for r in doc.roots {
     if id_of(r.node) == id {
       match f(r.node) {
-        Some(n) => roots.push(({ node: n, sides: fit(r.sides, n), } : Root))
+        Some(n) =>
+          roots.push(
+            (
+              {
+                node: n,
+                sides: fit(r.sides, n, Right),
+                rules: fit(r.rules, n, ""),
+              } : Root),
+          )
         None => ()
       }
     } else {
-      let (kids, sides) = morph_kids(children_of(r.node), r.sides, id, f)
+      let (kids, sides, rules) = morph_kids(
+        children_of(r.node),
+        r.sides,
+        r.rules,
+        id,
+        f,
+      )
       if r.node is ImplicitNode(_) && kids.is_empty() {
         continue
       }
-      roots.push(({ node: with_children(r.node, kids), sides, } : Root))
+      roots.push(({ node: with_children(r.node, kids), sides, rules, } : Root))
     }
   }
   { ..doc, roots, }
@@ -227,37 +263,43 @@ fn morph(doc : Doc, id : Int, f : (Node) -> Node?) -> Doc {
 fn morph_kids(
   kids : Array[Node],
   sides : Array[Side],
+  rules : Array[String],
   id : Int,
   f : (Node) -> Node?,
-) -> (Array[Node], Array[Side]) {
+) -> (Array[Node], Array[Side], Array[String]) {
   let out = []
   let out_sides = []
+  let out_rules = []
   for i, k in kids {
     let side = if i < sides.length() { sides[i] } else { Right }
+    let rule = if i < rules.length() { rules[i] } else { "" }
     if id_of(k) == id {
       match f(k) {
         Some(n) => {
           out.push(n)
           out_sides.push(side)
+          out_rules.push(rule)
         }
         None => ()
       }
     } else {
-      let (kk, _) = morph_kids(children_of(k), [], id, f)
+      let (kk, _, _) = morph_kids(children_of(k), [], [], id, f)
       if k is ImplicitNode(_) && kk.is_empty() {
         continue
       }
       out.push(with_children(k, kk))
       out_sides.push(side)
+      out_rules.push(rule)
     }
   }
-  (out, out_sides)
+  (out, out_sides, out_rules)
 }
 
 ///|
-fn fit(sides : Array[Side], node : Node) -> Array[Side] {
+/// 子と並走する列を、子の数に合わせて切り詰める・伸ばす。
+fn[T] fit(xs : Array[T], node : Node, pad : T) -> Array[T] {
   let n = children_of(node).length()
-  Array::makei(n, i => if i < sides.length() { sides[i] } else { Right })
+  Array::makei(n, i => if i < xs.length() { xs[i] } else { pad })
 }
 
 ///|
@@ -269,11 +311,13 @@ fn law(
   after : Doc,
   what : String,
 ) -> Array[Edit] raise {
-  let edits = merge(md, before, spans, after)
+  let { edits, same, } = merge(md, before, spans, after)
   let out = apply(md, edits)
   guard shape(parse(out)) == shape(after) else {
     fail("\{what}: 形が違う\n--- md\n\{md}\n--- out\n\{out}")
   }
+  // 合流の答えは、ここで測り直した形の一致そのもの
+  guard same else { fail("\{what}: 合流が形の一致を否と言う") }
   let mut last = 0
   for e in edits {
     guard e.from >= last && e.to >= e.from else {
@@ -338,7 +382,7 @@ test "法則 — 根を足す・消す" {
     let (before, spans) = survey(md)
     let more : Doc = {
       ..before,
-      roots: before.roots + [{ node: newborn(false), sides: [], }],
+      roots: before.roots + [{ node: newborn(false), sides: [], rules: [], }],
     }
     ignore(law(md, before, spans, more, "add root to \{md}"))
     if !before.roots.is_empty() {

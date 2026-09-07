@@ -28,6 +28,8 @@ pub(all) enum Flaw {
   GappedItem(Int)
   /// 深さ 7 以上の見出し。`#` は `deepest` 本までで、7 本目からは段落に読まれる
   TooDeep(Int)
+  /// 深さ 3 以上で名前に改行。setext は深さ 2 までしか無く、ATX は 1 行しか持てない
+  DeepSetext(Int)
 } derive(Eq, ToJson)
 
 ///|
@@ -57,7 +59,7 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   let border : Ref[Int?] = { val: None, }
   fn trailing(bs : Array[Block]) -> Int? {
     match bs.last() {
-      Some({ id, content: ThematicBreak, }) => Some(id)
+      Some({ id, content: ThematicBreak, .. }) => Some(id)
       _ => None
     }
   }
@@ -99,6 +101,9 @@ pub fn check(doc : Doc) -> Array[Flaw] {
           id(h.id)
           if depth > deepest {
             flaws.push(TooDeep(h.id))
+          }
+          if depth > 2 && h.label.contains("\n") {
+            flaws.push(DeepSetext(h.id))
           }
           blocks(h.body)
           border.val = trailing(h.body)

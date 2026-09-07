@@ -1021,7 +1021,11 @@ test "Graft の一番外 — 段落は行ごとにノード、中身は親の bo
         root(
           h(2, "r", body=[
             pic(3),
-            { id: 4, content: Image(alt="", src="q.png", title=""), },
+            {
+              id: 4,
+              source: Some("![](q.png)"),
+              content: Image(alt="", src="q.png", title=""),
+            },
           ]),
         ),
       ]),
@@ -1038,6 +1042,7 @@ test "Graft の一番外 — 段落は行ごとにノード、中身は親の bo
             pic(3),
             {
               id: 4,
+              source: Some("https://x"),
               content: Link(text="https://x", href="https://x", title=""),
             },
           ]),
@@ -1071,7 +1076,9 @@ test "Graft の一番外 — 段落は行ごとにノード、中身は親の bo
         root(
           h(2, "r", body=[pic(3)], children=[
             h(4, "intro"),
-            h(6, "a", body=[pic(7)], children=[h(8, "b")]),
+            h(6, "a", body=[pic(7, source=Some("![](p.png)"))], children=[
+              h(8, "b"),
+            ]),
           ]),
           sides=[Right, Right],
         ),

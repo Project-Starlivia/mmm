@@ -6,7 +6,6 @@
 ///|
 test "直後が見出しなら境界。側が裏返る" {
   json_inspect(parse("# r\n\n## a\n\n---\n\n## b\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -16,19 +15,36 @@ test "直後が見出しなら境界。側が裏返る" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
-                { "id": 3, "label": "a", "body": [], "children": [] },
+                {
+                  "id": 3,
+                  "label": "a",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
               [
                 "HeadingNode",
-                { "id": 4, "label": "b", "body": [], "children": [] },
+                {
+                  "id": 4,
+                  "label": "b",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
             ],
           },
         ],
         "sides": ["Right", "Left"],
+        "rules": ["", "---"],
       },
     ],
   })
@@ -37,7 +53,6 @@ test "直後が見出しなら境界。側が裏返る" {
 ///|
 test "先頭に置けば最初の子から左になる" {
   json_inspect(parse("# r\n\n---\n\n## a\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -47,15 +62,25 @@ test "先頭に置けば最初の子から左になる" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
-                { "id": 3, "label": "a", "body": [], "children": [] },
+                {
+                  "id": 3,
+                  "label": "a",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
             ],
           },
         ],
         "sides": ["Left"],
+        "rules": ["---"],
       },
     ],
   })
@@ -66,7 +91,6 @@ test "先頭に置けば最初の子から左になる" {
 /// 見出しは絶対座標で動かせないので、足りない深さを Implicit が埋める。
 test "深い見出しは Implicit を挟んで深さ 2 へ" {
   json_inspect(parse("# r\n\n## a\n\n---\n\n### x\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -76,10 +100,19 @@ test "深い見出しは Implicit を挟んで深さ 2 へ" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
-                { "id": 3, "label": "a", "body": [], "children": [] },
+                {
+                  "id": 3,
+                  "label": "a",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
               [
                 "ImplicitNode",
@@ -88,7 +121,14 @@ test "深い見出しは Implicit を挟んで深さ 2 へ" {
                   "children": [
                     [
                       "HeadingNode",
-                      { "id": 5, "label": "x", "body": [], "children": [] },
+                      {
+                        "id": 5,
+                        "label": "x",
+                        "body": [],
+                        "setext": false,
+                        "closing": 0,
+                        "children": [],
+                      },
                     ],
                   ],
                 },
@@ -97,6 +137,7 @@ test "深い見出しは Implicit を挟んで深さ 2 へ" {
           },
         ],
         "sides": ["Right", "Left"],
+        "rules": ["", "---"],
       },
     ],
   })
@@ -106,7 +147,6 @@ test "深い見出しは Implicit を挟んで深さ 2 へ" {
 /// 項目は相対記法で深さが導出値なので、深さ 2 に直接置き直せる。
 test "項目は Implicit を挟まず深さ 2 へ" {
   json_inspect(parse("# r\n\n## a\n\n---\n\n- b\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -116,19 +156,37 @@ test "項目は Implicit を挟まず深さ 2 へ" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
-                { "id": 3, "label": "a", "body": [], "children": [] },
+                {
+                  "id": 3,
+                  "label": "a",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
               [
                 "ListNode",
-                { "id": 4, "label": "b", "body": [], "children": [] },
+                {
+                  "id": 4,
+                  "label": "b",
+                  "body": [],
+                  "marker": "-",
+                  "offset": 2,
+                  "loose": false,
+                  "children": [],
+                },
               ],
             ],
           },
         ],
         "sides": ["Right", "Left"],
+        "rules": ["", "---"],
       },
     ],
   })
@@ -140,7 +198,6 @@ test "見出しと項目が交互に並ぶ" {
   json_inspect(
     parse("# root\n\n---\n\n## h1\n\n---\n\n* i1\n\n---\n\n## h2\n"),
     content={
-      "eol": "Lf",
       "body": [],
       "roots": [
         {
@@ -150,23 +207,48 @@ test "見出しと項目が交互に並ぶ" {
               "id": 2,
               "label": "root",
               "body": [],
+              "setext": false,
+              "closing": 0,
               "children": [
                 [
                   "HeadingNode",
-                  { "id": 3, "label": "h1", "body": [], "children": [] },
+                  {
+                    "id": 3,
+                    "label": "h1",
+                    "body": [],
+                    "setext": false,
+                    "closing": 0,
+                    "children": [],
+                  },
                 ],
                 [
                   "ListNode",
-                  { "id": 4, "label": "i1", "body": [], "children": [] },
+                  {
+                    "id": 4,
+                    "label": "i1",
+                    "body": [],
+                    "marker": "*",
+                    "offset": 2,
+                    "loose": false,
+                    "children": [],
+                  },
                 ],
                 [
                   "HeadingNode",
-                  { "id": 5, "label": "h2", "body": [], "children": [] },
+                  {
+                    "id": 5,
+                    "label": "h2",
+                    "body": [],
+                    "setext": false,
+                    "closing": 0,
+                    "children": [],
+                  },
                 ],
               ],
             },
           ],
           "sides": ["Left", "Right", "Left"],
+          "rules": ["---", "---", "---"],
         },
       ],
     },
@@ -177,7 +259,6 @@ test "見出しと項目が交互に並ぶ" {
 /// 兄弟の間でも同じ。y は x の一部ではないので引き出される。
 test "兄弟の間の水平線も引き出す" {
   json_inspect(parse("# r\n\n## a\n\n### x\n\n---\n\n### y\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -187,6 +268,8 @@ test "兄弟の間の水平線も引き出す" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
@@ -194,10 +277,19 @@ test "兄弟の間の水平線も引き出す" {
                   "id": 3,
                   "label": "a",
                   "body": [],
+                  "setext": false,
+                  "closing": 0,
                   "children": [
                     [
                       "HeadingNode",
-                      { "id": 4, "label": "x", "body": [], "children": [] },
+                      {
+                        "id": 4,
+                        "label": "x",
+                        "body": [],
+                        "setext": false,
+                        "closing": 0,
+                        "children": [],
+                      },
                     ],
                   ],
                 },
@@ -209,7 +301,14 @@ test "兄弟の間の水平線も引き出す" {
                   "children": [
                     [
                       "HeadingNode",
-                      { "id": 6, "label": "y", "body": [], "children": [] },
+                      {
+                        "id": 6,
+                        "label": "y",
+                        "body": [],
+                        "setext": false,
+                        "closing": 0,
+                        "children": [],
+                      },
                     ],
                   ],
                 },
@@ -218,6 +317,7 @@ test "兄弟の間の水平線も引き出す" {
           },
         ],
         "sides": ["Right", "Left"],
+        "rules": ["", "---"],
       },
     ],
   })
@@ -227,7 +327,6 @@ test "兄弟の間の水平線も引き出す" {
 /// 直後が中身なら境界になれない。**書かれた場所にそのまま残る。**
 test "中身に挟まれた水平線は装飾" {
   json_inspect(parse("# a\n\nbody\n\n---\n\nbody\n\n## b\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -237,19 +336,29 @@ test "中身に挟まれた水平線は装飾" {
             "id": 2,
             "label": "a",
             "body": [
-              { "id": 3, "content": ["Raw", "body"] },
-              { "id": 4, "content": "ThematicBreak" },
-              { "id": 5, "content": ["Raw", "body"] },
+              { "id": 3, "content": ["Raw", "body"], "source": "body" },
+              { "id": 4, "content": "ThematicBreak", "source": "---" },
+              { "id": 5, "content": ["Raw", "body"], "source": "body" },
             ],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
-                { "id": 6, "label": "b", "body": [], "children": [] },
+                {
+                  "id": 6,
+                  "label": "b",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
             ],
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -259,7 +368,6 @@ test "中身に挟まれた水平線は装飾" {
 /// 直前の中身を消すと、同じ線が境界に昇格する。md 自身の性質。
 test "直前が中身でも、直後が見出しなら境界" {
   json_inspect(parse("# a\n\nbody\n\n---\n\n## b\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -268,16 +376,26 @@ test "直前が中身でも、直後が見出しなら境界" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Raw", "body"] }],
+            "body": [{ "id": 3, "content": ["Raw", "body"], "source": "body" }],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
-                { "id": 4, "label": "b", "body": [], "children": [] },
+                {
+                  "id": 4,
+                  "label": "b",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
             ],
           },
         ],
         "sides": ["Left"],
+        "rules": ["---"],
       },
     ],
   })
@@ -287,7 +405,6 @@ test "直前が中身でも、直後が見出しなら境界" {
 /// 連続していても境界は 1 つ。最初の 1 本は直後が水平線なので装飾に落ちる。
 test "本数に意味は無い" {
   json_inspect(parse("# r\n\n## a\n\n---\n\n---\n\n## b\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -297,19 +414,36 @@ test "本数に意味は無い" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
-                { "id": 3, "label": "a", "body": [], "children": [] },
+                {
+                  "id": 3,
+                  "label": "a",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
               [
                 "HeadingNode",
-                { "id": 4, "label": "b", "body": [], "children": [] },
+                {
+                  "id": 4,
+                  "label": "b",
+                  "body": [],
+                  "setext": false,
+                  "closing": 0,
+                  "children": [],
+                },
               ],
             ],
           },
         ],
         "sides": ["Right", "Left"],
+        "rules": ["", "---"],
       },
     ],
   })
@@ -318,7 +452,6 @@ test "本数に意味は無い" {
 ///|
 test "文末の水平線は装飾" {
   json_inspect(parse("# r\n\n## a\n\n---\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -328,13 +461,19 @@ test "文末の水平線は装飾" {
             "id": 2,
             "label": "r",
             "body": [],
+            "setext": false,
+            "closing": 0,
             "children": [
               [
                 "HeadingNode",
                 {
                   "id": 3,
                   "label": "a",
-                  "body": [{ "id": 4, "content": "ThematicBreak" }],
+                  "body": [
+                    { "id": 4, "content": "ThematicBreak", "source": "---" },
+                  ],
+                  "setext": false,
+                  "closing": 0,
                   "children": [],
                 },
               ],
@@ -342,6 +481,7 @@ test "文末の水平線は装飾" {
           },
         ],
         "sides": ["Right"],
+        "rules": [""],
       },
     ],
   })
@@ -351,7 +491,6 @@ test "文末の水平線は装飾" {
 /// 根は側を持たないので、引き出す先が無い。
 test "根の直前の水平線は装飾" {
   json_inspect(parse("# r\n\n---\n\n# s\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -360,18 +499,29 @@ test "根の直前の水平線は装飾" {
           {
             "id": 2,
             "label": "r",
-            "body": [{ "id": 3, "content": "ThematicBreak" }],
+            "body": [{ "id": 3, "content": "ThematicBreak", "source": "---" }],
+            "setext": false,
+            "closing": 0,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
       {
         "node": [
           "HeadingNode",
-          { "id": 4, "label": "s", "body": [], "children": [] },
+          {
+            "id": 4,
+            "label": "s",
+            "body": [],
+            "setext": false,
+            "closing": 0,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
@@ -380,29 +530,42 @@ test "根の直前の水平線は装飾" {
 ///|
 test "最初の見出しより前の水平線は文書の中身" {
   json_inspect(parse("body\n\n---\n\n# a\n"), content={
-    "eol": "Lf",
     "body": [
-      { "id": 2, "content": ["Raw", "body"] },
-      { "id": 3, "content": "ThematicBreak" },
+      { "id": 2, "content": ["Raw", "body"], "source": "body" },
+      { "id": 3, "content": "ThematicBreak", "source": "---" },
     ],
     "roots": [
       {
         "node": [
           "HeadingNode",
-          { "id": 4, "label": "a", "body": [], "children": [] },
+          {
+            "id": 4,
+            "label": "a",
+            "body": [],
+            "setext": false,
+            "closing": 0,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })
 }
 
 ///|
-/// `***` も `___` も同じ意味。記法で差別しない。
-test "記法は差別しない" {
+/// `***` も `___` も同じ意味。記法で差別しないが、**読んだ綴りは残る**（`rules`）。
+test "記法は差別しない — 形は同じで、綴りだけ残る" {
   let dash = parse("# r\n\n---\n\n## a\n")
-  assert_eq(dash, parse("# r\n\n***\n\n## a\n"))
-  assert_eq(dash, parse("# r\n\n___\n\n## a\n"))
+  let star = parse("# r\n\n***\n\n## a\n")
+  let under = parse("# r\n\n___\n\n## a\n")
+  assert_eq(shape(dash), shape(star))
+  assert_eq(shape(dash), shape(under))
+  json_inspect(
+    [dash.roots[0].rules, star.roots[0].rules, under.roots[0].rules],
+    content=[["---"], ["***"], ["___"]],
+  )
 }
 
 ///|
@@ -411,7 +574,6 @@ test "記法は差別しない" {
 /// 帰る場所が無くなって文書へ落ちる。
 test "項目の中の水平線は、後ろが見出しでも項目の中身" {
   json_inspect(parse("- a\n\n  ---\n\n# h\n"), content={
-    "eol": "Lf",
     "body": [],
     "roots": [
       {
@@ -420,18 +582,30 @@ test "項目の中の水平線は、後ろが見出しでも項目の中身" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": "ThematicBreak" }],
+            "body": [{ "id": 3, "content": "ThematicBreak", "source": "---" }],
+            "marker": "-",
+            "offset": 2,
+            "loose": false,
             "children": [],
           },
         ],
         "sides": [],
+        "rules": [],
       },
       {
         "node": [
           "HeadingNode",
-          { "id": 4, "label": "h", "body": [], "children": [] },
+          {
+            "id": 4,
+            "label": "h",
+            "body": [],
+            "setext": false,
+            "closing": 0,
+            "children": [],
+          },
         ],
         "sides": [],
+        "rules": [],
       },
     ],
   })

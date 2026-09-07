@@ -3,9 +3,9 @@
 //
 //   (before, spans) = survey(md)
 //   done            = apply(before, op)           None なら編集は無い
-//   edits           = merge(md, before, spans, done.doc)
+//   merged          = merge(md, before, spans, done.doc)
 //   focus           = done.focus を、読み直したときの番号に読み替える
-//                     読み直した形が操作の後の木と合えば。合わなければ無い
+//                     合流が形の一致を言えば。言わなければ無い
 
 ///|
 /// 操作を md に映した結果。edits は CodeMirror の changes の形。
@@ -21,11 +21,10 @@ pub fn edit(md : String, op : Op) -> Edited {
   let (before, spans) = @tree.survey(md)
   match apply(before, op) {
     Some(done) => {
-      let edits = @tree.merge(md, before, spans, done.doc)
       // 書いた md を読み直して形が合わなければ focus は無い — focus は文書順の
-      // 番号なので、形がずれたまま返すと別のノードを指す（`- ---` が水平線になる等）
-      let same = @tree.shape(@tree.parse(@tree.apply(md, edits))) ==
-        @tree.shape(done.doc)
+      // 番号なので、形がずれたまま返すと別のノードを指す（`- ---` が水平線になる等）。
+      // 読み直しは合流がもう済ませているので、答え（same）をそのまま貰う
+      let { edits, same, } = @tree.merge(md, before, spans, done.doc)
       let focus = if same {
         done.focus.bind(id => @tree.number(done.doc, id))
       } else {

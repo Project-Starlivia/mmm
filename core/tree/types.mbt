@@ -11,7 +11,6 @@
 pub(all) struct Doc {
   /// frontmatter の原文。無ければ None
   frontmatter : String?
-  eol : Eol
   /// 最初の骨格より前の中身
   body : Array[Block]
   roots : Array[Root]
@@ -21,10 +20,13 @@ pub(all) struct Doc {
 /// 木 1 本。**側を持つ唯一の型**で、根の子と 1 対 1 に並ぶ。
 /// 組にせず並走させているのは、`children` を全部の深さで `Array[Node]` の
 /// まま保つため（深さで型が変わると走査も操作も割れる）。
-/// 長さが揃うことは型では言えないので check が見る。
+/// `sides` の長さが揃うことは型では言えないので check が見る。
 pub(all) struct Root {
   node : Node
   sides : Array[Side]
+  /// 側を変えた行の原文。`sides` と並走し、無い所は空。**書き戻すためだけの欄**で、
+  /// 短くても足りない所は `---` になるだけなので check は見ない
+  rules : Array[String]
 } derive(Eq, Debug, ToJson)
 
 ///|
@@ -56,6 +58,11 @@ pub(all) struct HeadingNode {
   /// `<details>` がこのノードの定義ごと包んでいた
   fold : Fold?
   body : Array[Block]
+  /// 読んだ書き方。新しく作るときは ATX で閉じ無し。
+  /// setext（`a` の次の行が `===`）は深さ 1〜2 でだけ書ける
+  setext : Bool
+  /// 読んだ閉じの `#` の本数（`# a ##` なら 2）。飾りなので 0 は付けない
+  closing : Int
   children : Array[Node]
 } derive(Eq, Debug, ToJson)
 
@@ -67,6 +74,14 @@ pub(all) struct ListNode {
   label : String
   fold : Fold?
   body : Array[Block]
+  /// 読んだマーカー（`-` `*` `+`、または `3.` `3)` — 数字ごと）。
+  /// 新しく作るときは `-`、席が変われば隣に従う
+  marker : String
+  /// 読んだラベルの桁（マーカーの頭からラベルの頭まで）。中身と入れ子もこの桁に座る。
+  /// 新しく作るときは 2（`- `）
+  offset : Int
+  /// 読んだ列が loose だった（項目の間に空行）。新しく作るときは詰める
+  loose : Bool
   children : Array[ListNode]
 } derive(Eq, Debug, ToJson)
 
@@ -92,18 +107,19 @@ pub(all) enum Side {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
-/// 原文の改行の流儀。保存して書き戻す。
-pub(all) enum Eol {
-  Lf
-  Crlf
-} derive(Eq, Debug, ToJson)
-
-///|
 /// ノードにぶら下がる中身 1 枚。**id はノードと同じ列**（文書順の通し番号）。
 /// ノードも中身も同じ番号で引き当てるので、操作も選択も型が割れない。
 pub(all) struct Block {
   id : Int
   content : Content
+  /// 読んだ原文（字下げを剥いだ塊の字）。**書き戻しはこれを返す。** 操作が作った
+  /// 中身は None で、そのときだけ種類ごとに綴る。決めは
+  /// docs/superpowers/specs/2026-09-06-verbatim-design.md
+  ///
+  /// **`content` の `Raw`（読み解かない中身の種類）とは軸が違う。**
+  /// `Raw` は中身の種類の 1 つ、`source` は字がどこから来たかで、
+  /// 読んだ中身なら種類によらず持つ
+  source : String?
 } derive(Eq, Debug, ToJson)
 
 ///|

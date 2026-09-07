@@ -4,10 +4,13 @@
 // 読みも書きも「ライブラリ」と「方言」の直列:
 //
 //   read(md)   = @markdown.parse(md) |> dialect(md)      mdAst → mmm の方言の mdAst
-//   write(ast) = @markdown.serialize(ast) |> spell     字 → mmm の綴り
+//   write(ast) = @markdown.serialize(ast)
 //
 // 方言はライブラリの癖を mmm の決めに揃える所で、build / content / fold / merge は
-// 方言の mdAst だけを見る。癖の一覧は docs/core.md「方言」。
+// 方言の mdAst だけを見る。癖の一覧は docs/core.md「方言」。書く側に方言は要らない
+// — 読んだ原文は生の塊で渡すので、ライブラリが綴るのは並びと字下げだけ。
+// 例外は項目の列（unbuild.mbt）— マーカー・ラベルの桁・詰めをライブラリの書き手が
+// 読まないので、そこだけ mmm が組んだ字を生の塊で渡す。
 //
 // 自前で書かないのは、ブロック規則を手で写すと間違いを照合する相手が
 // 居なくなるから。旧 core はそれで往復を壊していた（字下げ行を段落と読み、
@@ -291,15 +294,16 @@ fn after_newline(md : String, at : Int) -> Int {
 }
 
 ///|
-/// 木 → 正規形の md。mdAst に戻す（unbuild.mbt）のが我々の仕事で、
-/// 綴り（字下げ・フェンス・空行・エスケープ）はライブラリの仕事。
+/// 木 → 正規形の md。mdAst に戻す（unbuild.mbt）のが我々の仕事で、綴りは木が持つ
+/// 読んだ字（`source` / `rules` / `marker` / `offset` / `loose` / `setext`）から出る。
+/// ライブラリがやるのはブロックの並べ方と字下げだけ。
 pub fn serialize(doc : Doc) -> String {
-  let body = write(unbuild({ ..doc, frontmatter: None, }), doc.eol)
+  let body = write(unbuild({ ..doc, frontmatter: None, }))
   match doc.frontmatter {
     None => body
     // frontmatter と本文の間は空行 1 つ。読みは frontmatter の後ろの空行を落とすので、書く側で置く
     // （置かないと、合流の base が「頭の要素に隙間は無い」と言って原文の空行を消す）
-    Some(raw) => newline("---\n" + raw + "---\n\n", doc.eol) + body
+    Some(raw) => "---\n" + raw + "---\n\n" + body
   }
 }
 
@@ -309,92 +313,21 @@ pub fn fragment(
   x : Node,
   depth : Int,
   sides : Array[Side],
-  eol : Eol,
+  rules : Array[String],
 ) -> String {
-  write(unbuild_node(x, depth, sides), eol)
+  write(unbuild_node(x, depth, sides, rules))
 }
 
 ///|
 /// 散文 → 正規形の md。文書の頭（最初の骨格より前）の断片。
-pub fn prose(body : Array[Block], eol : Eol) -> String {
-  write(unbuild_prose(body), eol)
+pub fn prose(body : Array[Block]) -> String {
+  write(unbuild_prose(body))
 }
 
 ///|
-/// mdAst → md。ライブラリが LF で書いた字を mmm の綴りに直し、文書の改行の流儀に揃える。
-fn write(ast : @markdown.Document, eol : Eol) -> String {
-  newline(spell(@markdown.serialize(ast)), eol)
-}
-
-///|
-/// 書きの綴り。**書いた字を読み直して当てる** — span で当てるので、コードの中の
-/// 同じ字は触らない。
-///
-/// - 区切り線は `---`。ライブラリは marker に関わらず `***` と書く。同じ長さなので
-///   置き換えても span はずれない。**段落の直後に立つ線だけは `***` のまま** — そこに
-///   `---` を置くと setext 見出しの下線になる（引用と詰まった項目の中でライブラリが
-///   空行を落とすとき）
-fn spell(md : String) -> String {
-  let rules : Array[@markdown.Span] = []
-  fn rule(b : @markdown.Block) {
-    match b {
-      ThematicBreak(span~, ..) => if alone(md, span.from) { rules.push(span) }
-      BulletList(items~, ..) | OrderedList(items~, ..) =>
-        for it in items {
-          for c in it.children {
-            rule(c)
-          }
-        }
-      Blockquote(children~, ..)
-      | Alert(children~, ..)
-      | Directive(children~, ..)
-      | FootnoteDefinition(children~, ..) =>
-        for c in children {
-          rule(c)
-        }
-      Attributed(block~, ..) => rule(block)
-      _ => ()
-    }
-  }
-
-  for b in @markdown.parse(md).document.children {
-    rule(b)
-  }
-  // 区切り線の span の中の `*` は marker だけ（同じ長さの `-` に）
-  let sb = StringBuilder()
-  let mut at = 0
-  for s in rules {
-    sb.write_string(slice(md, at, s.from))
-    sb.write_string(slice(md, s.from, s.to).replace_all(old="*", new="-"))
-    at = s.to
-  }
-  sb.write_string(slice(md, at, md.length()))
-  sb.to_string()
-}
-
-///|
-/// その行の直前の行が空か（容器の前置き `>` と空白だけか）。文書の頭も空。
-fn alone(md : String, at : Int) -> Bool {
-  let head = line_start(md, at)
-  if head == 0 {
-    return true
-  }
-  let prev = line_start(md, head - 1)
-  for k in prev..<(head - 1) {
-    if md[k] != ' ' && md[k] != '\t' && md[k] != '>' {
-      return false
-    }
-  }
-  true
-}
-
-///|
-/// LF で組んだ字を、文書の改行の流儀に。
-fn newline(md : String, eol : Eol) -> String {
-  match eol {
-    Lf => md
-    Crlf => md.replace_all(old="\n", new="\r\n")
-  }
+/// mdAst → md。**改行は LF だけ**（spec「文字コードと改行」）。
+fn write(ast : @markdown.Document) -> String {
+  @markdown.serialize(ast)
 }
 
 ///|

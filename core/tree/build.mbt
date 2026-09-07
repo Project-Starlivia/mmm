@@ -14,6 +14,8 @@ priv struct Frame {
   kids : Array[Frame]
   /// 深さ 2 の枠だけが持つ。深い所の側は型に存在しない
   mut side : Side
+  /// 自分の手前で側を変えた水平線の原文。変えていなければ空
+  mut rule : String
   /// 文書順の番号。形を割り付ける前に振るので、割り付けが順序を動かしても動かない
   mut id : Int
   /// 原文の範囲（地番）。骨格の行の頭から、自分の最後の中身の尻まで。
@@ -32,7 +34,19 @@ priv struct Frame {
 priv enum Notation {
   /// 記法が無い。深さの飛びがそれを言う
   Gap
-  Line(sign~ : Sign, label~ : String, fold~ : Fold?, body~ : Array[Block])
+  Line(
+    sign~ : Sign,
+    label~ : String,
+    fold~ : Fold?,
+    body~ : Array[Block],
+    /// 見出しの行の書き方。項目には無い綴りなので `false` / `0`
+    setext~ : Bool,
+    closing~ : Int,
+    /// 項目の行の書き方。見出しには無い綴りなので `-` / 2 / false
+    marker~ : String,
+    offset~ : Int,
+    loose~ : Bool
+  )
 }
 
 ///|
@@ -116,11 +130,6 @@ pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
   }
   let doc : Doc = {
     frontmatter: ast.frontmatter.map(f => f.raw),
-    eol: if b.md.contains("\r\n") {
-      Crlf
-    } else {
-      Lf
-    },
     body: b.body,
     roots: roots.map(to_root),
   }
@@ -308,11 +317,17 @@ fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
     Capsule(text~, open~, summary~, body~, from~, to~) => {
       // 中身が来たので、保留中の水平線は境界になれない
       spill(b)
-      fill(b, Details(text~, open~, summary~, body~), from~, to~)
+      fill(
+        b,
+        Details(text~, open~, summary~, body~),
+        from~,
+        to~,
+        source=Some(text),
+      )
     }
     Text(text, from~, to~) => {
       spill(b)
-      fill(b, Raw(text), from~, to~)
+      fill(b, Raw(text), from~, to~, source=Some(text))
     }
   }
 }
@@ -326,7 +341,7 @@ fn take(
   fold? : Fold? = None,
 ) -> Unit {
   match block {
-    Heading(level~, style~, children~, span~, ..) => {
+    Heading(level~, style~, children~, closing_hashes~, span~, ..) => {
       let (sign, depth) : (Sign, Int) = if nest > 0 {
         // **項目の中身は文書と同じ規則で読む。** 中の見出しは項目の子（型が「項目の
         // 子孫は項目」なので綴りは項目）。`#` の本数は入れ子の相対だけを決め、飛びは
@@ -343,10 +358,23 @@ fn take(
       } else {
         (Heading, level)
       }
+      // 行の書き方は見出しの綴りにしか無い。項目に読み替えた見出しは `- a` に
+      // なるので、setext も閉じの `#` も持ち越さない
+      let head = sign is Heading
       put(
         b,
         depth,
-        Line(sign~, label=head_label(b.md, span, style, children), fold~, body=[]),
+        Line(
+          sign~,
+          label=head_label(b.md, span, style, children),
+          fold~,
+          body=[],
+          setext=head && style is Setext,
+          closing=if head { closing_hashes } else { 0 },
+          marker="-",
+          offset=2,
+          loose=false,
+        ),
         at=span,
         label=head_start(b.md, span, style),
       )
@@ -357,7 +385,13 @@ fn take(
     // 保留せずその場に置く（保留すると、置く前に項目の枠が閉じられたとき
     // 帰る場所が無くなって文書へ落ちる）
     ThematicBreak(span~, ..) if nest > 0 =>
-      fill(b, ThematicBreak, from=span.from, to=span.to)
+      fill(
+        b,
+        ThematicBreak,
+        from=span.from,
+        to=span.to,
+        source=Some(carve(b.md, span.from, span.to)),
+      )
     // 記法(`---` `***` `___`)も本数も差別しない。意味は常に「隣を区切る」で、
     // 行き先は**直後のブロックが何か**で決まる。ここでは保留するだけ
     ThematicBreak(span~, ..) => {
@@ -371,7 +405,7 @@ fn take(
           // 中身が来た時点で、保留中の水平線は境界になれない
           spill(b)
           let s = block_span(block)
-          fill(b, c, from=s.from, to=s.to)
+          fill(b, c, from=s.from, to=s.to, source=Some(verbatim(b.md, block)))
         }
         None => ()
       }
@@ -386,13 +420,14 @@ fn items_take(
   nest : Int,
   fold? : Fold? = None,
 ) -> Unit {
+  let loose = item_gaps(b.md, items)
   // **項目の深さは、この列が座る枠の 1 つ下。** 入れ子の段数や `#` の数から
   // 数え直すと、境界が手前の項目を深さ 2 へ引き出したときに元の位置から
   // 数えてしまい、間に綴られていない項目が生える（項目は相対記法なので
   // 飛びは存在しない）。列に入る前に 1 度だけ測る — 中で測ると前の兄弟を
   // 積んだぶんずれる
   let mut level = if nest == 0 { spine(b) + 1 } else { b.owner + 1 }
-  for it in items {
+  for i, it in items {
     // **ラベルは項目の 1 行目。** 途中の段落を引き上げると、その文字が
     // ラベルと中身の両方になる（切り出しはブロックの範囲でやるので、抜いたはずの
     // 段落が切り出しの内側に入る）。1 行目が段落でなければラベルは無い
@@ -415,7 +450,17 @@ fn items_take(
     put(
       b,
       level,
-      Line(sign=Item, label~, fold~, body=[]),
+      Line(
+        sign=Item,
+        label~,
+        fold~,
+        body=[],
+        setext=false,
+        closing=0,
+        marker=item_marker(b.md, it.span),
+        offset=it.content_offset,
+        loose=loose[i],
+      ),
       at=it.span,
       label=label_at,
     )
@@ -506,6 +551,7 @@ fn put(
       skel: Gap,
       kids: [],
       side: Right,
+      rule: "",
       id: 0,
       from: -1,
       to: -1,
@@ -525,6 +571,7 @@ fn put(
     skel,
     kids: [],
     side: Right,
+    rule: "",
     id: 0,
     from: at.from,
     to: at.to,
@@ -560,6 +607,8 @@ fn seat(b : Build, f : Frame) -> Unit {
   }
   if b.stack.length() == 1 {
     if b.pend {
+      // 境界になった水平線。書き戻しに要るのは綴りだけなので原文を控える
+      f.rule = carve(b.md, b.pend_from, b.pend_to)
       b.side = flipped(b.side)
       b.pend = false
     }
@@ -583,7 +632,13 @@ fn flipped(s : Side) -> Side {
 fn spill(b : Build) -> Unit {
   if b.pend {
     b.pend = false
-    fill(b, ThematicBreak, from=b.pend_from, to=b.pend_to)
+    fill(
+      b,
+      ThematicBreak,
+      from=b.pend_from,
+      to=b.pend_to,
+      source=Some(carve(b.md, b.pend_from, b.pend_to)),
+    )
   }
 }
 
@@ -668,9 +723,43 @@ fn head_start(
 }
 
 ///|
-/// 項目のラベルの頭。マーカー（`-` `*` `+`、または数字と `.` `)`）と空白を読み飛ばす。
+/// 項目のラベルの頭。マーカーと空白を読み飛ばす。
 /// 1 行目が段落ならその span の頭と一致する。段落の無い項目のために持つ。
 fn item_start(md : String, span : @markdown.Span) -> Int {
+  skip_blank(md, marker_end(md, span), span.to)
+}
+
+///|
+/// 列の詰め — 項目ごとに、手前の項目との間に空行が有るか。
+///
+/// **ライブラリの `tight` では測れない。** CommonMark の `tight` は列のどこかに
+/// 空行があれば偽なので、項目 1 つの中の空行でも列ぜんぶが loose になる。それで
+/// 書き戻すと、空行が項目と項目の**間**へ移る（触っていない字が変わり、冪等でもない）。
+/// 隙間は原文から測る。
+///
+/// 列の頭の隙間は列の手前のもの（その項目のものではない）ので、2 つ目に従う。
+/// 項目が 1 つだけなら間が無いので詰まっている。
+fn item_gaps(md : String, items : Array[@markdown.ListItem]) -> Array[Bool] {
+  let out = Array::makei(items.length(), i => {
+    let head = line_start(md, items[i].span.from)
+    i > 0 && blank_start(md, head) < head
+  })
+  if out.length() > 1 {
+    out[0] = out[1]
+  }
+  out
+}
+
+///|
+/// 項目のマーカーの字。**読んだ綴りをそのまま持つ** — 番号はライブラリが
+/// 列の先頭から振り直すので、飛んだ数字（`1.` の次が `5.`）は原文からしか取れない。
+fn item_marker(md : String, span : @markdown.Span) -> String {
+  carve(md, skip_blank(md, span.from, span.to), marker_end(md, span))
+}
+
+///|
+/// 項目のマーカーの尻。`-` `*` `+` か、数字と `.` `)`。
+fn marker_end(md : String, span : @markdown.Span) -> Int {
   let mut p = skip_blank(md, span.from, span.to)
   while p < span.to && md[p] >= '0' && md[p] <= '9' {
     p = p + 1
@@ -685,7 +774,7 @@ fn item_start(md : String, span : @markdown.Span) -> Int {
     ) {
     p = p + 1
   }
-  skip_blank(md, p, span.to)
+  p
 }
 
 ///|
@@ -802,15 +891,19 @@ pub fn number(doc : Doc, id : Int) -> Int? {
 /// 振るので、View が Raw を落としても残りの番号は動かない。
 fn number_blocks(body : Array[Block], next : Counter) -> Unit {
   for i, x in body {
-    body[i] = { id: next.val, content: x.content, }
+    body[i] = { id: next.val, content: x.content, source: x.source, }
     next.val = next.val + 1
   }
 }
 
 ///|
-/// 森の 1 本を根にする。子の側は積むときに決まっている。
+/// 森の 1 本を根にする。子の側と境界の綴りは積むときに決まっている。
 fn to_root(f : Frame) -> Root {
-  { node: to_node(f), sides: f.kids.map(k => k.side), }
+  {
+    node: to_node(f),
+    sides: f.kids.map(k => k.side),
+    rules: f.kids.map(k => k.rule),
+  }
 }
 
 ///|
@@ -818,14 +911,25 @@ fn to_root(f : Frame) -> Root {
 fn to_node(f : Frame) -> Node {
   match f.skel {
     Gap => ImplicitNode({ id: f.id, children: f.kids.map(to_node), })
-    Line(sign=Item, label~, fold~, body~) =>
-      ListNode({ id: f.id, label, fold, body, children: f.kids.map(to_list), })
-    Line(label~, fold~, body~, ..) =>
+    Line(sign=Item, label~, fold~, body~, marker~, offset~, loose~, ..) =>
+      ListNode({
+        id: f.id,
+        label,
+        fold,
+        body,
+        marker,
+        offset,
+        loose,
+        children: f.kids.map(to_list),
+      })
+    Line(label~, fold~, body~, setext~, closing~, ..) =>
       HeadingNode({
         id: f.id,
         label,
         fold,
         body,
+        setext,
+        closing,
         children: f.kids.map(to_node),
       })
   }
@@ -842,9 +946,21 @@ fn to_list(f : Frame) -> ListNode {
         label: "",
         fold: None,
         body: [],
+        marker: "-",
+        offset: 2,
+        loose: false,
         children: f.kids.map(to_list),
       }
-    Line(label~, fold~, body~, ..) =>
-      { id: f.id, label, fold, body, children: f.kids.map(to_list), }
+    Line(label~, fold~, body~, marker~, offset~, loose~, ..) =>
+      {
+        id: f.id,
+        label,
+        fold,
+        body,
+        marker,
+        offset,
+        loose,
+        children: f.kids.map(to_list),
+      }
   }
 }

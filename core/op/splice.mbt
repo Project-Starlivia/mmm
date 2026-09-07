@@ -29,7 +29,7 @@ fn splice(
     if id_of(r.node) == id {
       s.hit = true
       for y in f(r.node) {
-        roots.push({ node: y, sides: sides_for(y, r), })
+        roots.push({ node: y, sides: sides_for(y, r), rules: rules_for(y, r), })
       }
     } else {
       roots.push(rebuild_root(s, r))
@@ -55,55 +55,74 @@ fn sides_for(y : @tree.Node, old : @tree.Root) -> Array[@tree.Side] {
 }
 
 ///|
-/// 根 1 本。子の列と sides を並走して組み直す。
+/// 根の席に置くものの rules。sides と同じ規則で、綴りの無い所は空（書く側が `---`）。
+fn rules_for(y : @tree.Node, old : @tree.Root) -> Array[String] {
+  let n = kids(y).length()
+  if id_of(y) == id_of(old.node) && n == old.sides.length() {
+    old.rules
+  } else {
+    Array::make(n, "")
+  }
+}
+
+///|
+/// 根 1 本。子の列と sides・rules を並走して組み直す。
 fn rebuild_root(s : Splice, r : @tree.Root) -> @tree.Root {
   match r.node {
     HeadingNode(h) => {
-      let (children, sides) = rebuild_root_heading_children(
+      let (children, sides, rules) = rebuild_root_heading_children(
         s,
         h.children,
-        r.sides,
+        r,
       )
-      { node: HeadingNode({ ..h, children, }), sides, }
+      { node: HeadingNode({ ..h, children, }), sides, rules, }
     }
     ImplicitNode(g) => {
-      let (children, sides) = rebuild_root_heading_children(
+      let (children, sides, rules) = rebuild_root_heading_children(
         s,
         g.children,
-        r.sides,
+        r,
       )
-      { node: ImplicitNode({ ..g, children, }), sides, }
+      { node: ImplicitNode({ ..g, children, }), sides, rules, }
     }
     ListNode(l) => {
-      let (children, sides) = rebuild_root_item_children(s, l.children, r.sides)
-      { node: ListNode({ ..l, children, }), sides, }
+      let (children, sides, rules) = rebuild_root_item_children(
+        s,
+        l.children,
+        r,
+      )
+      { node: ListNode({ ..l, children, }), sides, rules, }
     }
   }
 }
 
 ///|
-/// 根が見出し（か Implicit）のときの子の列。席なら、その側を返された数だけ複製する。
+/// 根が見出し（か Implicit）のときの子の列。席なら、その側と綴りを返された数だけ複製する。
 fn rebuild_root_heading_children(
   s : Splice,
   xs : Array[@tree.Node],
-  sides : Array[@tree.Side],
-) -> (Array[@tree.Node], Array[@tree.Side]) {
+  r : @tree.Root,
+) -> (Array[@tree.Node], Array[@tree.Side], Array[String]) {
   let out = []
   let out_sides = []
+  let out_rules = []
   for i, x in xs {
-    let side = if i < sides.length() { sides[i] } else { @tree.Right }
+    let side = if i < r.sides.length() { r.sides[i] } else { @tree.Right }
+    let rule = if i < r.rules.length() { r.rules[i] } else { "" }
     if id_of(x) == s.id {
       s.hit = true
       for y in (s.f)(x) {
         out.push(y)
         out_sides.push(side)
+        out_rules.push(rule)
       }
     } else {
       out.push(rebuild_node(s, x))
       out_sides.push(side)
+      out_rules.push(rule)
     }
   }
-  (out, out_sides)
+  (out, out_sides, out_rules)
 }
 
 ///|
@@ -111,12 +130,14 @@ fn rebuild_root_heading_children(
 fn rebuild_root_item_children(
   s : Splice,
   xs : Array[@tree.ListNode],
-  sides : Array[@tree.Side],
-) -> (Array[@tree.ListNode], Array[@tree.Side]) {
+  r : @tree.Root,
+) -> (Array[@tree.ListNode], Array[@tree.Side], Array[String]) {
   let out = []
   let out_sides = []
+  let out_rules = []
   for i, x in xs {
-    let side = if i < sides.length() { sides[i] } else { @tree.Right }
+    let side = if i < r.sides.length() { r.sides[i] } else { @tree.Right }
+    let rule = if i < r.rules.length() { r.rules[i] } else { "" }
     if x.id == s.id {
       s.hit = true
       for y in (s.f)(@tree.ListNode(x)) {
@@ -124,6 +145,7 @@ fn rebuild_root_item_children(
           ListNode(l) => {
             out.push(l)
             out_sides.push(side)
+            out_rules.push(rule)
           }
           _ => s.bad = true
         }
@@ -131,9 +153,10 @@ fn rebuild_root_item_children(
     } else {
       out.push(rebuild_item(s, x))
       out_sides.push(side)
+      out_rules.push(rule)
     }
   }
-  (out, out_sides)
+  (out, out_sides, out_rules)
 }
 
 ///|
@@ -231,7 +254,11 @@ fn append(
   if node == @tree.doc_id {
     let roots = doc.roots.copy()
     for y in nodes {
-      roots.push({ node: y, sides: Array::make(kids(y).length(), @tree.Right), })
+      roots.push({
+        node: y,
+        sides: Array::make(kids(y).length(), @tree.Right),
+        rules: Array::make(kids(y).length(), ""),
+      })
     }
     return Some({ ..doc, roots, })
   }
@@ -247,11 +274,13 @@ fn append(
           }
       }
       let sides = r.sides.copy()
+      let rules = r.rules.copy()
       for _ in nodes {
         sides.push(s)
+        rules.push("")
       }
       let roots = doc.roots.copy()
-      roots[i] = { node: n, sides, }
+      roots[i] = { node: n, sides, rules, }
       return Some({ ..doc, roots, })
     }
   }

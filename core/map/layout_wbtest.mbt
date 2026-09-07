@@ -170,7 +170,11 @@ test "線は親の育つ辺（ずらし込み）から出て、子の入る辺�
 ///|
 test "カードの矩形は箱の左上から見た座標。無い行は None" {
   let blocks : Array[@tree.Block] = [
-    { id: 9, content: Link(text="t", href="https://x.example/", title=""), },
+    {
+      id: 9,
+      source: None,
+      content: Link(text="t", href="https://x.example/", title=""),
+    },
   ]
   let l = layout([root(node(1, "r", blocks~))], size)
   let b = box(l, 1)

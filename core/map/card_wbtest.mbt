@@ -3,7 +3,7 @@
 ///|
 /// id は分類に関係ないので、ここでは 1 で揃える
 fn block(content : @tree.Content) -> @tree.Block {
-  { id: 1, content, }
+  { id: 1, source: None, content, }
 }
 
 ///|
