@@ -237,9 +237,9 @@ test "中身に挟まれた水平線は装飾" {
             "id": 2,
             "label": "a",
             "body": [
-              { "id": 3, "content": ["Opaque", "body"] },
+              { "id": 3, "content": ["Raw", "body"] },
               { "id": 4, "content": "ThematicBreak" },
-              { "id": 5, "content": ["Opaque", "body"] },
+              { "id": 5, "content": ["Raw", "body"] },
             ],
             "children": [
               [
@@ -268,7 +268,7 @@ test "直前が中身でも、直後が見出しなら境界" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Opaque", "body"] }],
+            "body": [{ "id": 3, "content": ["Raw", "body"] }],
             "children": [
               [
                 "HeadingNode",
@@ -382,7 +382,7 @@ test "最初の見出しより前の水平線は文書の中身" {
   json_inspect(parse("body\n\n---\n\n# a\n"), content={
     "eol": "Lf",
     "body": [
-      { "id": 2, "content": ["Opaque", "body"] },
+      { "id": 2, "content": ["Raw", "body"] },
       { "id": 3, "content": "ThematicBreak" },
     ],
     "roots": [

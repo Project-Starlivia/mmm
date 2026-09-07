@@ -345,8 +345,7 @@ test "カードは選ぶと枠が出て、開けば欄、閉じるときに変�
   @web.set_value(ta, "```ts\ny\n```")
   s.map.card.close()
   assert_true(
-    s.stub.applied.last()
-    is Some(SetBlock(id=5, content=Opaque("```ts\ny\n```"))),
+    s.stub.applied.last() is Some(SetBlock(id=5, content=Raw("```ts\ny\n```"))),
   )
   // 無いカードは断る
   s.map.edit_card(99)

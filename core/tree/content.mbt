@@ -1,7 +1,7 @@
 // 骨格でないものは、いま積んでいるノードの中身になる。
 //
-// 絵になるのは 4 つ（画像・リンク・コード・SVG）だけで、**疑わしきは Opaque**。
-// Opaque は原文のままで、mmm は中を読み解かない — 読み解かないと決めることが、
+// 絵になるのは 4 つ（画像・リンク・コード・SVG）だけで、**疑わしきは Raw**。
+// Raw は原文のままで、mmm は中を読み解かない — 読み解かないと決めることが、
 // 「意味を 1 ビットも失わない」の実体になる。
 
 ///|
@@ -47,19 +47,19 @@ fn content_of(md : String, block : @markdown.Block) -> Content? {
       if is_svg(html) {
         Some(Svg(html))
       } else {
-        Some(Opaque(verbatim(md, block)))
+        Some(Raw(verbatim(md, block)))
       }
     Paragraph(children~, span~, ..) =>
       match sole(md, span, children) {
         Some(c) => Some(c)
-        None => Some(Opaque(verbatim(md, block)))
+        None => Some(Raw(verbatim(md, block)))
       }
-    _ => Some(Opaque(verbatim(md, block)))
+    _ => Some(Raw(verbatim(md, block)))
   }
 }
 
 ///|
-/// 段落まるごとが 1 枚の絵か。そうでなければ Opaque（`text ![a](b)` のように
+/// 段落まるごとが 1 枚の絵か。そうでなければ Raw（`text ![a](b)` のように
 /// 混ざったものは、切り分けると意味が変わるので分けない）。
 fn sole(
   md : String,
@@ -81,7 +81,7 @@ fn sole(
 
 ///|
 /// 開ける先（`http(s)`）の URL ちょうど 1 つならリンク。**見える字が URL そのもの**
-/// なので text も URL になる。字が混ざる行や開けない scheme は None（疑わしきは Opaque）。
+/// なので text も URL になる。字が混ざる行や開けない scheme は None（疑わしきは Raw）。
 ///
 /// **読みは寛容に、書きは CommonMark に。** 素の URL は CommonMark ではただの字で、
 /// リンクとして描くのは GFM の方言。読む側はそれに合わせるが、正規形は `[URL](URL)`
@@ -107,7 +107,7 @@ fn bare(text : String) -> Content? {
 }
 
 ///|
-/// 原文のまま持つ中身（Opaque）が段落 1 つなら、その行の列（前後の空白と `\r` を
+/// 原文のまま持つ中身（Raw）が段落 1 つなら、その行の列（前後の空白と `\r` を
 /// 除き、空の行は落とす）。表・引用・HTML など段落でなければ None。
 /// 貼るとき、一番外の段落だけを「行ごとにノード」にするための問い —
 /// 段落かどうかは mdAst しか知らないので、ここで読み直す（unbuild の splice と同じ手）。

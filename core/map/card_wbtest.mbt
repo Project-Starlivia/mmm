@@ -97,6 +97,6 @@ test "bare は先頭の ./ だけを落とす" {
 }
 
 ///|
-test "Opaque はカードにならない" {
-  assert_eq(cards([block(Opaque("<x>"))]), [])
+test "Raw はカードにならない" {
+  assert_eq(cards([block(Raw("<x>"))]), [])
 }

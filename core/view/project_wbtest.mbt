@@ -110,10 +110,10 @@ test "項目も子の項目も同じノードになる" {
 }
 
 ///|
-test "Opaque だけが落ちる。並びも id も保つ" {
+test "Raw だけが落ちる。並びも id も保つ" {
   let body : Array[@tree.Block] = [
     { id: 3, content: @tree.Image(alt="", src="p.png", title=""), },
-    { id: 4, content: @tree.Opaque("prose"), },
+    { id: 4, content: @tree.Raw("prose"), },
     { id: 5, content: @tree.Link(text="t", href="u", title=""), },
     { id: 6, content: @tree.Code(info="js", text="1\n"), },
     { id: 7, content: @tree.Svg("<svg/>"), },
@@ -230,7 +230,7 @@ test "frontmatter は通り、改行と散文は消える" {
     eol: Crlf,
     body: [
       { id: 2, content: @tree.ThematicBreak, },
-      { id: 3, content: @tree.Opaque("prose"), },
+      { id: 3, content: @tree.Raw("prose"), },
     ],
     roots: [root(heading(4, "a"))],
   }

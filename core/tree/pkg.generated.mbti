@@ -71,7 +71,7 @@ pub(all) enum Content {
   Svg(String)
   ThematicBreak
   Details(text~ : String, open~ : Bool, summary~ : String?, body~ : String)
-  Opaque(String)
+  Raw(String)
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 
 pub(all) struct Doc {

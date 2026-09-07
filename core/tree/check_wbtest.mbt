@@ -111,7 +111,7 @@ test "中身の id も一意さを見る" {
   let doc : Doc = {
     frontmatter: None,
     eol: Lf,
-    body: [{ id: 5, content: Opaque("a"), }],
+    body: [{ id: 5, content: Raw("a"), }],
     roots: [
       {
         node: HeadingNode({
@@ -236,7 +236,7 @@ test "中身の尻の水平線に骨格が続けば見つける" {
               body: [tb(8)],
               children: [],
             }),
-            leaf(9, "b", body=[tb(10), { id: 11, content: Opaque("x"), }]),
+            leaf(9, "b", body=[tb(10), { id: 11, content: Raw("x"), }]),
             leaf(12, "c", body=[tb(13)]),
           ],
         }),

@@ -662,7 +662,7 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   let rest : Array[@tree.Block] = []
   for b in sub.body {
     let ls = match b.content {
-      Opaque(text) => @tree.lines(text)
+      Raw(text) => @tree.lines(text)
       _ => None
     }
     match ls {
