@@ -81,6 +81,41 @@ pub(all) struct Way {
 }
 
 ///|
+/// canvas が受け取れる面積の上限（px）。形式によらず同じ
+let max_area = 268435456.0
+
+///|
+/// canvas が受け取れる 1 辺の上限（px）。**WebP だけ狭い** — しかも超えた分を
+/// 黙って切り落とす（null も例外も返さない）ので、渡す前に収めないと地図の
+/// 右端・下端が欠けた絵が出る。PNG は超えると toBlob が null を返す。
+/// どちらも Chromium で実測（2026-09-07）
+fn max_side(mime : String) -> Double {
+  if mime == "image/webp" {
+    16383.0
+  } else {
+    65535.0
+  }
+}
+
+///|
+/// 上限に収まる倍率。**欠かすくらいなら小さくする** — 画面のとおりに出すのが
+/// 本義だが、一部が欠けた絵や「出せない」より、粗くても全体が写るほうが良い。
+/// 上限に当たらない大きさでは `want` のまま
+fn fit(w : Double, h : Double, want : Double, mime : String) -> Double {
+  let side = max_side(mime)
+  let by_side = @cmp.minimum(side / w, side / h)
+  let by_area = (max_area / (w * h)).sqrt()
+  @cmp.minimum(want, @cmp.minimum(by_side, by_area))
+}
+
+///|
+/// 倍率を当てた px。**切り上げない** — 上限ちょうどの倍率で 1 px はみ出す。
+/// 0 px の canvas は絵にならないので下限は 1
+fn pixels(v : Double, scale : Double) -> Int {
+  @cmp.maximum(1, (v * scale).to_int())
+}
+
+///|
 /// SVG を絵にする。大きさが読めなければ投げる
 async fn raster(svg : @dom.Element, mime : String) -> @core.Any {
   let size = (n : String) => {
@@ -91,7 +126,8 @@ async fn raster(svg : @dom.Element, mime : String) -> @core.Any {
   let w = size("width")
   let h = size("height")
   guard w > 0.0 && h > 0.0 else { fail("書き出す大きさが読めない") }
-  @web.rasterize(@web.serialize(svg), w, h, mime, scale).wait()
+  let s = fit(w, h, scale, mime)
+  @web.rasterize(@web.serialize(svg), mime, pixels(w, s), pixels(h, s)).wait()
 }
 
 ///|

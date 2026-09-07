@@ -19,21 +19,22 @@ pub extern "js" fn download(blob : @core.Any, name : String) -> Unit =
   #|   a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
 
 ///|
-/// SVG の字を絵にする。`blob:` の参照を残していると canvas が汚れて toBlob が
-/// 投げるので、呼ぶ側が先に data URL へ埋め直しておく。絵にできなければ拒む
+/// SVG の字を、指定した px の絵にする。`blob:` の参照を残していると canvas が
+/// 汚れて toBlob が投げるので、呼ぶ側が先に data URL へ埋め直しておく。
+/// **大きさが上限に収まることは呼ぶ側の責任**（`fit`）— canvas は超えた分を
+/// 黙って切るか null を返すだけで、何も言わない。絵にできなければ拒む
 pub extern "js" fn rasterize(
   text : String,
-  w : Double,
-  h : Double,
   mime : String,
-  scale : Double,
+  px_w : Int,
+  px_h : Int,
 ) -> @js_async.Promise[@core.Any] =
-  #| (text, w, h, mime, scale) => new Promise((ok, no) => {
+  #| (text, mime, px_w, px_h) => new Promise((ok, no) => {
   #|   const img = new Image();
   #|   img.onload = () => {
   #|     const canvas = document.createElement("canvas");
-  #|     canvas.width = Math.ceil(w * scale); canvas.height = Math.ceil(h * scale);
-  #|     canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+  #|     canvas.width = px_w; canvas.height = px_h;
+  #|     canvas.getContext("2d").drawImage(img, 0, 0, px_w, px_h);
   #|     canvas.toBlob((blob) => (blob ? ok(blob) : no(new Error("could not rasterize"))), mime);
   #|   };
   #|   img.onerror = () => no(new Error("svg could not be drawn"));

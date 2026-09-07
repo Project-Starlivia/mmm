@@ -148,7 +148,7 @@ pub fn px(Double) -> String
 
 pub fn query_permission(@core.Any, String) -> @js_async.Promise[String]
 
-pub fn rasterize(String, Double, Double, String, Double) -> @js_async.Promise[@core.Any]
+pub fn rasterize(String, String, Int, Int) -> @js_async.Promise[@core.Any]
 
 pub fn read_clipboard(@dom.Document) -> @js_async.Promise[String]
 
