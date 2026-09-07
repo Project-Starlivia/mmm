@@ -57,6 +57,22 @@ pub fn init_shortcuts(doc : @dom.Document, deps : Shortcuts) -> Unit {
       if k.isComposing || k.keyCode == 229 || in_dialog(e) {
         return
       }
+      // **md ペインの Escape は帯へ抜ける。** Tab は字下げに使うので、
+      // キーボードだけで帯やブラウザへ戻る道が他に無い（WCAG 2.1.2）。
+      // 欄（ラベル・カードの編集）は自分の Escape を持つので譲る。
+      // 地図は選択を解いてから抜けるので、自分の表（map/keys.mbt）が持つ
+      if k.key == "Escape" &&
+        !k.ctrlKey &&
+        !k.metaKey &&
+        !k.altKey &&
+        !k.shiftKey &&
+        !in_field(e) &&
+        @web.target_in(e, "#md-pane") is Some(_) {
+        @web.prevent(e)
+        @web.stop(e)
+        focus_bar(doc)
+        return
+      }
       guard k.ctrlKey || k.metaKey else { return }
       match k.key.to_lower() {
         "s" => {

@@ -34,6 +34,9 @@ pub(all) enum Intent {
   /// 選んでいるもの（カードならその原文、でなければ選択の部分木）をクリップボードへ写す。
   /// cut は写せてから消すもの（Delete と同じ Intent）。写せなければ消さない
   Copy(cut~ : Intent?)
+  /// ペインから帯へ抜ける。**Tab は子を足すのに使うので、抜け道はこれ 1 つ**
+  /// （キーボードだけで帯やブラウザへ戻れないと、ペインが罠になる）
+  Leave
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -193,8 +196,16 @@ pub fn keyed(l : Layout, sel : Selection, k : Key) -> Intent? {
       },
     )
   }
+  // **Escape は 1 段ずつ外へ。** 選んでいれば解き、解くものが無ければ帯へ抜ける。
+  // Tab は子を足すのに使うので、キーボードだけで帯へ戻る道はこれしかない
   if k.key == "Escape" {
-    return Some(Select(sel=none, reveal=false))
+    return Some(
+      if sel.ids.length() > 0 {
+        Select(sel=none, reveal=false)
+      } else {
+        Leave
+      },
+    )
   }
   if k.key == "Home" && !k.mod {
     return Some(Center)

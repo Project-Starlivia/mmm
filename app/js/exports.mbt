@@ -434,6 +434,7 @@ fn host_of(h : @core.Any) -> @mindmap.Host {
     tokens_block: text => call("tokensBlock", [@core.any(text)]).cast(),
     epoch: () => call("epoch", []).cast(),
     failed: msg => @parts.failed(doc, msg),
+    leave: () => @app.focus_bar(doc),
   }
 }
 

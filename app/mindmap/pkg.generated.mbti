@@ -78,6 +78,7 @@ pub(all) struct Host {
   tokens_block : (String) -> Array[Array[Token]]
   epoch : () -> Int
   failed : (String) -> Unit
+  leave : () -> Unit
 }
 
 pub struct LabelField {
