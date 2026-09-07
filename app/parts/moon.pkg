@@ -5,7 +5,7 @@ import {
   "mizchi/js/core",
   "mizchi/js/builtins/global",
   "mizchi/js_browser/dom",
-  "mmm-app/core/web",
+  "mmm/app/web",
 }
 
 import {

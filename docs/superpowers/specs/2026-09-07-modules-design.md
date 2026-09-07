@@ -20,7 +20,9 @@
 
 ```
 core/   module mmm/core — DOM を知らない。mizchi/js* も moonbitlang/async も import しない
-  tree/   md ↔ 木（Doc）。view.mbt（map が見る木。木の射影）もここ
+  tree/   md ↔ 木（Doc）
+  view/   map が見る木。tree に畳もうとしたが、`Root` / `Node` が tree の同名の型と別物で衝突する —
+          自分の型を持つ package なので残す
   op/     操作（Op）と、それを md に映す edit.mbt
   read/   読み（Survey）と、そこから導くもの — 選択の規則・名前・宣言・写し
   map/    置く・当たる・視点・意図の表
@@ -74,7 +76,7 @@ CodeMirror `view` と tldraw `editor` の並び）から 3 つ。
 
 これで決まったこと:
 
-- `view`（86 行）は tree に、`edit`（28 行の 1 関数）は op に畳む
+- `edit`（28 行の 1 関数）は op に畳む。`view` は型が衝突するので残す（上）
 - `persist` → `prefs`（動詞でなく物の名）、`share` → `link`（提供するのはリンク）、
   `io` → `disk`・`Io` → `Disk`（Io は何も言わない）、`handles` → `recent`（使う人の言葉）、
   `assets` → `images`（この app の asset は画像だけ）、`dnd` → `drop`、web の `disk` → `fs`
@@ -98,8 +100,8 @@ CodeMirror `view` と tldraw `editor` の並び）から 3 つ。
 
 3 PR。docs は各 PR で追従する。
 
-1. core を `mmm/core` と `mmm/app` に割る。view → tree、edit → op。`check:core` は両 module を回し、
-   core の `moon.pkg` に `mizchi/*` / `moonbitlang/async` が無いことも見る
+1. core を `mmm/core` と `mmm/app` に割る（moon.work の workspace）。edit → op。`check:core` は workspace 全体を回し、
+   core の `moon.pkg` に `mizchi/js*` / `moonbitlang/async` が無いことも見る（test/tools/pure.ts）
 2. app の科を組み替える。bar / disk / mindmap（input・act・marks に割る）/ parts に draw・ask、root を平らに
 3. 改名。prefs / link / disk・Disk / recent / images / drop / fs、`spawn` を web へ、
    `coreApi.ts` → `app.ts`、`map/highlight.ts` → `highlight.ts`、`#topbar` → `#bar`

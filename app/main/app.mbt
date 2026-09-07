@@ -288,7 +288,7 @@ fn App::choose(self : App, next : @read.Choice, reveal : Bool) -> Unit {
 /// focus はノードとも中身とも限らない。ノードで `edit` ならその場編集を開く。
 /// 呼び出し側が続けられるよう focus を返す（Link / Code が使う）
 pub fn App::apply(self : App, op : @op.Op, edit : Bool) -> Int? {
-  let r = @edit.edit(self.text(), op)
+  let r = @op.edit(self.text(), op)
   // core は断りを「編集なし・focus なし」で言う。編集が無くても focus が在るのは、
   // 何も変わらなかった操作（同じ名前への Rename など）で、しらせは出さない
   if r.focus is None && r.edits.length() == 0 {
@@ -318,7 +318,7 @@ pub fn App::apply(self : App, op : @op.Op, edit : Bool) -> Int? {
 /// **選択には触らない** — 地図にフォーカスが無くても起きる操作なので、持ち主が決めた
 /// 選択を横から書き換えない（design.md「選択を書くのは持ち主の操作だけ」）
 fn App::write(self : App, op : @op.Op) -> Unit {
-  let r = @edit.edit(self.text(), op)
+  let r = @op.edit(self.text(), op)
   if r.edits.length() == 0 {
     if r.focus is None {
       @parts.failed(self.doc, "Couldn't do that here")
@@ -574,7 +574,7 @@ fn App::set_declared(self : App, value : String) -> Unit {
   match prev {
     Some(prev) =>
       for op in @read.retarget(s.view, prev, next) {
-        let r = @edit.edit(md, op)
+        let r = @op.edit(md, op)
         sets.push(r.edits)
         md = @tree.patched(md, r.edits)
       }

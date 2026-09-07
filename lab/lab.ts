@@ -8,7 +8,7 @@ import { EditorState } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { oneDark } from "@codemirror/theme-one-dark";
-import * as mbt from "../core/_build/js/release/build/js/js.js";
+import * as mbt from "../_build/js/release/build/mmm/app/js/js.js";
 import { paintAst, paintTree } from "./paint.ts";
 
 /** 見て回りたくなる形を、最初から手元に置いておく。 */

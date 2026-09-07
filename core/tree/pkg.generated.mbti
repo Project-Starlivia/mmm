@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mmm-app/core/tree"
+package "mmm/core/tree"
 
 import {
   "mizchi/markdown",

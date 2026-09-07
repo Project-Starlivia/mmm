@@ -139,8 +139,8 @@ fn strip(x : @tree.Node) -> Json {
 }
 
 ///|
-fn ops_for(all : Array[Int]) -> Array[@op.Op] {
-  let ops : Array[@op.Op] = []
+fn ops_for(all : Array[Int]) -> Array[Op] {
+  let ops : Array[Op] = []
   for id in all {
     ops.push(Rename(id~, label="z"))
     ops.push(Fold(id~, open=false))
@@ -152,20 +152,24 @@ fn ops_for(all : Array[Int]) -> Array[@op.Op] {
     for to in all {
       ops.push(MoveNode(ids=[id], at=Before(node=to)))
       ops.push(MoveNode(ids=[id], at=After(node=to)))
-      ops.push(MoveNode(ids=[id], at=In(node=to, side=Some(Left))))
+      ops.push(MoveNode(ids=[id], at=NodePlace::In(node=to, side=Some(Left))))
       ops.push(MoveBlock(ids=[id], at=Before(block=to)))
-      ops.push(MoveBlock(ids=[id], at=In(node=to)))
+      ops.push(MoveBlock(ids=[id], at=BlockPlace::In(node=to)))
       ops.push(AddNode(at=After(node=to), labels=["n"]))
-      ops.push(AddBlock(at=In(node=to), content=ThematicBreak))
-      ops.push(Graft(at=In(node=to, side=None), md="# g\n\n- i\n"))
-      ops.push(Graft(at=In(node=to, side=None), md="- i\n  - j\n"))
+      ops.push(AddBlock(at=BlockPlace::In(node=to), content=ThematicBreak))
+      ops.push(Graft(at=NodePlace::In(node=to, side=None), md="# g\n\n- i\n"))
+      ops.push(Graft(at=NodePlace::In(node=to, side=None), md="- i\n  - j\n"))
       ops.push(Graft(at=After(node=to), md="![](q.png)\n\ntext\n"))
     }
   }
-  ops.push(AddNode(at=In(node=@tree.doc_id, side=None), labels=["n"]))
-  ops.push(AddBlock(at=In(node=@tree.doc_id), content=ThematicBreak))
-  ops.push(Graft(at=In(node=@tree.doc_id, side=None), md="- i\n"))
-  ops.push(Graft(at=In(node=@tree.doc_id, side=None), md="text\n"))
+  ops.push(
+    AddNode(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["n"]),
+  )
+  ops.push(
+    AddBlock(at=BlockPlace::In(node=@tree.doc_id), content=ThematicBreak),
+  )
+  ops.push(Graft(at=NodePlace::In(node=@tree.doc_id, side=None), md="- i\n"))
+  ops.push(Graft(at=NodePlace::In(node=@tree.doc_id, side=None), md="text\n"))
   ops
 }
 
@@ -178,7 +182,7 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
     for op in ops_for(ids(before)) {
       let what = "\{i} \{op.to_json().stringify()}"
       let r = edit(md, op)
-      match @op.apply(before, op) {
+      match apply(before, op) {
         Some(done) => {
           some = some + 1
           let after = @tree.parse(@tree.apply(md, r.edits))
@@ -341,7 +345,7 @@ test "法則 — Delete の focus は消えていない兄弟か祖先（中身�
   for i, md in corpus {
     let before = @tree.parse(md)
     for id in ids(before) {
-      guard @op.apply(before, Delete(ids=[id])) is Some(done) else { continue }
+      guard apply(before, Delete(ids=[id])) is Some(done) else { continue }
       let what = "\{i} Delete \{id}"
       let block_owner = owner_of(before, id)
       match done.focus {

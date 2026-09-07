@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mmm-app/core/parts"
+package "mmm/app/parts"
 
 import {
   "mizchi/js/core",

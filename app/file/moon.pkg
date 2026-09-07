@@ -5,10 +5,10 @@ import {
   "moonbitlang/async/js_async",
   "mizchi/js/core",
   "mizchi/js_browser/dom",
-  "mmm-app/core/web",
-  "mmm-app/core/tree",
-  "mmm-app/core/read",
-  "mmm-app/core/app",
+  "mmm/app/web",
+  "mmm/core/tree",
+  "mmm/core/read",
+  "mmm/app/app",
 }
 
 import {
