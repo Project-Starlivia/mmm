@@ -54,8 +54,6 @@ pub fn unbuild_node(Node, Int, Array[Side]) -> @markdown.Document
 
 pub fn unbuild_prose(Array[Block]) -> @markdown.Document
 
-pub fn writable(String) -> Bool
-
 // Errors
 
 // Types and methods
@@ -96,7 +94,6 @@ pub(all) enum Flaw {
   DupeId(Int)
   BarrenImplicit(Int)
   SideCount(root~ : Int, sides~ : Int, children~ : Int)
-  UnwritableName(Int)
   BorderBreak(Int)
   Swallowed(Int)
   ListSide(Int)
