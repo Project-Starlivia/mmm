@@ -2,8 +2,8 @@
 // 見本の md を core に読ませ、選択と picked だけ持つ代役の host を渡す。
 // 手で Box を組まないのは、それが嘘の置き方になるから。
 
-import * as core from "../../src/coreApi.ts";
-import { languageEpoch, tokenize, tokenizeBlock } from "../../src/map/highlight.ts";
+import * as core from "../../src/app.ts";
+import { languageEpoch, tokenize, tokenizeBlock } from "../../src/highlight.ts";
 import type { Part } from "./kind.ts";
 
 const MD = `# mmm

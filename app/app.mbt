@@ -46,9 +46,9 @@ pub(all) struct Editor {
 pub struct App {
   doc : @dom.Document
   ed : Editor
-  io : @disk.Io
+  io : @disk.Disk
   map : @mindmap.Mindmap
-  assets : @disk.Assets
+  images : @disk.Images
   theme : @bar.Theme
   exporter : @bar.Export
   md_pane : @dom.Element
@@ -72,11 +72,6 @@ pub struct App {
 }
 
 ///|
-fn spawn(f : async () -> Unit) -> Unit {
-  @js_async.Promise::from_async(f) |> ignore
-}
-
-///|
 /// index.html の要素。無ければ壊れている
 fn el(doc : @dom.Document, id : String) -> @dom.Element {
   guard doc.getElementById(id) is Some(e) else {
@@ -90,7 +85,7 @@ fn el(doc : @dom.Document, id : String) -> @dom.Element {
 pub fn App::new(
   doc : @dom.Document,
   ed : Editor,
-  io : @disk.Io,
+  io : @disk.Disk,
   measure? : @map.Measure = @mindmap.measure(doc),
 ) -> App {
   let md_pane = el(doc, "md-pane")
@@ -99,7 +94,7 @@ pub fn App::new(
   // 組み上がってから動くものなので、後から入る自分を通して呼ぶ
   let late : Ref[App?] = { val: None, }
   let app = () => late.val.unwrap()
-  let assets = @disk.Assets::new(doc, io, {
+  let images = @disk.Images::new(doc, io, {
     failed: msg => @parts.failed(doc, msg),
     refresh: () => app().map.render(),
     declared: () => app().declared_folder(),
@@ -110,16 +105,16 @@ pub fn App::new(
     {
       survey: ed.survey,
       measure,
-      image_url: path => assets.image_url(path),
+      image_url: path => images.image_url(path),
       image_hint: () => {
-        if assets.readable() {
+        if images.readable() {
           None
         } else {
           Some("click to connect")
         }
       },
       connect_assets: () => {
-        spawn(async fn() { if app().ensure_place() { assets.connect() } })
+        @web.spawn(async fn() { if app().ensure_place() { images.connect() } })
       },
       holder: ed.holder,
       selection: ed.selection,
@@ -137,10 +132,10 @@ pub fn App::new(
       block_text: id => app().block_text(id),
       apply: (op, edit) => app().apply(op, edit),
       paste: () => app().paste(),
-      copy: k => spawn(async fn() { k(app().copy()) }),
+      copy: k => @web.spawn(async fn() { k(app().copy()) }),
       draw: id => app().draw(id),
       read_clipboard: k => {
-        spawn(async fn() { k(@web.read_clipboard(doc).wait()) })
+        @web.spawn(async fn() { k(@web.read_clipboard(doc).wait()) })
       },
       tokens: ed.tokens,
       tokens_block: ed.tokens_block,
@@ -166,13 +161,13 @@ pub fn App::new(
     ed,
     io,
     map,
-    assets,
+    images,
     theme,
     exporter,
     md_pane,
     map_pane,
     name: @bar.Name::new(doc, el(doc, "filename"), el(doc, "dirty"), theme, () => {
-      spawn(async fn() { app().rename_file() })
+      @web.spawn(async fn() { app().rename_file() })
     }),
     gen: 0,
     saved_text: "",
@@ -351,11 +346,11 @@ fn App::show_name(self : App) -> Unit {
 fn App::load_text(self : App, next : String, name : String?) -> Unit {
   self.gen += 1
   self.saved_name = name
-  self.assets.clear() // 画像のパスは（新しい）md からの相対
+  self.images.clear() // 画像のパスは（新しい）md からの相対
   (self.ed.set_text)(next) // → cycle
   self.map.fit_view()
   // 文書が入れ替わった。**Recent の並びもここで引き直す**
-  spawn(async fn() { self.refresh_recent() })
+  @web.spawn(async fn() { self.refresh_recent() })
 }
 
 // ---------- ファイル ----------
@@ -365,7 +360,7 @@ fn App::load_text(self : App, next : String, name : String?) -> Unit {
 fn App::apply_doc(self : App, opened : @disk.Doc) -> Unit {
   self.saved_text = opened.text
   self.load_text(opened.text, Some(opened.name))
-  spawn(async fn() { self.offer_connect() })
+  @web.spawn(async fn() { self.offer_connect() })
 }
 
 ///|
@@ -379,14 +374,14 @@ async fn App::offer_connect(self : App) -> Unit {
   guard self.saved_name is Some(_) && has_images(self.text()) else { return }
   // 許可を確かめるあいだに別の文書へ移っていたら、もうこの文書の話ではない
   let gen = self.gen
-  if self.assets.connected() || gen != self.gen {
+  if self.images.connected() || gen != self.gen {
     return
   }
   let folder = self.declared_folder().unwrap_or("./")
   let go = @parts.asked(self.doc, @parts.connect(folder))
   // 箱を読んでいるあいだに移っていることもある。**繋ぐ直前にもう一度見る**
   if go is Some(_) && gen == self.gen {
-    self.assets.connect()
+    self.images.connect()
   }
 }
 
@@ -465,9 +460,9 @@ async fn App::save_file(self : App, as_new : Bool) -> Unit {
       self.show_name()
       // **写しは別の文書。** 握りは「この md から見たあのフォルダ」という対
       // でしか意味を持たないので、md が別の場所へ移った時点で対ごと無効
-      self.assets.clear()
-      spawn(async fn() { self.refresh_recent() })
-      spawn(async fn() { self.offer_connect() })
+      self.images.clear()
+      @web.spawn(async fn() { self.refresh_recent() })
+      @web.spawn(async fn() { self.offer_connect() })
     } else {
       self.io.save(self.text())
     }
@@ -529,7 +524,7 @@ async fn App::copy_link(self : App) -> Bool {
   }
 }
 
-// ---------- 画像（ローカルファースト。実装は file/assets.mbt） ----------
+// ---------- 画像（ローカルファースト。実装は file/images.mbt） ----------
 
 ///|
 /// 宣言を頭に書く。頭を書いただけでは本文は古い場所を指したまま。**宣言と本文は同じ 1 つの
@@ -574,7 +569,7 @@ async fn App::attach_image(self : App, id : Int, blob : @core.Any) -> Unit {
   let gen = self.gen
   guard self.ensure_place() else { return }
   // 置いているあいだに文書が入れ替わった（世代）／ノードが消えている（id）ことがある
-  guard self.assets.save_to_disk(blob) is Some(rel) &&
+  guard self.images.save_to_disk(blob) is Some(rel) &&
     gen == self.gen &&
     self.survey().is_node(id) else {
     return
@@ -589,7 +584,7 @@ fn App::draw(self : App, id : Int) -> Unit {
     return
   }
   self.drawing_open = true
-  spawn(async fn() {
+  @web.spawn(async fn() {
     (async fn() -> Unit {
       match @parts.show_drawing(self.doc) {
         Some(blob) => self.attach_image(id, blob)
@@ -633,7 +628,7 @@ async fn App::copy(self : App) -> Bool {
 fn App::paste(self : App) -> Unit {
   let anchor = (self.ed.selection)().anchor
   let gen = self.gen
-  spawn(async fn() {
+  @web.spawn(async fn() {
     (async fn() -> Unit {
       // クリップボードに画像があれば、テキストより優先する。読めない / 断られたら字の道へ
       let img = @web.clipboard_image(self.doc).wait()
@@ -661,11 +656,11 @@ fn App::paste(self : App) -> Unit {
 }
 
 ///|
-/// 画像フォルダの状態。**言葉は宣言と許可の 2 つだけ**（file/assets.mbt の冒頭が
+/// 画像フォルダの状態。**言葉は宣言と許可の 2 つだけ**（file/images.mbt の冒頭が
 /// 名付けたもの）。許可が無いときは宣言のパスを出す — どこを指していて届いて
 /// いないのかが見えないと、直しようがない
 fn App::folder_caption(self : App) -> String {
-  match (self.assets.folder_name(), self.declared_folder()) {
+  match (self.images.folder_name(), self.declared_folder()) {
     (None, None) => "no folder"
     (None, Some(declared)) => declared + ", no access"
     (Some(name), Some(_)) => name
@@ -713,21 +708,21 @@ fn App::wire(self : App) -> Unit {
         folder: self.folder_caption(),
       },
       {
-        new_file: () => spawn(async fn() { self.new_file() }),
-        open: () => spawn(async fn() { self.open_file() }),
+        new_file: () => @web.spawn(async fn() { self.new_file() }),
+        open: () => @web.spawn(async fn() { self.open_file() }),
         open_recent: i => {
           match self.recent.get(i) {
-            Some(file) => spawn(async fn() { self.open_known(file) })
+            Some(file) => @web.spawn(async fn() { self.open_known(file) })
             None => ()
           }
         },
-        save: () => spawn(async fn() { self.save_file(false) }),
-        save_as: () => spawn(async fn() { self.save_file(true) }),
-        rename: () => spawn(async fn() { self.rename_file() }),
+        save: () => @web.spawn(async fn() { self.save_file(false) }),
+        save_as: () => @web.spawn(async fn() { self.save_file(true) }),
+        rename: () => @web.spawn(async fn() { self.rename_file() }),
         choose_folder: () => {
-          spawn(async fn() {
+          @web.spawn(async fn() {
             if self.ensure_place() {
-              self.assets.choose_folder()
+              self.images.choose_folder()
             }
           })
         },
@@ -740,7 +735,7 @@ fn App::wire(self : App) -> Unit {
       {
         light: self.theme.is_light(),
         grab: self.grab,
-        link_note: k => spawn(async fn() { k(self.link_note()) }),
+        link_note: k => @web.spawn(async fn() { k(self.link_note()) }),
       },
       {
         undo: self.ed.undo,
@@ -748,7 +743,7 @@ fn App::wire(self : App) -> Unit {
         pick_color: () => self.theme.pick_color(),
         toggle_theme: () => self.theme.toggle(),
         toggle_grab: () => self.set_grab(!self.grab),
-        copy_link: k => spawn(async fn() { k(self.copy_link()) }),
+        copy_link: k => @web.spawn(async fn() { k(self.copy_link()) }),
       },
     )
   })
@@ -781,9 +776,9 @@ fn App::wire(self : App) -> Unit {
     self.ed.focus,
   )
   init_shortcuts(doc, {
-    save: as_new => spawn(async fn() { self.save_file(as_new) }),
-    open: () => spawn(async fn() { self.open_file() }),
-    create: () => spawn(async fn() { self.new_file() }),
+    save: as_new => @web.spawn(async fn() { self.save_file(as_new) }),
+    open: () => @web.spawn(async fn() { self.open_file() }),
+    create: () => @web.spawn(async fn() { self.new_file() }),
     toggle_pane: () => panes.toggle(),
     toggle_pane_vis: which => panes.toggle_vis(which),
     undo: self.ed.undo,
@@ -807,7 +802,7 @@ pub fn App::boot(self : App) -> Unit {
   self.load_text("", None) // 空 = まだ何も無い。dirty も立たない
   let boot_gen = self.gen
   let hash = @web.hash(self.doc)
-  spawn(async fn() {
+  @web.spawn(async fn() {
     guard from_hash(hash) is Some(shared) else { return }
     // リンクで開いた。ハッシュはその場で消す — 文書の身元はあくまで
     // ファイルハンドル 1 つで、リンクは入口でしかない

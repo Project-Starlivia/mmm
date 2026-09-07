@@ -167,7 +167,7 @@ pub fn name_problem(typed : String) -> String? {
 
 ///|
 /// 外に頼るもの
-pub(all) struct AssetDeps {
+pub(all) struct ImageDeps {
   /// 果たせなかった（しらせの言葉）
   failed : (String) -> Unit
   /// 絵を引き直したので描き直す
@@ -198,10 +198,10 @@ priv struct Picked {
 }
 
 ///|
-pub struct Assets {
+pub struct Images {
   doc : @dom.Document
-  io : Io
-  deps : AssetDeps
+  io : Disk
+  deps : ImageDeps
   /// path → objectURL。None は「引きに行ったが無い / まだ」
   urls : Map[String, String?]
   mut cached : Binding?
@@ -212,7 +212,7 @@ pub struct Assets {
 }
 
 ///|
-pub fn Assets::new(doc : @dom.Document, io : Io, deps : AssetDeps) -> Assets {
+pub fn Images::new(doc : @dom.Document, io : Disk, deps : ImageDeps) -> Images {
   {
     doc,
     io,
@@ -226,12 +226,12 @@ pub fn Assets::new(doc : @dom.Document, io : Io, deps : AssetDeps) -> Assets {
 
 ///|
 /// 宣言が無いのは「md と同じ場所」。頭を持たない古い文書がそのまま読めるように、ここで倒す
-fn Assets::declared_path(self : Assets) -> String {
+fn Images::declared_path(self : Images) -> String {
   (self.deps.declared)().unwrap_or("./")
 }
 
 ///|
-fn Assets::release_urls(self : Assets) -> Unit {
+fn Images::release_urls(self : Images) -> Unit {
   for _, url in self.urls {
     match url {
       Some(u) => @web.revoke_url(u)
@@ -242,13 +242,7 @@ fn Assets::release_urls(self : Assets) -> Unit {
 }
 
 ///|
-/// 非同期を投げっぱなしにする（結果は待たない。失敗は中で拾う）
-fn spawn(f : async () -> Unit) -> Unit {
-  @js_async.Promise::from_async(f) |> ignore
-}
-
-///|
-async fn Assets::stored_binding(self : Assets) -> Binding? {
+async fn Images::stored_binding(self : Images) -> Binding? {
   if self.cached_known {
     return self.cached
   }
@@ -268,7 +262,7 @@ async fn Assets::stored_binding(self : Assets) -> Binding? {
 
 ///|
 /// フォルダを指してもらい、握る。取りやめは None
-async fn Assets::pick(self : Assets) -> Picked? {
+async fn Images::pick(self : Images) -> Picked? {
   guard self.io.current_file() is Some(file) else { return None }
   guard @web.can_choose_folder() else { return None }
   let picked = @web.pick_directory(file.as_any(), "readwrite").wait()
@@ -310,8 +304,8 @@ fn field_of(p : Picked) -> @parts.Field {
 
 ///|
 /// 宣言を聞く箱。初めて決めるときと、選び直して食い違ったときの両方
-async fn Assets::ask_declaration(
-  self : Assets,
+async fn Images::ask_declaration(
+  self : Images,
   p : Picked,
   was : String?,
 ) -> String? {
@@ -337,7 +331,7 @@ async fn Assets::ask_declaration(
 
 ///|
 /// 宣言を書く。宣言が変われば「どのパスが読めるか」も変わるので、絵は引き直す
-fn Assets::set_declared(self : Assets, value : String) -> Unit {
+fn Images::set_declared(self : Images, value : String) -> Unit {
   (self.deps.set_declared)(value)
   self.release_urls()
   (self.deps.refresh)()
@@ -352,8 +346,8 @@ fn Assets::set_declared(self : Assets, value : String) -> Unit {
 /// `inline` は「呼ぶ側のフォームが位置の欄を持っている」の合図。
 /// 画像を置く流れでは、フォルダも名前も 1 枚の中で聞きたいので、
 /// ここでは聞かずに欄だけ返す
-async fn Assets::settle(
-  self : Assets,
+async fn Images::settle(
+  self : Images,
   p : Picked,
   inline : Bool,
 ) -> @parts.Field? {
@@ -389,12 +383,12 @@ async fn Assets::settle(
 ///|
 /// 握りが腐った。**捨てて、繋ぎ直しの駅へ落とす** — 腐ったまま持っていると
 /// 次も同じところで失敗する。宣言は md に残るので、指し直せば戻る
-fn Assets::forget(self : Assets) -> Unit {
+fn Images::forget(self : Images) -> Unit {
   self.cached = None
   self.cached_known = true
   self.live = false
   match self.io.current_file() {
-    Some(file) => spawn(async fn() { self.io.handles.forget_folder(file) })
+    Some(file) => @web.spawn(async fn() { self.io.handles.forget_folder(file) })
     None => ()
   }
   self.release_urls()
@@ -419,7 +413,7 @@ async fn allowed(h : @web.DirHandle, mode : String) -> Bool {
 ///|
 /// 書けるフォルダを用意する。握っていればそれ、無ければ指してもらう。
 /// 返すのは「呼ぶ側のフォームに載せる位置の欄」（要らなければ None）。取りやめは None
-async fn Assets::ensure_binding(self : Assets) -> (Binding, @parts.Field?)? {
+async fn Images::ensure_binding(self : Images) -> (Binding, @parts.Field?)? {
   match self.stored_binding() {
     Some(binding) => {
       if allowed(binding.directory, "readwrite") {
@@ -450,7 +444,7 @@ async fn nested_file(
 }
 
 ///|
-async fn Assets::load_asset(self : Assets, path : String) -> Unit {
+async fn Images::load_asset(self : Images, path : String) -> Unit {
   guard self.stored_binding() is Some(binding) else { return }
   guard asset_target(self.declared_path(), path) is Some(parts) else { return }
   guard granted(binding.directory, "read") else { return }
@@ -470,12 +464,12 @@ async fn Assets::load_asset(self : Assets, path : String) -> Unit {
 
 ///|
 /// ローカル画像の objectURL。まだ読めていなければ None（引きに行く）
-pub fn Assets::image_url(self : Assets, path : String) -> String? {
+pub fn Images::image_url(self : Images, path : String) -> String? {
   match self.urls.get(path) {
     Some(hit) => hit
     None => {
       self.urls[path] = None
-      spawn(async fn() { self.load_asset(path) })
+      @web.spawn(async fn() { self.load_asset(path) })
       None
     }
   }
@@ -483,7 +477,7 @@ pub fn Assets::image_url(self : Assets, path : String) -> String? {
 
 ///|
 /// 文書が入れ替わった。絵も握りも捨て、その場で引き直す
-pub fn Assets::clear(self : Assets) -> Unit {
+pub fn Images::clear(self : Images) -> Unit {
   self.release_urls()
   self.cached = None
   self.cached_known = false
@@ -491,24 +485,24 @@ pub fn Assets::clear(self : Assets) -> Unit {
   // 捨てたその場で引き直す。`folder_name` は同期で答えるしかなく、
   // 「まだ引いていない」と「無い」を区別できない — 人が
   // メニューを開くより先に決着させて、嘘を言わせない
-  spawn(async fn() { self.stored_binding() |> ignore })
+  @web.spawn(async fn() { self.stored_binding() |> ignore })
 }
 
 ///|
 /// いま結び付いている画像フォルダの名前。未設定なら None
-pub fn Assets::folder_name(self : Assets) -> String? {
+pub fn Images::folder_name(self : Images) -> String? {
   self.cached.map(b => b.directory.name())
 }
 
 ///|
 /// いま画像が読めているか。**同期で答える** — 場所取りの字は描くたびに引かれるので、待てない
-pub fn Assets::readable(self : Assets) -> Bool {
+pub fn Images::readable(self : Images) -> Bool {
   self.live
 }
 
 ///|
 /// いま画像を読める状態か。**繋ぎ直しの箱を出すかの判定**。札を引き直し、許可まで見る
-pub async fn Assets::connected(self : Assets) -> Bool {
+pub async fn Images::connected(self : Images) -> Bool {
   self.live = match self.stored_binding() {
     Some(b) => granted(b.directory, "read")
     None => false
@@ -520,7 +514,7 @@ pub async fn Assets::connected(self : Assets) -> Bool {
 /// 繋ぎ直す。**札を持っているなら許可を聞くだけ**で済ませ、指し直しの
 /// ピッカーは出さない — 場所はもう分かっているのに選ばせるのは、
 /// 分かっていることを聞くのと同じ。札が無い / 断られたときだけ指してもらう
-pub async fn Assets::connect(self : Assets) -> Unit {
+pub async fn Images::connect(self : Images) -> Unit {
   let ok = (async fn() -> Unit {
     match self.stored_binding() {
       Some(b) =>
@@ -547,7 +541,7 @@ pub async fn Assets::connect(self : Assets) -> Unit {
 /// フォルダを指してもらう。**繋ぎ直しも選び直しも同じ一手** —
 /// 記録が無ければ宣言を決め、あって食い違えば直すか聞く（`settle`）。
 /// 保存されているかの確認は呼ぶ側（main.ts の駅）が済ませている
-pub async fn Assets::choose_folder(self : Assets) -> Unit {
+pub async fn Images::choose_folder(self : Images) -> Unit {
   (async fn() -> Unit {
     match self.pick() {
       Some(p) => self.settle(p, false) |> ignore
@@ -588,7 +582,7 @@ async fn taken(dir : @web.DirHandle) -> Set[String] {
 
 ///|
 /// 画像を置き、md に書く相対パスを返す。取りやめ / 失敗は None
-pub async fn Assets::save_to_disk(self : Assets, blob : @core.Any) -> String? {
+pub async fn Images::save_to_disk(self : Images, blob : @core.Any) -> String? {
   let ready = self.ensure_binding() catch {
     _ => {
       (self.deps.failed)("Couldn't open the image folder")

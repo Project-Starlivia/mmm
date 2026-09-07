@@ -63,7 +63,7 @@ fn names(rows : Array[Known]) -> Array[String] {
 ///|
 async test "opened: 行が無ければ作り、あれば前へ。画像フォルダは保つ" {
   let m : Memo = { table: Map([]), log: [], }
-  let h = Handles::new(memo_store(m))
+  let h = Recent::new(memo_store(m))
   assert_eq(h.list().length(), 0)
   h.opened(file(1, "a.md"))
   h.opened(file(2, "b.md"))
@@ -84,7 +84,7 @@ async test "opened: 行が無ければ作り、あれば前へ。画像フォル
 ///|
 async test "あふれたら古いものから捨てる（20 行）" {
   let m : Memo = { table: Map([]), log: [], }
-  let h = Handles::new(memo_store(m))
+  let h = Recent::new(memo_store(m))
   for i in 0..<25 {
     h.opened(file(i, "f\{i}.md"))
   }
@@ -101,7 +101,7 @@ async test "前の版の鍵（file / assets）を 1 行に読み替え、古い�
   let old = @core.new_object()
   old._set("directory", handle(7, "pics", true))
   m.table["assets"] = old
-  let h = Handles::new(memo_store(m))
+  let h = Recent::new(memo_store(m))
   let rows = h.list()
   assert_eq(names(rows), ["old.md"])
   assert_true(rows[0].directory is Some(_))
@@ -124,7 +124,7 @@ async test "壊れた行は落とす（型は名乗らせず確かめる）。�
   good._set("directory", @core.null())
   good._set("seen", @core.any(1.0))
   m.table["docs"] = @core.any([bad, good, @core.any(42)])
-  let h = Handles::new(memo_store(m))
+  let h = Recent::new(memo_store(m))
   let rows = h.list()
   assert_eq(names(rows), ["ok.md"])
   assert_true(rows[0].directory is None)

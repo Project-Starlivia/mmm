@@ -242,10 +242,3 @@ pub extern "js" fn write_blob(
 pub extern "js" fn stamp() -> String =
   #| () => { const d = new Date(), two = (v) => String(v).padStart(2, "0");
   #|   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}-${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`; }
-
-///|
-/// 続きで答えるもの（callback）を Promise に
-pub extern "js" fn promise_of(
-  f : ((@core.Any) -> Unit) -> Unit,
-) -> @js_async.Promise[@core.Any] =
-  #| (f) => new Promise((ok) => f(ok))

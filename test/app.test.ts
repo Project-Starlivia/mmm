@@ -4,8 +4,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import * as core from "../src/coreApi.ts";
-import { survey } from "../src/coreApi.ts";
+import * as core from "../src/app.ts";
+import { survey } from "../src/app.ts";
 
 test("survey は持ち手 — 問い合わせで読む。地番の label が無ければ null、無い id は null", () => {
   const s = survey("# r\n\n## a\n\n```\nx\n```\n");

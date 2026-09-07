@@ -397,11 +397,11 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
 - **parts/** — 帯と地図が共に使う部品。絵（`icons.mbt`。Lucide の綴りが唯一の表）、しらせ
   （`notice.mbt`。言葉の表もここで、知らない言葉は止める）、言い出し、道具の器、メニューの器
   （`menu.mbt`。行の形・入れ子・キーで辿る・外を押せば閉じる）。ts は作ってもらって置くだけ
-- **app/disk** — ディスク。`Io`（File System Access API の窓口。いま開いているファイル、
-  開く・保存・改名、覚えている文書）と `Handles`（札を IndexedDB に置く台帳。置き場 `Store` は
-  閉包で受け、試験は手元の表で回す）、`Assets`（画像の読み書き。宣言は md の頭が持ち、許可は
+- **app/disk** — ディスク。`Disk`（File System Access API の窓口。いま開いているファイル、
+  開く・保存・改名）と `Recent`（覚えている文書と画像フォルダ。札を IndexedDB に置く台帳。置き場 `Store` は
+  閉包で受け、試験は手元の表で回す）、`Images`（画像の読み書き。宣言は md の頭が持ち、許可は
   札。フォルダを指してもらい、宣言を決める / 直す `settle`、置く名前の柵、webp への変換と書き込み）。
-  落とされたファイルの振り分け（`dnd.mbt`。ドラッグ中は種類だけで受ける / 断るを言い、`.md` は開き、
+  落とされたファイルの振り分け（`drop.mbt`。ドラッグ中は種類だけで受ける / 断るを言い、`.md` は開き、
   画像はノードの上だけ）。札（`FileHandle` / `DirHandle`）は `#external` の持ち手で、
   中は覗かない。**置き場に入れる行は素の object に組み直す** — MoonBit の Option は JS の値ではない
 - **web/** — DOM の小さな道具。js_browser に型の無い呼び出しを 1 行ずつ包み、他の package は

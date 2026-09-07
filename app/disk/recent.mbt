@@ -56,7 +56,7 @@ pub(all) struct Store {
 }
 
 ///|
-pub struct Handles {
+pub struct Recent {
   store : Store
   /// 読み替えは済んだか。**1 セッションに 1 度でいい** — 済んだ後も毎回
   /// 古い鍵を読みに行くと、`list` を呼ぶたびに無駄な往復が 4 回増える
@@ -64,13 +64,13 @@ pub struct Handles {
 }
 
 ///|
-pub fn Handles::new(store : Store) -> Handles {
+pub fn Recent::new(store : Store) -> Recent {
   { store, inherited: false, }
 }
 
 ///|
 /// 覚えていたものが、いまも期待の形をしているか（型は名乗らせず確かめる）
-fn Handles::known_of(self : Handles, v : @core.Any) -> Known? {
+fn Recent::known_of(self : Recent, v : @core.Any) -> Known? {
   guard @core.is_object(v) else { return None }
   let doc = v._get("doc")
   guard (self.store.is_file)(doc) else { return None }
@@ -90,7 +90,7 @@ fn Handles::known_of(self : Handles, v : @core.Any) -> Known? {
 ///|
 /// 前の版が残したもの（`file` と `assets`）を 1 行に読み替える。
 /// **版が上がっただけで開き直しをさせない。** 読み替えたら古い鍵は捨てる
-async fn Handles::carry_over(self : Handles) -> Array[Known] {
+async fn Recent::carry_over(self : Recent) -> Array[Known] {
   guard !self.inherited else { return [] }
   self.inherited = true
   let file = (self.store.read)(legacy_file)
@@ -126,7 +126,7 @@ fn row_of(k : Known) -> @core.Any {
 }
 
 ///|
-async fn Handles::rows(self : Handles) -> Array[Known] {
+async fn Recent::rows(self : Recent) -> Array[Known] {
   let v = (self.store.read)(docs_key)
   if @core.is_array(v) {
     @core.array_from(v).filter_map(x => self.known_of(x))
@@ -138,8 +138,8 @@ async fn Handles::rows(self : Handles) -> Array[Known] {
 ///|
 /// その文書の行を探す。**札どうしは `same` でしか比べられない** —
 /// 中身が覗けないので、鍵で引くのではなく端から照合する（だから `keep` 行）
-async fn Handles::find(
-  self : Handles,
+async fn Recent::find(
+  self : Recent,
   rows : Array[Known],
   file : @web.FileHandle,
 ) -> Int {
@@ -167,7 +167,7 @@ fn by_recent(rows : Array[Known]) -> Array[Known] {
 }
 
 ///|
-async fn Handles::save(self : Handles, rows : Array[Known]) -> Unit {
+async fn Recent::save(self : Recent, rows : Array[Known]) -> Unit {
   (self.store.write)(
     docs_key,
     @core.any(by_recent(rows).iter().take(keep).map(row_of).collect()),
@@ -176,14 +176,14 @@ async fn Handles::save(self : Handles, rows : Array[Known]) -> Unit {
 
 ///|
 /// 知っている文書。**最後に触れた順** — Files の並びがそのままこれ
-pub async fn Handles::list(self : Handles) -> Array[Known] {
+pub async fn Recent::list(self : Recent) -> Array[Known] {
   self.rows()
 }
 
 ///|
 /// 開いた / 保存した。行が無ければ作り、あれば触れた印を新しくする。
 /// **画像フォルダは保つ** — 同じ文書に戻れば結び付きも戻る
-pub async fn Handles::opened(self : Handles, file : @web.FileHandle) -> Unit {
+pub async fn Recent::opened(self : Recent, file : @web.FileHandle) -> Unit {
   let rows = self.rows()
   let at = self.find(rows, file)
   let was = rows.get(at)
@@ -200,8 +200,8 @@ pub async fn Handles::opened(self : Handles, file : @web.FileHandle) -> Unit {
 
 ///|
 /// その文書の画像フォルダ。覚えていなければ None
-pub async fn Handles::folder_for(
-  self : Handles,
+pub async fn Recent::folder_for(
+  self : Recent,
   file : @web.FileHandle,
 ) -> @web.DirHandle? {
   let rows = self.rows()
@@ -211,8 +211,8 @@ pub async fn Handles::folder_for(
 
 ///|
 /// 画像フォルダを覚える。行が無ければ作る
-pub async fn Handles::remember_folder(
-  self : Handles,
+pub async fn Recent::remember_folder(
+  self : Recent,
   file : @web.FileHandle,
   directory : @web.DirHandle,
 ) -> Unit {
@@ -227,8 +227,8 @@ pub async fn Handles::remember_folder(
 
 ///|
 /// 画像フォルダだけ忘れる（触って失敗した・指し先が消えた）。行は残す
-pub async fn Handles::forget_folder(
-  self : Handles,
+pub async fn Recent::forget_folder(
+  self : Recent,
   file : @web.FileHandle,
 ) -> Unit {
   let rows = self.rows()

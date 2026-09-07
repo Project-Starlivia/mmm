@@ -156,11 +156,6 @@ pub async fn run(deps : ExportDeps, way : Way) -> Bool {
 }
 
 ///|
-fn spawn(f : async () -> Unit) -> Unit {
-  @js_async.Promise::from_async(f) |> ignore
-}
-
-///|
 /// 出し方の並び（`▾` に出す）。
 ///
 /// `header` はヘッダから開いたときの走らせ方。**選ばれた出し方を渡すだけで、
@@ -186,7 +181,7 @@ pub fn export_ways(
       @parts.Run(@parts.row(way.label, mark=Some(way.mark), disabled~), () => {
         match header {
           Some(h) => h(way)
-          None => spawn(async fn() { run(deps, way) |> ignore })
+          None => @web.spawn(async fn() { run(deps, way) |> ignore })
         }
       }),
     )
@@ -284,7 +279,7 @@ fn Export::undo(self : Export) -> Unit {
 /// かもしれないので、必ず通す
 fn Export::fire(self : Export, chosen : Way) -> Unit {
   @parts.nod(
-    k => spawn(async fn() { k(run(self.deps, chosen)) }),
+    k => @web.spawn(async fn() { k(run(self.deps, chosen)) }),
     mark => self.put(mark),
     ok => {
       if ok {
