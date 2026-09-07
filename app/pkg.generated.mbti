@@ -37,9 +37,9 @@ pub fn toggled(Vis, Pane, Array[Vis]) -> Vis
 pub struct App {
   doc : @dom.Document
   ed : Editor
-  io : @disk.Io
+  io : @disk.Disk
   map : @mindmap.Mindmap
-  assets : @disk.Assets
+  images : @disk.Images
   theme : @bar.Theme
   exporter : @bar.Export
   md_pane : @dom.Element
@@ -55,7 +55,7 @@ pub struct App {
 pub fn App::apply(Self, @op.Op, Bool) -> Int?
 pub fn App::boot(Self) -> Unit
 pub fn App::cycle(Self, @read.Survey?, Bool) -> Unit
-pub fn App::new(@dom.Document, Editor, @disk.Io, measure? : (@map.Font, String) -> Double) -> Self
+pub fn App::new(@dom.Document, Editor, @disk.Disk, measure? : (@map.Font, String) -> Double) -> Self
 
 pub(all) struct Editor {
   text : () -> String

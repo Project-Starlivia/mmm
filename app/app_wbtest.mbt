@@ -98,10 +98,10 @@ fn Fake::editor(self : Fake) -> Editor {
 
 ///|
 /// 手元の置き場（ディスクの代わり）。何も覚えていない
-fn memo_io() -> @disk.Io {
+fn memo_io() -> @disk.Disk {
   let table : Map[String, @core.Any] = Map([])
-  @disk.Io::new(
-    @disk.Handles::new({
+  @disk.Disk::new(
+    @disk.Recent::new({
       read: fn(key) { table.get(key).unwrap_or(@core.null()) },
       write: fn(key, value) { table[key] = value },
       remove: fn(key) { table.remove(key) },

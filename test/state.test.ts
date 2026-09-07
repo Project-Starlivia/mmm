@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EditorState } from "@codemirror/state";
 import { anchors, choice, fields, focused, highlightRanges, holder, setAnchors, setHolder, tree } from "../src/state.ts";
-import * as core from "../src/coreApi.ts";
+import * as core from "../src/app.ts";
 
 /** "# r\n\n## a\n\n## b\n": r=2 [0,2,16], a=3 [5,8,10], b=4 [11,14,16] */
 const md = "# r\n\n## a\n\n## b\n";

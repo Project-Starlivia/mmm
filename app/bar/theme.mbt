@@ -85,7 +85,7 @@ pub fn Theme::set_dirty(self : Theme, dirty : Bool) -> Unit {
 }
 
 ///|
-/// カラーとテーマの配線と、保存値の復元。`logo` は topbar の `<svg id="logo">`
+/// カラーとテーマの配線と、保存値の復元。`logo` は 帯 の `<svg id="logo">`
 /// （中身はここが入れる）。`set_editor_theme` は CodeMirror 側のテーマ切り替え
 /// （DOM の外なので注入）
 pub fn Theme::new(
@@ -98,7 +98,7 @@ pub fn Theme::new(
   guard @parts.accent(doc) is Some(base) else {
     abort("style.css の --accent が読めない")
   }
-  // ロゴの形の源は logo.mbt ひとつ。topbar も favicon もここから作る
+  // ロゴの形の源は logo.mbt ひとつ。帯 も favicon もここから作る
   // （静的ファイルに複製すると、以前のように片方だけ左右が反転していても
   // 誰も気づけない）。色は currentColor = --accent
   logo.insertAdjacentHTML("beforeend", logo_inner("currentColor"))

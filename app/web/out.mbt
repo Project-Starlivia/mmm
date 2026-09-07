@@ -56,8 +56,3 @@ pub extern "js" fn data_url(href : String) -> @js_async.Promise[String] =
   #|   const fr = new FileReader();
   #|   fr.onload = () => (typeof fr.result === "string" ? ok(fr.result) : no(new Error("not a data url")));
   #|   fr.onerror = () => no(fr.error); fr.readAsDataURL(b); }))
-
-///|
-/// 何であれ Promise に（ts の閉包が返したものを待てるように）
-pub extern "js" fn settled(v : @core.Any) -> @js_async.Promise[@core.Any] =
-  #| (v) => Promise.resolve(v)
