@@ -444,3 +444,210 @@ test "number — 文書順に振り直したときの番号。中身も同じ列
   assert_eq(number(d, 998), Some(7))
   assert_eq(number(d, 8), None)
 }
+
+// ══════════════════════════════════════════════════════════════════
+// 項目の中身は文書と同じ規則で読む — 見出しは項目の子
+// ══════════════════════════════════════════════════════════════════
+
+///|
+/// 空の項目の子に `n`。`- - n` と同じ木
+test "項目の中の見出しは子 — 名前の無い項目の子になる" {
+  json_inspect(parse("- # n\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "",
+            "body": [],
+            "children": [{ "id": 3, "label": "n", "body": [], "children": [] }],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+test "項目の中の見出しは子 — 名前のある項目の子にもなる" {
+  json_inspect(parse("- x\n  # n\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "x",
+            "body": [],
+            "children": [{ "id": 3, "label": "n", "body": [], "children": [] }],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// n > s（中身 text）> k。文書と同じ規則
+test "項目の中の見出しは子 — 見出しの後ろは文書と同じく中身と子" {
+  json_inspect(parse("- # n\n  ## s\n  text\n  - k\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "n",
+                "body": [],
+                "children": [
+                  {
+                    "id": 4,
+                    "label": "s",
+                    "body": [{ "id": 5, "content": ["Raw", "text"] }],
+                    "children": [
+                      { "id": 6, "label": "k", "body": [], "children": [] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// 飛びは埋めない（項目は相対記法）。`###` でも直の子
+test "項目の中の見出しは子 — 飛びは埋めない" {
+  json_inspect(parse("- ### a\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "",
+            "body": [],
+            "children": [{ "id": 3, "label": "a", "body": [], "children": [] }],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// `- k` は開いている `# a` の子。同じ深さの `# b` は `a` を閉じるので、
+/// 持ち主は項目 `x` に戻り `a` の兄弟になる（x > [a > [k], b]）。
+test "項目の中の見出しは子 — 見出しを閉じれば、続く見出しは元の項目の子" {
+  json_inspect(parse("- x\n  # a\n  - k\n  # b\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "x",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "body": [],
+                "children": [
+                  { "id": 4, "label": "k", "body": [], "children": [] },
+                ],
+              },
+              { "id": 5, "label": "b", "body": [], "children": [] },
+            ],
+          },
+        ],
+        "sides": ["Right", "Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// 項目を出れば積みも持ち主も戻る。`# b` は前の項目の `## a` に引きずられず、
+/// 2 つ目の項目の子（名前の無い項目 2 つが、それぞれ子を 1 つ持つ）。
+test "項目の中の見出しは子 — 見出しの積みは項目ごと" {
+  json_inspect(parse("- ## a\n- # b\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "",
+            "body": [],
+            "children": [{ "id": 3, "label": "a", "body": [], "children": [] }],
+          },
+        ],
+        "sides": ["Right"],
+      },
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 4,
+            "label": "",
+            "body": [],
+            "children": [{ "id": 5, "label": "b", "body": [], "children": [] }],
+          },
+        ],
+        "sides": ["Right"],
+      },
+    ],
+  })
+}
+
+///|
+/// `# b` は `## a` より浅いので兄弟
+test "項目の中の見出しは子 — 浅く戻れば兄弟" {
+  json_inspect(parse("- ## a\n  # b\n"), content={
+    "eol": "Lf",
+    "body": [],
+    "roots": [
+      {
+        "node": [
+          "ListNode",
+          {
+            "id": 2,
+            "label": "",
+            "body": [],
+            "children": [
+              { "id": 3, "label": "a", "body": [], "children": [] },
+              { "id": 4, "label": "b", "body": [], "children": [] },
+            ],
+          },
+        ],
+        "sides": ["Right", "Right"],
+      },
+    ],
+  })
+}

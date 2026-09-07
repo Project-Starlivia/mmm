@@ -14,6 +14,46 @@ test "Rename — 編集を当てれば名前が替わり、focus はそのノー
 }
 
 ///|
+test "Rename — 名前の字はそのまま md に置かれ、読み直しても同じ" {
+  assert_eq(
+    applied("# a\n", Rename(id=2, label="foo_bar")),
+    ("# foo_bar\n", Some(2)),
+  )
+  assert_eq(
+    applied("# a\n", Rename(id=2, label="__init__")),
+    ("# __init__\n", Some(2)),
+  )
+  assert_eq(applied("- a\n", Rename(id=2, label="2*3")), ("- 2*3\n", Some(2)))
+}
+
+///|
+/// 項目の名前 `---` は md では水平線。項目は無くなり、`a` の中身の水平線になる。
+/// 木と md の形が食い違うので focus は無い（番号のまま返すと別のノードを指す）
+test "Rename — 書いた md が別の形に読まれるなら focus は無い" {
+  assert_eq(
+    applied("# a\n\n- b\n", Rename(id=3, label="---")),
+    ("# a\n\n---\n", None),
+  )
+}
+
+///|
+/// 根の子の隙間に落ちれば、水平線は側の変わり目。項目 `c` は木から消え、
+/// `d` の側が右から左へ変わる。
+test "Rename — 項目が根の子なら、`---` は側の変わり目になる" {
+  assert_eq(
+    applied("# a\n\n## b\n\n- c\n\n## d\n", Rename(id=4, label="---")),
+    ("# a\n\n## b\n\n---\n\n## d\n", None),
+  )
+}
+
+///|
+/// 閉じの `#` は飾りなので、`# foo ##` は `foo` に読まれる。木と md の形が
+/// 食い違うので focus は無い。
+test "Rename — 閉じの `#` は飾りなので、書けば読みは変わり focus は無い" {
+  assert_eq(applied("# a\n", Rename(id=2, label="foo ##")), ("# foo\n", None))
+}
+
+///|
 test "できない操作 — 編集は無く、focus も無い" {
   assert_eq(edit("# a\n", Rename(id=9, label="b")), { edits: [], focus: None, })
 }

@@ -79,6 +79,7 @@ pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
     own: deep,
     dry: false,
     owner: 0,
+    hl: [],
   }
   for piece in pieces(md, ast.children, b.defs, 0) {
     lay(b, piece, 0)
@@ -218,9 +219,14 @@ priv struct Build {
   mut own : Int
   /// 深さを測るだけの空打ちか。畳みを見ないので、項目の中も読み解かない
   dry : Bool
-  /// いま中身を読んでいる項目の深さ。**入れ子の列はその 1 つ下に座る** —
-  /// stack の高さで測ると、前の列の項目が積まれたままなので次の列がその子になる
+  /// いま中身を読んでいる持ち主（項目、またはその中の見出し）の深さ。
+  /// **入れ子の列はその 1 つ下に座る** — stack の高さで測ると、前の列の
+  /// 項目が積まれたままなので次の列がその子になる
   mut owner : Int
+  /// いま中身を読んでいる項目の中の、開いている見出しの `#` の本数（浅い順）。
+  /// 項目の中身は文書と同じ規則で読むが、飛びは埋めない（項目は相対記法）ので、
+  /// 深さは本数そのものではなく「開いている見出しの数」で決める
+  mut hl : Array[Int]
 }
 
 ///|
@@ -266,6 +272,7 @@ fn depths(
     own: deep,
     dry: true,
     owner: 0,
+    hl: [],
   }
   let out = Array::make(blocks.length(), { top: deep, own: deep, })
   for i, block in blocks {
@@ -319,23 +326,31 @@ fn take(
   fold? : Fold? = None,
 ) -> Unit {
   match block {
-    // **単調性 — 項目の子孫は項目。** 項目の領土に書かれた見出しは骨格に
-    // ならず、原文のまま中身になる（列 0 へ出れば項目が閉じて木が変わる）
-    Heading(span~, ..) if nest > 0 =>
-      fill(b, Raw(verbatim(b.md, block)), from=span.from, to=span.to)
-    Heading(level~, style~, children~, span~, ..) =>
+    Heading(level~, style~, children~, span~, ..) => {
+      let (sign, depth) : (Sign, Int) = if nest > 0 {
+        // **項目の中身は文書と同じ規則で読む。** 中の見出しは項目の子（型が「項目の
+        // 子孫は項目」なので綴りは項目）。`#` の本数は入れ子の相対だけを決め、飛びは
+        // 埋めない。見出しの後ろの中身と入れ子はその見出しのもの（owner を進める）。
+        // 持ち主は**項目の深さ + 開いている見出しの数**。同じか浅い見出しは
+        // 開いている見出しを閉じるので、その数だけ浅い所へ戻る
+        let item_level = b.owner - b.hl.length()
+        while b.hl.length() > 0 && b.hl[b.hl.length() - 1] >= level {
+          ignore(b.hl.unsafe_pop())
+        }
+        b.hl.push(level)
+        b.owner = item_level + b.hl.length()
+        (Item, b.owner)
+      } else {
+        (Heading, level)
+      }
       put(
         b,
-        level,
-        Line(
-          sign=Heading,
-          label=head_label(b.md, span, style, children),
-          fold~,
-          body=[],
-        ),
+        depth,
+        Line(sign~, label=head_label(b.md, span, style, children), fold~, body=[]),
         at=span,
         label=head_start(b.md, span, style),
       )
+    }
     BulletList(items~, ..) => items_take(b, items, nest, fold~)
     OrderedList(items~, ..) => items_take(b, items, nest, fold~)
     // 区切りは**根の領土の隙間**でだけ側の変わり目になる。項目の中は中身なので
@@ -415,11 +430,14 @@ fn items_take(
       pieces(b.md, rest, defs_in(b.defs, from, it.span.to), nest + 1)
     }
     let outer = b.owner
+    let outer_hl = b.hl
     b.owner = level
+    b.hl = []
     for c in inner {
       lay(b, c, nest + 1)
     }
     b.owner = outer
+    b.hl = outer_hl
   }
 }
 

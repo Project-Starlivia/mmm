@@ -1,8 +1,8 @@
 // mmmTree → mdAst。build の逆。
 //
 // 我々の写像は**骨格だけ** — 深さを `#` の数に、側の変わり目を水平線に、
-// 畳みを `<details>` の塊にする。中身とラベルは md として読み直して
-// mdAst に戻す（読みが原文を切り出したのを、そのまま返す）。
+// 畳みを `<details>` の塊にする。ラベルは原文の 1 行を生の行として渡す
+// （md として読み直さない）。中身は md として読み直す（PR 2 で原文に揃える）。
 //
 // 字下げ・フェンスの長さ・空行・エスケープ・定義行の置き場は
 // ライブラリの serializer が持ち、ここには文字列の規則が 1 つも無い。
@@ -186,7 +186,7 @@ fn underlined(l : ListNode) -> Bool {
 fn list_item(u : Unbuild, l : ListNode) -> @markdown.ListItem {
   let kids = []
   if l.label != "" {
-    kids.push(paragraph(inlines(l.label)))
+    kids.push(paragraph([verbatim_inline(l.label)]))
   }
   for b in l.body {
     content(u, kids, b)
@@ -209,7 +209,9 @@ fn content(u : Unbuild, out : Array[@markdown.Block], b : Block) -> Unit {
       out.push(paragraph([Image(alt~, url=src, title~, span=nowhere)]))
     Link(text~, href~, title~) =>
       out.push(
-        paragraph([Link(children=inlines(text), url=href, title~, span=nowhere)]),
+        paragraph([
+          Link(children=[verbatim_inline(text)], url=href, title~, span=nowhere),
+        ]),
       )
     Code(info~, text~) =>
       out.push(
@@ -246,22 +248,18 @@ fn splice(u : Unbuild, out : Array[@markdown.Block], text : String) -> Unit {
 }
 
 ///|
-fn inlines(text : String) -> Array[@markdown.Inline] {
-  @markdown.parse_inlines(text)
+/// 見出しの行。**名前は md の 1 行の原文**なので、ライブラリに読み直させず
+/// 生の行として渡す（`HtmlBlock` は中身を逃がさずそのまま書く）。
+/// 空の名前は `##` だけ（Implicit を綴った空の見出しと同じ）。
+fn heading(level : Int, label : String) -> @markdown.Block {
+  let line = String::make(level, '#')
+  html(if label == "" { line } else { line + " " + label })
 }
 
 ///|
-/// 改行を含むラベルは setext と名乗る（ライブラリは今のところ ATX で書く）。
-fn heading(level : Int, label : String) -> @markdown.Block {
-  Heading(
-    level~,
-    style=if label.contains("\n") { Setext } else { Atx },
-    children=inlines(label),
-    closing_hashes=0,
-    span=nowhere,
-    leading_trivia=@markdown.Trivia::empty(),
-    trailing_trivia=@markdown.Trivia::empty(),
-  )
+/// 項目の名前と Link の題。生の字として段落に置く（逃がさない）。
+fn verbatim_inline(text : String) -> @markdown.Inline {
+  HtmlInline(html=text, span=nowhere)
 }
 
 ///|

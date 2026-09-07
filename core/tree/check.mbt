@@ -17,8 +17,6 @@ pub(all) enum Flaw {
   BarrenImplicit(Int)
   /// 側の本数が根の子と合わない
   SideCount(root~ : Int, sides~ : Int, children~ : Int)
-  /// 畳みの名前が `<summary>` に書けない。読み戻すと別のものになる
-  UnwritableName(Int)
   /// 中身の尻の水平線に骨格が続く。境界（側の変わり目）に読まれて中身に残らない
   BorderBreak(Int)
   /// 見出し（綴られた・綴られない）に境界なしで続く項目・Implicit。その見出しに
@@ -54,14 +52,6 @@ pub fn check(doc : Doc) -> Array[Flaw] {
     }
   }
 
-  /// 「畳んでいないのに open」は型が殺しているので、ここには来ない。
-  fn named(n : Int, fold : Fold?) -> Unit {
-    guard fold is Some({ summary: Some(s), .. }) else { return }
-    if !writable(s) {
-      flaws.push(UnwritableName(n))
-    }
-  }
-
   // 中身の尻に水平線があれば、次の骨格の行で境界に読まれる。
   // 項目の中の水平線は中身なので保留しない
   let border : Ref[Int?] = { val: None, }
@@ -83,7 +73,6 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   fn items(xs : Array[ListNode]) -> Unit {
     for x in xs {
       id(x.id)
-      named(x.id, x.fold)
       blocks(x.body)
       items(x.children)
     }
@@ -111,14 +100,12 @@ pub fn check(doc : Doc) -> Array[Flaw] {
           if depth > deepest {
             flaws.push(TooDeep(h.id))
           }
-          named(h.id, h.fold)
           blocks(h.body)
           border.val = trailing(h.body)
           nodes(h.children, depth + 1, kids(i), _ => [])
         }
         ListNode(l) => {
           id(l.id)
-          named(l.id, l.fold)
           blocks(l.body)
           items(l.children)
         }
@@ -157,35 +144,6 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   border.val = trailing(doc.body)
   nodes(doc.roots.map(r => r.node), 1, [], i => doc.roots[i].sides)
   flaws
-}
-
-///|
-/// 畳みの名前として `<summary>` に書けるか。**塊が割れる字並びは書けない** —
-/// `<summary>` の中身は最初の `</summary>` までで、生の HTML の塊は空行で終わる。
-/// 畳む操作もこれで見て、書けなければ名前を付けずに畳む。
-pub fn writable(s : String) -> Bool {
-  !(s.contains("</summary>") || blank_line(s))
-}
-
-///|
-/// 空行が混じっているか。行いっぱいが空白の行は、生の HTML の塊を終わらせる。
-fn blank_line(s : String) -> Bool {
-  let mut i = 0
-  while i < s.length() {
-    guard s[i] == '\n' else {
-      i = i + 1
-      continue
-    }
-    let mut k = i + 1
-    while k < s.length() && (s[k] == ' ' || s[k] == '\t' || s[k] == '\r') {
-      k = k + 1
-    }
-    if k < s.length() && s[k] == '\n' {
-      return true
-    }
-    i = k
-  }
-  false
 }
 
 ///|

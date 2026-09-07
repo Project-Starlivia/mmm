@@ -538,8 +538,9 @@ test "項目の中のコードは塊ごと字下げ" {
 }
 
 ///|
-/// 項目の中の見出しは骨格にならず中身（単調性）。書いても項目の中に居る。
-test "項目の中の見出しは中身のまま" {
+/// 木が中身として持っているなら、見出しの形の行でも中身。読みは項目の子に
+/// するが、書きは木が言うとおりに字下げして置くだけ。
+test "中身の見出しの形の行は、字下げした中身のまま" {
   inspect(
     serialize(doc([root(item("a", body=[Raw("# x")]))])),
     content=(
@@ -778,5 +779,77 @@ test "畳みと側" {
       #|</details>
       #|
     ),
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 名前 — md の 1 行の原文。mmm は字を足しも引きもしない
+// ══════════════════════════════════════════════════════════════════
+
+///|
+test "名前の字はそのまま — 逃がさず、強調にも直さない" {
+  inspect(serialize(doc([root(h("foo_bar"))])), content="# foo_bar\n")
+  inspect(serialize(doc([root(h("__init__"))])), content="# __init__\n")
+  inspect(serialize(doc([root(h("a\\_b"))])), content="# a\\_b\n")
+  inspect(serialize(doc([root(h("# node"))])), content="# # node\n")
+  inspect(serialize(doc([root(h("foo ##"))])), content="# foo ##\n")
+  inspect(serialize(doc([root(h("a</summary>b"))])), content="# a</summary>b\n")
+  inspect(serialize(doc([root(item("foo_bar"))])), content="- foo_bar\n")
+  inspect(serialize(doc([root(item("__init__"))])), content="- __init__\n")
+  inspect(serialize(doc([root(item("a\\_b"))])), content="- a\\_b\n")
+  inspect(serialize(doc([root(item("# node"))])), content="- # node\n")
+  inspect(serialize(doc([root(item("foo ##"))])), content="- foo ##\n")
+  inspect(
+    serialize(doc([root(item("a</summary>b"))])),
+    content="- a</summary>b\n",
+  )
+}
+
+///|
+test "名前の字はそのまま — 子と中身を持っても行は変わらない" {
+  inspect(
+    serialize(
+      doc([root(h("a_b", children=[item("c*d", children=[li("e_f")])]))]),
+    ),
+    content="# a_b\n\n- c*d\n  - e_f\n",
+  )
+}
+
+///|
+/// `- # node` は空の項目の子 `node`。書き戻せば `- - node`（現状の正規形）
+test "項目の中の見出しは、書き戻せば入れ子の項目" {
+  inspect(serialize(parse("- # node\n")), content="- - node\n")
+  inspect(
+    serialize(parse("- x\n  # n\n  ## s\n")),
+    content="- x\n  - n\n    - s\n",
+  )
+}
+
+///|
+/// #93 — 題は原文のまま置く。逃がしは打つ人の仕事で、mmm は足しも引きもしない
+test "Link の題はそのまま — 逃がしを足さず、消さない" {
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("a", body=[
+            Link(text="\\[WIP\\] design", href="https://e.com/x", title=""),
+          ]),
+        ),
+      ]),
+    ),
+    content="# a\n\n[\\[WIP\\] design](https://e.com/x)\n",
+  )
+  inspect(
+    serialize(
+      doc([
+        root(
+          h("a", body=[
+            Link(text="[WIP] design", href="https://e.com/x", title=""),
+          ]),
+        ),
+      ]),
+    ),
+    content="# a\n\n[[WIP] design](https://e.com/x)\n",
   )
 }

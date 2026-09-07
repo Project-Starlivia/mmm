@@ -320,10 +320,10 @@ test "項目にも中身が付く" {
 }
 
 ///|
-/// **容器の字下げは剥がす。** 項目の中の行頭の空白はその項目の記法であって
-/// 中身ではない。剥がさないと切り出しの列がずれ、深い入れ子では読み直したときに
-/// 字下げコードへ化ける。
-test "項目の中の切り出しは列 0 に揃う" {
+/// **容器の字下げを剥がすから、項目の中の `<details>` も畳みとして読める。**
+/// 剥がさないと切り出しの列がずれ、深い入れ子では字下げコードへ化ける。
+/// 包まれた `## h` は項目の子になり、畳みはその見出しに乗る。
+test "項目の中の畳みは、包んだ見出しに乗る" {
   json_inspect(parse("- a\n\n  <details>\n\n  ## h\n\n  </details>\n"), content={
     "eol": "Lf",
     "body": [],
@@ -334,31 +334,27 @@ test "項目の中の切り出しは列 0 に揃う" {
           {
             "id": 2,
             "label": "a",
-            "body": [
+            "body": [],
+            "children": [
               {
                 "id": 3,
-                "content": [
-                  "Details",
-                  {
-                    "text": "<details>\n\n## h\n\n</details>",
-                    "open": false,
-                    "body": "## h",
-                  },
-                ],
+                "label": "h",
+                "fold": { "open": false },
+                "body": [],
+                "children": [],
               },
             ],
-            "children": [],
           },
         ],
-        "sides": [],
+        "sides": ["Right"],
       },
     ],
   })
 }
 
 ///|
-/// 2 段でも同じ。剥がす幅は容器の字下げそのもの。
-test "入れ子の項目でも列 0 に揃う" {
+/// 2 段でも同じ。剥がす幅は容器の字下げそのものなので、深い項目でも畳みは乗る。
+test "入れ子の項目でも、畳みは包んだ見出しに乗る" {
   json_inspect(
     parse("- a\n  - b\n\n    <details>\n\n    ## h\n\n    </details>\n"),
     content={
@@ -376,20 +372,16 @@ test "入れ子の項目でも列 0 に揃う" {
                 {
                   "id": 3,
                   "label": "b",
-                  "body": [
+                  "body": [],
+                  "children": [
                     {
                       "id": 4,
-                      "content": [
-                        "Details",
-                        {
-                          "text": "<details>\n\n## h\n\n</details>",
-                          "open": false,
-                          "body": "## h",
-                        },
-                      ],
+                      "label": "h",
+                      "fold": { "open": false },
+                      "body": [],
+                      "children": [],
                     },
                   ],
-                  "children": [],
                 },
               ],
             },

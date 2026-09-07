@@ -1,7 +1,8 @@
 // 操作と合流の結合を法則で固定する。
 //
-//   法則 — edit の編集を md に当てて読み直せば、apply の後の木と形が一致する
-//   focus — 読み替えた focus は、後の木で focus だったのと同じ部分木を指す
+//   法則 — edit の編集を md に当てて読み直した形が apply の後の木と一致すれば、
+//          読み替えた focus は後の木で focus だったのと同じ部分木を指す。
+//          一致しなければ focus は無い（`- ---` で項目が水平線になる等）
 //   できない操作 — 編集も focus も無い
 //   Delete の focus — 消した後の focus は消えていない兄弟か祖先（中身なら持ち主）で、
 //              畳みの中に埋もれていない。無いのは最後の根と文書の散文を消したときだけ
@@ -143,6 +144,8 @@ fn ops_for(all : Array[Int]) -> Array[Op] {
   let ops : Array[Op] = []
   for id in all {
     ops.push(Rename(id~, label="z"))
+    // 書けば別の形に読まれる名前。形の食い違いに触れるのはこの 1 つだけ
+    ops.push(Rename(id~, label="---"))
     ops.push(Fold(id~, open=false))
     ops.push(Unfold(id~))
     ops.push(Delete(ids=[id]))
@@ -174,7 +177,7 @@ fn ops_for(all : Array[Int]) -> Array[Op] {
 }
 
 ///|
-test "法則 — 読み直せば操作後の木と形が一致し、focus は同じ部分木を指す" {
+test "法則 — 形が一致すれば focus は同じ部分木を指し、一致しなければ focus は無い" {
   let mut some = 0
   let bad : Array[String] = []
   for i, md in corpus {
@@ -187,7 +190,9 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
           some = some + 1
           let after = @tree.parse(@tree.apply(md, r.edits))
           if @tree.shape(after) != @tree.shape(done.doc) {
-            bad.push("\{what}: 形が違う")
+            if r.focus is Some(_) {
+              bad.push("\{what}: 形が違うのに focus がある")
+            }
             continue
           }
           match (done.focus, r.focus) {
@@ -210,7 +215,7 @@ test "法則 — 読み直せば操作後の木と形が一致し、focus は同
   }
   json_inspect(bad, content=[])
   // 全部 None に潰れる退化を落とすための下限チェック
-  inspect(some, content="1480")
+  inspect(some, content="1528")
 }
 
 ///|
@@ -431,7 +436,7 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   }
   json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
-  inspect(n, content="1438")
+  inspect(n, content="1486")
 }
 
 ///|
