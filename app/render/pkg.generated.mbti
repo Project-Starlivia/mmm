@@ -1,13 +1,13 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mmm-app/core/render"
+package "mmm/app/render"
 
 import {
   "mizchi/js/builtins/global",
   "mizchi/js_browser/dom",
-  "mmm-app/core/map",
-  "mmm-app/core/op",
-  "mmm-app/core/parts",
-  "mmm-app/core/read",
+  "mmm/app/parts",
+  "mmm/core/map",
+  "mmm/core/op",
+  "mmm/core/read",
   "moonbitlang/core/set",
 }
 

@@ -1,8 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mmm-app/core/view"
+package "mmm/core/view"
 
 import {
-  "mmm-app/core/tree",
+  "mmm/core/tree",
   "moonbitlang/core/debug",
 }
 

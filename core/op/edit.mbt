@@ -15,9 +15,9 @@ pub(all) struct Edited {
 } derive(Eq, Debug, ToJson)
 
 ///|
-pub fn edit(md : String, op : @op.Op) -> Edited {
+pub fn edit(md : String, op : Op) -> Edited {
   let (before, spans) = @tree.survey(md)
-  match @op.apply(before, op) {
+  match apply(before, op) {
     Some(done) => {
       let edits = @tree.merge(md, before, spans, done.doc)
       let focus = done.focus.bind(id => @tree.number(done.doc, id))

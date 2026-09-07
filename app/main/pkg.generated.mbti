@@ -1,16 +1,16 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mmm-app/core/main"
+package "mmm/app/main"
 
 import {
   "mizchi/js_browser/dom",
-  "mmm-app/core/app",
-  "mmm-app/core/file",
-  "mmm-app/core/map",
-  "mmm-app/core/op",
-  "mmm-app/core/read",
-  "mmm-app/core/render",
-  "mmm-app/core/tree",
-  "mmm-app/core/web",
+  "mmm/app/app",
+  "mmm/app/file",
+  "mmm/app/render",
+  "mmm/app/web",
+  "mmm/core/map",
+  "mmm/core/op",
+  "mmm/core/read",
+  "mmm/core/tree",
 }
 
 // Values
