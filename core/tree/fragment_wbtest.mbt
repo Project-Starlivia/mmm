@@ -68,7 +68,7 @@ test "畳みは部分木ごと包む" {
 /// 定義行は断片の中に留まる。文書の尻へ動かすと、触っていない場所が動く
 test "定義行は断片の中" {
   inspect(
-    fragment(h("a", body=[Opaque("[q]: /r")]), 1, [], Lf),
+    fragment(h("a", body=[Raw("[q]: /r")]), 1, [], Lf),
     content=(
       #|# a
       #|
@@ -86,7 +86,7 @@ test "CRLF" {
 ///|
 test "散文は根を持たない中身の列" {
   inspect(
-    prose(blocks([Opaque("hello"), ThematicBreak]), Lf),
+    prose(blocks([Raw("hello"), ThematicBreak]), Lf),
     content=(
       #|hello
       #|

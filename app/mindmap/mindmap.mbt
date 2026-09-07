@@ -120,7 +120,7 @@ pub fn Mindmap::new(pane : @dom.HTMLElement, host : Host) -> Mindmap {
   let card = CardField::new(doc, pane, host.measure, host.tokens_block, (
     id,
     text,
-  ) => (host.apply)(SetBlock(id~, content=Opaque(text)), false) |> ignore)
+  ) => (host.apply)(SetBlock(id~, content=Raw(text)), false) |> ignore)
   // md からの始め方は md ペイン自身が同じ器で言う
   let hint = @parts.pane_hint(doc, "map")
   @web.show(hint, "flex", false)

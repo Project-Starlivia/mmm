@@ -225,7 +225,7 @@ test "1 行目が段落でなければラベルは無い" {
             "label": "",
             "body": [
               { "id": 3, "content": ["Code", { "info": "", "text": "code\n" }] },
-              { "id": 4, "content": ["Opaque", "x"] },
+              { "id": 4, "content": ["Raw", "x"] },
             ],
             "children": [],
           },
@@ -489,7 +489,7 @@ test "項目の中の 2 つ目の列は前の列の兄弟" {
               {
                 "id": 3,
                 "label": "b",
-                "body": [{ "id": 4, "content": ["Opaque", "text"] }],
+                "body": [{ "id": 4, "content": ["Raw", "text"] }],
                 "children": [],
               },
               { "id": 5, "label": "c", "body": [], "children": [] },

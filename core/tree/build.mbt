@@ -292,7 +292,7 @@ fn depths(
 /// ひと切れを積む。畳みは見出し・項目の行に印を付けるか、中身の 1 枚になる。
 fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
   match piece {
-    Raw(block) => take(b, block, nest)
+    Plain(block) => take(b, block, nest)
     Folded(block, fold~, at~) => {
       b.fold_at = Some(at)
       take(b, block, nest, fold=Some(fold))
@@ -305,7 +305,7 @@ fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
     }
     Text(text, from~, to~) => {
       spill(b)
-      fill(b, Opaque(text), from~, to~)
+      fill(b, Raw(text), from~, to~)
     }
   }
 }
@@ -322,7 +322,7 @@ fn take(
     // **単調性 — 項目の子孫は項目。** 項目の領土に書かれた見出しは骨格に
     // ならず、原文のまま中身になる（列 0 へ出れば項目が閉じて木が変わる）
     Heading(span~, ..) if nest > 0 =>
-      fill(b, Opaque(verbatim(b.md, block)), from=span.from, to=span.to)
+      fill(b, Raw(verbatim(b.md, block)), from=span.from, to=span.to)
     Heading(level~, style~, children~, span~, ..) =>
       put(
         b,
@@ -410,7 +410,7 @@ fn items_take(
     // 空打ちでは畳みを見ない（深さを測るのに畳みは要らず、
     // 畳みの判定はこの深さを使うので、呼び合いになる）
     let inner = if b.dry {
-      rest.map(c => Raw(c))
+      rest.map(c => Plain(c))
     } else {
       pieces(b.md, rest, defs_in(b.defs, from, it.span.to), nest + 1)
     }
@@ -781,7 +781,7 @@ pub fn number(doc : Doc, id : Int) -> Int? {
 
 ///|
 /// 中身へ、ノードと同じ列で文書順の番号を振る。読み解かなかったものにも
-/// 振るので、View が Opaque を落としても残りの番号は動かない。
+/// 振るので、View が Raw を落としても残りの番号は動かない。
 fn number_blocks(body : Array[Block], next : Counter) -> Unit {
   for i, x in body {
     body[i] = { id: next.val, content: x.content, }

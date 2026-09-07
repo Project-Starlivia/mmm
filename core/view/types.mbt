@@ -18,7 +18,7 @@ pub(all) struct Node {
   /// Implicit だけ None。空の見出し（`## `）は Some("")
   label : String?
   fold : @tree.Fold?
-  /// 中身のうち、mmm が読み解いたもの。Opaque だけがここに来ない
+  /// 中身のうち、mmm が読み解いたもの。Raw だけがここに来ない
   blocks : Array[@tree.Block]
   children : Array[Node]
 } derive(Eq, Debug, ToJson)

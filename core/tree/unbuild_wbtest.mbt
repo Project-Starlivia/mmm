@@ -371,7 +371,7 @@ test "中身は文書順に、塊ごとに空行を挟んで" {
       doc([
         root(
           h("a", body=[
-            Opaque("text"),
+            Raw("text"),
             Image(alt="p", src="x.png", title=""),
             Link(text="記事", href="https://e", title=""),
             Code(info="js", text="let x = 1\n"),
@@ -429,7 +429,7 @@ test "画像とリンクのタイトル" {
 ///|
 test "最初の骨格より前の中身は文書のもの" {
   inspect(
-    serialize(doc([root(h("a"))], body=[Opaque("intro")])),
+    serialize(doc([root(h("a"))], body=[Raw("intro")])),
     content=(
       #|intro
       #|
@@ -441,9 +441,9 @@ test "最初の骨格より前の中身は文書のもの" {
 
 ///|
 /// 原文は md として読み直すので、ライブラリの正規化を受ける。
-test "Opaque は正規化される" {
+test "Raw は正規化される" {
   inspect(
-    serialize(doc([root(h("a", body=[Opaque("_em_ と *x*")]))])),
+    serialize(doc([root(h("a", body=[Raw("_em_ と *x*")]))])),
     content=(
       #|# a
       #|
@@ -457,7 +457,7 @@ test "Opaque は正規化される" {
 /// 定義行は文書ぜんぶで 1 列。ライブラリは末尾に集める。
 test "定義行は末尾へ" {
   inspect(
-    serialize(doc([root(h("a", body=[Opaque("[q]: /r")], children=[h("b")]))])),
+    serialize(doc([root(h("a", body=[Raw("[q]: /r")], children=[h("b")]))])),
     content=(
       #|# a
       #|
@@ -506,7 +506,7 @@ test "Details はそのまま" {
 test "項目の中身は項目の列に字下げ" {
   inspect(
     serialize(
-      doc([root(h("r", children=[item("a", body=[Opaque("text")]), item("b")]))]),
+      doc([root(h("r", children=[item("a", body=[Raw("text")]), item("b")]))]),
     ),
     content=(
       #|# r
@@ -541,7 +541,7 @@ test "項目の中のコードは塊ごと字下げ" {
 /// 項目の中の見出しは骨格にならず中身（単調性）。書いても項目の中に居る。
 test "項目の中の見出しは中身のまま" {
   inspect(
-    serialize(doc([root(item("a", body=[Opaque("# x")]))])),
+    serialize(doc([root(item("a", body=[Raw("# x")]))])),
     content=(
       #|- a
       #|
@@ -606,7 +606,7 @@ test "見出しの畳み" {
         root(
           h("r", children=[
             h("h", fold=Some({ open: false, summary: Some("h"), }), body=[
-              Opaque("body"),
+              Raw("body"),
             ]),
           ]),
         ),

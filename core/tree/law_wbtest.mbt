@@ -15,7 +15,7 @@ test "単調性 — 項目の中の見出しは原文のまま中身になる" {
           {
             "id": 2,
             "label": "a",
-            "body": [{ "id": 3, "content": ["Opaque", "# x"] }],
+            "body": [{ "id": 3, "content": ["Raw", "# x"] }],
             "children": [],
           },
         ],
@@ -275,7 +275,7 @@ fn written(doc : Doc) -> String {
         Svg(s) => bag.push(s)
         ThematicBreak => ()
         Details(text=s, ..) => bag.push(s)
-        Opaque(s) => bag.push(s)
+        Raw(s) => bag.push(s)
       }
     }
   }

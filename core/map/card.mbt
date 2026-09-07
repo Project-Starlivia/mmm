@@ -143,8 +143,8 @@ fn card_of(c : @tree.Content) -> Card? {
     ThematicBreak => Some(Break)
     Details(open~, summary~, body~, ..) =>
       Some(Details(open~, summary~, lines=lines_of(body)))
-    // View には来ない（view の project が Opaque を落とす）。ts から送る側でだけ使う形
-    Opaque(_) => None
+    // View には来ない（view の project が Raw を落とす）。ts から送る側でだけ使う形
+    Raw(_) => None
   }
 }
 

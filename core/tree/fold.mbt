@@ -12,7 +12,8 @@
 ///|
 /// 積む前のひと切れ。
 priv enum Piece {
-  Raw(@markdown.Block)
+  /// 畳みに関わらない、素の塊
+  Plain(@markdown.Block)
   /// 畳まれたノードの見出し・項目の行。中身は普通に読む。
   /// `at` は `<details>` 〜 `</details>` の原文の範囲（地番になる）
   Folded(@markdown.Block, fold~ : Fold, at~ : @markdown.Span)
@@ -620,7 +621,7 @@ fn pieces(
       out.push(
         match mark[i] {
           Some((fold, at)) => Folded(blocks[i], fold~, at~)
-          None => Raw(blocks[i])
+          None => Plain(blocks[i])
         },
       )
       carried = block_span(blocks[i]).to
