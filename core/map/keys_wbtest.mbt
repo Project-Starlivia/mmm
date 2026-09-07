@@ -352,3 +352,14 @@ test "keyed_card: Mod+Enter はその場編集。Escape は外す。Mod+C / Mod+
   )
   assert_eq(keyed_card(c, 99, k("Delete")), None)
 }
+
+///|
+/// **Escape は 1 段ずつ外へ。** 選んでいれば解き、解くものが無ければ帯へ抜ける。
+/// ペインは Tab を飲む（子を足す・字下げ）ので、キーボードだけで帯へ戻る道はこれ 1 つ
+test "Escape は選択を解き、解くものが無ければ帯へ抜ける" {
+  let l = keys_l()
+  assert_eq(keyed(l, one(3), k("Escape")), Some(Select(sel=none, reveal=false)))
+  assert_eq(keyed(l, none, k("Escape")), Some(Leave))
+  // カードを選んでいれば、まず外す（その次の Escape で抜ける）
+  assert_eq(keyed_card(keys_c(), 3, k("Escape")), Some(Pick(id=None)))
+}

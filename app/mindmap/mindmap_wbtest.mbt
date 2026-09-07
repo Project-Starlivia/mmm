@@ -25,6 +25,8 @@ struct Stub {
   mut pasted : Int
   mut drawn : Int?
   mut clipboard : String
+  /// 帯へ抜けた回数
+  mut left : Int
 }
 
 ///|
@@ -40,6 +42,7 @@ fn Stub::new(md : String) -> Stub {
     pasted: 0,
     drawn: None,
     clipboard: "",
+    left: 0,
   }
 }
 
@@ -80,6 +83,7 @@ fn Stub::host(self : Stub) -> Host {
     },
     epoch: () => 0,
     failed: msg => self.failed.push(msg),
+    leave: () => self.left = self.left + 1,
   }
 }
 
@@ -438,4 +442,18 @@ async test "to_svg: 全体を 1 枚に。選択の印は写さず画面には残
   let empty = stand(md="")
   defer empty.win.close()
   assert_true(empty.map.to_svg() is None)
+}
+
+///|
+/// **Escape は 1 段ずつ外へ。** 選んでいれば解き、解くものが無ければ帯へ抜ける。
+/// 抜けた先の焦点は app が持つ（ここは呼ばれたかだけを見る）
+test "Escape は選択を解き、解くものが無ければ帯へ抜ける" {
+  let s = stand()
+  defer s.win.close()
+  s.stub.selection = { ids: [3], anchor: Some(3), }
+  press_key(s, "Escape")
+  assert_eq(s.stub.selection, @map.none)
+  assert_eq(s.stub.left, 0)
+  press_key(s, "Escape")
+  assert_eq(s.stub.left, 1)
 }
