@@ -20,7 +20,7 @@ priv struct Ages {
 /// 全部捨てると、測る綴りが上限を超える文書では 1 つも当たらなくなる（1 周の
 /// 途中で捨てられ、次の周も頭から外れる）。1 世代残せば、上限の倍までの綴りを
 /// 持つ文書は 2 周目から全部当たる。使われない字は世代交代 2 回で落ちる
-pub fn cached(cap : Int, raw : (@map.Font, String) -> Double) -> @map.Measure {
+fn cached(cap : Int, raw : (@map.Font, String) -> Double) -> @map.Measure {
   let ages : Ages = { live: Map([]), prev: Map([]), }
   (f, text) => {
     let key = "\{f.px} \{f.mono} \{text}"
