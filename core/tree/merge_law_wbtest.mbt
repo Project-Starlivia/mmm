@@ -139,7 +139,7 @@ fn grain(
   edits : Array[Edit],
   what : String,
 ) -> Unit raise {
-  let out = apply(md, edits)
+  let out = patched(md, edits)
   let flat = (s : String) => s.replace_all(old="\r\n", new="\n")
   if blank_run(out) > blank_run(md) {
     fail("\{what}: 連続空行が増えた\n--- md\n\{md}\n--- out\n\{out}")
@@ -306,7 +306,7 @@ fn law(
   what : String,
 ) -> Array[Edit] raise {
   let { edits, same, } = merge(md, before, spans, after)
-  let out = apply(md, edits)
+  let out = patched(md, edits)
   guard shape(parse(out)) == shape(after) else {
     fail("\{what}: 形が違う\n--- md\n\{md}\n--- out\n\{out}")
   }

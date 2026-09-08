@@ -160,7 +160,7 @@ test "法則 — 形が一致すれば focus は同じ部分木を指し、一�
       match apply(before, op) {
         Some(done) => {
           some = some + 1
-          let after = @tree.parse(@tree.apply(md, r.edits))
+          let after = @tree.parse(@tree.patched(md, r.edits))
           if @tree.shape(after) != @tree.shape(done.doc) {
             if r.focus is Some(_) {
               bad.push("\{what}: 形が違うのに focus がある")
@@ -339,7 +339,7 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
         continue
       }
       n = n + 1
-      let out = @tree.apply(md, r.edits)
+      let out = @tree.patched(md, r.edits)
       let keeps = match op {
         // Wrap と Fold は部分木ごと正規形で書き直すので、そこでは正規形の空行の数になる
         AddNode(..) | AddBlock(..) | Graft(..) => true
@@ -392,7 +392,7 @@ test "法則 — 触っていない字は変わらない" {
     #|* c
     #|
   let r = edit(md, Rename(id=2, label="A"))
-  let out = @tree.apply(md, r.edits)
+  let out = @tree.patched(md, r.edits)
   // 名前の行を元に戻せば、原文そのもの
   assert_eq(out.replace(old="# A\n", new="# a\n"), md)
   // 見本ぜんぶ × 名前の行を持つ全ノードでも同じ。編集は 1 つ残らずその行の中
