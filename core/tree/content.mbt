@@ -27,13 +27,11 @@ fn fill(
     return
   }
   // 飛び（Implicit）は綴りが無いので中身も持てないが、put は必ず実体を最後に
-  // 積むので、ここに積まれるのは実体の枠だけ
+  // 積むので、ここに積まれるのは実体の枠だけ。持ち主の範囲がここまで伸びることは
+  // `body_at` が言うので、枠は書き換えない（`to_node` が足す）
   let f = b.stack[b.stack.length() - 1]
   f.body.push(block)
   f.body_at.push(at)
-  if to > f.to {
-    f.to = to
-  }
 }
 
 ///|
