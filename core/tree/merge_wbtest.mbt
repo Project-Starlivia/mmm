@@ -179,7 +179,7 @@ test "子を総取り替えすれば、消して同じ桁に差す" {
     { "from": 4, "to": 10, "insert": "  - z\n" },
   ])
   inspect(
-    apply(md, changes(md, before, spans, after)),
+    patched(md, changes(md, before, spans, after)),
     content=(
       #|- a
       #|  - z
@@ -210,7 +210,7 @@ test "入れ子の項目の手前に差せば、後ろに字下げを戻す" {
     { "from": 4, "to": 4, "insert": "  - z\n" },
   ])
   inspect(
-    apply(md, changes(md, before, spans, after)),
+    patched(md, changes(md, before, spans, after)),
     content=(
       #|- a
       #|  - z
@@ -317,7 +317,7 @@ test "入れ子の項目の子は、容器の中身の桁に差す" {
     { "from": 10, "to": 10, "insert": "    - d\n" },
   ])
   inspect(
-    apply(md, changes(md, before, spans, after)),
+    patched(md, changes(md, before, spans, after)),
     content=(
       #|- a
       #|  - b
@@ -406,7 +406,7 @@ test "項目のラベルだけなら、子の字下げは残る" {
     { "from": 0, "to": 4, "insert": "- A\n" },
   ])
   inspect(
-    apply(md, changes(md, before, spans, after)),
+    patched(md, changes(md, before, spans, after)),
     content=(
       #|- A
       #|  - b
@@ -445,7 +445,7 @@ test "中身を 1 枚足せば、行は触らず行の尻へ隙間を挟んで�
   let after = change(before, 0, [0], rebody([raw("x")]))
   let edits = changes(md, before, spans, after)
   json_inspect(edits, content=[{ "from": 10, "to": 10, "insert": "\nx\n" }])
-  inspect(apply(md, edits), content="# r\n\n## a\n\nx\n\n## b\n")
+  inspect(patched(md, edits), content="# r\n\n## a\n\nx\n\n## b\n")
 }
 
 ///|
@@ -455,7 +455,7 @@ test "中身を 1 枚消せば、その範囲と隙間だけ" {
   let after = change(before, 0, [0], rebody([]))
   let edits = changes(md, before, spans, after)
   json_inspect(edits, content=[{ "from": 10, "to": 17, "insert": "" }])
-  inspect(apply(md, edits), content="# r\n\n## a\n\n## b\n")
+  inspect(patched(md, edits), content="# r\n\n## a\n\n## b\n")
 }
 
 ///|
@@ -491,10 +491,10 @@ test "消える子は手前の隙間を道連れ" {
   }
   let mid = changes(md, before, spans, drop(1))
   json_inspect(mid, content=[{ "from": 10, "to": 16, "insert": "" }])
-  inspect(apply(md, mid), content="# r\n\n## a\n\n## c\n")
+  inspect(patched(md, mid), content="# r\n\n## a\n\n## c\n")
   let last = changes(md, before, spans, drop(2))
   json_inspect(last, content=[{ "from": 16, "to": 22, "insert": "" }])
-  inspect(apply(md, last), content="# r\n\n## a\n\n## b\n")
+  inspect(patched(md, last), content="# r\n\n## a\n\n## b\n")
 }
 
 ///|
@@ -504,7 +504,7 @@ test "増える子は正規形の隙間を連れてくる — 兄弟の後ろに
   let after = change(before, 0, [], adopt(fresh("c")))
   let edits = changes(md, before, spans, after)
   json_inspect(edits, content=[{ "from": 10, "to": 10, "insert": "\n## c\n" }])
-  inspect(apply(md, edits), content="# r\n\n## a\n\n## c\n")
+  inspect(patched(md, edits), content="# r\n\n## a\n\n## c\n")
   let solo = "# r\n"
   let (b2, s2) = survey(solo)
   let e2 = changes(solo, b2, s2, change(b2, 0, [], adopt(fresh("c"))))
@@ -525,7 +525,7 @@ test "詰まった項目の列は詰まったまま" {
   }
   let grown = changes(md, before, spans, change(before, 0, [], adopt(kid)))
   json_inspect(grown, content=[{ "from": 4, "to": 4, "insert": "  - c\n" }])
-  inspect(apply(md, grown), content="- a\n  - c\n- b\n")
+  inspect(patched(md, grown), content="- a\n  - c\n- b\n")
   let after : Doc = { ..before, roots: [before.roots[0]], }
   let cut = changes(md, before, spans, after)
   json_inspect(cut, content=[{ "from": 4, "to": 8, "insert": "" }])
@@ -545,7 +545,10 @@ test "枝の移動は隙間ごと — 元は消え、先には隙間を挟んで
   json_inspect(edits, content=[
     { "from": 17, "to": 29, "insert": "\n### b\n\n### c\n" },
   ])
-  inspect(apply(md, edits), content="# r\n\n## a\n\nhello\n\n### b\n\n### c\n")
+  inspect(
+    patched(md, edits),
+    content="# r\n\n## a\n\nhello\n\n### b\n\n### c\n",
+  )
 }
 
 ///|
@@ -553,16 +556,16 @@ test "文書の頭の散文 — 隙間は後ろに付く" {
   let md = "hello\n\n# a\n"
   let (before, spans) = survey(md)
   let swapped = changes(md, before, spans, { ..before, body: [raw("bye")], })
-  inspect(apply(md, swapped), content="bye\n\n# a\n")
+  inspect(patched(md, swapped), content="bye\n\n# a\n")
   let gone = changes(md, before, spans, { ..before, body: [], })
-  inspect(apply(md, gone), content="# a\n")
+  inspect(patched(md, gone), content="# a\n")
   let bare = "# a\n"
   let (b2, s2) = survey(bare)
   let born = changes(bare, b2, s2, { ..b2, body: [raw("bye")], })
-  inspect(apply(bare, born), content="bye\n\n# a\n")
+  inspect(patched(bare, born), content="bye\n\n# a\n")
   let (b3, s3) = survey("")
   let first = changes("", b3, s3, { ..b3, body: [raw("bye")], })
-  inspect(apply("", first), content="bye\n")
+  inspect(patched("", first), content="bye\n")
 }
 
 ///|
@@ -571,11 +574,11 @@ test "文書の頭の中身を並べ替えても、頭に空行は生まれな�
   let (before, spans) = survey(md)
   let bs = before.body
   let edits = changes(md, before, spans, { ..before, body: [bs[1], bs[0]], })
-  inspect(apply(md, edits), content="bbb\n\naaa\n\n# h\n")
+  inspect(patched(md, edits), content="bbb\n\naaa\n\n# h\n")
   let solo = "p1\n\np2\n"
   let (b2, s2) = survey(solo)
   let e2 = changes(solo, b2, s2, { ..b2, body: [b2.body[1], b2.body[0]], })
-  inspect(apply(solo, e2), content="p2\n\np1\n")
+  inspect(patched(solo, e2), content="p2\n\np1\n")
 }
 
 ///|
@@ -590,7 +593,7 @@ test "改行の無い末尾に差すとき、書き足す改行は LF" {
     spans,
     change(before, 0, [], adopt(fresh("c"))),
   )
-  inspect(apply(md, edits), content="# r\r\n\r\n## a\n\n## c\n")
+  inspect(patched(md, edits), content="# r\r\n\r\n## a\n\n## c\n")
 }
 
 ///|
@@ -600,7 +603,7 @@ test "Implicit の子を入れ替えても、その手前の隙間は 1 つの�
   // 深さ 3 の Implicit の中身（deep）を、新しい見出しに差し替える
   let after = change(before, 0, [0], x => { ..x, children: [fresh("w")], })
   let edits = changes(md, before, spans, after)
-  inspect(apply(md, edits), content="# a\n\n### w\n\n## b\n")
+  inspect(patched(md, edits), content="# a\n\n### w\n\n## b\n")
 }
 
 ///|
@@ -617,7 +620,7 @@ test "改行の無い末尾のノードを外へ出しても、空行は 1 つ" 
     ],
   }
   let edits = changes(md, before, spans, after)
-  inspect(apply(md, edits), content="# r\n\n# a\n\nhello\n")
+  inspect(patched(md, edits), content="# r\n\n# a\n\nhello\n")
 }
 
 ///|
@@ -631,7 +634,7 @@ test "Implicit の手前の隙間 — CRLF でも、空白だけの空行でも 
     change(b1, 0, [0], x => { ..x, children: [fresh("w")], }),
   )
   // 差した断片の改行は LF。触っていない行の CRLF はそのまま
-  inspect(apply(crlf, e1), content="# a\r\n\r\n### w\n\r\n## b\r\n")
+  inspect(patched(crlf, e1), content="# a\r\n\r\n### w\n\r\n## b\r\n")
   let spaced = "# a\n  \n#### deep\n\n## b\n"
   let (b2, s2) = survey(spaced)
   let e2 = changes(
@@ -641,7 +644,7 @@ test "Implicit の手前の隙間 — CRLF でも、空白だけの空行でも 
     change(b2, 0, [0], x => { ..x, children: [fresh("w")], }),
   )
   // 列の頭の境目は原文のまま（空白だけの行も 1 つの空行として残る）
-  inspect(apply(spaced, e2), content="# a\n  \n### w\n\n## b\n")
+  inspect(patched(spaced, e2), content="# a\n  \n### w\n\n## b\n")
 }
 
 ///|
@@ -655,7 +658,7 @@ test "列の頭の境目は列のもの — 頭を消しても差しても、境
     s1,
     change(b1, 0, [], x => { ..x, children: [kids1[1]], }),
   )
-  inspect(apply(tight, cut), content="# r\n- b\n")
+  inspect(patched(tight, cut), content="# r\n- b\n")
   let item = {
     id: 99,
     label: "z",
@@ -670,7 +673,7 @@ test "列の頭の境目は列のもの — 頭を消しても差しても、境
     s1,
     change(b1, 0, [], x => { ..x, children: [item] + kids1, }),
   )
-  inspect(apply(tight, born), content="# r\n- z\n- a\n- b\n")
+  inspect(patched(tight, born), content="# r\n- z\n- a\n- b\n")
   let loose = "# r\n\n- a\n- b\n- c\n"
   let (b2, s2) = survey(loose)
   let kids2 = b2.roots[0].node.children
@@ -680,7 +683,7 @@ test "列の頭の境目は列のもの — 頭を消しても差しても、境
     s2,
     change(b2, 0, [], x => { ..x, children: kids2[1:].to_owned(), }),
   )
-  inspect(apply(loose, e2), content="# r\n\n- b\n- c\n")
+  inspect(patched(loose, e2), content="# r\n\n- b\n- c\n")
 }
 
 ///|
@@ -689,18 +692,18 @@ test "frontmatter の直後の空行は、頭の要素を触っても消えな�
   let (before, spans) = survey(md)
   let less : Doc = { ..before, roots: [before.roots[1]], }
   inspect(
-    apply(md, changes(md, before, spans, less)),
+    patched(md, changes(md, before, spans, less)),
     content="---\nk: v\n---\n\n# b\n",
   )
   let prose : Doc = { ..before, body: [raw("x")], }
   inspect(
-    apply(md, changes(md, before, spans, prose)),
+    patched(md, changes(md, before, spans, prose)),
     content="---\nk: v\n---\n\nx\n\n# a\n\n# b\n",
   )
   let said = "---\nk: v\n---\n\nhello\n\n# a\n"
   let (b2, s2) = survey(said)
   inspect(
-    apply(said, changes(said, b2, s2, { ..b2, body: [], })),
+    patched(said, changes(said, b2, s2, { ..b2, body: [], })),
     content="---\nk: v\n---\n\n# a\n",
   )
 }
@@ -745,7 +748,7 @@ test "空行の後に詰めて書いた列の頭を包んでも、その空行�
   ignore(w)
   let after = change(before, 0, [], x => { ..x, children: [wrapped, kids[1]], })
   inspect(
-    apply(md, changes(md, before, spans, after)),
+    patched(md, changes(md, before, spans, after)),
     content="# r\n\n- w\n  - a\n- b\n",
   )
   let loose = "# r\n\n- a\n\n- b\n"
@@ -760,7 +763,7 @@ test "空行の後に詰めて書いた列の頭を包んでも、その空行�
     mark: Some(bullet),
   }
   inspect(
-    apply(
+    patched(
       loose,
       changes(
         loose,
@@ -782,5 +785,8 @@ test "散文を消しながら根の頭に差しても、文書の頭に空行�
     body: [],
     roots: [{ node: fresh("z"), sides: [], rules: [], }] + before.roots,
   }
-  inspect(apply(md, changes(md, before, spans, after)), content="# z\n\n# a\n")
+  inspect(
+    patched(md, changes(md, before, spans, after)),
+    content="# z\n\n# a\n",
+  )
 }

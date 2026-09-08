@@ -78,18 +78,7 @@ pub fn merge(
 ///|
 /// 編集を当てて読み直した形が、後の木と同じか。**合流の正しさはこれが持つ。**
 fn verified(md : String, edits : Array[Edit], after : Doc) -> Bool {
-  shape(parse(apply(md, edits))) == shape(after)
-}
-
-///|
-/// 編集列を md に当てる。後ろから当てれば座標がずれない。
-pub fn apply(md : String, edits : Array[Edit]) -> String {
-  let mut out = md
-  for i = edits.length() - 1; i >= 0; i = i - 1 {
-    let e = edits[i]
-    out = slice(out, 0, e.from) + e.insert + slice(out, e.to, out.length())
-  }
-  out
+  shape(parse(patched(md, edits))) == shape(after)
 }
 
 ///|
@@ -139,15 +128,13 @@ fn plan(
   }
   // 文書の散文。容器の自分の尻は散文の頭（frontmatter の尻）
   merge_body(r, before.body, after.body, spans.get(doc_id).unwrap().from, 0)
-  // 側は根のもの。変われば根が丸ごと（子の増減で長さが変わるだけ — 全部 Right — は同じ）
   let olds = Map::from_array(before.roots.map(x => (x.node.id, x.sides)))
   let sides = Map::from_array(after.roots.map(x => (x.node.id, x.sides)))
   let rules = Map::from_array(after.roots.map(x => (x.node.id, x.rules)))
+  // 側が変われば根が丸ごとなので、突き合わせから外す
   for x in after.roots {
-    match olds.get(x.node.id) {
-      Some(was) if !(was == x.sides || (plain(was) && plain(x.sides))) =>
-        r.old.remove(x.node.id)
-      _ => ()
+    if olds.get(x.node.id) is Some(was) && !sided(was, x.sides) {
+      r.old.remove(x.node.id)
     }
   }
   merge_children(
@@ -164,6 +151,14 @@ fn plan(
 }
 
 ///|
+/// 側が前後で同じか。**側は根のもの**で `---` は隙間に書かれるので、変われば
+/// 根ごと書き直す。子の増減で長さが変わるだけ（前後とも全部 Right）は同じと見る。
+fn sided(olds : Array[Side], news : Array[Side]) -> Bool {
+  olds == news || (plain(olds) && plain(news))
+}
+
+///|
+/// 側が 1 つも変わらない列（`---` が 1 本も書かれない）。
 fn plain(sides : Array[Side]) -> Bool {
   sides.iter().all(s => s is Right)
 }
@@ -351,16 +346,19 @@ priv struct Seq {
 ///   1 つずつ theirs の隙間を連れてくる。列の頭に差すなら境目の後ろに置き、隙間は
 ///   次に残る物との間に付ける
 fn merge_seq(r : Merge, q : Seq) -> Unit {
+  filled(r, q, dropped(r, q))
+}
+
+///|
+/// 消える並びを消す。連続して消える物は 1 つにまとめ、**手前の隙間から最後の尻まで**。
+/// 列の頭の並びで後ろに残る物が居れば、境目を残してその物の行頭まで消す
+/// （theirs がその物を文書の頭と言うなら、境目ごと）。
+/// 返すのは**境目を引き継いだ物** — その隙間は `filled` が書き換えない。
+fn dropped(r : Merge, q : Seq) -> Int? {
   let now = Map::from_array(q.news.map(id => (id, ())))
-  let was = Map::from_array(q.olds.map(id => (id, ())))
-  let at = (id : Int) => r.spans.get(id).unwrap()
-  let gap_text = (id : Int) => if (q.gap)(id) { "\n" } else { "" }
   // 列の頭に新しい物が来るか（頭の並びを消すとき、境目を残すかに要る）
   // 列ごと消えるとき、生まれ直すなら境目を残す（全部消えたなら news の頭は必ず新しい）
   let head_born = !q.news.is_empty()
-  // 文書の頭に来る要素（theirs が「手前に隙間は無い」と言う）。その手前の境目は消す
-  let headless = (id : Int) => !r.theirs.get(id).unwrap_or(true)
-  // 境目を引き継いだ物（隙間の書き換えを飛ばす）
   let mut inherited : Int? = None
   let mut i = 0
   let mut kept_before = false
@@ -375,113 +373,138 @@ fn merge_seq(r : Merge, q : Seq) -> Unit {
       i = i + 1
     }
     let first = q.olds[start]
-    let last = at(q.olds[i - 1]).to
+    let last = spot(r, q.olds[i - 1]).to
     let head = !kept_before
     let (from, to) = if head && i < q.olds.length() {
       let next = q.olds[i]
       inherited = Some(next)
       // 後ろに残る物が後の列の頭で、しかも文書の頭なら境目ごと。そうでなければ境目は残す
-      let bare = q.news.get(0) == Some(next) && headless(next)
+      let bare = q.news.get(0) == Some(next) && headless(r, next)
       (
         if bare {
           r.gap.get(first).unwrap()
         } else {
-          line_start(r.md, at(first).from)
+          line_start(r.md, spot(r, first).from)
         },
-        line_start(r.md, at(next).from),
+        line_start(r.md, spot(r, next).from),
       )
     } else if head && head_born {
-      (line_start(r.md, at(first).from), last)
+      (line_start(r.md, spot(r, first).from), last)
     } else {
       (r.gap.get(first).unwrap(), last)
     }
     r.out.push({ from, to, insert: "", })
   }
-  let body = (id : Int) => pad(q.col) + indent((q.make)(id), q.col)
+  inherited
+}
+
+///|
+/// 残る物と増える物を並べる。残る物には降りて、手前の隙間が base と theirs で
+/// 違えば（`gapped`）隙間だけ書き換える。増える並びは**次に残る物の隙間の頭か、
+/// 前に残る物の尻か、容器の自分の尻**に差す。列の頭に差すなら境目の後ろに置き、
+/// 隙間は次に残る物との間に付ける。
+fn filled(r : Merge, q : Seq, inherited : Int?) -> Unit {
+  let was = Map::from_array(q.olds.map(id => (id, ())))
   let pend : Array[Int] = []
+  let mut inherited = inherited
   let mut kept : Int? = None
   for id in q.news {
-    if was.contains(id) {
-      if !pend.is_empty() {
-        if kept is None {
-          // 列の頭。境目の後ろに置き、隙間は次に残る物との間に。
-          // 差す物が文書の頭なら（手前に何も残らない）、境目ごと置き換える
-          let text = pend
-            .mapi((k, x) => (if k == 0 { "" } else { gap_text(x) }) + body(x))
-            .join("") +
-            gap_text(id)
-          let pos = if headless(pend[0]) {
-            r.gap.get(id).unwrap()
-          } else {
-            line_start(r.md, at(id).from)
-          }
+    guard was.contains(id) else {
+      pend.push(id)
+      continue
+    }
+    if !pend.is_empty() {
+      match kept {
+        // 列の頭。境目の後ろに置き、隙間は次に残る物との間に。
+        // 差す物が文書の頭なら（手前に何も残らない）、境目ごと置き換える
+        None => {
+          let head = line_start(r.md, spot(r, id).from)
           r.out.push({
-            from: pos,
-            to: line_start(r.md, at(id).from),
-            insert: text,
+            from: if headless(r, pend[0]) {
+              r.gap.get(id).unwrap()
+            } else {
+              head
+            },
+            to: head,
+            insert: grown(q, pend, lead=false) + gap_text(q, id),
           })
           inherited = Some(id)
-        } else {
+        }
+        Some(_) => {
           let pos = r.gap.get(id).unwrap()
-          r.out.push({
-            from: pos,
-            to: pos,
-            insert: pend.map(x => gap_text(x) + body(x)).join(""),
-          })
-        }
-        pend.clear()
-      }
-      if inherited != Some(id) {
-        let had = r.base.get(id).unwrap_or(false)
-        let has = r.theirs.get(id).unwrap_or(had)
-        if had != has {
-          r.out.push({
-            from: r.gap.get(id).unwrap(),
-            to: line_start(r.md, at(id).from),
-            insert: if has {
-              "\n"
-            } else {
-              ""
-            },
-          })
+          r.out.push({ from: pos, to: pos, insert: grown(q, pend, lead=true), })
         }
       }
-      (q.keep)(id)
-      kept = Some(id)
+      pend.clear()
+    }
+    if inherited != Some(id) {
+      gapped(r, id)
+    }
+    (q.keep)(id)
+    kept = Some(id)
+  }
+  guard !pend.is_empty() else { return }
+  let (pos, lead) = match (kept, q.olds.get(0)) {
+    (Some(k), _) => (spot(r, k).to, true)
+    // 列ごと消えて生まれ直す。境目は残してあるので頭の隙間は要らない
+    (None, Some(first)) => (line_start(r.md, spot(r, first).from), false)
+    // 元から空の列。境目は無いので theirs の隙間から
+    (None, None) => (q.own, true)
+  }
+  r.out.push({ from: pos, to: pos, insert: grown(q, pend, lead~), })
+}
+
+///|
+/// 残る物の手前の隙間。base と theirs で違えば（文書の頭になった / 頭でなくなった、
+/// 列が詰まった / 空いた）、**隙間だけ**書き換える。
+fn gapped(r : Merge, id : Int) -> Unit {
+  let had = r.base.get(id).unwrap_or(false)
+  let has = r.theirs.get(id).unwrap_or(had)
+  guard had != has else { return }
+  r.out.push({
+    from: r.gap.get(id).unwrap(),
+    to: line_start(r.md, spot(r, id).from),
+    insert: if has {
+      "\n"
     } else {
-      pend.push(id)
-    }
+      ""
+    },
+  })
+}
+
+///|
+/// 増える並びの字。**1 つずつ theirs の隙間を連れてくる。**
+/// `lead` が偽なら先頭の隙間は付けない（列の頭の境目は原文のまま残る）。
+fn grown(q : Seq, pend : Array[Int], lead~ : Bool) -> String {
+  pend
+  .mapi((k, x) => {
+    (if k == 0 && !lead { "" } else { gap_text(q, x) }) +
+    pad(q.col) +
+    indent((q.make)(x), q.col)
+  })
+  .join("")
+}
+
+///|
+/// 増える物の手前の隙間の字。
+fn gap_text(q : Seq, id : Int) -> String {
+  if (q.gap)(id) {
+    "\n"
+  } else {
+    ""
   }
-  if !pend.is_empty() {
-    match (kept, q.olds.get(0)) {
-      (Some(k), _) => {
-        let pos = at(k).to
-        r.out.push({
-          from: pos,
-          to: pos,
-          insert: pend.map(x => gap_text(x) + body(x)).join(""),
-        })
-      }
-      // 列ごと消えて生まれ直す。境目は残してあるので頭の隙間は要らない
-      (None, Some(first)) => {
-        let pos = line_start(r.md, at(first).from)
-        r.out.push({
-          from: pos,
-          to: pos,
-          insert: pend
-          .mapi((k, x) => (if k == 0 { "" } else { gap_text(x) }) + body(x))
-          .join(""),
-        })
-      }
-      // 元から空の列。境目は無いので theirs の隙間から
-      (None, None) =>
-        r.out.push({
-          from: q.own,
-          to: q.own,
-          insert: pend.map(x => gap_text(x) + body(x)).join(""),
-        })
-    }
-  }
+}
+
+///|
+/// 文書の頭に来る要素（theirs が「手前に隙間は無い」と言う）。その手前の境目は消す。
+fn headless(r : Merge, id : Int) -> Bool {
+  !r.theirs.get(id).unwrap_or(true)
+}
+
+///|
+/// その要素の地番。
+fn spot(r : Merge, id : Int) -> Spot {
+  r.spans.get(id).unwrap()
 }
 
 ///|
@@ -498,20 +521,8 @@ fn merge_children(
   rules : Map[Int, Array[String]],
 ) -> Unit {
   let now = Map::from_array(news.map(x => (x.id, x)))
-  let item = news.get(0).map(sign_of) is Some(Some(Item))
   let old_ids = ids(olds)
-  let style : Bool? = if item && old_ids.length() >= 2 {
-    // 2 つ目からの兄弟の隙間が、この列の流儀（先頭の隙間は列の手前のもの）
-    Some(
-      old_ids[1:]
-      .iter()
-      .any(id => {
-        r.gap.get(id).unwrap() < line_start(r.md, r.spans.get(id).unwrap().from)
-      }),
-    )
-  } else {
-    None
-  }
+  let style = loosened(r, news, old_ids)
   merge_seq(r, {
     olds: old_ids,
     news: ids(news),
@@ -541,6 +552,22 @@ fn merge_children(
       )
     },
   })
+}
+
+///|
+/// 読んだ列の流儀 — 項目の間が空いているか。**正規形は流儀を知らない**ので、
+/// 項目の列だけは増える物にも ours の兄弟の流儀を写す。2 つ目からの兄弟の隙間で
+/// 測る（先頭の隙間は列の手前のもの）。項目でない列と、兄弟が 1 つしかない列は
+/// 流儀を持たないので None — そのときは theirs に従う。
+fn loosened(r : Merge, news : Array[Node], olds : Array[Int]) -> Bool? {
+  guard news.get(0).map(sign_of) is Some(Some(Item)) && olds.length() >= 2 else {
+    return None
+  }
+  Some(
+    olds[1:]
+    .iter()
+    .any(id => r.gap.get(id).unwrap() < line_start(r.md, spot(r, id).from)),
+  )
 }
 
 ///|

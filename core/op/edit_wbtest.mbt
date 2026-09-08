@@ -5,7 +5,7 @@
 ///|
 fn applied(md : String, op : Op) -> (String, Int?) {
   let r = edit(md, op)
-  (@tree.serialize(@tree.parse(@tree.apply(md, r.edits))), r.focus)
+  (@tree.serialize(@tree.parse(@tree.patched(md, r.edits))), r.focus)
 }
 
 ///|
@@ -184,7 +184,7 @@ test "新しい項目は隣の綴りを継ぐ — * の列に足せば *" {
 test "新しい根の項目は最後の根の綴りを継ぐ — * の根に足せば *" {
   let md = "* a\n"
   let r = edit(md, AddNode(at=In(node=@tree.doc_id, side=None), labels=["b"]))
-  assert_eq(@tree.apply(md, r.edits), "* a\n\n* b\n")
+  assert_eq(@tree.patched(md, r.edits), "* a\n\n* b\n")
   assert_eq(r.focus, Some(3))
 }
 
@@ -212,7 +212,7 @@ test "MoveNode — 席の列の綴りを継ぐ" {
   let md = "# h\n\n* a\n\n## s\n\n- x\n- y\n"
   // a（id 3）を x（id 5）の後ろへ
   let r = edit(md, MoveNode(ids=[3], at=After(node=5)))
-  assert_eq(@tree.apply(md, r.edits), "# h\n\n## s\n\n- x\n- a\n- y\n")
+  assert_eq(@tree.patched(md, r.edits), "# h\n\n## s\n\n- x\n- a\n- y\n")
   assert_eq(r.focus, Some(5))
 }
 
@@ -223,7 +223,7 @@ test "MoveNode — 詰まった列へ動かせば詰まったまま" {
   let md = "# h\n\n* a\n\n* b\n\n## s\n\n- x\n- y\n"
   // a（id 3）を y（id 7）の後ろへ
   let r = edit(md, MoveNode(ids=[3], at=After(node=7)))
-  assert_eq(@tree.apply(md, r.edits), "# h\n\n* b\n\n## s\n\n- x\n- y\n- a\n")
+  assert_eq(@tree.patched(md, r.edits), "# h\n\n* b\n\n## s\n\n- x\n- y\n- a\n")
   assert_eq(r.focus, Some(7))
 }
 
@@ -267,7 +267,7 @@ test "MoveNode — 改行を含む名前を見出しの席へ動かせば setext
   let md = "# r\n\n- a\n  b\n\n# s\n"
   // a\nb（id 3）を s（id 4）の子へ
   let r = edit(md, MoveNode(ids=[3], at=In(node=4, side=None)))
-  assert_eq(@tree.apply(md, r.edits), "# r\n\n# s\n\na\nb\n---\n")
+  assert_eq(@tree.patched(md, r.edits), "# r\n\n# s\n\na\nb\n---\n")
   assert_eq(r.focus, Some(4))
 }
 
@@ -290,7 +290,7 @@ test "MoveNode — setext の見出しを深さ 3 へ動かせば ATX で綴り�
   let md = "# a\n\n## b\n\nc\n---\n"
   // c（id 4）を b（id 3）の子へ
   let r = edit(md, MoveNode(ids=[4], at=In(node=3, side=None)))
-  assert_eq(@tree.apply(md, r.edits), "# a\n\n## b\n\n### c\n")
+  assert_eq(@tree.patched(md, r.edits), "# a\n\n## b\n\n### c\n")
   assert_eq(r.focus, Some(4))
   assert_false(r.edits.any(e => e.from == 0 && e.to == md.length()))
 }

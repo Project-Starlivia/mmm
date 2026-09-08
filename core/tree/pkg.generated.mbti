@@ -8,8 +8,6 @@ import {
 }
 
 // Values
-pub fn apply(String, Array[Edit]) -> String
-
 pub fn ast_sig(@markdown.Document) -> String
 
 pub let atx : Mark
