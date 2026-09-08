@@ -62,7 +62,7 @@ fn remove(sel : Selection) -> Intent? {
 
 ///|
 /// Mod+C / Mod+X。写すものが無ければ None。cut は消すもの（無ければ Mod+X も拾わない）
-fn copied(k : Key, cut : () -> Intent?) -> Intent? {
+fn copy_of(k : Key, cut : () -> Intent?) -> Intent? {
   guard k.mod && !k.alt && !k.shift else { return None }
   let key = k.key.to_lower()
   if key == "c" {
@@ -93,151 +93,253 @@ fn node_of(l : Layout, id : Int?) -> @view.Node? {
 /// - ノードが 1 つも無ければ、Enter は最初の根
 /// - Tab / Shift+Tab は 1 つなら足す・包む、複数なら段下げ・上げ（先頭の前の兄弟の子へ / 先頭の親の後ろへ）
 pub fn keyed(l : Layout, sel : Selection, k : Key) -> Intent? {
-  // Alt が意味を持つのは Alt+↑↓（並べ替え）だけ。それ以外の Alt の組は拾わない。
-  // ここで先に他のキーだけ弾く — Alt+↑↓ 自身の判断は後ろの専用の行に任せる
-  // （Alt を真っ先に全部捨てると、並べ替えが書けなくなる）
-  if k.alt && k.key != "ArrowUp" && k.key != "ArrowDown" {
-    return None
-  }
-  // anchor が無くても拾う（貼る先が無ければ文書へ）。anchor 頼みの行より先に置く
-  if k.mod && !k.alt && !k.shift && k.key.to_lower() == "v" {
-    return Some(Paste)
-  }
-  if sel.ids.length() > 0 {
-    match copied(k, () => remove(sel)) {
-      Some(c) => return Some(c)
-      None => ()
+  let h = Hand::new(l, sel, k)
+  // **上から順に当て、キーを名乗った行で終わる。** `reordered` が先頭なのは
+  // Alt をそこで閉じるため、`pasted` が早いのは貼るのに anchor が要らないため
+  for
+    row in (
+      [
+        reordered, pasted, copied, attached, entered, tabbed, deleted, folded, escaped,
+        centered, chose_all, arrowed, typed,
+      ] : Array[(Hand) -> Answer]) {
+    match row(h) {
+      Do(i) => return Some(i)
+      Stop => return None
+      Pass => ()
     }
-  }
-  let anchor = sel.anchor
-  let label = match node_of(l, anchor) {
-    Some(n) => n.label
-    None => None
-  }
-  let blank = label == Some("")
-  if k.shift &&
-    !k.mod &&
-    !k.alt &&
-    (k.key == "L" || k.key == "C" || k.key == "D") {
-    guard solo(sel) is Some(id) else { return None }
-    return Some(
-      match k.key {
-        "L" => AddLink(id~)
-        "C" => AddCode(id~)
-        _ => Draw(id~)
-      },
-    )
-  }
-  if k.key == "Enter" {
-    if l.order.length() == 0 {
-      return Some(add(In(node=@tree.doc_id, side=None)))
-    }
-    guard anchor is Some(anchor) else { return None }
-    if k.mod {
-      return Some(Edit(id=anchor, seed=None))
-    }
-    if k.shift {
-      return Some(add(Before(node=anchor)))
-    }
-    if blank {
-      return Some(Edit(id=anchor, seed=None))
-    }
-    return Some(add(After(node=anchor)))
-  }
-  if k.key == "Tab" && !k.mod {
-    match solo(sel) {
-      Some(id) =>
-        return Some(
-          if k.shift {
-            op(Wrap(id~, label=""))
-          } else {
-            add(In(node=id, side=None))
-          },
-        )
-      None => ()
-    }
-    guard sel.ids.length() >= 2 else { return None }
-    let first = sel.ids[0]
-    if k.shift {
-      guard parent_of(l, first) is Some(p) else { return None }
-      return Some(Op(op=MoveNode(ids=sel.ids, at=After(node=p)), edit=false))
-    }
-    guard prev_sibling(l, first) is Some(prev) else { return None }
-    return Some(
-      Op(op=MoveNode(ids=sel.ids, at=In(node=prev, side=None)), edit=false),
-    )
-  }
-  if (k.key == "Delete" || k.key == "Backspace") && !k.mod {
-    return remove(sel)
-  }
-  if k.alt && (k.key == "ArrowUp" || k.key == "ArrowDown") && !k.mod {
-    guard sel.ids.length() > 0 else { return None }
-    let first = sel.ids[0]
-    let last = sel.ids[sel.ids.length() - 1]
-    let moved = (at : @op.NodePlace) => {
-      Op(op=MoveNode(ids=sel.ids, at~), edit=false)
-    }
-    if k.key == "ArrowUp" {
-      return prev_sibling(l, first).map(p => moved(Before(node=p)))
-    }
-    return next_sibling(l, last).map(n => moved(After(node=n)))
-  }
-  if k.alt {
-    return None
-  }
-  if k.key == "H" && k.shift && !k.mod {
-    guard anchor is Some(anchor) else { return None }
-    guard node_of(l, Some(anchor)) is Some(node) else { return None }
-    return Some(
-      if node.fold is Some(_) {
-        Op(op=Unfold(id=anchor), edit=false)
-      } else {
-        Op(op=Fold(id=anchor, open=false), edit=false)
-      },
-    )
-  }
-  // **Escape は 1 段ずつ外へ。** 選んでいれば解き、解くものが無ければ帯へ抜ける。
-  // Tab は子を足すのに使うので、キーボードだけで帯へ戻る道はこれしかない
-  if k.key == "Escape" {
-    return Some(
-      if sel.ids.length() > 0 {
-        Select(sel=none, reveal=false)
-      } else {
-        Leave
-      },
-    )
-  }
-  if k.key == "Home" && !k.mod {
-    return Some(Center)
-  }
-  if k.mod && k.key.to_lower() == "a" {
-    return Some(Select(sel=all(l), reveal=false))
-  }
-  if arrow_of(k.key) is Some(a) && !k.mod {
-    guard arrow(l, sel.anchor, a) is Some(next) else { return None }
-    let sel = if k.shift {
-      extend_to(sel, next)
-    } else {
-      { ids: [next], anchor: Some(next), }
-    }
-    return Some(Select(sel~, reveal=true))
-  }
-  // 名前が無いなら、打ち始めればそのまま書ける。字は e.key のまま（CapsLock の
-  // 正規化を通さない）。Space はパンに使うので除く
-  if blank &&
-    anchor is Some(anchor) &&
-    !k.mod &&
-    k.key.char_length() == 1 &&
-    k.key != " " {
-    return Some(Edit(id=anchor, seed=Some(k.key)))
   }
   None
 }
 
 ///|
-/// カードを選んでいるときの表。持ち主は `node.blocks` に `picked` が居るノード、
-/// 隣はその `blocks` を文書順（= 配列順）に見た前後。持ち主が見つからなければ
-/// （箱が無い = 畳まれて埋もれた）None
+/// 行の答え。**「拾わない」と「拾ったが、いまはできない」は別。** 後者を次の行へ
+/// 落とすと、キーが 2 つの意味を持ってしまう（Alt+↑ が動かせないときに素の矢印として
+/// 選択を動かす、Shift+L が 2 つ選んでいるときに名前の頭文字として打たれる）。
+priv enum Answer {
+  /// このキーは自分のものではない。次の行へ
+  Pass
+  /// 拾った
+  Do(Intent)
+  /// 拾ったが、いまはできない。次の行へは落とさない
+  Stop
+}
+
+///|
+/// 拾った行の答え。できなければそこで止まる。
+fn claimed(i : Intent?) -> Answer {
+  match i {
+    Some(x) => Do(x)
+    None => Stop
+  }
+}
+
+///|
+/// 押されたときの手元。**どの行も同じ形でここを読む。**
+priv struct Hand {
+  l : Layout
+  sel : Selection
+  k : Key
+  /// 宛先。いくつ選んでいても、行が見るのはこれ 1 つ
+  anchor : Int?
+  /// 宛先の名前。Implicit（綴りの無いノード）は無い
+  label : String?
+}
+
+///|
+fn Hand::new(l : Layout, sel : Selection, k : Key) -> Hand {
+  let anchor = sel.anchor
+  { l, sel, k, anchor, label: node_of(l, anchor).bind(n => n.label), }
+}
+
+///|
+/// 名前がまだ無い。打ち始めればそのまま書ける
+fn Hand::blank(self : Hand) -> Bool {
+  self.label == Some("")
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 行 — 1 つにつき 1 つ。上から順に当たる
+// ══════════════════════════════════════════════════════════════════
+
+///|
+/// Alt+↑↓ — 兄弟の並べ替え。先頭の手前へ / 末尾の後ろへ。
+/// **Alt が意味を持つのはここだけ**なので、ほかの Alt もここで閉じる。
+fn reordered(h : Hand) -> Answer {
+  guard h.k.alt else { return Pass }
+  guard h.k.key == "ArrowUp" || h.k.key == "ArrowDown" else { return Stop }
+  guard h.sel.ids.length() > 0 && !h.k.mod else { return Stop }
+  let ids = h.sel.ids
+  let moved = (at : @op.NodePlace) => Op(op=MoveNode(ids~, at~), edit=false)
+  if h.k.key == "ArrowUp" {
+    return claimed(prev_sibling(h.l, ids[0]).map(p => moved(Before(node=p))))
+  }
+  claimed(
+    next_sibling(h.l, ids[ids.length() - 1]).map(n => moved(After(node=n))),
+  )
+}
+
+///|
+/// Mod+V — クリップボードを貼る。**anchor が無くても拾う**（貼る先が無ければ文書へ）。
+fn pasted(h : Hand) -> Answer {
+  guard h.k.mod && !h.k.shift && h.k.key.to_lower() == "v" else { return Pass }
+  Do(Paste)
+}
+
+///|
+/// Mod+C / Mod+X — 選んでいるものを写す・切り取る。選んでいなければ他の行へ譲る。
+fn copied(h : Hand) -> Answer {
+  guard h.sel.ids.length() > 0 else { return Pass }
+  match copy_of(h.k, () => remove(h.sel)) {
+    Some(c) => Do(c)
+    None => Pass
+  }
+}
+
+///|
+/// Shift+L / C / D — 中身を 1 枚足す。宛先が 1 つに決まるときだけ。
+fn attached(h : Hand) -> Answer {
+  guard h.k.shift && !h.k.mod else { return Pass }
+  guard h.k.key == "L" || h.k.key == "C" || h.k.key == "D" else { return Pass }
+  guard solo(h.sel) is Some(id) else { return Stop }
+  Do(
+    match h.k.key {
+      "L" => AddLink(id~)
+      "C" => AddCode(id~)
+      _ => Draw(id~)
+    },
+  )
+}
+
+///|
+/// Enter — 足す、または埋める。文書が空なら最初の根、Mod なら名前を直す、
+/// Shift なら手前に、名前がまだ無いなら埋める、でなければ後ろに。
+fn entered(h : Hand) -> Answer {
+  guard h.k.key == "Enter" else { return Pass }
+  guard h.l.order.length() > 0 else {
+    return Do(add(In(node=@tree.doc_id, side=None)))
+  }
+  guard h.anchor is Some(anchor) else { return Stop }
+  if h.k.mod {
+    return Do(Edit(id=anchor, seed=None))
+  }
+  // **Shift は blank より先。** 名前がまだ無いノードでも Shift+Enter は手前に足す
+  if h.k.shift {
+    return Do(add(Before(node=anchor)))
+  }
+  if h.blank() {
+    return Do(Edit(id=anchor, seed=None))
+  }
+  Do(add(After(node=anchor)))
+}
+
+///|
+/// Tab — 1 つなら子を足す・包む、複数なら段下げ・段上げ
+/// （先頭の前の兄弟の子へ / 先頭の親の後ろへ）。
+fn tabbed(h : Hand) -> Answer {
+  guard h.k.key == "Tab" && !h.k.mod else { return Pass }
+  if solo(h.sel) is Some(id) {
+    return Do(
+      if h.k.shift {
+        op(Wrap(id~, label=""))
+      } else {
+        add(In(node=id, side=None))
+      },
+    )
+  }
+  guard h.sel.ids.length() >= 2 else { return Stop }
+  let ids = h.sel.ids
+  let first = ids[0]
+  if h.k.shift {
+    return claimed(
+      parent_of(h.l, first).map(p => {
+        Op(op=MoveNode(ids~, at=After(node=p)), edit=false)
+      }),
+    )
+  }
+  claimed(
+    prev_sibling(h.l, first).map(prev => {
+      Op(op=MoveNode(ids~, at=In(node=prev, side=None)), edit=false)
+    }),
+  )
+}
+
+///|
+/// Delete / Backspace — 選んでいるものを消す。
+fn deleted(h : Hand) -> Answer {
+  guard (h.k.key == "Delete" || h.k.key == "Backspace") && !h.k.mod else {
+    return Pass
+  }
+  claimed(remove(h.sel))
+}
+
+///|
+/// Shift+H — 畳む / 開く。畳んでいるかで向きが決まる。
+fn folded(h : Hand) -> Answer {
+  guard h.k.key == "H" && h.k.shift && !h.k.mod else { return Pass }
+  guard h.anchor is Some(anchor) else { return Stop }
+  guard node_of(h.l, Some(anchor)) is Some(node) else { return Stop }
+  Do(
+    if node.fold is Some(_) {
+      Op(op=Unfold(id=anchor), edit=false)
+    } else {
+      Op(op=Fold(id=anchor, open=false), edit=false)
+    },
+  )
+}
+
+///|
+/// Escape — **1 段ずつ外へ。** 選んでいれば解き、解くものが無ければ帯へ抜ける。
+/// Tab は子を足すのに使うので、キーボードだけで帯へ戻る道はこれしかない。
+fn escaped(h : Hand) -> Answer {
+  guard h.k.key == "Escape" else { return Pass }
+  Do(
+    if h.sel.ids.length() > 0 {
+      Select(sel=none, reveal=false)
+    } else {
+      Leave
+    },
+  )
+}
+
+///|
+/// Home — 選択（無ければ根）を画面の中心へ。
+fn centered(h : Hand) -> Answer {
+  guard h.k.key == "Home" && !h.k.mod else { return Pass }
+  Do(Center)
+}
+
+///|
+/// Mod+A — ぜんぶ選ぶ。
+fn chose_all(h : Hand) -> Answer {
+  guard h.k.mod && h.k.key.to_lower() == "a" else { return Pass }
+  Do(Select(sel=all(h.l), reveal=false))
+}
+
+///|
+/// 矢印 — 選択を動かす。Shift なら伸ばす。
+fn arrowed(h : Hand) -> Answer {
+  guard arrow_of(h.k.key) is Some(a) && !h.k.mod else { return Pass }
+  guard arrow(h.l, h.anchor, a) is Some(next) else { return Stop }
+  let sel = if h.k.shift {
+    extend_to(h.sel, next)
+  } else {
+    { ids: [next], anchor: Some(next), }
+  }
+  Do(Select(sel~, reveal=true))
+}
+
+///|
+/// 名前がまだ無いノードで字を打つ — そのまま書き始める。字は `e.key` のまま
+/// （CapsLock の正規化を通さない）。Space はパンに使うので除く。
+fn typed(h : Hand) -> Answer {
+  guard h.blank() && h.anchor is Some(anchor) else { return Pass }
+  guard !h.k.mod && h.k.key.char_length() == 1 && h.k.key != " " else {
+    return Pass
+  }
+  Do(Edit(id=anchor, seed=Some(h.k.key)))
+}
+
+///|
 pub fn keyed_card(l : Layout, picked : Int, k : Key) -> Intent? {
   // 外すのに持ち主は要らない（畳まれて箱が無くても、ここから抜けられる）
   if k.key == "Escape" {
@@ -250,7 +352,7 @@ pub fn keyed_card(l : Layout, picked : Int, k : Key) -> Intent? {
   if (k.key == "Delete" || k.key == "Backspace") && !k.mod {
     return Some(remove)
   }
-  match copied(k, () => Some(remove)) {
+  match copy_of(k, () => Some(remove)) {
     Some(c) => return Some(c)
     None => ()
   }

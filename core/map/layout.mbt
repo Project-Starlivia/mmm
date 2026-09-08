@@ -319,39 +319,20 @@ fn Pass::place_tree(
     size.h,
     @cmp.maximum(self.stack_h(right), self.stack_h(left)),
   )
-  let mut center_y = top + span / 2.0
   let placed : Array[Placed] = []
+  let mut center_y = top + span / 2.0
   for side in ([Right, Left] : Array[@tree.Side]) {
     let kids = if side == Right { right } else { left }
-    if kids.length() == 0 {
-      continue
-    }
-    let d = dir(side)
-    let near_x = if d == 1 { size.w + gap.x } else { -gap.x }
-    let h = self.stack_h(kids)
-    let y0 = top + @cmp.maximum(0.0, (span - h) / 2.0)
-    let mut y = y0
-    let centers = []
-    for i, k in kids {
-      y += gap_before(i)
-      centers.push(self.place(k, { id: root.id, side, }, near_x, y))
-      y += self.height_of(k)
-    }
-    placed.push({ kids, centers, y0, h, })
+    guard kids.length() > 0 else { continue }
+    let p = self.stack_side(root, kids, side, size, top, span)
+    placed.push(p)
+    // 右が居れば右が根の中心を決める。片側だけなら、その側が決める
     if side == Right || right.length() == 0 {
-      center_y = (centers[0] + centers[centers.length() - 1]) / 2.0
+      center_y = mid_of(p)
     }
   }
   for p in placed {
-    let mid = (p.centers[0] + p.centers[p.centers.length() - 1]) / 2.0
-    let dy = center_y - mid
-    if dy == 0.0 {
-      continue
-    }
-    for k in p.kids {
-      self.shift_subtree(k, dy)
-    }
-    p.y0 += dy
+    self.center_side(p, center_y)
   }
   self.boxes[root.id] = {
     node: root,
@@ -364,8 +345,61 @@ fn Pass::place_tree(
     h: size.h,
     cards,
   }
-  let mut lo = center_y - size.h / 2.0
-  let mut hi = center_y + size.h / 2.0
+  reach_of_tree(placed, center_y, size.h)
+}
+
+///|
+/// 側 1 つに子を積む。**縦は側の見積もり（span）の中で真ん中**に寄せる。
+fn Pass::stack_side(
+  self : Pass,
+  root : @view.Node,
+  kids : Array[@view.Node],
+  side : @tree.Side,
+  size : Size,
+  top : Double,
+  span : Double,
+) -> Placed {
+  let near_x = if dir(side) == 1 { size.w + gap.x } else { -gap.x }
+  let h = self.stack_h(kids)
+  let y0 = top + @cmp.maximum(0.0, (span - h) / 2.0)
+  let mut y = y0
+  let centers = []
+  for i, k in kids {
+    y += gap_before(i)
+    centers.push(self.place(k, { id: root.id, side, }, near_x, y))
+    y += self.height_of(k)
+  }
+  { kids, centers, y0, h, }
+}
+
+///|
+/// 積んだ側を、根の中心に合わせて動かす。
+/// **不変条件: どの側も、第 1 子と最終子の中心の中点が根の中心に乗る。**
+fn Pass::center_side(self : Pass, p : Placed, center_y : Double) -> Unit {
+  let dy = center_y - mid_of(p)
+  guard dy != 0.0 else { return }
+  for k in p.kids {
+    self.shift_subtree(k, dy)
+  }
+  p.y0 += dy
+}
+
+///|
+/// その側の第 1 子と最終子の中心の中点。
+fn mid_of(p : Placed) -> Double {
+  (p.centers[0] + p.centers[p.centers.length() - 1]) / 2.0
+}
+
+///|
+/// 木が実際に占めた縦の範囲。**ずらしたぶん見積もり（span）を超えうる**ので、
+/// 木を積む側はこれを見る。
+fn reach_of_tree(
+  placed : Array[Placed],
+  center_y : Double,
+  h : Double,
+) -> (Double, Double) {
+  let mut lo = center_y - h / 2.0
+  let mut hi = center_y + h / 2.0
   for p in placed {
     lo = @cmp.minimum(lo, p.y0)
     hi = @cmp.maximum(hi, p.y0 + p.h)
