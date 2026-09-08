@@ -156,103 +156,132 @@ fn find_open_end(s : Scene) -> Target? {
 }
 
 ///|
-/// どこへ落とすか。優先順は 4 段:
-///   1. 箱の中
-///   2. 前後への挿入（箱の上下の帯）
-///   3. 外側ゾーン（reach まで）… 近い側は near まで帯より強い
-///   4. 列の上端の上 / 下端の下（open_band まで）… 誰も取らなかった空白
-///
-/// 近くを子に振らないと、次の列の子の帯に吸われて「右に置いたのに兄弟になる」
-/// が起きる。逆に遠くまで子を優先させると前後への挿入がほぼ出せなくなるので、
-/// そこは前後に譲る
+/// ポインタの下に落とす。**帯（箱とその前後）と外側ゾーン（成長軸の先の通路）を
+/// それぞれ当たって、近いほうを採る**。誰も取らなければ、開いている側の上下端が受ける。
 pub fn resolve(l : Layout, at : Pt, dragging : Array[Int]) -> Drop? {
   let s : Scene = { at, layout: l, dragging: Set::from_array(dragging), }
-  // ポインタがその箱の中心より左か。**側を決めるのはここだけ**
-  let side_of = (b : Box) => s.at.x < b.rect().center().x
+  let inner = banded(s)
+  let outer = beyond(s)
+  // 外側ゾーンの**近い側は帯より強い**（右に置いたのに兄弟になる、を防ぐ）。
+  // 遠い側は「誰も取らない空間の受け皿」なので、帯が居れば譲る
+  let winner = if outer.target is Some(_) &&
+    inner.dist > 0.0 &&
+    (outer.edge <= near || inner.target is None) {
+    outer.target
+  } else {
+    inner.target
+  }
+  // 誰も取らなかった空白は、開いている側の上下端が受ける
+  let target = match winner {
+    Some(t) => Some(t)
+    None => find_open_end(s)
+  }
+  guard target is Some(t) else { return None }
+  landed(s, t)
+}
 
-  // 帯は隣の兄弟と重なるので、最初に見つかった相手ではなく「いちばん近い」
-  // 相手を選ぶ。文書順で決めていたころは、親が違う子スタックの境目で
-  // どちらに倒れるかが実質その場の運になっていた
+///|
+/// 帯の中でいちばん近い相手と、その近さ。
+priv struct Near {
+  target : Target?
+  /// 箱からの距離。箱の中なら 0
+  dist : Double
+}
+
+///|
+/// 外側ゾーンでいちばん近い相手。順位づけ（縦のずれも足した距離）は `beyond` の
+/// 中だけの話で、外に出るのは**近い側は帯より強い**の判定に使う素の距離。
+priv struct Zone {
+  target : Target?
+  /// 箱の外縁からどれだけ出た所で拾ったか
+  edge : Double
+}
+
+///|
+/// 帯の中でいちばん近い相手。**帯は隣の兄弟と重なる**ので、最初に見つかった相手では
+/// なく近いほうを選ぶ（文書順で決めていたころは、親が違う子スタックの境目で
+/// どちらに倒れるかが実質その場の運になっていた）。
+fn banded(s : Scene) -> Near {
   let mut target : Target? = None
   let mut best = @double.infinity
-  for id in l.order {
-    guard !s.dragging.contains(id) else { continue }
-    guard l.boxes.get(id) is Some(b) else { continue }
+  for id in s.layout.order {
+    guard reachable(s, id) is Some(b) else { continue }
     let (du, dv, hu, hv) = offset(s.at, b)
     guard du.abs() <= hu + slop && dv.abs() <= hv + band else { continue }
     // 箱の中なら 0。外に出た分だけ距離が増える（兄弟軸のほうを重く見る）
     let dist = @cmp.maximum(0.0, du.abs() - hu) +
       @cmp.maximum(0.0, dv.abs() - hv) * 2.0
-    // 根に兄弟は無い。上に落ちたものはすべて子になる
-    let pos = if b.parent is None {
-      0
-    } else if dv < -hv * 0.4 {
-      1
-    } else if dv > hv * 0.4 {
-      2
-    } else {
-      0
-    }
-    if dist < best {
-      best = dist
-      target = Some({ id, pos, })
-    }
+    guard dist < best else { continue }
+    best = dist
+    target = Some({ id, pos: slot_of(b, dv, hv), })
   }
+  { target, dist: best, }
+}
 
-  // 外側ゾーン: 箱の外、成長軸の方向へ少し出たところも「子にする」
-  let mut out_target : Target? = None
-  let mut best_out = @double.infinity
-  let mut out_u = @double.infinity // 選んだ相手の、箱の外縁からの距離
-  for id in l.order {
-    guard !s.dragging.contains(id) else { continue }
-    guard l.boxes.get(id) is Some(b) else { continue }
+///|
+/// 帯のどこで拾ったか。0 = その子 / 1 = 直前 / 2 = 直後。
+/// **根に兄弟は無い**ので、上に落ちたものはすべて子になる。
+fn slot_of(b : Box, dv : Double, hv : Double) -> Int {
+  guard b.parent is Some(_) else { return 0 }
+  if dv < -hv * 0.4 {
+    1
+  } else if dv > hv * 0.4 {
+    2
+  } else {
+    0
+  }
+}
+
+///|
+/// 外側ゾーン — 箱の外、成長軸の方向へ少し出たところ。ここは「子にする」通路で、
+/// 縦の位置が**どの子の隣か**まで決める（通路は子の列そのものではないが、
+/// 子は縦に積まれるので縦は子の列と同じ意味を持つ。一律「末尾に足す」に潰していた
+/// ころは、通路のどこを指しても印が最後の子の下に 1 点で出ていた）。
+fn beyond(s : Scene) -> Zone {
+  let mut target : Target? = None
+  let mut best = @double.infinity
+  let mut edge = @double.infinity
+  for id in s.layout.order {
+    guard reachable(s, id) is Some(b) else { continue }
     let (du, dv, hu, hv) = offset(s.at, b)
     // 根は両方向に伸びる木の付け根なので、成長軸の判定を絶対値で見る
-    // （`local` の du は dir で片側だけ正にしてあるので、根では素のままだと右側しか拾えない）
+    //（`local` の du は dir で片側だけ正にしてあるので、根では素のままだと右側しか拾えない）
     let is_root = b.parent is None
     let grow = if is_root { du.abs() } else { du }
     guard grow > hu && grow <= hu + reach && dv.abs() <= hv + slack else {
       continue
     }
     let d = grow - hu + @cmp.maximum(0.0, dv.abs() - hv) * 2.0
-    if d < best_out {
-      best_out = d
-      out_u = grow - hu
-      // 既に子がいるなら、通路の**縦の位置**で「どの子の隣か」まで決める。
-      // 通路は子の列そのものではないが、縦は子の列とそのまま同じ意味を持つ
-      // （子は縦に積まれるので）。ここを一律「末尾に足す」に潰していたころは、
-      // 通路のどこを指しても印が最後の子の下に 1 点で出て、指した場所と
-      // 着地点が対応しなかった。根は側の話が乗るので触らない
-      out_target = match (if is_root { None } else { slot_among_kids(s, id) }) {
-        Some(t) => Some(t)
-        None => Some({ id, pos: 0, })
-      }
+    guard d < best else { continue }
+    best = d
+    edge = grow - hu
+    // 根は側の話が乗るので、子の列には割り込まない
+    target = match (if is_root { None } else { slot_among_kids(s, id) }) {
+      Some(t) => Some(t)
+      None => Some({ id, pos: 0, })
     }
   }
-  // 外側ゾーンの**近い側は帯より強い**（右に置いたのに兄弟になる、を防ぐ）。
-  // 遠い側は「誰も取らない空間の受け皿」なので、帯が居れば譲る
-  if out_target is Some(_) && best > 0.0 && (out_u <= near || target is None) {
-    target = out_target
-  }
+  { target, edge, }
+}
 
-  // 誰も取らなかった空白は、開いている側の上下端が受ける
-  if target is None {
-    target = find_open_end(s)
-  }
+///|
+/// 落とし先になれる箱。掴んでいる部分木と、箱を持たないものは外す。
+fn reachable(s : Scene, id : Int) -> Box? {
+  guard !s.dragging.contains(id) else { return None }
+  s.layout.boxes.get(id)
+}
 
-  // 木の根が相手の「子にする」は、**どちら側か**まで決まって初めて意味を持つ。
-  // ポインタが根の中心のどちら側にあるかで振り分ける（素のドラッグでの左右）
-  guard target is Some(t) else { return None }
+///|
+/// 相手を落とし先にする。**「子にする」は、木の根が相手なら**どちら側か**まで
+/// 決まって初めて意味を持つ**ので、ポインタが根の中心のどちら側にあるかで振り分ける。
+fn landed(s : Scene, t : Target) -> Drop? {
   guard t.pos == 0 else { return Some(Node(id=t.id, pos=t.pos)) }
-  match l.boxes.get(t.id) {
-    Some(b) =>
-      if b.parent is Some(_) {
-        Some(Node(id=t.id, pos=0))
-      } else {
-        Some(Side(root=t.id, left=side_of(b)))
-      }
-    None => Some(Side(root=t.id, left=false))
+  guard s.layout.boxes.get(t.id) is Some(b) else {
+    return Some(Side(root=t.id, left=false))
   }
+  guard b.parent is None else { return Some(Node(id=t.id, pos=0)) }
+  // ポインタがその箱の中心より左か。**側を決めるのはここだけ**
+  Some(Side(root=t.id, left=s.at.x < b.rect().center().x))
 }
 
 ///|
