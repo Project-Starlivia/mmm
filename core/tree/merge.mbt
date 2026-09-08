@@ -218,7 +218,7 @@ fn gaps(md : String, spans : Map[Int, Spot]) -> Map[Int, Int] {
 /// 要素は文書順に 1 対 1 で並ぶので、順に組にする。並ばなければ None（全文へ落ちる）。
 fn canon_gaps(doc : Doc) -> Map[Int, Bool]? {
   let canon = serialize(doc)
-  let (read, spans) = survey(canon)
+  let (read, spans) = build(canon, read(canon))
   let mine = elements(doc)
   let theirs = elements(read)
   guard mine.length() == theirs.length() else { return None }

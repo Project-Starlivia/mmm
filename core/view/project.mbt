@@ -24,13 +24,13 @@ fn cast(n : @tree.Node) -> Node {
       None
     },
     fold: n.fold,
-    blocks: read(n.body),
+    blocks: meant(n.body),
     children: n.children.map(cast),
   }
 }
 
 ///|
-/// 読み解いたものだけ。id は Doc のままなので、落ちた分で番号はずれない。
-fn read(body : Array[@tree.Block]) -> Array[@tree.Block] {
+/// 意味の在る中身だけ。id は Doc のままなので、落ちた分で番号はずれない。
+fn meant(body : Array[@tree.Block]) -> Array[@tree.Block] {
   body.filter(b => b.content is Some(_))
 }

@@ -52,12 +52,6 @@ pub(all) struct Spot {
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// md を木にし、地番（ノード id → 原文の範囲）も返す。合流が使う。
-pub fn survey(md : String) -> (Doc, Map[Int, Spot]) {
-  build(md, read(md))
-}
-
-///|
 /// mdAst を mmmTree にする。ラベルは原文から切り出す（mmm はインラインを解釈しない）。
 /// 地番は Doc に載せず並べて返す — 載せると Doc が特定の原文に縛られ、
 /// 手で組む木に在り得ない欄が生える。
@@ -98,7 +92,7 @@ fn prose_at(b : Build, frontmatter : @markdown.Frontmatter?) -> Spot {
 ///|
 /// 地番の指紋。`id[from,label,to]` を id 順に並べる。
 pub fn spans_sig(md : String) -> String {
-  let (_, spans) = survey(md)
+  let (_, spans) = build(md, read(md))
   let ids = spans.keys().collect()
   ids.sort()
   ids

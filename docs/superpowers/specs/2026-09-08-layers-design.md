@@ -124,10 +124,11 @@ survey と serialize は段の合成に名を付けただけ（段ではない�
 PR 1 で `put` を割るついでに 5 つとも落とし、`Frame` を「作ったら変えない」にする。
 残る可変は `kids` / `body` の配列（積む先）だけ。
 
-**所属違い（content.mbt）** — `line_start` / `line_end` / `blank_start` / `column` は
-原文の行の算術で、merge も使う → `text.mbt`。`bare_path` は画像のパスの話で、
-tree の外（read/head・app/disk・map/card）が使う → read/head へ。`lines` は
-op の graft が「段落なら行ごと」に割るための問い → op へ。
+**所属違い（content.mbt）** — `carve` / `column` / `line_start` / `line_end` /
+`blank_start` は原文の字と行の算術で、merge も使う → `text.mbt`。`bare_path` も
+md の意味を知らない字の話なので同じ所へ（read/head へ出すと map が read を
+import することになるので動かさない — 名前のために依存は増やさない）。`lines` は
+mdAst を要る（段落 1 つか読み直す）ので tree に残す。
 
 ### project — Doc → View（view/）
 
@@ -222,8 +223,8 @@ op の graft が「段落なら行ごと」に割るための問い → op へ�
 | `read` | 段（md.mbt）/ view の `read(body)` / fold の `read_spell` | 段だけに。`meant` / `spell_of` |
 | `spell` | op の `spell`（Implicit を綴る）と、fold の `read_spell`（綴りを読む） | 向きが逆の同じ語は作らない。fold は `spell_of`（`Spell` を返す） |
 | `apply` | 段（op）/ tree の `apply(md, edits)` | tree の方は `patched` と統合 |
-| `survey` | tree の `survey(md) -> (Doc, spans)` / read の `survey(md) -> Survey` | 同じ名で返りが違う。tree の方は中身が `build(md, read(md))` の 1 行なので消し、2 か所の呼び元でそう書く |
-| `read` | package `core/read`（Survey と問い合わせ）/ 段の read | 一番重い衝突。package が提供するのは `Survey` なので `survey/` に（modules-design「提供するもの 1 語」） |
+| `survey` | tree の `survey(md) -> (Doc, spans)` / read の `survey(md) -> Survey` | 同じ名で返りが違い、後者が前者を包んでいた。tree の方は中身が `build(md, read(md))` の 1 行なので消し、呼び元でそう書く |
+| `read` | package `core/read`（Survey と問い合わせ）/ 段の read | **取りやめ。** `survey/` にすると `@survey.survey(md)` になり、いまより読みにくい。package は「md を読んだもの」、段は「md をライブラリで読む」で、同じ動詞の別の粒度 — `@read.survey(md)` は「read の survey」と読めて筋が通る |
 | `parse` | tree の `parse(md) -> Doc` / ライブラリ | 2026-09-05 に許容と決めた。据え置き |
 | `seat` / `take` / `put` | build（Frame を置く）と op（席を引く・抜く・差す） | 段が違えば同じ語でよい。意味が同じ方向かだけ確かめる |
 
@@ -263,7 +264,7 @@ op の graft が「段落なら行ごと」に割るための問い → op へ�
 3. merge — `merge_seq` を 3 つに、`plan` / `merge_children` の切り出し。`apply` と `patched` を 1 つに
 4. op — `flip` を 3 段に、`graft` の切り出し
 5. read — `dialect_block` を 2 つに
-6. 名 — 段と衝突する語（`read` / `apply` / `survey`、package `read/` → `survey/`）。所属違いの移動（text / bare_path / lines）
+6. 名 — 段と衝突する語（view の `read` → `meant`、tree の `survey` を消す）。所属違いを `text.mbt` へ
 7. docs — core.md のパイプライン図を 9 段に。各段の項に語彙の表。「作り直している最中」の断りを消す
 
 ## 触らないもの
