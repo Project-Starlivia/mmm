@@ -268,7 +268,7 @@ test "1 行目が段落でなければラベルは無い" {
               "content": ["Code", { "info": "", "text": "code\n" }],
               "source": "```\ncode\n```",
             },
-            { "id": 4, "content": ["Raw", "x"], "source": "x" },
+            { "id": 4, "source": "x" },
           ],
           "children": [],
           "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
@@ -296,12 +296,7 @@ test "途中の段落はラベルにならない" {
                 "id": 3,
                 "content": [
                   "Details",
-                  {
-                    "text": "<details>\n<summary>a</summary>\n\nx\n\n</details>",
-                    "open": false,
-                    "summary": "a",
-                    "body": "x",
-                  },
+                  { "open": false, "summary": "a", "body": "x" },
                 ],
                 "source": "<details>\n<summary>a</summary>\n\nx\n\n</details>",
               },
@@ -561,9 +556,7 @@ test "項目の中の 2 つ目の列は前の列の兄弟" {
             {
               "id": 3,
               "label": "b",
-              "body": [
-                { "id": 4, "content": ["Raw", "text"], "source": "text" },
-              ],
+              "body": [{ "id": 4, "source": "text" }],
               "children": [],
               "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
             },

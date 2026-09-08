@@ -141,10 +141,8 @@ fn card_of(c : @tree.Content) -> Card? {
     Svg(markup) => Some(Svg(markup~))
     Code(info~, text~) => Some(Code(lang=info, lines=lines_of(text)))
     ThematicBreak => Some(Break)
-    Details(open~, summary~, body~, ..) =>
+    Details(open~, summary~, body~) =>
       Some(Details(open~, summary~, lines=lines_of(body)))
-    // View には来ない（view の project が Raw を落とす）。ts から送る側でだけ使う形
-    Raw(_) => None
   }
 }
 
@@ -153,7 +151,8 @@ fn card_of(c : @tree.Content) -> Card? {
 pub fn cards(blocks : Array[@tree.Block]) -> Array[Card] {
   let out = []
   for b in blocks {
-    match card_of(b.content) {
+    // 読み解かなかった中身は View に来ない（project が落とす）
+    match b.content.bind(card_of) {
       Some(c) => out.push(c)
       None => ()
     }

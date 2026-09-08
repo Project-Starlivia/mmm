@@ -108,8 +108,16 @@ test "set_image_folder → image_folder は往復する" {
 test "retarget: 宣言の下にある画像だけを、新しい宣言の下へ移す操作列" {
   let md = "# r\n\n![a](./img/a.webp)\n\n![b](img/sub/b.png)\n\n![c](./other/c.webp)\n\n![d](https://x/d.png)\n"
   assert_eq(retarget(survey(md).view, "./img/", "../pics/"), [
-    SetBlock(id=3, content=Image(alt="a", src="../pics/a.webp", title="")),
-    SetBlock(id=4, content=Image(alt="b", src="../pics/sub/b.png", title="")),
+    SetBlock(
+      id=3,
+      content=Some(Image(alt="a", src="../pics/a.webp", title="")),
+      source=None,
+    ),
+    SetBlock(
+      id=4,
+      content=Some(Image(alt="b", src="../pics/sub/b.png", title="")),
+      source=None,
+    ),
   ])
 }
 
@@ -118,7 +126,7 @@ test "retarget: 宣言が ./ なら本文の相対パスは全部が対象。動
   let v = survey("# r\n\n![](a.webp)\n\n![](./s/b.webp)\n\n![](../up.webp)\n").view
   let srcs = retarget(v, "./", "./img/").map(op => {
     match op {
-      SetBlock(content=Image(src~, ..), ..) => src
+      SetBlock(content=Some(Image(src~, ..)), source=None, ..) => src
       _ => "?"
     }
   })

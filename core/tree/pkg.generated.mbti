@@ -65,7 +65,7 @@ pub fn unbuild_prose(Array[Block]) -> @markdown.Document
 // Types and methods
 pub(all) struct Block {
   id : Int
-  content : Content
+  content : Content?
   source : String?
 } derive(Eq, ToJson, @debug.Debug)
 
@@ -75,8 +75,7 @@ pub(all) enum Content {
   Code(info~ : String, text~ : String)
   Svg(String)
   ThematicBreak
-  Details(text~ : String, open~ : Bool, summary~ : String?, body~ : String)
-  Raw(String)
+  Details(open~ : Bool, summary~ : String?, body~ : String)
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 
 pub(all) struct Doc {
@@ -102,6 +101,7 @@ pub(all) enum Flaw {
   TooDeep(Int)
   DeepSetext(Int)
   Unmarked(Int)
+  Wordless(Int)
 } derive(Eq, ToJson)
 
 pub(all) struct Fold {

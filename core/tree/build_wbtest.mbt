@@ -466,7 +466,7 @@ test "number — 文書順に振り直したときの番号。中身も同じ列
 
   let d : Doc = {
     frontmatter: None,
-    body: [{ id: 2, source: None, content: ThematicBreak, }],
+    body: [{ id: 2, source: None, content: Some(ThematicBreak), }],
     roots: [
       { node: leaf(999, "n"), sides: [], rules: [], },
       {
@@ -474,7 +474,7 @@ test "number — 文書順に振り直したときの番号。中身も同じ列
           id: 3,
           label: "r",
           fold: None,
-          body: [{ id: 4, source: None, content: ThematicBreak, }],
+          body: [{ id: 4, source: None, content: Some(ThematicBreak), }],
           children: [leaf(5, "a"), leaf(998, "m")],
           mark: Some(atx),
         },

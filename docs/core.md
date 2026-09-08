@@ -21,18 +21,23 @@ Mark = Heading { setext, closing }          // 読んだ書き方。新しく作
 Fold { open, summary: String? }             // 在ること自体が「畳まれている」
 
 Side  = Right | Left
-Block   { id, content: Content, source: String? }  // 中身 1 枚。id はノードと同じ列。source は
-                                            // 読んだ原文。書き戻しはこれを返し、無ければ種類ごとに綴る
+Block   { id, content: Content?, source: String? }  // 中身 1 枚。id はノードと同じ列。
+                                            // content が無ければ読み解いていない（散文・表・引用・コメント）。
+                                            // source は読んだ原文で、書き戻しはこれを返す。
+                                            // 無ければ意味から綴る
 Content = Image | Link | Code | Svg         // 解釈の包みは無い
         | ThematicBreak                     // 境界にならなかった水平線
-        | Details(text, open, summary, body) // <details>。text は領域の原文で、書き戻しはこれだけ。
-                                            // 残りは GitHub が描くのと同じ読み取り（導出はしない）
-        | Raw(text)                         // 原文のまま。読み解いていないもの全部
+        | Details(open, summary, body)      // <details>。GitHub が描くのと同じ読み取りで、
+                                            // 導出はしない。書き戻しは source の原文だけ
 ```
 
 **id はノードにも中身にも、1 つの列で振る。** 中身がノードと同じ番号を
 持つので、引き当てる・選ぶ・動かすが型の上で割れない。読み解けたかどうかで
-型は分けず（Result で包まない）、読み解かなかったものは `Raw` が原文のまま持つ。
+型は分けず（Result で包まない）、読み解かなかったことは `content` の不在が言う。
+
+**読んだ字は `source` 1 か所。** 意味の側は原文を持たない — 同じ字を 2 か所に置くと、
+書き戻す側と読み直す側が食い違う。書き戻せるのは「原文が在る」か「意味から綴れる」
+かのどちらかで、どちらも無い中身は check（`Wordless`）が言う。
 
 **型が言うのは「あり得ない形」だけ**で、仕様を満たすのは実装の仕事。
 型の上で作れるものは何でも許容し、細かい充足はテストが受け持つ。
@@ -56,7 +61,8 @@ Content = Image | Link | Code | Svg         // 解釈の包みは無い
 check が見る。
 
 check が見るもの — id 一意（ノードも中身も） / Implicit は子を持ち、名前・畳み・中身を
-持たない（`Unmarked`） / `sides` と根の子の長さが揃う / **md に書けない並びが無い**。
+持たない（`Unmarked`） / 中身に書き戻す字が在る（`Wordless`） / `sides` と根の子の長さが揃う /
+**md に書けない並びが無い**。
 **`open` と名前が畳みのときだけ在ることは型が殺す**（`fold : Fold?` に括ってあるので、
 畳みでなければ持ちようがない）。
 
@@ -97,14 +103,14 @@ Root { node: Node, sides: [Side] }          // 側は Doc の Root と同じ。�
 Node { id, label: String?, fold: Fold?, blocks: [Block], children: [Node] }
 ```
 
-- **Doc との差は綴り（`mark`）と Raw だけ。** 描く側は綴りを 1 つも見ない
+- **Doc との差は綴り（`mark`）と、読み解かなかった中身だけ。** 描く側は綴りを 1 つも見ない
 - **Implicit は `label` が無い。** Doc の `mark` 無しを `None` に写す。空の見出し
   （`## `）は `Some("")` なので型で区別が付く。旗も種類も要らない
-- **`blocks` は body から Raw を落としたもの。** core が「読み解かない」と
+- **`blocks` は body から読み解かなかったものを落としたもの。** core が「読み解かない」と
   裁定したものだけが map に届かない。何がカードかは描く側の分類のまま
 - 書き戻すためだけの欄（散文の body・境界の綴り）は無い。**frontmatter だけは残す** —
   画像フォルダの宣言がそこに書かれていて、描くのに要る
-- **id は Doc のまま。** 読みが文書順に振った通し番号で、Raw にも振ってある
+- **id は Doc のまま。** 読みが文書順に振った通し番号で、読み解かなかった中身にも振ってある
   ので、落としても残りの番号は動かない（View の添字を body の添字へ読み替える
   段は要らない）。順序を id に読ませない（下の「id は読みのサイクルを越えて持たない」）
 
@@ -495,9 +501,5 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
   ので体感に出ない。今の入れ子のまま。splice の行き先が 3 を超えた
   ときに「op の中だけ flatten / unflatten」から考え直す
 - **View を Doc と別の型に保つか。** Doc の Node = View の Node + 綴りになったので、
-  project が削るのは `mark` と Raw だけ。描く側が Doc をそのまま受けて Raw を飛ばす形と
+  project が削るのは `mark` と、読み解かなかった中身だけ。描く側が Doc をそのまま受けて飛ばす形と
   比べる。別の型で得ているのは「描く側に綴りを見せない」だけ
-- **`Opaque`（main では `Raw`）の `content` と `source` は同じ字を 2 回持つ。** 読み解かない
-  中身は、種類（`Opaque`/`Raw`）自体が原文をそのまま抱え、`Block.source` にも同じ字が乗る。
-  `content` を `Content?` にして読み解けなければ `None`、字は `source` だけ、という形も
-  あり得るが、`content` も `source` も無い無意味な形が作れてしまう。改名とは別の設計の話として残す

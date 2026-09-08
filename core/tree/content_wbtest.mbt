@@ -11,7 +11,7 @@ test "散文はノードの中身になる" {
         "node": {
           "id": 2,
           "label": "a",
-          "body": [{ "id": 3, "content": ["Raw", "hello"], "source": "hello" }],
+          "body": [{ "id": 3, "source": "hello" }],
           "children": [],
           "mark": ["Heading", { "setext": false, "closing": 0 }],
         },
@@ -32,8 +32,8 @@ test "中身は文書順に並ぶ" {
           "id": 2,
           "label": "a",
           "body": [
-            { "id": 3, "content": ["Raw", "hello"], "source": "hello" },
-            { "id": 4, "content": ["Raw", "world"], "source": "world" },
+            { "id": 3, "source": "hello" },
+            { "id": 4, "source": "world" },
           ],
           "children": [],
           "mark": ["Heading", { "setext": false, "closing": 0 }],
@@ -54,12 +54,12 @@ test "中身は深さで振り分けられる" {
         "node": {
           "id": 2,
           "label": "a",
-          "body": [{ "id": 3, "content": ["Raw", "x"], "source": "x" }],
+          "body": [{ "id": 3, "source": "x" }],
           "children": [
             {
               "id": 4,
               "label": "b",
-              "body": [{ "id": 5, "content": ["Raw", "y"], "source": "y" }],
+              "body": [{ "id": 5, "source": "y" }],
               "children": [],
               "mark": ["Heading", { "setext": false, "closing": 0 }],
             },
@@ -76,7 +76,7 @@ test "中身は深さで振り分けられる" {
 ///|
 test "最初の骨格より前の散文は文書のもの" {
   json_inspect(parse("intro\n\n# a\n"), content={
-    "body": [{ "id": 2, "content": ["Raw", "intro"], "source": "intro" }],
+    "body": [{ "id": 2, "source": "intro" }],
     "roots": [
       {
         "node": {
@@ -160,13 +160,7 @@ test "混ざった段落は切り分けない" {
         "node": {
           "id": 2,
           "label": "a",
-          "body": [
-            {
-              "id": 3,
-              "content": ["Raw", "see ![alt](x.png)"],
-              "source": "see ![alt](x.png)",
-            },
-          ],
+          "body": [{ "id": 3, "source": "see ![alt](x.png)" }],
           "children": [],
           "mark": ["Heading", { "setext": false, "closing": 0 }],
         },
@@ -284,9 +278,7 @@ test "引用と表は原文のまま" {
         "node": {
           "id": 2,
           "label": "a",
-          "body": [
-            { "id": 3, "content": ["Raw", "> quote"], "source": "> quote" },
-          ],
+          "body": [{ "id": 3, "source": "> quote" }],
           "children": [],
           "mark": ["Heading", { "setext": false, "closing": 0 }],
         },
@@ -306,7 +298,7 @@ test "項目にも中身が付く" {
         "node": {
           "id": 2,
           "label": "a",
-          "body": [{ "id": 3, "content": ["Raw", "hello"], "source": "hello" }],
+          "body": [{ "id": 3, "source": "hello" }],
           "children": [],
           "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
         },
@@ -414,13 +406,7 @@ test "項目の中の Raw も列 0 に揃う" {
         "node": {
           "id": 2,
           "label": "a",
-          "body": [
-            {
-              "id": 3,
-              "content": ["Raw", "<!-- x\ny -->"],
-              "source": "<!-- x\ny -->",
-            },
-          ],
+          "body": [{ "id": 3, "source": "<!-- x\ny -->" }],
           "children": [],
           "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
         },
@@ -446,14 +432,7 @@ test "CRLF は切り出しの中でも保たれる" {
             "body": [
               {
                 "id": 3,
-                "content": [
-                  "Details",
-                  {
-                    "text": "<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>",
-                    "open": false,
-                    "body": "## h",
-                  },
-                ],
+                "content": ["Details", { "open": false, "body": "## h" }],
                 "source": "<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>",
               },
             ],
@@ -481,13 +460,7 @@ test "リンクの定義行は位置ごと残る" {
         "node": {
           "id": 2,
           "label": "r",
-          "body": [
-            {
-              "id": 3,
-              "content": ["Raw", "[a]: b \"c\""],
-              "source": "[a]: b \"c\"",
-            },
-          ],
+          "body": [{ "id": 3, "source": "[a]: b \"c\"" }],
           "children": [
             {
               "id": 4,
@@ -520,9 +493,7 @@ test "定義行が文末にあっても残る" {
             {
               "id": 3,
               "label": "h",
-              "body": [
-                { "id": 4, "content": ["Raw", "[a]: b"], "source": "[a]: b" },
-              ],
+              "body": [{ "id": 4, "source": "[a]: b" }],
               "children": [],
               "mark": ["Heading", { "setext": false, "closing": 0 }],
             },
@@ -583,12 +554,8 @@ test "数式とディレクティブの閉じは残る" {
           "id": 2,
           "label": "r",
           "body": [
-            { "id": 3, "content": ["Raw", "$$\nx\n$$"], "source": "$$\nx\n$$" },
-            {
-              "id": 4,
-              "content": ["Raw", ":::note\ny\n:::"],
-              "source": ":::note\ny\n:::",
-            },
+            { "id": 3, "source": "$$\nx\n$$" },
+            { "id": 4, "source": ":::note\ny\n:::" },
           ],
           "children": [],
           "mark": ["Heading", { "setext": false, "closing": 0 }],
@@ -617,9 +584,7 @@ test "項目の中の定義行は項目の中に残る" {
             {
               "id": 3,
               "label": "b",
-              "body": [
-                { "id": 4, "content": ["Raw", "[q]: /r"], "source": "[q]: /r" },
-              ],
+              "body": [{ "id": 4, "source": "[q]: /r" }],
               "children": [],
               "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
             },
@@ -651,11 +616,7 @@ test "原文のまま持つ領域の中の定義行は重ねない" {
                 "id": 3,
                 "content": [
                   "Details",
-                  {
-                    "text": "<details>\njunk\n\n[q]: /r\n\n## a\n\n</details>",
-                    "open": false,
-                    "body": "junk\n\n[q]: /r\n\n## a",
-                  },
+                  { "open": false, "body": "junk\n\n[q]: /r\n\n## a" },
                 ],
                 "source": "<details>\njunk\n\n[q]: /r\n\n## a\n\n</details>",
               },
@@ -688,11 +649,7 @@ test "開きとノードの間の定義行があれば中身" {
               "id": 3,
               "content": [
                 "Details",
-                {
-                  "text": "<details>\n\n[q]: /r\n\n## a\n\n</details>",
-                  "open": false,
-                  "body": "[q]: /r\n\n## a",
-                },
+                { "open": false, "body": "[q]: /r\n\n## a" },
               ],
               "source": "<details>\n\n[q]: /r\n\n## a\n\n</details>",
             },
@@ -725,7 +682,7 @@ test "定義行は保留中の水平線を飾りに落とす" {
               "label": "a",
               "body": [
                 { "id": 4, "content": "ThematicBreak", "source": "---" },
-                { "id": 5, "content": ["Raw", "[q]: /r"], "source": "[q]: /r" },
+                { "id": 5, "source": "[q]: /r" },
               ],
               "children": [],
               "mark": ["Heading", { "setext": false, "closing": 0 }],
@@ -771,26 +728,40 @@ test "素の URL とオートリンク" {
     content=[
       [
         [
-          "Link",
-          { "text": "https://e.com/x", "href": "https://e.com/x", "title": "" },
+          [
+            "Link",
+            {
+              "text": "https://e.com/x",
+              "href": "https://e.com/x",
+              "title": "",
+            },
+          ],
         ],
       ],
       [
         [
-          "Link",
-          { "text": "https://e.com/x", "href": "https://e.com/x", "title": "" },
+          [
+            "Link",
+            {
+              "text": "https://e.com/x",
+              "href": "https://e.com/x",
+              "title": "",
+            },
+          ],
         ],
       ],
       [
         [
-          "Link",
-          { "text": "http://e.com", "href": "http://e.com", "title": "" },
+          [
+            "Link",
+            { "text": "http://e.com", "href": "http://e.com", "title": "" },
+          ],
         ],
       ],
-      [["Raw", "see https://e.com/x"]],
-      [["Raw", "https://e.com/x y"]],
-      [["Raw", "ftp://e.com/x"]],
-      [["Raw", "<mailto:a@e.com>"]],
+      [null],
+      [null],
+      [null],
+      [null],
     ],
   )
 }
@@ -806,4 +777,48 @@ test "lines — 段落なら行の列、それ以外の中身は None" {
   assert_eq(lines("<div>x</div>\n"), None)
   assert_eq(lines("```\nx\n```\n"), None)
   assert_eq(lines(""), None)
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 読んだ字は source だけ — content は意味だけを持ち、無ければ読み解いていない
+// ══════════════════════════════════════════════════════════════════
+
+///|
+/// **同じ字を 2 か所に持たない。** 読み解かなかった中身は `content` を持たず、
+/// 原文は `source` 1 か所。書き戻しもそこから。
+test "読み解かない中身は content を持たず、原文は source だけ" {
+  let body = (md : String) => parse("# a\n\n" + md + "\n").roots[0].node.body
+  json_inspect(body("hello"), content=[{ "id": 3, "source": "hello" }])
+  json_inspect(body("| x |\n| - |"), content=[
+    { "id": 3, "source": "| x |\n| - |" },
+  ])
+  json_inspect(body("<!-- c -->"), content=[{ "id": 3, "source": "<!-- c -->" }])
+}
+
+///|
+/// 畳みにならなかった領域も原文は `source` 1 か所。`open` / `summary` / `body` は
+/// GitHub が描くのと同じ読み取りなので残る。
+test "Details も原文は source だけ" {
+  json_inspect(
+    parse("# a\n\n<details>\n\nx\n\n</details>\n\n## b\n").roots[0].node.body,
+    content=[
+      {
+        "id": 3,
+        "content": ["Details", { "open": false, "body": "x" }],
+        "source": "<details>\n\nx\n\n</details>",
+      },
+    ],
+  )
+}
+
+///|
+/// 意味の在る中身は、読んだ原文と両方を持つ — 綴りが違えば触った所だけ正規形に落ちる。
+test "読み解いた中身は意味と原文の両方を持つ" {
+  json_inspect(parse("# a\n\n![alt](x.png)\n").roots[0].node.body, content=[
+    {
+      "id": 3,
+      "content": ["Image", { "alt": "alt", "src": "x.png", "title": "" }],
+      "source": "![alt](x.png)",
+    },
+  ])
 }

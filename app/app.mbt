@@ -575,7 +575,13 @@ async fn App::attach_image(self : App, id : Int, blob : @core.Any) -> Unit {
     self.survey().is_node(id) else {
     return
   }
-  self.write(AddBlock(at=In(node=id), content=Image(alt="", src=rel, title="")))
+  self.write(
+    AddBlock(
+      at=In(node=id),
+      content=Some(Image(alt="", src=rel, title="")),
+      source=None,
+    ),
+  )
 }
 
 ///|

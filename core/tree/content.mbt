@@ -1,7 +1,7 @@
 // 骨格でないものは、いま積んでいるノードの中身になる。
 //
-// 絵になるのは 4 つ（画像・リンク・コード・SVG）だけで、**疑わしきは Raw**。
-// Raw は原文のままで、mmm は中を読み解かない — 読み解かないと決めることが、
+// 絵になるのは 4 つ（画像・リンク・コード・SVG）だけで、**疑わしきは読み解かない**。
+// 読み解かなければ意味は空で、原文が `source` に残る — 読み解かないと決めることが、
 // 「意味を 1 ビットも失わない」の実体になる。
 
 ///|
@@ -11,7 +11,7 @@
 /// `source` は読んだ原文 — 書き戻しはこれをそのまま返す。
 fn fill(
   b : Build,
-  content : Content,
+  content : Content?,
   from~ : Int,
   to~ : Int,
   source~ : String?,
@@ -37,26 +37,16 @@ fn fill(
 }
 
 ///|
-/// mdAst のブロック 1 枚を中身にする。骨格と区切りはここへ来ない。
+/// mdAst のブロック 1 枚の意味。**読み解けなければ None** — 原文は `source` が
+/// 持つので、ここで字を抱えない。骨格と区切りはここへ来ない。
 fn content_of(md : String, block : @markdown.Block) -> Content? {
   match block {
-    // 空行は綴りであってモデルには無い。serialize が正規形として置き直す
-    BlankLines(..) => None
     FencedCode(info~, code~, ..) => Some(Code(info~, text=code))
     // インデントコードは読めるが書かない（正規形はフェンス）
     IndentedCode(code~, ..) => Some(Code(info="", text=code))
-    HtmlBlock(html~, ..) =>
-      if is_svg(html) {
-        Some(Svg(html))
-      } else {
-        Some(Raw(verbatim(md, block)))
-      }
-    Paragraph(children~, span~, ..) =>
-      match sole(md, span, children) {
-        Some(c) => Some(c)
-        None => Some(Raw(verbatim(md, block)))
-      }
-    _ => Some(Raw(verbatim(md, block)))
+    HtmlBlock(html~, ..) => if is_svg(html) { Some(Svg(html)) } else { None }
+    Paragraph(children~, span~, ..) => sole(md, span, children)
+    _ => None
   }
 }
 

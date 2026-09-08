@@ -67,7 +67,8 @@ fn changed(doc : Doc, id : Int, how : Change) -> Doc {
       AddBlock =>
         Some({
           ..x,
-          body: x.body + [{ id: 999, source: None, content: ThematicBreak, }],
+          body: x.body +
+          [{ id: 999, source: None, content: Some(ThematicBreak), }],
         })
       DropBlock =>
         if x.body.is_empty() {
@@ -80,7 +81,7 @@ fn changed(doc : Doc, id : Int, how : Change) -> Doc {
           ..x,
           body: x.body.mapi((i, b) => {
             if i == 0 {
-              { id: b.id, source: None, content: Raw("changed"), }
+              { id: b.id, content: None, source: Some("changed"), }
             } else {
               b
             }

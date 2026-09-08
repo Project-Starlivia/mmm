@@ -13,7 +13,8 @@ test "Op は JSON の値になる" {
   json_inspect(
     Op::AddBlock(
       at=BlockPlace::Before(block=7),
-      content=Code(info="js", text="x"),
+      content=Some(Code(info="js", text="x")),
+      source=None,
     ),
     content=[
       "AddBlock",

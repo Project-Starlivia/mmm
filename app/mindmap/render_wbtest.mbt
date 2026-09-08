@@ -201,17 +201,21 @@ test "カードは仕切り線に続けて種類ごとの形で並び、data-car
     {
       id: 5,
       source: None,
-      content: Link(text="t", href="https://x.example/p", title=""),
+      content: Some(Link(text="t", href="https://x.example/p", title="")),
     },
-    { id: 6, source: None, content: Code(info="js", text="1\n2\n"), },
-    { id: 7, source: None, content: Image(alt="", src="./p.png", title=""), },
-    { id: 8, source: None, content: ThematicBreak, },
+    { id: 6, source: None, content: Some(Code(info="js", text="1\n2\n")), },
+    {
+      id: 7,
+      source: None,
+      content: Some(Image(alt="", src="./p.png", title="")),
+    },
+    { id: 8, source: None, content: Some(ThematicBreak), },
     {
       id: 9,
       source: None,
-      content: Details(text="", open=true, summary=Some("s"), body="d\n"),
+      content: Some(Details(open=true, summary=Some("s"), body="d\n")),
     },
-    { id: 10, source: None, content: Svg("<svg/>"), },
+    { id: 10, source: None, content: Some(Svg("<svg/>")), },
   ]
   r.draw(scene([root(node(1, "r", blocks~))], image_hint=Some("connect")))
   let g = r.node_el(1).unwrap()

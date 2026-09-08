@@ -33,6 +33,9 @@ pub(all) enum Flaw {
   /// 綴りの無いノード（Implicit）が、行の要るもの（名前・畳み・中身）を持つ。
   /// 行を省いた空の見出しなので、綴ってからでないと当てられない
   Unmarked(Int)
+  /// 書き戻す字が無い中身。読み解かなかったものと、畳めなかった `<details>` の
+  /// 領域は原文でしか書けないので、`source` が無ければ書いたときに消える
+  Wordless(Int)
 } derive(Eq, ToJson)
 
 ///|
@@ -54,6 +57,12 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   fn blocks(bs : Array[Block]) -> Unit {
     for x in bs {
       id(x.id)
+      // 意味から綴れるのは絵の 4 つと水平線だけ。読み解かなかったものと
+      // 畳めなかった領域は原文でしか書けない
+      if x.source is None &&
+        (x.content is None || x.content is Some(Details(..))) {
+        flaws.push(Wordless(x.id))
+      }
     }
   }
 
@@ -63,7 +72,7 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   let border : Ref[Int?] = { val: None, }
   fn trailing(bs : Array[Block]) -> Int? {
     match bs.last() {
-      Some({ id, content: ThematicBreak, .. }) => Some(id)
+      Some({ id, content: Some(ThematicBreak), .. }) => Some(id)
       _ => None
     }
   }

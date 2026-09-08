@@ -170,11 +170,15 @@ pub fn retarget(view : @view.View, from : String, to : String) -> Array[@op.Op] 
   each_node(view, n => {
     for b in n.blocks {
       match b.content {
-        Image(alt~, src~, title~) =>
+        Some(Image(alt~, src~, title~)) =>
           match under(src, from) {
             Some(rest) =>
               out.push(
-                SetBlock(id=b.id, content=Image(alt~, src=to + rest, title~)),
+                SetBlock(
+                  id=b.id,
+                  content=Some(Image(alt~, src=to + rest, title~)),
+                  source=None,
+                ),
               )
             None => ()
           }

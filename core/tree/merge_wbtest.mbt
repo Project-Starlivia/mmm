@@ -93,7 +93,7 @@ test "ラベルだけ変えれば、その地番だけ" {
 test "中身を足せば、そのノードの地番" {
   let md = "# r\n\n## a\n\n## b\n"
   let (before, spans) = survey(md)
-  let after = change(before, 0, [0], x => { ..x, body: blocks([Raw("x")]), })
+  let after = change(before, 0, [0], x => { ..x, body: [raw("x")], })
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 10, "to": 10, "insert": "\nx\n" },
   ])
@@ -332,7 +332,7 @@ test "入れ子の項目の子は、容器の中身の桁に差す" {
 test "散文" {
   let md = "hello\n\n# a\n"
   let (before, spans) = survey(md)
-  let after : Doc = { ..before, body: blocks([Raw("bye")]), }
+  let after : Doc = { ..before, body: [raw("bye")], }
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 0, "to": 6, "insert": "bye\n" },
   ])
@@ -442,7 +442,7 @@ fn rebody(body : Array[Block]) -> (Node) -> Node {
 test "中身を 1 枚足せば、行は触らず行の尻へ隙間を挟んで差す" {
   let md = "# r\n\n## a\n\n## b\n"
   let (before, spans) = survey(md)
-  let after = change(before, 0, [0], rebody(blocks([Raw("x")])))
+  let after = change(before, 0, [0], rebody([raw("x")]))
   let edits = changes(md, before, spans, after)
   json_inspect(edits, content=[{ "from": 10, "to": 10, "insert": "\nx\n" }])
   inspect(apply(md, edits), content="# r\n\n## a\n\nx\n\n## b\n")
@@ -467,7 +467,7 @@ test "中身を置き換えれば、その範囲だけ" {
     before,
     0,
     [0],
-    rebody([{ id: a.body[0].id, source: None, content: Raw("bye"), }]),
+    rebody([{ id: a.body[0].id, content: None, source: Some("bye"), }]),
   )
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 11, "to": 17, "insert": "bye\n" },
@@ -552,19 +552,16 @@ test "枝の移動は隙間ごと — 元は消え、先には隙間を挟んで
 test "文書の頭の散文 — 隙間は後ろに付く" {
   let md = "hello\n\n# a\n"
   let (before, spans) = survey(md)
-  let swapped = changes(md, before, spans, {
-    ..before,
-    body: blocks([Raw("bye")]),
-  })
+  let swapped = changes(md, before, spans, { ..before, body: [raw("bye")], })
   inspect(apply(md, swapped), content="bye\n\n# a\n")
   let gone = changes(md, before, spans, { ..before, body: [], })
   inspect(apply(md, gone), content="# a\n")
   let bare = "# a\n"
   let (b2, s2) = survey(bare)
-  let born = changes(bare, b2, s2, { ..b2, body: blocks([Raw("bye")]), })
+  let born = changes(bare, b2, s2, { ..b2, body: [raw("bye")], })
   inspect(apply(bare, born), content="bye\n\n# a\n")
   let (b3, s3) = survey("")
-  let first = changes("", b3, s3, { ..b3, body: blocks([Raw("bye")]), })
+  let first = changes("", b3, s3, { ..b3, body: [raw("bye")], })
   inspect(apply("", first), content="bye\n")
 }
 
@@ -695,7 +692,7 @@ test "frontmatter の直後の空行は、頭の要素を触っても消えな�
     apply(md, changes(md, before, spans, less)),
     content="---\nk: v\n---\n\n# b\n",
   )
-  let prose : Doc = { ..before, body: blocks([Raw("x")]), }
+  let prose : Doc = { ..before, body: [raw("x")], }
   inspect(
     apply(md, changes(md, before, spans, prose)),
     content="---\nk: v\n---\n\nx\n\n# a\n\n# b\n",

@@ -10,10 +10,10 @@
 ///|
 fn doc(
   roots : Array[Root],
-  body? : Array[Content] = [],
+  body? : Array[Block] = [],
   frontmatter? : String? = None,
 ) -> Doc {
-  { frontmatter, body: blocks(body), roots, }
+  { frontmatter, body, roots, }
 }
 
 ///|
@@ -26,21 +26,35 @@ fn root(
 }
 
 ///|
-/// id は書きに関係しないので 0 のまま。source は「読んだ原文」— 手で組む木では None
+/// mmm が作った中身の列。**原文を持たない**ので、意味から綴られる。
+/// id は書きに関係しないので 0 のまま
 fn blocks(body : Array[Content]) -> Array[Block] {
-  body.map(content => ({ id: 0, content, source: None, } : Block))
+  body.map(content => ({ id: 0, content: Some(content), source: None, } : Block))
 }
 
 ///|
+/// 読み解かなかった中身。意味は無く、原文がそのまま書き戻る
+fn raw(source : String) -> Block {
+  { id: 0, content: None, source: Some(source), }
+}
+
+///|
+/// mmm が作った中身。原文を持たないので、意味から綴られる
+fn made(content : Content) -> Block {
+  { id: 0, content: Some(content), source: None, }
+}
+
+///|
+/// 読んだ中身。意味も原文も持つので、書き戻しは原文のまま
 fn read_block(content : Content, source : String) -> Block {
-  { id: 0, content, source: Some(source), }
+  { id: 0, content: Some(content), source: Some(source), }
 }
 
 ///|
 fn h(
   label : String,
   children? : Array[Node] = [],
-  body? : Array[Content] = [],
+  body? : Array[Block] = [],
   fold? : Fold? = None,
   setext? : Bool = false,
   closing? : Int = 0,
@@ -49,7 +63,7 @@ fn h(
     id: 0,
     label,
     fold,
-    body: blocks(body),
+    body,
     children,
     mark: Some(Heading(setext~, closing~)),
   }
@@ -59,7 +73,7 @@ fn h(
 fn item(
   label : String,
   children? : Array[Node] = [],
-  body? : Array[Content] = [],
+  body? : Array[Block] = [],
   fold? : Fold? = None,
   marker? : String = "-",
   offset? : Int = 2,
@@ -69,7 +83,7 @@ fn item(
     id: 0,
     label,
     fold,
-    body: blocks(body),
+    body,
     children,
     mark: Some(Item(marker~, offset~, loose~)),
   }
@@ -489,10 +503,7 @@ test "読んだ中身は原文のまま — 表の桁は揃えず、フェンス
         id: 0,
         label: "a",
         fold: None,
-        body: [
-          read_block(Raw(table), table),
-          read_block(Code(info="", text="x\n"), "~~~\nx\n~~~"),
-        ],
+        body: [raw(table), read_block(Code(info="", text="x\n"), "~~~\nx\n~~~")],
         children: [],
         mark: Some(atx),
       }),
@@ -508,8 +519,8 @@ test "mmm が作った中身は既定で綴る — source が無ければ種類�
       doc([
         root(
           h("a", body=[
-            Code(info="js", text="1\n"),
-            Image(alt="", src="p.png", title=""),
+            made(Code(info="js", text="1\n")),
+            made(Image(alt="", src="p.png", title="")),
           ]),
         ),
       ]),
@@ -525,12 +536,12 @@ test "中身は文書順に、塊ごとに空行を挟んで" {
       doc([
         root(
           h("a", body=[
-            Raw("text"),
-            Image(alt="p", src="x.png", title=""),
-            Link(text="記事", href="https://e", title=""),
-            Code(info="js", text="let x = 1\n"),
-            Svg("<svg><rect/></svg>\n"),
-            ThematicBreak,
+            raw("text"),
+            made(Image(alt="p", src="x.png", title="")),
+            made(Link(text="記事", href="https://e", title="")),
+            made(Code(info="js", text="let x = 1\n")),
+            made(Svg("<svg><rect/></svg>\n")),
+            made(ThematicBreak),
           ]),
         ),
       ]),
@@ -563,8 +574,8 @@ test "画像とリンクのタイトル" {
       doc([
         root(
           h("a", body=[
-            Image(alt="p", src="x.png", title="t"),
-            Link(text="l", href="/u", title="v"),
+            made(Image(alt="p", src="x.png", title="t")),
+            made(Link(text="l", href="/u", title="v")),
           ]),
         ),
       ]),
@@ -583,7 +594,7 @@ test "画像とリンクのタイトル" {
 ///|
 test "最初の骨格より前の中身は文書のもの" {
   inspect(
-    serialize(doc([root(h("a"))], body=[Raw("intro")])),
+    serialize(doc([root(h("a"))], body=[raw("intro")])),
     content=(
       #|intro
       #|
@@ -597,7 +608,7 @@ test "最初の骨格より前の中身は文書のもの" {
 /// Raw は生の塊のまま置く。読み直さないので、強調の綴りも変わらない。
 test "Raw の字はそのまま — 強調の綴りも直さない" {
   inspect(
-    serialize(doc([root(h("a", body=[Raw("_em_ と *x*")]))])),
+    serialize(doc([root(h("a", body=[raw("_em_ と *x*")]))])),
     content=(
       #|# a
       #|
@@ -611,7 +622,7 @@ test "Raw の字はそのまま — 強調の綴りも直さない" {
 /// 定義行は原文の中に居るので、書かれた場所に残る。
 test "定義行は書かれた場所に残る" {
   inspect(
-    serialize(doc([root(h("a", body=[Raw("[q]: /r")], children=[h("b")]))])),
+    serialize(doc([root(h("a", body=[raw("[q]: /r")], children=[h("b")]))])),
     content=(
       #|# a
       #|
@@ -631,11 +642,9 @@ test "Details はそのまま" {
       doc([
         root(
           h("r", body=[
-            Details(
-              text="<details>\n<summary>h</summary>\n\ninner\n\n</details>",
-              open=false,
-              summary=Some("h"),
-              body="inner",
+            read_block(
+              Details(open=false, summary=Some("h"), body="inner"),
+              "<details>\n<summary>h</summary>\n\ninner\n\n</details>",
             ),
           ]),
         ),
@@ -660,7 +669,7 @@ test "Details はそのまま" {
 test "項目の中身は項目の列に字下げ" {
   inspect(
     serialize(
-      doc([root(h("r", children=[item("a", body=[Raw("text")]), item("b")]))]),
+      doc([root(h("r", children=[item("a", body=[raw("text")]), item("b")]))]),
     ),
     content=(
       #|# r
@@ -677,7 +686,9 @@ test "項目の中身は項目の列に字下げ" {
 ///|
 test "項目の中のコードは塊ごと字下げ" {
   inspect(
-    serialize(doc([root(item("a", body=[Code(info="", text="x\n\ny\n")]))])),
+    serialize(
+      doc([root(item("a", body=[made(Code(info="", text="x\n\ny\n"))]))]),
+    ),
     content=(
       #|- a
       #|
@@ -696,7 +707,7 @@ test "項目の中のコードは塊ごと字下げ" {
 /// するが、書きは木が言うとおりに字下げして置くだけ。
 test "中身の見出しの形の行は、字下げした中身のまま" {
   inspect(
-    serialize(doc([root(item("a", body=[Raw("# x")]))])),
+    serialize(doc([root(item("a", body=[raw("# x")]))])),
     content=(
       #|- a
       #|
@@ -710,7 +721,7 @@ test "中身の見出しの形の行は、字下げした中身のまま" {
 test "コードの中に ``` があれば外を長くする" {
   inspect(
     serialize(
-      doc([root(h("a", body=[Code(info="md", text="```js\nx\n```\n")]))]),
+      doc([root(h("a", body=[made(Code(info="md", text="```js\nx\n```\n"))]))]),
     ),
     content=(
       #|# a
@@ -753,7 +764,7 @@ test "見出しの畳み" {
         root(
           h("r", children=[
             h("h", fold=Some({ open: false, summary: Some("h"), }), body=[
-              Raw("body"),
+              raw("body"),
             ]),
           ]),
         ),
@@ -986,7 +997,9 @@ test "Link の題はそのまま — 逃がしを足さず、消さない" {
       doc([
         root(
           h("a", body=[
-            Link(text="\\[WIP\\] design", href="https://e.com/x", title=""),
+            made(
+              Link(text="\\[WIP\\] design", href="https://e.com/x", title=""),
+            ),
           ]),
         ),
       ]),
@@ -998,7 +1011,7 @@ test "Link の題はそのまま — 逃がしを足さず、消さない" {
       doc([
         root(
           h("a", body=[
-            Link(text="[WIP] design", href="https://e.com/x", title=""),
+            made(Link(text="[WIP] design", href="https://e.com/x", title="")),
           ]),
         ),
       ]),

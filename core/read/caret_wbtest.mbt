@@ -174,7 +174,7 @@ test "derive — 地図が持つ間は位置から。点はラベルの頭、カ
   let card : @tree.Block = {
     id: 4,
     source: None,
-    content: Code(info="", text="x"),
+    content: Some(Code(info="", text="x")),
   }
   let card_at = spots([
     (1, 0, None, 0),

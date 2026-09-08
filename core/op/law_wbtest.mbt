@@ -113,7 +113,7 @@ fn ops_for(all : Array[Int]) -> Array[Op] {
     ops.push(Delete(ids=[id]))
     ops.push(Wrap(id~, label="w"))
     ops.push(FlipSide(id~))
-    ops.push(SetBlock(id~, content=ThematicBreak))
+    ops.push(SetBlock(id~, content=Some(ThematicBreak), source=None))
     for to in all {
       ops.push(MoveNode(ids=[id], at=Before(node=to)))
       ops.push(MoveNode(ids=[id], at=After(node=to)))
@@ -121,7 +121,13 @@ fn ops_for(all : Array[Int]) -> Array[Op] {
       ops.push(MoveBlock(ids=[id], at=Before(block=to)))
       ops.push(MoveBlock(ids=[id], at=BlockPlace::In(node=to)))
       ops.push(AddNode(at=After(node=to), labels=["n"]))
-      ops.push(AddBlock(at=BlockPlace::In(node=to), content=ThematicBreak))
+      ops.push(
+        AddBlock(
+          at=BlockPlace::In(node=to),
+          content=Some(ThematicBreak),
+          source=None,
+        ),
+      )
       ops.push(Graft(at=NodePlace::In(node=to, side=None), md="# g\n\n- i\n"))
       ops.push(Graft(at=NodePlace::In(node=to, side=None), md="- i\n  - j\n"))
       ops.push(Graft(at=After(node=to), md="![](q.png)\n\ntext\n"))
@@ -131,7 +137,11 @@ fn ops_for(all : Array[Int]) -> Array[Op] {
     AddNode(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["n"]),
   )
   ops.push(
-    AddBlock(at=BlockPlace::In(node=@tree.doc_id), content=ThematicBreak),
+    AddBlock(
+      at=BlockPlace::In(node=@tree.doc_id),
+      content=Some(ThematicBreak),
+      source=None,
+    ),
   )
   ops.push(Graft(at=NodePlace::In(node=@tree.doc_id, side=None), md="- i\n"))
   ops.push(Graft(at=NodePlace::In(node=@tree.doc_id, side=None), md="text\n"))

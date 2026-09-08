@@ -125,22 +125,21 @@ test "Raw だけが落ちる。並びも id も保つ" {
     {
       id: 3,
       source: None,
-      content: @tree.Image(alt="", src="p.png", title=""),
+      content: Some(@tree.Image(alt="", src="p.png", title="")),
     },
-    { id: 4, source: None, content: @tree.Raw("prose"), },
-    { id: 5, source: None, content: @tree.Link(text="t", href="u", title=""), },
-    { id: 6, source: None, content: @tree.Code(info="js", text="1\n"), },
-    { id: 7, source: None, content: @tree.Svg("<svg/>"), },
-    { id: 8, source: None, content: @tree.ThematicBreak, },
+    { id: 4, content: None, source: Some("prose"), },
+    {
+      id: 5,
+      source: None,
+      content: Some(@tree.Link(text="t", href="u", title="")),
+    },
+    { id: 6, source: None, content: Some(@tree.Code(info="js", text="1\n")), },
+    { id: 7, source: None, content: Some(@tree.Svg("<svg/>")), },
+    { id: 8, source: None, content: Some(@tree.ThematicBreak), },
     {
       id: 9,
       source: None,
-      content: @tree.Details(
-        text="<details>x</details>",
-        open=false,
-        summary=None,
-        body="x",
-      ),
+      content: Some(@tree.Details(open=false, summary=None, body="x")),
     },
   ]
   json_inspect(project(doc([root(heading(2, "a", body~))])), content={
@@ -161,13 +160,7 @@ test "Raw だけが落ちる。並びも id も保つ" {
             { "id": 6, "content": ["Code", { "info": "js", "text": "1\n" }] },
             { "id": 7, "content": ["Svg", "<svg/>"] },
             { "id": 8, "content": "ThematicBreak" },
-            {
-              "id": 9,
-              "content": [
-                "Details",
-                { "text": "<details>x</details>", "open": false, "body": "x" },
-              ],
-            },
+            { "id": 9, "content": ["Details", { "open": false, "body": "x" }] },
           ],
           "children": [],
         },
@@ -243,8 +236,8 @@ test "frontmatter は通り、散文は消える" {
   let d : @tree.Doc = {
     frontmatter: Some("k: v\n"),
     body: [
-      { id: 2, source: None, content: @tree.ThematicBreak, },
-      { id: 3, source: None, content: @tree.Raw("prose"), },
+      { id: 2, source: None, content: Some(@tree.ThematicBreak), },
+      { id: 3, content: None, source: Some("prose"), },
     ],
     roots: [root(heading(4, "a"))],
   }
