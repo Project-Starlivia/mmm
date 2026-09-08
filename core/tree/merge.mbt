@@ -140,13 +140,13 @@ fn plan(
   // 文書の散文。容器の自分の尻は散文の頭（frontmatter の尻）
   merge_body(r, before.body, after.body, spans.get(doc_id).unwrap().from, 0)
   // 側は根のもの。変われば根が丸ごと（子の増減で長さが変わるだけ — 全部 Right — は同じ）
-  let olds = Map::from_array(before.roots.map(x => (id_of(x.node), x.sides)))
-  let sides = Map::from_array(after.roots.map(x => (id_of(x.node), x.sides)))
-  let rules = Map::from_array(after.roots.map(x => (id_of(x.node), x.rules)))
+  let olds = Map::from_array(before.roots.map(x => (x.node.id, x.sides)))
+  let sides = Map::from_array(after.roots.map(x => (x.node.id, x.sides)))
+  let rules = Map::from_array(after.roots.map(x => (x.node.id, x.rules)))
   for x in after.roots {
-    match olds.get(id_of(x.node)) {
+    match olds.get(x.node.id) {
       Some(was) if !(was == x.sides || (plain(was) && plain(x.sides))) =>
-        r.old.remove(id_of(x.node))
+        r.old.remove(x.node.id)
       _ => ()
     }
   }
@@ -173,14 +173,13 @@ fn plain(sides : Array[Side]) -> Bool {
 fn elements(doc : Doc) -> Array[Int] {
   let out : Array[Int] = []
   fn node(x : Node) {
-    match x {
-      ImplicitNode(_) => ()
-      _ => out.push(id_of(x))
+    if x.mark is Some(_) {
+      out.push(x.id)
     }
-    for b in body_of(x) {
+    for b in x.body {
       out.push(b.id)
     }
-    for k in children_of(x) {
+    for k in x.children {
       node(k)
     }
   }
@@ -199,13 +198,12 @@ fn elements(doc : Doc) -> Array[Int] {
 /// 在り得ない（check が言う）ので None は来ないが、来れば theirs の既定に落ちて
 /// 検証が全文へ落とす
 fn head_element(x : Node) -> Int? {
-  match x {
-    ImplicitNode(g) =>
-      match g.children.get(0) {
-        Some(k) => head_element(k)
-        None => None
-      }
-    _ => Some(id_of(x))
+  if x.mark is Some(_) {
+    return Some(x.id)
+  }
+  match x.children.get(0) {
+    Some(k) => head_element(k)
+    None => None
   }
 }
 
@@ -237,20 +235,14 @@ fn canon_gaps(doc : Doc) -> Map[Int, Bool]? {
   }
   // Implicit は行を持たないので、その隙間は最初の要素の隙間
   fn implicit(x : Node) {
-    match x {
-      ImplicitNode(g) => {
-        match head_element(x) {
-          Some(first) => out[g.id] = out.get(first).unwrap_or(true)
-          None => ()
-        }
-        for k in g.children {
-          implicit(k)
-        }
+    if x.mark is None {
+      match head_element(x) {
+        Some(first) => out[x.id] = out.get(first).unwrap_or(true)
+        None => ()
       }
-      _ =>
-        for k in children_of(x) {
-          implicit(k)
-        }
+    }
+    for k in x.children {
+      implicit(k)
     }
   }
 
@@ -271,44 +263,44 @@ fn merge_node(
   sides : Array[Side],
   rules : Array[String],
 ) -> Unit {
-  match r.old.get(id_of(x)) {
+  match r.old.get(x.id) {
     // 畳みは `<details>` が部分木を包むので、自分か子列が変わればそこから丸ごと
     Some(old) if kind(old) == kind(x) &&
-      aligned(ids(children_of(old)), ids(children_of(x))) &&
+      aligned(ids(old.children), ids(x.children)) &&
       (
-        !(folded(old) || folded(x)) ||
-        (same(old, x) && ids(children_of(old)) == ids(children_of(x)))
+        !(old.fold is Some(_) || x.fold is Some(_)) ||
+        (same(old, x) && ids(old.children) == ids(x.children))
       ) => {
-      let s = r.spans.get(id_of(x)).unwrap()
+      let s = r.spans.get(x.id).unwrap()
       // 項目の中身と子は容器のラベルの桁（読んだ字下げ幅の右）に居る
-      let col = match x {
-        ListNode(l) => column(r.md, s.from) + l.offset
+      let col = match x.mark {
+        Some(Item(offset~, ..)) => column(r.md, s.from) + offset
         _ => 0
       }
       // Implicit は行も中身も持たない（範囲は子の和）
-      match x {
-        ImplicitNode(_) => ()
-        _ => {
+      match x.mark {
+        None => ()
+        Some(_) => {
           let line_to = line_end(r.md, s.from)
           if !same_line(old, x) {
             r.out.push({
               from: s.from,
               to: line_to,
               insert: indent(
-                fragment(with_children(with_body(x, []), []), depth, [], []),
+                fragment({ ..x, body: [], children: [], }, depth, [], []),
                 column(r.md, s.from),
               ),
             })
           }
-          merge_body(r, body_of(old), body_of(x), line_to, col)
+          merge_body(r, old.body, x.body, line_to, col)
         }
       }
       merge_children(
         r,
         own_end(r, old),
         col,
-        children_of(old),
-        children_of(x),
+        old.children,
+        x.children,
         depth + 1,
         Map([]),
         Map([]),
@@ -505,8 +497,8 @@ fn merge_children(
   sides : Map[Int, Array[Side]],
   rules : Map[Int, Array[String]],
 ) -> Unit {
-  let now = Map::from_array(news.map(x => (id_of(x), x)))
-  let item = news.get(0) is Some(ListNode(_))
+  let now = Map::from_array(news.map(x => (x.id, x)))
+  let item = news.get(0).map(sign_of) is Some(Some(Item))
   let old_ids = ids(olds)
   let style : Bool? = if item && old_ids.length() >= 2 {
     // 2 つ目からの兄弟の隙間が、この列の流儀（先頭の隙間は列の手前のもの）
@@ -616,7 +608,7 @@ fn merge_body(
 /// 前の木のノードの、自分の尻。元から子の無い容器に差すときだけ使い、そのとき
 /// 地番の尻は自分の尻そのもの（setext の 2 行目も含む）。
 fn own_end(r : Merge, old : Node) -> Int {
-  r.spans.get(id_of(old)).unwrap().to
+  r.spans.get(old.id).unwrap().to
 }
 
 ///|
@@ -673,7 +665,7 @@ fn replace(
   sides : Array[Side],
   rules : Array[String],
 ) -> Unit {
-  r.out.push(patch(r, id_of(x), fragment(x, depth, sides, rules)))
+  r.out.push(patch(r, x.id, fragment(x, depth, sides, rules)))
 }
 
 ///|
@@ -707,104 +699,36 @@ fn indent(text : String, n : Int) -> String {
 ///|
 /// 行が同じか — ラベルと畳み。中身と子は見ない。
 fn same_line(a : Node, b : Node) -> Bool {
-  match (a, b) {
-    (HeadingNode(p), HeadingNode(q)) => p.label == q.label && p.fold == q.fold
-    (ListNode(p), ListNode(q)) => p.label == q.label && p.fold == q.fold
-    (ImplicitNode(_), ImplicitNode(_)) => true
-    _ => false
-  }
-}
-
-///|
-fn body_of(x : Node) -> Array[Block] {
-  match x {
-    HeadingNode(h) => h.body
-    ListNode(l) => l.body
-    ImplicitNode(_) => []
-  }
-}
-
-///|
-fn with_body(x : Node, body : Array[Block]) -> Node {
-  match x {
-    HeadingNode(h) => HeadingNode({ ..h, body, })
-    ListNode(l) => ListNode({ ..l, body, })
-    ImplicitNode(_) => x
-  }
+  kind(a) == kind(b) && a.label == b.label && a.fold == b.fold
 }
 
 ///|
 /// ノード自身が同じか — 行（ラベル・畳み）と中身。子は見ない。
 fn same(a : Node, b : Node) -> Bool {
-  same_line(a, b) && body_of(a) == body_of(b)
+  same_line(a, b) && a.body == b.body
 }
 
 ///|
 fn index(into : Map[Int, Node], x : Node) -> Unit {
-  into[id_of(x)] = x
-  for k in children_of(x) {
+  into[x.id] = x
+  for k in x.children {
     index(into, k)
   }
 }
 
 ///|
-fn id_of(x : Node) -> Int {
-  match x {
-    HeadingNode(h) => h.id
-    ListNode(l) => l.id
-    ImplicitNode(g) => g.id
-  }
-}
-
-///|
-/// 種類。構築子の名前そのもの
+/// 種類。綴りの書き方は見ない
 fn kind(x : Node) -> Int {
-  match x {
-    HeadingNode(_) => 0
-    ListNode(_) => 1
-    ImplicitNode(_) => 2
-  }
-}
-
-///|
-fn with_children(x : Node, kids : Array[Node]) -> Node {
-  match x {
-    HeadingNode(h) => HeadingNode({ ..h, children: kids, })
-    ImplicitNode(g) => ImplicitNode({ ..g, children: kids, })
-    ListNode(l) =>
-      ListNode({
-        ..l,
-        children: kids.map(k => {
-          match k {
-            ListNode(c) => c
-            _ => abort("項目の子は項目")
-          }
-        }),
-      })
-  }
-}
-
-///|
-fn folded(x : Node) -> Bool {
-  match x {
-    HeadingNode(h) => h.fold is Some(_)
-    ListNode(l) => l.fold is Some(_)
-    ImplicitNode(_) => false
-  }
-}
-
-///|
-fn children_of(x : Node) -> Array[Node] {
-  match x {
-    HeadingNode(h) => h.children
-    ListNode(l) => l.children.map(c => ListNode(c))
-    ImplicitNode(g) => g.children
+  match sign_of(x) {
+    Some(Heading) => 0
+    Some(Item) => 1
+    None => 2
   }
 }
 
 ///|
 fn ids(xs : Array[Node]) -> Array[Int] {
-  xs.map(id_of)
+  xs.map(x => x.id)
 }
 
 ///|
@@ -825,37 +749,19 @@ pub fn shape(doc : Doc) -> Doc {
 }
 
 ///|
+/// 綴りの書き方（setext・閉じの `#`・マーカー・字下げ幅・詰め）は原文から来る
+/// もので、席が変われば綴り直される。**形は種類だけを見る。**
 fn faceless_node(x : Node) -> Node {
-  match x {
-    HeadingNode(h) =>
-      HeadingNode({
-        ..h,
-        id: 0,
-        // 見出しの綴り（setext・閉じの `#`）は原文から来るもので、席が変われば
-        // 綴り直される（深さ 3 に setext は無い）。形は綴りを見ない
-        setext: false,
-        closing: 0,
-        body: faceless(h.body),
-        children: h.children.map(faceless_node),
-      })
-    ListNode(l) => ListNode(faceless_list(l))
-    ImplicitNode(g) =>
-      ImplicitNode({ id: 0, children: g.children.map(faceless_node), })
-  }
-}
-
-///|
-fn faceless_list(l : ListNode) -> ListNode {
   {
-    ..l,
+    ..x,
     id: 0,
-    // 項目の綴り（マーカー・字下げ幅・詰め）も原文から来るもので、席が変われば
-    // 隣に従う。見出しの setext と同じく、形は綴りを見ない
-    marker: "-",
-    offset: 2,
-    loose: false,
-    body: faceless(l.body),
-    children: l.children.map(faceless_list),
+    body: faceless(x.body),
+    children: x.children.map(faceless_node),
+    mark: match sign_of(x) {
+      Some(Heading) => Some(atx)
+      Some(Item) => Some(bullet)
+      None => None
+    },
   }
 }
 

@@ -1,32 +1,32 @@
 // 書きの道具。id の席を f の返した列に置き換え、根までの道を組み直す。
 //
-// **check の書き込み版。** 読む側で check が見張る 2 つの約束（項目の子は項目 /
-// sides は根の子と並走）を、書く側で破らないように組む唯一の場所。f は
-// 「どうしたいか」だけを言い、できるかは席を知るここが決める。
+// **check の書き込み版。** 読む側で check が見張る約束（sides は根の子と並走）を、
+// 書く側で破らないように組む唯一の場所。f は「どうしたいか」だけを言い、
+// 席を知るここが並走を保つ。
 // 子が尽きた Implicit は残す — 抜いてから差す操作の途中で席が消えないように。
 // 掃除は門（mend）の仕事。
 
 ///|
-/// 1 回の置き換え。歩きながら「席が見つかったか」「席の型に合わなかったか」を残す。
+/// 1 回の置き換え。歩きながら「席が見つかったか」を残す。
 priv struct Splice {
   id : Int
   f : (@tree.Node) -> Array[@tree.Node]
   mut hit : Bool
-  mut bad : Bool
 }
 
 ///|
 /// id の席を f の返した列に置き換える。0 = 抜く、1 = 替える、n = 差す。
-/// None は 2 つ: id が無い / 席の型に返された列が合わない（項目の下に見出し）。
+/// None は id が無いときだけ — **席は種類を選ばない**（項目の中は、その項目の
+/// 深さを 0 とした文書）。
 fn splice(
   doc : @tree.Doc,
   id : Int,
   f : (@tree.Node) -> Array[@tree.Node],
 ) -> @tree.Doc? {
-  let s : Splice = { id, f, hit: false, bad: false, }
+  let s : Splice = { id, f, hit: false, }
   let roots : Array[@tree.Root] = []
   for r in doc.roots {
-    if id_of(r.node) == id {
+    if r.node.id == id {
       s.hit = true
       for y in f(r.node) {
         roots.push({ node: y, sides: sides_for(y, r), rules: rules_for(y, r), })
@@ -35,7 +35,7 @@ fn splice(
       roots.push(rebuild_root(s, r))
     }
   }
-  if !s.hit || s.bad {
+  if !s.hit {
     None
   } else {
     Some({ ..doc, roots, })
@@ -46,8 +46,8 @@ fn splice(
 /// 根の席に置くものの sides。id も子の数も同じなら元のまま、それ以外は Right × 子の数
 /// （新しい根は右から始まる。包んだ根が `[Right]` になるのもこの規則）。
 fn sides_for(y : @tree.Node, old : @tree.Root) -> Array[@tree.Side] {
-  let n = kids(y).length()
-  if id_of(y) == id_of(old.node) && n == old.sides.length() {
+  let n = y.children.length()
+  if y.id == old.node.id && n == old.sides.length() {
     old.sides
   } else {
     Array::make(n, @tree.Right)
@@ -57,8 +57,8 @@ fn sides_for(y : @tree.Node, old : @tree.Root) -> Array[@tree.Side] {
 ///|
 /// 根の席に置くものの rules。sides と同じ規則で、綴りの無い所は空（書く側が `---`）。
 fn rules_for(y : @tree.Node, old : @tree.Root) -> Array[String] {
-  let n = kids(y).length()
-  if id_of(y) == id_of(old.node) && n == old.sides.length() {
+  let n = y.children.length()
+  if y.id == old.node.id && n == old.sides.length() {
     old.rules
   } else {
     Array::make(n, "")
@@ -68,177 +68,49 @@ fn rules_for(y : @tree.Node, old : @tree.Root) -> Array[String] {
 ///|
 /// 根 1 本。子の列と sides・rules を並走して組み直す。
 fn rebuild_root(s : Splice, r : @tree.Root) -> @tree.Root {
-  match r.node {
-    HeadingNode(h) => {
-      let (children, sides, rules) = rebuild_root_heading_children(
-        s,
-        h.children,
-        r,
-      )
-      { node: HeadingNode({ ..h, children, }), sides, rules, }
-    }
-    ImplicitNode(g) => {
-      let (children, sides, rules) = rebuild_root_heading_children(
-        s,
-        g.children,
-        r,
-      )
-      { node: ImplicitNode({ ..g, children, }), sides, rules, }
-    }
-    ListNode(l) => {
-      let (children, sides, rules) = rebuild_root_item_children(
-        s,
-        l.children,
-        r,
-      )
-      { node: ListNode({ ..l, children, }), sides, rules, }
-    }
-  }
-}
-
-///|
-/// 根が見出し（か Implicit）のときの子の列。席なら、その側と綴りを返された数だけ複製する。
-fn rebuild_root_heading_children(
-  s : Splice,
-  xs : Array[@tree.Node],
-  r : @tree.Root,
-) -> (Array[@tree.Node], Array[@tree.Side], Array[String]) {
   let out = []
-  let out_sides = []
-  let out_rules = []
-  for i, x in xs {
+  let sides = []
+  let rules = []
+  for i, x in r.node.children {
     let side = if i < r.sides.length() { r.sides[i] } else { @tree.Right }
     let rule = if i < r.rules.length() { r.rules[i] } else { "" }
-    if id_of(x) == s.id {
-      s.hit = true
-      for y in (s.f)(x) {
-        out.push(y)
-        out_sides.push(side)
-        out_rules.push(rule)
-      }
-    } else {
-      out.push(rebuild_node(s, x))
-      out_sides.push(side)
-      out_rules.push(rule)
+    // 席なら、その側と綴りを返された数だけ複製する
+    for y in rebuild_child(s, x) {
+      out.push(y)
+      sides.push(side)
+      rules.push(rule)
     }
   }
-  (out, out_sides, out_rules)
-}
-
-///|
-/// 項目が根のときの子の列。
-fn rebuild_root_item_children(
-  s : Splice,
-  xs : Array[@tree.ListNode],
-  r : @tree.Root,
-) -> (Array[@tree.ListNode], Array[@tree.Side], Array[String]) {
-  let out = []
-  let out_sides = []
-  let out_rules = []
-  for i, x in xs {
-    let side = if i < r.sides.length() { r.sides[i] } else { @tree.Right }
-    let rule = if i < r.rules.length() { r.rules[i] } else { "" }
-    if x.id == s.id {
-      s.hit = true
-      for y in (s.f)(@tree.ListNode(x)) {
-        match y {
-          ListNode(l) => {
-            out.push(l)
-            out_sides.push(side)
-            out_rules.push(rule)
-          }
-          _ => s.bad = true
-        }
-      }
-    } else {
-      out.push(rebuild_item(s, x))
-      out_sides.push(side)
-      out_rules.push(rule)
-    }
-  }
-  (out, out_sides, out_rules)
+  { node: { ..r.node, children: out, }, sides, rules, }
 }
 
 ///|
 /// ノード 1 つ。子の列を組み直す。
 fn rebuild_node(s : Splice, x : @tree.Node) -> @tree.Node {
-  match x {
-    HeadingNode(h) =>
-      HeadingNode({ ..h, children: rebuild_heading_children(s, h.children), })
-    ListNode(l) => ListNode(rebuild_item(s, l))
-    ImplicitNode(g) =>
-      ImplicitNode({ ..g, children: rebuild_heading_children(s, g.children), })
-  }
-}
-
-///|
-/// 見出し・Implicit の子の列。何でも来る。
-fn rebuild_heading_children(
-  s : Splice,
-  xs : Array[@tree.Node],
-) -> Array[@tree.Node] {
   let out = []
-  for x in xs {
-    if id_of(x) == s.id {
-      s.hit = true
-      for y in (s.f)(x) {
-        out.push(y)
-      }
-    } else {
-      out.push(rebuild_node(s, x))
+  for k in x.children {
+    for y in rebuild_child(s, k) {
+      out.push(y)
     }
   }
-  out
+  { ..x, children: out, }
 }
 
 ///|
-/// 項目 1 つ。子の列を組み直す。
-fn rebuild_item(s : Splice, l : @tree.ListNode) -> @tree.ListNode {
-  { ..l, children: rebuild_item_children(s, l.children), }
+/// 子 1 つを組み直した列。席なら f の返した列、そうでなければ組み直した 1 つ。
+fn rebuild_child(s : Splice, x : @tree.Node) -> Array[@tree.Node] {
+  if x.id != s.id {
+    return [rebuild_node(s, x)]
+  }
+  s.hit = true
+  (s.f)(x)
 }
 
 ///|
-/// 項目の子の列。項目しか置けない（型が強いる）。
-fn rebuild_item_children(
-  s : Splice,
-  xs : Array[@tree.ListNode],
-) -> Array[@tree.ListNode] {
-  let out = []
-  for x in xs {
-    if x.id == s.id {
-      s.hit = true
-      for y in (s.f)(@tree.ListNode(x)) {
-        match y {
-          ListNode(l) => out.push(l)
-          _ => s.bad = true
-        }
-      }
-    } else {
-      out.push(rebuild_item(s, x))
-    }
-  }
-  out
-}
-
-///|
-/// 子の列に足したノード。項目の下に項目でないものは置けない。
-fn with_kids(n : @tree.Node, more : Array[@tree.Node]) -> @tree.Node? {
-  match n {
-    HeadingNode(h) =>
-      Some(HeadingNode({ ..h, children: [..h.children, ..more], }))
-    ImplicitNode(g) =>
-      Some(ImplicitNode({ ..g, children: [..g.children, ..more], }))
-    ListNode(l) => {
-      let children = l.children.copy()
-      for y in more {
-        match y {
-          ListNode(c) => children.push(c)
-          _ => return None
-        }
-      }
-      Some(ListNode({ ..l, children, }))
-    }
-  }
+/// 子の列に足したノード。**種類は問わない** — 項目の中は、その項目の深さを
+/// 0 とした文書（docs/spec.md「項目の中」）。
+fn with_kids(n : @tree.Node, more : Array[@tree.Node]) -> @tree.Node {
+  { ..n, children: [..n.children, ..more], }
 }
 
 ///|
@@ -256,15 +128,15 @@ fn append(
     for y in nodes {
       roots.push({
         node: y,
-        sides: Array::make(kids(y).length(), @tree.Right),
-        rules: Array::make(kids(y).length(), ""),
+        sides: Array::make(y.children.length(), @tree.Right),
+        rules: Array::make(y.children.length(), ""),
       })
     }
     return Some({ ..doc, roots, })
   }
   for i, r in doc.roots {
-    if id_of(r.node) == node {
-      guard with_kids(r.node, nodes) is Some(n) else { return None }
+    if r.node.id == node {
+      let n = with_kids(r.node, nodes)
       let s = match side {
         Some(s) => s
         None =>
@@ -285,8 +157,7 @@ fn append(
     }
   }
   guard find(doc, node) is Some(n) else { return None }
-  guard with_kids(n, nodes) is Some(m) else { return None }
-  splice(doc, node, _ => [m])
+  splice(doc, node, _ => [with_kids(n, nodes)])
 }
 
 ///|
@@ -300,10 +171,8 @@ fn body(
     return Some({ ..doc, body: f(doc.body), })
   }
   guard find(doc, node) is Some(n) else { return None }
-  let m = match n {
-    HeadingNode(h) => @tree.HeadingNode({ ..h, body: f(h.body), })
-    ListNode(l) => @tree.ListNode({ ..l, body: f(l.body), })
-    ImplicitNode(_) => return None
-  }
+  // Implicit は綴りが無いので中身も持てない
+  guard n.mark is Some(_) else { return None }
+  let m = { ..n, body: f(n.body), }
   splice(doc, node, _ => [m])
 }

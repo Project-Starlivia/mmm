@@ -15,35 +15,17 @@ pub fn project(doc : @tree.Doc) -> View {
 
 ///|
 fn cast(n : @tree.Node) -> Node {
-  match n {
-    HeadingNode(h) =>
-      {
-        id: h.id,
-        label: Some(h.label),
-        fold: h.fold,
-        blocks: read(h.body),
-        children: h.children.map(cast),
-      }
-    ListNode(l) => cast_item(l)
-    ImplicitNode(i) =>
-      {
-        id: i.id,
-        label: None,
-        fold: None,
-        blocks: [],
-        children: i.children.map(cast),
-      }
-  }
-}
-
-///|
-fn cast_item(l : @tree.ListNode) -> Node {
   {
-    id: l.id,
-    label: Some(l.label),
-    fold: l.fold,
-    blocks: read(l.body),
-    children: l.children.map(cast_item),
+    id: n.id,
+    // Implicit（綴りが無い）は名前を持たない。空の見出し（`## `）は `Some("")`
+    label: if n.mark is Some(_) {
+      Some(n.label)
+    } else {
+      None
+    },
+    fold: n.fold,
+    blocks: read(n.body),
+    children: n.children.map(cast),
   }
 }
 

@@ -9,18 +9,13 @@ test "項目だけの木" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "root",
-            "body": [],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "root",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -34,28 +29,21 @@ test "入れ子は深くなる" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "root",
-            "body": [],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [
-              {
-                "id": 3,
-                "label": "a",
-                "body": [],
-                "marker": "-",
-                "offset": 2,
-                "loose": false,
-                "children": [],
-              },
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "root",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "a",
+              "body": [],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+          ],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -69,37 +57,28 @@ test "兄弟は並ぶ" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "root",
-            "body": [],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [
-              {
-                "id": 3,
-                "label": "a",
-                "body": [],
-                "marker": "-",
-                "offset": 2,
-                "loose": false,
-                "children": [],
-              },
-              {
-                "id": 4,
-                "label": "b",
-                "body": [],
-                "marker": "-",
-                "offset": 2,
-                "loose": false,
-                "children": [],
-              },
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "root",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "a",
+              "body": [],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+            {
+              "id": 4,
+              "label": "b",
+              "body": [],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+          ],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": ["Right", "Right"],
         "rules": ["", ""],
       },
@@ -113,30 +92,21 @@ test "見出しの下の項目は 1 つ深い" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "ListNode",
-                {
-                  "id": 3,
-                  "label": "a",
-                  "body": [],
-                  "marker": "-",
-                  "offset": 2,
-                  "loose": false,
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "a",
+              "body": [],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -150,52 +120,43 @@ test "見出しは入れ子をリセットする" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "s",
+              "body": [],
+              "children": [
                 {
-                  "id": 3,
-                  "label": "s",
+                  "id": 4,
+                  "label": "a",
                   "body": [],
-                  "setext": false,
-                  "closing": 0,
                   "children": [
-                    [
-                      "ListNode",
-                      {
-                        "id": 4,
-                        "label": "a",
-                        "body": [],
-                        "marker": "-",
-                        "offset": 2,
-                        "loose": false,
-                        "children": [
-                          {
-                            "id": 5,
-                            "label": "b",
-                            "body": [],
-                            "marker": "-",
-                            "offset": 2,
-                            "loose": false,
-                            "children": [],
-                          },
-                        ],
-                      },
-                    ],
+                    {
+                      "id": 5,
+                      "label": "b",
+                      "body": [],
+                      "children": [],
+                      "mark": [
+                        "Item",
+                        { "marker": "-", "offset": 2, "loose": false },
+                      ],
+                    },
+                  ],
+                  "mark": [
+                    "Item",
+                    { "marker": "-", "offset": 2, "loose": false },
                   ],
                 },
               ],
-            ],
-          },
-        ],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -209,18 +170,13 @@ test "マーカーの銘柄は構造に影響しない" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "body": [],
-            "marker": "*",
-            "offset": 2,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "a",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "*", "offset": 2, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -230,18 +186,13 @@ test "マーカーの銘柄は構造に影響しない" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "body": [],
-            "marker": "+",
-            "offset": 2,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "a",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "+", "offset": 2, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -255,34 +206,24 @@ test "順序リストも項目として読む" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "body": [],
-            "marker": "1.",
-            "offset": 3,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "a",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "1.", "offset": 3, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 3,
-            "label": "b",
-            "body": [],
-            "marker": "2.",
-            "offset": 3,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 3,
+          "label": "b",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "2.", "offset": 3, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -296,18 +237,13 @@ test "ラベルは原文のまま" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "a **b**",
-            "body": [],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "a **b**",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -323,25 +259,20 @@ test "1 行目が段落でなければラベルは無い" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "",
-            "body": [
-              {
-                "id": 3,
-                "content": ["Code", { "info": "", "text": "code\n" }],
-                "source": "```\ncode\n```",
-              },
-              { "id": 4, "content": ["Raw", "x"], "source": "x" },
-            ],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "",
+          "body": [
+            {
+              "id": 3,
+              "content": ["Code", { "info": "", "text": "code\n" }],
+              "source": "```\ncode\n```",
+            },
+            { "id": 4, "content": ["Raw", "x"], "source": "x" },
+          ],
+          "children": [],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -357,32 +288,27 @@ test "途中の段落はラベルにならない" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "ListNode",
-            {
-              "id": 2,
-              "label": "",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n<summary>a</summary>\n\nx\n\n</details>",
-                      "open": false,
-                      "summary": "a",
-                      "body": "x",
-                    },
-                  ],
-                  "source": "<details>\n<summary>a</summary>\n\nx\n\n</details>",
-                },
-              ],
-              "marker": "-",
-              "offset": 2,
-              "loose": false,
-              "children": [],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n<summary>a</summary>\n\nx\n\n</details>",
+                    "open": false,
+                    "summary": "a",
+                    "body": "x",
+                  },
+                ],
+                "source": "<details>\n<summary>a</summary>\n\nx\n\n</details>",
+              },
+            ],
+            "children": [],
+            "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+          },
           "sides": [],
           "rules": [],
         },
@@ -399,18 +325,13 @@ test "続きの行があるラベルは末尾まで残る" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "aaa\nbbb\nccc",
-            "body": [],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "aaa\nbbb\nccc",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -424,18 +345,13 @@ test "CRLF でもラベルは末尾まで残る" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "aaa\r\nbbb",
-            "body": [],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "aaa\r\nbbb",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -453,18 +369,13 @@ test "定義行に見える 1 行目でもラベルは全部残る" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "[q]: /r\nZZZ",
-            "body": [],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "[q]: /r\nZZZ",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -481,51 +392,39 @@ test "境界のあとの入れ子項目に空の項目が生えない" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "h",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+            {
+              "id": 4,
+              "label": "a",
+              "body": [],
+              "children": [
                 {
-                  "id": 3,
-                  "label": "h",
+                  "id": 5,
+                  "label": "b",
                   "body": [],
-                  "setext": false,
-                  "closing": 0,
                   "children": [],
-                },
-              ],
-              [
-                "ListNode",
-                {
-                  "id": 4,
-                  "label": "a",
-                  "body": [],
-                  "marker": "-",
-                  "offset": 2,
-                  "loose": false,
-                  "children": [
-                    {
-                      "id": 5,
-                      "label": "b",
-                      "body": [],
-                      "marker": "-",
-                      "offset": 2,
-                      "loose": false,
-                      "children": [],
-                    },
+                  "mark": [
+                    "Item",
+                    { "marker": "-", "offset": 2, "loose": false },
                   ],
                 },
               ],
-            ],
-          },
-        ],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right", "Left"],
         "rules": ["", "---"],
       },
@@ -540,82 +439,61 @@ test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "h",
+              "body": [],
+              "children": [
                 {
-                  "id": 3,
-                  "label": "h",
+                  "id": 4,
+                  "label": "x",
                   "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [
-                    [
-                      "HeadingNode",
-                      {
-                        "id": 4,
-                        "label": "x",
-                        "body": [],
-                        "setext": false,
-                        "closing": 0,
-                        "children": [],
-                      },
-                    ],
-                  ],
+                  "children": [],
+                  "mark": ["Heading", { "setext": false, "closing": 0 }],
                 },
               ],
-              [
-                "ListNode",
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+            {
+              "id": 5,
+              "label": "a",
+              "body": [],
+              "children": [
                 {
-                  "id": 5,
-                  "label": "a",
+                  "id": 6,
+                  "label": "b",
                   "body": [],
-                  "marker": "-",
-                  "offset": 2,
-                  "loose": false,
-                  "children": [
-                    {
-                      "id": 6,
-                      "label": "b",
-                      "body": [],
-                      "marker": "-",
-                      "offset": 2,
-                      "loose": false,
-                      "children": [],
-                    },
+                  "children": [],
+                  "mark": [
+                    "Item",
+                    { "marker": "-", "offset": 2, "loose": false },
                   ],
                 },
               ],
-              [
-                "ImplicitNode",
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+            {
+              "id": 7,
+              "label": "",
+              "body": [],
+              "children": [
                 {
-                  "id": 7,
-                  "children": [
-                    [
-                      "HeadingNode",
-                      {
-                        "id": 8,
-                        "label": "t",
-                        "body": [],
-                        "setext": false,
-                        "closing": 0,
-                        "children": [],
-                      },
-                    ],
-                  ],
+                  "id": 8,
+                  "label": "t",
+                  "body": [],
+                  "children": [],
+                  "mark": ["Heading", { "setext": false, "closing": 0 }],
                 },
               ],
-            ],
-          },
-        ],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right", "Left", "Left"],
         "rules": ["", "---", ""],
       },
@@ -631,53 +509,35 @@ test "境界のあとの兄弟項目は同じ深さに並ぶ" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "a",
-                  "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-              [
-                "ListNode",
-                {
-                  "id": 4,
-                  "label": "b",
-                  "body": [],
-                  "marker": "-",
-                  "offset": 2,
-                  "loose": true,
-                  "children": [],
-                },
-              ],
-              [
-                "ListNode",
-                {
-                  "id": 5,
-                  "label": "c",
-                  "body": [],
-                  "marker": "-",
-                  "offset": 2,
-                  "loose": true,
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "a",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+            {
+              "id": 4,
+              "label": "b",
+              "body": [],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": true }],
+            },
+            {
+              "id": 5,
+              "label": "c",
+              "body": [],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": true }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right", "Left", "Left"],
         "rules": ["", "---", ""],
       },
@@ -693,39 +553,30 @@ test "項目の中の 2 つ目の列は前の列の兄弟" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "body": [],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [
-              {
-                "id": 3,
-                "label": "b",
-                "body": [
-                  { "id": 4, "content": ["Raw", "text"], "source": "text" },
-                ],
-                "marker": "-",
-                "offset": 2,
-                "loose": false,
-                "children": [],
-              },
-              {
-                "id": 5,
-                "label": "c",
-                "body": [],
-                "marker": "-",
-                "offset": 2,
-                "loose": false,
-                "children": [],
-              },
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "a",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "b",
+              "body": [
+                { "id": 4, "content": ["Raw", "text"], "source": "text" },
+              ],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+            {
+              "id": 5,
+              "label": "c",
+              "body": [],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+          ],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": ["Right", "Right"],
         "rules": ["", ""],
       },

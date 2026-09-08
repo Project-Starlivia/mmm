@@ -22,34 +22,33 @@ fn heading(
   body? : Array[@tree.Block] = [],
   fold? : @tree.Fold? = None,
 ) -> @tree.Node {
-  @tree.HeadingNode({
-    id,
-    label,
-    fold,
-    body,
-    setext: false,
-    closing: 0,
-    children,
-  })
+  { id, label, fold, body, children, mark: Some(@tree.atx), }
 }
 
 ///|
 fn item(
   id : Int,
   label : String,
-  children? : Array[@tree.ListNode] = [],
+  children? : Array[@tree.Node] = [],
   body? : Array[@tree.Block] = [],
   fold? : @tree.Fold? = None,
   marker? : String = "-",
   offset? : Int = 2,
   loose? : Bool = false,
-) -> @tree.ListNode {
-  { id, label, fold, body, marker, offset, loose, children, }
+) -> @tree.Node {
+  {
+    id,
+    label,
+    fold,
+    body,
+    children,
+    mark: Some(Item(marker~, offset~, loose~)),
+  }
 }
 
 ///|
 fn implicit(id : Int, children : Array[@tree.Node]) -> @tree.Node {
-  @tree.ImplicitNode({ id, children, })
+  { id, label: "", fold: None, body: [], children, mark: None, }
 }
 
 ///|
@@ -104,7 +103,7 @@ test "空のラベルは Implicit と区別が付く" {
 
 ///|
 test "項目も子の項目も同じノードになる" {
-  let a = @tree.ListNode(item(2, "a", children=[item(3, "b")]))
+  let a = item(2, "a", children=[item(3, "b")])
   json_inspect(project(doc([root(a)])), content={
     "roots": [
       {

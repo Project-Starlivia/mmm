@@ -30,6 +30,9 @@ pub(all) enum Flaw {
   TooDeep(Int)
   /// 深さ 3 以上で名前に改行。setext は深さ 2 までしか無く、ATX は 1 行しか持てない
   DeepSetext(Int)
+  /// 綴りの無いノード（Implicit）が、行の要るもの（名前・畳み・中身）を持つ。
+  /// 行を省いた空の見出しなので、綴ってからでないと当てられない
+  Unmarked(Int)
 } derive(Eq, ToJson)
 
 ///|
@@ -55,7 +58,8 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   }
 
   // 中身の尻に水平線があれば、次の骨格の行で境界に読まれる。
-  // 項目の中の水平線は中身なので保留しない
+  // **境界が読まれるのは項目の外だけ**（項目の中の水平線は中身）なので、
+  // そこでしか保留しない
   let border : Ref[Int?] = { val: None, }
   fn trailing(bs : Array[Block]) -> Int? {
     match bs.last() {
@@ -72,86 +76,74 @@ pub fn check(doc : Doc) -> Array[Flaw] {
     border.val = None
   }
 
-  fn items(xs : Array[ListNode]) -> Unit {
-    for x in xs {
-      id(x.id)
-      blocks(x.body)
-      items(x.children)
-    }
-  }
-
   /// 同じ列の兄弟。並びの規則もここで見る。`sides` はこの列の側（根の子だけが
   /// 持つ）で、側が変わる所には境界（`---`）が書かれるので、そこでは飲み込まれない。
-  /// `kids` は i 番目の子の列の側（根なら `Root.sides`、深ければ無い）
+  /// `kids` は i 番目の子の列の側（根なら `Root.sides`、深ければ無い）。
+  /// `base` はこの列を抱える項目の深さ — **`#` の本数はそこから測る**
+  /// （項目の中は、その項目の深さを 0 とした文書）。項目の外は 0。
   fn nodes(
     xs : Array[Node],
     depth : Int,
+    base : Int,
     sides : Array[Side],
     kids : (Int) -> Array[Side],
   ) -> Unit {
     for i, x in xs {
       skeleton()
-      let after_heading = i > 0 && !(xs[i - 1] is ListNode(_))
+      let after_heading = i > 0 && !(sign_of(xs[i - 1]) is Some(Item))
       let bordered = i > 0 && i < sides.length() && sides[i] != sides[i - 1]
-      if after_heading && !bordered && !(x is HeadingNode(_)) {
-        flaws.push(Swallowed(id_of(x)))
+      if after_heading && !bordered && !(sign_of(x) is Some(Heading)) {
+        flaws.push(Swallowed(x.id))
       }
-      match x {
-        HeadingNode(h) => {
-          id(h.id)
-          if depth > deepest {
-            flaws.push(TooDeep(h.id))
+      id(x.id)
+      blocks(x.body)
+      match sign_of(x) {
+        Some(Heading) => {
+          if depth - base > deepest {
+            flaws.push(TooDeep(x.id))
           }
-          if depth > 2 && h.label.contains("\n") {
-            flaws.push(DeepSetext(h.id))
+          if depth - base > 2 && x.label.contains("\n") {
+            flaws.push(DeepSetext(x.id))
           }
-          blocks(h.body)
-          border.val = trailing(h.body)
-          nodes(h.children, depth + 1, kids(i), _ => [])
+          // 境界に読まれるのは項目の外の水平線だけ
+          if base == 0 {
+            border.val = trailing(x.body)
+          }
+          nodes(x.children, depth + 1, base, kids(i), _ => [])
         }
-        ListNode(l) => {
-          id(l.id)
-          blocks(l.body)
-          items(l.children)
-        }
-        ImplicitNode(g) => {
-          id(g.id)
-          if g.children.is_empty() {
-            flaws.push(BarrenImplicit(g.id))
+        // 項目の中は、その項目の深さを 0 とした文書
+        Some(Item) => nodes(x.children, depth + 1, depth, [], _ => [])
+        None => {
+          if x.children.is_empty() {
+            flaws.push(BarrenImplicit(x.id))
           }
-          for k in g.children {
-            if k is ListNode(l) {
-              flaws.push(GappedItem(l.id))
-            }
+          if x.label != "" || x.fold is Some(_) || !x.body.is_empty() {
+            flaws.push(Unmarked(x.id))
           }
-          nodes(g.children, depth + 1, kids(i), _ => [])
+          // 深さは直前の行から読まれる。Implicit に行は無いので、先頭の子の
+          // 項目だけが 1 つ浅く読まれる（2 つ目からは直前の兄弟が留める）
+          if x.children is [first, ..] && sign_of(first) is Some(Item) {
+            flaws.push(GappedItem(first.id))
+          }
+          nodes(x.children, depth + 1, base, kids(i), _ => [])
         }
       }
     }
   }
 
   for r in doc.roots {
-    let kids = match r.node {
-      HeadingNode(h) => h.children.length()
-      ImplicitNode(g) => g.children.length()
-      ListNode(l) => l.children.length()
-    }
+    let kids = r.node.children.length()
     if r.sides.length() != kids {
       flaws.push(
-        SideCount(root=root_id(r), sides=r.sides.length(), children=kids),
+        SideCount(root=r.node.id, sides=r.sides.length(), children=kids),
       )
     }
-    if r.node is ListNode(_) && r.sides.contains(Left) {
-      flaws.push(ListSide(root_id(r)))
+    if sign_of(r.node) is Some(Item) && r.sides.contains(Left) {
+      flaws.push(ListSide(r.node.id))
     }
   }
   blocks(doc.body)
   border.val = trailing(doc.body)
-  nodes(doc.roots.map(r => r.node), 1, [], i => doc.roots[i].sides)
+  nodes(doc.roots.map(r => r.node), 1, 0, [], i => doc.roots[i].sides)
   flaws
-}
-
-///|
-fn root_id(r : Root) -> Int {
-  id_of(r.node)
 }

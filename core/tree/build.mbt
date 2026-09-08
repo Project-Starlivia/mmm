@@ -10,7 +10,11 @@
 ///|
 /// 積み上げ中のノード。深さは stack の高さが持つので、自分では持たない。
 priv struct Frame {
-  skel : Notation
+  /// 行に書かれていた綴り。飛び（Implicit）は None
+  mark : Mark?
+  label : String
+  fold : Fold?
+  body : Array[Block]
   kids : Array[Frame]
   /// 深さ 2 の枠だけが持つ。深い所の側は型に存在しない
   mut side : Side
@@ -22,31 +26,10 @@ priv struct Frame {
   /// 飛び（Gap）は行を持たないので -1 で置き、最後に子の和で埋める
   mut from : Int
   mut to : Int
-  /// ラベルの頭（マーカーの後ろ）。飛び（Gap）は行を持たないので -1
-  label : Int
+  /// ラベルの頭（マーカーの後ろ）。飛び（Implicit）は行を持たないので -1
+  at_label : Int
   /// 中身（body）と並走する地番。chart が番号と付き合わせて spans に写す
   body_at : Array[Spot]
-}
-
-///|
-/// 行に書かれていた記法。見出しと項目を 1 つの型で平らに持ち、
-/// 種類ごとの型への割り付けは最後に 1 回だけやる。
-priv enum Notation {
-  /// 記法が無い。深さの飛びがそれを言う
-  Gap
-  Line(
-    sign~ : Sign,
-    label~ : String,
-    fold~ : Fold?,
-    body~ : Array[Block],
-    /// 見出しの行の書き方。項目には無い綴りなので `false` / `0`
-    setext~ : Bool,
-    closing~ : Int,
-    /// 項目の行の書き方。見出しには無い綴りなので `-` / 2 / false
-    marker~ : String,
-    offset~ : Int,
-    loose~ : Bool
-  )
 }
 
 ///|
@@ -93,7 +76,7 @@ pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
     own: deep,
     dry: false,
     owner: 0,
-    hl: [],
+    base: 0,
   }
   for piece in pieces(md, ast.children, b.defs, 0) {
     lay(b, piece, 0)
@@ -177,19 +160,15 @@ fn chart(f : Frame, spans : Map[Int, Spot]) -> Unit {
   }
   spans[f.id] = {
     from: f.from,
-    label: if f.label < 0 {
+    label: if f.at_label < 0 {
       None
     } else {
-      Some(f.label)
+      Some(f.at_label)
     },
     to: f.to,
   }
-  match f.skel {
-    Line(body~, ..) =>
-      for i, at in f.body_at {
-        spans[body[i].id] = at
-      }
-    Gap => ()
+  for i, at in f.body_at {
+    spans[f.body[i].id] = at
   }
 }
 
@@ -232,10 +211,10 @@ priv struct Build {
   /// **入れ子の列はその 1 つ下に座る** — stack の高さで測ると、前の列の
   /// 項目が積まれたままなので次の列がその子になる
   mut owner : Int
-  /// いま中身を読んでいる項目の中の、開いている見出しの `#` の本数（浅い順）。
-  /// 項目の中身は文書と同じ規則で読むが、飛びは埋めない（項目は相対記法）ので、
-  /// 深さは本数そのものではなく「開いている見出しの数」で決める
-  mut hl : Array[Int]
+  /// いま中身を読んでいる項目の深さ。**`#` の本数はここから測る** —
+  /// 項目の中は、その項目の深さを 0 とした文書（docs/spec.md「項目の中」）。
+  /// 文書そのものを読んでいる間は 0
+  mut base : Int
 }
 
 ///|
@@ -281,7 +260,7 @@ fn depths(
     own: deep,
     dry: true,
     owner: 0,
-    hl: [],
+    base: 0,
   }
   let out = Array::make(blocks.length(), { top: deep, own: deep, })
   for i, block in blocks {
@@ -342,41 +321,19 @@ fn take(
 ) -> Unit {
   match block {
     Heading(level~, style~, children~, closing_hashes~, span~, ..) => {
-      let (sign, depth) : (Sign, Int) = if nest > 0 {
-        // **項目の中身は文書と同じ規則で読む。** 中の見出しは項目の子（型が「項目の
-        // 子孫は項目」なので綴りは項目）。`#` の本数は入れ子の相対だけを決め、飛びは
-        // 埋めない。見出しの後ろの中身と入れ子はその見出しのもの（owner を進める）。
-        // 持ち主は**項目の深さ + 開いている見出しの数**。同じか浅い見出しは
-        // 開いている見出しを閉じるので、その数だけ浅い所へ戻る
-        let item_level = b.owner - b.hl.length()
-        while b.hl.length() > 0 && b.hl[b.hl.length() - 1] >= level {
-          ignore(b.hl.unsafe_pop())
-        }
-        b.hl.push(level)
-        b.owner = item_level + b.hl.length()
-        (Item, b.owner)
-      } else {
-        (Heading, level)
-      }
-      // 行の書き方は見出しの綴りにしか無い。項目に読み替えた見出しは `- a` に
-      // なるので、setext も閉じの `#` も持ち越さない
-      let head = sign is Heading
+      // **項目の中は、その項目の深さを 0 とした文書。** `#` の本数はそこから
+      // 測る絶対の深さで、飛びは put が Implicit で埋める。見出しの後ろの中身と
+      // 入れ子はその見出しのもの（owner を進める）
+      let depth = b.base + level
+      b.owner = depth
       put(
         b,
         depth,
-        Line(
-          sign~,
-          label=head_label(b.md, span, style, children),
-          fold~,
-          body=[],
-          setext=head && style is Setext,
-          closing=if head { closing_hashes } else { 0 },
-          marker="-",
-          offset=2,
-          loose=false,
-        ),
+        Some(Heading(setext=style is Setext, closing=closing_hashes)),
+        label=head_label(b.md, span, style, children),
+        fold~,
         at=span,
-        label=head_start(b.md, span, style),
+        at_label=head_start(b.md, span, style),
       )
     }
     BulletList(items~, ..) => items_take(b, items, nest, fold~)
@@ -450,19 +407,17 @@ fn items_take(
     put(
       b,
       level,
-      Line(
-        sign=Item,
-        label~,
-        fold~,
-        body=[],
-        setext=false,
-        closing=0,
-        marker=item_marker(b.md, it.span),
-        offset=it.content_offset,
-        loose=loose[i],
+      Some(
+        Item(
+          marker=item_marker(b.md, it.span),
+          offset=it.content_offset,
+          loose=loose[i],
+        ),
       ),
+      label~,
+      fold~,
       at=it.span,
-      label=label_at,
+      at_label=label_at,
     )
     // **同じ列の項目は兄弟。** 境界は最初の項目を深さ 2 へ引き出すので、
     // 残りも引き出された先に並ぶ（数え直すと元の位置から数えてしまう）
@@ -474,15 +429,15 @@ fn items_take(
     } else {
       pieces(b.md, rest, defs_in(b.defs, from, it.span.to), nest + 1)
     }
-    let outer = b.owner
-    let outer_hl = b.hl
+    let outer_owner = b.owner
+    let outer_base = b.base
     b.owner = level
-    b.hl = []
+    b.base = level
     for c in inner {
       lay(b, c, nest + 1)
     }
-    b.owner = outer
-    b.hl = outer_hl
+    b.owner = outer_owner
+    b.base = outer_base
   }
 }
 
@@ -501,7 +456,7 @@ fn item_label(md : String, p : @markdown.Block) -> String {
 /// （md でもそうなる）ので、見出しの背骨の底が座る枠になる。
 fn spine(b : Build) -> Int {
   let mut h = b.stack.length()
-  while h > 0 && b.stack[h - 1].skel is Line(sign=Item, ..) {
+  while h > 0 && b.stack[h - 1].mark is Some(Item(..)) {
     h = h - 1
   }
   h
@@ -514,20 +469,21 @@ fn spine(b : Build) -> Int {
 fn put(
   b : Build,
   level : Int,
-  skel : Notation,
+  mark : Mark?,
+  label~ : String,
+  fold~ : Fold?,
   at~ : @markdown.Span,
-  label~ : Int,
+  at_label~ : Int,
 ) -> Unit {
   // 境界のとき、項目は**深さ 2 に直接置く**。項目は相対記法なので深さが
   // 導出値で、引き出し先に合わせて置き直せる（見出しは絶対座標なので
   // 動かせず、足りない深さを Implicit が埋める）
-  let level = if b.pend && skel is Line(sign=Item, ..) { 2 } else { level }
-  // **見出しは見出しの背骨にしか積まれない。** 項目の枠は見出しの親に
-  // なれないので落とす（列 0 の見出しは md でも項目を閉じる）。C17 を
-  // 深さ 1 から全部の深さへ広げたもの。これが無いと項目の子が見出しになる
-  if skel is Line(sign=Heading, ..) {
+  let level = if b.pend && mark is Some(Item(..)) { 2 } else { level }
+  // **列 0 の見出しは開いている項目を閉じる**（md でもそうなる）。項目の中の
+  // 見出し（`b.base > 0`）はその項目の子なので、閉じない
+  if b.base == 0 && mark is Some(Heading(..)) {
     while b.stack.length() > 0 &&
-          b.stack[b.stack.length() - 1].skel is Line(sign=Item, ..) {
+          b.stack[b.stack.length() - 1].mark is Some(Item(..)) {
       ignore(b.stack.unsafe_pop())
     }
   }
@@ -548,14 +504,17 @@ fn put(
   }
   while b.stack.length() < level - 1 {
     let gap : Frame = {
-      skel: Gap,
+      mark: None,
+      label: "",
+      fold: None,
+      body: [],
       kids: [],
       side: Right,
       rule: "",
       id: 0,
       from: -1,
       to: -1,
-      label: -1,
+      at_label: -1,
       body_at: [],
     }
     sink(b)
@@ -568,14 +527,17 @@ fn put(
     None => at
   }
   let f : Frame = {
-    skel,
+    mark,
+    label,
+    fold,
+    body: [],
     kids: [],
     side: Right,
     rule: "",
     id: 0,
     from: at.from,
     to: at.to,
-    label,
+    at_label,
     body_at: [],
   }
   sink(b)
@@ -821,10 +783,7 @@ fn number_frame(f : Frame, next : Counter) -> Unit {
   f.id = next.val
   next.val = f.id + 1
   // 中身は子より前に書かれているので、先に振る
-  match f.skel {
-    Line(body~, ..) => number_blocks(body, next)
-    Gap => ()
-  }
+  number_blocks(f.body, next)
   for k in f.kids {
     number_frame(k, next)
   }
@@ -851,20 +810,15 @@ pub fn number(doc : Doc, id : Int) -> Int? {
   }
 
   fn node(x : Node) -> Int? {
-    if id_of(x) == id {
+    if x.id == id {
       return Some(next.val)
     }
     next.val = next.val + 1
-    let body = match x {
-      HeadingNode(h) => h.body
-      ListNode(l) => l.body
-      ImplicitNode(_) => []
-    }
-    match blocks(body) {
+    match blocks(x.body) {
       Some(n) => return Some(n)
       None => ()
     }
-    for k in children_of(x) {
+    for k in x.children {
       match node(k) {
         Some(n) => return Some(n)
         None => ()
@@ -907,60 +861,14 @@ fn to_root(f : Frame) -> Root {
 }
 
 ///|
-/// 枠をノードにする。項目だけは子も項目に畳む（単調性）。
+/// 枠をノードにする。綴りはそのまま運ぶ。
 fn to_node(f : Frame) -> Node {
-  match f.skel {
-    Gap => ImplicitNode({ id: f.id, children: f.kids.map(to_node), })
-    Line(sign=Item, label~, fold~, body~, marker~, offset~, loose~, ..) =>
-      ListNode({
-        id: f.id,
-        label,
-        fold,
-        body,
-        marker,
-        offset,
-        loose,
-        children: f.kids.map(to_list),
-      })
-    Line(label~, fold~, body~, setext~, closing~, ..) =>
-      HeadingNode({
-        id: f.id,
-        label,
-        fold,
-        body,
-        setext,
-        closing,
-        children: f.kids.map(to_node),
-      })
-  }
-}
-
-///|
-/// 項目にする。飛びは綴りが無いので空ラベルへ落ちる（項目の子に飛びは
-/// 来ないので、実際には通らない）。
-fn to_list(f : Frame) -> ListNode {
-  match f.skel {
-    Gap =>
-      {
-        id: f.id,
-        label: "",
-        fold: None,
-        body: [],
-        marker: "-",
-        offset: 2,
-        loose: false,
-        children: f.kids.map(to_list),
-      }
-    Line(label~, fold~, body~, marker~, offset~, loose~, ..) =>
-      {
-        id: f.id,
-        label,
-        fold,
-        body,
-        marker,
-        offset,
-        loose,
-        children: f.kids.map(to_list),
-      }
+  {
+    id: f.id,
+    label: f.label,
+    fold: f.fold,
+    body: f.body,
+    children: f.kids.map(to_node),
+    mark: f.mark,
   }
 }

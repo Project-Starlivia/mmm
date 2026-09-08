@@ -9,7 +9,7 @@ test "深いラベルを替えると、根までの道が組み直る" {
   ])
   let got = splice(d, 4, n => {
     match n {
-      HeadingNode(x) => [@tree.HeadingNode({ ..x, label: "y", })]
+      x if @tree.sign_of(x) is Some(Heading) => [{ ..x, label: "y", }]
       _ => [n]
     }
   })
@@ -92,7 +92,7 @@ test "根を同じ id で替えれば sides は保つ" {
   assert_eq(
     splice(d, 2, n => {
       match n {
-        HeadingNode(x) => [@tree.HeadingNode({ ..x, label: "q", })]
+        x if @tree.sign_of(x) is Some(Heading) => [{ ..x, label: "q", }]
         _ => [n]
       }
     }),
@@ -110,20 +110,31 @@ test "根の隣に差せば新しい根になる" {
 }
 
 ///|
-test "項目の席には項目しか置けない" {
-  let d = doc([root(item(2, "a", children=[li(3, "b")]), sides=[Right])])
+/// **席は種類を選ばない** — 項目の中は、その項目の深さを 0 とした文書。
+test "項目の席には見出しも置ける" {
+  let d = doc([root(item(2, "a", children=[item(3, "b")]), sides=[Right])])
   assert_eq(
     splice(d, 3, n => [n, item(9, "c")]),
     Some(
       doc([
-        root(item(2, "a", children=[li(3, "b"), li(9, "c")]), sides=[
+        root(item(2, "a", children=[item(3, "b"), item(9, "c")]), sides=[
           Right,
           Right,
         ]),
       ]),
     ),
   )
-  assert_eq(splice(d, 3, n => [n, h(9, "c")]), None)
+  assert_eq(
+    splice(d, 3, n => [n, h(9, "c")]),
+    Some(
+      doc([
+        root(item(2, "a", children=[item(3, "b"), h(9, "c")]), sides=[
+          Right,
+          Right,
+        ]),
+      ]),
+    ),
+  )
 }
 
 ///|
@@ -207,13 +218,16 @@ test "append を doc_id にすれば新しい根" {
 }
 
 ///|
-test "append は項目の下に項目しか置けない" {
+test "append は席の末尾に足す。種類は選ばない" {
   let d = doc([root(item(2, "a"), sides=[])])
   assert_eq(
     append(d, node=2, [item(9, "b")]),
-    Some(doc([root(item(2, "a", children=[li(9, "b")]), sides=[Right])])),
+    Some(doc([root(item(2, "a", children=[item(9, "b")]), sides=[Right])])),
   )
-  assert_eq(append(d, node=2, [h(9, "b")]), None)
+  assert_eq(
+    append(d, node=2, [h(9, "b")]),
+    Some(doc([root(item(2, "a", children=[h(9, "b")]), sides=[Right])])),
+  )
   assert_eq(append(d, node=99, [h(9, "b")]), None)
 }
 
