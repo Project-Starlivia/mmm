@@ -1,29 +1,29 @@
 // 書きの道具。id の席を f の返した列に置き換え、根までの道を組み直す。
 //
-// **check の書き込み版。** 読む側で check が見張る 2 つの約束（項目の子は項目 /
-// sides は根の子と並走）を、書く側で破らないように組む唯一の場所。f は
-// 「どうしたいか」だけを言い、できるかは席を知るここが決める。
+// **check の書き込み版。** 読む側で check が見張る約束（sides は根の子と並走）を、
+// 書く側で破らないように組む唯一の場所。f は「どうしたいか」だけを言い、
+// 席を知るここが並走を保つ。
 // 子が尽きた Implicit は残す — 抜いてから差す操作の途中で席が消えないように。
 // 掃除は門（mend）の仕事。
 
 ///|
-/// 1 回の置き換え。歩きながら「席が見つかったか」「席の型に合わなかったか」を残す。
+/// 1 回の置き換え。歩きながら「席が見つかったか」を残す。
 priv struct Splice {
   id : Int
   f : (@tree.Node) -> Array[@tree.Node]
   mut hit : Bool
-  mut bad : Bool
 }
 
 ///|
 /// id の席を f の返した列に置き換える。0 = 抜く、1 = 替える、n = 差す。
-/// None は 2 つ: id が無い / 席の型に返された列が合わない（項目の下に見出し）。
+/// None は id が無いときだけ — **席は種類を選ばない**（項目の中は、その項目の
+/// 深さを 0 とした文書）。
 fn splice(
   doc : @tree.Doc,
   id : Int,
   f : (@tree.Node) -> Array[@tree.Node],
 ) -> @tree.Doc? {
-  let s : Splice = { id, f, hit: false, bad: false, }
+  let s : Splice = { id, f, hit: false, }
   let roots : Array[@tree.Root] = []
   for r in doc.roots {
     if r.node.id == id {
@@ -35,7 +35,7 @@ fn splice(
       roots.push(rebuild_root(s, r))
     }
   }
-  if !s.hit || s.bad {
+  if !s.hit {
     None
   } else {
     Some({ ..doc, roots, })
@@ -75,7 +75,7 @@ fn rebuild_root(s : Splice, r : @tree.Root) -> @tree.Root {
     let side = if i < r.sides.length() { r.sides[i] } else { @tree.Right }
     let rule = if i < r.rules.length() { r.rules[i] } else { "" }
     // 席なら、その側と綴りを返された数だけ複製する
-    for y in rebuild_child(s, r.node, x) {
+    for y in rebuild_child(s, x) {
       out.push(y)
       sides.push(side)
       rules.push(rule)
@@ -89,7 +89,7 @@ fn rebuild_root(s : Splice, r : @tree.Root) -> @tree.Root {
 fn rebuild_node(s : Splice, x : @tree.Node) -> @tree.Node {
   let out = []
   for k in x.children {
-    for y in rebuild_child(s, x, k) {
+    for y in rebuild_child(s, k) {
       out.push(y)
     }
   }
@@ -98,32 +98,19 @@ fn rebuild_node(s : Splice, x : @tree.Node) -> @tree.Node {
 
 ///|
 /// 子 1 つを組み直した列。席なら f の返した列、そうでなければ組み直した 1 つ。
-/// 項目の下に項目でないものは置けない。
-fn rebuild_child(
-  s : Splice,
-  parent : @tree.Node,
-  x : @tree.Node,
-) -> Array[@tree.Node] {
+fn rebuild_child(s : Splice, x : @tree.Node) -> Array[@tree.Node] {
   if x.id != s.id {
     return [rebuild_node(s, x)]
   }
   s.hit = true
-  let out = (s.f)(x)
-  if @tree.sign_of(parent) is Some(Item) &&
-    out.iter().any(y => !(@tree.sign_of(y) is Some(Item))) {
-    s.bad = true
-  }
-  out
+  (s.f)(x)
 }
 
 ///|
-/// 子の列に足したノード。項目の下に項目でないものは置けない。
-fn with_kids(n : @tree.Node, more : Array[@tree.Node]) -> @tree.Node? {
-  if @tree.sign_of(n) is Some(Item) &&
-    more.iter().any(y => !(@tree.sign_of(y) is Some(Item))) {
-    return None
-  }
-  Some({ ..n, children: [..n.children, ..more], })
+/// 子の列に足したノード。**種類は問わない** — 項目の中は、その項目の深さを
+/// 0 とした文書（docs/spec.md「項目の中」）。
+fn with_kids(n : @tree.Node, more : Array[@tree.Node]) -> @tree.Node {
+  { ..n, children: [..n.children, ..more], }
 }
 
 ///|
@@ -149,7 +136,7 @@ fn append(
   }
   for i, r in doc.roots {
     if r.node.id == node {
-      guard with_kids(r.node, nodes) is Some(n) else { return None }
+      let n = with_kids(r.node, nodes)
       let s = match side {
         Some(s) => s
         None =>
@@ -170,8 +157,7 @@ fn append(
     }
   }
   guard find(doc, node) is Some(n) else { return None }
-  guard with_kids(n, nodes) is Some(m) else { return None }
-  splice(doc, node, _ => [m])
+  splice(doc, node, _ => [with_kids(n, nodes)])
 }
 
 ///|

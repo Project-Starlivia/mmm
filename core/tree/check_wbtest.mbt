@@ -353,46 +353,178 @@ test "項目の根の子の Left を見つける" {
 }
 
 ///|
-/// 項目は相対記法で深さが飛ばないので、飛び（Implicit）の直下には居られない。
-/// 書くと Implicit が消え、項目は 1 つ浅く読まれる。
-test "Implicit の直下の項目を見つける" {
-  let doc : Doc = {
-    frontmatter: None,
-    body: [],
-    roots: [
+/// **check は「書いて読み直すと同じ木」の近似。** 門が直す・断るための材料なので、
+/// 書ける形を咎めない。ここは読みを物差しにして、その一致を総当たりで見る。
+test "書けるのに咎める形が無い — 読みと突き合わせる" {
+  let sources = [
+    "## head\n\n---\n\n- head\n", "# r\n\n## a\n\n---\n\n- b\n- c\n", "# r\n\n---\n\n### x\n\n- y\n",
+    "- # x\n\n  ---\n\n  # y\n", "- a\n  # x\n\n  ---\n\n  # y\n", "- - x\n\n  ---\n\n  - y\n",
+    "- ###### a\n", "- - ###### a\n", "- a\n  ---\n", "- ## a\n  # b\n",
+  ]
+  let bad = []
+  for md in sources {
+    let doc = parse(md)
+    // 読んだ木は必ず書ける（往復して同じ木になる）ので、破れは 1 つも無い
+    if shape(parse(serialize(doc))) == shape(doc) && check(doc).length() > 0 {
+      bad.push(md.escape() + " -> " + check(doc).to_json().stringify())
+    }
+  }
+  json_inspect(bad, content=[])
+}
+
+///|
+/// 項目の深さは直前の行から読まれる。Implicit には行が無いので、**先頭の子**が
+/// 項目なら 1 つ浅く読まれて Implicit が消える。2 つ目からは直前の兄弟が
+/// 深さを留めるので書ける。
+test "Implicit の先頭の子の項目だけを見つける" {
+  let doc = (kids : Array[Node]) => {
+    (
       {
-        node: {
-          id: 2,
-          label: "r",
-          fold: None,
-          body: [],
-          children: [
-            {
-              id: 3,
-              label: "",
+        frontmatter: None,
+        body: [],
+        roots: [
+          {
+            node: {
+              id: 2,
+              label: "r",
               fold: None,
               body: [],
               children: [
                 {
-                  id: 4,
-                  label: "i",
+                  id: 3,
+                  label: "",
                   fold: None,
                   body: [],
-                  children: [],
-                  mark: Some(bullet),
+                  children: kids,
+                  mark: None,
                 },
               ],
-              mark: None,
+              mark: Some(atx),
             },
-          ],
-          mark: Some(atx),
-        },
-        sides: [Right],
-        rules: [],
-      },
-    ],
+            sides: [Right],
+            rules: [],
+          },
+        ],
+      } : Doc)
   }
-  json_inspect(check(doc), content=[["GappedItem", 4]])
+  let head = (id : Int) => {
+    (
+      { id, label: "h", fold: None, body: [], children: [], mark: Some(atx), } :
+      Node)
+  }
+  let item = (id : Int) => {
+    (
+      {
+        id,
+        label: "i",
+        fold: None,
+        body: [],
+        children: [],
+        mark: Some(bullet),
+      } : Node)
+  }
+  json_inspect(check(doc([item(4)])), content=[["GappedItem", 4]])
+  json_inspect(check(doc([item(4), item(5)])), content=[["GappedItem", 4]])
+  // 先頭が見出しなら、続く項目はその見出しに飲み込まれる（Swallowed）
+  json_inspect(check(doc([head(4), item(5)])), content=[["Swallowed", 5]])
+}
+
+///|
+/// Implicit は行を省いた空の見出しなので、行が要るもの（名前・畳み・中身）は
+/// 持てない。持っていれば綴ってから当てる（`mend`）。
+test "綴りの無いノードの名前・畳み・中身を見つける" {
+  let doc = (n : Node) => {
+    (
+      {
+        frontmatter: None,
+        body: [],
+        roots: [{ node: n, sides: [Right], rules: [], }],
+      } : Doc)
+  }
+  let kid : Node = {
+    id: 3,
+    label: "x",
+    fold: None,
+    body: [],
+    children: [],
+    mark: Some(atx),
+  }
+  let gap : Node = {
+    id: 2,
+    label: "",
+    fold: None,
+    body: [],
+    children: [kid],
+    mark: None,
+  }
+  json_inspect(check(doc(gap)), content=[])
+  json_inspect(check(doc({ ..gap, label: "name", })), content=[["Unmarked", 2]])
+  json_inspect(
+    check(doc({ ..gap, fold: Some({ open: false, summary: None, }), })),
+    content=[["Unmarked", 2]],
+  )
+  json_inspect(
+    check(
+      doc({ ..gap, body: [{ id: 9, content: ThematicBreak, source: None, }], }),
+    ),
+    content=[["Unmarked", 2]],
+  )
+}
+
+///|
+/// **`#` の本数は項目からの深さ。** 項目の中では、天井も改行の綴りもそこから測る。
+test "項目の中の見出しの深さは、その項目から測る" {
+  fn chain(depth : Int, tip : Node) -> Node {
+    let mut n = tip
+    for i in 0..<depth {
+      n = {
+        id: depth - i + 10,
+        label: "h",
+        fold: None,
+        body: [],
+        children: [n],
+        mark: Some(atx),
+      }
+    }
+    n
+  }
+
+  let under_item = (kid : Node) => {
+    (
+      {
+        frontmatter: None,
+        body: [],
+        roots: [
+          {
+            node: {
+              id: 2,
+              label: "i",
+              fold: None,
+              body: [],
+              children: [kid],
+              mark: Some(bullet),
+            },
+            sides: [Right],
+            rules: [],
+          },
+        ],
+      } : Doc)
+  }
+  let tip : Node = {
+    id: 3,
+    label: "deep",
+    fold: None,
+    body: [],
+    children: [],
+    mark: Some(atx),
+  }
+  // 項目の子は `#` 1 本なので、6 本目まで書ける
+  json_inspect(check(under_item(chain(5, tip))), content=[])
+  json_inspect(check(under_item(chain(6, tip))), content=[["TooDeep", 3]])
+  // 改行を含む名前は setext なので、項目からの深さ 2 まで
+  let wrapped : Node = { ..tip, label: "a\nb", }
+  json_inspect(check(under_item(chain(1, wrapped))), content=[])
+  json_inspect(check(under_item(chain(2, wrapped))), content=[["DeepSetext", 3]])
 }
 
 ///|

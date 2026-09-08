@@ -41,19 +41,26 @@ fn respell(n : @tree.Node, sign : @tree.Sign) -> @tree.Node {
 /// （子が項目になれば `GappedItem` — 綴れば読める）。上の段には触らないので、
 /// parse の出力には何もしない。
 fn cap(doc : @tree.Doc) -> @tree.Doc {
-  fn node(n : @tree.Node, depth : Int, out : Array[@tree.Node]) -> Unit {
-    fn under(xs : Array[@tree.Node]) -> Array[@tree.Node] {
+  // `base` はその列を抱える項目の深さ。**`#` の本数はそこから測る**
+  // （項目の中は、その項目の深さを 0 とした文書）。項目の外は 0
+  fn node(
+    n : @tree.Node,
+    depth : Int,
+    base : Int,
+    out : Array[@tree.Node],
+  ) -> Unit {
+    fn under(xs : Array[@tree.Node], base : Int) -> Array[@tree.Node] {
       let children = []
       for c in xs {
-        node(c, depth + 1, children)
+        node(c, depth + 1, base, children)
       }
       children
     }
 
     if @tree.sign_of(n) is Some(Item) {
-      out.push(n)
-    } else if depth <= @tree.deepest {
-      out.push({ ..n, children: under(n.children), })
+      out.push({ ..n, children: under(n.children, depth), })
+    } else if depth - base <= @tree.deepest {
+      out.push({ ..n, children: under(n.children, base), })
     } else {
       out.push(respell(n, Item))
     }
@@ -64,7 +71,7 @@ fn cap(doc : @tree.Doc) -> @tree.Doc {
     ..doc,
     roots: doc.roots.map(r => {
       let out = []
-      node(r.node, 1, out)
+      node(r.node, 1, 0, out)
       { ..r, node: out[0], }
     }),
   }
@@ -73,8 +80,9 @@ fn cap(doc : @tree.Doc) -> @tree.Doc {
 ///|
 /// check の破れのうち、Implicit で直るものを直して通し直す。子が尽きた Implicit
 /// （`BarrenImplicit`）は消す — 道具は途中で席が消えないように残しておくので、
-/// 掃除はここ。見出しの直後に来た Implicit（`Swallowed`）と、項目を子に持った
-/// Implicit（`GappedItem` の親）は綴る。消すものは綴らないので、消す回は綴らない。
+/// 掃除はここ。見出しの直後に来た Implicit（`Swallowed`）と、先頭の子が項目の
+/// Implicit（`GappedItem` の親）と、行の要るものを持った Implicit（`Unmarked`）は
+/// 綴る。消すものは綴らないので、消す回は綴らない。
 /// 一回ごとに Implicit は減るので止まる。残った破れは None。
 fn mend(doc : @tree.Doc) -> @tree.Doc? {
   let mut cur = doc
@@ -89,6 +97,7 @@ fn mend(doc : @tree.Doc) -> @tree.Doc? {
       match f {
         BarrenImplicit(id) => barren.push(id)
         Swallowed(id) => ids.push(id)
+        Unmarked(id) => ids.push(id)
         GappedItem(id) => ids.push(parent(cur, id).unwrap())
         _ => ()
       }

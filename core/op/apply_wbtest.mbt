@@ -1319,3 +1319,92 @@ test "apply の結果は check を通る" {
   inspect(some, content="512")
   json_inspect(bad, content=[])
 }
+
+// ══════════════════════════════════════════════════════════════════
+// 項目の中は文書 — 綴りは席が決め、深さはその項目から測る
+// ══════════════════════════════════════════════════════════════════
+
+///|
+/// **mmm は見出しの無い項目に見出しを持ち込まない。** 席の綴りは隣に従い、
+/// 隣が居なければ親に従う（項目の下は項目）。md が項目の中に見出しを
+/// 書いていれば、その隣だけがそれに従う。
+test "項目の中の席の綴りは隣に従う" {
+  // 子の無い項目の下は項目
+  let bare = doc([root(item(2, "i"))])
+  assert_eq(
+    run(bare, AddNode(at=In(node=2, side=None), labels=["n"])),
+    Some({
+      doc: doc([root(item(2, "i", children=[item(3, "n")]), sides=[Right])]),
+      focus: Some(3),
+    }),
+  )
+  // 中に見出しが書かれていれば、その隣も見出し
+  let inner = doc([root(item(2, "i", children=[h(3, "x")]), sides=[Right])])
+  assert_eq(
+    run(inner, AddNode(at=After(node=3), labels=["n"])),
+    Some({
+      doc: doc([
+        root(item(2, "i", children=[h(3, "x"), h(4, "n")]), sides=[Right, Right]),
+      ]),
+      focus: Some(4),
+    }),
+  )
+  // 見出しを見出しの無い項目の下へ落とせば項目になる
+  let into = doc([root(item(2, "i")), root(h(3, "x"))])
+  assert_eq(
+    run(into, MoveNode(ids=[3], at=In(node=2, side=None))),
+    Some({
+      doc: doc([root(item(2, "i", children=[item(3, "x")]), sides=[Right])]),
+      focus: Some(3),
+    }),
+  )
+}
+
+///|
+/// **天井も項目から測る。** 項目の中の見出しは `#` 1 本から始まるので、
+/// 7 本目に着地する部分木だけが項目に綴り替わる。
+test "項目の中の見出しの天井は、その項目から測る" {
+  fn chain(depth : Int, tip : @tree.Node) -> @tree.Node {
+    let mut n = tip
+    for i in 0..<depth {
+      n = h(20 + depth - i, "h", children=[n])
+    }
+    n
+  }
+
+  // 項目 > 見出し 6 段まではそのまま
+  let six = doc([
+    root(item(2, "i", children=[chain(5, h(3, "z"))]), sides=[Right]),
+  ])
+  assert_eq(run(six, Rename(id=3, label="z")).map(d => d.doc), Some(six))
+  // 7 段目に着けば、その部分木は項目になる
+  let seven = doc([
+    root(item(2, "i", children=[chain(6, h(3, "z"))]), sides=[Right]),
+  ])
+  let capped = run(seven, Rename(id=3, label="z")).unwrap().doc
+  // 書いた字を読み直しても同じ木（`- z` は `###### h` の子のまま）
+  assert_eq(
+    @tree.shape(@tree.parse(@tree.serialize(capped))),
+    @tree.shape(capped),
+  )
+  inspect(
+    @tree.serialize(capped),
+    content=(
+      #|- i
+      #|  # h
+      #|
+      #|  ## h
+      #|
+      #|  ### h
+      #|
+      #|  #### h
+      #|
+      #|  ##### h
+      #|
+      #|  ###### h
+      #|
+      #|  - z
+      #|
+    ),
+  )
+}

@@ -110,7 +110,8 @@ test "根の隣に差せば新しい根になる" {
 }
 
 ///|
-test "項目の席には項目しか置けない" {
+/// **席は種類を選ばない** — 項目の中は、その項目の深さを 0 とした文書。
+test "項目の席には見出しも置ける" {
   let d = doc([root(item(2, "a", children=[item(3, "b")]), sides=[Right])])
   assert_eq(
     splice(d, 3, n => [n, item(9, "c")]),
@@ -123,7 +124,17 @@ test "項目の席には項目しか置けない" {
       ]),
     ),
   )
-  assert_eq(splice(d, 3, n => [n, h(9, "c")]), None)
+  assert_eq(
+    splice(d, 3, n => [n, h(9, "c")]),
+    Some(
+      doc([
+        root(item(2, "a", children=[item(3, "b"), h(9, "c")]), sides=[
+          Right,
+          Right,
+        ]),
+      ]),
+    ),
+  )
 }
 
 ///|
@@ -207,13 +218,16 @@ test "append を doc_id にすれば新しい根" {
 }
 
 ///|
-test "append は項目の下に項目しか置けない" {
+test "append は席の末尾に足す。種類は選ばない" {
   let d = doc([root(item(2, "a"), sides=[])])
   assert_eq(
     append(d, node=2, [item(9, "b")]),
     Some(doc([root(item(2, "a", children=[item(9, "b")]), sides=[Right])])),
   )
-  assert_eq(append(d, node=2, [h(9, "b")]), None)
+  assert_eq(
+    append(d, node=2, [h(9, "b")]),
+    Some(doc([root(item(2, "a", children=[h(9, "b")]), sides=[Right])])),
+  )
   assert_eq(append(d, node=99, [h(9, "b")]), None)
 }
 

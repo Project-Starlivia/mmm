@@ -101,6 +101,7 @@ pub(all) enum Flaw {
   GappedItem(Int)
   TooDeep(Int)
   DeepSetext(Int)
+  Unmarked(Int)
 } derive(Eq, ToJson)
 
 pub(all) struct Fold {
