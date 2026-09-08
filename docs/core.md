@@ -3,8 +3,6 @@
 md が何を意味するか（方言の裁定）は [spec.md](spec.md) の「md の裁定」。
 ここはその意味を **core がどう持ち、どう回すか**だけを書く。
 
-**いま作り直している最中。** ここは今のコードの説明ではなく、これから作る形。
-
 ## 型
 
 ```
@@ -116,18 +114,34 @@ Node { id, label: String?, fold: Fold?, blocks: [Block], children: [Node] }
 
 ## パイプライン
 
+**段は 9 つ。** どれも 1 語の動詞で、中身は語彙の合成だけ。**pub なのは段と型だけ**で、
+その下の語彙は「1 関数 = 1 文で言い切れる」まで割ってある（決めは
+`superpowers/specs/2026-09-08-layers-design.md`）。
+
 ```
-読み   md ──mizchi/markdown──> mdAst ──方言(dialect)──> mdAst ──build──> Doc + 地番 ──project──> View
-書き   Doc ──unbuild──> mdAst ──mizchi/markdown──> md   // 読んだ原文は生の塊で通す
-合流   md + 前の Doc + 地番 + 後の Doc ──merge──> 編集リスト ──> CodeMirror
-操作   Doc ──apply(op)──> Doc
-境界   md + Op ──edit──> 編集リスト + focus        // survey → apply → merge（edit/）
-配置   View + 寸法(SizeOf) ──layout──> Layout      // map/。字の実測は ts の canvas を閉包で受ける
-描画   Layout + 場面(Scene) ──draw──> SVG の差分   // app/mindmap。js だけ
+            read             build                project
+md ───────> mdAst ─────────> Doc + 地番 ────────> View        @read.survey = read → build → project
+            write            unbuild
+md <─────── mdAst <───────── Doc                              serialize    = unbuild → write
+                              │ check    Doc → 破れ
+                              │ apply    Doc × Op → Doc + focus   = attempt → cap → mend
+md × Doc × 地番 × Doc ──merge──> 編集リスト                    = plan → verified（違えば全文）
+md × Op ──edit──> 編集リスト + focus                           = 読み → apply → merge → number
 ```
+
+地図はその先。**配置** `View + 寸法 ──layout──> Layout`（map/。字の実測は ts の canvas を
+閉包で受ける）、**描画** `Layout + 場面 ──draw──> SVG の差分`（app/mindmap。js だけ）。
 
 **サイクルは 1 本**。md が変わったら必ず 読み → project → 描画。無限ループしないのは
 「**書くのは操作だけ。読みのサイクルは決して書かない**」から。
+
+**段は一方向で、相互再帰は段の中に閉じる。** 唯一のそれは build の中 — 畳みが立つかは
+「領域が部分木を過不足なく覆うか」で決まり、その深さは積んでみないと分からない
+（`standing` ↔ `depths`）。だから畳みを裁く `sift` は read の下ではなく build の中の工程。
+
+**純粋なのは段。** 語彙の中で可変を回すのは build の積む群（`lay` / `take` / `put` / `seat`）
+だけで、深さを stack の高さで持つ設計と引き換え。段としての `build(md, ast)` は同じ入力に
+同じ出力を返す。
 
 ### 方言 — md.mbt
 
@@ -135,7 +149,11 @@ Node { id, label: String?, fold: Fold?, blocks: [Block], children: [Node] }
 「方言」の直列で、ライブラリの癖を mmm の決めに揃えるのはここに閉じる。その先の
 build / content / fold / merge は方言の mdAst だけを見る。
 
-読み `dialect` — **塊の尻は行末の改行込み**:
+**方言は意味を 1 つも足さない** — やるのは span の尻を伸ばすことだけなので `stretch`。
+容器を先に歩き（`nested`）、フェンスを伸ばし（`stretched`）、飲まれた塊を落とす
+（`unswallowed`）。順番はこの 3 つの直列がそのまま言う。
+
+読み `stretch` — **塊の尻は行末の改行込み**:
 
 - フェンス付きの塊（コード・`$$`・`:::`）の span は閉じの行の改行まで（ライブラリは閉じの手前で
   止める）。閉じの行が別のフェンスの開きなら閉じと見ない。`:::` は中身の尻まで伸ばしてから閉じを探す
@@ -175,10 +193,15 @@ build / content / fold / merge は方言の mdAst だけを見る。
 
 ### 地番 — 木が原文のどこに書かれているか
 
-**`Doc` には載せない。** `survey(md)` が `id → 範囲` の表を Doc と並べて返す
-（build.mbt）。Doc に載せると Doc が特定の原文に縛られ、手で組む木(unbuild の
+**`Doc` には載せない。** `build(md, ast)` が `id → 範囲` の表を Doc と並べて返す。
+Doc に載せると Doc が特定の原文に縛られ、手で組む木(unbuild の
 テスト)に在り得ない欄が生える。id はサイクルの中でしか通じないので、表も同じ
 サイクルの中でだけ使う。指紋 `id[from,to]` は spans_wbtest.mbt が固定する。
+
+**番号も地番も、枠をノードにする 1 度の歩き（`to_node`）が配る。** 番号は文書順
+（自分 → 中身 → 子）なので行きがけ、地番は自分の最後の中身の尻までで子の中身も含むので
+帰りがけ（`frame_at`）。積むあいだの `Frame` は**作ったら変えない** — 側も綴りも
+座る前に決まり、番号と範囲は導けるので持たない。
 
 範囲は**骨格の行の頭から、自分の最後の中身の尻まで**（子の中身も含む）。
 次の骨格の頭までは伸ばさない — 伸ばすと隣の空行や側の `---` を抱え込み、
@@ -192,7 +215,7 @@ build / content / fold / merge は方言の mdAst だけを見る。
   使う。行を持たない Implicit と文書の散文は無い
 - **中身（Block）** — 骨格でない中身にも地番がある（`{ from, label: None, to }`）。
   `label` は持たない。範囲は中身の原文そのもので、フェンス付きコードは**閉じの
-  フェンスの行まで含む**（`closing()`）。カードのその場編集が原文を切り出すのと、
+  フェンスの行まで含む**（読みの `stretch`）。カードのその場編集が原文を切り出すのと、
   Markdown 側の色付き薄塗りがこの範囲を使う
 - 空行と側の `---` は**どのノードのものでもない**（隙間）
 
@@ -401,7 +424,7 @@ Op も ts も数えない。行き先は 3 つ(roots / 子 / 中身)で、
 core はここでも状態を持たず、操作 1 回ごとに md を読み直す。
 
 ```
-(before, spans) = survey(md)
+(before, spans) = build(md, read(md))
 done            = apply(before, op)            // None なら edits は空、focus も無い
 edits           = merge(md, before, spans, done.doc)
 focus           = number(done.doc, done.focus) // 読み直したときの id

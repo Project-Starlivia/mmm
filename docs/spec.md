@@ -17,9 +17,12 @@
 ```
 core/   MoonBit — module `mmm/core`。文書モデルと地図の判断。**DOM を知らない**（import は mizchi/markdown だけ。
         `check:core` の pure.ts が見張る）。意味は下の「文書モデル」、内部は core.md
-  tree/         md.mbt が md との境界（read / serialize / fragment）、build.mbt が
-                mdAst → 木と地番、unbuild.mbt が木 → mdAst、merge.mbt が前後の木の
-                差を原文 md への編集列にする。md_wbtest.mbt が
+  tree/         md.mbt が md との境界（read / serialize / fragment。ライブラリに触るのはここだけ）、
+                fold.mbt が畳みの綴りを裁いてひと切れの列にし（sift）、build.mbt が
+                mdAst → 木と地番、check.mbt が md に書けない並びを見つけ、
+                unbuild.mbt が木 → mdAst、merge.mbt が前後の木の差を原文 md への
+                編集列にする。content.mbt は塊 1 枚の意味、text.mbt は md の意味を
+                知らない字と行の算術。md_wbtest.mbt が
                 ライブラリの読みを指紋で固定し、build_wbtest.mbt 以降が
                 「この md はこう読まれる」、unbuild_wbtest.mbt が
                 「この木はこう書かれる」、merge_wbtest.mbt が
@@ -29,7 +32,7 @@ core/   MoonBit — module `mmm/core`。文書モデルと地図の判断。**DO
   op/           操作。apply(doc, op) が Doc を Doc にする。席は隣の id で言う
                 （NodePlace / BlockPlace）。道具（splice / append / body）が
                 型の異種性を幽閉する。決めは core.md「操作」。edit.mbt が境界 —
-                edit(md, op) が survey → apply → merge を繋ぎ、編集列と読み直した木での
+                edit(md, op) が 読み → apply → merge を繋ぎ、編集列と読み直した木での
                 focus を返す。law_wbtest.mbt が操作 × 合流の結合を総当たりで固定する
   map/          Mindmap の配置と判断。DOM を知らない — geometry(座標系。側 → 符号はここだけ) /
                 card(Block → Card。分類だけ) / metric(寸法の唯一の定義。字の実測は
@@ -1090,10 +1093,9 @@ Undo / Redo は Markdown と Mindmap で共通の単一スタック(ただし、
 間はその欄の中の取り消しになる)。どこにフォーカスがあっても効くキーの
 一覧は [shortcuts.md](shortcuts.md)。
 
-## 文書モデル(作りかけ)
+## 文書モデル
 
-md をどう読むかの裁定。**ここは今のコードの説明ではなく、これから作る形。**
-上の「使い方」も同じ裁定で書き直してあるので、読みは 1 本に揃っている。
+md をどう読むかの裁定。「使い方」も同じ裁定で書いてあるので、読みは 1 本に揃っている。
 
 > **mmm は意味を 1 ビットも失わない。記法は mmm が所有する。**
 
