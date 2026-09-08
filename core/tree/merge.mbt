@@ -591,7 +591,9 @@ fn merge_body(
     gap,
     keep: id => {
       let b = now.get(id).unwrap()
-      if was.get(id).unwrap().content != b.content {
+      let old = was.get(id).unwrap()
+      // 書き戻す字は意味と原文の両方で決まるので、両方を見る
+      if old.content != b.content || old.source != b.source {
         let s = r.spans.get(id).unwrap()
         r.out.push({
           from: s.from,

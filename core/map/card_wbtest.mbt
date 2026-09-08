@@ -3,7 +3,7 @@
 ///|
 /// id は分類に関係ないので、ここでは 1 で揃える
 fn block(content : @tree.Content) -> @tree.Block {
-  { id: 1, source: None, content, }
+  { id: 1, source: None, content: Some(content), }
 }
 
 ///|
@@ -13,9 +13,7 @@ test "Block の種類がカードの種類になる。並びは Block のまま"
     block(ThematicBreak),
     block(Link(text="t", href="https://x.example/a", title="")),
     block(Code(info="js", text="1\n")),
-    block(
-      Details(text="<details>x</details>", open=false, summary=None, body="x"),
-    ),
+    block(Details(open=false, summary=None, body="x")),
     block(Svg("<svg/>")),
   ])
   assert_eq(rows, [
@@ -31,7 +29,7 @@ test "Block の種類がカードの種類になる。並びは Block のまま"
 ///|
 test "details は open と summary をそのまま持ち、中身はコードと同じ割り方" {
   fn d(open : Bool, summary : String?, body : String) -> Array[Card] {
-    cards([block(Details(text="", open~, summary~, body~))])
+    cards([block(Details(open~, summary~, body~))])
   }
 
   assert_eq(d(true, Some("s"), "a\n\nb\n"), [
@@ -97,6 +95,6 @@ test "bare は先頭の ./ だけを落とす" {
 }
 
 ///|
-test "Raw はカードにならない" {
-  assert_eq(cards([block(Raw("<x>"))]), [])
+test "読み解かなかった中身はカードにならない" {
+  assert_eq(cards([{ id: 1, content: None, source: Some("<x>"), }]), [])
 }

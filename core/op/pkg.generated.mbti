@@ -39,9 +39,9 @@ pub(all) enum NodePlace {
 
 pub(all) enum Op {
   AddNode(at~ : NodePlace, labels~ : Array[String])
-  AddBlock(at~ : BlockPlace, content~ : @tree.Content)
+  AddBlock(at~ : BlockPlace, content~ : @tree.Content?, source~ : String?)
   Rename(id~ : Int, label~ : String)
-  SetBlock(id~ : Int, content~ : @tree.Content)
+  SetBlock(id~ : Int, content~ : @tree.Content?, source~ : String?)
   MoveNode(ids~ : Array[Int], at~ : NodePlace)
   MoveBlock(ids~ : Array[Int], at~ : BlockPlace)
   Delete(ids~ : Array[Int])

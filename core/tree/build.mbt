@@ -298,7 +298,7 @@ fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
       spill(b)
       fill(
         b,
-        Details(text~, open~, summary~, body~),
+        Some(Details(open~, summary~, body~)),
         from~,
         to~,
         source=Some(text),
@@ -306,7 +306,7 @@ fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
     }
     Text(text, from~, to~) => {
       spill(b)
-      fill(b, Raw(text), from~, to~, source=Some(text))
+      fill(b, None, from~, to~, source=Some(text))
     }
   }
 }
@@ -344,7 +344,7 @@ fn take(
     ThematicBreak(span~, ..) if nest > 0 =>
       fill(
         b,
-        ThematicBreak,
+        Some(ThematicBreak),
         from=span.from,
         to=span.to,
         source=Some(carve(b.md, span.from, span.to)),
@@ -356,16 +356,20 @@ fn take(
       b.pend_from = span.from
       b.pend_to = span.to
     }
-    _ =>
-      match content_of(b.md, block) {
-        Some(c) => {
-          // 中身が来た時点で、保留中の水平線は境界になれない
-          spill(b)
-          let s = block_span(block)
-          fill(b, c, from=s.from, to=s.to, source=Some(verbatim(b.md, block)))
-        }
-        None => ()
-      }
+    // 空行は綴りであってモデルには無い。serialize が正規形として置き直す
+    BlankLines(..) => ()
+    _ => {
+      // 中身が来た時点で、保留中の水平線は境界になれない
+      spill(b)
+      let s = block_span(block)
+      fill(
+        b,
+        content_of(b.md, block),
+        from=s.from,
+        to=s.to,
+        source=Some(verbatim(b.md, block)),
+      )
+    }
   }
 }
 
@@ -596,7 +600,7 @@ fn spill(b : Build) -> Unit {
     b.pend = false
     fill(
       b,
-      ThematicBreak,
+      Some(ThematicBreak),
       from=b.pend_from,
       to=b.pend_to,
       source=Some(carve(b.md, b.pend_from, b.pend_to)),

@@ -92,7 +92,11 @@ test "Op は JSON から起こせる — 席の side の None は鍵ごと落ち
     AddNode(at=NodePlace::In(node=2, side=None), labels=["n"]),
     AddNode(at=NodePlace::In(node=2, side=Some(Left)), labels=["n"]),
     MoveBlock(ids=[3, 4], at=Before(block=5)),
-    AddBlock(at=BlockPlace::In(node=2), content=Code(info="js", text="1\n")),
+    AddBlock(
+      at=BlockPlace::In(node=2),
+      content=Some(Code(info="js", text="1\n")),
+      source=None,
+    ),
     Fold(id=2, open=false),
   ]
   for op in ops {

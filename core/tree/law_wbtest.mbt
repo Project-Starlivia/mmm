@@ -292,24 +292,28 @@ fn written(doc : Doc) -> String {
   fn blocks(bs : Array[Block]) -> Unit {
     for b in bs {
       match b.content {
-        Image(alt~, src~, title~) => {
+        Some(Image(alt~, src~, title~)) => {
           bag.push(alt)
           bag.push(src)
           bag.push(title)
         }
-        Link(text~, href~, title~) => {
+        Some(Link(text~, href~, title~)) => {
           bag.push(text)
           bag.push(href)
           bag.push(title)
         }
-        Code(info~, text~) => {
+        Some(Code(info~, text~)) => {
           bag.push(info)
           bag.push(text)
         }
-        Svg(s) => bag.push(s)
-        ThematicBreak => ()
-        Details(text=s, ..) => bag.push(s)
-        Raw(s) => bag.push(s)
+        Some(Svg(s)) => bag.push(s)
+        Some(ThematicBreak) => ()
+        // 畳めない領域と、読み解かなかった中身の字は原文にしか無い（`source` が持つ）
+        Some(Details(..)) | None =>
+          match b.source {
+            Some(s) => bag.push(s)
+            None => ()
+          }
       }
     }
   }

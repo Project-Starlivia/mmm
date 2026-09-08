@@ -30,7 +30,11 @@ fn Mindmap::add_link(self : Mindmap, id : Int) -> Unit {
       return
     }
     let f = (self.host.apply)(
-      AddBlock(at=In(node=id), content=Link(text="", href=url, title="")),
+      AddBlock(
+        at=In(node=id),
+        content=Some(Link(text="", href=url, title="")),
+        source=None,
+      ),
       false,
     )
     match f {
@@ -45,7 +49,7 @@ fn Mindmap::add_link(self : Mindmap, id : Int) -> Unit {
 /// 2 行で書くので、欄には空行を 1 つ挟んだ形で載せ、そこに頭を置く（打たなければ書かない）
 fn Mindmap::add_code(self : Mindmap, id : Int) -> Unit {
   let f = (self.host.apply)(
-    AddBlock(at=In(node=id), content=Code(info="", text="")),
+    AddBlock(at=In(node=id), content=Some(Code(info="", text="")), source=None),
     false,
   )
   match f {

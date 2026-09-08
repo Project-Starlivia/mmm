@@ -125,7 +125,7 @@ test "側の本数が子と合わなければ見つける" {
 test "中身の id も一意さを見る" {
   let doc : Doc = {
     frontmatter: None,
-    body: [{ id: 5, source: None, content: Raw("a"), }],
+    body: [{ id: 5, content: None, source: Some("a"), }],
     roots: [
       {
         node: {
@@ -200,7 +200,7 @@ test "改行だけの名前は書ける" {
 
 ///|
 fn tb(id : Int) -> Block {
-  { id, source: None, content: ThematicBreak, }
+  { id, source: None, content: Some(ThematicBreak), }
 }
 
 ///|
@@ -235,7 +235,7 @@ test "中身の尻の水平線に骨格が続けば見つける" {
             },
             leaf(9, "b", body=[
               tb(10),
-              { id: 11, source: None, content: Raw("x"), },
+              { id: 11, content: None, source: Some("x"), },
             ]),
             leaf(12, "c", body=[tb(13)]),
           ],
@@ -465,7 +465,10 @@ test "綴りの無いノードの名前・畳み・中身を見つける" {
   )
   json_inspect(
     check(
-      doc({ ..gap, body: [{ id: 9, content: ThematicBreak, source: None, }], }),
+      doc({
+        ..gap,
+        body: [{ id: 9, content: Some(ThematicBreak), source: None, }],
+      }),
     ),
     content=[["Unmarked", 2]],
   )

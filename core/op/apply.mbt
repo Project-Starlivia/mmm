@@ -142,8 +142,8 @@ fn attempt(doc : @tree.Doc, op : Op) -> Done? {
     Wrap(id~, label~) => wrap(doc, id, label)
     MoveNode(ids~, at~) => move_node(doc, ids, at)
     FlipSide(id~) => flip(doc, id)
-    AddBlock(at~, content~) => add_block(doc, at, content)
-    SetBlock(id~, content~) => set_block(doc, id, content)
+    AddBlock(at~, content~, source~) => add_block(doc, at, content, source)
+    SetBlock(id~, content~, source~) => set_block(doc, id, content, source)
     MoveBlock(ids~, at~) => move_block(doc, ids, at)
     Graft(at~, md~) => graft(doc, at, md)
   }
@@ -559,21 +559,27 @@ fn holder(doc : @tree.Doc, at : BlockPlace) -> Int? {
 fn add_block(
   doc : @tree.Doc,
   at : BlockPlace,
-  content : @tree.Content,
+  content : @tree.Content?,
+  source : String?,
 ) -> Done? {
   guard holder(doc, at) is Some(o) else { return None }
-  let b : @tree.Block = { id: fresh(doc), content, source: None, }
+  let b : @tree.Block = { id: fresh(doc), content, source, }
   done(body(doc, node=o, bs => put(bs, at, [b])), Some(b.id))
 }
 
 ///|
-/// 中身を入れ替える。**原文は捨てる** — 新しい中身は mmm が作ったものなので、
-/// 種類ごとに綴られる。
-fn set_block(doc : @tree.Doc, id : Int, content : @tree.Content) -> Done? {
+/// 中身を入れ替える。**前の字は残さない** — 意味を渡せば種類ごとに綴られ、
+/// 原文を渡せばその字がそのまま書き戻る（カードのその場編集）。
+fn set_block(
+  doc : @tree.Doc,
+  id : Int,
+  content : @tree.Content?,
+  source : String?,
+) -> Done? {
   guard owner(doc, block=id) is Some(o) else { return None }
   done(
     body(doc, node=o, bs => {
-      bs.map(b => if b.id == id { { id, content, source: None, } } else { b })
+      bs.map(b => if b.id == id { { id, content, source, } } else { b })
     }),
     Some(id),
   )
@@ -660,10 +666,8 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   let labels : Array[String] = []
   let rest : Array[@tree.Block] = []
   for b in sub.body {
-    let ls = match b.content {
-      Raw(text) => @tree.lines(text)
-      _ => None
-    }
+    // 読み解かなかった中身の原文だけが、行のノードになりうる
+    let ls = if b.content is None { b.source.bind(@tree.lines) } else { None }
     match ls {
       Some(ls) => labels.append(ls)
       None => rest.push(b)

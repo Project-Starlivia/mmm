@@ -56,10 +56,10 @@ fn gap(id : Int, children : Array[@tree.Node]) -> @tree.Node {
 ///|
 /// source は読んだ原文。断片から来た中身だけが持つ
 fn pic(id : Int, source? : String? = None) -> @tree.Block {
-  { id, source, content: Image(alt="", src="p.png", title=""), }
+  { id, source, content: Some(Image(alt="", src="p.png", title="")), }
 }
 
 ///|
 fn code(id : Int) -> @tree.Block {
-  { id, source: None, content: Code(info="", text="x"), }
+  { id, source: None, content: Some(Code(info="", text="x")), }
 }

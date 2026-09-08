@@ -268,9 +268,9 @@ fn content(out : Array[@markdown.Block], b : Block) -> Unit {
     Some(source) => out.push(html(source))
     None =>
       match b.content {
-        Image(alt~, src~, title~) =>
+        Some(Image(alt~, src~, title~)) =>
           out.push(paragraph([Image(alt~, url=src, title~, span=nowhere)]))
-        Link(text~, href~, title~) =>
+        Some(Link(text~, href~, title~)) =>
           out.push(
             paragraph([
               Link(
@@ -281,7 +281,7 @@ fn content(out : Array[@markdown.Block], b : Block) -> Unit {
               ),
             ]),
           )
-        Code(info~, text~) =>
+        Some(Code(info~, text~)) =>
           out.push(
             FencedCode(
               fence_marker=Backtick,
@@ -294,10 +294,11 @@ fn content(out : Array[@markdown.Block], b : Block) -> Unit {
               trailing_trivia=@markdown.Trivia::empty(),
             ),
           )
-        Svg(s) => out.push(html(s))
-        ThematicBreak => out.push(html("---"))
-        Details(text~, ..) => out.push(html(text))
-        Raw(text) => out.push(html(text))
+        Some(Svg(s)) => out.push(html(s))
+        Some(ThematicBreak) => out.push(html("---"))
+        // 畳みにならなかった領域も、読み解かなかった中身も、原文だけが書き戻せる
+        // （`source` が持つ）。どちらも無ければ書く字が無い（check の `Wordless`）
+        Some(Details(..)) | None => ()
       }
   }
 }

@@ -830,7 +830,10 @@ test "AddBlock は隣の前後と body の末尾" {
   ])
   let c : @tree.Content = Code(info="", text="x")
   assert_eq(
-    run(d, AddBlock(at=BlockPlace::After(block=3), content=c)),
+    run(
+      d,
+      AddBlock(at=BlockPlace::After(block=3), content=Some(c), source=None),
+    ),
     Some({
       doc: doc([
         root(h(2, "r", body=[pic(3), code(5)], children=[h(4, "a")]), sides=[
@@ -841,7 +844,10 @@ test "AddBlock は隣の前後と body の末尾" {
     }),
   )
   assert_eq(
-    run(d, AddBlock(at=BlockPlace::Before(block=3), content=c)),
+    run(
+      d,
+      AddBlock(at=BlockPlace::Before(block=3), content=Some(c), source=None),
+    ),
     Some({
       doc: doc([
         root(h(2, "r", body=[code(5), pic(3)], children=[h(4, "a")]), sides=[
@@ -852,7 +858,7 @@ test "AddBlock は隣の前後と body の末尾" {
     }),
   )
   assert_eq(
-    run(d, AddBlock(at=BlockPlace::In(node=4), content=c)),
+    run(d, AddBlock(at=BlockPlace::In(node=4), content=Some(c), source=None)),
     Some({
       doc: doc([
         root(h(2, "r", body=[pic(3)], children=[h(4, "a", body=[code(5)])]), sides=[
@@ -863,7 +869,14 @@ test "AddBlock は隣の前後と body の末尾" {
     }),
   )
   assert_eq(
-    run(d, AddBlock(at=BlockPlace::In(node=@tree.doc_id), content=c)),
+    run(
+      d,
+      AddBlock(
+        at=BlockPlace::In(node=@tree.doc_id),
+        content=Some(c),
+        source=None,
+      ),
+    ),
     Some({
       doc: doc(
         [root(h(2, "r", body=[pic(3)], children=[h(4, "a")]), sides=[Right])],
@@ -878,19 +891,37 @@ test "AddBlock は隣の前後と body の末尾" {
 test "AddBlock は Implicit・ノードの id・知らない id に None" {
   let d = doc([root(h(2, "r", children=[gap(3, [h(4, "x")])]), sides=[Right])])
   let c : @tree.Content = Code(info="", text="x")
-  assert_eq(run(d, AddBlock(at=BlockPlace::In(node=3), content=c)), None)
-  assert_eq(run(d, AddBlock(at=BlockPlace::After(block=4), content=c)), None)
-  assert_eq(run(d, AddBlock(at=BlockPlace::After(block=9), content=c)), None)
+  assert_eq(
+    run(d, AddBlock(at=BlockPlace::In(node=3), content=Some(c), source=None)),
+    None,
+  )
+  assert_eq(
+    run(
+      d,
+      AddBlock(at=BlockPlace::After(block=4), content=Some(c), source=None),
+    ),
+    None,
+  )
+  assert_eq(
+    run(
+      d,
+      AddBlock(at=BlockPlace::After(block=9), content=Some(c), source=None),
+    ),
+    None,
+  )
 }
 
 ///|
 test "SetBlock は中身を替え、id は保つ" {
   let d = doc([root(h(2, "r", body=[pic(3)]))])
   assert_eq(
-    run(d, SetBlock(id=3, content=Code(info="", text="x"))),
+    run(d, SetBlock(id=3, content=Some(Code(info="", text="x")), source=None)),
     Some({ doc: doc([root(h(2, "r", body=[code(3)]))]), focus: Some(3), }),
   )
-  assert_eq(run(d, SetBlock(id=2, content=Code(info="", text="x"))), None)
+  assert_eq(
+    run(d, SetBlock(id=2, content=Some(Code(info="", text="x")), source=None)),
+    None,
+  )
 }
 
 ///|
@@ -1024,7 +1055,7 @@ test "Graft の一番外 — 段落は行ごとにノード、中身は親の bo
             {
               id: 4,
               source: Some("![](q.png)"),
-              content: Image(alt="", src="q.png", title=""),
+              content: Some(Image(alt="", src="q.png", title="")),
             },
           ]),
         ),
@@ -1043,7 +1074,7 @@ test "Graft の一番外 — 段落は行ごとにノード、中身は親の bo
             {
               id: 4,
               source: Some("https://x"),
-              content: Link(text="https://x", href="https://x", title=""),
+              content: Some(Link(text="https://x", href="https://x", title="")),
             },
           ]),
         ),
@@ -1287,7 +1318,7 @@ test "apply の結果は check を通る" {
     ops.push(Delete(ids=[id]))
     ops.push(Wrap(id~, label="w"))
     ops.push(FlipSide(id~))
-    ops.push(SetBlock(id~, content=ThematicBreak))
+    ops.push(SetBlock(id~, content=Some(ThematicBreak), source=None))
     for to in ids {
       ops.push(MoveNode(ids=[id], at=NodePlace::Before(node=to)))
       ops.push(MoveNode(ids=[id], at=NodePlace::After(node=to)))
@@ -1295,7 +1326,13 @@ test "apply の結果は check を通る" {
       ops.push(MoveBlock(ids=[id], at=BlockPlace::Before(block=to)))
       ops.push(MoveBlock(ids=[id], at=BlockPlace::In(node=to)))
       ops.push(AddNode(at=NodePlace::After(node=to), labels=["n"]))
-      ops.push(AddBlock(at=BlockPlace::In(node=to), content=ThematicBreak))
+      ops.push(
+        AddBlock(
+          at=BlockPlace::In(node=to),
+          content=Some(ThematicBreak),
+          source=None,
+        ),
+      )
       ops.push(Graft(at=NodePlace::In(node=to, side=None), md="# g\n\n- i\n"))
       ops.push(Graft(at=NodePlace::In(node=to, side=None), md="- i\n  - j\n"))
       ops.push(Graft(at=NodePlace::After(node=to), md="![](q.png)\n\ntext\n"))

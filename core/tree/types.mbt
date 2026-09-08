@@ -111,20 +111,22 @@ pub(all) enum Side {
 /// ノードも中身も同じ番号で引き当てるので、操作も選択も型が割れない。
 pub(all) struct Block {
   id : Int
-  content : Content
+  /// 読み解いた意味。**無ければ読み解いていない** — 散文・表・引用・コメントは
+  /// みなここ。そのときは `source` が原文をそのまま持つ
+  content : Content?
   /// 読んだ原文（字下げを剥いだ塊の字）。**書き戻しはこれを返す。** 操作が作った
-  /// 中身は None で、そのときだけ種類ごとに綴る。決めは
+  /// 中身は None で、そのときだけ意味から綴る。決めは
   /// docs/superpowers/specs/2026-09-06-verbatim-design.md
   ///
-  /// **`content` の `Raw`（読み解かない中身の種類）とは軸が違う。**
-  /// `Raw` は中身の種類の 1 つ、`source` は字がどこから来たかで、
-  /// 読んだ中身なら種類によらず持つ
+  /// **読んだ字はここ 1 か所。** 意味の側は原文を持たない（同じ字を 2 か所に
+  /// 置くと、書き戻す側と読み直す側が食い違う）。意味も原文も無い中身は
+  /// 書けないので check（`Wordless`）が言う
   source : String?
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// 中身そのもの。**解釈の包みは作らない** — 読み解けたかどうかで型は分けず、
-/// 読み解かなかったものは Raw が原文のまま持つ。
+/// 中身の意味。**読み解けたものだけ**で、読み解かなかったことは `Block.content`
+/// の不在が言う（解釈の包みは作らない）。
 /// カードかどうかは描画側の分類で、core は意味だけを持つ。
 pub(all) enum Content {
   Image(alt~ : String, src~ : String, title~ : String)
@@ -134,10 +136,8 @@ pub(all) enum Content {
   /// 水平線。md の要素名そのまま
   ThematicBreak
   /// `<details>`。**中を読み解かない** — 触っていない畳みが正規形に落ちるのを
-  /// 防ぐため、領域を原文（text）のまま持ち、書き戻しは text だけを使う。
+  /// 防ぐため、書き戻しは `source` の原文だけを使う。
   /// open / summary / body は読み取り（GitHub が描くのと同じもの）で、導出はしない。
   /// body は開き（と summary）の後ろから閉じの手前までの原文
-  Details(text~ : String, open~ : Bool, summary~ : String?, body~ : String)
-  /// 原文のまま。読み解いていないものは全部ここ（コメント・表・引用も）
-  Raw(String)
+  Details(open~ : Bool, summary~ : String?, body~ : String)
 } derive(Eq, Debug, ToJson, FromJson)

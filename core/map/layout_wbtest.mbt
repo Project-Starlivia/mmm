@@ -173,7 +173,7 @@ test "カードの矩形は箱の左上から見た座標。無い行は None" {
     {
       id: 9,
       source: None,
-      content: Link(text="t", href="https://x.example/", title=""),
+      content: Some(Link(text="t", href="https://x.example/", title="")),
     },
   ]
   let l = layout([root(node(1, "r", blocks~))], size)
