@@ -1,35 +1,6 @@
 // 木を読むだけの道具。文書順の歩きは each 1 本で、owner / parent / pick / within /
 // fresh / has はその上に乗る。find と seat だけは、ノードそのものと添字が要るので
-// 自分で降りる。3 種のノードの違い（子の型・中身の有無）は id_of / kids / blocks_of で吸う。
-
-///|
-fn id_of(n : @tree.Node) -> Int {
-  match n {
-    HeadingNode(h) => h.id
-    ListNode(l) => l.id
-    ImplicitNode(g) => g.id
-  }
-}
-
-///|
-/// 子の列。項目の子は項目だが、歩くときは Node に包んで同じ列にする。
-fn kids(n : @tree.Node) -> Array[@tree.Node] {
-  match n {
-    HeadingNode(h) => h.children
-    ImplicitNode(g) => g.children
-    ListNode(l) => l.children.map(c => @tree.ListNode(c))
-  }
-}
-
-///|
-/// 中身の列。Implicit は持たない。
-fn blocks_of(n : @tree.Node) -> Array[@tree.Block] {
-  match n {
-    HeadingNode(h) => h.body
-    ListNode(l) => l.body
-    ImplicitNode(_) => []
-  }
-}
+// 自分で降りる。
 
 ///|
 /// 文書順に、ノードと中身を 1 つずつ訪ねる。f は (id, 中身か, 祖先の id 列) を
@@ -37,12 +8,12 @@ fn blocks_of(n : @tree.Node) -> Array[@tree.Block] {
 fn each(doc : @tree.Doc, f : (Int, Bool, Array[Int]) -> Unit) -> Unit {
   let path : Array[Int] = []
   fn node(n : @tree.Node) -> Unit {
-    f(id_of(n), false, path)
-    path.push(id_of(n))
-    for b in blocks_of(n) {
+    f(n.id, false, path)
+    path.push(n.id)
+    for b in n.body {
       f(b.id, true, path)
     }
-    for c in kids(n) {
+    for c in n.children {
       node(c)
     }
     ignore(path.pop())
@@ -60,10 +31,10 @@ fn each(doc : @tree.Doc, f : (Int, Bool, Array[Int]) -> Unit) -> Unit {
 /// id のノード。中身の id には応えない。
 fn find(doc : @tree.Doc, id : Int) -> @tree.Node? {
   fn go(n : @tree.Node) -> @tree.Node? {
-    if id_of(n) == id {
+    if n.id == id {
       return Some(n)
     }
-    for c in kids(n) {
+    for c in n.children {
       match go(c) {
         Some(m) => return Some(m)
         None => ()
@@ -85,10 +56,10 @@ fn find(doc : @tree.Doc, id : Int) -> @tree.Node? {
 /// 根の添字から辿る道。長さが深さ（根 = 1、根の子 = 2）。中身には応えない。
 fn seat(doc : @tree.Doc, id : Int) -> Array[Int]? {
   fn go(n : @tree.Node) -> Array[Int]? {
-    if id_of(n) == id {
+    if n.id == id {
       return Some([])
     }
-    for k, c in kids(n) {
+    for k, c in n.children {
       match go(c) {
         Some(p) => {
           p.insert(0, k)
@@ -192,10 +163,10 @@ fn siblings(doc : @tree.Doc, id : Int) -> Array[Int] {
   match parent(doc, id) {
     Some(p) if p != @tree.doc_id =>
       match find(doc, p) {
-        Some(n) => kids(n).map(id_of)
+        Some(n) => n.children.map(x => x.id)
         None => []
       }
-    Some(_) => doc.roots.map(r => id_of(r.node))
+    Some(_) => doc.roots.map(r => r.node.id)
     None => []
   }
 }

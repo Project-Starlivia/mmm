@@ -72,7 +72,7 @@ pub fn check(doc : Doc) -> Array[Flaw] {
     border.val = None
   }
 
-  fn items(xs : Array[ListNode]) -> Unit {
+  fn items(xs : Array[Node]) -> Unit {
     for x in xs {
       id(x.id)
       blocks(x.body)
@@ -91,67 +91,56 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   ) -> Unit {
     for i, x in xs {
       skeleton()
-      let after_heading = i > 0 && !(xs[i - 1] is ListNode(_))
+      let after_heading = i > 0 && !(sign_of(xs[i - 1]) is Some(Item))
       let bordered = i > 0 && i < sides.length() && sides[i] != sides[i - 1]
-      if after_heading && !bordered && !(x is HeadingNode(_)) {
-        flaws.push(Swallowed(id_of(x)))
+      if after_heading && !bordered && !(sign_of(x) is Some(Heading)) {
+        flaws.push(Swallowed(x.id))
       }
-      match x {
-        HeadingNode(h) => {
-          id(h.id)
+      id(x.id)
+      match sign_of(x) {
+        Some(Heading) => {
           if depth > deepest {
-            flaws.push(TooDeep(h.id))
+            flaws.push(TooDeep(x.id))
           }
-          if depth > 2 && h.label.contains("\n") {
-            flaws.push(DeepSetext(h.id))
+          if depth > 2 && x.label.contains("\n") {
+            flaws.push(DeepSetext(x.id))
           }
-          blocks(h.body)
-          border.val = trailing(h.body)
-          nodes(h.children, depth + 1, kids(i), _ => [])
+          blocks(x.body)
+          border.val = trailing(x.body)
+          nodes(x.children, depth + 1, kids(i), _ => [])
         }
-        ListNode(l) => {
-          id(l.id)
-          blocks(l.body)
-          items(l.children)
+        Some(Item) => {
+          blocks(x.body)
+          items(x.children)
         }
-        ImplicitNode(g) => {
-          id(g.id)
-          if g.children.is_empty() {
-            flaws.push(BarrenImplicit(g.id))
+        None => {
+          if x.children.is_empty() {
+            flaws.push(BarrenImplicit(x.id))
           }
-          for k in g.children {
-            if k is ListNode(l) {
-              flaws.push(GappedItem(l.id))
+          for k in x.children {
+            if sign_of(k) is Some(Item) {
+              flaws.push(GappedItem(k.id))
             }
           }
-          nodes(g.children, depth + 1, kids(i), _ => [])
+          nodes(x.children, depth + 1, kids(i), _ => [])
         }
       }
     }
   }
 
   for r in doc.roots {
-    let kids = match r.node {
-      HeadingNode(h) => h.children.length()
-      ImplicitNode(g) => g.children.length()
-      ListNode(l) => l.children.length()
-    }
+    let kids = r.node.children.length()
     if r.sides.length() != kids {
       flaws.push(
-        SideCount(root=root_id(r), sides=r.sides.length(), children=kids),
+        SideCount(root=r.node.id, sides=r.sides.length(), children=kids),
       )
     }
-    if r.node is ListNode(_) && r.sides.contains(Left) {
-      flaws.push(ListSide(root_id(r)))
+    if sign_of(r.node) is Some(Item) && r.sides.contains(Left) {
+      flaws.push(ListSide(r.node.id))
     }
   }
   blocks(doc.body)
   border.val = trailing(doc.body)
   nodes(doc.roots.map(r => r.node), 1, [], i => doc.roots[i].sides)
   flaws
-}
-
-///|
-fn root_id(r : Root) -> Int {
-  id_of(r.node)
 }

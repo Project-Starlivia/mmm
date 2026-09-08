@@ -45,46 +45,39 @@ fn h(
   setext? : Bool = false,
   closing? : Int = 0,
 ) -> Node {
-  HeadingNode({
+  {
     id: 0,
     label,
     fold,
     body: blocks(body),
-    setext,
-    closing,
     children,
-  })
-}
-
-///|
-fn li(
-  label : String,
-  children? : Array[ListNode] = [],
-  body? : Array[Content] = [],
-  fold? : Fold? = None,
-  marker? : String = "-",
-  offset? : Int = 2,
-  loose? : Bool = false,
-) -> ListNode {
-  { id: 0, label, fold, body: blocks(body), marker, offset, loose, children, }
+    mark: Some(Heading(setext~, closing~)),
+  }
 }
 
 ///|
 fn item(
   label : String,
-  children? : Array[ListNode] = [],
+  children? : Array[Node] = [],
   body? : Array[Content] = [],
   fold? : Fold? = None,
   marker? : String = "-",
   offset? : Int = 2,
   loose? : Bool = false,
 ) -> Node {
-  ListNode(li(label, children~, body~, fold~, marker~, offset~, loose~))
+  {
+    id: 0,
+    label,
+    fold,
+    body: blocks(body),
+    children,
+    mark: Some(Item(marker~, offset~, loose~)),
+  }
 }
 
 ///|
 fn gap(children : Array[Node]) -> Node {
-  ImplicitNode({ id: 0, children, })
+  { id: 0, label: "", fold: None, body: [], children, mark: None, }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -149,7 +142,7 @@ test "木は何本でも" {
 ///|
 test "項目は入れ子。兄弟は詰める" {
   inspect(
-    serialize(doc([root(item("root", children=[li("a"), li("b")]))])),
+    serialize(doc([root(item("root", children=[item("a"), item("b")]))])),
     content=(
       #|- root
       #|  - a
@@ -214,7 +207,7 @@ test "項目の字下げは読んだ綴り — 入れ子はその桁から" {
       doc([
         root(
           item("a", marker="*", offset=3, children=[
-            li("b", marker="*", offset=3),
+            item("b", marker="*", offset=3),
           ]),
         ),
       ]),
@@ -229,7 +222,9 @@ test "項目の字下げは読んだ綴り — 入れ子はその桁から" {
 /// 空の項目でも直前が段落でなければ（前に兄弟が居る）詰めたまま。
 test "ラベルの直後の空の項目は空行で分ける" {
   inspect(
-    serialize(doc([root(item("root", children=[li("a", children=[li("")])]))])),
+    serialize(
+      doc([root(item("root", children=[item("a", children=[item("")])]))]),
+    ),
     content=(
       #|- root
       #|  - a
@@ -239,7 +234,7 @@ test "ラベルの直後の空の項目は空行で分ける" {
     ),
   )
   inspect(
-    serialize(doc([root(item("root", children=[li("a"), li("")]))])),
+    serialize(doc([root(item("root", children=[item("a"), item("")]))])),
     content=(
       #|- root
       #|  - a
@@ -249,7 +244,9 @@ test "ラベルの直後の空の項目は空行で分ける" {
   )
   inspect(
     serialize(
-      doc([root(item("root", children=[li("a", children=[li("x"), li("")])]))]),
+      doc([
+        root(item("root", children=[item("a", children=[item("x"), item("")])])),
+      ]),
     ),
     content=(
       #|- root
@@ -321,7 +318,7 @@ test "改行を含む名前は setext で書く" {
 ///|
 test "改行入りの項目ラベルは続きの行になる" {
   inspect(
-    serialize(doc([root(item("a\nb", children=[li("c")]))])),
+    serialize(doc([root(item("a\nb", children=[item("c")]))])),
     content=(
       #|- a
       #|  b
@@ -334,7 +331,7 @@ test "改行入りの項目ラベルは続きの行になる" {
 ///|
 test "空のラベル" {
   inspect(
-    serialize(doc([root(h("", children=[item("", children=[li("x")])]))])),
+    serialize(doc([root(h("", children=[item("", children=[item("x")])]))])),
     content=(
       #|#
       #|
@@ -488,20 +485,17 @@ test "読んだ中身は原文のまま — 表の桁は揃えず、フェンス
     frontmatter: None,
     body: [],
     roots: [
-      root(
-        HeadingNode({
-          id: 0,
-          label: "a",
-          fold: None,
-          body: [
-            read_block(Raw(table), table),
-            read_block(Code(info="", text="x\n"), "~~~\nx\n~~~"),
-          ],
-          setext: false,
-          closing: 0,
-          children: [],
-        }),
-      ),
+      root({
+        id: 0,
+        label: "a",
+        fold: None,
+        body: [
+          read_block(Raw(table), table),
+          read_block(Code(info="", text="x\n"), "~~~\nx\n~~~"),
+        ],
+        children: [],
+        mark: Some(atx),
+      }),
     ],
   }
   inspect(serialize(doc), content="# a\n\n" + table + "\n\n~~~\nx\n~~~\n")
@@ -881,8 +875,8 @@ test "入れ子項目の畳みは親の列に" {
       doc([
         root(
           item("a", children=[
-            li("b", fold=Some({ open: false, summary: None, })),
-            li("c"),
+            item("b", fold=Some({ open: false, summary: None, })),
+            item("c"),
           ]),
         ),
       ]),
@@ -961,7 +955,7 @@ test "名前の字はそのまま — 逃がさず、強調にも直さない" {
 test "名前の字はそのまま — 子と中身を持っても行は変わらない" {
   inspect(
     serialize(
-      doc([root(h("a_b", children=[item("c*d", children=[li("e_f")])]))]),
+      doc([root(h("a_b", children=[item("c*d", children=[item("e_f")])]))]),
     ),
     content="# a_b\n\n- c*d\n  - e_f\n",
   )

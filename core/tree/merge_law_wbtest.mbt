@@ -54,50 +54,44 @@ fn name(how : Change) -> String {
 /// id のノードを how で変えた木。
 fn changed(doc : Doc, id : Int, how : Change) -> Doc {
   morph(doc, id, x => {
+    // Implicit は行が無いので、名前も中身も持てない
+    guard x.mark is Some(_) || how is (Delete | Adopt) else { return Some(x) }
     match how {
-      Relabel =>
-        Some(
-          match x {
-            HeadingNode(h) => HeadingNode({ ..h, label: h.label + "!", })
-            ListNode(l) => ListNode({ ..l, label: l.label + "!", })
-            other => other
-          },
-        )
+      Relabel => Some({ ..x, label: x.label + "!", })
       Delete => None
       Adopt =>
-        Some(with_children(x, children_of(x) + [newborn(x is ListNode(_))]))
+        Some({
+          ..x,
+          children: x.children + [newborn(sign_of(x) is Some(Item))],
+        })
       AddBlock =>
-        Some(
-          with_body(
-            x,
-            body_of(x) + [{ id: 999, source: None, content: ThematicBreak, }],
-          ),
-        )
+        Some({
+          ..x,
+          body: x.body + [{ id: 999, source: None, content: ThematicBreak, }],
+        })
       DropBlock =>
-        if body_of(x).is_empty() {
+        if x.body.is_empty() {
           Some(x)
         } else {
-          Some(with_body(x, body_of(x)[0:body_of(x).length() - 1].to_owned()))
+          Some({ ..x, body: x.body[0:x.body.length() - 1].to_owned(), })
         }
       SetBlock =>
-        Some(
-          with_body(
-            x,
-            body_of(x).mapi((i, b) => {
-              if i == 0 {
-                { id: b.id, source: None, content: Raw("changed"), }
-              } else {
-                b
-              }
-            }),
-          ),
-        )
+        Some({
+          ..x,
+          body: x.body.mapi((i, b) => {
+            if i == 0 {
+              { id: b.id, source: None, content: Raw("changed"), }
+            } else {
+              b
+            }
+          }),
+        })
       Swap => {
-        let bs = body_of(x)
+        let bs = x.body
         if bs.length() < 2 {
           Some(x)
         } else {
-          Some(with_body(x, [bs[1], bs[0]] + bs[2:].to_owned()))
+          Some({ ..x, body: [bs[1], bs[0]] + bs[2:].to_owned(), })
         }
       }
     }
@@ -108,11 +102,11 @@ fn changed(doc : Doc, id : Int, how : Change) -> Doc {
 /// 畳まれた部分木の中に居るか（自分も含む）。畳みは `<details>` が包むので丸ごと書かれる
 fn under_fold(doc : Doc, id : Int) -> Bool {
   fn go(x : Node, fold : Bool) -> Bool {
-    let here = fold || folded(x)
-    if id_of(x) == id {
+    let here = fold || x.fold is Some(_)
+    if x.id == id {
       return here
     }
-    for k in children_of(x) {
+    for k in x.children {
       if go(k, here) {
         return true
       }
@@ -166,7 +160,7 @@ fn grain(
   for id in all_ids(before) {
     guard news.get(id) is Some(x) else { continue }
     let old = spans.get(id).unwrap()
-    guard !(x is ImplicitNode(_)) && !under_fold(before, id) else { continue }
+    guard x.mark is Some(_) && !under_fold(before, id) else { continue }
     guard same_line(olds.get(id).unwrap(), x) else { continue }
     let line_to = line_end(md, old.from)
     for e in edits {
@@ -183,26 +177,23 @@ fn grain(
 /// 新しいノード（id は読みが振る番号と被らない）。項目の子は項目。
 fn newborn(item : Bool) -> Node {
   if item {
-    ListNode({
+    {
       id: 999,
       label: "new",
       fold: None,
       body: [],
-      marker: "-",
-      offset: 2,
-      loose: false,
       children: [],
-    })
+      mark: Some(bullet),
+    }
   } else {
-    HeadingNode({
+    {
       id: 999,
       label: "new",
       fold: None,
       body: [],
-      setext: false,
-      closing: 0,
       children: [],
-    })
+      mark: Some(atx),
+    }
   }
 }
 
@@ -211,8 +202,8 @@ fn newborn(item : Bool) -> Node {
 fn all_ids(doc : Doc) -> Array[Int] {
   let out = []
   fn go(x : Node) {
-    out.push(id_of(x))
-    for k in children_of(x) {
+    out.push(x.id)
+    for k in x.children {
       go(k)
     }
   }
@@ -229,7 +220,7 @@ fn all_ids(doc : Doc) -> Array[Int] {
 fn morph(doc : Doc, id : Int, f : (Node) -> Node?) -> Doc {
   let roots = []
   for r in doc.roots {
-    if id_of(r.node) == id {
+    if r.node.id == id {
       match f(r.node) {
         Some(n) =>
           roots.push(
@@ -244,16 +235,18 @@ fn morph(doc : Doc, id : Int, f : (Node) -> Node?) -> Doc {
       }
     } else {
       let (kids, sides, rules) = morph_kids(
-        children_of(r.node),
+        r.node.children,
         r.sides,
         r.rules,
         id,
         f,
       )
-      if r.node is ImplicitNode(_) && kids.is_empty() {
+      if r.node.mark is None && kids.is_empty() {
         continue
       }
-      roots.push(({ node: with_children(r.node, kids), sides, rules, } : Root))
+      roots.push(
+        ({ node: { ..r.node, children: kids, }, sides, rules, } : Root),
+      )
     }
   }
   { ..doc, roots, }
@@ -273,7 +266,7 @@ fn morph_kids(
   for i, k in kids {
     let side = if i < sides.length() { sides[i] } else { Right }
     let rule = if i < rules.length() { rules[i] } else { "" }
-    if id_of(k) == id {
+    if k.id == id {
       match f(k) {
         Some(n) => {
           out.push(n)
@@ -283,11 +276,11 @@ fn morph_kids(
         None => ()
       }
     } else {
-      let (kk, _, _) = morph_kids(children_of(k), [], [], id, f)
-      if k is ImplicitNode(_) && kk.is_empty() {
+      let (kk, _, _) = morph_kids(k.children, [], [], id, f)
+      if k.mark is None && kk.is_empty() {
         continue
       }
-      out.push(with_children(k, kk))
+      out.push({ ..k, children: kk, })
       out_sides.push(side)
       out_rules.push(rule)
     }
@@ -298,7 +291,7 @@ fn morph_kids(
 ///|
 /// 子と並走する列を、子の数に合わせて切り詰める・伸ばす。
 fn[T] fit(xs : Array[T], node : Node, pad : T) -> Array[T] {
-  let n = children_of(node).length()
+  let n = node.children.length()
   Array::makei(n, i => if i < xs.length() { xs[i] } else { pad })
 }
 

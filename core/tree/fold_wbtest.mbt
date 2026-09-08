@@ -14,32 +14,24 @@ test "形が揃えば、そのノードの畳み" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "h",
-                    "fold": { "open": false, "summary": "h" },
-                    "body": [
-                      { "id": 4, "content": ["Raw", "body"], "source": "body" },
-                    ],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "h",
+                "fold": { "open": false, "summary": "h" },
+                "body": [
+                  { "id": 4, "content": ["Raw", "body"], "source": "body" },
                 ],
-              ],
-            },
-          ],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -55,30 +47,22 @@ test "summary が無くても畳み" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "h",
-                  "fold": { "open": false },
-                  "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "h",
+              "fold": { "open": false },
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -95,30 +79,22 @@ test "summary はラベルと違ってもよい" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "h",
-                    "fold": { "open": false, "summary": "x" },
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "h",
+                "fold": { "open": false, "summary": "x" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -134,42 +110,34 @@ test "中身だけ包んでいれば中身の 1 枚" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "h",
+              "body": [
                 {
-                  "id": 3,
-                  "label": "h",
-                  "body": [
+                  "id": 4,
+                  "content": [
+                    "Details",
                     {
-                      "id": 4,
-                      "content": [
-                        "Details",
-                        {
-                          "text": "<details>\n\nbody\n\n</details>",
-                          "open": false,
-                          "body": "body",
-                        },
-                      ],
-                      "source": "<details>\n\nbody\n\n</details>",
+                      "text": "<details>\n\nbody\n\n</details>",
+                      "open": false,
+                      "body": "body",
                     },
                   ],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
+                  "source": "<details>\n\nbody\n\n</details>",
                 },
               ],
-            ],
-          },
-        ],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -184,30 +152,26 @@ test "2 ノード分を包んでいれば中身" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [
-              {
-                "id": 3,
-                "content": [
-                  "Details",
-                  {
-                    "text": "<details>\n\n## h\n\n## h2\n\n</details>",
-                    "open": false,
-                    "body": "## h\n\n## h2",
-                  },
-                ],
-                "source": "<details>\n\n## h\n\n## h2\n\n</details>",
-              },
-            ],
-            "setext": false,
-            "closing": 0,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [
+            {
+              "id": 3,
+              "content": [
+                "Details",
+                {
+                  "text": "<details>\n\n## h\n\n## h2\n\n</details>",
+                  "open": false,
+                  "body": "## h\n\n## h2",
+                },
+              ],
+              "source": "<details>\n\n## h\n\n## h2\n\n</details>",
+            },
+          ],
+          "children": [],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -221,30 +185,26 @@ test "最初が段落なら中身" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [
-              {
-                "id": 3,
-                "content": [
-                  "Details",
-                  {
-                    "text": "<details>\n\nbodya\n\n# head\n\n</details>",
-                    "open": false,
-                    "body": "bodya\n\n# head",
-                  },
-                ],
-                "source": "<details>\n\nbodya\n\n# head\n\n</details>",
-              },
-            ],
-            "setext": false,
-            "closing": 0,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [
+            {
+              "id": 3,
+              "content": [
+                "Details",
+                {
+                  "text": "<details>\n\nbodya\n\n# head\n\n</details>",
+                  "open": false,
+                  "body": "bodya\n\n# head",
+                },
+              ],
+              "source": "<details>\n\nbodya\n\n# head\n\n</details>",
+            },
+          ],
+          "children": [],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -259,30 +219,26 @@ test "空行なしで 1 塊なら中身" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [
-              {
-                "id": 3,
-                "content": [
-                  "Details",
-                  {
-                    "text": "<details>\n## h\n</details>",
-                    "open": false,
-                    "body": "## h",
-                  },
-                ],
-                "source": "<details>\n## h\n</details>",
-              },
-            ],
-            "setext": false,
-            "closing": 0,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [
+            {
+              "id": 3,
+              "content": [
+                "Details",
+                {
+                  "text": "<details>\n## h\n</details>",
+                  "open": false,
+                  "body": "## h",
+                },
+              ],
+              "source": "<details>\n## h\n</details>",
+            },
+          ],
+          "children": [],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -297,35 +253,23 @@ test "閉じの無い開きはただの文字" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [
-              {
-                "id": 3,
-                "content": ["Raw", "<details>"],
-                "source": "<details>",
-              },
-            ],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
-                {
-                  "id": 4,
-                  "label": "h",
-                  "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [
+            { "id": 3, "content": ["Raw", "<details>"], "source": "<details>" },
+          ],
+          "children": [
+            {
+              "id": 4,
+              "label": "h",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -339,23 +283,19 @@ test "相手の居ない閉じもただの文字" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [
-              {
-                "id": 3,
-                "content": ["Raw", "</details>"],
-                "source": "</details>",
-              },
-            ],
-            "setext": false,
-            "closing": 0,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [
+            {
+              "id": 3,
+              "content": ["Raw", "</details>"],
+              "source": "</details>",
+            },
+          ],
+          "children": [],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -374,41 +314,29 @@ test "畳みの後ろは元の深さに戻る" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "h",
-                    "fold": { "open": false, "summary": "h" },
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-                [
-                  "HeadingNode",
-                  {
-                    "id": 4,
-                    "label": "b",
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "h",
+                "fold": { "open": false, "summary": "h" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+              {
+                "id": 4,
+                "label": "b",
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right", "Right"],
           "rules": ["", ""],
         },
@@ -425,31 +353,22 @@ test "項目も定義ごと包める" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "ListNode",
-                  {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": false, "summary": "a" },
-                    "body": [],
-                    "marker": "-",
-                    "offset": 2,
-                    "loose": false,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": false, "summary": "a" },
+                "body": [],
+                "children": [],
+                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -467,30 +386,26 @@ test "開きに飲み込まれた行があれば中身" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [
-              {
-                "id": 3,
-                "content": [
-                  "Details",
-                  {
-                    "text": "<details>\n### x\n\n## y\n</details>",
-                    "open": false,
-                    "body": "### x\n\n## y",
-                  },
-                ],
-                "source": "<details>\n### x\n\n## y\n</details>",
-              },
-            ],
-            "setext": false,
-            "closing": 0,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [
+            {
+              "id": 3,
+              "content": [
+                "Details",
+                {
+                  "text": "<details>\n### x\n\n## y\n</details>",
+                  "open": false,
+                  "body": "### x\n\n## y",
+                },
+              ],
+              "source": "<details>\n### x\n\n## y\n</details>",
+            },
+          ],
+          "children": [],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -518,43 +433,31 @@ test "入れ子の畳みも畳み" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": false, "summary": "a" },
+                "body": [],
+                "children": [
                   {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": false, "summary": "a" },
+                    "id": 4,
+                    "label": "a1",
+                    "fold": { "open": false, "summary": "a1" },
                     "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [
-                      [
-                        "HeadingNode",
-                        {
-                          "id": 4,
-                          "label": "a1",
-                          "fold": { "open": false, "summary": "a1" },
-                          "body": [],
-                          "setext": false,
-                          "closing": 0,
-                          "children": [],
-                        },
-                      ],
-                    ],
+                    "children": [],
+                    "mark": ["Heading", { "setext": false, "closing": 0 }],
                   },
                 ],
-              ],
-            },
-          ],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -576,43 +479,31 @@ test "重なった閉じはほどいて読む" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "x",
+                "fold": { "open": false, "summary": "x" },
+                "body": [],
+                "children": [
                   {
-                    "id": 3,
-                    "label": "x",
-                    "fold": { "open": false, "summary": "x" },
+                    "id": 4,
+                    "label": "y",
+                    "fold": { "open": false, "summary": "y" },
                     "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [
-                      [
-                        "HeadingNode",
-                        {
-                          "id": 4,
-                          "label": "y",
-                          "fold": { "open": false, "summary": "y" },
-                          "body": [],
-                          "setext": false,
-                          "closing": 0,
-                          "children": [],
-                        },
-                      ],
-                    ],
+                    "children": [],
+                    "mark": ["Heading", { "setext": false, "closing": 0 }],
                   },
                 ],
-              ],
-            },
-          ],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -631,30 +522,22 @@ test "open は畳みに持つ" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "h",
-                    "fold": { "open": true, "summary": "h" },
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "h",
+                "fold": { "open": true, "summary": "h" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -675,31 +558,27 @@ test "知らない属性が付いていれば中身" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>",
-                      "open": false,
-                      "summary": "h",
-                      "body": "## h",
-                    },
-                  ],
-                  "source": "<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>",
+                    "open": false,
+                    "summary": "h",
+                    "body": "## h",
+                  },
+                ],
+                "source": "<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>",
+              },
+            ],
+            "children": [],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": [],
           "rules": [],
         },
@@ -720,30 +599,26 @@ test "重なった開きは中身" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>",
-                      "open": false,
-                      "body": "<details>\n<summary>h</summary>\n\n## h\n\n</details>",
-                    },
-                  ],
-                  "source": "<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>",
+                    "open": false,
+                    "body": "<details>\n<summary>h</summary>\n\n## h\n\n</details>",
+                  },
+                ],
+                "source": "<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>",
+              },
+            ],
+            "children": [],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": [],
           "rules": [],
         },
@@ -761,31 +636,22 @@ test "項目の畳みにも open が付く" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "ListNode",
-                  {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": true, "summary": "a" },
-                    "body": [],
-                    "marker": "-",
-                    "offset": 2,
-                    "loose": false,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": true, "summary": "a" },
+                "body": [],
+                "children": [],
+                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -805,43 +671,31 @@ test "内側だけ open" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": false, "summary": "a" },
+                "body": [],
+                "children": [
                   {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": false, "summary": "a" },
+                    "id": 4,
+                    "label": "a1",
+                    "fold": { "open": true, "summary": "a1" },
                     "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [
-                      [
-                        "HeadingNode",
-                        {
-                          "id": 4,
-                          "label": "a1",
-                          "fold": { "open": true, "summary": "a1" },
-                          "body": [],
-                          "setext": false,
-                          "closing": 0,
-                          "children": [],
-                        },
-                      ],
-                    ],
+                    "children": [],
+                    "mark": ["Heading", { "setext": false, "closing": 0 }],
                   },
                 ],
-              ],
-            },
-          ],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -861,43 +715,31 @@ test "同じ行に重なった閉じもほどく" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "x",
+                "fold": { "open": false, "summary": "x" },
+                "body": [],
+                "children": [
                   {
-                    "id": 3,
-                    "label": "x",
-                    "fold": { "open": false, "summary": "x" },
+                    "id": 4,
+                    "label": "y",
+                    "fold": { "open": false, "summary": "y" },
                     "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [
-                      [
-                        "HeadingNode",
-                        {
-                          "id": 4,
-                          "label": "y",
-                          "fold": { "open": false, "summary": "y" },
-                          "body": [],
-                          "setext": false,
-                          "closing": 0,
-                          "children": [],
-                        },
-                      ],
-                    ],
+                    "children": [],
+                    "mark": ["Heading", { "setext": false, "closing": 0 }],
                   },
                 ],
-              ],
-            },
-          ],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -916,56 +758,40 @@ test "3 段の重なりもほどく" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "x",
+                "fold": { "open": false, "summary": "x" },
+                "body": [],
+                "children": [
                   {
-                    "id": 3,
-                    "label": "x",
-                    "fold": { "open": false, "summary": "x" },
+                    "id": 4,
+                    "label": "y",
+                    "fold": { "open": false, "summary": "y" },
                     "body": [],
-                    "setext": false,
-                    "closing": 0,
                     "children": [
-                      [
-                        "HeadingNode",
-                        {
-                          "id": 4,
-                          "label": "y",
-                          "fold": { "open": false, "summary": "y" },
-                          "body": [],
-                          "setext": false,
-                          "closing": 0,
-                          "children": [
-                            [
-                              "HeadingNode",
-                              {
-                                "id": 5,
-                                "label": "z",
-                                "fold": { "open": false, "summary": "z" },
-                                "body": [],
-                                "setext": false,
-                                "closing": 0,
-                                "children": [],
-                              },
-                            ],
-                          ],
-                        },
-                      ],
+                      {
+                        "id": 5,
+                        "label": "z",
+                        "fold": { "open": false, "summary": "z" },
+                        "body": [],
+                        "children": [],
+                        "mark": ["Heading", { "setext": false, "closing": 0 }],
+                      },
                     ],
+                    "mark": ["Heading", { "setext": false, "closing": 0 }],
                   },
                 ],
-              ],
-            },
-          ],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -986,31 +812,27 @@ test "落とせない閉じに頼る畳みは立たない" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>",
-                      "open": false,
-                      "summary": "y",
-                      "body": "## y",
-                    },
-                  ],
-                  "source": "<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>",
+                    "open": false,
+                    "summary": "y",
+                    "body": "## y",
+                  },
+                ],
+                "source": "<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>",
+              },
+            ],
+            "children": [],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": [],
           "rules": [],
         },
@@ -1030,30 +852,22 @@ test "summary は原文のまま持つ" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "**h**",
-                    "fold": { "open": false, "summary": "**h**" },
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "**h**",
+                "fold": { "open": false, "summary": "**h**" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -1070,30 +884,22 @@ test "記法つきのラベルと違う summary も持つ" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "**h**",
-                    "fold": { "open": false, "summary": "h" },
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "**h**",
+                "fold": { "open": false, "summary": "h" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -1111,30 +917,22 @@ test "1 行に書いた開きと名前も畳み" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": false, "summary": "a" },
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": false, "summary": "a" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -1154,42 +952,30 @@ test "兄弟の畳みは両方立つ" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": false, "summary": "a" },
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-                [
-                  "HeadingNode",
-                  {
-                    "id": 4,
-                    "label": "b",
-                    "fold": { "open": false, "summary": "b" },
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": false, "summary": "a" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+              {
+                "id": 4,
+                "label": "b",
+                "fold": { "open": false, "summary": "b" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right", "Right"],
           "rules": ["", ""],
         },
@@ -1206,41 +992,33 @@ test "名前が違うタグは畳みの開きではない" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [
-              {
-                "id": 3,
-                "content": ["Raw", "<details-x>"],
-                "source": "<details-x>",
-              },
-            ],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [
+            {
+              "id": 3,
+              "content": ["Raw", "<details-x>"],
+              "source": "<details-x>",
+            },
+          ],
+          "children": [
+            {
+              "id": 4,
+              "label": "a",
+              "body": [
                 {
-                  "id": 4,
-                  "label": "a",
-                  "body": [
-                    {
-                      "id": 5,
-                      "content": ["Raw", "</details>"],
-                      "source": "</details>",
-                    },
-                  ],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
+                  "id": 5,
+                  "content": ["Raw", "</details>"],
+                  "source": "</details>",
                 },
               ],
-            ],
-          },
-        ],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -1260,31 +1038,27 @@ test "summary が 2 枚なら中身" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n<summary>h</summary>\n<summary>ZZZ</summary>\n\n## h\n\n</details>",
-                      "open": false,
-                      "summary": "h",
-                      "body": "<summary>ZZZ</summary>\n\n## h",
-                    },
-                  ],
-                  "source": "<details>\n<summary>h</summary>\n<summary>ZZZ</summary>\n\n## h\n\n</details>",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n<summary>h</summary>\n<summary>ZZZ</summary>\n\n## h\n\n</details>",
+                    "open": false,
+                    "summary": "h",
+                    "body": "<summary>ZZZ</summary>\n\n## h",
+                  },
+                ],
+                "source": "<details>\n<summary>h</summary>\n<summary>ZZZ</summary>\n\n## h\n\n</details>",
+              },
+            ],
+            "children": [],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": [],
           "rules": [],
         },
@@ -1304,31 +1078,27 @@ test "閉じの塊に地の文が続けば中身" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n<summary>h</summary>\n\n## h\n\n</details>\ntail",
-                      "open": false,
-                      "summary": "h",
-                      "body": "## h",
-                    },
-                  ],
-                  "source": "<details>\n<summary>h</summary>\n\n## h\n\n</details>\ntail",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n<summary>h</summary>\n\n## h\n\n</details>\ntail",
+                    "open": false,
+                    "summary": "h",
+                    "body": "## h",
+                  },
+                ],
+                "source": "<details>\n<summary>h</summary>\n\n## h\n\n</details>\ntail",
+              },
+            ],
+            "children": [],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": [],
           "rules": [],
         },
@@ -1346,32 +1116,28 @@ test "項目の畳みも領域の後ろを見る" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n<summary>a</summary>\n\n- a\n\n</details>",
-                      "open": false,
-                      "summary": "a",
-                      "body": "- a",
-                    },
-                  ],
-                  "source": "<details>\n<summary>a</summary>\n\n- a\n\n</details>",
-                },
-                { "id": 4, "content": ["Raw", "x"], "source": "x" },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n<summary>a</summary>\n\n- a\n\n</details>",
+                    "open": false,
+                    "summary": "a",
+                    "body": "- a",
+                  },
+                ],
+                "source": "<details>\n<summary>a</summary>\n\n- a\n\n</details>",
+              },
+              { "id": 4, "content": ["Raw", "x"], "source": "x" },
+            ],
+            "children": [],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": [],
           "rules": [],
         },
@@ -1392,38 +1158,30 @@ test "script の中の閉じは綴りではない" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": false, "summary": "a" },
+                "body": [
                   {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": false, "summary": "a" },
-                    "body": [
-                      {
-                        "id": 4,
-                        "content": [
-                          "Raw", "<script>\nvar x = \"</details>\";\n</script>",
-                        ],
-                        "source": "<script>\nvar x = \"</details>\";\n</script>",
-                      },
+                    "id": 4,
+                    "content": [
+                      "Raw", "<script>\nvar x = \"</details>\";\n</script>",
                     ],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
+                    "source": "<script>\nvar x = \"</details>\";\n</script>",
                   },
                 ],
-              ],
-            },
-          ],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -1443,36 +1201,28 @@ test "コメントの中の閉じは綴りではない" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": false, "summary": "a" },
+                "body": [
                   {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": false, "summary": "a" },
-                    "body": [
-                      {
-                        "id": 4,
-                        "content": ["Raw", "<!-- </details> -->"],
-                        "source": "<!-- </details> -->",
-                      },
-                    ],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
+                    "id": 4,
+                    "content": ["Raw", "<!-- </details> -->"],
+                    "source": "<!-- </details> -->",
                   },
                 ],
-              ],
-            },
-          ],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -1494,31 +1244,27 @@ test "境界の水平線が領域の中にあれば中身" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n<summary>a</summary>\n\n## a\n\n---\n\n### x\n\n</details>",
-                      "open": false,
-                      "summary": "a",
-                      "body": "## a\n\n---\n\n### x",
-                    },
-                  ],
-                  "source": "<details>\n<summary>a</summary>\n\n## a\n\n---\n\n### x\n\n</details>",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n<summary>a</summary>\n\n## a\n\n---\n\n### x\n\n</details>",
+                    "open": false,
+                    "summary": "a",
+                    "body": "## a\n\n---\n\n### x",
+                  },
+                ],
+                "source": "<details>\n<summary>a</summary>\n\n## a\n\n---\n\n### x\n\n</details>",
+              },
+            ],
+            "children": [],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": [],
           "rules": [],
         },
@@ -1538,33 +1284,25 @@ test "飾りの水平線が領域の中なら畳み" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": false, "summary": "a" },
-                    "body": [
-                      { "id": 4, "content": ["Raw", "body"], "source": "body" },
-                      { "id": 5, "content": "ThematicBreak", "source": "---" },
-                    ],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": false, "summary": "a" },
+                "body": [
+                  { "id": 4, "content": ["Raw", "body"], "source": "body" },
+                  { "id": 5, "content": "ThematicBreak", "source": "---" },
                 ],
-              ],
-            },
-          ],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -1584,41 +1322,29 @@ test "境界の水平線が閉じの直後なら畳み" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": false, "summary": "a" },
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-                [
-                  "HeadingNode",
-                  {
-                    "id": 4,
-                    "label": "b",
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": false, "summary": "a" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+              {
+                "id": 4,
+                "label": "b",
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right", "Left"],
           "rules": ["", "---"],
         },
@@ -1638,37 +1364,33 @@ test "飾りの水平線が閉じの直後なら中身" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n<summary>a</summary>\n\n## a\n\n</details>",
-                      "open": false,
-                      "summary": "a",
-                      "body": "## a",
-                    },
-                  ],
-                  "source": "<details>\n<summary>a</summary>\n\n## a\n\n</details>",
-                },
-                { "id": 4, "content": "ThematicBreak", "source": "---" },
-                {
-                  "id": 5,
-                  "content": ["Raw", "some text"],
-                  "source": "some text",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n<summary>a</summary>\n\n## a\n\n</details>",
+                    "open": false,
+                    "summary": "a",
+                    "body": "## a",
+                  },
+                ],
+                "source": "<details>\n<summary>a</summary>\n\n## a\n\n</details>",
+              },
+              { "id": 4, "content": "ThematicBreak", "source": "---" },
+              {
+                "id": 5,
+                "content": ["Raw", "some text"],
+                "source": "some text",
+              },
+            ],
+            "children": [],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": [],
           "rules": [],
         },
@@ -1688,50 +1410,37 @@ test "飛びが領域の中でも畳み" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": false, "summary": "a" },
+                "body": [],
+                "children": [
                   {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": false, "summary": "a" },
+                    "id": 4,
+                    "label": "",
                     "body": [],
-                    "setext": false,
-                    "closing": 0,
                     "children": [
-                      [
-                        "ImplicitNode",
-                        {
-                          "id": 4,
-                          "children": [
-                            [
-                              "HeadingNode",
-                              {
-                                "id": 5,
-                                "label": "deep",
-                                "body": [],
-                                "setext": false,
-                                "closing": 0,
-                                "children": [],
-                              },
-                            ],
-                          ],
-                        },
-                      ],
+                      {
+                        "id": 5,
+                        "label": "deep",
+                        "body": [],
+                        "children": [],
+                        "mark": ["Heading", { "setext": false, "closing": 0 }],
+                      },
                     ],
                   },
                 ],
-              ],
-            },
-          ],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -1752,44 +1461,40 @@ test "後ろの領域が立たなければ跨がない" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "a",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
-                      "open": false,
-                      "summary": "b",
-                      "body": "## b",
-                    },
-                  ],
-                  "source": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
-                },
-                {
-                  "id": 4,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details class=\"z\">\n<summary>c</summary>\n\n## c\n\n</details>",
-                      "open": false,
-                      "summary": "c",
-                      "body": "## c",
-                    },
-                  ],
-                  "source": "<details class=\"z\">\n<summary>c</summary>\n\n## c\n\n</details>",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "a",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                    "open": false,
+                    "summary": "b",
+                    "body": "## b",
+                  },
+                ],
+                "source": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+              },
+              {
+                "id": 4,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details class=\"z\">\n<summary>c</summary>\n\n## c\n\n</details>",
+                    "open": false,
+                    "summary": "c",
+                    "body": "## c",
+                  },
+                ],
+                "source": "<details class=\"z\">\n<summary>c</summary>\n\n## c\n\n</details>",
+              },
+            ],
+            "children": [],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": [],
           "rules": [],
         },
@@ -1808,48 +1513,40 @@ test "後ろの迷子のタグは跨がない" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "a",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
-                      "open": false,
-                      "summary": "b",
-                      "body": "## b",
-                    },
-                  ],
-                  "source": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
-                },
-                {
-                  "id": 4,
-                  "content": ["Raw", "<details>"],
-                  "source": "<details>",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "a",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
                   {
-                    "id": 5,
-                    "label": "c",
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
+                    "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                    "open": false,
+                    "summary": "b",
+                    "body": "## b",
                   },
                 ],
-              ],
-            },
-          ],
+                "source": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+              },
+              {
+                "id": 4,
+                "content": ["Raw", "<details>"],
+                "source": "<details>",
+              },
+            ],
+            "children": [
+              {
+                "id": 5,
+                "label": "c",
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -1870,32 +1567,28 @@ test "末尾の飾りの水平線は跨がない" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "a",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
-                      "open": false,
-                      "summary": "b",
-                      "body": "## b",
-                    },
-                  ],
-                  "source": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
-                },
-                { "id": 4, "content": "ThematicBreak", "source": "---" },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "a",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+                    "open": false,
+                    "summary": "b",
+                    "body": "## b",
+                  },
+                ],
+                "source": "<details>\n<summary>b</summary>\n\n## b\n\n</details>",
+              },
+              { "id": 4, "content": "ThematicBreak", "source": "---" },
+            ],
+            "children": [],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": [],
           "rules": [],
         },
@@ -1916,54 +1609,36 @@ test "畳みの前の境界は空打ちでも境界のまま" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "a",
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-                [
-                  "ListNode",
-                  {
-                    "id": 4,
-                    "label": "c",
-                    "fold": { "open": false, "summary": "c" },
-                    "body": [],
-                    "marker": "-",
-                    "offset": 2,
-                    "loose": false,
-                    "children": [],
-                  },
-                ],
-                [
-                  "ListNode",
-                  {
-                    "id": 5,
-                    "label": "e",
-                    "body": [],
-                    "marker": "-",
-                    "offset": 2,
-                    "loose": false,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+              {
+                "id": 4,
+                "label": "c",
+                "fold": { "open": false, "summary": "c" },
+                "body": [],
+                "children": [],
+                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+              },
+              {
+                "id": 5,
+                "label": "e",
+                "body": [],
+                "children": [],
+                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right", "Left", "Left"],
           "rules": ["", "---", ""],
         },
@@ -1980,35 +1655,27 @@ test "svg の中のタグは綴りではない" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "h",
+              "body": [
                 {
-                  "id": 3,
-                  "label": "h",
-                  "body": [
-                    {
-                      "id": 4,
-                      "content": ["Svg", "<svg><details>a</details></svg>\n"],
-                      "source": "<svg><details>a</details></svg>",
-                    },
-                  ],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
+                  "id": 4,
+                  "content": ["Svg", "<svg><details>a</details></svg>\n"],
+                  "source": "<svg><details>a</details></svg>",
                 },
               ],
-            ],
-          },
-        ],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -2027,36 +1694,28 @@ test "擬似コメントの中の閉じは綴りではない" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "h",
+                "fold": { "open": false, "summary": "h" },
+                "body": [
                   {
-                    "id": 3,
-                    "label": "h",
-                    "fold": { "open": false, "summary": "h" },
-                    "body": [
-                      {
-                        "id": 4,
-                        "content": ["Raw", "<?x </details> ?>"],
-                        "source": "<?x </details> ?>",
-                      },
-                    ],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
+                    "id": 4,
+                    "content": ["Raw", "<?x </details> ?>"],
+                    "source": "<?x </details> ?>",
                   },
                 ],
-              ],
-            },
-          ],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -2077,59 +1736,47 @@ test "pre は生テキストではない" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [
-                {
-                  "id": 3,
-                  "content": ["Raw", "<details>\n<summary>h</summary>"],
-                  "source": "<details>\n<summary>h</summary>",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [
+              {
+                "id": 3,
+                "content": ["Raw", "<details>\n<summary>h</summary>"],
+                "source": "<details>\n<summary>h</summary>",
+              },
+            ],
+            "children": [
+              {
+                "id": 4,
+                "label": "h",
+                "body": [
                   {
-                    "id": 4,
-                    "label": "h",
-                    "body": [
+                    "id": 5,
+                    "content": [
+                      "Details",
                       {
-                        "id": 5,
-                        "content": [
-                          "Details",
-                          {
-                            "text": "<pre><details></pre>\n\n</details>",
-                            "open": false,
-                            "body": "</pre>",
-                          },
-                        ],
-                        "source": "<pre><details></pre>\n\n</details>",
+                        "text": "<pre><details></pre>\n\n</details>",
+                        "open": false,
+                        "body": "</pre>",
                       },
                     ],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
+                    "source": "<pre><details></pre>\n\n</details>",
                   },
                 ],
-                [
-                  "HeadingNode",
-                  {
-                    "id": 6,
-                    "label": "h2",
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+              {
+                "id": 6,
+                "label": "h2",
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right", "Right"],
           "rules": ["", ""],
         },
@@ -2148,31 +1795,27 @@ test "= の後ろでない引用符は囲みを始めない" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details \"x>\n<summary>h</summary>\n\n## h\n\n</details>",
-                      "open": false,
-                      "summary": "h",
-                      "body": "## h",
-                    },
-                  ],
-                  "source": "<details \"x>\n<summary>h</summary>\n\n## h\n\n</details>",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  {
+                    "text": "<details \"x>\n<summary>h</summary>\n\n## h\n\n</details>",
+                    "open": false,
+                    "summary": "h",
+                    "body": "## h",
+                  },
+                ],
+                "source": "<details \"x>\n<summary>h</summary>\n\n## h\n\n</details>",
+              },
+            ],
+            "children": [],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": [],
           "rules": [],
         },
@@ -2195,73 +1838,56 @@ test "落ちない綴りの塊は深さでも跨がない" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n\n## s\n\n---\n\n<summary>z</summary>\n\n</details>",
-                      "open": false,
-                      "summary": "z",
-                      "body": "",
-                    },
-                  ],
-                  "source": "<details>\n\n## s\n\n---\n\n<summary>z</summary>\n\n</details>",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "ImplicitNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
                   {
-                    "id": 4,
-                    "children": [
-                      [
-                        "HeadingNode",
-                        {
-                          "id": 5,
-                          "label": "a",
-                          "body": [],
-                          "setext": false,
-                          "closing": 0,
-                          "children": [],
-                        },
-                      ],
-                      [
-                        "HeadingNode",
-                        {
-                          "id": 6,
-                          "label": "b",
-                          "body": [],
-                          "setext": false,
-                          "closing": 0,
-                          "children": [],
-                        },
-                      ],
-                    ],
+                    "text": "<details>\n\n## s\n\n---\n\n<summary>z</summary>\n\n</details>",
+                    "open": false,
+                    "summary": "z",
+                    "body": "",
                   },
                 ],
-                [
-                  "HeadingNode",
+                "source": "<details>\n\n## s\n\n---\n\n<summary>z</summary>\n\n</details>",
+              },
+            ],
+            "children": [
+              {
+                "id": 4,
+                "label": "",
+                "body": [],
+                "children": [
                   {
-                    "id": 7,
-                    "label": "t",
+                    "id": 5,
+                    "label": "a",
                     "body": [],
-                    "setext": false,
-                    "closing": 0,
                     "children": [],
+                    "mark": ["Heading", { "setext": false, "closing": 0 }],
+                  },
+                  {
+                    "id": 6,
+                    "label": "b",
+                    "body": [],
+                    "children": [],
+                    "mark": ["Heading", { "setext": false, "closing": 0 }],
                   },
                 ],
-              ],
-            },
-          ],
+              },
+              {
+                "id": 7,
+                "label": "t",
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right", "Right"],
           "rules": ["", ""],
         },
@@ -2283,64 +1909,47 @@ test "入れ子項目を含む塊でも、持ち主の深さで測る" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "h",
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+              {
+                "id": 4,
+                "label": "a",
+                "fold": { "open": false },
+                "body": [],
+                "children": [
                   {
-                    "id": 3,
-                    "label": "h",
+                    "id": 5,
+                    "label": "b",
                     "body": [],
-                    "setext": false,
-                    "closing": 0,
                     "children": [],
-                  },
-                ],
-                [
-                  "ListNode",
-                  {
-                    "id": 4,
-                    "label": "a",
-                    "fold": { "open": false },
-                    "body": [],
-                    "marker": "-",
-                    "offset": 2,
-                    "loose": false,
-                    "children": [
-                      {
-                        "id": 5,
-                        "label": "b",
-                        "body": [],
-                        "marker": "-",
-                        "offset": 2,
-                        "loose": false,
-                        "children": [],
-                      },
+                    "mark": [
+                      "Item",
+                      { "marker": "-", "offset": 2, "loose": false },
                     ],
                   },
                 ],
-                [
-                  "ListNode",
-                  {
-                    "id": 6,
-                    "label": "c",
-                    "body": [],
-                    "marker": "-",
-                    "offset": 2,
-                    "loose": false,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+              },
+              {
+                "id": 6,
+                "label": "c",
+                "body": [],
+                "children": [],
+                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right", "Left", "Left"],
           "rules": ["", "---", ""],
         },
@@ -2360,42 +1969,34 @@ test "領域の中の境界が外の骨格を引き出せば中身" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [
-                {
-                  "id": 3,
-                  "content": [
-                    "Details",
-                    {
-                      "text": "<details>\n\n## a\n\n---\n\n</details>",
-                      "open": false,
-                      "body": "## a\n\n---",
-                    },
-                  ],
-                  "source": "<details>\n\n## a\n\n---\n\n</details>",
-                },
-              ],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
                   {
-                    "id": 4,
-                    "label": "b",
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
+                    "text": "<details>\n\n## a\n\n---\n\n</details>",
+                    "open": false,
+                    "body": "## a\n\n---",
                   },
                 ],
-              ],
-            },
-          ],
+                "source": "<details>\n\n## a\n\n---\n\n</details>",
+              },
+            ],
+            "children": [
+              {
+                "id": 4,
+                "label": "b",
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -2416,41 +2017,29 @@ test "閉じの直後の水平線が続いても境界" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": false, "summary": "a" },
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-                [
-                  "HeadingNode",
-                  {
-                    "id": 4,
-                    "label": "b",
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": false, "summary": "a" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+              {
+                "id": 4,
+                "label": "b",
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right", "Left"],
           "rules": ["", "---"],
         },
@@ -2469,30 +2058,22 @@ test "タブで繋いだ開きと名前も畳み" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "a",
-                    "fold": { "open": false, "summary": "s" },
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "a",
+                "fold": { "open": false, "summary": "s" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -2513,43 +2094,35 @@ test "中身の Details は open と summary と中身を読む" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "r",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
+          "node": {
+            "id": 2,
+            "label": "r",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "h",
+                "body": [
                   {
-                    "id": 3,
-                    "label": "h",
-                    "body": [
+                    "id": 4,
+                    "content": [
+                      "Details",
                       {
-                        "id": 4,
-                        "content": [
-                          "Details",
-                          {
-                            "text": "<details open>\n<summary>s</summary>\n\nbody\n\nmore\n\n</details>",
-                            "open": true,
-                            "summary": "s",
-                            "body": "body\n\nmore",
-                          },
-                        ],
-                        "source": "<details open>\n<summary>s</summary>\n\nbody\n\nmore\n\n</details>",
+                        "text": "<details open>\n<summary>s</summary>\n\nbody\n\nmore\n\n</details>",
+                        "open": true,
+                        "summary": "s",
+                        "body": "body\n\nmore",
                       },
                     ],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
+                    "source": "<details open>\n<summary>s</summary>\n\nbody\n\nmore\n\n</details>",
                   },
                 ],
-              ],
-            },
-          ],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Right"],
           "rules": [""],
         },
@@ -2570,38 +2143,29 @@ test "項目の中の畳みは、兄弟の項目が続いても立つ" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "ListNode",
-            {
-              "id": 2,
-              "label": "a",
-              "body": [],
-              "marker": "-",
-              "offset": 2,
-              "loose": false,
-              "children": [
-                {
-                  "id": 3,
-                  "label": "b",
-                  "fold": { "open": false, "summary": "b" },
-                  "body": [],
-                  "marker": "-",
-                  "offset": 2,
-                  "loose": false,
-                  "children": [],
-                },
-                {
-                  "id": 4,
-                  "label": "c",
-                  "body": [],
-                  "marker": "-",
-                  "offset": 2,
-                  "loose": false,
-                  "children": [],
-                },
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "a",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "b",
+                "fold": { "open": false, "summary": "b" },
+                "body": [],
+                "children": [],
+                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+              },
+              {
+                "id": 4,
+                "label": "c",
+                "body": [],
+                "children": [],
+                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+              },
+            ],
+            "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+          },
           "sides": ["Right", "Right"],
           "rules": ["", ""],
         },

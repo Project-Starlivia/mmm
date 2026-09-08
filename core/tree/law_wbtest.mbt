@@ -9,28 +9,21 @@ test "単調性 — 項目の中の見出しは項目として子になる" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "body": [],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [
-              {
-                "id": 3,
-                "label": "x",
-                "body": [],
-                "marker": "-",
-                "offset": 2,
-                "loose": false,
-                "children": [],
-              },
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "a",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "x",
+              "body": [],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+          ],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -45,33 +38,24 @@ test "単調性 — 列 0 の見出しは項目を閉じる" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "body": [],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "a",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 3,
-            "label": "x",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 3,
+          "label": "x",
+          "body": [],
+          "children": [],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -87,41 +71,28 @@ test "順序法則 — 項目のあとの見出しは兄弟になる" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "ListNode",
-                {
-                  "id": 3,
-                  "label": "b",
-                  "body": [],
-                  "marker": "-",
-                  "offset": 2,
-                  "loose": false,
-                  "children": [],
-                },
-              ],
-              [
-                "HeadingNode",
-                {
-                  "id": 4,
-                  "label": "a",
-                  "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "b",
+              "body": [],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+            {
+              "id": 4,
+              "label": "a",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right", "Right"],
         "rules": ["", ""],
       },
@@ -137,42 +108,32 @@ test "順序法則 — 見出しのあとの項目は子になる" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "a",
+              "body": [],
+              "children": [
                 {
-                  "id": 3,
-                  "label": "a",
+                  "id": 4,
+                  "label": "b",
                   "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [
-                    [
-                      "ListNode",
-                      {
-                        "id": 4,
-                        "label": "b",
-                        "body": [],
-                        "marker": "-",
-                        "offset": 2,
-                        "loose": false,
-                        "children": [],
-                      },
-                    ],
+                  "children": [],
+                  "mark": [
+                    "Item",
+                    { "marker": "-", "offset": 2, "loose": false },
                   ],
                 },
               ],
-            ],
-          },
-        ],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -189,49 +150,35 @@ test "単調性 — 深い見出しも項目の下へ潜らない" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "ListNode",
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "b",
+              "body": [],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+            {
+              "id": 4,
+              "label": "",
+              "body": [],
+              "children": [
                 {
-                  "id": 3,
-                  "label": "b",
+                  "id": 5,
+                  "label": "x",
                   "body": [],
-                  "marker": "-",
-                  "offset": 2,
-                  "loose": false,
                   "children": [],
+                  "mark": ["Heading", { "setext": false, "closing": 0 }],
                 },
               ],
-              [
-                "ImplicitNode",
-                {
-                  "id": 4,
-                  "children": [
-                    [
-                      "HeadingNode",
-                      {
-                        "id": 5,
-                        "label": "x",
-                        "body": [],
-                        "setext": false,
-                        "closing": 0,
-                        "children": [],
-                      },
-                    ],
-                  ],
-                },
-              ],
-            ],
-          },
-        ],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right", "Right"],
         "rules": ["", ""],
       },
@@ -245,49 +192,38 @@ test "単調性 — 項目の根の下にも潜らない" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "body": [],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "a",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
       {
-        "node": [
-          "ImplicitNode",
-          {
-            "id": 3,
-            "children": [
-              [
-                "ImplicitNode",
+        "node": {
+          "id": 3,
+          "label": "",
+          "body": [],
+          "children": [
+            {
+              "id": 4,
+              "label": "",
+              "body": [],
+              "children": [
                 {
-                  "id": 4,
-                  "children": [
-                    [
-                      "HeadingNode",
-                      {
-                        "id": 5,
-                        "label": "x",
-                        "body": [],
-                        "setext": false,
-                        "closing": 0,
-                        "children": [],
-                      },
-                    ],
-                  ],
+                  "id": 5,
+                  "label": "x",
+                  "body": [],
+                  "children": [],
+                  "mark": ["Heading", { "setext": false, "closing": 0 }],
                 },
               ],
-            ],
-          },
-        ],
+            },
+          ],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -301,59 +237,46 @@ test "単調性 — 入れ子項目の後ろでも潜らない" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "ListNode",
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "b",
+              "body": [],
+              "children": [
                 {
-                  "id": 3,
-                  "label": "b",
+                  "id": 4,
+                  "label": "c",
                   "body": [],
-                  "marker": "-",
-                  "offset": 2,
-                  "loose": false,
-                  "children": [
-                    {
-                      "id": 4,
-                      "label": "c",
-                      "body": [],
-                      "marker": "-",
-                      "offset": 2,
-                      "loose": false,
-                      "children": [],
-                    },
+                  "children": [],
+                  "mark": [
+                    "Item",
+                    { "marker": "-", "offset": 2, "loose": false },
                   ],
                 },
               ],
-              [
-                "ImplicitNode",
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+            {
+              "id": 5,
+              "label": "",
+              "body": [],
+              "children": [
                 {
-                  "id": 5,
-                  "children": [
-                    [
-                      "HeadingNode",
-                      {
-                        "id": 6,
-                        "label": "x",
-                        "body": [],
-                        "setext": false,
-                        "closing": 0,
-                        "children": [],
-                      },
-                    ],
-                  ],
+                  "id": 6,
+                  "label": "x",
+                  "body": [],
+                  "children": [],
+                  "mark": ["Heading", { "setext": false, "closing": 0 }],
                 },
               ],
-            ],
-          },
-        ],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right", "Right"],
         "rules": ["", ""],
       },
@@ -398,32 +321,15 @@ fn written(doc : Doc) -> String {
     }
   }
 
-  fn items(xs : Array[ListNode]) -> Unit {
-    for x in xs {
-      bag.push(x.label)
-      named(x.fold)
-      blocks(x.body)
-      items(x.children)
-    }
-  }
-
   fn nodes(xs : Array[Node]) -> Unit {
     for x in xs {
-      match x {
-        HeadingNode(h) => {
-          bag.push(h.label)
-          named(h.fold)
-          blocks(h.body)
-          nodes(h.children)
-        }
-        ListNode(l) => {
-          bag.push(l.label)
-          named(l.fold)
-          blocks(l.body)
-          items(l.children)
-        }
-        ImplicitNode(g) => nodes(g.children)
+      // Implicit（綴りが無い）は行を持たないので、名前も中身も持たない
+      if x.mark is Some(_) {
+        bag.push(x.label)
+        named(x.fold)
+        blocks(x.body)
       }
+      nodes(x.children)
     }
   }
 

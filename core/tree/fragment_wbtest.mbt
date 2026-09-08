@@ -18,7 +18,7 @@ test "見出しは渡した深さから" {
 /// 入れ子は列 0 で出る。容器の桁に合わせるのは差す側の仕事
 test "項目は入れ子込み" {
   inspect(
-    fragment(item("a", children=[li("b")]), 0, [], []),
+    fragment(item("a", children=[item("b")]), 0, [], []),
     content=(
       #|- a
       #|  - b

@@ -21,62 +21,16 @@ pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
 /// 見出しにするとき、Implicit はそのまま — 省いたままで読めない席かは check と mend が見る。
 /// 決めは docs/superpowers/specs/2026-09-06-paste-design.md
 fn respell(n : @tree.Node, sign : @tree.Sign) -> @tree.Node {
-  match sign {
-    Item => @tree.ListNode(as_item(n))
-    Heading =>
-      match n {
-        HeadingNode(h) =>
-          @tree.HeadingNode({
-            ..h,
-            children: h.children.map(c => respell(c, Heading)),
-          })
-        ImplicitNode(g) =>
-          @tree.ImplicitNode({
-            ..g,
-            children: g.children.map(c => respell(c, Heading)),
-          })
-        ListNode(l) =>
-          @tree.HeadingNode({
-            id: l.id,
-            label: l.label,
-            fold: l.fold,
-            body: l.body,
-            setext: false,
-            closing: 0,
-            children: l.children.map(c => respell(@tree.ListNode(c), Heading)),
-          })
-      }
+  // **読んだ綴りは保つ。** 種類が変わるものだけ、新しく作る綴りで書く。
+  // 飛び（Implicit）は行を省けないので項目にするときだけ空の項目として綴り、
+  // 見出しにするときはそのまま（省いたままで読めない席かは check と mend が見る）
+  let mark : @tree.Mark? = match (sign, n.mark) {
+    (Item, Some(Item(..))) | (Heading, Some(Heading(..))) => n.mark
+    (Item, _) => Some(@tree.bullet)
+    (Heading, None) => None
+    (Heading, _) => Some(@tree.atx)
   }
-}
-
-///|
-/// 部分木を項目で書く。型が「項目の子孫は項目」なので、下は全部項目になる。
-fn as_item(n : @tree.Node) -> @tree.ListNode {
-  match n {
-    ListNode(l) => l
-    HeadingNode(h) =>
-      {
-        id: h.id,
-        label: h.label,
-        fold: h.fold,
-        body: h.body,
-        marker: "-",
-        offset: 2,
-        loose: false,
-        children: h.children.map(as_item),
-      }
-    ImplicitNode(g) =>
-      {
-        id: g.id,
-        label: "",
-        fold: None,
-        body: [],
-        marker: "-",
-        offset: 2,
-        loose: false,
-        children: g.children.map(as_item),
-      }
-  }
+  { ..n, mark, children: n.children.map(c => respell(c, sign)), }
 }
 
 ///|
@@ -96,13 +50,12 @@ fn cap(doc : @tree.Doc) -> @tree.Doc {
       children
     }
 
-    match n {
-      HeadingNode(h) if depth <= @tree.deepest =>
-        out.push(@tree.HeadingNode({ ..h, children: under(h.children), }))
-      ImplicitNode(g) if depth <= @tree.deepest =>
-        out.push(@tree.ImplicitNode({ ..g, children: under(g.children), }))
-      ListNode(_) => out.push(n)
-      _ => out.push(respell(n, Item))
+    if @tree.sign_of(n) is Some(Item) {
+      out.push(n)
+    } else if depth <= @tree.deepest {
+      out.push({ ..n, children: under(n.children), })
+    } else {
+      out.push(respell(n, Item))
     }
   }
 
@@ -148,7 +101,8 @@ fn mend(doc : @tree.Doc) -> @tree.Doc? {
     }
     if barren.is_empty() {
       for id in ids {
-        guard find(cur, id) is Some(ImplicitNode(g)) else { continue }
+        guard find(cur, id) is Some(g) else { continue }
+        guard g.mark is None else { continue }
         guard splice(cur, id, _ => [spell(g, "")]) is Some(d) else {
           return None
         }
@@ -164,16 +118,8 @@ fn mend(doc : @tree.Doc) -> @tree.Doc? {
 
 ///|
 /// Implicit を綴る。行を省いた空の見出しなので、名を付ければ見出しそのもの。
-fn spell(g : @tree.ImplicitNode, label : String) -> @tree.Node {
-  @tree.HeadingNode({
-    id: g.id,
-    label,
-    fold: None,
-    body: [],
-    setext: false,
-    closing: 0,
-    children: g.children,
-  })
+fn spell(g : @tree.Node, label : String) -> @tree.Node {
+  { ..g, label, mark: Some(@tree.atx), }
 }
 
 ///|
@@ -207,11 +153,8 @@ fn done(doc : @tree.Doc?, focus : Int?) -> Done? {
 /// ラベルを替える。Implicit は見出しとして綴られる。
 fn rename(doc : @tree.Doc, id : Int, label : String) -> Done? {
   guard find(doc, id) is Some(n) else { return None }
-  let m = match n {
-    HeadingNode(h) => @tree.HeadingNode({ ..h, label, })
-    ListNode(l) => @tree.ListNode({ ..l, label, })
-    ImplicitNode(g) => spell(g, label)
-  }
+  // Implicit は行を省いた空の見出しなので、名を付ければ見出しそのもの
+  let m = if n.mark is None { spell(n, label) } else { { ..n, label, } }
   done(splice(doc, id, _ => [m]), Some(id))
 }
 
@@ -227,15 +170,12 @@ fn fold(doc : @tree.Doc, id : Int, open : Bool) -> Done? {
     }
   }
 
-  let m = match n {
-    HeadingNode(h) =>
-      @tree.HeadingNode({ ..h, fold: Some(next(h.fold, h.label)), })
-    ListNode(l) => @tree.ListNode({ ..l, fold: Some(next(l.fold, l.label)), })
-    ImplicitNode(g) => {
-      guard splice(doc, id, _ => [spell(g, "")]) is Some(d) else { return None }
-      return fold(d, id, open)
-    }
+  // Implicit は綴ってから畳む
+  if n.mark is None {
+    guard splice(doc, id, _ => [spell(n, "")]) is Some(d) else { return None }
+    return fold(d, id, open)
   }
+  let m = { ..n, fold: Some(next(n.fold, n.label)), }
   done(splice(doc, id, _ => [m]), Some(id))
 }
 
@@ -243,17 +183,8 @@ fn fold(doc : @tree.Doc, id : Int, open : Bool) -> Done? {
 /// 畳みを外す。中身はその場で普通の md として読み直される（読みのサイクルの仕事）。
 fn unfold(doc : @tree.Doc, id : Int) -> Done? {
   guard find(doc, id) is Some(n) else { return None }
-  let m = match n {
-    HeadingNode(h) => {
-      guard h.fold is Some(_) else { return None }
-      @tree.HeadingNode({ ..h, fold: None, })
-    }
-    ListNode(l) => {
-      guard l.fold is Some(_) else { return None }
-      @tree.ListNode({ ..l, fold: None, })
-    }
-    ImplicitNode(_) => return None
-  }
+  guard n.fold is Some(_) else { return None }
+  let m = { ..n, fold: None, }
   done(splice(doc, id, _ => [m]), Some(id))
 }
 
@@ -321,36 +252,19 @@ fn delete(doc : @tree.Doc, ids : Array[Int]) -> Done? {
 ///|
 /// その綴りで空のノードを作る。項目の綴りは既定で、席のものは `spelled` が当てる。
 fn make(sign : @tree.Sign, id : Int, label : String) -> @tree.Node {
-  match sign {
-    Heading =>
-      @tree.HeadingNode({
-        id,
-        label,
-        fold: None,
-        body: [],
-        setext: false,
-        closing: 0,
-        children: [],
-      })
-    Item =>
-      @tree.ListNode({
-        id,
-        label,
-        fold: None,
-        body: [],
-        marker: "-",
-        offset: 2,
-        loose: false,
-        children: [],
-      })
+  let mark = match sign {
+    Heading => @tree.atx
+    Item => @tree.bullet
   }
+  { id, label, fold: None, body: [], children: [], mark: Some(mark), }
 }
 
 ///|
+/// その綴りの種類。飛び（Implicit）は行を省いた空の見出しなので見出し。
 fn sign_of(n : @tree.Node) -> @tree.Sign {
-  match n {
-    ListNode(_) => Item
-    _ => Heading
+  match @tree.sign_of(n) {
+    Some(s) => s
+    None => Heading
   }
 }
 
@@ -358,7 +272,7 @@ fn sign_of(n : @tree.Node) -> @tree.Sign {
 /// この下に足すときの綴り。末尾の子がいればそれに、いなければ親に従う
 /// （項目の下は項目、それ以外は見出し）。
 fn sign_in(n : @tree.Node) -> @tree.Sign {
-  match kids(n).last() {
+  match n.children.last() {
     Some(c) => sign_of(c)
     None => sign_of(n)
   }
@@ -397,11 +311,11 @@ fn spell_at(doc : @tree.Doc, at : NodePlace) -> (String, Int, Bool) {
       if node == @tree.doc_id {
         doc.roots.last().map(r => r.node)
       } else {
-        find(doc, node).bind(n => kids(n).last())
+        find(doc, node).bind(n => n.children.last())
       }
   }
-  match near {
-    Some(ListNode(l)) => (l.marker, l.offset, l.loose)
+  match near.map(x => x.mark) {
+    Some(Some(Item(marker~, offset~, loose~))) => (marker, offset, loose)
     _ => ("-", 2, false)
   }
 }
@@ -425,15 +339,10 @@ fn step(marker : String, n : Int) -> String {
 ///|
 /// その席に座る項目の綴り。k 番目の新入りは番号を k + 1 だけ進める。
 fn spelled(n : @tree.Node, spell : (String, Int, Bool), k : Int) -> @tree.Node {
-  match n {
-    ListNode(l) =>
-      @tree.ListNode({
-        ..l,
-        marker: step(spell.0, k + 1),
-        offset: spell.1,
-        loose: spell.2,
-      })
-    _ => n
+  guard n.mark is Some(Item(..)) else { return n }
+  {
+    ..n,
+    mark: Some(Item(marker=step(spell.0, k + 1), offset=spell.1, loose=spell.2)),
   }
 }
 
@@ -465,29 +374,19 @@ fn add_node(doc : @tree.Doc, at : NodePlace, labels : Array[String]) -> Done? {
 fn wrap(doc : @tree.Doc, id : Int, label : String) -> Done? {
   guard find(doc, id) is Some(n) else { return None }
   let nid = fresh(doc)
-  let w = match n {
-    ListNode(l) =>
-      @tree.ListNode({
-        id: nid,
-        label,
-        fold: None,
-        body: [],
-        // id の席に座るので、綴りも id のもの
-        marker: l.marker,
-        offset: l.offset,
-        loose: l.loose,
-        children: [l],
-      })
-    _ =>
-      @tree.HeadingNode({
-        id: nid,
-        label,
-        fold: None,
-        body: [],
-        setext: false,
-        closing: 0,
-        children: [n],
-      })
+  // id の席に座るので、項目なら綴りも id のもの。見出しは新しく作る綴り
+  // （読んだ setext や閉じの `#` は運ばない。飛びは行が無いので見出しで綴る）
+  let mark = match n.mark {
+    Some(Item(..)) as m => m.unwrap()
+    _ => @tree.atx
+  }
+  let w : @tree.Node = {
+    id: nid,
+    label,
+    fold: None,
+    body: [],
+    children: [n],
+    mark: Some(mark),
   }
   done(splice(doc, id, _ => [w]), Some(nid))
 }
@@ -587,13 +486,20 @@ fn flip(doc : @tree.Doc, id : Int) -> Done? {
       guard take(doc, [id], taken) is Some(rest) else { return None }
       let mut wrapped = taken[0]
       // 項目は相対記法で深さを持たないので、飛びを綴れない。直に深さ 2 へ
-      if !(wrapped is ListNode(_)) {
+      if !(@tree.sign_of(wrapped) is Some(Item)) {
         for _ in 0..<(depth - 2) {
-          wrapped = @tree.ImplicitNode({ id: next, children: [wrapped], })
+          wrapped = {
+            id: next,
+            label: "",
+            fold: None,
+            body: [],
+            children: [wrapped],
+            mark: None,
+          }
           next = next + 1
         }
       }
-      done(append(rest, node=id_of(r.node), side~, [wrapped]), Some(id))
+      done(append(rest, node=r.node.id, side~, [wrapped]), Some(id))
     }
   }
 }
@@ -714,29 +620,11 @@ fn shift(n : @tree.Node, by : Int) -> @tree.Node {
     bs.map(b => { id: b.id + by, content: b.content, source: b.source, })
   }
 
-  fn list(l : @tree.ListNode) -> @tree.ListNode {
-    {
-      ..l,
-      id: l.id + by,
-      body: blocks(l.body),
-      children: l.children.map(list),
-    }
-  }
-
-  match n {
-    HeadingNode(h) =>
-      @tree.HeadingNode({
-        ..h,
-        id: h.id + by,
-        body: blocks(h.body),
-        children: h.children.map(c => shift(c, by)),
-      })
-    ListNode(l) => @tree.ListNode(list(l))
-    ImplicitNode(g) =>
-      @tree.ImplicitNode({
-        id: g.id + by,
-        children: g.children.map(c => shift(c, by)),
-      })
+  {
+    ..n,
+    id: n.id + by,
+    body: blocks(n.body),
+    children: n.children.map(c => shift(c, by)),
   }
 }
 
@@ -795,7 +683,7 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   if nodes.is_empty() {
     return Some({ doc: cur, focus: Some(prose[0].id), })
   }
-  done(place(cur, at, nodes), Some(id_of(nodes[0])))
+  done(place(cur, at, nodes), Some(nodes[0].id))
 }
 
 ///|
@@ -803,7 +691,7 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
 /// 途中の飛び（子の中の Implicit）は綴りなので触らない。
 fn peel(roots : Array[@tree.Node]) -> Array[@tree.Node] {
   match roots {
-    [ImplicitNode(g)] => peel(g.children)
+    [g] if g.mark is None => peel(g.children)
     _ => roots
   }
 }

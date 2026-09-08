@@ -9,40 +9,28 @@ test "直後が見出しなら境界。側が裏返る" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "a",
-                  "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-              [
-                "HeadingNode",
-                {
-                  "id": 4,
-                  "label": "b",
-                  "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "a",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+            {
+              "id": 4,
+              "label": "b",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right", "Left"],
         "rules": ["", "---"],
       },
@@ -56,29 +44,21 @@ test "先頭に置けば最初の子から左になる" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "a",
-                  "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "a",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Left"],
         "rules": ["---"],
       },
@@ -94,48 +74,35 @@ test "深い見出しは Implicit を挟んで深さ 2 へ" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "a",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+            {
+              "id": 4,
+              "label": "",
+              "body": [],
+              "children": [
                 {
-                  "id": 3,
-                  "label": "a",
+                  "id": 5,
+                  "label": "x",
                   "body": [],
-                  "setext": false,
-                  "closing": 0,
                   "children": [],
+                  "mark": ["Heading", { "setext": false, "closing": 0 }],
                 },
               ],
-              [
-                "ImplicitNode",
-                {
-                  "id": 4,
-                  "children": [
-                    [
-                      "HeadingNode",
-                      {
-                        "id": 5,
-                        "label": "x",
-                        "body": [],
-                        "setext": false,
-                        "closing": 0,
-                        "children": [],
-                      },
-                    ],
-                  ],
-                },
-              ],
-            ],
-          },
-        ],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right", "Left"],
         "rules": ["", "---"],
       },
@@ -150,41 +117,28 @@ test "項目は Implicit を挟まず深さ 2 へ" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "a",
-                  "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-              [
-                "ListNode",
-                {
-                  "id": 4,
-                  "label": "b",
-                  "body": [],
-                  "marker": "-",
-                  "offset": 2,
-                  "loose": false,
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "a",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+            {
+              "id": 4,
+              "label": "b",
+              "body": [],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right", "Left"],
         "rules": ["", "---"],
       },
@@ -201,52 +155,35 @@ test "見出しと項目が交互に並ぶ" {
       "body": [],
       "roots": [
         {
-          "node": [
-            "HeadingNode",
-            {
-              "id": 2,
-              "label": "root",
-              "body": [],
-              "setext": false,
-              "closing": 0,
-              "children": [
-                [
-                  "HeadingNode",
-                  {
-                    "id": 3,
-                    "label": "h1",
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-                [
-                  "ListNode",
-                  {
-                    "id": 4,
-                    "label": "i1",
-                    "body": [],
-                    "marker": "*",
-                    "offset": 2,
-                    "loose": false,
-                    "children": [],
-                  },
-                ],
-                [
-                  "HeadingNode",
-                  {
-                    "id": 5,
-                    "label": "h2",
-                    "body": [],
-                    "setext": false,
-                    "closing": 0,
-                    "children": [],
-                  },
-                ],
-              ],
-            },
-          ],
+          "node": {
+            "id": 2,
+            "label": "root",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "h1",
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+              {
+                "id": 4,
+                "label": "i1",
+                "body": [],
+                "children": [],
+                "mark": ["Item", { "marker": "*", "offset": 2, "loose": false }],
+              },
+              {
+                "id": 5,
+                "label": "h2",
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
           "sides": ["Left", "Right", "Left"],
           "rules": ["---", "---", "---"],
         },
@@ -262,60 +199,43 @@ test "兄弟の間の水平線も引き出す" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "a",
+              "body": [],
+              "children": [
                 {
-                  "id": 3,
-                  "label": "a",
+                  "id": 4,
+                  "label": "x",
                   "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [
-                    [
-                      "HeadingNode",
-                      {
-                        "id": 4,
-                        "label": "x",
-                        "body": [],
-                        "setext": false,
-                        "closing": 0,
-                        "children": [],
-                      },
-                    ],
-                  ],
+                  "children": [],
+                  "mark": ["Heading", { "setext": false, "closing": 0 }],
                 },
               ],
-              [
-                "ImplicitNode",
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+            {
+              "id": 5,
+              "label": "",
+              "body": [],
+              "children": [
                 {
-                  "id": 5,
-                  "children": [
-                    [
-                      "HeadingNode",
-                      {
-                        "id": 6,
-                        "label": "y",
-                        "body": [],
-                        "setext": false,
-                        "closing": 0,
-                        "children": [],
-                      },
-                    ],
-                  ],
+                  "id": 6,
+                  "label": "y",
+                  "body": [],
+                  "children": [],
+                  "mark": ["Heading", { "setext": false, "closing": 0 }],
                 },
               ],
-            ],
-          },
-        ],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right", "Left"],
         "rules": ["", "---"],
       },
@@ -330,33 +250,25 @@ test "中身に挟まれた水平線は装飾" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "a",
-            "body": [
-              { "id": 3, "content": ["Raw", "body"], "source": "body" },
-              { "id": 4, "content": "ThematicBreak", "source": "---" },
-              { "id": 5, "content": ["Raw", "body"], "source": "body" },
-            ],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
-                {
-                  "id": 6,
-                  "label": "b",
-                  "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "a",
+          "body": [
+            { "id": 3, "content": ["Raw", "body"], "source": "body" },
+            { "id": 4, "content": "ThematicBreak", "source": "---" },
+            { "id": 5, "content": ["Raw", "body"], "source": "body" },
+          ],
+          "children": [
+            {
+              "id": 6,
+              "label": "b",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -371,29 +283,21 @@ test "直前が中身でも、直後が見出しなら境界" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "a",
-            "body": [{ "id": 3, "content": ["Raw", "body"], "source": "body" }],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
-                {
-                  "id": 4,
-                  "label": "b",
-                  "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "a",
+          "body": [{ "id": 3, "content": ["Raw", "body"], "source": "body" }],
+          "children": [
+            {
+              "id": 4,
+              "label": "b",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Left"],
         "rules": ["---"],
       },
@@ -408,40 +312,28 @@ test "本数に意味は無い" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "a",
-                  "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-              [
-                "HeadingNode",
-                {
-                  "id": 4,
-                  "label": "b",
-                  "body": [],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "a",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+            {
+              "id": 4,
+              "label": "b",
+              "body": [],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right", "Left"],
         "rules": ["", "---"],
       },
@@ -455,31 +347,21 @@ test "文末の水平線は装飾" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [
-              [
-                "HeadingNode",
-                {
-                  "id": 3,
-                  "label": "a",
-                  "body": [
-                    { "id": 4, "content": "ThematicBreak", "source": "---" },
-                  ],
-                  "setext": false,
-                  "closing": 0,
-                  "children": [],
-                },
-              ],
-            ],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "a",
+              "body": [{ "id": 4, "content": "ThematicBreak", "source": "---" }],
+              "children": [],
+              "mark": ["Heading", { "setext": false, "closing": 0 }],
+            },
+          ],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": ["Right"],
         "rules": [""],
       },
@@ -494,32 +376,24 @@ test "根の直前の水平線は装飾" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 2,
-            "label": "r",
-            "body": [{ "id": 3, "content": "ThematicBreak", "source": "---" }],
-            "setext": false,
-            "closing": 0,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "r",
+          "body": [{ "id": 3, "content": "ThematicBreak", "source": "---" }],
+          "children": [],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": [],
         "rules": [],
       },
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 4,
-            "label": "s",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 4,
+          "label": "s",
+          "body": [],
+          "children": [],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -536,17 +410,13 @@ test "最初の見出しより前の水平線は文書の中身" {
     ],
     "roots": [
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 4,
-            "label": "a",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 4,
+          "label": "a",
+          "body": [],
+          "children": [],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": [],
         "rules": [],
       },
@@ -577,33 +447,24 @@ test "項目の中の水平線は、後ろが見出しでも項目の中身" {
     "body": [],
     "roots": [
       {
-        "node": [
-          "ListNode",
-          {
-            "id": 2,
-            "label": "a",
-            "body": [{ "id": 3, "content": "ThematicBreak", "source": "---" }],
-            "marker": "-",
-            "offset": 2,
-            "loose": false,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 2,
+          "label": "a",
+          "body": [{ "id": 3, "content": "ThematicBreak", "source": "---" }],
+          "children": [],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
         "sides": [],
         "rules": [],
       },
       {
-        "node": [
-          "HeadingNode",
-          {
-            "id": 4,
-            "label": "h",
-            "body": [],
-            "setext": false,
-            "closing": 0,
-            "children": [],
-          },
-        ],
+        "node": {
+          "id": 4,
+          "label": "h",
+          "body": [],
+          "children": [],
+          "mark": ["Heading", { "setext": false, "closing": 0 }],
+        },
         "sides": [],
         "rules": [],
       },

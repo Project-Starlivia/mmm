@@ -3,8 +3,8 @@
 // md の裁定（何がどういう意味か）は docs/spec.md、内部の決めは docs/core.md。
 //
 // **型が言うのは「あり得ない形」だけ**で、仕様を満たすのは実装の仕事。
-// 型で殺しているのは、項目の子孫が項目であること・Implicit が綴りを持たない
-// こと・側が根の子にしか無いことの 3 つ。それ以外は実装とテストが受け持つ。
+// **型が払うのは、走査から分岐が消えるときだけ。** 殺しているのは側が根の子にしか
+// 無いことの 1 つで、それ以外は check とテストが受け持つ。
 
 ///|
 /// 文書ぜんぶ。木は何本でも生える（`# a` と `# b` は別の木）。
@@ -30,14 +30,46 @@ pub(all) struct Root {
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// ノード 1 つ。種類はこの 3 つしかない。
-/// 構築子は型名と同じ — **タグ自体に意味は無く**、無名 union が書けないから
-/// 置いているだけなので、別の語を作らない。
-pub(all) enum Node {
-  HeadingNode(HeadingNode)
-  ListNode(ListNode)
-  ImplicitNode(ImplicitNode)
+/// ノード 1 つ。**種類は無い** — 見出しと項目は意味の欄が同じで、違うのは
+/// 綴り（`mark`）だけ。種類で型を割ると、種類を問わない操作（動かす・選ぶ・
+/// 名を付ける・畳む）が全部そのぶん分岐する。
+///
+/// **項目の中は、その項目の深さを 0 とした文書**（docs/spec.md「項目の中」）なので、
+/// 項目の子に見出しが生え、見出しの子に項目が生える。
+pub(all) struct Node {
+  id : Int
+  label : String
+  /// `<details>` がこのノードの定義ごと包んでいた
+  fold : Fold?
+  body : Array[Block]
+  children : Array[Node]
+  /// 読んだ綴り。**無ければ Implicit** — 行を省いた空の見出しで、記法が要るもの
+  /// （名前・畳み・中身・見出しの直後の席）は綴ってから当てる。隣の行で決まる
+  /// 規則なので、型ではなく check（`Unmarked`）が見る
+  mark : Mark?
 } derive(Eq, Debug, ToJson)
+
+///|
+/// 骨格の行の綴り。**種類はこれが持つ唯一の在り処。**
+pub(all) enum Mark {
+  /// 見出し（`# a`）。setext（`a` の次の行が `===`）は深さ 1〜2 でだけ書ける。
+  /// closing は読んだ閉じの `#` の本数（`# a ##` なら 2）で、飾りなので 0 は付けない。
+  /// 新しく作るときは ATX で閉じ無し
+  Heading(setext~ : Bool, closing~ : Int)
+  /// 項目（`- a`）。marker は読んだ字（`-` `*` `+`、または `3.` `3)` — 数字ごと）、
+  /// offset は読んだラベルの桁（マーカーの頭からラベルの頭まで。中身と入れ子も
+  /// この桁に座る）、loose は読んだ列が loose だった（項目の間に空行）。
+  /// 新しく作るときは `-` / 2 / 詰める
+  Item(marker~ : String, offset~ : Int, loose~ : Bool)
+} derive(Eq, Debug, ToJson)
+
+///|
+/// 新しく作る見出しの綴り。読んだ書き方は持ち込まない。
+pub let atx : Mark = Heading(setext=false, closing=0)
+
+///|
+/// 新しく作る項目の綴り。マーカーとラベルの桁は席が決め直す（`spell_at`）。
+pub let bullet : Mark = Item(marker="-", offset=2, loose=false)
 
 ///|
 /// 畳み。**在ること自体が「このノードは畳まれている」**で、中身は書き戻すのに
@@ -51,54 +83,22 @@ pub(all) struct Fold {
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// 見出し（`# a`）。子は何でも来る。
-pub(all) struct HeadingNode {
-  id : Int
-  label : String
-  /// `<details>` がこのノードの定義ごと包んでいた
-  fold : Fold?
-  body : Array[Block]
-  /// 読んだ書き方。新しく作るときは ATX で閉じ無し。
-  /// setext（`a` の次の行が `===`）は深さ 1〜2 でだけ書ける
-  setext : Bool
-  /// 読んだ閉じの `#` の本数（`# a ##` なら 2）。飾りなので 0 は付けない
-  closing : Int
-  children : Array[Node]
-} derive(Eq, Debug, ToJson)
-
-///|
-/// 項目（`- a`）。**子も項目**（単調性）。相対記法なので飛びが無く、
-/// 綴られない項目も存在しない。
-pub(all) struct ListNode {
-  id : Int
-  label : String
-  fold : Fold?
-  body : Array[Block]
-  /// 読んだマーカー（`-` `*` `+`、または `3.` `3)` — 数字ごと）。
-  /// 新しく作るときは `-`、席が変われば隣に従う
-  marker : String
-  /// 読んだラベルの桁（マーカーの頭からラベルの頭まで）。中身と入れ子もこの桁に座る。
-  /// 新しく作るときは 2（`- `）
-  offset : Int
-  /// 読んだ列が loose だった（項目の間に空行）。新しく作るときは詰める
-  loose : Bool
-  children : Array[ListNode]
-} derive(Eq, Debug, ToJson)
-
-///|
-/// 綴られなかった見出し。階層の飛びが綴りなので、**ラベルも中身も畳みも
-/// 型ごと持たない**（包む骨格行が無いので畳めない）。
-pub(all) struct ImplicitNode {
-  id : Int
-  children : Array[Node]
-} derive(Eq, Debug, ToJson)
-
-///|
-/// 骨格の記述方式。「何に変えるか」の引数型。
+/// 綴りの種類。「何に変えるか」の引数型で、綴りそのもの（`Mark`）から
+/// 書き方の欄を落としたもの。席が綴りを決め直すので、操作は種類だけを言う。
 pub(all) enum Sign {
   Heading
   Item
 } derive(Eq, Debug, ToJson)
+
+///|
+/// その綴りの種類。飛び（Implicit）は綴りが無いので None。
+pub fn sign_of(n : Node) -> Sign? {
+  match n.mark {
+    Some(Heading(..)) => Some(Heading)
+    Some(Item(..)) => Some(Item)
+    None => None
+  }
+}
 
 ///|
 pub(all) enum Side {

@@ -73,7 +73,7 @@ fn nodes(
   sides : Array[Side],
   rules : Array[String],
 ) -> Unit {
-  let run : Array[ListNode] = []
+  let run : Array[Node] = []
   fn flush() {
     if !run.is_empty() {
       out.push(bullets(run))
@@ -90,12 +90,12 @@ fn nodes(
       out.push(html(if rule == "" { "---" } else { rule }))
       prev = side
     }
-    match x {
-      ListNode(l) if l.fold is None => {
-        if run is [first, ..] && kind_of(first.marker) != kind_of(l.marker) {
+    match x.mark {
+      Some(Item(marker~, ..)) if x.fold is None => {
+        if run is [first, ..] && kind_of(marker_of(first)) != kind_of(marker) {
           flush()
         }
-        run.push(l)
+        run.push(x)
       }
       _ => {
         flush()
@@ -116,17 +116,17 @@ fn node(
   sides : Array[Side],
   rules : Array[String],
 ) -> Unit {
-  match x {
-    ListNode(l) => wrap(out, l.fold, () => out.push(bullets([l])))
-    HeadingNode(n) =>
-      wrap(out, n.fold, () => {
-        out.push(heading(depth, n.label, n.setext, n.closing))
-        for b in n.body {
+  match x.mark {
+    Some(Item(..)) => wrap(out, x.fold, () => out.push(bullets([x])))
+    Some(Heading(setext~, closing~)) =>
+      wrap(out, x.fold, () => {
+        out.push(heading(depth, x.label, setext, closing))
+        for b in x.body {
           content(out, b)
         }
-        nodes(out, n.children, depth + 1, sides, rules)
+        nodes(out, x.children, depth + 1, sides, rules)
       })
-    ImplicitNode(g) => nodes(out, g.children, depth + 1, sides, rules)
+    None => nodes(out, x.children, depth + 1, sides, rules)
   }
 }
 
@@ -162,7 +162,7 @@ fn wrap(out : Array[@markdown.Block], fold : Fold?, inner : () -> Unit) -> Unit 
 /// 中身は空行で分けないと段落に飲み込まれ、畳まれた子の `<details>` は空行で
 /// 終わる塊なので、分けないと次の項目を飲み込む。ラベルの直後の空の項目も
 /// 分ける（`underlined`）— 正規形は並びで変わる。
-fn bullets(run : Array[ListNode]) -> @markdown.Block {
+fn bullets(run : Array[Node]) -> @markdown.Block {
   let tight = run
     .iter()
     .all(l => {
@@ -170,7 +170,7 @@ fn bullets(run : Array[ListNode]) -> @markdown.Block {
       l.children.iter().all(c => c.fold is None) &&
       !underlined(l)
     })
-  let loose = run.iter().any(l => l.loose)
+  let loose = run.iter().any(l => l.mark is Some(Item(loose=true, ..)))
   let sb = StringBuilder()
   for i, l in run {
     if i > 0 && loose {
@@ -199,7 +199,7 @@ fn kind_of(marker : String) -> String {
 ///|
 /// ラベルの直後に空の項目が続く形。詰めて書くと `-` 1 本が段落の setext の
 /// 下線に読まれ、ラベルが消えて子も読まれない。空行で分ければ空の項目に読まれる。
-fn underlined(l : ListNode) -> Bool {
+fn underlined(l : Node) -> Bool {
   l.label != "" && l.children is [{ label: "", .. }, ..]
 }
 
@@ -207,12 +207,12 @@ fn underlined(l : ListNode) -> Bool {
 /// 項目 1 つ。1 行目はマーカーとラベル、続きは中身と入れ子の列 —
 /// **その字はライブラリに綴らせ**、ラベルの桁ぶん字下げしてぶら下げる。
 /// ラベルも中身も無ければマーカーだけの行。
-fn list_item(l : ListNode, tight : Bool) -> String {
+fn list_item(l : Node, tight : Bool) -> String {
   let kids = []
   for b in l.body {
     content(kids, b)
   }
-  nodes(kids, l.children.map(c => ListNode(c)), 0, [], [])
+  nodes(kids, l.children, 0, [], [])
   let inner = StringBuilder()
   if l.label != "" {
     inner.write_string(l.label)
@@ -231,17 +231,31 @@ fn list_item(l : ListNode, tight : Bool) -> String {
       }),
     )
   }
+  let marker = marker_of(l)
   let text = inner.to_string()
   if text == "" {
-    return l.marker + "\n"
+    return marker + "\n"
   }
   // ラベルの桁は読んだ幅。マーカーで埋まっていれば空白 1 つ
-  let width = if l.offset > l.marker.length() {
-    l.offset
-  } else {
-    l.marker.length() + 1
+  let offset = match l.mark {
+    Some(Item(offset~, ..)) => offset
+    _ => 0
   }
-  l.marker + pad(width - l.marker.length()) + indent(text, width)
+  let width = if offset > marker.length() {
+    offset
+  } else {
+    marker.length() + 1
+  }
+  marker + pad(width - marker.length()) + indent(text, width)
+}
+
+///|
+/// 読んだマーカーの字。項目でなければ既定（項目として書く席に来ている）。
+fn marker_of(l : Node) -> String {
+  match l.mark {
+    Some(Item(marker~, ..)) => marker
+    _ => "-"
+  }
 }
 
 ///|

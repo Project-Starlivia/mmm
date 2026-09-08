@@ -284,7 +284,7 @@ test "AddNode の綴り: 項目の隣は項目、項目の下は項目、見出�
     run(d, AddNode(at=NodePlace::In(node=3, side=None), labels=["b"])),
     Some({
       doc: doc([
-        root(h(2, "r", children=[item(3, "a", children=[li(4, "b")])]), sides=[
+        root(h(2, "r", children=[item(3, "a", children=[item(4, "b")])]), sides=[
           Right,
         ]),
       ]),
@@ -376,12 +376,12 @@ test "Wrap は席に座って id を唯一の子にする。根なら sides は 
       focus: Some(5),
     }),
   )
-  let e = doc([root(item(2, "a", children=[li(3, "b")]), sides=[Right])])
+  let e = doc([root(item(2, "a", children=[item(3, "b")]), sides=[Right])])
   assert_eq(
     run(e, Wrap(id=3, label="p")),
     Some({
       doc: doc([
-        root(item(2, "a", children=[li(4, "p", children=[li(3, "b")])]), sides=[
+        root(item(2, "a", children=[item(4, "p", children=[item(3, "b")])]), sides=[
           Right,
         ]),
       ]),
@@ -514,7 +514,7 @@ test "MoveNode は形だけ運び、綴りは席が決める" {
     run(d, MoveNode(ids=[3], at=NodePlace::In(node=4, side=None))),
     Some({
       doc: doc([
-        root(h(2, "r", children=[item(4, "b", children=[li(3, "a")])]), sides=[
+        root(h(2, "r", children=[item(4, "b", children=[item(3, "a")])]), sides=[
           Left,
         ]),
       ]),
@@ -755,7 +755,7 @@ test "FlipSide の 3 段: 根は鏡像、根の子は 1 つ、深いものは反
 /// 項目は相対記法で深さを持たないので、Implicit で包まず直に深さ 2 へ。
 test "FlipSide の深い項目は Implicit で包まず引き出す" {
   let d = doc([
-    root(h(2, "r", children=[item(3, "i", children=[li(4, "j")])]), sides=[
+    root(h(2, "r", children=[item(3, "i", children=[item(4, "j")])]), sides=[
       Right,
     ]),
   ])
@@ -1112,7 +1112,10 @@ test "Graft は席の綴りで差す — 見出しの列では見出し、項目
     Some({
       doc: doc([
         root(
-          h(2, "r", children=[item(3, "a"), item(5, "b", children=[li(6, "c")])]),
+          h(2, "r", children=[
+            item(3, "a"),
+            item(5, "b", children=[item(6, "c")]),
+          ]),
           sides=[Right, Right],
         ),
       ]),
@@ -1153,7 +1156,7 @@ test "Graft は空・知らない id に None。項目の下の見出しは項�
       doc: doc([
         root(
           h(2, "r", children=[
-            item(3, "a", children=[li(4, "p", children=[li(5, "q")])]),
+            item(3, "a", children=[item(4, "p", children=[item(5, "q")])]),
           ]),
           sides=[Right],
         ),
@@ -1197,7 +1200,7 @@ test "Graft は 6 段目の下なら部分木ごと項目にする。途中の�
       Graft(at=NodePlace::In(node=7, side=None), md="# p\n\n## q\n\n- i\n"),
     ),
     Some({
-      doc: six([item(8, "p", children=[li(9, "q", children=[li(10, "i")])])]),
+      doc: six([item(8, "p", children=[item(9, "q", children=[item(10, "i")])])]),
       focus: Some(8),
     }),
   )
@@ -1208,7 +1211,7 @@ test "Graft は 6 段目の下なら部分木ごと項目にする。途中の�
       Graft(at=NodePlace::In(node=7, side=None), md="# p\n\n### q\n"),
     ),
     Some({
-      doc: six([item(8, "p", children=[li(9, "", children=[li(10, "q")])])]),
+      doc: six([item(8, "p", children=[item(9, "", children=[item(10, "q")])])]),
       focus: Some(8),
     }),
   )
@@ -1222,7 +1225,7 @@ test "MoveNode は 6 段目の下へ落とせば見出しを項目にする。Im
   assert_eq(
     run(e, MoveNode(ids=[8], at=NodePlace::In(node=7, side=None))),
     Some({
-      doc: six([item(8, "x", body=[pic(9)], children=[li(10, "y")])]),
+      doc: six([item(8, "x", body=[pic(9)], children=[item(10, "y")])]),
       focus: Some(8),
     }),
   )
@@ -1230,7 +1233,7 @@ test "MoveNode は 6 段目の下へ落とせば見出しを項目にする。Im
   let f : @tree.Doc = { ..d, roots: [..d.roots, g], }
   assert_eq(
     run(f, MoveNode(ids=[8], at=NodePlace::In(node=7, side=None))),
-    Some({ doc: six([item(8, "", children=[li(9, "z")])]), focus: Some(8), }),
+    Some({ doc: six([item(8, "", children=[item(9, "z")])]), focus: Some(8), }),
   )
 }
 
@@ -1266,7 +1269,7 @@ test "apply の結果は check を通る" {
     root(
       h(2, "r", body=[pic(3)], children=[
         h(4, "a", children=[
-          item(7, "b", children=[li(8, "c")]),
+          item(7, "b", children=[item(8, "c")]),
           gap(5, [h(6, "x")]),
         ]),
         h(9, "d", body=[code(10)]),

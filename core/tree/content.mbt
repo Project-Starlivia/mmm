@@ -26,16 +26,11 @@ fn fill(
     }
     return
   }
+  // 飛び（Implicit）は綴りが無いので中身も持てないが、put は必ず実体を最後に
+  // 積むので、ここに積まれるのは実体の枠だけ
   let f = b.stack[b.stack.length() - 1]
-  match f.skel {
-    Line(body~, ..) => {
-      body.push(block)
-      f.body_at.push(at)
-    }
-    // 飛びは綴りが無いので中身も持てない。put は必ず実体を最後に積むので、
-    // ここに来ることは無い
-    Gap => ()
-  }
+  f.body.push(block)
+  f.body_at.push(at)
   if to > f.to {
     f.to = to
   }

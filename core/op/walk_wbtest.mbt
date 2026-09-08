@@ -34,19 +34,19 @@ test "each は文書順に、中身も含めて訪ねる" {
 }
 
 ///|
-test "kids は項目の子も Node に包む" {
-  let n = item(2, "a", children=[li(3, "b"), li(4, "c")])
-  json_inspect(kids(n).map(id_of), content=[3, 4])
-  json_inspect(kids(gap(5, [h(6, "x")])).map(id_of), content=[6])
-  json_inspect(kids(h(7, "y")).map(id_of), content=[])
+test "子の列はどの種類でも 1 つ" {
+  let n = item(2, "a", children=[item(3, "b"), item(4, "c")])
+  json_inspect(n.children.map(x => x.id), content=[3, 4])
+  json_inspect(gap(5, [h(6, "x")]).children.map(x => x.id), content=[6])
+  json_inspect(h(7, "y").children.map(x => x.id), content=[])
 }
 
 ///|
 test "find はノードだけに応える" {
-  debug_inspect(find(sample(), 5).map(id_of), content="Some(5)")
-  debug_inspect(find(sample(), 8).map(id_of), content="Some(8)")
-  debug_inspect(find(sample(), 3).map(id_of), content="None")
-  debug_inspect(find(sample(), 99).map(id_of), content="None")
+  debug_inspect(find(sample(), 5).map(x => x.id), content="Some(5)")
+  debug_inspect(find(sample(), 8).map(x => x.id), content="Some(8)")
+  debug_inspect(find(sample(), 3).map(x => x.id), content="None")
+  debug_inspect(find(sample(), 99).map(x => x.id), content="None")
 }
 
 ///|

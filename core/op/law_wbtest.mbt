@@ -32,30 +32,11 @@ fn ids(doc : @tree.Doc) -> Array[Int] {
     }
   }
 
-  fn list(l : @tree.ListNode) {
-    out.push(l.id)
-    blocks(l.body)
-    for k in l.children {
-      list(k)
-    }
-  }
-
   fn node(x : @tree.Node) {
-    match x {
-      HeadingNode(h) => {
-        out.push(h.id)
-        blocks(h.body)
-        for k in h.children {
-          node(k)
-        }
-      }
-      ListNode(l) => list(l)
-      ImplicitNode(g) => {
-        out.push(g.id)
-        for k in g.children {
-          node(k)
-        }
-      }
+    out.push(x.id)
+    blocks(x.body)
+    for k in x.children {
+      node(k)
     }
   }
 
@@ -78,36 +59,13 @@ fn bare(doc : @tree.Doc, id : Int) -> Json? {
     }
   }
 
-  fn list(l : @tree.ListNode) {
-    if l.id == id {
-      found.val = Some(strip(ListNode(l)))
-    }
-    blocks(l.body)
-    for k in l.children {
-      list(k)
-    }
-  }
-
   fn node(x : @tree.Node) {
-    match x {
-      HeadingNode(h) => {
-        if h.id == id {
-          found.val = Some(strip(x))
-        }
-        blocks(h.body)
-        for k in h.children {
-          node(k)
-        }
-      }
-      ListNode(l) => list(l)
-      ImplicitNode(g) => {
-        if g.id == id {
-          found.val = Some(strip(x))
-        }
-        for k in g.children {
-          node(k)
-        }
-      }
+    if x.id == id {
+      found.val = Some(strip(x))
+    }
+    blocks(x.body)
+    for k in x.children {
+      node(k)
     }
   }
 
@@ -234,26 +192,10 @@ fn owner_of(doc : @tree.Doc, block : Int) -> Int? {
     }
   }
 
-  fn list(l : @tree.ListNode) {
-    blocks(l.id, l.body)
-    for k in l.children {
-      list(k)
-    }
-  }
-
   fn node(x : @tree.Node) {
-    match x {
-      HeadingNode(h) => {
-        blocks(h.id, h.body)
-        for k in h.children {
-          node(k)
-        }
-      }
-      ListNode(l) => list(l)
-      ImplicitNode(g) =>
-        for k in g.children {
-          node(k)
-        }
+    blocks(x.id, x.body)
+    for k in x.children {
+      node(k)
     }
   }
 
@@ -265,24 +207,15 @@ fn owner_of(doc : @tree.Doc, block : Int) -> Int? {
 }
 
 ///|
-/// 畳まれた部分木の中に居るか（自分も含む）。tree の私有関数は見えないので、
-/// 項目の子は `@tree.ListNode` に包み直して歩く（merge_law_wbtest.mbt にも同じものが在る）
+/// 畳まれた部分木の中に居るか（自分も含む）。
+/// （merge_law_wbtest.mbt にも同じものが在る）
 fn under_fold(doc : @tree.Doc, id : Int) -> Bool {
   fn go(x : @tree.Node, fold : Bool) -> Bool {
-    let (here, mine, kids) = match x {
-      HeadingNode(h) => (fold || h.fold is Some(_), h.id, h.children)
-      ListNode(l) =>
-        (
-          fold || l.fold is Some(_),
-          l.id,
-          l.children.map(c => @tree.ListNode(c)),
-        )
-      ImplicitNode(g) => (fold, g.id, g.children)
-    }
-    if mine == id {
+    let here = fold || x.fold is Some(_)
+    if x.id == id {
       return here
     }
-    for k in kids {
+    for k in x.children {
       if go(k, here) {
         return true
       }
@@ -302,29 +235,12 @@ fn under_fold(doc : @tree.Doc, id : Int) -> Bool {
 /// ノードの親の id。根なら doc_id。中身と知らない id は None
 fn parent_of(doc : @tree.Doc, id : Int) -> Int? {
   let found : Ref[Int?] = { val: None, }
-  fn list(l : @tree.ListNode, above : Int) {
-    if l.id == id {
-      found.val = Some(above)
-    }
-    for k in l.children {
-      list(k, l.id)
-    }
-  }
-
   fn node(x : @tree.Node, above : Int) {
-    let (mine, kids) = match x {
-      HeadingNode(h) => (h.id, h.children)
-      ListNode(l) => {
-        list(l, above)
-        return
-      }
-      ImplicitNode(g) => (g.id, g.children)
-    }
-    if mine == id {
+    if x.id == id {
       found.val = Some(above)
     }
-    for k in kids {
-      node(k, mine)
+    for k in x.children {
+      node(k, x.id)
     }
   }
 
