@@ -46,113 +46,227 @@ pub let deepest : Int = 6
 ///|
 /// 文書ぜんぶを見る。破れが無ければ空。
 pub fn check(doc : Doc) -> Array[Flaw] {
-  let flaws = []
-  let seen : Set[Int] = Set([])
-  fn id(n : Int) -> Unit {
-    if !seen.add_and_check(n) {
-      flaws.push(DupeId(n))
-    }
-  }
-
-  fn blocks(bs : Array[Block]) -> Unit {
-    for x in bs {
-      id(x.id)
-      // 意味から綴れるのは絵の 4 つと水平線だけ。読み解かなかったものと
-      // 畳めなかった領域は原文でしか書けない
-      if x.source is None &&
-        (x.content is None || x.content is Some(Details(..))) {
-        flaws.push(Wordless(x.id))
-      }
-    }
-  }
-
-  // 中身の尻に水平線があれば、次の骨格の行で境界に読まれる。
-  // **境界が読まれるのは項目の外だけ**（項目の中の水平線は中身）なので、
-  // そこでしか保留しない
-  let border : Ref[Int?] = { val: None, }
-  fn trailing(bs : Array[Block]) -> Int? {
-    match bs.last() {
-      Some({ id, content: Some(ThematicBreak), .. }) => Some(id)
-      _ => None
-    }
-  }
-
-  fn skeleton() -> Unit {
-    match border.val {
-      Some(b) => flaws.push(BorderBreak(b))
-      None => ()
-    }
-    border.val = None
-  }
-
-  /// 同じ列の兄弟。並びの規則もここで見る。`sides` はこの列の側（根の子だけが
-  /// 持つ）で、側が変わる所には境界（`---`）が書かれるので、そこでは飲み込まれない。
-  /// `kids` は i 番目の子の列の側（根なら `Root.sides`、深ければ無い）。
-  /// `base` はこの列を抱える項目の深さ — **`#` の本数はそこから測る**
-  /// （項目の中は、その項目の深さを 0 とした文書）。項目の外は 0。
-  fn nodes(
-    xs : Array[Node],
-    depth : Int,
-    base : Int,
-    sides : Array[Side],
-    kids : (Int) -> Array[Side],
-  ) -> Unit {
-    for i, x in xs {
-      skeleton()
-      let after_heading = i > 0 && !(sign_of(xs[i - 1]) is Some(Item))
-      let bordered = i > 0 && i < sides.length() && sides[i] != sides[i - 1]
-      if after_heading && !bordered && !(sign_of(x) is Some(Heading)) {
-        flaws.push(Swallowed(x.id))
-      }
-      id(x.id)
-      blocks(x.body)
-      match sign_of(x) {
-        Some(Heading) => {
-          if depth - base > deepest {
-            flaws.push(TooDeep(x.id))
-          }
-          if depth - base > 2 && x.label.contains("\n") {
-            flaws.push(DeepSetext(x.id))
-          }
-          // 境界に読まれるのは項目の外の水平線だけ
-          if base == 0 {
-            border.val = trailing(x.body)
-          }
-          nodes(x.children, depth + 1, base, kids(i), _ => [])
-        }
-        // 項目の中は、その項目の深さを 0 とした文書
-        Some(Item) => nodes(x.children, depth + 1, depth, [], _ => [])
-        None => {
-          if x.children.is_empty() {
-            flaws.push(BarrenImplicit(x.id))
-          }
-          if x.label != "" || x.fold is Some(_) || !x.body.is_empty() {
-            flaws.push(Unmarked(x.id))
-          }
-          // 深さは直前の行から読まれる。Implicit に行は無いので、先頭の子の
-          // 項目だけが 1 つ浅く読まれる（2 つ目からは直前の兄弟が留める）
-          if x.children is [first, ..] && sign_of(first) is Some(Item) {
-            flaws.push(GappedItem(first.id))
-          }
-          nodes(x.children, depth + 1, base, kids(i), _ => [])
-        }
-      }
-    }
-  }
-
+  let c : Check = { flaws: [], seen: Set([]), border: None, }
   for r in doc.roots {
-    let kids = r.node.children.length()
-    if r.sides.length() != kids {
-      flaws.push(
-        SideCount(root=r.node.id, sides=r.sides.length(), children=kids),
-      )
+    note(c, side_count(r))
+    note(c, list_side(r))
+  }
+  each_block(c, doc.body)
+  c.border = trailing(doc.body)
+  walk(c, doc.roots.map(r => r.node), 1, 0, [], i => doc.roots[i].sides)
+  c.flaws
+}
+
+///|
+/// 検めの途中。**状態は 2 つだけ** — id は文書ぜんぶで 1 つの列なので覚え、
+/// 中身の尻の水平線は次の骨格まで文書順に持ち回る。
+priv struct Check {
+  flaws : Array[Flaw]
+  seen : Set[Int]
+  /// 文書順で 1 つ前の骨格が、中身の尻に置いた水平線
+  mut border : Int?
+}
+
+///|
+/// ノード 1 つが座っている席。**並びの規則はここから読む** — 前後の行で決まる
+/// ことは、その席が言えるようにしてある。
+priv struct Site {
+  node : Node
+  /// 深さ。根が 1
+  depth : Int
+  /// この列を抱える項目の深さ。**`#` の本数はそこから測る**（項目の中は、
+  /// その項目の深さを 0 とした文書）。項目の外は 0
+  base : Int
+  /// 直前の兄弟。列の頭なら無い
+  prev : Node?
+  /// 直前の兄弟との間で側が変わる。そこには境界（`---`）が書かれる
+  bordered : Bool
+  /// 文書順で 1 つ前の骨格が、中身の尻に置いた水平線
+  border : Int?
+}
+
+///|
+/// 同じ列の兄弟を順に見る。`sides` はこの列の側（根の子だけが持つ）、
+/// `kids` は i 番目の子の列の側（根なら `Root.sides`、深ければ無い）。
+fn walk(
+  c : Check,
+  xs : Array[Node],
+  depth : Int,
+  base : Int,
+  sides : Array[Side],
+  kids : (Int) -> Array[Side],
+) -> Unit {
+  for i, x in xs {
+    let s : Site = {
+      node: x,
+      depth,
+      base,
+      prev: if i > 0 {
+        Some(xs[i - 1])
+      } else {
+        None
+      },
+      bordered: i > 0 && i < sides.length() && sides[i] != sides[i - 1],
+      border: c.border,
     }
-    if sign_of(r.node) is Some(Item) && r.sides.contains(Left) {
-      flaws.push(ListSide(r.node.id))
+    c.border = None
+    note(c, border_break(s))
+    note(c, swallowed(s))
+    dupe(c, x.id)
+    each_block(c, x.body)
+    note(c, too_deep(s))
+    note(c, deep_setext(s))
+    note(c, barren(s))
+    note(c, unmarked(s))
+    note(c, gapped_item(s))
+    // 境界に読まれるのは項目の外の水平線だけ（項目の中の `---` は中身）
+    if sign_of(x) is Some(Heading) && base == 0 {
+      c.border = trailing(x.body)
+    }
+    if sign_of(x) is Some(Item) {
+      // 項目の中は、その項目の深さを 0 とした文書。側は無い
+      walk(c, x.children, depth + 1, depth, [], _ => [])
+    } else {
+      walk(c, x.children, depth + 1, base, kids(i), _ => [])
     }
   }
-  blocks(doc.body)
-  border.val = trailing(doc.body)
-  nodes(doc.roots.map(r => r.node), 1, 0, [], i => doc.roots[i].sides)
-  flaws
+}
+
+///|
+/// 中身の列を見る。**id はノードと同じ列**なので、ここでも数える。
+fn each_block(c : Check, bs : Array[Block]) -> Unit {
+  for b in bs {
+    dupe(c, b.id)
+    note(c, wordless(b))
+  }
+}
+
+///|
+/// その中身の列が尻に置いた水平線。
+fn trailing(bs : Array[Block]) -> Int? {
+  match bs.last() {
+    Some({ id, content: Some(ThematicBreak), .. }) => Some(id)
+    _ => None
+  }
+}
+
+///|
+/// 破れが在れば控える。
+fn note(c : Check, flaw : Flaw?) -> Unit {
+  match flaw {
+    Some(f) => c.flaws.push(f)
+    None => ()
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 規則 — 1 つにつき 1 つ。破れが無ければ None
+// ══════════════════════════════════════════════════════════════════
+
+///|
+/// 同じ id が 2 度出た。文書ぜんぶで 1 つの列なので、歩きが覚えている。
+fn dupe(c : Check, id : Int) -> Unit {
+  if !c.seen.add_and_check(id) {
+    c.flaws.push(DupeId(id))
+  }
+}
+
+///|
+/// 書き戻す字が無い中身。意味から綴れるのは絵の 4 つと水平線だけで、
+/// 読み解かなかったものと畳めなかった領域は原文でしか書けない。
+fn wordless(b : Block) -> Flaw? {
+  guard b.source is None &&
+    (b.content is None || b.content is Some(Details(..))) else {
+    return None
+  }
+  Some(Wordless(b.id))
+}
+
+///|
+/// 側の本数が根の子と合わない。
+fn side_count(r : Root) -> Flaw? {
+  let kids = r.node.children.length()
+  guard r.sides.length() != kids else { return None }
+  Some(SideCount(root=r.node.id, sides=r.sides.length(), children=kids))
+}
+
+///|
+/// 項目の根の子に Left。項目の中の `---` は中身なので側を書けない。
+fn list_side(r : Root) -> Flaw? {
+  guard sign_of(r.node) is Some(Item) && r.sides.contains(Left) else {
+    return None
+  }
+  Some(ListSide(r.node.id))
+}
+
+///|
+/// 中身の尻の水平線に骨格が続く。次の骨格の行で境界（側の変わり目）に
+/// 読まれて、中身に残らない。
+fn border_break(s : Site) -> Flaw? {
+  s.border.map(b => BorderBreak(b))
+}
+
+///|
+/// 見出し（綴られた・綴られない）に境界なしで続く項目・Implicit。その見出しに
+/// 飲み込まれる — 項目は子に読まれ、飛びはその見出しの深さから測られる。
+/// 側が変わる所には `---` が書かれるので飲み込まれない。
+fn swallowed(s : Site) -> Flaw? {
+  guard s.prev is Some(prev) else { return None }
+  guard !(sign_of(prev) is Some(Item)) &&
+    !s.bordered &&
+    !(sign_of(s.node) is Some(Heading)) else {
+    return None
+  }
+  Some(Swallowed(s.node.id))
+}
+
+///|
+/// 深さ 7 以上の見出し。`#` は `deepest` 本までで、7 本目からは段落に読まれる。
+fn too_deep(s : Site) -> Flaw? {
+  guard sign_of(s.node) is Some(Heading) && s.depth - s.base > deepest else {
+    return None
+  }
+  Some(TooDeep(s.node.id))
+}
+
+///|
+/// 深さ 3 以上で名前に改行。setext は深さ 2 までしか無く、ATX は 1 行しか持てない。
+fn deep_setext(s : Site) -> Flaw? {
+  guard sign_of(s.node) is Some(Heading) &&
+    s.depth - s.base > 2 &&
+    s.node.label.contains("\n") else {
+    return None
+  }
+  Some(DeepSetext(s.node.id))
+}
+
+///|
+/// 子を持たない Implicit。飛びを埋める理由が無く、書き出す文字も無い。
+fn barren(s : Site) -> Flaw? {
+  guard sign_of(s.node) is None && s.node.children.is_empty() else {
+    return None
+  }
+  Some(BarrenImplicit(s.node.id))
+}
+
+///|
+/// 綴りの無いノード（Implicit）が、行の要るもの（名前・畳み・中身）を持つ。
+/// 行を省いた空の見出しなので、綴ってからでないと当てられない。
+fn unmarked(s : Site) -> Flaw? {
+  guard sign_of(s.node) is None else { return None }
+  guard s.node.label != "" || s.node.fold is Some(_) || !s.node.body.is_empty() else {
+    return None
+  }
+  Some(Unmarked(s.node.id))
+}
+
+///|
+/// Implicit の先頭の子が項目。深さは直前の行から読まれ、Implicit に行は無いので
+/// 1 つ浅く読まれる（2 つ目からは直前の兄弟が深さを留める）。
+fn gapped_item(s : Site) -> Flaw? {
+  guard sign_of(s.node) is None else { return None }
+  guard s.node.children is [first, ..] && sign_of(first) is Some(Item) else {
+    return None
+  }
+  Some(GappedItem(first.id))
 }
