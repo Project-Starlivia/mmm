@@ -467,50 +467,70 @@ fn flipped(s : @tree.Side) -> @tree.Side {
 /// 反対側の末尾へ引き出す（深さは保つので、間を Implicit が埋める）。
 fn flip(doc : @tree.Doc, id : Int) -> Done? {
   guard seat(doc, id) is Some(path) else { return None }
-  let roots = doc.roots.copy()
-  let r = roots[path[0]]
-  fn side_at(j : Int) -> @tree.Side {
-    if j < r.sides.length() {
-      r.sides[j]
-    } else {
-      @tree.Right
-    }
-  }
-
+  let r = doc.roots[path[0]]
   match path.length() {
-    1 => {
-      roots[path[0]] = { ..r, sides: r.sides.map(flipped), }
-      Some({ doc: { ..doc, roots, }, focus: Some(id), })
-    }
+    1 => reside(doc, path[0], r.sides.map(flipped), id)
     2 => {
       let sides = r.sides.copy()
-      sides[path[1]] = flipped(side_at(path[1]))
-      roots[path[0]] = { ..r, sides, }
-      Some({ doc: { ..doc, roots, }, focus: Some(id), })
+      sides[path[1]] = flipped(side_of(r, path[1]))
+      reside(doc, path[0], sides, id)
     }
-    depth => {
-      let side = flipped(side_at(path[1]))
-      let mut next = fresh(doc)
-      let taken = []
-      guard take(doc, [id], taken) is Some(rest) else { return None }
-      let mut wrapped = taken[0]
-      // 項目は相対記法で深さを持たないので、飛びを綴れない。直に深さ 2 へ
-      if !(@tree.sign_of(wrapped) is Some(Item)) {
-        for _ in 0..<(depth - 2) {
-          wrapped = {
-            id: next,
-            label: "",
-            fold: None,
-            body: [],
-            children: [wrapped],
-            mark: None,
-          }
-          next = next + 1
-        }
+    depth => haul(doc, r, id, side=flipped(side_of(r, path[1])), depth~)
+  }
+}
+
+///|
+/// 根の子の側。書かれていない所は Right（`sides` は子と並走するが、
+/// 短くても足りない所は `---` が書かれていないということ）。
+fn side_of(r : @tree.Root, j : Int) -> @tree.Side {
+  if j < r.sides.length() {
+    r.sides[j]
+  } else {
+    @tree.Right
+  }
+}
+
+///|
+/// 根の側を置き換える。**側は根のもの**なので、書き換わるのは `sides` だけ。
+fn reside(
+  doc : @tree.Doc,
+  at : Int,
+  sides : Array[@tree.Side],
+  focus : Int,
+) -> Done? {
+  let roots = doc.roots.copy()
+  roots[at] = { ..roots[at], sides, }
+  Some({ doc: { ..doc, roots, }, focus: Some(focus), })
+}
+
+///|
+/// 深いノードを反対側の末尾へ引き出す。**深さは保つ**ので、間を Implicit が埋める。
+/// 項目は相対記法で深さを持たず飛びを綴れないので、直に深さ 2 へ。
+fn haul(
+  doc : @tree.Doc,
+  r : @tree.Root,
+  id : Int,
+  side~ : @tree.Side,
+  depth~ : Int,
+) -> Done? {
+  let taken = []
+  guard take(doc, [id], taken) is Some(rest) else { return None }
+  let mut next = fresh(doc)
+  let mut wrapped = taken[0]
+  if !(@tree.sign_of(wrapped) is Some(Item)) {
+    for _ in 0..<(depth - 2) {
+      wrapped = {
+        id: next,
+        label: "",
+        fold: None,
+        body: [],
+        children: [wrapped],
+        mark: None,
       }
-      done(append(rest, node=r.node.id, side~, [wrapped]), Some(id))
+      next = next + 1
     }
   }
+  done(append(rest, node=r.node.id, side~, [wrapped]), Some(id))
 }
 
 ///|
@@ -662,17 +682,7 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
       p
     }
   }
-  // 一番外の中身を、行のノードになる段落と、body へ行く中身に分ける
-  let labels : Array[String] = []
-  let rest : Array[@tree.Block] = []
-  for b in sub.body {
-    // 読み解かなかった中身の原文だけが、行のノードになりうる
-    let ls = if b.content is None { b.source.bind(@tree.lines) } else { None }
-    match ls {
-      Some(ls) => labels.append(ls)
-      None => rest.push(b)
-    }
-  }
+  let (labels, rest) = split_prose(sub.body)
   // 行のノードは文書に無い番号から、断片の id はその先へ寄せる
   let first = fresh(doc)
   let by = first + labels.length() - (@tree.doc_id + 1)
@@ -697,6 +707,24 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
     return Some({ doc: cur, focus: Some(prose[0].id), })
   }
   done(place(cur, at, nodes), Some(nodes[0].id))
+}
+
+///|
+/// 貼る断片の一番外の中身を、**行のノードになる字**と**中身のまま行くもの**に分ける。
+/// 行になりうるのは読み解かなかった中身の原文（段落）だけで、1 行が 1 ノード。
+fn split_prose(
+  body : Array[@tree.Block],
+) -> (Array[String], Array[@tree.Block]) {
+  let labels : Array[String] = []
+  let rest : Array[@tree.Block] = []
+  for b in body {
+    let ls = if b.content is None { b.source.bind(@tree.lines) } else { None }
+    match ls {
+      Some(ls) => labels.append(ls)
+      None => rest.push(b)
+    }
+  }
+  (labels, rest)
 }
 
 ///|
