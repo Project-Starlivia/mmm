@@ -50,8 +50,6 @@ pub fn sign_of(Node) -> Sign?
 
 pub fn spans_sig(String) -> String
 
-pub fn survey(String) -> (Doc, Map[Int, Spot])
-
 pub fn unbuild(Doc) -> @markdown.Document
 
 pub fn unbuild_node(Node, Int, Array[Side], Array[String]) -> @markdown.Document

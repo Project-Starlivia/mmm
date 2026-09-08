@@ -75,14 +75,14 @@ fn fresh(label : String) -> Node {
 ///|
 test "変わっていなければ編集は無い" {
   let md = "# r\n\n## a\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   json_inspect(changes(md, before, spans, before), content=[])
 }
 
 ///|
 test "ラベルだけ変えれば、その地番だけ" {
   let md = "# r\n\n## a\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [0], relabel("A"))
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 5, "to": 10, "insert": "## A\n" },
@@ -92,7 +92,7 @@ test "ラベルだけ変えれば、その地番だけ" {
 ///|
 test "中身を足せば、そのノードの地番" {
   let md = "# r\n\n## a\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [0], x => { ..x, body: [raw("x")], })
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 10, "to": 10, "insert": "\nx\n" },
@@ -102,7 +102,7 @@ test "中身を足せば、そのノードの地番" {
 ///|
 test "深い所の変化は上を触らない" {
   let md = "# r\n\n## a\n\n### x\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [0, 0], relabel("X"))
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 11, "to": 17, "insert": "### X\n" },
@@ -112,7 +112,7 @@ test "深い所の変化は上を触らない" {
 ///|
 test "最初の子は親の尻に差す" {
   let md = "# r\n\n## a\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [0], adopt(fresh("c")))
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 10, "to": 10, "insert": "\n### c\n" },
@@ -122,7 +122,7 @@ test "最初の子は親の尻に差す" {
 ///|
 test "増えた子は最後に残る子の後ろ" {
   let md = "# r\n\n## a\n\n### x\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [0], adopt(fresh("y")))
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 17, "to": 17, "insert": "\n### y\n" },
@@ -132,7 +132,7 @@ test "増えた子は最後に残る子の後ろ" {
 ///|
 test "頭に差せば次に残る子の手前" {
   let md = "# r\n\n## a\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [], x => {
     ..x,
     children: [fresh("c")] + x.children,
@@ -145,7 +145,7 @@ test "頭に差せば次に残る子の手前" {
 ///|
 test "消えた子は範囲ごと消える" {
   let md = "# r\n\n## a\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [], x => { ..x, children: [x.children[0]], })
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 10, "to": 16, "insert": "" },
@@ -155,7 +155,7 @@ test "消えた子は範囲ごと消える" {
 ///|
 test "並べ替えは容器ごと" {
   let md = "# r\n\n## a\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [], x => { ..x, children: x.children.rev(), })
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 0, "to": 16, "insert": "# r\n\n## b\n\n## a\n" },
@@ -165,7 +165,7 @@ test "並べ替えは容器ごと" {
 ///|
 test "子を総取り替えすれば、消して同じ桁に差す" {
   let md = "- a\n  - b\n- c\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let z : Node = {
     id: 99,
     label: "z",
@@ -192,7 +192,7 @@ test "子を総取り替えすれば、消して同じ桁に差す" {
 ///|
 test "入れ子の項目の手前に差せば、後ろに字下げを戻す" {
   let md = "- a\n  - b\n- c\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let z : Node = {
     id: 99,
     label: "z",
@@ -224,7 +224,7 @@ test "入れ子の項目の手前に差せば、後ろに字下げを戻す" {
 ///|
 test "入れ子の項目が消えれば字下げも道連れ" {
   let md = "- a\n  - b\n  - d\n- c\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [], x => { ..x, children: [x.children[1]], })
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 4, "to": 10, "insert": "" },
@@ -234,7 +234,7 @@ test "入れ子の項目が消えれば字下げも道連れ" {
 ///|
 test "側の在る根に子を足せば根が丸ごと" {
   let md = "# r\n\n## a\n\n---\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let roots = before.roots.copy()
   let r = roots[0]
   roots[0] = {
@@ -255,7 +255,7 @@ test "側の在る根に子を足せば根が丸ごと" {
 ///|
 test "畳みの中の子の出し入れは容器ごと" {
   let md = "# r\n\n<details>\n\n## a\n\n</details>\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [0], adopt(fresh("c")))
   json_inspect(changes(md, before, spans, after), content=[
     {
@@ -269,7 +269,7 @@ test "畳みの中の子の出し入れは容器ごと" {
 ///|
 test "改行の無い末尾に差すときは改行してから" {
   let md = "# a"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [], adopt(fresh("b")))
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 3, "to": 3, "insert": "\n\n## b\n" },
@@ -279,7 +279,7 @@ test "改行の無い末尾に差すときは改行してから" {
 ///|
 test "側が変われば根が丸ごと" {
   let md = "# r\n\n## a\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let roots = before.roots.copy()
   roots[0] = { node: roots[0].node, sides: [Right, Left], rules: ["", ""], }
   let after : Doc = { ..before, roots, }
@@ -291,7 +291,7 @@ test "側が変われば根が丸ごと" {
 ///|
 test "枝の移動は元と先の 2 箇所" {
   let md = "# r\n\n## a\n\n### x\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let x = before.roots[0].node.children[0].children[0]
   let after = change(change(before, 0, [0], orphan), 0, [1], adopt(x))
   json_inspect(changes(md, before, spans, after), content=[
@@ -303,7 +303,7 @@ test "枝の移動は元と先の 2 箇所" {
 ///|
 test "入れ子の項目の子は、容器の中身の桁に差す" {
   let md = "- a\n  - b\n- c\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let d : Node = {
     id: 99,
     label: "d",
@@ -331,7 +331,7 @@ test "入れ子の項目の子は、容器の中身の桁に差す" {
 ///|
 test "散文" {
   let md = "hello\n\n# a\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after : Doc = { ..before, body: [raw("bye")], }
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 0, "to": 6, "insert": "bye\n" },
@@ -341,7 +341,7 @@ test "散文" {
 ///|
 test "根も同じ — 増えれば隣に差す" {
   let md = "# a\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after : Doc = {
     ..before,
     roots: before.roots + [{ node: fresh("b"), sides: [], rules: [], }],
@@ -354,7 +354,7 @@ test "根も同じ — 増えれば隣に差す" {
 ///|
 test "根が消えれば範囲ごと消える" {
   let md = "# a\n\n# b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after : Doc = { ..before, roots: [before.roots[0]], }
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 4, "to": 9, "insert": "" },
@@ -364,7 +364,7 @@ test "根が消えれば範囲ごと消える" {
 ///|
 test "根が無い文書に最初の根を差す" {
   let md = "hello\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after : Doc = {
     ..before,
     roots: [{ node: fresh("b"), sides: [], rules: [], }],
@@ -380,7 +380,7 @@ test "根が無い文書に最初の根を差す" {
 /// （全文も同じ形になるが、それが正規形）
 test "読み直して形が違えば全文へ落ちる" {
   let md = "# r\n\n## a\n\n### c\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [0, 0], relabel("a\nb"))
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 0, "to": 17, "insert": "# r\n\n## a\n\n### a\nb\n" },
@@ -390,7 +390,7 @@ test "読み直して形が違えば全文へ落ちる" {
 ///|
 test "ラベルだけなら自分の行だけ。子は触らない" {
   let md = "# r\n\n## a\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [], relabel("R"))
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 0, "to": 4, "insert": "# R\n" },
@@ -400,7 +400,7 @@ test "ラベルだけなら自分の行だけ。子は触らない" {
 ///|
 test "項目のラベルだけなら、子の字下げは残る" {
   let md = "- a\n  - b\n- c\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [], relabel("A"))
   json_inspect(changes(md, before, spans, after), content=[
     { "from": 0, "to": 4, "insert": "- A\n" },
@@ -419,7 +419,7 @@ test "項目のラベルだけなら、子の字下げは残る" {
 ///|
 test "自分も子も変われば、自分の行と子列の差分" {
   let md = "# r\n\n## a\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(
     change(before, 0, [], relabel("R")),
     0,
@@ -441,7 +441,7 @@ fn rebody(body : Array[Block]) -> (Node) -> Node {
 ///|
 test "中身を 1 枚足せば、行は触らず行の尻へ隙間を挟んで差す" {
   let md = "# r\n\n## a\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [0], rebody([raw("x")]))
   let edits = changes(md, before, spans, after)
   json_inspect(edits, content=[{ "from": 10, "to": 10, "insert": "\nx\n" }])
@@ -451,7 +451,7 @@ test "中身を 1 枚足せば、行は触らず行の尻へ隙間を挟んで�
 ///|
 test "中身を 1 枚消せば、その範囲と隙間だけ" {
   let md = "# r\n\n## a\n\nhello\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [0], rebody([]))
   let edits = changes(md, before, spans, after)
   json_inspect(edits, content=[{ "from": 10, "to": 17, "insert": "" }])
@@ -461,7 +461,7 @@ test "中身を 1 枚消せば、その範囲と隙間だけ" {
 ///|
 test "中身を置き換えれば、その範囲だけ" {
   let md = "# r\n\n## a\n\nhello\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let a = before.roots[0].node.children[0]
   let after = change(
     before,
@@ -477,7 +477,7 @@ test "中身を置き換えれば、その範囲だけ" {
 ///|
 test "消える子は手前の隙間を道連れ" {
   let md = "# r\n\n## a\n\n## b\n\n## c\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let drop = (i : Int) => {
     change(before, 0, [], x => {
       match x {
@@ -500,13 +500,13 @@ test "消える子は手前の隙間を道連れ" {
 ///|
 test "増える子は正規形の隙間を連れてくる — 兄弟の後ろにも、空の親にも" {
   let md = "# r\n\n## a\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after = change(before, 0, [], adopt(fresh("c")))
   let edits = changes(md, before, spans, after)
   json_inspect(edits, content=[{ "from": 10, "to": 10, "insert": "\n## c\n" }])
   inspect(patched(md, edits), content="# r\n\n## a\n\n## c\n")
   let solo = "# r\n"
-  let (b2, s2) = survey(solo)
+  let (b2, s2) = build(solo, read(solo))
   let e2 = changes(solo, b2, s2, change(b2, 0, [], adopt(fresh("c"))))
   json_inspect(e2, content=[{ "from": 4, "to": 4, "insert": "\n## c\n" }])
 }
@@ -514,7 +514,7 @@ test "増える子は正規形の隙間を連れてくる — 兄弟の後ろに
 ///|
 test "詰まった項目の列は詰まったまま" {
   let md = "- a\n- b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let kid = {
     id: 99,
     label: "c",
@@ -534,7 +534,7 @@ test "詰まった項目の列は詰まったまま" {
 ///|
 test "枝の移動は隙間ごと — 元は消え、先には隙間を挟んで差す" {
   let md = "# r\n\n## a\n\nhello\n\n## b\n\n## c\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let r = before.roots[0].node
   let kids = r.children
   let after = change(before, 0, [], x => {
@@ -554,16 +554,16 @@ test "枝の移動は隙間ごと — 元は消え、先には隙間を挟んで
 ///|
 test "文書の頭の散文 — 隙間は後ろに付く" {
   let md = "hello\n\n# a\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let swapped = changes(md, before, spans, { ..before, body: [raw("bye")], })
   inspect(patched(md, swapped), content="bye\n\n# a\n")
   let gone = changes(md, before, spans, { ..before, body: [], })
   inspect(patched(md, gone), content="# a\n")
   let bare = "# a\n"
-  let (b2, s2) = survey(bare)
+  let (b2, s2) = build(bare, read(bare))
   let born = changes(bare, b2, s2, { ..b2, body: [raw("bye")], })
   inspect(patched(bare, born), content="bye\n\n# a\n")
-  let (b3, s3) = survey("")
+  let (b3, s3) = build("", read(""))
   let first = changes("", b3, s3, { ..b3, body: [raw("bye")], })
   inspect(patched("", first), content="bye\n")
 }
@@ -571,12 +571,12 @@ test "文書の頭の散文 — 隙間は後ろに付く" {
 ///|
 test "文書の頭の中身を並べ替えても、頭に空行は生まれない" {
   let md = "aaa\n\nbbb\n\n# h\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let bs = before.body
   let edits = changes(md, before, spans, { ..before, body: [bs[1], bs[0]], })
   inspect(patched(md, edits), content="bbb\n\naaa\n\n# h\n")
   let solo = "p1\n\np2\n"
-  let (b2, s2) = survey(solo)
+  let (b2, s2) = build(solo, read(solo))
   let e2 = changes(solo, b2, s2, { ..b2, body: [b2.body[1], b2.body[0]], })
   inspect(patched(solo, e2), content="p2\n\np1\n")
 }
@@ -586,7 +586,7 @@ test "文書の頭の中身を並べ替えても、頭に空行は生まれな�
 /// 触っていない行のバイト列はそのまま残るので、原文の CRLF は動かない。
 test "改行の無い末尾に差すとき、書き足す改行は LF" {
   let md = "# r\r\n\r\n## a"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let edits = changes(
     md,
     before,
@@ -599,7 +599,7 @@ test "改行の無い末尾に差すとき、書き足す改行は LF" {
 ///|
 test "Implicit の子を入れ替えても、その手前の隙間は 1 つのまま" {
   let md = "# a\n\n#### deep\n\n## b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   // 深さ 3 の Implicit の中身（deep）を、新しい見出しに差し替える
   let after = change(before, 0, [0], x => { ..x, children: [fresh("w")], })
   let edits = changes(md, before, spans, after)
@@ -609,7 +609,7 @@ test "Implicit の子を入れ替えても、その手前の隙間は 1 つの�
 ///|
 test "改行の無い末尾のノードを外へ出しても、空行は 1 つ" {
   let md = "# r\n\n## a\n\nhello"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let r = before.roots[0].node
   let a = r.children[0]
   let after : Doc = {
@@ -626,7 +626,7 @@ test "改行の無い末尾のノードを外へ出しても、空行は 1 つ" 
 ///|
 test "Implicit の手前の隙間 — CRLF でも、空白だけの空行でも 1 つのまま" {
   let crlf = "# a\r\n\r\n#### deep\r\n\r\n## b\r\n"
-  let (b1, s1) = survey(crlf)
+  let (b1, s1) = build(crlf, read(crlf))
   let e1 = changes(
     crlf,
     b1,
@@ -636,7 +636,7 @@ test "Implicit の手前の隙間 — CRLF でも、空白だけの空行でも 
   // 差した断片の改行は LF。触っていない行の CRLF はそのまま
   inspect(patched(crlf, e1), content="# a\r\n\r\n### w\n\r\n## b\r\n")
   let spaced = "# a\n  \n#### deep\n\n## b\n"
-  let (b2, s2) = survey(spaced)
+  let (b2, s2) = build(spaced, read(spaced))
   let e2 = changes(
     spaced,
     b2,
@@ -650,7 +650,7 @@ test "Implicit の手前の隙間 — CRLF でも、空白だけの空行でも 
 ///|
 test "列の頭の境目は列のもの — 頭を消しても差しても、境目の字は残る" {
   let tight = "# r\n- a\n- b\n"
-  let (b1, s1) = survey(tight)
+  let (b1, s1) = build(tight, read(tight))
   let kids1 = b1.roots[0].node.children
   let cut = changes(
     tight,
@@ -675,7 +675,7 @@ test "列の頭の境目は列のもの — 頭を消しても差しても、境
   )
   inspect(patched(tight, born), content="# r\n- z\n- a\n- b\n")
   let loose = "# r\n\n- a\n- b\n- c\n"
-  let (b2, s2) = survey(loose)
+  let (b2, s2) = build(loose, read(loose))
   let kids2 = b2.roots[0].node.children
   let e2 = changes(
     loose,
@@ -689,7 +689,7 @@ test "列の頭の境目は列のもの — 頭を消しても差しても、境
 ///|
 test "frontmatter の直後の空行は、頭の要素を触っても消えない" {
   let md = "---\nk: v\n---\n\n# a\n\n# b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let less : Doc = { ..before, roots: [before.roots[1]], }
   inspect(
     patched(md, changes(md, before, spans, less)),
@@ -701,7 +701,7 @@ test "frontmatter の直後の空行は、頭の要素を触っても消えな�
     content="---\nk: v\n---\n\nx\n\n# a\n\n# b\n",
   )
   let said = "---\nk: v\n---\n\nhello\n\n# a\n"
-  let (b2, s2) = survey(said)
+  let (b2, s2) = build(said, read(said))
   inspect(
     patched(said, changes(said, b2, s2, { ..b2, body: [], })),
     content="---\nk: v\n---\n\n# a\n",
@@ -711,7 +711,7 @@ test "frontmatter の直後の空行は、頭の要素を触っても消えな�
 ///|
 test "setext の見出しに子を足しても、下線の中に差さない" {
   let md = "a\n===\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let edits = changes(
     md,
     before,
@@ -724,7 +724,7 @@ test "setext の見出しに子を足しても、下線の中に差さない" {
 ///|
 test "空行の後に詰めて書いた列の頭を包んでも、その空行は残る" {
   let md = "# r\n\n- a\n- b\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let kids = before.roots[0].node.children
   let w = {
     id: 99,
@@ -752,7 +752,7 @@ test "空行の後に詰めて書いた列の頭を包んでも、その空行�
     content="# r\n\n- w\n  - a\n- b\n",
   )
   let loose = "# r\n\n- a\n\n- b\n"
-  let (b2, s2) = survey(loose)
+  let (b2, s2) = build(loose, read(loose))
   let k2 = b2.roots[0].node.children
   let z = {
     id: 98,
@@ -779,7 +779,7 @@ test "空行の後に詰めて書いた列の頭を包んでも、その空行�
 ///|
 test "散文を消しながら根の頭に差しても、文書の頭に空行は生まれない" {
   let md = "hello\n\n# a\n"
-  let (before, spans) = survey(md)
+  let (before, spans) = build(md, read(md))
   let after : Doc = {
     ..before,
     body: [],

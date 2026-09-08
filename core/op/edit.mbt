@@ -1,7 +1,7 @@
 // md と操作の境界。操作（Doc → Doc）と合流（前後の木 → 編集列）を繋ぐ
 // 唯一の場所で、core はここでも状態を持たない — 操作 1 回ごとに md を読み直す。
 //
-//   (before, spans) = survey(md)
+//   (before, spans) = build(md, read(md))
 //   done            = apply(before, op)           None なら編集は無い
 //   merged          = merge(md, before, spans, done.doc)
 //   focus           = done.focus を、読み直したときの番号に読み替える
@@ -18,7 +18,7 @@ pub(all) struct Edited {
 
 ///|
 pub fn edit(md : String, op : Op) -> Edited {
-  let (before, spans) = @tree.survey(md)
+  let (before, spans) = @tree.build(md, @tree.read(md))
   match apply(before, op) {
     Some(done) => {
       // 書いた md を読み直して形が合わなければ focus は無い — focus は文書順の

@@ -325,7 +325,7 @@ fn law(
 ///|
 test "法則 — 全ノードのラベルを変える。比例性も見る" {
   for md in corpus {
-    let (before, spans) = survey(md)
+    let (before, spans) = build(md, read(md))
     for id in all_ids(before) {
       let after = changed(before, id, Relabel)
       let edits = law(md, before, spans, after, "relabel \{id} in \{md}")
@@ -351,7 +351,7 @@ test "法則 — 全ノードのラベルを変える。比例性も見る" {
 ///|
 test "法則 — 全ノードを消す" {
   for md in corpus {
-    let (before, spans) = survey(md)
+    let (before, spans) = build(md, read(md))
     for id in all_ids(before) {
       let after = changed(before, id, Delete)
       ignore(law(md, before, spans, after, "delete \{id} in \{md}"))
@@ -362,7 +362,7 @@ test "法則 — 全ノードを消す" {
 ///|
 test "法則 — 全ノードに子を足す" {
   for md in corpus {
-    let (before, spans) = survey(md)
+    let (before, spans) = build(md, read(md))
     for id in all_ids(before) {
       let after = changed(before, id, Adopt)
       ignore(law(md, before, spans, after, "adopt \{id} in \{md}"))
@@ -373,7 +373,7 @@ test "法則 — 全ノードに子を足す" {
 ///|
 test "法則 — 根を足す・消す" {
   for md in corpus {
-    let (before, spans) = survey(md)
+    let (before, spans) = build(md, read(md))
     let more : Doc = {
       ..before,
       roots: before.roots + [{ node: newborn(false), sides: [], rules: [], }],
@@ -389,7 +389,7 @@ test "法則 — 根を足す・消す" {
 ///|
 test "法則 — 行の不可侵と隙間の保存。全ノード × 全部の変え方" {
   for md in corpus {
-    let (before, spans) = survey(md)
+    let (before, spans) = build(md, read(md))
     for id in all_ids(before) {
       for how in [Relabel, Delete, Adopt, AddBlock, DropBlock, SetBlock, Swap] {
         let after = changed(before, id, how)
