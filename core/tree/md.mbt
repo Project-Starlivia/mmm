@@ -3,10 +3,11 @@
 //
 // 読みも書きも「ライブラリ」と「方言」の直列:
 //
-//   read(md)   = @markdown.parse(md) |> dialect(md)      mdAst → mmm の方言の mdAst
+//   read(md)   = @markdown.parse(md) |> stretch(md)      mdAst → mmm の方言の mdAst
 //   write(ast) = @markdown.serialize(ast)
 //
-// 方言はライブラリの癖を mmm の決めに揃える所で、build / content / fold / merge は
+// 方言はライブラリの癖を mmm の決めに揃える所で、**意味は 1 つも足さない** —
+// やるのは span の尻を行末まで伸ばすことだけ（`stretch`）。build / content / fold / merge は
 // 方言の mdAst だけを見る。癖の一覧は docs/core.md「方言」。書く側に方言は要らない
 // — 読んだ原文は生の塊で渡すので、ライブラリが綴るのは並びと字下げだけ。
 // 例外は項目の列（unbuild.mbt）— マーカー・ラベルの桁・詰めをライブラリの書き手が
@@ -23,7 +24,7 @@
 ///|
 /// md → 方言の mdAst。
 pub fn read(md : String) -> @markdown.Document {
-  dialect(md, @markdown.parse(md).document)
+  stretch(md, @markdown.parse(md).document)
 }
 
 ///|
@@ -33,14 +34,28 @@ pub fn read(md : String) -> @markdown.Document {
 /// 揃える。段落の span が中身の頭から始まること、インラインの span が段落の中身に
 /// 対する相対であることは、ライブラリの決めとしてそのまま使う。`Blank` は触らない
 /// （入れ子の項目の周りで範囲が壊れているので、隙間は原文の字で測る）。
-fn dialect(md : String, doc : @markdown.Document) -> @markdown.Document {
-  // フェンス付きの塊の開きの行。閉じのフェンスを探すとき、別の塊の開きを閉じと見ないため
-  // （閉じの無いフェンスが容器の尻で切れると、次の開きが閉じに見える）
-  let openers : Set[Int] = Set([])
+fn stretch(md : String, doc : @markdown.Document) -> @markdown.Document {
+  {
+    ..doc,
+    children: stretch_all(md, openers_of(md, doc.children), doc.children),
+    // ライブラリの定義行の span は、次も定義行なら改行込み・そうでなければ改行の手前で
+    // 止まる。改行の手前なら改行まで、もう改行の次なら据え置き
+    definitions: doc.definitions.map(d => {
+      ..d,
+      span: { from: d.span.from, to: after_newline(md, d.span.to), },
+    }),
+  }
+}
+
+///|
+/// フェンス付きの塊の開きの行。閉じのフェンスを探すとき、別の塊の開きを閉じと
+/// 見ないために要る（閉じの無いフェンスが容器の尻で切れると、次の開きが閉じに見える）。
+fn openers_of(md : String, blocks : Array[@markdown.Block]) -> Set[Int] {
+  let out : Set[Int] = Set([])
   fn note(b : @markdown.Block) {
     match b {
       FencedCode(span~, ..) | MathBlock(span~, ..) | Directive(span~, ..) =>
-        openers.add(line_start(md, span.from))
+        out.add(line_start(md, span.from))
       _ => ()
     }
     match b {
@@ -62,56 +77,60 @@ fn dialect(md : String, doc : @markdown.Document) -> @markdown.Document {
     }
   }
 
-  for b in doc.children {
+  for b in blocks {
     note(b)
   }
-  {
-    ..doc,
-    children: dialect_blocks(md, openers, doc.children),
-    // ライブラリの定義行の span は、次も定義行なら改行込み・そうでなければ改行の手前で
-    // 止まる。改行の手前なら改行まで、もう改行の次なら据え置き
-    definitions: doc.definitions.map(d => {
-      ..d,
-      span: { from: d.span.from, to: after_newline(md, d.span.to), },
-    }),
-  }
+  out
 }
 
 ///|
-/// 塊の列の方言。伸ばした span に丸ごと飲まれた塊は落とす — 入れ子の `:::` の閉じを
-/// ライブラリが段落と読むと、外の span を閉じまで伸ばした後に同じ字が 2 度書かれる。
-fn dialect_blocks(
+/// 塊の列。1 枚ずつ伸ばしてから、丸ごと飲まれた塊を落とす。
+fn stretch_all(
   md : String,
   openers : Set[Int],
   bs : Array[@markdown.Block],
 ) -> Array[@markdown.Block] {
+  unswallowed(bs.map(b => stretch_block(md, openers, b)))
+}
+
+///|
+/// 伸ばした span に丸ごと飲まれた塊を落とす — 入れ子の `:::` の閉じを
+/// ライブラリが段落と読むと、外の span を閉じまで伸ばした後に同じ字が 2 度書かれる。
+fn unswallowed(bs : Array[@markdown.Block]) -> Array[@markdown.Block] {
   let out : Array[@markdown.Block] = []
   let mut reach = -1
   for b in bs {
-    let m = dialect_block(md, openers, b)
-    let s = block_span(m)
+    let s = block_span(b)
     if s.from < reach && s.to <= reach {
       continue
     }
     if s.to > reach {
       reach = s.to
     }
-    out.push(m)
+    out.push(b)
   }
   out
 }
 
 ///|
-/// 塊 1 つの方言。容器は中まで歩く。
-fn dialect_block(
+/// 塊 1 つ。**容器を先に歩く** — `:::` は中身の尻まで伸ばしてから閉じを探すので、
+/// 中の塊が伸びた後でないと尻が決まらない。
+fn stretch_block(
   md : String,
   openers : Set[Int],
   b : @markdown.Block,
 ) -> @markdown.Block {
-  let inner = (bs : Array[@markdown.Block]) => dialect_blocks(md, openers, bs)
-  let items = (xs : Array[@markdown.ListItem]) => {
-    xs.map(it => { ..it, children: inner(it.children), })
-  }
+  stretched(md, openers, nested(md, openers, b))
+}
+
+///|
+/// フェンス付きの塊（コード・`$$`・`:::`）の span を、閉じの行の改行まで伸ばす。
+/// ほかの塊はそのまま。
+fn stretched(
+  md : String,
+  openers : Set[Int],
+  b : @markdown.Block,
+) -> @markdown.Block {
   match b {
     FencedCode(
       fence_marker~,
@@ -160,8 +179,7 @@ fn dialect_block(
       trailing_trivia~
     ) => {
       // 中身が 2 塊以上だと span は最初の塊の尻で止まる。中身の尻まで伸ばしてから閉じを探す
-      let kids = inner(children)
-      let to = kids.fold(init=span.to, (t, c) => {
+      let to = children.fold(init=span.to, (t, c) => {
         let s = block_span(c)
         if s.to > t {
           s.to
@@ -172,17 +190,30 @@ fn dialect_block(
       Directive(
         name~,
         meta~,
-        children=kids,
+        children~,
         fence_length~,
         span=closed(md, openers, ':', { from: span.from, to, }),
         leading_trivia~,
         trailing_trivia~,
       )
     }
+    other => other
+  }
+}
+
+///|
+/// 容器の中の塊も方言に直す。ほかの塊はそのまま。
+fn nested(
+  md : String,
+  openers : Set[Int],
+  b : @markdown.Block,
+) -> @markdown.Block {
+  let inner = (bs : Array[@markdown.Block]) => stretch_all(md, openers, bs)
+  match b {
     BulletList(
       marker~,
       tight~,
-      items=xs,
+      items~,
       span~,
       leading_trivia~,
       trailing_trivia~
@@ -190,7 +221,7 @@ fn dialect_block(
       BulletList(
         marker~,
         tight~,
-        items=items(xs),
+        items=items.map(it => { ..it, children: inner(it.children), }),
         span~,
         leading_trivia~,
         trailing_trivia~,
@@ -199,7 +230,7 @@ fn dialect_block(
       start~,
       delimiter~,
       tight~,
-      items=xs,
+      items~,
       span~,
       leading_trivia~,
       trailing_trivia~
@@ -208,7 +239,7 @@ fn dialect_block(
         start~,
         delimiter~,
         tight~,
-        items=items(xs),
+        items=items.map(it => { ..it, children: inner(it.children), }),
         span~,
         leading_trivia~,
         trailing_trivia~,
@@ -228,6 +259,24 @@ fn dialect_block(
         leading_trivia~,
         trailing_trivia~,
       )
+    Directive(
+      name~,
+      meta~,
+      children~,
+      fence_length~,
+      span~,
+      leading_trivia~,
+      trailing_trivia~
+    ) =>
+      Directive(
+        name~,
+        meta~,
+        children=inner(children),
+        fence_length~,
+        span~,
+        leading_trivia~,
+        trailing_trivia~,
+      )
     FootnoteDefinition(
       label~,
       children~,
@@ -243,7 +292,7 @@ fn dialect_block(
         trailing_trivia~,
       )
     Attributed(block~, attributes~, span~) =>
-      Attributed(block=dialect_block(md, openers, block), attributes~, span~)
+      Attributed(block=stretch_block(md, openers, block), attributes~, span~)
     other => other
   }
 }
