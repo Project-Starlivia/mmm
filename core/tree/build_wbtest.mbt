@@ -497,274 +497,194 @@ test "number — 文書順に振り直したときの番号。中身も同じ列
 // 項目の中身は文書と同じ規則で読む — 見出しは項目の子
 // ══════════════════════════════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════════
+// 項目の中は、その項目の深さを 0 とした文書（docs/spec.md「項目の中」）
+// ══════════════════════════════════════════════════════════════════
+
 ///|
-/// 空の項目の子に `n`。`- - n` と同じ木
-test "項目の中の見出しは子 — 名前の無い項目の子になる" {
-  json_inspect(parse("- # n\n"), content={
-    "body": [],
-    "roots": [
-      {
-        "node": {
-          "id": 2,
-          "label": "",
-          "body": [],
-          "children": [
-            {
-              "id": 3,
-              "label": "n",
-              "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-            },
-          ],
-          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-        },
-        "sides": ["Right"],
-        "rules": [""],
-      },
-    ],
-  })
+/// 骨格だけを見る。深さぶん字下げして、綴りの印（`#` 見出し・`-` 項目・
+/// `.` 飛び）とラベルを並べる。中身は枚数だけ。
+fn skeleton(md : String) -> String {
+  let out = []
+  fn node(x : Node, depth : Int) -> Unit {
+    let sign = match x.mark {
+      Some(Heading(..)) => "#"
+      Some(Item(..)) => "-"
+      None => "."
+    }
+    let label = if x.label == "" { "" } else { " " + x.label }
+    let body = if x.body.is_empty() {
+      ""
+    } else {
+      " +" + x.body.length().to_string()
+    }
+    out.push("  ".repeat(depth - 1) + sign + label + body)
+    for k in x.children {
+      node(k, depth + 1)
+    }
+  }
+
+  for r in parse(md).roots {
+    node(r.node, 1)
+  }
+  out.join("\n")
 }
 
 ///|
-test "項目の中の見出しは子 — 名前のある項目の子にもなる" {
-  json_inspect(parse("- x\n  # n\n"), content={
-    "body": [],
-    "roots": [
-      {
-        "node": {
-          "id": 2,
-          "label": "x",
-          "body": [],
-          "children": [
-            {
-              "id": 3,
-              "label": "n",
-              "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-            },
-          ],
-          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-        },
-        "sides": ["Right"],
-        "rules": [""],
-      },
-    ],
-  })
+/// 顔（最初の塊）が見出しなら、項目のラベルは空でその見出しは子。
+/// `<li>` は 1 つなので項目も 1 つ。
+test "項目の中は文書 — 顔の見出しは子" {
+  inspect(
+    skeleton("- # head\n"),
+    content=(
+      #|-
+      #|  # head
+    ),
+  )
 }
 
 ///|
-/// n > s（中身 text）> k。文書と同じ規則
-test "項目の中の見出しは子 — 見出しの後ろは文書と同じく中身と子" {
-  json_inspect(parse("- # n\n  ## s\n  text\n  - k\n"), content={
-    "body": [],
-    "roots": [
-      {
-        "node": {
-          "id": 2,
-          "label": "",
-          "body": [],
-          "children": [
-            {
-              "id": 3,
-              "label": "n",
-              "body": [],
-              "children": [
-                {
-                  "id": 4,
-                  "label": "s",
-                  "body": [
-                    { "id": 5, "content": ["Raw", "text"], "source": "text" },
-                  ],
-                  "children": [
-                    {
-                      "id": 6,
-                      "label": "k",
-                      "body": [],
-                      "children": [],
-                      "mark": [
-                        "Item",
-                        { "marker": "-", "offset": 2, "loose": false },
-                      ],
-                    },
-                  ],
-                  "mark": [
-                    "Item",
-                    { "marker": "-", "offset": 2, "loose": false },
-                  ],
-                },
-              ],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-            },
-          ],
-          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-        },
-        "sides": ["Right"],
-        "rules": [""],
-      },
-    ],
-  })
+/// 2 塊目でも同じ。顔かどうかは関係ない（ラベルは顔が段落のときだけ）。
+test "項目の中は文書 — 2 塊目の見出しも子" {
+  inspect(
+    skeleton("- a\n  # x\n"),
+    content=(
+      #|- a
+      #|  # x
+    ),
+  )
 }
 
 ///|
-/// 飛びは埋めない（項目は相対記法）。`###` でも直の子
-test "項目の中の見出しは子 — 飛びは埋めない" {
-  json_inspect(parse("- ### a\n"), content={
-    "body": [],
-    "roots": [
-      {
-        "node": {
-          "id": 2,
-          "label": "",
-          "body": [],
-          "children": [
-            {
-              "id": 3,
-              "label": "a",
-              "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-            },
-          ],
-          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-        },
-        "sides": ["Right"],
-        "rules": [""],
-      },
-    ],
-  })
+/// `#` の本数は項目からの深さ。飛びは文書と同じく Implicit が埋める。
+test "項目の中は文書 — 飛びは Implicit が埋める" {
+  inspect(
+    skeleton("- ## head\n"),
+    content=(
+      #|-
+      #|  .
+      #|    # head
+    ),
+  )
 }
 
 ///|
-/// `- k` は開いている `# a` の子。同じ深さの `# b` は `a` を閉じるので、
-/// 持ち主は項目 `x` に戻り `a` の兄弟になる（x > [a > [k], b]）。
-test "項目の中の見出しは子 — 見出しを閉じれば、続く見出しは元の項目の子" {
-  json_inspect(parse("- x\n  # a\n  - k\n  # b\n"), content={
-    "body": [],
-    "roots": [
-      {
-        "node": {
-          "id": 2,
-          "label": "x",
-          "body": [],
-          "children": [
-            {
-              "id": 3,
-              "label": "a",
-              "body": [],
-              "children": [
-                {
-                  "id": 4,
-                  "label": "k",
-                  "body": [],
-                  "children": [],
-                  "mark": [
-                    "Item",
-                    { "marker": "-", "offset": 2, "loose": false },
-                  ],
-                },
-              ],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-            },
-            {
-              "id": 5,
-              "label": "b",
-              "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-            },
-          ],
-          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-        },
-        "sides": ["Right", "Right"],
-        "rules": ["", ""],
-      },
-    ],
-  })
+/// 深い見出しは浅い見出しの子。
+test "項目の中は文書 — 深い見出しは子" {
+  inspect(
+    skeleton("- # x\n  ## y\n"),
+    content=(
+      #|-
+      #|  # x
+      #|    # y
+    ),
+  )
 }
 
 ///|
-/// 項目を出れば積みも持ち主も戻る。`# b` は前の項目の `## a` に引きずられず、
-/// 2 つ目の項目の子（名前の無い項目 2 つが、それぞれ子を 1 つ持つ）。
-test "項目の中の見出しは子 — 見出しの積みは項目ごと" {
-  json_inspect(parse("- ## a\n- # b\n"), content={
-    "body": [],
-    "roots": [
-      {
-        "node": {
-          "id": 2,
-          "label": "",
-          "body": [],
-          "children": [
-            {
-              "id": 3,
-              "label": "a",
-              "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-            },
-          ],
-          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-        },
-        "sides": ["Right"],
-        "rules": [""],
-      },
-      {
-        "node": {
-          "id": 4,
-          "label": "",
-          "body": [],
-          "children": [
-            {
-              "id": 5,
-              "label": "b",
-              "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-            },
-          ],
-          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-        },
-        "sides": ["Right"],
-        "rules": [""],
-      },
-    ],
-  })
+/// 浅く戻れば兄弟。飛びを埋めた Implicit の隣に並ぶ。
+test "項目の中は文書 — 浅く戻れば兄弟" {
+  inspect(
+    skeleton("- ## x\n  # y\n"),
+    content=(
+      #|-
+      #|  .
+      #|    # x
+      #|  # y
+    ),
+  )
 }
 
 ///|
-/// `# b` は `## a` より浅いので兄弟
-test "項目の中の見出しは子 — 浅く戻れば兄弟" {
-  json_inspect(parse("- ## a\n  # b\n"), content={
-    "body": [],
-    "roots": [
-      {
-        "node": {
-          "id": 2,
-          "label": "",
-          "body": [],
-          "children": [
-            {
-              "id": 3,
-              "label": "a",
-              "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-            },
-            {
-              "id": 4,
-              "label": "b",
-              "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-            },
-          ],
-          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-        },
-        "sides": ["Right", "Right"],
-        "rules": ["", ""],
-      },
-    ],
-  })
+/// 順序法則も文書と同じ — 見出しの後ろの項目はその見出しの子。
+test "項目の中は文書 — 見出しの後ろの項目は子" {
+  inspect(
+    skeleton("- # x\n  - y\n"),
+    content=(
+      #|-
+      #|  # x
+      #|    - y
+    ),
+  )
+}
+
+///|
+/// 同じ深さの見出しは前の見出しを閉じるので、続く見出しは元の項目の子。
+test "項目の中は文書 — 見出しを閉じれば元の項目の子" {
+  inspect(
+    skeleton("- x\n  # a\n  - k\n  # b\n"),
+    content=(
+      #|- x
+      #|  # a
+      #|    - k
+      #|  # b
+    ),
+  )
+}
+
+///|
+/// 積みは項目ごと。前の項目の見出しは次の項目に引きずられない。
+test "項目の中は文書 — 積みは項目ごと" {
+  inspect(
+    skeleton("- ## a\n- # b\n"),
+    content=(
+      #|-
+      #|  .
+      #|    # a
+      #|-
+      #|  # b
+    ),
+  )
+}
+
+///|
+/// 側は根の子だけの性質なので、項目の中の `---` は常に飾り（直前のノードの
+/// 中身の尻）。境界にならないので、続く見出しは引き出されない。
+test "項目の中は文書 — 中の水平線は飾り" {
+  inspect(
+    skeleton("- # x\n\n  ---\n\n  # y\n"),
+    content=(
+      #|-
+      #|  # x +1
+      #|  # y
+    ),
+  )
+}
+
+///|
+/// 項目の中の見出しも `#` は 6 本まで。7 本目は段落なので中身に落ちる。
+test "項目の中は文書 — 7 本目の # は中身" {
+  inspect(
+    skeleton("- ###### a\n  ####### b\n"),
+    content=(
+      #|-
+      #|  .
+      #|    .
+      #|      .
+      #|        .
+      #|          .
+      #|            # a +1
+    ),
+  )
+}
+
+///|
+/// **意味は往復で失われない。** 項目の中の見出しは `#` のまま読み書きされ、
+/// 書いた字を読み直しても同じ木になる（空行の数は正規形に落ちる）。
+test "項目の中は文書 — 往復しても木は変わらず、書き方は落ち着く" {
+  let corpus = [
+    "- # head\n", "- a\n  # x\n", "- ## head\n", "- # x\n  ## y\n", "- ## x\n  # y\n",
+    "- # x\n  - y\n", "- x\n  # a\n  - k\n  # b\n", "- ## a\n- # b\n", "- # x\n\n  ---\n\n  # y\n",
+  ]
+  let bad = []
+  for md in corpus {
+    let once = serialize(parse(md))
+    if shape(parse(once)) != shape(parse(md)) {
+      bad.push("木が変わる " + md.escape() + " -> " + once.escape())
+    }
+    if serialize(parse(once)) != once {
+      bad.push("冪等でない " + once.escape())
+    }
+  }
+  json_inspect(bad, content=[])
 }

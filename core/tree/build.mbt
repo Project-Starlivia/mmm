@@ -76,7 +76,7 @@ pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
     own: deep,
     dry: false,
     owner: 0,
-    hl: [],
+    base: 0,
   }
   for piece in pieces(md, ast.children, b.defs, 0) {
     lay(b, piece, 0)
@@ -211,10 +211,10 @@ priv struct Build {
   /// **入れ子の列はその 1 つ下に座る** — stack の高さで測ると、前の列の
   /// 項目が積まれたままなので次の列がその子になる
   mut owner : Int
-  /// いま中身を読んでいる項目の中の、開いている見出しの `#` の本数（浅い順）。
-  /// 項目の中身は文書と同じ規則で読むが、飛びは埋めない（項目は相対記法）ので、
-  /// 深さは本数そのものではなく「開いている見出しの数」で決める
-  mut hl : Array[Int]
+  /// いま中身を読んでいる項目の深さ。**`#` の本数はここから測る** —
+  /// 項目の中は、その項目の深さを 0 とした文書（docs/spec.md「項目の中」）。
+  /// 文書そのものを読んでいる間は 0
+  mut base : Int
 }
 
 ///|
@@ -260,7 +260,7 @@ fn depths(
     own: deep,
     dry: true,
     owner: 0,
-    hl: [],
+    base: 0,
   }
   let out = Array::make(blocks.length(), { top: deep, own: deep, })
   for i, block in blocks {
@@ -321,32 +321,15 @@ fn take(
 ) -> Unit {
   match block {
     Heading(level~, style~, children~, closing_hashes~, span~, ..) => {
-      let (sign, depth) : (Sign, Int) = if nest > 0 {
-        // **項目の中身は文書と同じ規則で読む。** 中の見出しは項目の子（型が「項目の
-        // 子孫は項目」なので綴りは項目）。`#` の本数は入れ子の相対だけを決め、飛びは
-        // 埋めない。見出しの後ろの中身と入れ子はその見出しのもの（owner を進める）。
-        // 持ち主は**項目の深さ + 開いている見出しの数**。同じか浅い見出しは
-        // 開いている見出しを閉じるので、その数だけ浅い所へ戻る
-        let item_level = b.owner - b.hl.length()
-        while b.hl.length() > 0 && b.hl[b.hl.length() - 1] >= level {
-          ignore(b.hl.unsafe_pop())
-        }
-        b.hl.push(level)
-        b.owner = item_level + b.hl.length()
-        (Item, b.owner)
-      } else {
-        (Heading, level)
-      }
-      // 行の書き方は見出しの綴りにしか無い。項目に読み替えた見出しは `- a` に
-      // なるので、setext も閉じの `#` も持ち越さない
-      let mark = match sign {
-        Heading => Mark::Heading(setext=style is Setext, closing=closing_hashes)
-        Item => bullet
-      }
+      // **項目の中は、その項目の深さを 0 とした文書。** `#` の本数はそこから
+      // 測る絶対の深さで、飛びは put が Implicit で埋める。見出しの後ろの中身と
+      // 入れ子はその見出しのもの（owner を進める）
+      let depth = b.base + level
+      b.owner = depth
       put(
         b,
         depth,
-        Some(mark),
+        Some(Heading(setext=style is Setext, closing=closing_hashes)),
         label=head_label(b.md, span, style, children),
         fold~,
         at=span,
@@ -446,15 +429,15 @@ fn items_take(
     } else {
       pieces(b.md, rest, defs_in(b.defs, from, it.span.to), nest + 1)
     }
-    let outer = b.owner
-    let outer_hl = b.hl
+    let outer_owner = b.owner
+    let outer_base = b.base
     b.owner = level
-    b.hl = []
+    b.base = level
     for c in inner {
       lay(b, c, nest + 1)
     }
-    b.owner = outer
-    b.hl = outer_hl
+    b.owner = outer_owner
+    b.base = outer_base
   }
 }
 
@@ -496,10 +479,9 @@ fn put(
   // 導出値で、引き出し先に合わせて置き直せる（見出しは絶対座標なので
   // 動かせず、足りない深さを Implicit が埋める）
   let level = if b.pend && mark is Some(Item(..)) { 2 } else { level }
-  // **見出しは見出しの背骨にしか積まれない。** 項目の枠は見出しの親に
-  // なれないので落とす（列 0 の見出しは md でも項目を閉じる）。C17 を
-  // 深さ 1 から全部の深さへ広げたもの。これが無いと項目の子が見出しになる
-  if mark is Some(Heading(..)) {
+  // **列 0 の見出しは開いている項目を閉じる**（md でもそうなる）。項目の中の
+  // 見出し（`b.base > 0`）はその項目の子なので、閉じない
+  if b.base == 0 && mark is Some(Heading(..)) {
     while b.stack.length() > 0 &&
           b.stack[b.stack.length() - 1].mark is Some(Item(..)) {
       ignore(b.stack.unsafe_pop())

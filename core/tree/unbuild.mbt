@@ -212,7 +212,9 @@ fn list_item(l : Node, tight : Bool) -> String {
   for b in l.body {
     content(kids, b)
   }
-  nodes(kids, l.children, 0, [], [])
+  // **項目の中は、その項目の深さを 0 とした文書。** 子の見出しは項目からの
+  // 深さぶんの `#` で書く（docs/spec.md「項目の中」）
+  nodes(kids, l.children, 1, [], [])
   let inner = StringBuilder()
   if l.label != "" {
     inner.write_string(l.label)

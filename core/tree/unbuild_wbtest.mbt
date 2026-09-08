@@ -962,12 +962,19 @@ test "名前の字はそのまま — 子と中身を持っても行は変わら
 }
 
 ///|
-/// `- # node` は空の項目の子 `node`。書き戻せば `- - node`（現状の正規形）
-test "項目の中の見出しは、書き戻せば入れ子の項目" {
-  inspect(serialize(parse("- # node\n")), content="- - node\n")
+/// **項目の中は、その項目の深さを 0 とした文書。** 中の見出しは項目からの
+/// 深さぶんの `#` で書き戻る（塊なので間は空行）。
+test "項目の中の見出しは、項目からの深さの # で書き戻る" {
+  inspect(serialize(parse("- # node\n")), content="- # node\n")
   inspect(
     serialize(parse("- x\n  # n\n  ## s\n")),
-    content="- x\n  - n\n    - s\n",
+    content=(
+      #|- x
+      #|  # n
+      #|
+      #|  ## s
+      #|
+    ),
   )
 }
 

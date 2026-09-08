@@ -333,11 +333,18 @@ test "項目の中の畳みは、包んだ見出しに乗る" {
           "children": [
             {
               "id": 3,
-              "label": "h",
-              "fold": { "open": false },
+              "label": "",
               "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+              "children": [
+                {
+                  "id": 4,
+                  "label": "h",
+                  "fold": { "open": false },
+                  "body": [],
+                  "children": [],
+                  "mark": ["Heading", { "setext": false, "closing": 0 }],
+                },
+              ],
             },
           ],
           "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
@@ -370,13 +377,17 @@ test "入れ子の項目でも、畳みは包んだ見出しに乗る" {
                 "children": [
                   {
                     "id": 4,
-                    "label": "h",
-                    "fold": { "open": false },
+                    "label": "",
                     "body": [],
-                    "children": [],
-                    "mark": [
-                      "Item",
-                      { "marker": "-", "offset": 2, "loose": false },
+                    "children": [
+                      {
+                        "id": 5,
+                        "label": "h",
+                        "fold": { "open": false },
+                        "body": [],
+                        "children": [],
+                        "mark": ["Heading", { "setext": false, "closing": 0 }],
+                      },
                     ],
                   },
                 ],
