@@ -210,8 +210,10 @@ fn leaf(id : Int, label : String, body? : Array[Block] = []) -> Node {
 
 ///|
 /// 骨格の直前の水平線は境界（側の変わり目）に読まれるので、中身としては書けない。
-/// 文書の中身の尻に根が続く・見出しの中身の尻に子が続く・兄弟が続く、の 3 つ。
+/// 文書の中身の尻に根が続く・見出しの中身の尻に子が続く、の 2 つ。
 /// 最後のノードの尻と、項目の中は飾りのまま。
+/// **側が変わる所は破れではない** — 境界の `---` がもう 1 本書かれるので、
+/// 読みは 1 本目を中身に落として 2 本目を境界にする（`a` の尻の 6 が残るのはこれ）。
 test "中身の尻の水平線に骨格が続けば見つける" {
   let doc : Doc = {
     frontmatter: None,
@@ -247,11 +249,7 @@ test "中身の尻の水平線に骨格が続けば見つける" {
       },
     ],
   }
-  json_inspect(check(doc), content=[
-    ["BorderBreak", 2],
-    ["BorderBreak", 4],
-    ["BorderBreak", 6],
-  ])
+  json_inspect(check(doc), content=[["BorderBreak", 2], ["BorderBreak", 4]])
 }
 
 ///|

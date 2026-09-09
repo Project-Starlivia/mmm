@@ -1353,7 +1353,8 @@ test "apply の結果は check を通る" {
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="512")
+  // 512 → 522: 境界の手前の水平線を断らなくなった分（#178）
+  inspect(some, content="522")
   json_inspect(bad, content=[])
 }
 

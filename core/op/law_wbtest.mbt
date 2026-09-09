@@ -187,7 +187,8 @@ test "法則 — 形が一致すれば focus は同じ部分木を指し、一�
   }
   json_inspect(bad, content=[])
   // 全部 None に潰れる退化を落とすための下限チェック
-  inspect(some, content="1528")
+  // 1528 → 1538: 境界の手前の水平線を断らなくなった分（#178）
+  inspect(some, content="1538")
 }
 
 ///|
@@ -366,7 +367,8 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   }
   json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
-  inspect(n, content="1486")
+  // 1486 → 1496: 境界の手前の水平線を断らなくなった分（#178）
+  inspect(n, content="1496")
 }
 
 ///|

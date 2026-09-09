@@ -421,3 +421,17 @@ test "閉じたフェンスを含む引用は、書き戻しても字が減ら�
     inspect(serialize(parse(md)) == md, content="true")
   }
 }
+
+///|
+/// #178 — 水平線が続いても字は減らない。境界を取るのは最後の 1 本だけで、
+/// 手前は書かれた場所（直前のノードの中身）に残る
+test "水平線が続いても、書き戻せば本数はそのまま" {
+  let cases = [
+    "# a\n\n## b\n\n---\n\n---\n\n## c\n", "# a\n\n## b\n\n---\n\n---\n\n---\n\n## c\n",
+    "# a\n\n## b\n\n---\n\n***\n\n## c\n", "# a\n\n## b\n\n---\n\n---\n", "# r\n\n## a\n\n---\n\n- i\n",
+  ]
+  for md in cases {
+    inspect(serialize(parse(md)) == md, content="true")
+    json_inspect(check(parse(md)), content=[])
+  }
+}
