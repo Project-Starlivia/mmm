@@ -3,7 +3,7 @@
 ///|
 fn row_of(e : @parts.Entry) -> String {
   match e {
-    Run(r, _) | Done(r, _) | Sub(r, _, _) =>
+    Run(r, _) | Done(r, _) | Flip(r, _) | Sub(r, _, _) =>
       r.label +
       (match r.disabled {
         No => ""

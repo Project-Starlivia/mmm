@@ -45,6 +45,10 @@ pub(all) struct Row {
 /// `Done` は**閉じずに走り、済んだらその行の絵がチェックになる** —
 /// 手元から何も見えないもの（コピー）を、押した場所で答えるため。
 /// **できたかを続きで返す** — しくじりに頷いてしまわないように。
+/// `Flip` は**閉じずに走り、並びを綴り直す** — 行そのものが次の状態を名乗るもの
+/// （`Dark theme` を押すと行が `Light theme` になる）。閉じないのは、変わったのが
+/// 画面の見え方そのもので、押した場所から確かめられるため。**綴り直すのは並び全部** —
+/// 行が自分だけを書き換えると、同じ状態を 2 か所（並びを組む表と行）が持つことになる。
 /// `Sub` は入れ子。**入れ子の行も走れる** — 触れば開き、押せばその場で走る
 /// （`Add ▸` を押すと子ノードが増え、開けば下や上や親も選べる）。走るものの無い
 /// 入れ子は開くだけ。
@@ -53,6 +57,7 @@ pub(all) struct Row {
 pub(all) enum Entry {
   Run(Row, () -> Unit)
   Done(Row, ((Bool) -> Unit) -> Unit)
+  Flip(Row, () -> Unit)
   Sub(Row, Array[Entry], (() -> Unit)?)
   Caption(String, String?)
   Sep
@@ -88,6 +93,8 @@ pub(all) struct Ways {
   close_sub : () -> Unit
   /// 選んだので器ごと閉じる
   close : () -> Unit
+  /// 状態が変わったので、いまの状態から並びを引き直す（閉じない）
+  respell : () -> Unit
 }
 
 ///|
@@ -101,7 +108,7 @@ fn empty_mark(doc : @dom.Document) -> @dom.Element {
 ///|
 fn Entry::row_of(self : Entry) -> Row? {
   match self {
-    Run(r, _) | Done(r, _) | Sub(r, _, _) => Some(r)
+    Run(r, _) | Done(r, _) | Flip(r, _) | Sub(r, _, _) => Some(r)
     _ => None
   }
 }
@@ -269,6 +276,12 @@ pub fn fill(
             },
             _ => (),
           )
+        // **`Flip` の行も閉じない。** 走らせてから並びを引き直すので、
+        // 押した行がその場で次の状態を名乗る
+        Flip(_, run) => {
+          run()
+          (ways.respell)()
+        }
         Sub(_, _, Some(run)) | Run(_, run) => {
           (ways.close)()
           run()
@@ -291,6 +304,7 @@ pub fn rows(doc : @dom.Document, items : Array[Entry]) -> @dom.Element {
     open_sub: (_, _) => (),
     close_sub: () => (),
     close: () => (),
+    respell: () => (),
   })
   |> ignore
   el
@@ -310,6 +324,10 @@ pub struct Menu {
   mut opener : @dom.Element?
   /// 入れ子を持つ行の「開く」動作（`fill` が返す）。ArrowRight が引く
   mut openers : Array[(@dom.Element, () -> Unit)]
+  /// 並びの作り方。**開くたび・綴り直すたびに引く** — いまの状態に合わせるため
+  mut items : () -> Array[Entry]
+  /// 頼まれた場所。綴り直しで大きさが変わっても、寄せ直せるように覚えておく
+  mut at : (Double, Double)
 }
 
 ///|
@@ -331,6 +349,8 @@ pub fn Menu::new(doc : @dom.Document) -> Menu {
     opener_row: None,
     opener: None,
     openers: [],
+    items: () => [],
+    at: (0.0, 0.0),
   }
   // 開いているあいだだけ付け外しする手もあるが、`hide` は何度呼んでも
   // 同じなので、付けっぱなしのほうが短い
@@ -382,6 +402,23 @@ fn Menu::active_row(self : Menu) -> @dom.Element? {
 }
 
 ///|
+/// 焦点のある行が上から何番目か。行に無ければ -1
+fn Menu::row_index(self : Menu) -> Int {
+  let rows = self.el.querySelectorAll(".item")
+  let mut at = -1
+  match self.active_row() {
+    Some(a) =>
+      for i, r in rows {
+        if @web.same(r, a) {
+          at = i
+        }
+      }
+    None => ()
+  }
+  at
+}
+
+///|
 fn Menu::top(self : Menu) -> Menu {
   match self.parent {
     Some(p) => p.top()
@@ -394,16 +431,7 @@ fn Menu::on_keydown(self : Menu, e : @core.Any) -> Unit {
   let rows = self.el.querySelectorAll(".item")
   guard rows.length() > 0 else { return }
   let active = self.active_row()
-  let mut at = -1
-  match active {
-    Some(a) =>
-      for i, r in rows {
-        if @web.same(r, a) {
-          at = i
-        }
-      }
-    None => ()
-  }
+  let at = self.row_index()
   let step = (next : Int) => {
     @web.focus(rows[(next % rows.length() + rows.length()) % rows.length()])
   }
@@ -470,25 +498,57 @@ fn Menu::on_keydown(self : Menu, e : @core.Any) -> Unit {
 }
 
 ///|
-/// その座標に開く。画面外へはみ出すときは内側へ寄せる
+/// その座標に開く。**並びは作り方で受ける** — 開くたびに引くので、押した瞬間の
+/// 状態に合う（綴り直し（`Flip`）も同じ口から引く）
 pub fn Menu::show(
   self : Menu,
   x : Double,
   y : Double,
-  items : Array[Entry],
+  items : () -> Array[Entry],
 ) -> Unit {
+  self.items = items
+  self.at = (x, y)
+  self.draw()
+}
+
+///|
+/// いまの並びを組んで置く。画面外へはみ出すときは内側へ寄せる
+fn Menu::draw(self : Menu) -> Unit {
   self.close_sub()
-  self.openers = fill(self.el, items, {
+  self.openers = fill(self.el, (self.items)(), {
     open_sub: (row, items) => self.open_sub(row, items),
     close_sub: () => self.close_sub(),
     close: () => self.close(true),
+    respell: () => self.top().respell(),
   })
   // 大きさは出してからでないと測れない
   @web.show(self.el, "block", true)
   let (w, h) = @web.offset_size(self.el)
   let (iw, ih) = @web.inner_size(self.doc)
-  @web.set_style(self.el, "left", @web.px(@cmp.minimum(x, iw - w - margin)))
-  @web.set_style(self.el, "top", @web.px(@cmp.minimum(y, ih - h - margin)))
+  @web.set_style(
+    self.el,
+    "left",
+    @web.px(@cmp.minimum(self.at.0, iw - w - margin)),
+  )
+  @web.set_style(
+    self.el,
+    "top",
+    @web.px(@cmp.minimum(self.at.1, ih - h - margin)),
+  )
+}
+
+///|
+/// **開いたまま、いまの状態から並びを引き直す。** 行は作り直されるので、
+/// 焦点は同じ位置の行へ戻す — キーで辿っている途中に切り替えても、
+/// 手が置いてある場所は動かない
+pub fn Menu::respell(self : Menu) -> Unit {
+  let at = self.row_index()
+  self.draw()
+  guard at >= 0 else { return }
+  let rows = self.el.querySelectorAll(".item")
+  if at < rows.length() {
+    @web.focus(rows[at])
+  }
 }
 
 ///|
@@ -551,7 +611,7 @@ pub fn Menu::open_sub(
   row.setAttribute("aria-expanded", "true")
   sub.opener_row = Some(row)
   let r = @web.client_rect(row)
-  sub.show(r.right - overlap, r.top - overlap, items)
+  sub.show(r.right - overlap, r.top - overlap, () => items)
   // 右に入らないときは**親の左へ回す**。`show` の寄せは画面の中へ入れる
   // だけなので、そのままだと親に重なって文字を隠す
   let (w, _) = @web.offset_size(sub.el)
@@ -605,7 +665,7 @@ pub fn open_on_click(button : @dom.Element, items : () -> Array[Entry]) -> Unit 
       return
     }
     let r = @web.client_rect(button)
-    menu.show(r.left, r.bottom + 4.0, items())
+    menu.show(r.left, r.bottom + 4.0, items)
     menu.focus_first(@web.detail(e) == 0)
   })
 }
