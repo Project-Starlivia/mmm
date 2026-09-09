@@ -7,7 +7,8 @@
 //   write(ast) = @markdown.serialize(ast)
 //
 // 方言はライブラリの癖を mmm の決めに揃える所で、**意味は 1 つも足さない** —
-// やるのは span の尻を行末まで伸ばすことだけ（`stretch`）。build / content / fold / merge は
+// やるのは span を直すことだけ。尻を行末まで伸ばし（`stretch`）、読み落とされた
+// 塊の尻を原文から測り直す（`measured`）。build / content / fold / merge は
 // 方言の mdAst だけを見る。癖の一覧は docs/core.md「方言」。書く側に方言は要らない
 // — 読んだ原文は生の塊で渡すので、ライブラリが綴るのは並びと字下げだけ。
 // 例外は項目の列（unbuild.mbt）— マーカー・ラベルの桁・詰めをライブラリの書き手が
@@ -37,7 +38,11 @@ pub fn read(md : String) -> @markdown.Document {
 fn stretch(md : String, doc : @markdown.Document) -> @markdown.Document {
   {
     ..doc,
-    children: stretch_all(md, openers_of(md, doc.children), doc.children),
+    children: measured(
+      md,
+      md.length(),
+      stretch_all(md, openers_of(md, doc.children), doc.children),
+    ),
     // ライブラリの定義行の span は、次も定義行なら改行込み・そうでなければ改行の手前で
     // 止まる。改行の手前なら改行まで、もう改行の次なら据え置き
     definitions: doc.definitions.map(d => {
@@ -81,6 +86,58 @@ fn openers_of(md : String, blocks : Array[@markdown.Block]) -> Set[Int] {
     note(b)
   }
   out
+}
+
+///|
+/// 読み落とされた塊の尻を、原文から測り直す。**空の span（`from == to`）は
+/// 「中身を読めなかった」印** — ライブラリは閉じたフェンスを含む引用をこれで返し、
+/// その字を次の `BlankLines` に付ける（`> ```\n> x\n> ```\n` が丸ごと空行になり、
+/// 書き戻すと文書が消える）。尻は次の塊の頭まで伸ばす（手前に続く空行は隙間なので
+/// 渡さない）。span は原文を隙間なく敷き詰めるので、次の塊の頭も揃え直す。
+fn measured(
+  md : String,
+  to : Int,
+  bs : Array[@markdown.Block],
+) -> Array[@markdown.Block] {
+  let out : Array[@markdown.Block] = []
+  // 手前の塊が伸びた尻。伸びていなければ無い
+  let mut grown : Int? = None
+  for i, b in bs {
+    let s = block_span(b)
+    if s.from == s.to {
+      // 読み落とされた字は次の `BlankLines` が抱えている（空行でない行まで飲む）
+      let next = match bs.get(i + 1) {
+        Some(BlankLines(span~, ..)) => span.to
+        Some(k) => block_span(k).from
+        None => to
+      }
+      let end = blank_start(md, next)
+      grown = Some(end)
+      out.push(respan(b, { from: s.from, to: end, }))
+      continue
+    }
+    match grown {
+      Some(g) if s.from < g =>
+        out.push(respan(b, { from: g, to: if s.to > g { s.to } else { g }, }))
+      _ => out.push(b)
+    }
+    grown = None
+  }
+  out
+}
+
+///|
+/// span を差し替える。**ライブラリが span を落とすのは容器（引用・注意書き）と、
+/// その字を抱える空行だけ**（md_wbtest が押さえる）ので、他の塊はそのまま。
+fn respan(b : @markdown.Block, span : @markdown.Span) -> @markdown.Block {
+  match b {
+    Blockquote(children~, leading_trivia~, trailing_trivia~, ..) =>
+      Blockquote(children~, span~, leading_trivia~, trailing_trivia~)
+    Alert(kind~, children~, leading_trivia~, trailing_trivia~, ..) =>
+      Alert(kind~, children~, span~, leading_trivia~, trailing_trivia~)
+    BlankLines(count~, ..) => BlankLines(count~, span~)
+    other => other
+  }
 }
 
 ///|

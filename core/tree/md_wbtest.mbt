@@ -386,3 +386,38 @@ test "綴り — 項目の中の空行は項目の間に移らない。冪等" {
   inspect(again == fenced, content="true")
   inspect(serialize(parse(again)) == again, content="true")
 }
+
+///|
+/// #46 — ライブラリは**閉じたフェンスを含む引用**の span を空（`from == to`）で
+/// 返し、その字を次の `BlankLines` に付ける。方言（`measured`）が原文から測り直す。
+/// 直す前は木に引用が残らず、書き戻すと文書ごと消えていた
+test "閉じたフェンスを含む引用の span は、原文から測り直す" {
+  inspect(md_ast_sig("> ```\n> x\n> ```\n"), content="Quote[0,16]")
+  inspect(
+    md_ast_sig("# h\n\n> ```\n> x\n> ```\n\n# i\n"),
+    content=(
+      #|H1Atx[0,4] Blank1[4,5] Quote[5,21] Blank1[21,22] H1Atx[22,26]
+    ),
+  )
+  // frontmatter の後ろでも、文書の尻でも同じ
+  inspect(
+    md_ast_sig("---\nk: v\n---\n\n> ```\n> x\n> ```\n"),
+    content=(
+      #|Front[0,13] Blank1[13,14] Quote[14,30]
+    ),
+  )
+  // 閉じの無いフェンスなら span は元から在る（癖はこの形だけ）
+  inspect(md_ast_sig("> ```\n> x\n"), content="Quote[0,10]")
+}
+
+///|
+/// #46 — 測り直した span がそのまま原文になる。往復で字が 1 つも減らない
+test "閉じたフェンスを含む引用は、書き戻しても字が減らない" {
+  let cases = [
+    "> ```\n> x\n> ```\n", "# h\n\n> ```\n> x\n> ```\n\n# i\n", "---\nk: v\n---\n\n> ```\n> x\n> ```\n",
+    "> [!NOTE]\n> ```\n> x\n> ```\n",
+  ]
+  for md in cases {
+    inspect(serialize(parse(md)) == md, content="true")
+  }
+}
