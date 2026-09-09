@@ -106,7 +106,10 @@ fn walk(
       } else {
         None
       },
-      bordered: i > 0 && i < sides.length() && sides[i] != sides[i - 1],
+      // 手前に境界の `---` が書かれるか。**書く側（unbuild の `nodes`）と同じ見方** —
+      // 側は Right から始まるので、先頭の子が Left なら手前にも 1 本書かれる
+      bordered: i < sides.length() &&
+      sides[i] != (if i > 0 { sides[i - 1] } else { Right }),
       border: c.border,
     }
     c.border = None

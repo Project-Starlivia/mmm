@@ -1279,23 +1279,22 @@ test "飾りの水平線が閉じの直後なら中身" {
             "id": 2,
             "label": "r",
             "body": [
-              { "id": 3, "content": "ThematicBreak", "source": "---" },
-              { "id": 4, "source": "some text" },
-            ],
-            "children": [
               {
-                "id": 5,
-                "label": "a",
-                "fold": { "open": false, "summary": "a" },
-                "body": [],
-                "children": [],
-                "mark": ["Heading", { "setext": false, "closing": 0 }],
+                "id": 3,
+                "content": [
+                  "Details",
+                  { "open": false, "summary": "a", "body": "## a" },
+                ],
+                "source": "<details>\n<summary>a</summary>\n\n## a\n\n</details>",
               },
+              { "id": 4, "content": "ThematicBreak", "source": "---" },
+              { "id": 5, "source": "some text" },
             ],
+            "children": [],
             "mark": ["Heading", { "setext": false, "closing": 0 }],
           },
-          "sides": ["Right"],
-          "rules": [""],
+          "sides": [],
+          "rules": [],
         },
       ],
     },
@@ -1865,16 +1864,18 @@ test "閉じの直後の水平線が続いても境界" {
           "node": {
             "id": 2,
             "label": "r",
-            "body": [{ "id": 3, "content": "ThematicBreak", "source": "---" }],
-            "children": [
+            "body": [
               {
-                "id": 4,
-                "label": "a",
-                "fold": { "open": false, "summary": "a" },
-                "body": [],
-                "children": [],
-                "mark": ["Heading", { "setext": false, "closing": 0 }],
+                "id": 3,
+                "content": [
+                  "Details",
+                  { "open": false, "summary": "a", "body": "## a" },
+                ],
+                "source": "<details>\n<summary>a</summary>\n\n## a\n\n</details>",
               },
+              { "id": 4, "content": "ThematicBreak", "source": "---" },
+            ],
+            "children": [
               {
                 "id": 5,
                 "label": "b",
@@ -1885,8 +1886,8 @@ test "閉じの直後の水平線が続いても境界" {
             ],
             "mark": ["Heading", { "setext": false, "closing": 0 }],
           },
-          "sides": ["Right", "Left"],
-          "rules": ["", "---"],
+          "sides": ["Left"],
+          "rules": ["---"],
         },
       ],
     },
@@ -2169,4 +2170,19 @@ test "閉じの後ろに何が来ても、書き戻せば同じ字" {
     inspect(serialize(parse(md)) == md, content="true")
     json_inspect(check(parse(md)), content=[])
   }
+}
+
+///|
+/// #178 #181 — 閉じの後ろの水平線は、**直後が骨格なら**境界。続けて書けば手前の
+/// 1 本は飾りなので、領域は部分木より狭い ＝ 畳みは立たない。どちらも字は動かない
+test "閉じの後ろの水平線は、直後が骨格なら境界" {
+  // 1 本なら境界。畳みは立つ
+  let one = "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n---\n\n## b\n"
+  inspect(serialize(parse(one)) == one, content="true")
+  inspect(parse(one).to_json().stringify().contains("fold"), content="true")
+  // 2 本なら手前は飾り。畳みは立たず、領域ごと中身になる
+  let two = "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n---\n\n---\n\n## b\n"
+  inspect(serialize(parse(two)) == two, content="true")
+  inspect(parse(two).to_json().stringify().contains("fold"), content="false")
+  json_inspect(check(parse(two)), content=[])
 }

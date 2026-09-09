@@ -427,17 +427,6 @@ fn ahead_of(
 }
 
 ///|
-/// 保留中の水平線が行き先に選ぶ塊。**本数に意味は無い**ので水平線が続くうちは
-/// 先へ送り、骨格でない塊に当たればそこで飾りに落ちる。
-fn lands(blocks : Array[@markdown.Block], gone : Array[Bool], i : Int) -> Int {
-  let mut k = beyond(blocks, gone, i)
-  while k < blocks.length() && blocks[k] is ThematicBreak(..) {
-    k = beyond(blocks, gone, k)
-  }
-  k
-}
-
-///|
 /// 開きの塊が言っている畳み。**塊が綴りだけで出来ていることは `folds` が確かめる**
 /// ので、ここは読むだけ。
 fn fold_of(s : Spell) -> Fold {
@@ -480,9 +469,10 @@ fn covers(
     guard depth[k].top > level else { return false }
     // 領域の中に書いた水平線の行き先が領域の外の骨格なら、その水平線は
     // 部分木のものではない（書き戻すと領域の外に出る）。行き先が中なら、
-    // 引き出された骨格は上の深さで弾かれるか、飾りとして中身に残る
+    // 引き出された骨格は上の深さで弾かれるか、飾りとして中身に残る。
+    // **行き先は直後の塊だけ** — 水平線が続けば手前は飾りに落ちる（#178）
     if blocks[k] is ThematicBreak(..) {
-      let w = lands(blocks, gone, k)
+      let w = beyond(blocks, gone, k)
       guard !(w > last && w < blocks.length() && depth[w].own < deep) else {
         return false
       }
@@ -494,10 +484,12 @@ fn covers(
   // 骨格でなければ、その中身はこのノードの body ＝ 領域が狭いということ
   let z = beyond(blocks, gone, last)
   guard z < blocks.length() else { return true }
-  // 水平線は単体では中身ではない。**その先が骨格なら境界**（部分木の外）で、
+  // 水平線は単体では中身ではない。**直後が骨格なら境界**（部分木の外）で、
   // そうでなければ飾り＝このノードの中身なので、領域が狭い
+  // （水平線が続けば手前は飾り。境界を取るのは最後の 1 本だけ。#178）
   if blocks[z] is ThematicBreak(..) {
-    return lands(blocks, gone, z) < blocks.length()
+    let w = beyond(blocks, gone, z)
+    return w < blocks.length() && depth[w].top < deep
   }
   depth[z].top < deep
 }
