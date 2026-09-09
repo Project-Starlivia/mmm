@@ -205,6 +205,39 @@ test "飛びは Implicit が埋める" {
 }
 
 ///|
+/// #203 — 桁 0 に並ぶ項目は木が本ごとに分かれる。詰めは木ごとの `loose` にしか
+/// 残らないので、書きはそれを見て列に戻す（unbuild_wbtest）
+test "桁 0 の項目は 1 本ずつ別の木。詰めは木ごとに持つ" {
+  json_inspect(parse("- a\n- b\n"), content={
+    "body": [],
+    "roots": [
+      {
+        "node": {
+          "id": 2,
+          "label": "a",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
+        "sides": [],
+        "rules": [],
+      },
+      {
+        "node": {
+          "id": 3,
+          "label": "b",
+          "body": [],
+          "children": [],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
+        "sides": [],
+        "rules": [],
+      },
+    ],
+  })
+}
+
+///|
 test "深さ 1 が無ければ根が Implicit になる" {
   json_inspect(parse("## a\n"), content={
     "body": [],
