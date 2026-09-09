@@ -2,7 +2,7 @@
 // 試験は Doc の型にぶら下がっているが、ここは md → md しか見ないので、内側の作りが
 // 変わっても生き残る。**型を壊しても、ここが通れば同じ mmm。**
 //
-// 見本は木の形の試験が読ませている md を全部集めたもの（156 通り）。
+// 見本は木の形の試験が読ませている md を全部集めたもの（162 通り）。
 // 押さえるのは 4 つ:
 //
 //   正規形     読んで書き戻した字。**読み方の答えがそのまま出る**
@@ -15,28 +15,31 @@
 ///|
 /// 木の形の試験が読ませている md、全部。
 let read_corpus : Array[String] = [
-  "# \n", "# a\n", "* a\n", "+ a\n", "# a\n\n", "# a\r\n", "# a#\n", "## a\n", "# a #b\n",
-  "- root\n", "# a ###\n", "- - - a\n", "# a\n\n# b\n", "# a\n\n***\n", "# r\n\n- a\n",
-  "- # node\n", "- a\n\n# x\n", "- a\n  # x\n", "- a **b**\n", "1. a\n2. b\n", "# a\n\nhello\n",
-  "# r\n\n### x\n", "- a\n\n### x\n", "intro\n\n# a\n", "# a\n\n> quote\n", "# a\r\n\r\n## b\r\n",
-  "- a\n\n  hello\n", "- root\n  - a\n", "# a\n\n    code\n", "# a **b** `c`\n",
-  "# r\n\n---\n\n# s\n", "- aaa\r\n  bbb\r\n", "# r\n\n## a\n\n- b\n", "# r\n\n## a\n\n---\n",
-  "# r\n\n***\n\n## a\n", "# r\n\n- b\n\n## a\n", "# r\n\n---\n\n## a\n", "# r\n\n___\n\n## a\n",
-  "* \n  * \n    * \n", "- \n  - \n    - \n", "- item\n\n  ## h\n", "aaa\r\nbbb\r\n===\r\n",
-  "body\n\n---\n\n# a\n", "# a\n\nx\n\n## b\n\ny\n", "# r\n\n## a\n\n## b\n", "# r\n\n- b\n\n### x\n",
-  "# r\n\n</details>\n", "- [q]: /r\n  ZZZ\n", "- a\n\n  ---\n\n# h\n", "[q]: /r\nZZZ\n---\n",
-  "# r\n\n## a\n\n### x\n", "- x\n  # n\n  ## s\n", "---\nk: v\n---\n# a\n", "# a\n\nhello\n\nworld\n",
-  "# r\n\n## h\n\n[a]: b\n", "- [ ] a\n  - [x] b\n", "- a\n\n  ***\n\n  - b\n", "- aaa\n  bbb\n  ccc\n",
-  "---\nk: v\n---\n\n# a\n", "# a\n\n![alt](x.png)\n", "- root\n  - a\n  - b\n",
-  "# a\r\n\r\n```\r\nx\r\n```\r\n", "# r\n\n## a\n\n---\n\n- b\n", ":::a\n:::b\nx\n:::\n:::\n",
-  "# a\n\nbody\n\n---\n\n## b\n", "# r\n\n## a\n\n---\n\n## b\n", "# r\n\n## s\n\n- a\n  - b\n",
-  "# r\n\n<details>\n\n## h\n", "# r\n\n## a\n\n---\n\n### x\n", "# r\n\n[a]: b \"c\"\n\n## h\n",
-  "- a\n\n  <!-- x\n  y -->\n", "# a\n\nsee ![alt](x.png)\n", "# r\n\n## a\n\n### x\n\n## b\n",
-  "# r\n\n- b\n\n  - c\n\n### x\n", "- a\n  - b\n\n    [q]: /r\n", "# a\n\n<svg><rect/></svg>\n",
-  "- \n  - \n    - \n      - \n", "- ```\n  code\n  ```\n\n  x\n", "# a\n\n```js\nlet x = 1\n```\n",
-  "# r\n\n## a\n\n---\n\n- b\n\n- c\n", "# r\n\n## a\n\n---\n\n---\n\n## b\n", "# r\n\n## h\n\n---\n\n- a\n  - b\n",
-  "- a\n\n  - b\n\n  text\n\n  - c\n", "# a\n\n[text](https://e.com)\n", "# a\n\nbody\n\n---\n\nbody\n\n## b\n",
-  "# r\n\n:::note\n- a\n  ***\n:::\n", "# r\n\n## a\n\n---\n\nZZZ\nWWW\n---\n", "# r\n\n$$\nx\n$$\n\n:::note\ny\n:::\n",
+  // #206 — 字下げコード。記法の 4 桁、越えた分の中身、タブ、項目の中
+  "    code\n", "      code\n", "\tcode\n", "# a\n\n    a\n      b\n", "- x\n\n      code\n",
+  "- a\n  - b\n\n        code\n", "# \n", "# a\n", "* a\n", "+ a\n", "# a\n\n", "# a\r\n",
+  "# a#\n", "## a\n", "# a #b\n", "- root\n", "# a ###\n", "- - - a\n", "# a\n\n# b\n",
+  "# a\n\n***\n", "# r\n\n- a\n", "- # node\n", "- a\n\n# x\n", "- a\n  # x\n", "- a **b**\n",
+  "1. a\n2. b\n", "# a\n\nhello\n", "# r\n\n### x\n", "- a\n\n### x\n", "intro\n\n# a\n",
+  "# a\n\n> quote\n", "# a\r\n\r\n## b\r\n", "- a\n\n  hello\n", "- root\n  - a\n",
+  "# a\n\n    code\n", "# a **b** `c`\n", "# r\n\n---\n\n# s\n", "- aaa\r\n  bbb\r\n",
+  "# r\n\n## a\n\n- b\n", "# r\n\n## a\n\n---\n", "# r\n\n***\n\n## a\n", "# r\n\n- b\n\n## a\n",
+  "# r\n\n---\n\n## a\n", "# r\n\n___\n\n## a\n", "* \n  * \n    * \n", "- \n  - \n    - \n",
+  "- item\n\n  ## h\n", "aaa\r\nbbb\r\n===\r\n", "body\n\n---\n\n# a\n", "# a\n\nx\n\n## b\n\ny\n",
+  "# r\n\n## a\n\n## b\n", "# r\n\n- b\n\n### x\n", "# r\n\n</details>\n", "- [q]: /r\n  ZZZ\n",
+  "- a\n\n  ---\n\n# h\n", "[q]: /r\nZZZ\n---\n", "# r\n\n## a\n\n### x\n", "- x\n  # n\n  ## s\n",
+  "---\nk: v\n---\n# a\n", "# a\n\nhello\n\nworld\n", "# r\n\n## h\n\n[a]: b\n",
+  "- [ ] a\n  - [x] b\n", "- a\n\n  ***\n\n  - b\n", "- aaa\n  bbb\n  ccc\n", "---\nk: v\n---\n\n# a\n",
+  "# a\n\n![alt](x.png)\n", "- root\n  - a\n  - b\n", "# a\r\n\r\n```\r\nx\r\n```\r\n",
+  "# r\n\n## a\n\n---\n\n- b\n", ":::a\n:::b\nx\n:::\n:::\n", "# a\n\nbody\n\n---\n\n## b\n",
+  "# r\n\n## a\n\n---\n\n## b\n", "# r\n\n## s\n\n- a\n  - b\n", "# r\n\n<details>\n\n## h\n",
+  "# r\n\n## a\n\n---\n\n### x\n", "# r\n\n[a]: b \"c\"\n\n## h\n", "- a\n\n  <!-- x\n  y -->\n",
+  "# a\n\nsee ![alt](x.png)\n", "# r\n\n## a\n\n### x\n\n## b\n", "# r\n\n- b\n\n  - c\n\n### x\n",
+  "- a\n  - b\n\n    [q]: /r\n", "# a\n\n<svg><rect/></svg>\n", "- \n  - \n    - \n      - \n",
+  "- ```\n  code\n  ```\n\n  x\n", "# a\n\n```js\nlet x = 1\n```\n", "# r\n\n## a\n\n---\n\n- b\n\n- c\n",
+  "# r\n\n## a\n\n---\n\n---\n\n## b\n", "# r\n\n## h\n\n---\n\n- a\n  - b\n", "- a\n\n  - b\n\n  text\n\n  - c\n",
+  "# a\n\n[text](https://e.com)\n", "# a\n\nbody\n\n---\n\nbody\n\n## b\n", "# r\n\n:::note\n- a\n  ***\n:::\n",
+  "# r\n\n## a\n\n---\n\nZZZ\nWWW\n---\n", "# r\n\n$$\nx\n$$\n\n:::note\ny\n:::\n",
   "# r\n\n## a\n\n### x\n\n---\n\n### y\n", "# r\n\n## a\n\n---\n\n[q]: /r\n\n## b\n",
   "# r\n\n<details>\n## h\n</details>\n", "# r\n\n<details>\n\n## h\n\n</details>\n",
   "# r\n\n![a](b.png \"t1\")\n\n[c](d \"t2\")\n", "# r\n\n<details-x>\n\n## a\n\n</details>\n",
@@ -111,8 +114,6 @@ test "見本 — 読んで書き戻した字" {
       #|  → "1. a\n\n2. b\n"
       #|"# a\r\n\r\n## b\r\n"
       #|  → "# a\n\n## b\n"
-      #|"# a\n\n    code\n"
-      #|  → "# a\n\ncode\n"
       #|"- aaa\r\n  bbb\r\n"
       #|  → "- aaa\r\n  bbb\n"
       #|"* \n  * \n    * \n"
@@ -183,8 +184,6 @@ test "見本 — 往復" {
     content=(
       #|"1. a\n2. b\n"
       #|  → "1. a\n\n2. b\n"
-      #|"# a\n\n    code\n"
-      #|  → "# a\n\ncode\n"
       #|"# r\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n---\n\n</details>\n"
       #|  → "# r\n\n---\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n</details>\n"
       #|
