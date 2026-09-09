@@ -198,7 +198,9 @@ test "フェンスのコード" {
 }
 
 ///|
-test "インデントコードも読む（書くのはフェンス）" {
+/// 意味は Code。**記法（字下げ 4 桁）は `source` に残る**ので、書き戻せば字下げのまま
+/// （#206。前は剥いだ字が返って段落に化けていた）
+test "インデントコードも読む — 記法は source に残る" {
   json_inspect(parse("# a\n\n    code\n"), content={
     "body": [],
     "roots": [
@@ -210,7 +212,7 @@ test "インデントコードも読む（書くのはフェンス）" {
             {
               "id": 3,
               "content": ["Code", { "info": "", "text": "code\n" }],
-              "source": "code",
+              "source": "    code",
             },
           ],
           "children": [],

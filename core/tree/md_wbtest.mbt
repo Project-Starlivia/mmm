@@ -5,11 +5,14 @@
 // span は原文を隙間なく敷き詰める（前の to = 次の from）。すげ替えがこれに乗る。
 
 ///|
+/// 字下げコードの span は**記法の 4 桁を含む**。ライブラリは剥いだ位置から始めるが、
+/// その 4 桁は容器の字下げではなくその塊の記法なので、方言が戻す（#206）。
+/// 戻すと span が隙間なく敷き詰まる（前は [4,8) が誰のものでもなかった）
 test "字下げの見出しはコードとして読まれる（F5）" {
   inspect(
     md_ast_sig("# a\n    # x\n"),
     content=(
-      #|H1Atx[0,4] Indent[8,12]
+      #|H1Atx[0,4] Indent[4,12]
     ),
   )
 }
@@ -474,6 +477,24 @@ test "タスクリストは、書き戻しても字が減らない" {
   let cases = [
     "- [ ] a\n  - [x] b\n", "* [X] a\n", "1. [ ] a\n", "- [ ] a\n  more\n", "- [ ]\n",
     "- [ ] a\n\n  text\n",
+  ]
+  for md in cases {
+    inspect(serialize(parse(md)) == md, content="true")
+  }
+}
+
+///|
+/// #206 — 字下げコードの記法は**その塊の字下げ 4 桁**。容器の字下げではないので
+/// 剥がさない。剥がすと書き戻したとき段落に化けて、意味が減る
+test "字下げコードは、書き戻しても字下げのまま" {
+  let cases = [
+    "    code\n", "# a\n\n    code\n", "# a\n\n    a\n    b\n",
+    // 4 桁を越えた分は中身。5 桁目からはコードの字
+     "      code\n", "# a\n\n    a\n      b\n",
+    // タブ 1 つで 4 桁
+     "\tcode\n",
+    // 項目の中では、項目の桁の上にさらに 4 桁
+     "- x\n\n      code\n", "- a\n  - b\n\n        code\n",
   ]
   for md in cases {
     inspect(serialize(parse(md)) == md, content="true")

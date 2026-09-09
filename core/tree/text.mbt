@@ -38,6 +38,23 @@ fn carve(md : String, from : Int, to : Int) -> String {
 }
 
 ///|
+/// 字下げコードの記法の頭 — `at` から**空白 4 桁ぶん**だけ戻った位置。
+/// 手前に残る空白は容器の字下げなので、そこは越えない（項目の中なら項目の桁で止まる）。
+/// タブは 4 桁（CommonMark のタブ幅）。
+fn undent(md : String, at : Int) -> Int {
+  let head = line_start(md, at)
+  let mut i = at
+  let mut n = 0
+  while i > head && n < 4 {
+    let c = md[i - 1]
+    guard c == ' ' || c == '\t' else { break }
+    n = n + (if c == '\t' { 4 } else { 1 })
+    i = i - 1
+  }
+  i
+}
+
+///|
 /// 行頭からの桁。容器の字下げの幅になる。
 fn column(md : String, at : Int) -> Int {
   let mut i = at

@@ -226,6 +226,15 @@ fn stretched(
         leading_trivia~,
         trailing_trivia~,
       )
+    // 字下げコードの記法は**その塊の字下げ 4 桁**。ライブラリはそれを剥いだ位置から
+    // span を始めるので、書き戻すと記法ごと消えて段落になる（#206）。4 桁ぶん戻す
+    IndentedCode(code~, span~, leading_trivia~, trailing_trivia~) =>
+      IndentedCode(
+        code~,
+        span={ from: undent(md, span.from), to: span.to, },
+        leading_trivia~,
+        trailing_trivia~,
+      )
     Directive(
       name~,
       meta~,
