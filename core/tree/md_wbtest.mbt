@@ -435,3 +435,47 @@ test "水平線が続いても、書き戻せば本数はそのまま" {
     json_inspect(check(parse(md)), content=[])
   }
 }
+
+///|
+/// #180 — GFM のタスクリスト（`- [ ] a`）は解釈しない。ライブラリは `[ ]` を
+/// 食べて段落をその後ろから始めるので、ラベルはマーカーの後ろから測り直す。
+/// **チェックは綴り**なので、名前の字にそのまま残る（地図にも `[ ] a` と出る）
+test "タスクリストのチェックは名前の字" {
+  json_inspect(parse("- [ ] a\n  - [x] b\n"), content={
+    "body": [],
+    "roots": [
+      {
+        "node": {
+          "id": 2,
+          "label": "[ ] a",
+          "body": [],
+          "children": [
+            {
+              "id": 3,
+              "label": "[x] b",
+              "body": [],
+              "children": [],
+              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+            },
+          ],
+          "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+        },
+        "sides": ["Right"],
+        "rules": [""],
+      },
+    ],
+  })
+}
+
+///|
+/// #180 — 書き戻してもチェックの 4 文字は落ちない。字だけの項目（`- [ ]`）も、
+/// 折り返した名前も、番号付きの列も同じ
+test "タスクリストは、書き戻しても字が減らない" {
+  let cases = [
+    "- [ ] a\n  - [x] b\n", "* [X] a\n", "1. [ ] a\n", "- [ ] a\n  more\n", "- [ ]\n",
+    "- [ ] a\n\n  text\n",
+  ]
+  for md in cases {
+    inspect(serialize(parse(md)) == md, content="true")
+  }
+}

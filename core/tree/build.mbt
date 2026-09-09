@@ -390,14 +390,22 @@ fn face_of(md : String, it : @markdown.ListItem) -> Face {
     if i == 0 && c is Paragraph(span~, ..) {
       // **インラインの並びからは導かない** — mdAst が中身の一部をリンクの
       // 定義として引き取ると、インラインが行の全部を覆わないことがある。
-      // 段落の span は中身の先頭から始まるので、マーカーの読み飛ばしは要らない
-      // （実測は probe を参照）
-      label = carve(md, span.from, span.to)
-      at = span.from
+      // 段落の span は中身の先頭から始まるので、ふつうはマーカーの後ろと一致する。
+      // ずれるのは GFM のタスクリスト（`- [ ] a`）— ライブラリが `[ ]` を食べて
+      // 段落をその後ろから始める。**チェックは綴り**（mmm は GFM のタスクリストを
+      // 解釈しない）なので、頭が手前ならマーカーの後ろから測る
+      let head = if at < span.from { at } else { span.from }
+      label = carve(md, head, span.to)
+      at = head
       from = span.to
     } else {
       rest.push(c)
     }
+  }
+  // 塊が 1 つも残らない項目は、マーカーの後ろの字がそのままラベル。
+  // ライブラリが食べて塊を残さない綴り（`- [ ]`）のため
+  if it.children.is_empty() {
+    label = carve(md, at, it.span.to)
   }
   { label, at, from, rest, }
 }
