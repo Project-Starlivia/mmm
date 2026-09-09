@@ -35,6 +35,21 @@ test "Rename はラベルを替える。Implicit は見出しになる" {
 }
 
 ///|
+/// 畳まれたノードの名前は summary（地図が出す字）。名を付け直せばラベルも summary も同じ字に
+test "Rename は畳まれたノードの summary も同じ字にする" {
+  let d = doc([
+    root(h(2, "a", fold=Some({ open: true, summary: Some("old"), }))),
+  ])
+  assert_eq(
+    run(d, Rename(id=2, label="b")),
+    Some({
+      doc: doc([root(h(2, "b", fold=Some({ open: true, summary: Some("b"), })))]),
+      focus: Some(2),
+    }),
+  )
+}
+
+///|
 test "Rename は中身と知らない id に None" {
   let d = doc([root(h(2, "r", body=[pic(3)]))])
   assert_eq(run(d, Rename(id=3, label="y")), None)

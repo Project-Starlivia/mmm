@@ -80,7 +80,7 @@ test "畳んだノードは字を幅で詰め、バッジは詰めない" {
     Some("abcdefghijklmnopqrstuvwxyz"),
     fold=Some({ open: false, summary: None, }),
   )
-  assert_eq(hidden_label(n, 3, seven), "abcdefghijklm…  +3")
+  assert_eq(hidden_label(n, 3, seven), "▷ abcdefghijk…  +3")
   assert_eq(node_size(seven)(n, [], 3), { w: 144, h: 24, })
   // 収まるなら詰めない
   assert_eq(
@@ -89,7 +89,7 @@ test "畳んだノードは字を幅で詰め、バッジは詰めない" {
       0,
       seven,
     ),
-    "ab",
+    "▷ ab",
   )
 }
 

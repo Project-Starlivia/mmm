@@ -181,11 +181,33 @@ pub fn fold_name(n : @view.Node) -> String {
 }
 
 ///|
+/// 畳まれて閉じているか。子を隠し、小さく描くのはこのときだけ。`<details open>` は
+/// **開いた畳み**で、子は普通に出る（名前は summary のまま）。畳みは mmm の独自要素で、
+/// `<details>` の見た目には引っ張られない — GitHub は summary の行の下に中身を並べるが、
+/// mmm は畳まれたノードの名前を summary で統一する（開いていても）
+pub fn closed(n : @view.Node) -> Bool {
+  n.fold is Some({ open: false, .. })
+}
+
+///|
+/// 畳みの印。閉じていれば ▷、開いていれば ▽（名前の前に付く）
+pub let fold_mark_closed = "▷ "
+
+///|
+pub let fold_mark_open = "▽ "
+
+///|
+/// 開いた畳みの字。印 + 名前（summary）
+pub fn open_label(n : @view.Node) -> String {
+  fold_mark_open + display_label(fold_name(n))
+}
+
+///|
 pub fn row_of(n : @view.Node) -> Row {
-  if n.fold is None {
-    normal
-  } else {
+  if closed(n) {
     hidden
+  } else {
+    normal
   }
 }
 
@@ -246,8 +268,11 @@ pub fn hidden_label(n : @view.Node, buried : Int, measure : Measure) -> String {
   let raw = display_label(fold_name(n))
   let badge = collapsed_badge(buried)
   let font = label_font(hidden)
-  let budget = hidden_max_w - hidden.pad * 2.0 - measure(font, badge)
-  clip_label(raw, font, budget, measure) + badge
+  // 印とバッジは詰めない。名前だけを残りの幅に詰める
+  let budget = hidden_max_w -
+    hidden.pad * 2.0 -
+    measure(font, fold_mark_closed + badge)
+  fold_mark_closed + clip_label(raw, font, budget, measure) + badge
 }
 
 ///|
@@ -269,8 +294,8 @@ pub fn row_top(cards : Array[Card], i : Int) -> Double {
 /// 「最低幅」も content 側の基準であって、箱の実測幅そのものではない
 pub fn node_size(measure : Measure) -> SizeOf {
   fn(n, cards, buried) {
-    if n.fold is Some(_) {
-      // 畳み表示: ラベルを詰めた幅だけ。カード類は持たない
+    if closed(n) {
+      // 閉じた畳み: ラベルを詰めた幅だけ。カード類は持たない
       let font = label_font(hidden)
       let w = @cmp.minimum(
         measure(font, hidden_label(n, buried, measure)),
@@ -278,7 +303,13 @@ pub fn node_size(measure : Measure) -> SizeOf {
       ).ceil()
       return { w: w + hidden.pad * 2.0, h: hidden.h, }
     }
-    let mut w = measure(label_font(normal), display_label(label_of(n)))
+    // 開いた畳みは印 + summary、それ以外はラベル
+    let text = if n.fold is Some(_) {
+      open_label(n)
+    } else {
+      display_label(label_of(n))
+    }
+    let mut w = measure(label_font(normal), text)
     for c in cards {
       match c {
         Image(..) | Svg(..) => w = @cmp.maximum(w, img_min_w)

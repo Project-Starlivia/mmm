@@ -45,9 +45,9 @@ fn row(es : Array[Entry], label : String) -> Item {
 }
 
 ///|
-test "並び — Add / Rename / Hide / Flip side / Link / Code / Draw / Copy / Cut / Paste / Delete" {
+test "並び — Add / Rename / Fold / Flip side / Link / Code / Draw / Copy / Cut / Paste / Delete" {
   assert_eq(labels(items(ctx_l(), one(3))), [
-    "Add", "Rename", "—", "Show (unfold)", "Flip side", "—", "Link", "Code",
+    "Add", "Rename", "—", "Open (folded)", "Flip side", "—", "Link", "Code",
     "Draw", "—", "Copy", "Cut", "Paste", "—", "Delete",
   ])
 }
@@ -97,7 +97,7 @@ test "複数選択では宛先が 1 つの行が沈む。Delete は沈まない"
 ///|
 test "Implicit も畳める。根は側を持たない" {
   assert_eq(
-    row(items(ctx_l(), one(4)), "Hide (fold)").intent,
+    row(items(ctx_l(), one(4)), "Fold").intent,
     Some(Op(op=Fold(id=4, open=false), edit=false)),
   )
   assert_eq(
