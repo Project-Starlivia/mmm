@@ -248,7 +248,43 @@ fn list_item(l : Node, tight : Bool) -> String {
   } else {
     marker.length() + 1
   }
-  marker + pad(width - marker.length()) + indent(text, width)
+  let line = marker + pad(width - marker.length()) + indent(text, width)
+  // **mmm が組んだ字が別の記法に読まれるなら、その形では書かない。** 名前の無い
+  // 項目が 3 段続くとマーカーだけが 1 行に並び、md は水平線を優先する（`- - -`。
+  // docs/spec.md「項目の中」）。子を次の行へ落とせば、桁が入れ子を言う。
+  // **名前が在る行は直さない** — その字は利用者のもので、`- ---` が水平線に
+  // 読まれるのは md の文法どおり（docs/spec.md「ノードの名前」）
+  if l.label == "" && ruled(line) {
+    marker + "\n" + pad(width) + indent(text, width)
+  } else {
+    line
+  }
+}
+
+///|
+/// 1 行目が md では水平線に読まれるか。空白を除いて `-` `_` `*` のどれか 1 種が
+/// 3 つ以上だけ並ぶ行。
+fn ruled(text : String) -> Bool {
+  let mut mark = ' '
+  let mut count = 0
+  for c in text {
+    if c == '\n' {
+      break
+    }
+    if c == ' ' || c == '\t' || c == '\r' {
+      continue
+    }
+    if c != '-' && c != '_' && c != '*' {
+      return false
+    }
+    if count == 0 {
+      mark = c
+    } else if c != mark {
+      return false
+    }
+    count = count + 1
+  }
+  count >= 3
 }
 
 ///|

@@ -306,7 +306,8 @@ test "直前が中身でも、直後が見出しなら境界" {
 }
 
 ///|
-/// 連続していても境界は 1 つ。最初の 1 本は直後が水平線なので装飾に落ちる。
+/// 連続していても境界は 1 つ。最初の 1 本は直後が水平線なので装飾に落ちる
+/// （#178。保留は 1 本しか持てないので、上書きの前に吐き出す）。
 test "本数に意味は無い" {
   json_inspect(parse("# r\n\n## a\n\n---\n\n---\n\n## b\n"), content={
     "body": [],
@@ -320,12 +321,12 @@ test "本数に意味は無い" {
             {
               "id": 3,
               "label": "a",
-              "body": [],
+              "body": [{ "id": 4, "content": "ThematicBreak", "source": "---" }],
               "children": [],
               "mark": ["Heading", { "setext": false, "closing": 0 }],
             },
             {
-              "id": 4,
+              "id": 5,
               "label": "b",
               "body": [],
               "children": [],

@@ -202,7 +202,10 @@ fn list_side(r : Root) -> Flaw? {
 ///|
 /// 中身の尻の水平線に骨格が続く。次の骨格の行で境界（側の変わり目）に
 /// 読まれて、中身に残らない。
+/// 側が変わる所には境界の `---` がもう 1 本書かれるので、中身の水平線は残る
+/// （読みは 1 本目を中身に落とし、2 本目を境界にする）。
 fn border_break(s : Site) -> Flaw? {
+  guard !s.bordered else { return None }
   s.border.map(b => BorderBreak(b))
 }
 
