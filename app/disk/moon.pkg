@@ -3,6 +3,7 @@ pkgtype(kind: "library")
 import {
   "mmm/app/parts",
   "moonbitlang/core/cmp",
+  "moonbitlang/core/set",
   "moonbitlang/async/js_async",
   "mizchi/js/core",
   "mizchi/js_browser/dom",

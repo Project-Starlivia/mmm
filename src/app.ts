@@ -387,9 +387,17 @@ export interface Field {
 /** 並べるもの。ただの字か、打てる欄か */
 export type Part = string | Field;
 
-/** たずねの中身（form）だけ。並べ方は core/app/asks.mbt */
-export const askForm = (kind: "discard" | "place" | "connect" | "rename" | "imageName", args: unknown = null): HTMLFormElement =>
-  form(mbt.mmmAskForm(kind, args));
+/**
+ * たずねの中身（form）だけ。並べ方は app/parts/asks.mbt。
+ *
+ * **欄の検査は本物を通す** — `declaration` / `redeclaration` は `dirName` を、
+ * `imageName` は `taken`（置き場に既に在る名前）を渡せば、だめな値でその検査が
+ * 本物の理由を返す。言葉をここへ写さない
+ */
+export const askForm = (
+  kind: "discard" | "place" | "connect" | "rename" | "imageName" | "declaration" | "redeclaration",
+  args: unknown = null,
+): HTMLFormElement => form(mbt.mmmAskForm(kind, args));
 
 // ---- 形を確かめながら整える ----
 

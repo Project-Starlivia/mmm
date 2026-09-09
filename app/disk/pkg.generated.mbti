@@ -5,6 +5,7 @@ import {
   "mizchi/js/core",
   "mizchi/js_browser/dom",
   "mmm/app/web",
+  "moonbitlang/core/set",
 }
 
 // Values
@@ -15,6 +16,8 @@ pub fn folder_from_doc(Array[String]) -> String
 pub fn folder_problem(String, String?) -> String?
 
 pub fn idb_store() -> Store
+
+pub fn image_name_problem(String, @set.Set[String]) -> String?
 
 pub fn image_type(String) -> String?
 
