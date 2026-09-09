@@ -16,9 +16,13 @@ pub fn unbuild(doc : Doc) -> @markdown.Document {
   for b in doc.body {
     content(out, b)
   }
-  for r in doc.roots {
-    node(out, r.node, 1, r.sides, r.rules)
-  }
+  // **木は桁 0 の兄弟。** md で桁 0 に並ぶ項目は 1 本の列で、木が本ごとに
+  // 分かれるのは読みの都合。木ごとに書くと間に空行がライブラリから入り、
+  // 読んだ詰めが消える（#203）
+  nodes(out, doc.roots.map(r => r.node), 1, [], [], inner=i => {
+    let r = doc.roots[i]
+    (r.sides, r.rules)
+  })
   {
     // serialize は frontmatter を自分で書く（本文との間に空行を置くため）。
     // ここで持つのは、指紋（ast_sig）が mdAst ぜんぶを見るため
@@ -72,6 +76,9 @@ fn nodes(
   depth : Int,
   sides : Array[Side],
   rules : Array[String],
+  /// 項目でない兄弟を 1 つ書くとき、その**子**に効く側と境界の綴り。
+  /// 木の列では木ごとに在り、子の列では 1 つも無い（深い所の側は型に無い）
+  inner? : (Int) -> (Array[Side], Array[String]) = _ => ([], []),
 ) -> Unit {
   let run : Array[Node] = []
   fn flush() {
@@ -99,7 +106,8 @@ fn nodes(
       }
       _ => {
         flush()
-        node(out, x, depth, [], [])
+        let (s, r) = inner(i)
+        node(out, x, depth, s, r)
       }
     }
   }

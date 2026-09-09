@@ -239,11 +239,12 @@ test "新しい項目は隣の綴りを継ぐ — * の列に足せば *" {
 }
 
 ///|
-/// #84 — 文書の席（`In(doc_id)`）も最後の根に従う。`sign` と同じ見方
+/// #84 — 文書の席（`In(doc_id)`）も最後の根に従う。`sign` と同じ見方。
+/// 詰まった列に足せば詰まったまま（#203）
 test "新しい根の項目は最後の根の綴りを継ぐ — * の根に足せば *" {
   let md = "* a\n"
   let r = edit(md, AddNode(at=In(node=@tree.doc_id, side=None), labels=["b"]))
-  assert_eq(@tree.patched(md, r.edits), "* a\n\n* b\n")
+  assert_eq(@tree.patched(md, r.edits), "* a\n* b\n")
   assert_eq(r.focus, Some(3))
 }
 

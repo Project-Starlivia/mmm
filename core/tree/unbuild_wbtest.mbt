@@ -154,6 +154,51 @@ test "木は何本でも" {
 }
 
 ///|
+/// #203 — 桁 0 に並ぶ項目は md では 1 本の列。木が本ごとに分かれるのは読みの
+/// 都合なので、書くときは 1 つの列に戻す（分けると間に空行が入る）
+test "桁 0 の項目の木は 1 本の列に戻る。見出しの木を挟めばそこで割れる" {
+  inspect(
+    serialize(doc([root(item("a")), root(item("b"))])),
+    content=(
+      #|- a
+      #|- b
+      #|
+    ),
+  )
+  inspect(
+    serialize(doc([root(item("a")), root(h("h")), root(item("b"))])),
+    content=(
+      #|- a
+      #|
+      #|# h
+      #|
+      #|- b
+      #|
+    ),
+  )
+  // 読んだ列が loose なら空行のまま
+  inspect(
+    serialize(doc([root(item("a", loose=true)), root(item("b", loose=true))])),
+    content=(
+      #|- a
+      #|
+      #|- b
+      #|
+    ),
+  )
+  // 種類が変われば md でも別の列
+  inspect(
+    serialize(doc([root(item("a")), root(item("b", marker="1."))])),
+    content=(
+      #|- a
+      #|
+      #|1. b
+      #|
+    ),
+  )
+}
+
+///|
 test "項目は入れ子。兄弟は詰める" {
   inspect(
     serialize(doc([root(item("root", children=[item("a"), item("b")]))])),
