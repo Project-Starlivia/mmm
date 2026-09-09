@@ -35,9 +35,12 @@ core/   MoonBit — module `mmm/core`。文書モデルと地図の判断。**DO
                 edit(md, op) が 読み → apply → merge を繋ぎ、編集列と読み直した木での
                 focus を返す。law_wbtest.mbt が操作 × 合流の結合を総当たりで固定する
   map/          Mindmap の配置と判断。DOM を知らない — geometry(座標系。側 → 符号はここだけ) /
-                card(Block → Card。分類だけ) / metric(寸法の唯一の定義。字の実測は
+                card(Block → Card。分類だけ。カードにならない中身があるので、
+                1 枚ずつが出どころの中身の id を持つ — 描く側は `data-card` にこれを出す) /
+                metric(寸法の唯一の定義。字の実測は
                 Measure で外から受ける) / layout(View → Layout。畳みの埋没と sides の zip、
-                付け根の配り、card_rect / owner_of / edge_ends) / edge(線の形。d 属性) /
+                付け根の配り、card_rect(枚目で引く) / owner_of(中身の id からカードを探す) /
+                edge_ends) / edge(線の形。d 属性) /
                 select(選択の値と、入力でどう変わるか。矩形・矢印・点の当たり・親兄弟と隣。
                 Easy grab の広げ幅) / drop(ドラッグの落とし先) / keys(キー → Intent の表) /
                 context(右クリックの行) / camera(視点。world ↔ 画面、寄せ、ピンチ) /

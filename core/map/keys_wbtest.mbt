@@ -290,7 +290,8 @@ test "Mod+V は貼り付け。anchor が無くても拾う" {
 }
 
 // ---- keyed_card — カードを選んでいるときの表 ----
-// r(2) に blocks [3: 水平線, 4: コード]。持ち主は 2、隣は 3 と 4
+// r(2) に blocks [3: 水平線, 4: mailto リンク, 5: コード]。カードになるのは 3 と 5 で、
+// **隣はカードの隣** — 4 はカードにならないので、どの一手にも出てこない
 
 ///|
 fn keys_c() -> Layout {
@@ -299,7 +300,12 @@ fn keys_c() -> Layout {
       root(
         node(2, "r", blocks=[
           { id: 3, source: None, content: Some(ThematicBreak), },
-          { id: 4, source: None, content: Some(Code(info="", text="x")), },
+          {
+            id: 4,
+            source: None,
+            content: Some(Link(text="m", href="mailto:a@b", title="")),
+          },
+          { id: 5, source: None, content: Some(Code(info="", text="x")), },
         ]),
       ),
     ],
@@ -315,17 +321,17 @@ test "keyed_card: Delete / Backspace はそのカードを消す（持ち主を�
     Some(Op(op=Delete(ids=[3]), edit=false)),
   )
   assert_eq(
-    keyed_card(c, 4, k("Backspace")),
-    Some(Op(op=Delete(ids=[4]), edit=false)),
+    keyed_card(c, 5, k("Backspace")),
+    Some(Op(op=Delete(ids=[5]), edit=false)),
   )
 }
 
 ///|
 test "keyed_card: ↑↓ は隣のカードを選ぶ。端では拾わない。← は持ち主のノード" {
   let c = keys_c()
-  assert_eq(keyed_card(c, 3, k("ArrowDown")), Some(Pick(id=Some(4))))
-  assert_eq(keyed_card(c, 4, k("ArrowDown")), None)
-  assert_eq(keyed_card(c, 4, k("ArrowUp")), Some(Pick(id=Some(3))))
+  assert_eq(keyed_card(c, 3, k("ArrowDown")), Some(Pick(id=Some(5))))
+  assert_eq(keyed_card(c, 5, k("ArrowDown")), None)
+  assert_eq(keyed_card(c, 5, k("ArrowUp")), Some(Pick(id=Some(3))))
   assert_eq(keyed_card(c, 3, k("ArrowUp")), None)
   assert_eq(
     keyed_card(c, 3, k("ArrowLeft")),
@@ -337,15 +343,15 @@ test "keyed_card: ↑↓ は隣のカードを選ぶ。端では拾わない。�
 test "keyed_card: Alt+↑↓ は前後のカードの前後へ並べ替え。端では拾わない" {
   let c = keys_c()
   assert_eq(
-    keyed_card(c, 4, k("ArrowUp", alt=true)),
-    Some(Op(op=MoveBlock(ids=[4], at=Before(block=3)), edit=false)),
+    keyed_card(c, 5, k("ArrowUp", alt=true)),
+    Some(Op(op=MoveBlock(ids=[5], at=Before(block=3)), edit=false)),
   )
   assert_eq(keyed_card(c, 3, k("ArrowUp", alt=true)), None)
   assert_eq(
     keyed_card(c, 3, k("ArrowDown", alt=true)),
-    Some(Op(op=MoveBlock(ids=[3], at=After(block=4)), edit=false)),
+    Some(Op(op=MoveBlock(ids=[3], at=After(block=5)), edit=false)),
   )
-  assert_eq(keyed_card(c, 4, k("ArrowDown", alt=true)), None)
+  assert_eq(keyed_card(c, 5, k("ArrowDown", alt=true)), None)
 }
 
 ///|
@@ -355,10 +361,12 @@ test "keyed_card: Mod+Enter はその場編集。Escape は外す。Mod+C / Mod+
   assert_eq(keyed_card(c, 3, k("Escape")), Some(Pick(id=None)))
   assert_eq(keyed_card(c, 3, k("c", mod=true)), Some(Copy(cut=None)))
   assert_eq(
-    keyed_card(c, 4, k("x", mod=true)),
-    Some(Copy(cut=Some(Op(op=Delete(ids=[4]), edit=false)))),
+    keyed_card(c, 5, k("x", mod=true)),
+    Some(Copy(cut=Some(Op(op=Delete(ids=[5]), edit=false)))),
   )
+  // 居ない中身も、カードにならなかった中身（4）も、持ち主を持たない
   assert_eq(keyed_card(c, 99, k("Delete")), None)
+  assert_eq(keyed_card(c, 4, k("Delete")), None)
 }
 
 ///|

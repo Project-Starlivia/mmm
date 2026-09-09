@@ -216,11 +216,18 @@ test "文書順が変われば DOM の並び（重なり順）も変わる" {
 }
 
 ///|
-test "カードは仕切り線に続けて種類ごとの形で並び、data-card は「id,枚目」" {
+/// `data-card` はカードが出た**中身の id**。カードにならない中身（4）を先に置いても、
+/// 後ろのカードは自分の id を名乗る — 枚目は入らない（#212）
+test "カードは仕切り線に続けて種類ごとの形で並び、data-card は中身の id" {
   let w = @test_utils.create_happy_window()
   defer w.close()
   let r = Renderer::new(w.document())
   let blocks : Array[@tree.Block] = [
+    {
+      id: 4,
+      source: None,
+      content: Some(Link(text="m", href="mailto:a@b", title="")),
+    },
     {
       id: 5,
       source: None,
@@ -244,7 +251,7 @@ test "カードは仕切り線に続けて種類ごとの形で並び、data-car
   let g = r.node_el(1).unwrap()
   assert_eq(g.querySelectorAll(".sep").length(), 6)
   let hit = one(g, ".link-hit")
-  assert_eq(attr(hit, "data-card"), "1,0")
+  assert_eq(attr(hit, "data-card"), "5")
   assert_eq(attr(one(g, ".link-open"), "data-url"), "https://x.example/p")
   assert_eq(one(g, ".link-row").textContent(), "t")
   assert_eq(one(g, ".code-bg title").textContent(), "js")
@@ -254,7 +261,7 @@ test "カードは仕切り線に続けて種類ごとの形で並び、data-car
   assert_eq(one(g, ".image-name").textContent(), "p.png")
   assert_eq(one(g, ".image-connect").textContent(), "connect")
   assert_eq(attr(one(g, ".image-connect"), "data-connect"), "1")
-  assert_eq(attr(one(g, ".break"), "data-card"), "1,3")
+  assert_eq(attr(one(g, ".break"), "data-card"), "8")
   assert_eq(one(g, ".details-mark").textContent(), "▾")
   assert_eq(one(g, ".details-row").textContent(), "s")
   assert_eq(one(g, ".details-line").textContent(), "d")

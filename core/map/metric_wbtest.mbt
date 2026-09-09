@@ -50,8 +50,14 @@ test "カードの高さと、行の枠から中身までの余白" {
 }
 
 ///|
+/// 出どころの id は寸法に効かないので、ここでは通し番号で置く
+fn card(kind : Kind) -> Card {
+  { id: 1, kind, }
+}
+
+///|
 test "row_top は i 枚目の上端。i = 枚数なら箱の高さ" {
-  let cards = [Link(title="", url=""), Break]
+  let cards = [card(Link(title="", url="")), card(Break)]
   assert_eq(row_top(cards, 0), 30)
   assert_eq(row_top(cards, 1), 56)
   assert_eq(row_top(cards, 2), 68)
@@ -64,13 +70,13 @@ test "箱の幅はいちばん広い行の実測 + 左右の余白、高さは�
   assert_eq(
     size(
       leaf(Some("ab")),
-      [Link(title="t", url="u"), Code(lang="", lines=["x", "y"])],
+      [card(Link(title="t", url="u")), card(Code(lang="", lines=["x", "y"]))],
       0,
     ),
     { w: 53, h: 102, },
   )
   // 画像は最低幅を持つ。空のラベルはプレースホルダの幅
-  assert_eq(size(leaf(Some("")), [Svg(markup="")], 0), { w: 224, h: 106, })
+  assert_eq(size(leaf(Some("")), [card(Svg(markup=""))], 0), { w: 224, h: 106, })
   assert_eq(size(leaf(Some("")), [], 0).w, 7.0 * 7.0 + 24.0)
 }
 

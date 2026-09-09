@@ -110,7 +110,7 @@ pub let empty_label = "(empty)"
 
 ///|
 /// カード 1 枚ぶんの高さ
-pub fn row_h(c : Card) -> Double {
+pub fn row_h(c : Kind) -> Double {
   match c {
     Image(..) | Svg(..) => img_row
     Code(lines~, ..) => lines.length().to_double() * code_line + code_pad * 2.0
@@ -129,7 +129,7 @@ pub fn row_h(c : Card) -> Double {
 ///|
 /// カード 1 枚の、行の枠から中身までの上下の余白。描くのも書き出すのも
 /// 同じ場所を指さないと 2px ずれる — 実際にずれた。数字を 2 か所に置かないための唯一の定義
-pub fn card_inset(c : Card) -> Double {
+pub fn card_inset(c : Kind) -> Double {
   match c {
     Code(..) => 5
     Link(..) | Details(..) => 4
@@ -141,7 +141,7 @@ pub fn card_inset(c : Card) -> Double {
 ///|
 /// カード 1 枚が、中身の箱から左右へはみ出す量。コードだけは背景をノードの
 /// 縁近くまで塗るので、その分だけ広い
-pub fn card_bleed(c : Card) -> Double {
+pub fn card_bleed(c : Kind) -> Double {
   match c {
     Code(..) => 5
     _ => 0
@@ -283,7 +283,7 @@ pub fn hidden_label(n : @view.Node, buried : Int, measure : Measure) -> String {
 pub fn row_top(cards : Array[Card], i : Int) -> Double {
   let mut y = normal.h
   for k in 0..<i {
-    y += row_h(cards[k])
+    y += row_h(cards[k].kind)
   }
   y
 }
@@ -311,7 +311,7 @@ pub fn node_size(measure : Measure) -> SizeOf {
     }
     let mut w = measure(label_font(normal), text)
     for c in cards {
-      match c {
+      match c.kind {
         Image(..) | Svg(..) => w = @cmp.maximum(w, img_min_w)
         Code(lines~, ..) =>
           for ln in lines {
