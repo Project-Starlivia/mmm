@@ -8,7 +8,7 @@
 pub fn Survey::copy(self : Survey, ids : Array[Int]) -> String {
   let chosen : Set[Int] = Set::from_array(ids)
   let parts : Array[String] = []
-  fn walk(n : @view.Node) -> Unit {
+  fn walk(n : @tree.Node) -> Unit {
     if chosen.contains(n.id) && self.spots.get(n.id) is Some(sp) {
       parts.push(
         trim_eol(String::unsafe_substring(self.md, start=sp.from, end=sp.to)),
@@ -20,7 +20,7 @@ pub fn Survey::copy(self : Survey, ids : Array[Int]) -> String {
     }
   }
 
-  for t in self.view.roots {
+  for t in self.doc.roots {
     walk(t.node)
   }
   if parts.length() == 0 {

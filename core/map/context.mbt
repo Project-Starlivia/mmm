@@ -61,7 +61,7 @@ priv struct Menu {
   /// 宛先。1 つに決まらなければ無い
   id : Int?
   /// 宛先のノード
-  node : @view.Node?
+  node : @tree.Node?
 }
 
 ///|

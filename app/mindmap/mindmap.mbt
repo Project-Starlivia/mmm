@@ -87,7 +87,7 @@ pub struct Mindmap {
 
 ///|
 fn place_layout(host : Host) -> @map.Layout {
-  @map.layout((host.survey)().view.roots, @map.node_size(host.measure))
+  @map.layout((host.survey)().doc.roots, @map.node_size(host.measure))
 }
 
 ///|
@@ -249,18 +249,6 @@ fn Mindmap::follow_card(self : Mindmap) -> Unit {
 }
 
 ///|
-/// data-card の「ノードの id, 何枚目」から中身の id
-fn Mindmap::block_at(self : Mindmap, spot : String) -> Int? {
-  let parts = spot.split(",").map(s => s.to_owned()).collect()
-  guard parts.length() == 2 else { return None }
-  guard int_of(parts[0]) is Some(node) && int_of(parts[1]) is Some(index) else {
-    return None
-  }
-  guard self.layout.boxes.get(node) is Some(b) else { return None }
-  b.node.blocks.get(index).map(blk => blk.id)
-}
-
-///|
 /// 属性の数字。読めなければ None
 fn int_of(s : String) -> Int? {
   try @string.parse_int(s) catch {
@@ -373,7 +361,7 @@ pub fn Mindmap::refresh_selection(self : Mindmap) -> Unit {
 /// 戻り値はそれを呼び出し側（main.ts の apply）に言うためのもの
 pub fn Mindmap::begin_edit(self : Mindmap, id : Int, seed : String?) -> Bool {
   guard self.layout.boxes.get(id) is Some(b) else { return false }
-  self.label.open(id, self.layout, self.camera, @map.label_of(b.node), seed)
+  self.label.open(id, self.layout, self.camera, b.node.label, seed)
   true
 }
 

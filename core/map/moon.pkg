@@ -6,6 +6,5 @@ import {
   "moonbitlang/core/json",
   "moonbitlang/core/math",
   "mmm/core/tree",
-  "mmm/core/view",
   "mmm/core/op",
 }

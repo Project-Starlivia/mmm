@@ -2,22 +2,25 @@
 // 区間の重なりだけの層。木と地番は手で組む（読みは tree の wbtest が固定済み）。
 
 ///|
+/// 綴りは既定で `#`。`mark=None` で Implicit（綴りの無いノード）
 fn node(
   id : Int,
-  label : String?,
-  children? : Array[@view.Node] = [],
-  blocks? : Array[@tree.Block] = [],
+  label : String,
+  children? : Array[@tree.Node] = [],
+  body? : Array[@tree.Block] = [],
   fold? : @tree.Fold? = None,
-) -> @view.Node {
-  { id, label, fold, blocks, children, }
+  mark? : @tree.Mark? = Some(@tree.atx),
+) -> @tree.Node {
+  { id, label, fold, body, children, mark, }
 }
 
 ///|
-fn view(roots : Array[@view.Node]) -> @view.View {
+fn tree(roots : Array[@tree.Node]) -> @tree.Doc {
   {
     frontmatter: None,
+    body: [],
     roots: roots.map(n => {
-      ({ node: n, sides: n.children.map(_ => Right), } : @view.Root)
+      ({ node: n, sides: n.children.map(_ => Right), rules: [], } : @tree.Root)
     }),
   }
 }
@@ -34,15 +37,15 @@ fn spots(rows : Array[(Int, Int, Int?, Int)]) -> Map[Int, @tree.Spot] {
 }
 
 ///|
-fn reading(view : @view.View, spots : Map[Int, @tree.Spot]) -> Survey {
-  { md: "", view, spots, }
+fn reading(doc : @tree.Doc, spots : Map[Int, @tree.Spot]) -> Survey {
+  { md: "", doc, spots, }
 }
 
 ///|
 /// "# r\n\n## a\n\nhello\n\n## b\n"
 fn doc() -> Survey {
   reading(
-    view([node(2, Some("r"), children=[node(3, Some("a")), node(5, Some("b"))])]),
+    tree([node(2, "r", children=[node(3, "a"), node(5, "b")])]),
     spots([
       (1, 0, None, 0),
       (2, 0, Some(2), 23),
@@ -97,8 +100,8 @@ test "範囲と複数カーソルは掛かるもの全部。無ければ空" {
 test "Implicit は行が無く自身の文が空なので掛からない" {
   // "# r\n\n### x\n": r=2, Implicit=3, x=4
   let gap = reading(
-    view([
-      node(2, Some("r"), children=[node(3, None, children=[node(4, Some("x"))])]),
+    tree([
+      node(2, "r", children=[node(3, "", mark=None, children=[node(4, "x")])]),
     ]),
     spots([
       (1, 0, None, 0),
@@ -115,15 +118,15 @@ test "Implicit は行が無く自身の文が空なので掛からない" {
 /// "# r\n\n## a\n\n### x\n\n## b\n" で a が畳まれている: r=2, a=3, x=4, b=5
 fn hidden() -> Survey {
   reading(
-    view([
-      node(2, Some("r"), children=[
+    tree([
+      node(2, "r", children=[
         node(
           3,
-          Some("a"),
-          children=[node(4, Some("x"))],
+          "a",
+          children=[node(4, "x")],
           fold=Some({ open: false, summary: Some("a"), }),
         ),
-        node(5, Some("b")),
+        node(5, "b"),
       ]),
     ]),
     spots([
@@ -138,8 +141,8 @@ fn hidden() -> Survey {
 
 ///|
 test "buried — 畳まれたノードの子孫。畳まれたノード自身は入らない" {
-  assert_eq(buried(hidden().view).iter().collect(), [4])
-  assert_eq(buried(doc().view).length(), 0)
+  assert_eq(buried(hidden().doc).iter().collect(), [4])
+  assert_eq(buried(doc().doc).length(), 0)
 }
 
 ///|
@@ -183,7 +186,7 @@ test "derive — 地図が持つ間は位置から。点はラベルの頭、カ
     (4, 10, None, 18),
   ])
   let carded = reading(
-    view([node(2, Some("r"), children=[node(3, Some("a"), blocks=[card])])]),
+    tree([node(2, "r", children=[node(3, "a", body=[card])])]),
     card_at,
   )
   assert_eq(chosen(carded, Map, caret(1), Some(CardAt(at=10))), Card(id=4))
@@ -195,12 +198,12 @@ test "derive — 地図が持つ間は位置から。点はラベルの頭、カ
   )
   // 畳まれたノードのカードは選べない。開けば選べる
   let shut = reading(
-    view([
-      node(2, Some("r"), children=[
+    tree([
+      node(2, "r", children=[
         node(
           3,
-          Some("a"),
-          blocks=[card],
+          "a",
+          body=[card],
           fold=Some({ open: false, summary: Some("a"), }),
         ),
       ]),

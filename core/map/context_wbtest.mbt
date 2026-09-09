@@ -8,13 +8,7 @@ fn ctx_l() -> Layout {
       root(
         node(2, "r", children=[
           node(3, "a", fold=Some({ open: false, summary: Some("a"), })),
-          {
-            id: 4,
-            label: None,
-            fold: None,
-            blocks: [],
-            children: [node(5, "x")],
-          },
+          node(4, "", mark=None, children=[node(5, "x")]),
         ]),
         sides=[Right, Right],
       ),

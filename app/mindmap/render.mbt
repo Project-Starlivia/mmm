@@ -128,12 +128,12 @@ fn shape_of(b : @map.Box, scene : Scene) -> Shape {
     label: match n.fold {
       Some({ open: true, .. }) => @map.open_label(n)
       Some(_) => @map.fold_name(n)
-      None => @map.label_of(n)
+      None => n.label
     },
     cards: b.cards,
     // 画像は「まだ読めていない」から「読めた」へ後から変わる
     urls: b.cards.map(c => {
-      match c {
+      match c.kind {
         Image(path~, ..) => (scene.image_url)(path)
         _ => None
       }
@@ -230,11 +230,7 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
     let folded = @map.closed(n)
     // 畳まれていれば名前は summary（開いていても）。閉じていれば小さく詰めて、
     // 開いていれば ▽ を付けて普通の行に
-    let text = if n.fold is Some(_) {
-      @map.fold_name(n)
-    } else {
-      @map.label_of(n)
-    }
+    let text = if n.fold is Some(_) { @map.fold_name(n) } else { n.label }
     let row = @map.row_of(n)
     let label = @web.el(doc, "text", [
       ("class", "label" + (if text == "" { " empty" } else { "" })),
@@ -263,14 +259,15 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
     g.append(label.as_node())
     g.append(title.as_node())
     // ラベルの下に、本文から起こしたカードを積む。**形は draw_card が持つ**
-    // — ここが決めるのは「どこに置くか」だけ
+    // — ここが決めるのは「どこに置くか」だけ。積む場所は枚目で数え、
+    // `data-card` はカードが持つ中身の id を出す（この 2 つは別の数）
     for i, c in b.cards {
       guard @map.card_rect(b, i) is Some(rect) else { continue }
       let at : Spot = {
         rect,
         row_y: @map.row_top(b.cards, i),
         box_w: b.w,
-        spot: "\{id},\{i}",
+        id: c.id,
       }
       for e in draw_card(doc, c, at, scene) {
         g.append(e.as_node())

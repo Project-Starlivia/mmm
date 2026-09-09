@@ -10,7 +10,6 @@ import {
   "mizchi/js/builtins/global",
   "mizchi/js_browser/dom",
   "mmm/core/tree",
-  "mmm/core/view",
   "mmm/core/op",
   "mmm/core/map",
   "mmm/core/read",

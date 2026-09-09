@@ -4,8 +4,9 @@
 **読んだ md の並びそのものを型にして、記法をそこに置く。** 木はそこから導く使い捨てにし、
 構造と機能だけを持つ。
 
-範囲は `core/tree` と `core/op` の境界、`core/view` の存在意義まで。map/ と app/ は
-`View` を見ているだけなので触らない。#188 より大きい。
+範囲は `core/tree` と `core/op` の境界まで。map/ と app/ は Doc の木を直に歩くが、
+綴りは `sign_of` 経由でしか見ないので、`mark` が `sign` に痩せても触らずに済む
+（`core/view` は #212 で畳んだ）。#188 より大きい。
 
 ## 事実
 
@@ -69,7 +70,7 @@ core/tree/fold.mbt      17 か所   畳みの裁定
 core/tree/content.mbt    8 か所   意味の読み取り
 ```
 
-守れているのは**科の境界**のほうで、`core/op` も `core/map` も `core/view` も `@markdown` を
+守れているのは**科の境界**のほうで、`core/op` も `core/map` も `core/read` も `@markdown` を
 1 度も見ない。`moon.pkg` で import しているのも `core/tree` だけ。
 
 書く側は最初から依存している。`unbuild` は `@markdown.Block` を組んで `serialize` に渡す —
@@ -111,8 +112,8 @@ fixtures  7 本 361 KB   木として安定・字まで一致しないのは 2 �
 新しい動詞は要らない。**`read` が md から記法構造まで読む。**
 
 ```
-            read              build              project
-md ───────> 記法構造 ───────> Doc + 地番 ──────> View
+            read              build
+md ───────> 記法構造 ───────> Doc + 地番
             write             unbuild
 md <─────── 記法構造 <─────── Doc
 ```
@@ -175,16 +176,16 @@ enum Verdict {
 
 ```
 消える   Mark の綴り 5 欄 / Block.source / Root.rules / Doc.body
-残る     id / label / fold / children / blocks / side / 種類（Sign）
+残る     id / label / fold / children / body / side / 種類（Sign）
 ```
 
 **種類は残す。** `Mark` は綴りと種類を兼ねていて、種類のほうは `op` が席の綴りを決めるのに
 読む（`sign_at` / `respell`）。`mark : Mark?` を `sign : Sign?` に痩せさせる — 綴りは落ちるが、
-「見出しか項目か飛びか」は残る。
+「見出しか項目か飛びか」は残る。map も `sign_of` で聞くだけなので、この痩せで 1 行も動かない。
 
-**`Doc.body` の行き先は未決。** 最初の骨格より前の散文は、新しい木にも `View` にも置き場が
-無い（`project` が落としている）。記法構造の列が引き取るのが筋だが、`op` の
-`BlockPlace::In(doc_id)` が今そこへ書いている。
+**`Doc.body` の行き先は未決。** 最初の骨格より前の散文は、新しい木に置き場が無い。
+描く側には今も届いていない（`layout` は `Array[Root]` を受けるので `Doc` の欄は射程外）。
+記法構造の列が引き取るのが筋だが、`op` の `BlockPlace::In(doc_id)` が今そこへ書いている。
 
 ### 反映は「触った piece を差し替える」
 
@@ -284,7 +285,7 @@ piece に移り、後半（新しいものを綴る道）だけが残る。
 ```
 5a  安全網と検証の入力を、木から記法構造へ付け替える
 5b  木から綴りの欄を落とす（Mark の 5 欄 / Block.source / Root.rules / Doc.body）
-5c  古い 3-way の群と core/view/project、段 2 で書いた埋め直しを消す
+5c  古い 3-way の群と、段 2 で書いた埋め直しを消す
 ```
 
 5a を飛ばすと、綴りを落とした木で全文 md を綴ろうとして詰む。`Mark` は種類も持つので、
@@ -351,7 +352,7 @@ core/tree/merge_law_wbtest.mbt  見本 × 全ノード × 変え方           �
   `fn verdict`（残る）が同じ語。片方を改名する
 - **id の対応。** 木の id は走査で振る通し番号で、Implicit は piece を持たないのに id を
   持つ。並びの id と木の id は 1 対 1 にならない
-- **`Doc.body` の行き先。** 木にも `View` にも置き場が無い。`op` の `BlockPlace::In(doc_id)` が
+- **`Doc.body` の行き先。** 新しい木に置き場が無い。`op` の `BlockPlace::In(doc_id)` が
   今そこへ書いている
 - **ラベルを字で持つか、範囲で持つか。** 上の型は範囲にした。「読んだ字は 1 か所」に
   揃うが、木を組むたびに切り出す

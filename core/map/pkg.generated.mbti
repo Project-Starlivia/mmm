@@ -4,7 +4,6 @@ package "mmm/core/map"
 import {
   "mmm/core/op",
   "mmm/core/tree",
-  "mmm/core/view",
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
   "moonbitlang/core/set",
@@ -17,7 +16,7 @@ pub fn arrow(Layout, Int?, Arrow) -> Int?
 
 pub fn arrow_of(String) -> Arrow?
 
-pub fn card_bleed(Card) -> Double
+pub fn card_bleed(Kind) -> Double
 
 pub let card_border : Double
 
@@ -25,7 +24,7 @@ pub let card_font : Font
 
 pub let card_font_px : Double
 
-pub fn card_inset(Card) -> Double
+pub fn card_inset(Kind) -> Double
 
 pub let card_pad : Double
 
@@ -41,7 +40,7 @@ pub fn click(Selection, Int, Modifier, Array[Int]) -> Selection
 
 pub fn clip_label(String, Font, Double, (Font, String) -> Double) -> String
 
-pub fn closed(@view.Node) -> Bool
+pub fn closed(@tree.Node) -> Bool
 
 pub let code_line : Double
 
@@ -79,15 +78,15 @@ pub fn fit(Array[Rect], Pane, Double) -> Camera?
 
 pub fn flatten(Array[Seg], Int) -> Array[Pt]
 
-pub fn fold_label(@view.Node?) -> String
+pub fn fold_label(@tree.Node?) -> String
 
 pub let fold_mark_closed : String
 
 pub let fold_mark_open : String
 
-pub fn fold_name(@view.Node) -> String
+pub fn fold_name(@tree.Node) -> String
 
-pub fn fold_step(@view.Node, Int) -> Intent
+pub fn fold_step(@tree.Node, Int) -> Intent
 
 pub let gap : Gap
 
@@ -95,7 +94,7 @@ pub let grab : Reach
 
 pub let hidden : Row
 
-pub fn hidden_label(@view.Node, Int, (Font, String) -> Double) -> String
+pub fn hidden_label(@tree.Node, Int, (Font, String) -> Double) -> String
 
 pub let hidden_max_w : Double
 
@@ -121,11 +120,9 @@ pub fn label_font(Row) -> Font
 
 pub let label_min_pad : Double
 
-pub fn label_of(@view.Node) -> String
-
 pub fn label_place(Box, Camera, Double) -> Placement
 
-pub fn layout(Array[@view.Root], (@view.Node, Array[Card], Int) -> Size) -> Layout
+pub fn layout(Array[@tree.Root], (@tree.Node, Array[Card], Int) -> Size) -> Layout
 
 pub let max_zoom : Double
 
@@ -139,7 +136,7 @@ pub fn nearest(Array[Rect], Camera, Pane) -> Rect?
 
 pub fn next_sibling(Layout, Int) -> Int?
 
-pub fn node_size((Font, String) -> Double) -> (@view.Node, Array[Card], Int) -> Size
+pub fn node_size((Font, String) -> Double) -> (@tree.Node, Array[Card], Int) -> Size
 
 pub let none : Selection
 
@@ -147,7 +144,7 @@ pub let normal : Row
 
 pub fn num(Double) -> String
 
-pub fn open_label(@view.Node) -> String
+pub fn open_label(@tree.Node) -> String
 
 pub fn owner_of(Layout, Int) -> (Box, Int)?
 
@@ -169,9 +166,9 @@ pub fn root_box(Layout) -> Box?
 
 pub fn round2(Double) -> Double
 
-pub fn row_h(Card) -> Double
+pub fn row_h(Kind) -> Double
 
-pub fn row_of(@view.Node) -> Row
+pub fn row_of(@tree.Node) -> Row
 
 pub fn row_top(Array[Card], Int) -> Double
 
@@ -200,7 +197,7 @@ pub(all) enum Arrow {
 } derive(Eq, @debug.Debug)
 
 pub(all) struct Box {
-  node : @view.Node
+  node : @tree.Node
   parent : Edge?
   buried : Int
   mut fan : Double
@@ -218,13 +215,9 @@ pub(all) struct Camera {
   ty : Double
 } derive(Eq, @debug.Debug)
 
-pub(all) enum Card {
-  Link(title~ : String, url~ : String)
-  Image(path~ : String, name~ : String)
-  Svg(markup~ : String)
-  Code(lang~ : String, lines~ : Array[String])
-  Break
-  Details(open~ : Bool, summary~ : String?, lines~ : Array[String])
+pub(all) struct Card {
+  id : Int
+  kind : Kind
 } derive(Eq, ToJson, @debug.Debug)
 
 pub(all) enum Drop {
@@ -300,6 +293,15 @@ pub(all) struct Key {
   mod : Bool
   alt : Bool
 } derive(Eq, @debug.Debug)
+
+pub(all) enum Kind {
+  Link(title~ : String, url~ : String)
+  Image(path~ : String, name~ : String)
+  Svg(markup~ : String)
+  Code(lang~ : String, lines~ : Array[String])
+  Break
+  Details(open~ : Bool, summary~ : String?, lines~ : Array[String])
+} derive(Eq, ToJson, @debug.Debug)
 
 pub(all) struct Layout {
   order : Array[Int]
@@ -377,6 +379,6 @@ pub(all) struct Span {
 // Type aliases
 pub type Measure = (Font, String) -> Double
 
-pub type SizeOf = (@view.Node, Array[Card], Int) -> Size
+pub type SizeOf = (@tree.Node, Array[Card], Int) -> Size
 
 // Traits

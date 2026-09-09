@@ -182,7 +182,8 @@ fn LabelField::write(self : LabelField) -> Unit {
 }
 
 ///|
-/// その中身（ブロック id）の矩形（world）。持ち主が畳まれていれば None
+/// その中身から起きたカードの矩形（world）。カードにならない中身と、
+/// 持ち主が畳まれた中身は None
 pub fn card_rect_of(l : @map.Layout, block : Int) -> @map.Rect? {
   guard @map.owner_of(l, block) is Some((b, i)) else { return None }
   guard @map.card_rect(b, i) is Some(r) else { return None }

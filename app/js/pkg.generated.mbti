@@ -97,8 +97,6 @@ pub fn mmm_tree_json(String) -> String
 
 pub fn mmm_unbuild_sig(String) -> String
 
-pub fn mmm_view_json(String) -> String
-
 // Errors
 
 // Types and methods

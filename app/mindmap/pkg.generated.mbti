@@ -199,7 +199,7 @@ pub(all) struct Spot {
   rect : @map.Rect
   row_y : Double
   box_w : Double
-  spot : String
+  id : Int
 }
 
 pub(all) struct Token {

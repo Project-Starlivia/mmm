@@ -3,24 +3,26 @@
 
 ///|
 /// 全部 100 × 30
-fn size(_n : @view.Node, _cards : Array[@map.Card], _buried : Int) -> @map.Size {
+fn size(_n : @tree.Node, _cards : Array[@map.Card], _buried : Int) -> @map.Size {
   { w: 100, h: 30, }
 }
 
 ///|
+/// 綴りは既定で `#`。`mark=None` で Implicit（綴りの無いノード）
 fn node(
   id : Int,
   label : String,
-  children? : Array[@view.Node] = [],
+  children? : Array[@tree.Node] = [],
   fold? : @tree.Fold? = None,
-  blocks? : Array[@tree.Block] = [],
-) -> @view.Node {
-  { id, label: Some(label), fold, blocks, children, }
+  body? : Array[@tree.Block] = [],
+  mark? : @tree.Mark? = Some(@tree.atx),
+) -> @tree.Node {
+  { id, label, fold, body, children, mark, }
 }
 
 ///|
-fn root(n : @view.Node, sides? : Array[@tree.Side] = []) -> @view.Root {
-  { node: n, sides, }
+fn root(n : @tree.Node, sides? : Array[@tree.Side] = []) -> @tree.Root {
+  { node: n, sides, rules: [], }
 }
 
 ///|
@@ -31,7 +33,7 @@ fn seven(_font : @map.Font, text : String) -> Double {
 
 ///|
 fn scene(
-  roots : Array[@view.Root],
+  roots : Array[@tree.Root],
   image_url? : (String) -> String? = _ => None,
   image_hint? : String? = None,
   epoch? : Int = 0,
@@ -216,11 +218,18 @@ test "文書順が変われば DOM の並び（重なり順）も変わる" {
 }
 
 ///|
-test "カードは仕切り線に続けて種類ごとの形で並び、data-card は「id,枚目」" {
+/// `data-card` はカードが出た**中身の id**。カードにならない中身（4）を先に置いても、
+/// 後ろのカードは自分の id を名乗る — 枚目は入らない（#212）
+test "カードは仕切り線に続けて種類ごとの形で並び、data-card は中身の id" {
   let w = @test_utils.create_happy_window()
   defer w.close()
   let r = Renderer::new(w.document())
-  let blocks : Array[@tree.Block] = [
+  let body : Array[@tree.Block] = [
+    {
+      id: 4,
+      source: None,
+      content: Some(Link(text="m", href="mailto:a@b", title="")),
+    },
     {
       id: 5,
       source: None,
@@ -240,11 +249,11 @@ test "カードは仕切り線に続けて種類ごとの形で並び、data-car
     },
     { id: 10, source: None, content: Some(Svg("<svg/>")), },
   ]
-  r.draw(scene([root(node(1, "r", blocks~))], image_hint=Some("connect")))
+  r.draw(scene([root(node(1, "r", body~))], image_hint=Some("connect")))
   let g = r.node_el(1).unwrap()
   assert_eq(g.querySelectorAll(".sep").length(), 6)
   let hit = one(g, ".link-hit")
-  assert_eq(attr(hit, "data-card"), "1,0")
+  assert_eq(attr(hit, "data-card"), "5")
   assert_eq(attr(one(g, ".link-open"), "data-url"), "https://x.example/p")
   assert_eq(one(g, ".link-row").textContent(), "t")
   assert_eq(one(g, ".code-bg title").textContent(), "js")
@@ -254,7 +263,7 @@ test "カードは仕切り線に続けて種類ごとの形で並び、data-car
   assert_eq(one(g, ".image-name").textContent(), "p.png")
   assert_eq(one(g, ".image-connect").textContent(), "connect")
   assert_eq(attr(one(g, ".image-connect"), "data-connect"), "1")
-  assert_eq(attr(one(g, ".break"), "data-card"), "1,3")
+  assert_eq(attr(one(g, ".break"), "data-card"), "8")
   assert_eq(one(g, ".details-mark").textContent(), "▾")
   assert_eq(one(g, ".details-row").textContent(), "s")
   assert_eq(one(g, ".details-line").textContent(), "d")
@@ -264,7 +273,7 @@ test "カードは仕切り線に続けて種類ごとの形で並び、data-car
   )
   // 画像が読めれば <image> に、入口は消える
   r.draw(
-    scene([root(node(1, "r", blocks~))], image_url=p => {
+    scene([root(node(1, "r", body~))], image_url=p => {
       if p == "p.png" {
         Some("blob:x")
       } else {

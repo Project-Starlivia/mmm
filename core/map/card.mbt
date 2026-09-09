@@ -3,10 +3,22 @@
 //
 // md の読みは tree が済ませている。ここが見るのは tree が「これは画像・リンク・
 // コード・SVG・水平線・details だ」と言った Block だけで、原文はもう無い。
+//
+// **カードは自分が出た中身の id を持つ。** 分類は全域ではない（外部の画像・
+// http 以外のリンクは落ちる）ので、カードの列は中身の列より短くなりうる。
+// 添字で 2 つの列を突き合わせると別のカードを掴む — 実際に掴んでいた（#212）。
 
 ///|
-/// ラベルの下に積むカード 1 枚
-pub(all) enum Card {
+/// ラベルの下に積むカード 1 枚。**それが出た中身の id を持つ** —
+/// 選ぶ・消す・開くは、枚数ではなくこの id で言う
+pub(all) struct Card {
+  id : Int
+  kind : Kind
+} derive(Eq, Debug, ToJson)
+
+///|
+/// カードの種類。何をどう見せるかだけを言う
+pub(all) enum Kind {
   /// `http(s)` のリンク。題が空ならホスト名が題
   Link(title~ : String, url~ : String)
   /// 相対パスのローカル画像。name はパスの最後の要素
@@ -26,7 +38,7 @@ let code_max_lines = 6
 
 ///|
 /// `http(s)` のリンクだけ
-fn link_card(text : String, href : String) -> Card? {
+fn link_card(text : String, href : String) -> Kind? {
   guard href.has_prefix("http://") || href.has_prefix("https://") else {
     return None
   }
@@ -66,7 +78,7 @@ fn host_of(href : String) -> String {
 ///|
 /// 相対パスのローカル画像だけ。外部の画像（http / data）は出さない — 外へ通信しない。
 /// scheme は 2 文字以上（1 文字は Windows のドライブ `C:\`）。
-fn image_card(src : String) -> Card? {
+fn image_card(src : String) -> Kind? {
   guard scheme_len(src) <= 1 else { return None }
   let path = @tree.bare_path(src)
   guard path != "" else { return None }
@@ -134,7 +146,7 @@ fn lines_of(text : String) -> Array[String] {
 }
 
 ///|
-fn card_of(c : @tree.Content) -> Card? {
+fn card_of(c : @tree.Content) -> Kind? {
   match c {
     Image(src~, ..) => image_card(src)
     Link(text~, href~, ..) => link_card(text, href)
@@ -147,13 +159,14 @@ fn card_of(c : @tree.Content) -> Card? {
 }
 
 ///|
-/// ノード 1 つぶんのカード。並びは Block のまま。id は今は使わない（選ぶ段で使う）
+/// ノード 1 つぶんのカード。並びは中身のまま、**枚数は中身の数と揃わない** —
+/// カードにならない中身（読み解いていない・外部の画像・http 以外のリンク）は
+/// 飛ばす。だからこそ 1 枚ずつが出どころの id を連れる
 pub fn cards(blocks : Array[@tree.Block]) -> Array[Card] {
   let out = []
   for b in blocks {
-    // 読み解かなかった中身は View に来ない（project が落とす）
     match b.content.bind(card_of) {
-      Some(c) => out.push(c)
+      Some(kind) => out.push({ id: b.id, kind, })
       None => ()
     }
   }
