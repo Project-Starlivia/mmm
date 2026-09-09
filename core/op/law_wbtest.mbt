@@ -149,8 +149,11 @@ fn ops_for(all : Array[Int]) -> Array[Op] {
 }
 
 ///|
+/// **形は md が決める。** 操作後の木が md に書けない形（中身の尻の水平線に骨格が
+/// 続く境界）なら、書いた md は境界として読まれるので形が一致しない。
 test "法則 — 形が一致すれば focus は同じ部分木を指し、一致しなければ focus は無い" {
   let mut some = 0
+  let mut decided = 0
   let bad : Array[String] = []
   for i, md in corpus {
     let before = @tree.parse(md)
@@ -162,6 +165,7 @@ test "法則 — 形が一致すれば focus は同じ部分木を指し、一�
           some = some + 1
           let after = @tree.parse(@tree.patched(md, r.edits))
           if @tree.shape(after) != @tree.shape(done.doc) {
+            decided = decided + 1
             if r.focus is Some(_) {
               bad.push("\{what}: 形が違うのに focus がある")
             }
@@ -187,8 +191,11 @@ test "法則 — 形が一致すれば focus は同じ部分木を指し、一�
   }
   json_inspect(bad, content=[])
   // 全部 None に潰れる退化を落とすための下限チェック
-  // 1528 → 1538: 境界の手前の水平線を断らなくなった分（#178）
-  inspect(some, content="1538")
+  // 1528 → 1635: 境界、→ 1705: 文書へ中身を断らなくなった分
+  inspect(some, content="1705")
+  // md が形を決めた回数。0 なら法則の 2 つ目の道が死んでいる
+  // 109 → 99: 境界の手前の水平線を中身に落とすようになった分（#178）
+  inspect(decided, content="99")
 }
 
 ///|
@@ -367,8 +374,8 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   }
   json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
-  // 1486 → 1496: 境界の手前の水平線を断らなくなった分（#178）
-  inspect(n, content="1496")
+  // 1486 → 1593: 境界、→ 1663: 文書へ中身を断らなくなった分
+  inspect(n, content="1663")
 }
 
 ///|

@@ -225,8 +225,10 @@ test "複数選択の Tab は先頭の前の兄弟の子へ、Shift+Tab は先�
 }
 
 ///|
-test "Shift+H は畳む / 畳みを外す。Implicit も畳む（core が綴る）。無選択は拾わない" {
-  // r(2) → a(3。畳んである), Implicit(4) → x(5)
+/// 畳みは 1 歩ずつ巡る: 畳む（閉）→ 開く（`<details open>`）→ 外す。Implicit も畳む
+/// （core が綴る）。無選択は拾わない。`H` はもう畳みではない
+test "Shift+F は畳む → 開く → 外す、を巡る。Implicit も畳む。無選択は拾わない" {
+  // r(2) → a(3。閉じた畳み), Implicit(4) → x(5), o(6。開いた畳み)
   let f = layout(
     [
       root(
@@ -239,25 +241,31 @@ test "Shift+H は畳む / 畳みを外す。Implicit も畳む（core が綴る�
             blocks: [],
             children: [node(5, "x")],
           },
+          node(6, "o", fold=Some({ open: true, summary: Some("o"), })),
         ]),
-        sides=[Right, Right],
+        sides=[Right, Right, Right],
       ),
     ],
     size,
   )
   assert_eq(
-    keyed(f, one(2), k("H", shift=true)),
+    keyed(f, one(2), k("F", shift=true)),
     Some(Op(op=Fold(id=2, open=false), edit=false)),
   )
   assert_eq(
-    keyed(f, one(3), k("H", shift=true)),
-    Some(Op(op=Unfold(id=3), edit=false)),
+    keyed(f, one(3), k("F", shift=true)),
+    Some(Op(op=Fold(id=3, open=true), edit=false)),
   )
   assert_eq(
-    keyed(f, one(4), k("H", shift=true)),
+    keyed(f, one(6), k("F", shift=true)),
+    Some(Op(op=Unfold(id=6), edit=false)),
+  )
+  assert_eq(
+    keyed(f, one(4), k("F", shift=true)),
     Some(Op(op=Fold(id=4, open=false), edit=false)),
   )
-  assert_eq(keyed(f, none, k("H", shift=true)), None)
+  assert_eq(keyed(f, none, k("F", shift=true)), None)
+  assert_eq(keyed(f, one(2), k("H", shift=true)), None)
 }
 
 ///|

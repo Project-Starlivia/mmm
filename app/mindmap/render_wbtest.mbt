@@ -99,13 +99,36 @@ test "空の字はプレースホルダを出し、畳んだノードは字を�
   let g = r.node_el(2).unwrap()
   assert_eq(attr(g, "class"), "node folded")
   let label = one(g, ".label")
-  assert_eq(label.textContent(), "abcdefghijklm…  +1")
+  assert_eq(label.textContent(), "▷ abcdefghijk…  +1")
   assert_eq(attr(label, "font-size"), "11")
   assert_eq(
     one(g, "title").textContent(),
     "abcdefghijklmnopqrstuvwxyz\n(1 folded)",
   )
   assert_true(r.node_el(3) is None)
+}
+
+///|
+/// `<details open>` は開いた畳み。名前は summary のまま ▽ を付けて普通の行に、
+/// 子は描かれ、`folded open` で沈まない
+test "開いた畳みは ▽ summary で普通の行、子も描く" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let r = Renderer::new(w.document())
+  let opened = node(
+    2,
+    "a",
+    children=[node(3, "x")],
+    fold=Some({ open: true, summary: Some("s"), }),
+  )
+  r.draw(scene([root(node(1, "r", children=[opened]))]))
+  let g = r.node_el(2).unwrap()
+  assert_eq(attr(g, "class"), "node folded open")
+  let label = one(g, ".label")
+  assert_eq(label.textContent(), "▽ s")
+  assert_eq(attr(label, "font-size"), "13")
+  assert_eq(one(g, "title").textContent(), "s")
+  assert_true(r.node_el(3) is Some(_))
 }
 
 ///|

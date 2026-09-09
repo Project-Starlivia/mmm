@@ -273,18 +273,34 @@ fn deleted(h : Hand) -> Answer {
 }
 
 ///|
-/// Shift+H — 畳む / 開く。畳んでいるかで向きが決まる。
+/// Shift+F — 畳み（F = fold）。畳む（閉）→ 開く（`<details open>`）→ 外す、を
+/// 1 つのキーで 1 歩ずつ巡る。
 fn folded(h : Hand) -> Answer {
-  guard h.k.key == "H" && h.k.shift && !h.k.mod else { return Pass }
+  guard h.k.key == "F" && h.k.shift && !h.k.mod else { return Pass }
   guard h.anchor is Some(anchor) else { return Stop }
   guard node_of(h.l, Some(anchor)) is Some(node) else { return Stop }
-  Do(
-    if node.fold is Some(_) {
-      Op(op=Unfold(id=anchor), edit=false)
-    } else {
-      Op(op=Fold(id=anchor, open=false), edit=false)
-    },
-  )
+  Do(fold_step(node, anchor))
+}
+
+///|
+/// 畳みの次の 1 歩。畳んでいなければ畳む（閉）、閉じていれば開く（子は出るが
+/// 畳みのまま）、開いていれば外す。右クリックの行も同じ 1 歩を名乗る
+pub fn fold_step(node : @view.Node, id : Int) -> Intent {
+  match node.fold {
+    None => Op(op=Fold(id~, open=false), edit=false)
+    Some({ open: false, .. }) => Op(op=Fold(id~, open=true), edit=false)
+    Some(_) => Op(op=Unfold(id~), edit=false)
+  }
+}
+
+///|
+/// 畳みの行の字。次の 1 歩を名乗る
+pub fn fold_label(node : @view.Node?) -> String {
+  match node {
+    Some({ fold: Some({ open: false, .. }), .. }) => "Open (folded)"
+    Some({ fold: Some(_), .. }) => "Unfold"
+    _ => "Fold"
+  }
 }
 
 ///|

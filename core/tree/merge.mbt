@@ -15,8 +15,9 @@
 // 増えるときは theirs の隙間を連れてきて、残る要素の隙間は theirs で変わったときだけ
 // 書き換える。隙間そのものは原文の字で測る（空白だけの行 = 空行。読みと同じ）。
 // 出来た文章を読み直して後の木と形が一致しなければ全文を正規形に落とす —
-// **正しさはこの検証が持つ**ので、比較がどれだけ雑でも壊れない。答えは返り値に
-// 載せる（`same`）— 呼ぶ側も同じことを知りたいので、二度読み直さない。
+// **正しさはこの検証が持つ**ので、比較がどれだけ雑でも壊れない。ただし
+// **正規形に落としても同じ形に読まれる**なら落とさない（形を md が決める木）。
+// 答えは返り値に載せる（`same`）— 呼ぶ側も同じことを知りたいので、二度読み直さない。
 // 決めは docs/core.md「合流」。
 
 ///|
@@ -65,20 +66,31 @@ pub fn merge(
   } else {
     plan(md, before, spans, after)
   }
-  match planned {
-    Some(edits) if verified(md, edits, after) => { edits, same: true, }
-    // 全文の正規形は断片と字が違うので、検証もやり直す
-    _ => {
-      let edits = [{ from: 0, to: md.length(), insert: serialize(after), }]
-      { edits, same: verified(md, edits, after), }
-    }
+  if planned is Some(edits) && verdict(md, edits, after) is Some(same) {
+    return { edits, same, }
   }
+  // 全文の正規形は断片と字が違うので、検証もやり直す
+  let edits = [{ from: 0, to: md.length(), insert: serialize(after), }]
+  { edits, same: verdict(md, edits, after) is Some(true), }
 }
 
 ///|
-/// 編集を当てて読み直した形が、後の木と同じか。**合流の正しさはこれが持つ。**
-fn verified(md : String, edits : Array[Edit], after : Doc) -> Bool {
-  shape(parse(patched(md, edits))) == shape(after)
+/// 編集を当てて読み直した形の答え。**合流の正しさはこれが持つ。**
+///
+/// `Some(true)` は後の木そのもの。`Some(false)` は木とは違うが、**木を正規形に
+/// 書いて読み直した形とは同じ** — 木が md に書けない形（中身の尻の水平線に骨格が
+/// 続く `BorderBreak`）を持つときで、正規形に落としても同じ字に読まれるのだから
+/// 全文へ落とす理由が無い。そのとき文書順の番号は別のものを指すので `same` は偽。
+/// `None` は断片で書けていない。
+fn verdict(md : String, edits : Array[Edit], after : Doc) -> Bool? {
+  let read = shape(parse(patched(md, edits)))
+  if read == shape(after) {
+    Some(true)
+  } else if read == shape(parse(serialize(after))) {
+    Some(false)
+  } else {
+    None
+  }
 }
 
 ///|

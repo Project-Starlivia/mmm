@@ -9,6 +9,7 @@
 /// 操作ごとに規則を写さず、組んだ結果を check に通す。見出しの深さは cap が
 /// 綴り替え、Implicit を綴れば直る破れは mend が繕い、残れば断る。
 /// cap が先 — 天井を越えた見出しは mend には直せない。
+/// 例外は境界（`BorderBreak`）だけ — 書けば md が境界と読むので、形は読み直しが決める。
 pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
   guard attempt(doc, op) is Some(d) else { return None }
   guard mend(cap(d.doc)) is Some(doc) else { return None }
@@ -120,7 +121,14 @@ fn mend(doc : @tree.Doc) -> @tree.Doc? {
       }
     }
     if !fixed {
-      return None
+      // 中身の尻の水平線に骨格が続く形（`BorderBreak`）だけは通す — 書けば md が
+      // 境界と読む（深さ 2 なら側の反転、深ければ深さ 2 へ引き出して反対側）。
+      // 形は読み直しが決めるので、そのとき edit は focus を持たない
+      return if flaws.iter().all(f => f is BorderBreak(_)) {
+        Some(cur)
+      } else {
+        None
+      }
     }
   }
 }
@@ -160,10 +168,21 @@ fn done(doc : @tree.Doc?, focus : Int?) -> Done? {
 
 ///|
 /// ラベルを替える。Implicit は見出しとして綴られる。
+/// 畳まれたノードの名前は summary（地図が出す字）なので、summary も同じ字にする —
+/// 手書きで食い違っていた 2 つの名前も、名を付け直せば 1 つに揃う
 fn rename(doc : @tree.Doc, id : Int, label : String) -> Done? {
   guard find(doc, id) is Some(n) else { return None }
   // Implicit は行を省いた空の見出しなので、名を付ければ見出しそのもの
-  let m = if n.mark is None { spell(n, label) } else { { ..n, label, } }
+  // （畳みは持てないので summary も無い）
+  let m = if n.mark is None {
+    spell(n, label)
+  } else {
+    {
+      ..n,
+      label,
+      fold: n.fold.map(f => ({ ..f, summary: Some(label), } : @tree.Fold)),
+    }
+  }
   done(splice(doc, id, _ => [m]), Some(id))
 }
 
@@ -666,8 +685,10 @@ fn shift(n : @tree.Node, by : Int) -> @tree.Node {
 ///|
 /// md を読んで形にし、席の綴りで差す。断片が持ち込むのは形（ラベル・中身・子・畳み・
 /// 飛び）だけで、`#` の本数・マーカー・字下げ・先頭の飛びは書き方なので捨てる。
-/// 一番外の段落は行ごとにノード、それ以外の中身は行き先の親の body 末尾へ
-/// （行き先が文書なら断る — 文書の散文はマップに出ない）。
+/// 一番外は順に読み、段落は行ごとにノード、それ以外の中身は直前に生えたノードの
+/// 中身へ（無ければ行き先の親の body 末尾へ）。`---` は md と同じ意味 — 断片の側は
+/// 境界として運び、書けば md が境界と読む（形は読み直しが決める）
+/// （行き先が文書なら文書の散文へ。マップには出ないが、手で頭に書いたのと同じ）。
 /// 断片が `##` から始まると parse は根を Implicit で包む（深さ 1 の飛び）。
 /// それは切り出した場所の名残でしかないので剥がし、相対の形で差す。
 /// 決めは docs/superpowers/specs/2026-09-06-paste-design.md
@@ -682,22 +703,45 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
       p
     }
   }
-  let (labels, rest) = split_prose(sub.body)
+  // 断片の側は境界の水平線に戻す。側は根のものなので席へ差せば消えるが、
+  // 字として運べば書き戻したときに md が境界と読む
+  let sub = bordered(sub)
+  let cut = pieces(sub.body)
   // 行のノードは文書に無い番号から、断片の id はその先へ寄せる
   let first = fresh(doc)
-  let by = first + labels.length() - (@tree.doc_id + 1)
+  let by = first + count_lines(cut) - (@tree.doc_id + 1)
   let spell = spell_at(doc, at)
-  let heads = labels.mapi((k, label) => make(sign, first + k, label))
-  let prose = rest.map(b => {
-    ({ id: b.id + by, content: b.content, source: b.source, } : @tree.Block)
-  })
+  // 一番外は順に読む。中身は直前に生えたノードのもの（文書の読みと同じ —
+  // 骨格の行の後ろの中身はその行のもの）で、手前にノードが無ければ貼り先の中身
+  let heads : Array[@tree.Node] = []
+  let prose : Array[@tree.Block] = []
+  for p in cut {
+    match p {
+      Lines(ls) =>
+        for label in ls {
+          heads.push(make(sign, first + heads.length(), label))
+        }
+      Card(b) => {
+        let blk : @tree.Block = {
+          id: b.id + by,
+          content: b.content,
+          source: b.source,
+        }
+        match heads.pop() {
+          Some(n) => heads.push({ ..n, body: [..n.body, blk], })
+          None => prose.push(blk)
+        }
+      }
+    }
+  }
   let subs = peel(sub.roots.map(r => r.node)).map(n => {
     respell(shift(n, by), sign)
   })
   let nodes = [..heads, ..subs].mapi((k, n) => spelled(n, spell, k))
   let mut cur = doc
+  // 貼り先が文書なら文書の散文（最初の骨格より前）へ。マップには出ないが、
+  // 手で md の頭に書いたのと同じ形 — 見えないことは地図の都合で、断る理由にしない
   if !prose.is_empty() {
-    guard host != @tree.doc_id else { return None }
     guard body(cur, node=host, bs => [..bs, ..prose]) is Some(d) else {
       return None
     }
@@ -710,21 +754,73 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
 }
 
 ///|
-/// 貼る断片の一番外の中身を、**行のノードになる字**と**中身のまま行くもの**に分ける。
+/// 貼る断片の一番外の 1 切れ。**行のノードになる字**か、**中身のまま行くもの**。
 /// 行になりうるのは読み解かなかった中身の原文（段落）だけで、1 行が 1 ノード。
-fn split_prose(
-  body : Array[@tree.Block],
-) -> (Array[String], Array[@tree.Block]) {
-  let labels : Array[String] = []
-  let rest : Array[@tree.Block] = []
-  for b in body {
+priv enum Piece {
+  Lines(Array[String])
+  Card(@tree.Block)
+}
+
+///|
+/// 一番外の中身を、順のまま切る。
+fn pieces(body : Array[@tree.Block]) -> Array[Piece] {
+  body.map(b => {
     let ls = if b.content is None { b.source.bind(@tree.lines) } else { None }
     match ls {
-      Some(ls) => labels.append(ls)
-      None => rest.push(b)
+      Some(ls) => Lines(ls)
+      None => Card(b)
+    }
+  })
+}
+
+///|
+fn count_lines(cut : Array[Piece]) -> Int {
+  cut.fold(init=0, (n, p) => {
+    match p {
+      Lines(ls) => n + ls.length()
+      Card(_) => n
+    }
+  })
+}
+
+///|
+/// 断片の側を、境界の水平線に戻す。側が変わる子の**手前の子の部分木の最後の行**
+/// （文書順で境界の直前に書かれていた行）の中身の尻に置く。読んだ字（`rules`）は
+/// そのまま運ぶ。行が綴りを持たない（Implicit）なら中身を持てないので置けない。
+fn bordered(sub : @tree.Doc) -> @tree.Doc {
+  let mut cur = sub
+  let mut next = fresh(sub)
+  for r in sub.roots {
+    let kids = r.node.children
+    for i in 1..<kids.length() {
+      guard i < r.sides.length() && r.sides[i] != r.sides[i - 1] else {
+        continue
+      }
+      let source = match r.rules.get(i) {
+        Some(line) if line != "" => Some(line)
+        _ => None
+      }
+      let rule : @tree.Block = {
+        id: next,
+        content: Some(ThematicBreak),
+        source,
+      }
+      next = next + 1
+      if body(cur, node=last_line(kids[i - 1]), bs => [..bs, rule]) is Some(d) {
+        cur = d
+      }
     }
   }
-  (labels, rest)
+  cur
+}
+
+///|
+/// 部分木の中で文書順が最後の骨格の行。
+fn last_line(n : @tree.Node) -> Int {
+  match n.children.last() {
+    Some(k) => last_line(k)
+    None => n.id
+  }
 }
 
 ///|
