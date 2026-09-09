@@ -141,8 +141,14 @@ pub fn select_range(e : @dom.Element, from : Int, to : Int) -> Unit {
 }
 
 ///|
+/// 焦点を移す。**ブラウザに寄せさせない**（`preventScroll`）— 器はどれも
+/// `overflow: hidden` で、見えている場所は地図なら camera、md なら
+/// CodeMirror が決める。ブラウザが器ごとスクロールすると、その決めと食い違って
+/// 中身が画面の外へ出る（#134 — 画面外のノードを編集し始めると地図が全部消えた）
 pub fn focus(e : @dom.Element) -> Unit {
-  e.as_any()._call("focus", []) |> ignore
+  let opts = @core.new_object()
+  opts._set("preventScroll", @core.any(true))
+  e.as_any()._call("focus", [opts]) |> ignore
 }
 
 ///|
