@@ -106,7 +106,10 @@ fn walk(
       } else {
         None
       },
-      bordered: i > 0 && i < sides.length() && sides[i] != sides[i - 1],
+      // 手前に境界の `---` が書かれるか。**書く側（unbuild の `nodes`）と同じ見方** —
+      // 側は Right から始まるので、先頭の子が Left なら手前にも 1 本書かれる
+      bordered: i < sides.length() &&
+      sides[i] != (if i > 0 { sides[i - 1] } else { Right }),
       border: c.border,
     }
     c.border = None
@@ -213,9 +216,12 @@ fn border_break(s : Site) -> Flaw? {
 /// 見出し（綴られた・綴られない）に境界なしで続く項目・Implicit。その見出しに
 /// 飲み込まれる — 項目は子に読まれ、飛びはその見出しの深さから測られる。
 /// 側が変わる所には `---` が書かれるので飲み込まれない。
+/// **畳まれた見出しも飲み込まない** — `</details>` がその部分木の終わりを言うので、
+/// 閉じの後ろに書かれたものは外（docs/core.md「畳み」）。
 fn swallowed(s : Site) -> Flaw? {
   guard s.prev is Some(prev) else { return None }
   guard !(sign_of(prev) is Some(Item)) &&
+    prev.fold is None &&
     !s.bordered &&
     !(sign_of(s.node) is Some(Heading)) else {
     return None

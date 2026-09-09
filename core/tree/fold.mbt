@@ -30,6 +30,9 @@ priv enum Piece {
   )
   /// mdAst がブロックとして返さないもの（リンクの定義行）。原文のまま中身になる
   Text(String, from~ : Int, to~ : Int)
+  /// 立った畳みの閉じ。**その部分木が終わったという宣言**で、字は持たない
+  /// （綴りは落ちている）。積む側が枠を降ろす目印
+  Closed(from~ : Int, to~ : Int)
 }
 
 ///|
@@ -424,17 +427,6 @@ fn ahead_of(
 }
 
 ///|
-/// 保留中の水平線が行き先に選ぶ塊。**本数に意味は無い**ので水平線が続くうちは
-/// 先へ送り、骨格でない塊に当たればそこで飾りに落ちる。
-fn lands(blocks : Array[@markdown.Block], gone : Array[Bool], i : Int) -> Int {
-  let mut k = beyond(blocks, gone, i)
-  while k < blocks.length() && blocks[k] is ThematicBreak(..) {
-    k = beyond(blocks, gone, k)
-  }
-  k
-}
-
-///|
 /// 開きの塊が言っている畳み。**塊が綴りだけで出来ていることは `folds` が確かめる**
 /// ので、ここは読むだけ。
 fn fold_of(s : Spell) -> Fold {
@@ -477,25 +469,29 @@ fn covers(
     guard depth[k].top > level else { return false }
     // 領域の中に書いた水平線の行き先が領域の外の骨格なら、その水平線は
     // 部分木のものではない（書き戻すと領域の外に出る）。行き先が中なら、
-    // 引き出された骨格は上の深さで弾かれるか、飾りとして中身に残る
+    // 引き出された骨格は上の深さで弾かれるか、飾りとして中身に残る。
+    // **行き先は直後の塊だけ** — 水平線が続けば手前は飾りに落ちる（#178）
     if blocks[k] is ThematicBreak(..) {
-      let w = lands(blocks, gone, k)
+      let w = beyond(blocks, gone, k)
       guard !(w > last && w < blocks.length() && depth[w].own < deep) else {
         return false
       }
     }
     k = k + 1
   }
-  // 後ろが部分木の中なら狭い
+  // **後ろが骨格なら深さは見ない。** 閉じは「この部分木が終わった」という宣言で、
+  // 続く骨格は定義上その外（`shut` が枠を降ろし、深ければ間を Implicit が埋める）。
+  // 骨格でなければ、その中身はこのノードの body ＝ 領域が狭いということ
   let z = beyond(blocks, gone, last)
   guard z < blocks.length() else { return true }
-  // 水平線は単体では中身ではない。**その先が骨格なら境界**（部分木の外）で、
-  // そうでなければ飾り＝このノードの中身なので、領域が狭いということ
+  // 水平線は単体では中身ではない。**直後が骨格なら境界**（部分木の外）で、
+  // そうでなければ飾り＝このノードの中身なので、領域が狭い
+  // （水平線が続けば手前は飾り。境界を取るのは最後の 1 本だけ。#178）
   if blocks[z] is ThematicBreak(..) {
-    let w = lands(blocks, gone, z)
-    return w < blocks.length() && depth[w].top <= level
+    let w = beyond(blocks, gone, z)
+    return w < blocks.length() && depth[w].top < deep
   }
-  depth[z].top <= level
+  depth[z].top < deep
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -519,6 +515,10 @@ priv struct Sift {
   pairs : Array[Pair]
   /// 塊ごと、手前に塊にならない中身が在るか
   ahead : Array[Bool]
+  /// 塊ごと、対の開き・閉じを持つか。落ちる綴りでも深さは動かすので、
+  /// 深さの空打ち（`depths`）に渡す
+  opens : Array[Bool]
+  closes : Array[Bool]
 }
 
 ///|
@@ -531,6 +531,13 @@ fn sift(
 ) -> Array[Piece] {
   let spells = blocks.map(b => spell_of(md, b))
   let spots = found(spells)
+  let pairs = paired(spots)
+  let opens = Array::make(blocks.length(), false)
+  let closes = Array::make(blocks.length(), false)
+  for p in pairs {
+    opens[spots[p.open].block] = true
+    closes[spots[p.close].block] = true
+  }
   let s : Sift = {
     md,
     blocks,
@@ -538,8 +545,10 @@ fn sift(
     nest,
     spells,
     spots,
-    pairs: paired(spots),
+    pairs,
     ahead: ahead_of(blocks, defs),
+    opens,
+    closes,
   }
   let v = standing(s)
   restore(s, arrange(s, v, marks(s, v), raws(s, v)))
@@ -567,7 +576,7 @@ fn standing(s : Sift) -> Verdict {
   for _ in 0..<=s.pairs.length() {
     // 深さも同じ `gone` で測る。跨ぐ塊が変われば本番の木も変わるので、
     // 判定と同じ前提で測り直さないと食い違う
-    let depth = depths(s.md, s.blocks, gone, s.ahead, s.nest)
+    let depth = depths(s.md, s.blocks, gone, s.ahead, s.opens, s.closes, s.nest)
     folded = s.pairs.map(p => stands(s, depth, gone, p))
     let now = fallen(s, folded)
     let mut moved = false
@@ -736,7 +745,13 @@ fn arrange(
         i = r.last + 1
       }
       None => {
-        if !v.gone[i] {
+        if v.gone[i] {
+          // 立った畳みの閉じは、字は落ちても**部分木の終わり**は残す
+          if closing(s, v, i) {
+            let at = block_span(s.blocks[i])
+            out.push(Closed(from=at.from, to=at.to))
+          }
+        } else {
           out.push(
             match folds[i] {
               Some((fold, at)) => Folded(s.blocks[i], fold~, at~)
@@ -749,6 +764,18 @@ fn arrange(
     }
   }
   out
+}
+
+///|
+/// その塊が、立った畳みの閉じか。1 つの塊が閉じを何本も持つことはあるので、
+/// **どれか 1 本でも立った対の閉じなら**その塊で部分木が終わる。
+fn closing(s : Sift, v : Verdict, block : Int) -> Bool {
+  for k, p in s.pairs {
+    if v.folded[k] && s.spots[p.close].block == block {
+      return true
+    }
+  }
+  false
 }
 
 ///|
@@ -797,5 +824,6 @@ fn piece_span(p : Piece) -> @markdown.Span {
     Folded(b, ..) => block_span(b)
     Capsule(from~, to~, ..) => { from, to, }
     Text(_, from~, to~) => { from, to, }
+    Closed(from~, to~) => { from, to, }
   }
 }
