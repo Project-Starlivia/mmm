@@ -1,6 +1,6 @@
 // 部品 × 状態の表。**見本の値は core と src の表から引く** — 絵の名前・しらせの言葉・
-// 言い出し・たずね（core/parts・core/app）、メニューの並び（core/map/context.mbt /
-// core/app の files / more / export）。ここが持つのは「どの状態で呼ぶか」だけで、
+// 言い出し・たずね（app/parts）、メニューの並び（core/map/context.mbt /
+// app/bar の files / more / export）。ここが持つのは「どの状態で呼ぶか」だけで、
 // 綴りも並びも持たない。
 //
 // テーマは部品の話ではないので、ここには無い（index.ts が枠に振る）。
@@ -120,11 +120,20 @@ export const PARTS: Part[] = [
       rename: () => asked("rename", "notes.md"),
       "image-name": () =>
         asked("imageName", { shape: ["![](", "./pics/", { value: "2026-09-05-101500" }, ".webp)"], shot: SHOT }),
+      // **言葉は写さない。** 置き場に `shot.webp` が居ることにすれば、
+      // 本物の検査（app/disk/images.mbt の image_name_problem）が理由を返す
       "image-name-taken": () =>
         asked("imageName", {
-          shape: ["![](", "./pics/", { value: "shot", check: () => "That name is taken" }, ".webp)"],
+          shape: ["![](", "./pics/", { value: "shot" }, ".webp)"],
           shot: SHOT,
+          taken: ["shot.webp"],
         }),
+      // 宣言。計算できていれば道が入り（dirName は渡さない）、当て推量なら
+      // フォルダの実名と末尾を照合する
+      declaration: () => asked("declaration", { folder: "pics", value: "./pics/" }),
+      // 指したのは pics なのに、道の末尾が違う。実名と照合して止める
+      "declaration-mismatch": () => asked("declaration", { folder: "pics", value: "./img/", dirName: "pics" }),
+      redeclaration: () => asked("redeclaration", { value: "./img/" }),
     },
   },
   {
