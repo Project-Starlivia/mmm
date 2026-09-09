@@ -51,7 +51,7 @@ Content = Image | Link | Code | Svg         // 解釈の包みは無い
 同じで、違うのは綴り（`mark`）だけ。**項目の中は、その項目の深さを 0 とした文書**
 （[spec.md](spec.md)「項目の中」）なので、項目の子に見出しが生え、見出しの子に項目が
 生える。種類で型を割ると、種類を問わない操作（動かす・選ぶ・名を付ける・畳む）が
-全部 3 分岐になり、分岐が減る場所が無い。**Doc の Node = View の Node + 綴り。**
+全部 3 分岐になり、分岐が減る場所が無い。
 
 **Implicit は記法を持たない**（`mark` が無い）。行を省いた空の見出しなので、
 記法が要るもの（名前・畳み・中身・見出しの直後の席）は綴ってから当てる（下の
@@ -92,40 +92,32 @@ md に書けない並びは 6 つ。
 - 深さ 3 以上で名前に改行（`DeepSetext`）— setext は深さ 2 までで、ATX は 1 行しか
   持てない
 
-### View — map が見る木
+### 描く側が見るもの
 
-`project(Doc)`（`view/`）が Doc から**削るだけ**で作る。足すものは無い。
+**描く側も同じ Doc を見る。** 木は 1 つで、写しは作らない。
 ts には渡らない — 読み（`read/` の Survey = 木 + 地番 + 原文）を持ち手として持ち、
 問い合わせで読む（`is_node` / `spot` / `chosen` / `name` / `copy` / `image_folder` …）。
 
-```
-View { frontmatter: String?, roots: [Root] }
-Root { node: Node, sides: [Side] }          // 側は Doc の Root と同じ。根の子と並走
-Node { id, label: String?, fold: Fold?, blocks: [Block], children: [Node] }
-```
-
-- **Doc との差は綴り（`mark`）と、読み解かなかった中身だけ。** 描く側は綴りを 1 つも見ない
-- **Implicit は `label` が無い。** Doc の `mark` 無しを `None` に写す。空の見出し
-  （`## `）は `Some("")` なので型で区別が付く。旗も種類も要らない
-- **`blocks` は body から読み解かなかったものを落としたもの。** core が「読み解かない」と
-  裁定したものだけが map に届かない。何がカードかは描く側の分類のまま
-- 書き戻すためだけの欄（散文の body・境界の綴り）は無い。**frontmatter だけは残す** —
-  画像フォルダの宣言がそこに書かれていて、描くのに要る
-- **id は Doc のまま。** 読みが文書順に振った通し番号で、読み解かなかった中身にも振ってある
-  ので、落としても残りの番号は動かない。順序を id に読ませない（下の「id は読みの
-  サイクルを越えて持たない」）。**添字は列をまたげない** — 落ちるものがある列と
-  無い列は長さが違うので、列をまたいで指すのは id だけ（カードは自分が出た中身の
-  id を持つ。#212 はこれを添字でやって別のカードを掴んでいた）
+- **描く側は綴り（`mark`）を見ない。** 種類を要るのは「Implicit か」の 1 か所だけで、
+  そこは `sign_of` で聞く。見出しか項目かは、置き方にも見せ方にも効かない
+- **読み解かなかった中身（Raw）は自分で飛ばす。** `map` はカードにならない中身を
+  数えないし、`read` は中身の id に混ぜない。落とす段は要らない
+- **添字は列をまたげない。** 落ちるものがある列と無い列は長さが違うので、列をまたいで
+  指すのは id だけ（カードは自分が出た中身の id を持つ。#212 はこれを添字でやって
+  別のカードを掴んでいた）
+- **id は読みが文書順に振った通し番号。** 読み解かなかった中身にも振ってあるので、
+  飛ばしても残りの番号は動かない。順序を id に読ませない（下の「id は読みの
+  サイクルを越えて持たない」）
 
 ## パイプライン
 
-**段は 9 つ。** どれも 1 語の動詞で、中身は語彙の合成だけ。**pub なのは段と型だけ**で、
+**段は 8 つ。** どれも 1 語の動詞で、中身は語彙の合成だけ。**pub なのは段と型だけ**で、
 その下の語彙は「1 関数 = 1 文で言い切れる」まで割ってある（決めは
 `superpowers/specs/2026-09-08-layers-design.md`）。
 
 ```
-            read             build                project
-md ───────> mdAst ─────────> Doc + 地番 ────────> View        @read.survey = read → build → project
+            read             build
+md ───────> mdAst ─────────> Doc + 地番                       @read.survey = read → build
             write            unbuild
 md <─────── mdAst <───────── Doc                              serialize    = unbuild → write
                               │ check    Doc → 破れ
@@ -134,10 +126,10 @@ md × Doc × 地番 × Doc ──merge──> 編集リスト                   
 md × Op ──edit──> 編集リスト + focus                           = 読み → apply → merge → number
 ```
 
-地図はその先。**配置** `View + 寸法 ──layout──> Layout`（map/。字の実測は ts の canvas を
+地図はその先。**配置** `木 + 寸法 ──layout──> Layout`（map/。字の実測は ts の canvas を
 閉包で受ける）、**描画** `Layout + 場面 ──draw──> SVG の差分`（app/mindmap。js だけ）。
 
-**サイクルは 1 本**。md が変わったら必ず 読み → project → 描画。無限ループしないのは
+**サイクルは 1 本**。md が変わったら必ず 読み → 描画。無限ループしないのは
 「**書くのは操作だけ。読みのサイクルは決して書かない**」から。
 
 **段は一方向で、相互再帰は段の中に閉じる。** 唯一のそれは build の中 — 畳みが立つかは
@@ -162,7 +154,7 @@ Implicit が埋める。**側は裏返らない**（裏返すのは `---` だけ
 「ライブラリ」と「方言」の直列で、その先の build / content / fold / merge は方言の
 mdAst だけを見る。
 
-**ライブラリの型が出るのは `core/tree` の中まで。** `core/op` も `core/map` も `core/view` も
+**ライブラリの型が出るのは `core/tree` の中まで。** `core/op` も `core/map` も `core/read` も
 `@markdown` を 1 度も見ず、`moon.pkg` で import しているのも `core/tree` だけ。科の中では
 5 ファイル 98 か所が触る（`md.mbt` 29 / `build.mbt` 24 / `unbuild.mbt` 20 / `fold.mbt` 17 /
 `content.mbt` 8）— 書く側は `@markdown.Block` を組んで `serialize` に渡すので、型を通貨に
@@ -499,8 +491,9 @@ Mindmap の「どこに置くか」と「SVG をどう組むか」も core が�
 docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を持つ md 側と
 違い、map 側の SVG は全部自作なので、core が描いてよい。
 
-- **map/** — DOM を知らない。`layout(roots, size) -> Layout { order, boxes }` が View の木を
-  そのまま歩き、幾何と畳みの埋没とカード（`Card`。Block の分類）を足す。寸法は
+- **map/** — DOM を知らない。`layout(roots, size) -> Layout { order, boxes }` が Doc の木を
+  そのまま歩き、幾何と畳みの埋没とカード（`Card`。Block の分類 + 出どころの id）を
+  足す。受けるのは `Array[Root]` で `Doc` ではない — 最初の骨格より前の散文は届かない。寸法は
   `metric.mbt` が**唯一の定義**で、字の実測だけ `Measure = (Font, String) -> Double` で
   外から受ける（`Font { px, mono }`。大きさは core、綴りは ts の CSS）。試験は数だけで書く
 - **app/mindmap** — `Renderer::draw(scene)` が Layout を `<g>` の中の SVG に差分で写す。
@@ -572,7 +565,3 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
   ので体感に出ない。今の入れ子のまま。splice の行き先が 3 を超えた
   ときに「op の中だけ flatten / unflatten」から考え直す（**行き先は 13 になった**。
   記法構造が平らになれば木は入れ子のままでよい、が notation の答え）
-- **View を Doc と別の型に保つか。** Doc の Node = View の Node + 綴りになったので、
-  project が削るのは `mark` と、読み解かなかった中身だけ。描く側が Doc をそのまま受けて飛ばす形と
-  比べる。別の型で得ているのは「描く側に綴りを見せない」だけ（notation では Doc から綴りが
-  消えるので、2 つの型が 1 つになる）

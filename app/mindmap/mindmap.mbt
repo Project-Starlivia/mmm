@@ -87,7 +87,7 @@ pub struct Mindmap {
 
 ///|
 fn place_layout(host : Host) -> @map.Layout {
-  @map.layout((host.survey)().view.roots, @map.node_size(host.measure))
+  @map.layout((host.survey)().doc.roots, @map.node_size(host.measure))
 }
 
 ///|
@@ -361,7 +361,7 @@ pub fn Mindmap::refresh_selection(self : Mindmap) -> Unit {
 /// 戻り値はそれを呼び出し側（main.ts の apply）に言うためのもの
 pub fn Mindmap::begin_edit(self : Mindmap, id : Int, seed : String?) -> Bool {
   guard self.layout.boxes.get(id) is Some(b) else { return false }
-  self.label.open(id, self.layout, self.camera, @map.label_of(b.node), seed)
+  self.label.open(id, self.layout, self.camera, b.node.label, seed)
   true
 }
 

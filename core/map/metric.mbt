@@ -29,7 +29,7 @@ pub(all) struct Size {
 
 ///|
 /// ノードの箱の大きさを答えるもの。layout はこれしか知らない — 試験は数で渡す
-pub type SizeOf = (@view.Node, Array[Card], Int) -> Size
+pub type SizeOf = (@tree.Node, Array[Card], Int) -> Size
 
 ///|
 /// ラベル行の規格。pad は文字の開始位置（箱の左からの距離）
@@ -161,22 +161,13 @@ pub let card_font : Font = { px: 12, mono: false, }
 pub let mono_font : Font = { px: 11, mono: true, }
 
 ///|
-/// Implicit は字を持たない。空の見出しと同じく空の字として扱う（種類は無い）
-pub fn label_of(n : @view.Node) -> String {
-  match n.label {
-    Some(s) => s
-    None => ""
-  }
-}
-
-///|
 /// 畳んだノードに出す字。**`<summary>` > ラベル**（spec「畳み」の表示名の規則。
 /// 3 段目の「最初の行」はラベルも空のときにしか来ないので、いまはプレースホルダに任せる）。
 /// GitHub が畳んだ塊に見せるのも summary なので、鏡としてもこちら
-pub fn fold_name(n : @view.Node) -> String {
+pub fn fold_name(n : @tree.Node) -> String {
   match n.fold {
     Some({ summary: Some(s), .. }) => s
-    _ => label_of(n)
+    _ => n.label
   }
 }
 
@@ -185,7 +176,7 @@ pub fn fold_name(n : @view.Node) -> String {
 /// **開いた畳み**で、子は普通に出る（名前は summary のまま）。畳みは mmm の独自要素で、
 /// `<details>` の見た目には引っ張られない — GitHub は summary の行の下に中身を並べるが、
 /// mmm は畳まれたノードの名前を summary で統一する（開いていても）
-pub fn closed(n : @view.Node) -> Bool {
+pub fn closed(n : @tree.Node) -> Bool {
   n.fold is Some({ open: false, .. })
 }
 
@@ -198,12 +189,12 @@ pub let fold_mark_open = "▽ "
 
 ///|
 /// 開いた畳みの字。印 + 名前（summary）
-pub fn open_label(n : @view.Node) -> String {
+pub fn open_label(n : @tree.Node) -> String {
   fold_mark_open + display_label(fold_name(n))
 }
 
 ///|
-pub fn row_of(n : @view.Node) -> Row {
+pub fn row_of(n : @tree.Node) -> Row {
   if closed(n) {
     hidden
   } else {
@@ -264,7 +255,7 @@ pub fn collapsed_badge(buried : Int) -> String {
 ///|
 /// 畳んだノードの表示ラベル。幅で詰める（文字数だと CJK で箱からはみ出す）。
 /// バッジは詰めの対象にしない — 「+3」が読めなくなっては意味がない
-pub fn hidden_label(n : @view.Node, buried : Int, measure : Measure) -> String {
+pub fn hidden_label(n : @tree.Node, buried : Int, measure : Measure) -> String {
   let raw = display_label(fold_name(n))
   let badge = collapsed_badge(buried)
   let font = label_font(hidden)
@@ -307,7 +298,7 @@ pub fn node_size(measure : Measure) -> SizeOf {
     let text = if n.fold is Some(_) {
       open_label(n)
     } else {
-      display_label(label_of(n))
+      display_label(n.label)
     }
     let mut w = measure(label_font(normal), text)
     for c in cards {

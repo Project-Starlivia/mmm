@@ -27,8 +27,6 @@ core/   MoonBit — module `mmm/core`。文書モデルと地図の判断。**DO
                 「この md はこう読まれる」、unbuild_wbtest.mbt が
                 「この木はこう書かれる」、merge_wbtest.mbt が
                 「木がこう違えば md はここだけ変わる」を固定する
-  view/         map が見る木。project が Doc から削るだけで作る
-                （`View { frontmatter, roots }`。frontmatter は画像フォルダの宣言のため）
   op/           操作。apply(doc, op) が Doc を Doc にする。席は隣の id で言う
                 （NodePlace / BlockPlace）。道具（splice / append / body）が
                 型の異種性を幽閉する。決めは core.md「操作」。edit.mbt が境界 —
@@ -38,7 +36,7 @@ core/   MoonBit — module `mmm/core`。文書モデルと地図の判断。**DO
                 card(Block → Card。分類だけ。カードにならない中身があるので、
                 1 枚ずつが出どころの中身の id を持つ — 描く側は `data-card` にこれを出す) /
                 metric(寸法の唯一の定義。字の実測は
-                Measure で外から受ける) / layout(View → Layout。畳みの埋没と sides の zip、
+                Measure で外から受ける) / layout(木 → Layout。畳みの埋没と sides の zip、
                 付け根の配り、card_rect(枚目で引く) / owner_of(中身の id からカードを探す) /
                 edge_ends) / edge(線の形。d 属性) /
                 select(選択の値と、入力でどう変わるか。矩形・矢印・点の当たり・親兄弟と隣。
@@ -108,7 +106,7 @@ test/   検証 — core に触らない純粋層(camera / geometry / gesture / h
         分類(cards)・配置(layout)・select / caret / keys / label / context / drop /
         card / copy / paste。tools/(負荷サンプル生成)、fixtures/(負荷サンプル)
 lab/    見るための道具（`pnpm run lab`）。index.html は md がどう読まれるか（mdAst /
-        mmmTree / View と書き戻し）、parts/ は部品 × 状態 × テーマを 1 ページに
+        mmmTree と書き戻し）、parts/ は部品 × 状態 × テーマを 1 ページに
         並べたもの — 表 parts.ts（DOM の部品）と map.ts（本物の Mindmap を通す）が
         唯一の源で、見た目はここに 1 つも無い（src の builder と style.css のまま出す）
 docs/   記録 — spec.md はこのファイル、core.md は文書モデルの内部

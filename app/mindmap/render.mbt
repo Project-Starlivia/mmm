@@ -128,7 +128,7 @@ fn shape_of(b : @map.Box, scene : Scene) -> Shape {
     label: match n.fold {
       Some({ open: true, .. }) => @map.open_label(n)
       Some(_) => @map.fold_name(n)
-      None => @map.label_of(n)
+      None => n.label
     },
     cards: b.cards,
     // 画像は「まだ読めていない」から「読めた」へ後から変わる
@@ -230,11 +230,7 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
     let folded = @map.closed(n)
     // 畳まれていれば名前は summary（開いていても）。閉じていれば小さく詰めて、
     // 開いていれば ▽ を付けて普通の行に
-    let text = if n.fold is Some(_) {
-      @map.fold_name(n)
-    } else {
-      @map.label_of(n)
-    }
+    let text = if n.fold is Some(_) { @map.fold_name(n) } else { n.label }
     let row = @map.row_of(n)
     let label = @web.el(doc, "text", [
       ("class", "label" + (if text == "" { " empty" } else { "" })),
