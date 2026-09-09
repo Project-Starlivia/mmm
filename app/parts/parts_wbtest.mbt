@@ -164,7 +164,7 @@ test "Menu: 開く・押して閉じる・沈む行は押せない・外を押�
   let pressed : Array[String] = []
   let m = Menu::new(d)
   assert_false(m.is_open())
-  m.show(10, 20, sample(pressed))
+  m.show(10, 20, () => sample(pressed))
   assert_true(m.is_open())
   let items = m.el.querySelectorAll(".item")
   @dom.HTMLElement::cast_from_element(items[1]).click()
@@ -174,7 +174,7 @@ test "Menu: 開く・押して閉じる・沈む行は押せない・外を押�
   assert_eq(pressed, ["new"])
   assert_false(m.is_open())
   // Done は閉じずに走り、絵がチェックになる
-  m.show(10, 20, sample(pressed))
+  m.show(10, 20, () => sample(pressed))
   let copy = m.el.querySelectorAll(".item")[3]
   @dom.HTMLElement::cast_from_element(copy).click()
   assert_eq(pressed, ["new", "copy"])
@@ -202,7 +202,7 @@ test "Menu: 入れ子は行の隣に開き、子から選べば親ごと閉じ�
   let d = doc_of(w)
   let pressed : Array[String] = []
   let m = Menu::new(d)
-  m.show(0, 0, sample(pressed))
+  m.show(0, 0, () => sample(pressed))
   let recent = m.el.querySelectorAll(".item")[2]
   @dom.HTMLElement::cast_from_element(recent).click()
   assert_eq(attr(recent, "aria-expanded"), "true")
@@ -213,7 +213,47 @@ test "Menu: 入れ子は行の隣に開き、子から選べば親ごと閉じ�
   assert_eq(pressed, ["b"])
   assert_false(sub.is_open())
   assert_false(m.is_open())
-  m.show(0, 0, sample(pressed))
+  m.show(0, 0, () => sample(pressed))
   m.close_sub()
   assert_eq(attr(m.el.querySelectorAll(".item")[2], "aria-expanded"), "false")
+}
+
+///|
+test "Menu: Flip は閉じずに走り、並びが次の状態を名乗る。焦点は同じ位置に残る" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let d = doc_of(w)
+  let light : Ref[Bool] = { val: false, }
+  let m = Menu::new(d)
+  // 並びは状態から引く。綴りを持つのは表 1 つで、行は持たない
+  m.show(0, 0, () => {
+    [
+      Run(row("Undo"), () => ()),
+      Flip(
+        row(
+          if light.val {
+            "Dark theme"
+          } else {
+            "Light theme"
+          },
+          mark=Some(if light.val { "moon" } else { "sun" }),
+        ),
+        () => light.val = !light.val,
+      ),
+    ]
+  })
+  let before = m.el.querySelectorAll(".item")[1]
+  assert_eq(before.textContent(), "Light theme")
+  @web.focus(before)
+  @dom.HTMLElement::cast_from_element(before).click()
+  assert_true(light.val)
+  assert_true(m.is_open())
+  let after = m.el.querySelectorAll(".item")
+  assert_eq(after[1].textContent(), "Dark theme")
+  // 行は作り直されるが、手の置き場は動かない
+  let active : @dom.Element? = @core.identity_option(d.activeElement().as_any())
+  match active {
+    Some(a) => assert_true(@web.same(a, after[1]))
+    None => fail("焦点が行に戻っていない")
+  }
 }

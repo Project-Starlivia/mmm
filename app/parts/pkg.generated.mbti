@@ -106,6 +106,7 @@ pub(all) enum Disabled {
 pub(all) enum Entry {
   Run(Row, () -> Unit)
   Done(Row, ((Bool) -> Unit) -> Unit)
+  Flip(Row, () -> Unit)
   Sub(Row, Array[Entry], (() -> Unit)?)
   Caption(String, String?)
   Sep
@@ -129,6 +130,8 @@ pub struct Menu {
   mut opener_row : @dom.Element?
   mut opener : @dom.Element?
   mut openers : Array[(@dom.Element, () -> Unit)]
+  mut items : () -> Array[Entry]
+  mut at : (Double, Double)
 }
 pub fn Menu::close(Self, Bool) -> Unit
 pub fn Menu::close_sub(Self) -> Unit
@@ -138,7 +141,8 @@ pub fn Menu::hide(Self, Bool) -> Unit
 pub fn Menu::is_open(Self) -> Bool
 pub fn Menu::new(@dom.Document) -> Self
 pub fn Menu::open_sub(Self, @dom.Element, Array[Entry]) -> Unit
-pub fn Menu::show(Self, Double, Double, Array[Entry]) -> Unit
+pub fn Menu::respell(Self) -> Unit
+pub fn Menu::show(Self, Double, Double, () -> Array[Entry]) -> Unit
 
 pub(all) struct Paint {
   fill : () -> Unit
@@ -188,6 +192,7 @@ pub(all) struct Ways {
   open_sub : (@dom.Element, Array[Entry]) -> Unit
   close_sub : () -> Unit
   close : () -> Unit
+  respell : () -> Unit
 }
 
 // Type aliases
