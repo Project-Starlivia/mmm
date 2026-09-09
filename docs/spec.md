@@ -124,7 +124,8 @@ docs/   記録 — spec.md はこのファイル、core.md は文書モデルの
         superpowers/ は段ごとの設計（specs/）と計画（plans/）の日付付きの記録
         （コードのコメントが「決めは …」と指す先）
 ai-docs/ 実測の控え — moonbit.md は MoonBit の癖、codemirror.md は CodeMirror 6 の
-        癖、sources.md は知見の在り処と取り方。あてにしない前提の覚書
+        癖、markdown.md は mizchi/markdown の癖（方言が直したもの・直していないもの・
+        直さないと決めたもの）、sources.md は知見の在り処と取り方。あてにしない前提の覚書
 ```
 
 ブラウザで動く。ファイルは **File System Access API** で 1 つずつ開き、
