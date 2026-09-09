@@ -156,9 +156,15 @@ Implicit が埋める。**側は裏返らない**（裏返すのは `---` だけ
 
 ### 方言 — md.mbt
 
-ライブラリ（mizchi/markdown）に触るのは `md.mbt` だけ。読みも書きも「ライブラリ」と
-「方言」の直列で、ライブラリの癖を mmm の決めに揃えるのはここに閉じる。その先の
-build / content / fold / merge は方言の mdAst だけを見る。
+ライブラリ（mizchi/markdown）の癖を mmm の決めに揃えるのが `md.mbt`。読みも書きも
+「ライブラリ」と「方言」の直列で、その先の build / content / fold / merge は方言の
+mdAst だけを見る。
+
+**ライブラリの型が出るのは `core/tree` の中まで。** `core/op` も `core/map` も `core/view` も
+`@markdown` を 1 度も見ず、`moon.pkg` で import しているのも `core/tree` だけ。科の中では
+5 ファイル 98 か所が触る（`md.mbt` 29 / `build.mbt` 24 / `unbuild.mbt` 20 / `fold.mbt` 17 /
+`content.mbt` 8）— 書く側は `@markdown.Block` を組んで `serialize` に渡すので、型を通貨に
+しないと書けない。**差し替えの代償はこの 98 か所**で、1 ファイルではない。
 
 **方言は意味を 1 つも足さない** — やるのは span を直すことだけなので `stretch`。
 容器を先に歩き（`nested`）、フェンスを伸ばし（`stretched`）、飲まれた塊を落とし
@@ -196,7 +202,7 @@ build / content / fold / merge は方言の mdAst だけを見る。
 生の指紋が変われば、そこで気付く。
 
 **読みは md の字だけでも固定してある。** `corpus_wbtest.mbt` が、木の形の試験が読ませている
-md を全部集めた見本（156 通り）を、正規形・冪等・往復・破れの 4 つで押さえる。木の形
+md を全部集めた見本（162 通り）を、正規形・冪等・往復・破れの 4 つで押さえる。木の形
 （`json_inspect(parse(md))`）で言っている試験は `Doc` の型にぶら下がるが、こちらは md → md
 しか見ないので**内側の作りが変わっても生き残る**。正規形が入力と違う 23 通りは、そのまま
 「何がどう正規化されるか」の一覧になっている。
@@ -554,10 +560,11 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
 - **`Interpose(id, target)`**（Shift+ドラッグ）。道具は Wrap と同じ
 - **`Comment(ids)`**。断片に依存し、入口も未決
 - **記法を木から追い出すか（#205）。** 木が md の書き方を覚えるための欄を足し続けていて、
-  記法を 1 つ覆うたびに `Mark` が太る。md の並びそのものに記法を持たせ、木は構造と機能だけに
-  する案を `superpowers/specs/2026-09-09-notation-design.md` に置いた。下の 2 つはそこで
-  まとめて答えが出る。**急がない** — 読んだ文書に対して今の形はほぼ正しい（fixtures 361 KB と
-  見本 156 通りで実測）
+  記法を 1 つ覆うたびに `Mark` が太る。**ライブラリの塊がその全部を既に持っている**
+  （16 種・綴りの欄・`Trivia`・`checked`）ので、そこに mmm の裁定を足すだけにして、木は
+  構造と機能だけを持つ案を `superpowers/specs/2026-09-09-notation-design.md` に置いた。
+  下の 2 つはそこでまとめて答えが出る。**急がない** — 読んだ文書に対して今の形はほぼ
+  正しい（fixtures 361 KB と見本 162 通りで実測）
 - **Doc を id キーの平らな store にするか。** 2026-09-04 に見て据え置き。walk / splice が
   O(n) の全複製なのは承知で、理論値は平らが勝つが、読みのサイクルが同じイベントで O(n) 走る
   ので体感に出ない。今の入れ子のまま。splice の行き先が 3 を超えた
