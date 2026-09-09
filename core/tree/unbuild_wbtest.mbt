@@ -1019,3 +1019,50 @@ test "Link の題はそのまま — 逃がしを足さず、消さない" {
     content="# a\n\n[[WIP] design](https://e.com/x)\n",
   )
 }
+
+///|
+/// #179 — 名前の無い項目が 3 段続くとマーカーだけが 1 行に並び、md は水平線を
+/// 優先する（`- - -`）。子を次の行へ落として桁で入れ子を言う。
+/// 名前が在る行は直さない — `- ---` が水平線に読まれるのは md の文法どおり
+test "名前の無い項目が 3 段続いても、水平線には化けない" {
+  inspect(
+    serialize(parse("- \n  - \n    - \n")),
+    content=(
+      #|-
+      #|  - -
+      #|
+    ),
+  )
+  inspect(
+    serialize(parse("- \n  - \n    - \n      - \n")),
+    content=(
+      #|- -
+      #|    - -
+      #|
+    ),
+  )
+  // 名前が 1 つでも付けば並ばない
+  inspect(serialize(parse("- - - a\n")), content="- - - a\n")
+  // 印が変わっても同じ（`*` も `_` も水平線）
+  inspect(
+    serialize(parse("* \n  * \n    * \n")),
+    content=(
+      #|*
+      #|  * *
+      #|
+    ),
+  )
+}
+
+///|
+/// #179 — 読み直せば同じ木で、書き直しても同じ字（往復と冪等）
+test "名前の無い深い入れ子は、往復しても木が変わらない" {
+  let cases = [
+    "- \n  - \n    - \n", "- \n  - \n    - \n      - \n", "* \n  * \n    * \n", "# r\n\n- \n  - \n    - \n",
+  ]
+  for md in cases {
+    let once = serialize(parse(md))
+    inspect(parse(once) == parse(md), content="true")
+    inspect(serialize(parse(once)) == once, content="true")
+  }
+}
