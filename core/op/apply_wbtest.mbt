@@ -966,7 +966,9 @@ test "MoveBlock は空・ノード混じり・知らない id・自分の隣へ�
 }
 
 ///|
-test "Graft は parse した根たちを差す。側は捨て、id は鋳直す" {
+/// 側は根のものなので、席へ差せば消える。捨てずに境界の字（読んだ `---` そのまま）
+/// へ戻し、境界の直前に書かれていた行の中身の尻に置く — 書き戻せば md が境界と読む
+test "Graft は parse した根たちを差す。側は境界の字に戻し、id は鋳直す" {
   let d = doc([root(h(2, "r", children=[h(3, "a")]), sides=[Left])])
   assert_eq(
     run(
@@ -981,7 +983,12 @@ test "Graft は parse した根たちを差す。側は捨て、id は鋳直す"
         root(
           h(2, "r", children=[
             h(3, "a", children=[
-              h(4, "p", children=[h(5, "q"), h(6, "s")]),
+              h(4, "p", children=[
+                h(5, "q", body=[
+                  { id: 8, content: Some(ThematicBreak), source: Some("---"), },
+                ]),
+                h(6, "s"),
+              ]),
               h(7, "t"),
             ]),
           ]),
@@ -1028,9 +1035,9 @@ test "Graft は断片の先頭の Implicit を剥がして差す。途中の飛�
 }
 
 ///|
-/// 断片の一番外の段落は行ごとにノード、それ以外の中身は行き先の親の body の末尾。
-/// 文書（anchor 無し）へ中身は断る — 文書の散文はマップに出ない。
-test "Graft の一番外 — 段落は行ごとにノード、中身は親の body、文書へ中身は None" {
+/// 断片の一番外の段落は行ごとにノード、それ以外の中身は直前に生えたノードの中身
+/// （無ければ行き先の親の body の末尾）。文書（anchor 無し）へ入れば文書の散文。
+test "Graft の一番外 — 段落は行ごとにノード、中身は直前のノード、文書へ中身は散文" {
   let d = doc([root(h(2, "r", body=[pic(3)]))])
   // 根の隣に段落 2 行 → 最後の根に従って見出しの根 2 つ
   assert_eq(
@@ -1082,7 +1089,8 @@ test "Graft の一番外 — 段落は行ごとにノード、中身は親の bo
       focus: Some(4),
     }),
   )
-  // 文書へ中身は断る
+  // 文書へ中身は文書の散文（最初の骨格より前）へ。マップには出ないが、手で頭に
+  // 書いたのと同じ形 — 見えないことは地図の都合で、断る理由にしない
   assert_eq(
     run(
       d,
@@ -1091,7 +1099,16 @@ test "Graft の一番外 — 段落は行ごとにノード、中身は親の bo
         md="![](q.png)\n\n# s\n",
       ),
     ),
-    None,
+    Some({
+      doc: doc([root(h(2, "r", body=[pic(3)])), root(h(5, "s"))], body=[
+        {
+          id: 4,
+          content: Some(Image(alt="", src="q.png", title="")),
+          source: Some("![](q.png)"),
+        },
+      ]),
+      focus: Some(5),
+    }),
   )
   // 混ざった断片 — 一番外の段落はノード、見出しの下の中身はその見出しのまま
   assert_eq(
@@ -1293,7 +1310,8 @@ test "Wrap は 6 段目を包めば、包まれたほうが項目になる" {
 ///|
 /// 代表的な木に、代表的な Op を総当たりで当て、Some ならその結果が
 /// check を通ることを見る。落ちた Op と破れを並べる。
-test "apply の結果は check を通る" {
+/// 境界（`BorderBreak`）だけは通す — 書けば md が境界と読むので、形は読み直しが決める。
+test "apply の結果は check を通る（境界は md が決めるので除く）" {
   // 見出しの直後の項目・Implicit は飲み込まれるので、項目を先に置く（check が言う）
   let base = doc([
     root(item(11, "e"), sides=[]),
@@ -1344,7 +1362,7 @@ test "apply の結果は check を通る" {
     match apply(base, op) {
       Some(done) => {
         some = some + 1
-        let flaws = @tree.check(done.doc)
+        let flaws = @tree.check(done.doc).filter(f => !(f is BorderBreak(_)))
         if !flaws.is_empty() {
           bad.push((op, flaws))
         }
@@ -1353,7 +1371,8 @@ test "apply の結果は check を通る" {
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="512")
+  // 512 → 543: 境界を断らなくなった分、→ 563: 文書へ中身を断らなくなった分
+  inspect(some, content="563")
   json_inspect(bad, content=[])
 }
 
