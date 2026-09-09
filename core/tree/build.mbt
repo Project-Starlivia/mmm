@@ -140,6 +140,10 @@ priv struct Build {
   mut pend_to : Int
   /// いま積む骨格が畳まれているなら、その `<details>` 〜 `</details>` の範囲
   mut fold_at : @markdown.Span?
+  /// まだ閉じていない畳みの、畳んだノードの深さ。**閉じは境界と同じ** —
+  /// 領域は部分木を過不足なく覆うので、閉じの後ろはその部分木の外。
+  /// 閉じで枠を降ろせば、続く骨格は畳んだノードの兄弟から測る
+  fold_roots : Array[Int]
   /// このブロックで生まれた一番浅い枠の深さ。骨格でなければ `deep` のまま
   mut top : Int
   /// このブロック自身のノードの深さ。飛びを埋めた Implicit は数えない
@@ -176,6 +180,7 @@ fn Build::new(
     pend_from: 0,
     pend_to: 0,
     fold_at: None,
+    fold_roots: [],
     top: deep,
     own: deep,
     dry,
@@ -208,10 +213,14 @@ fn depths(
   blocks : Array[@markdown.Block],
   gone : Array[Bool],
   ahead : Array[Bool],
+  opens : Array[Bool],
+  closes : Array[Bool],
   nest : Int,
 ) -> Array[Depth] {
   let b = Build::new(md, [], dry=true)
   let out = Array::make(blocks.length(), { top: deep, own: deep, })
+  // 直前に開きの綴りを跨いだ。次に座る枠が畳みの根
+  let mut opening = false
   for i, block in blocks {
     // 塊にならない中身（リンクの定義行）も中身なので、保留中の水平線は
     // そこで飾りに落ちる。本番と同じ前提で測らないと深さが食い違う
@@ -222,11 +231,22 @@ fn depths(
     // `<summary>` など）は本番では中身になり、そこで保留中の水平線が装飾に落ちる。
     // 跨いでしまうと水平線が保留のまま次の骨格を引き出し、本番と深さがずれる
     if gone[i] {
+      // 落ちる綴りでも、畳みの開きと閉じは深さを動かす（本番の `lay` と同じ）
+      if closes[i] {
+        shut(b)
+      }
+      if opens[i] {
+        opening = true
+      }
       continue
     }
     b.top = deep
     b.own = deep
     take(b, block, nest)
+    if opening {
+      b.fold_roots.push(b.stack.length())
+      opening = false
+    }
     out[i] = { top: b.top, own: b.own, }
   }
   out
@@ -241,7 +261,9 @@ fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
       b.fold_at = Some(at)
       take(b, block, nest, fold=Some(fold))
       b.fold_at = None
+      b.fold_roots.push(b.stack.length())
     }
+    Closed(..) => shut(b)
     Capsule(text~, open~, summary~, body~, from~, to~) => {
       // 中身が来たので、保留中の水平線は境界になれない
       spill(b)
@@ -587,6 +609,18 @@ fn flipped(s : Side) -> Side {
     Left
   } else {
     Right
+  }
+}
+
+///|
+/// 畳みの閉じ。**その部分木が終わったという宣言**なので、畳んだノードの枠を
+/// 降ろす（領域は部分木を過不足なく覆うので、閉じの後ろはその外）。
+/// 続く骨格は畳んだノードの兄弟から測り、深い見出しは Implicit が間を埋める。
+/// 側は裏返らない — 裏返すのは `---` だけ。
+fn shut(b : Build) -> Unit {
+  guard b.fold_roots.pop() is Some(root) else { return }
+  while b.stack.length() >= root && !b.stack.is_empty() {
+    ignore(b.stack.unsafe_pop())
   }
 }
 

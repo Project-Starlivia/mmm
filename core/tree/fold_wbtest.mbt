@@ -1201,16 +1201,13 @@ test "飾りの水平線が領域の中なら畳み" {
           "node": {
             "id": 2,
             "label": "r",
-            "body": [],
+            "body": [{ "id": 3, "content": "ThematicBreak", "source": "---" }],
             "children": [
               {
-                "id": 3,
+                "id": 4,
                 "label": "a",
                 "fold": { "open": false, "summary": "a" },
-                "body": [
-                  { "id": 4, "source": "body" },
-                  { "id": 5, "content": "ThematicBreak", "source": "---" },
-                ],
+                "body": [{ "id": 5, "source": "body" }],
                 "children": [],
                 "mark": ["Heading", { "setext": false, "closing": 0 }],
               },
@@ -1282,22 +1279,23 @@ test "飾りの水平線が閉じの直後なら中身" {
             "id": 2,
             "label": "r",
             "body": [
-              {
-                "id": 3,
-                "content": [
-                  "Details",
-                  { "open": false, "summary": "a", "body": "## a" },
-                ],
-                "source": "<details>\n<summary>a</summary>\n\n## a\n\n</details>",
-              },
-              { "id": 4, "content": "ThematicBreak", "source": "---" },
-              { "id": 5, "source": "some text" },
+              { "id": 3, "content": "ThematicBreak", "source": "---" },
+              { "id": 4, "source": "some text" },
             ],
-            "children": [],
+            "children": [
+              {
+                "id": 5,
+                "label": "a",
+                "fold": { "open": false, "summary": "a" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+            ],
             "mark": ["Heading", { "setext": false, "closing": 0 }],
           },
-          "sides": [],
-          "rules": [],
+          "sides": ["Right"],
+          "rules": [""],
         },
       ],
     },
@@ -1867,15 +1865,13 @@ test "閉じの直後の水平線が続いても境界" {
           "node": {
             "id": 2,
             "label": "r",
-            "body": [],
+            "body": [{ "id": 3, "content": "ThematicBreak", "source": "---" }],
             "children": [
               {
-                "id": 3,
+                "id": 4,
                 "label": "a",
                 "fold": { "open": false, "summary": "a" },
-                "body": [
-                  { "id": 4, "content": "ThematicBreak", "source": "---" },
-                ],
+                "body": [],
                 "children": [],
                 "mark": ["Heading", { "setext": false, "closing": 0 }],
               },
@@ -2016,4 +2012,161 @@ test "項目の中の畳みは、兄弟の項目が続いても立つ" {
       ],
     },
   )
+}
+
+///|
+/// #181 — **閉じは境界と同じ。** 領域は部分木を過不足なく覆うので、`</details>` の
+/// 後ろに書かれたものはその部分木の外。畳んだノードの枠を降ろすので、続く項目は
+/// 子ではなく兄弟になる（GitHub が縦に 3 つ並べて描くのと同じ）。
+/// 側は裏返らない — 裏返すのは `---` だけ
+test "閉じの後ろの項目は、畳んだノードの兄弟" {
+  json_inspect(
+    parse(
+      "# root\n\n- head\n\n<details>\n<summary>head</summary>\n\n## head\n\n</details>\n\n- y\n",
+    ),
+    content={
+      "body": [],
+      "roots": [
+        {
+          "node": {
+            "id": 2,
+            "label": "root",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "head",
+                "body": [],
+                "children": [],
+                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+              },
+              {
+                "id": 4,
+                "label": "head",
+                "fold": { "open": false, "summary": "head" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+              {
+                "id": 5,
+                "label": "y",
+                "body": [],
+                "children": [],
+                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
+          "sides": ["Right", "Right", "Right"],
+          "rules": ["", "", ""],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// #181 — 閉じの後ろが深い見出しなら、畳んだノードの子にはなれない（領域の外）。
+/// 間を Implicit が埋める
+test "閉じの後ろの深い見出しは、Implicit を挟んで兄弟の下へ" {
+  json_inspect(
+    parse(
+      "# root\n\n<details>\n<summary>head</summary>\n\n## head\n\n</details>\n\n### z\n",
+    ),
+    content={
+      "body": [],
+      "roots": [
+        {
+          "node": {
+            "id": 2,
+            "label": "root",
+            "body": [],
+            "children": [
+              {
+                "id": 3,
+                "label": "head",
+                "fold": { "open": false, "summary": "head" },
+                "body": [],
+                "children": [],
+                "mark": ["Heading", { "setext": false, "closing": 0 }],
+              },
+              {
+                "id": 4,
+                "label": "",
+                "body": [],
+                "children": [
+                  {
+                    "id": 5,
+                    "label": "z",
+                    "body": [],
+                    "children": [],
+                    "mark": ["Heading", { "setext": false, "closing": 0 }],
+                  },
+                ],
+              },
+            ],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
+          "sides": ["Right", "Right"],
+          "rules": ["", ""],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// #181 — 閉じの後ろが骨格でなければ、その中身は畳むノードの body。
+/// 領域が部分木より狭いので畳みは立たない（今までどおり Details カード）
+test "閉じの後ろが中身なら畳みは立たない" {
+  json_inspect(
+    parse(
+      "# root\n\n<details>\n<summary>head</summary>\n\n## head\n\n</details>\n\ntext\n",
+    ),
+    content={
+      "body": [],
+      "roots": [
+        {
+          "node": {
+            "id": 2,
+            "label": "root",
+            "body": [
+              {
+                "id": 3,
+                "content": [
+                  "Details",
+                  { "open": false, "summary": "head", "body": "## head" },
+                ],
+                "source": "<details>\n<summary>head</summary>\n\n## head\n\n</details>",
+              },
+              { "id": 4, "source": "text" },
+            ],
+            "children": [],
+            "mark": ["Heading", { "setext": false, "closing": 0 }],
+          },
+          "sides": [],
+          "rules": [],
+        },
+      ],
+    },
+  )
+}
+
+///|
+/// #181 — 閉じを境界と同じに見ても、字は 1 つも動かない
+test "閉じの後ろに何が来ても、書き戻せば同じ字" {
+  let d = "<details>\n<summary>head</summary>\n\n## head\n\n</details>"
+  let cases = [
+    "# root\n\n- head\n\n" + d + "\n\n- y\n",
+    "# root\n\n- head\n\n" + d + "\n\n## y\n",
+    "# root\n\n- head\n\n" + d + "\n\n### z\n",
+    "# root\n\n- head\n\n" + d + "\n\n# w\n",
+    "# root\n\n- head\n\n" + d + "\n\n---\n\n- y\n",
+    "# root\n\n- head\n\n" + d + "\n\n- y\n  - z\n",
+  ]
+  for md in cases {
+    inspect(serialize(parse(md)) == md, content="true")
+    json_inspect(check(parse(md)), content=[])
+  }
 }
