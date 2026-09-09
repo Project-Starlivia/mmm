@@ -17,7 +17,7 @@ pub fn arrow(Layout, Int?, Arrow) -> Int?
 
 pub fn arrow_of(String) -> Arrow?
 
-pub fn card_bleed(Card) -> Double
+pub fn card_bleed(Kind) -> Double
 
 pub let card_border : Double
 
@@ -25,7 +25,7 @@ pub let card_font : Font
 
 pub let card_font_px : Double
 
-pub fn card_inset(Card) -> Double
+pub fn card_inset(Kind) -> Double
 
 pub let card_pad : Double
 
@@ -169,7 +169,7 @@ pub fn root_box(Layout) -> Box?
 
 pub fn round2(Double) -> Double
 
-pub fn row_h(Card) -> Double
+pub fn row_h(Kind) -> Double
 
 pub fn row_of(@view.Node) -> Row
 
@@ -218,13 +218,9 @@ pub(all) struct Camera {
   ty : Double
 } derive(Eq, @debug.Debug)
 
-pub(all) enum Card {
-  Link(title~ : String, url~ : String)
-  Image(path~ : String, name~ : String)
-  Svg(markup~ : String)
-  Code(lang~ : String, lines~ : Array[String])
-  Break
-  Details(open~ : Bool, summary~ : String?, lines~ : Array[String])
+pub(all) struct Card {
+  id : Int
+  kind : Kind
 } derive(Eq, ToJson, @debug.Debug)
 
 pub(all) enum Drop {
@@ -300,6 +296,15 @@ pub(all) struct Key {
   mod : Bool
   alt : Bool
 } derive(Eq, @debug.Debug)
+
+pub(all) enum Kind {
+  Link(title~ : String, url~ : String)
+  Image(path~ : String, name~ : String)
+  Svg(markup~ : String)
+  Code(lang~ : String, lines~ : Array[String])
+  Break
+  Details(open~ : Bool, summary~ : String?, lines~ : Array[String])
+} derive(Eq, ToJson, @debug.Debug)
 
 pub(all) struct Layout {
   order : Array[Int]

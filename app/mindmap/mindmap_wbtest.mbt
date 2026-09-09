@@ -322,6 +322,21 @@ test "ダブルクリックでラベルの欄が開き、打てば Rename。Esca
 }
 
 ///|
+/// **`data-card` は枚目ではなく中身の id。** カードにならない中身（mailto のリンク）を
+/// 先に置いた木で、描かれた 1 枚を押すと、その 1 枚の中身が選ばれる（#212）
+test "カードを押すと、そのカードの中身を選ぶ" {
+  let s = stand(md="# r\n\n[m](mailto:a@b)\n\n```ts\nx\n```\n")
+  defer s.win.close()
+  let code = s.pane.as_element().querySelector(".code-bg").unwrap()
+  assert_eq(code.getAttribute("data-card"), Some("4"))
+  fire(s, "MouseEvent", "click", 0, 0, target=Some(code))
+  assert_eq(s.stub.picked, Some(4))
+  // もう一度押せば外れる
+  fire(s, "MouseEvent", "click", 0, 0, target=Some(code))
+  assert_eq(s.stub.picked, None)
+}
+
+///|
 test "カードは選ぶと枠が出て、開けば欄、閉じるときに変わっていれば 1 回だけ書く" {
   let s = stand()
   defer s.win.close()

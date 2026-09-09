@@ -6,7 +6,7 @@
 //
 // 置き場所は自分では数えない — `@map.card_rect` が唯一の出所で、選んだ枠も
 // 入力欄も同じ数を使う。class と data-* は ts の style.css とハンドラとの契約 —
-// 変えない。
+// 変えない。`data-card` はカードが出た**中身の id** 1 つ（枚目は入れない）。
 
 ///|
 /// カード 1 枚を置く場所
@@ -17,8 +17,8 @@ pub(all) struct Spot {
   row_y : Double
   /// ノードの箱の幅。仕切り線だけは中身ではなく箱に合わせて引く
   box_w : Double
-  /// `data-card` に入れる「どのノードの何枚目か」
-  spot : String
+  /// `data-card` に入れる、そのカードが出た中身の id
+  id : Int
 }
 
 ///|
@@ -52,7 +52,7 @@ fn link(
   // 描かないので、行いっぱいの透明な面を敷く
   let hit = @web.el(doc, "rect", [
     ("class", "link-hit"),
-    ("data-card", at.spot),
+    ("data-card", at.id.to_string()),
     ("x", @web.num(x)),
     ("y", @web.num(y)),
     ("width", @web.num(w)),
@@ -83,7 +83,7 @@ fn link(
 fn picture(doc : @dom.Document, href : String, at : Spot) -> @dom.Element {
   let { x, y, w, h, } = at.rect
   @web.el(doc, "image", [
-    ("data-card", at.spot),
+    ("data-card", at.id.to_string()),
     ("x", @web.num(x)),
     ("y", @web.num(y)),
     ("width", @web.num(w)),
@@ -121,7 +121,7 @@ fn image(
   let { x, y, w, h, } = at.rect
   let box = @web.el(doc, "rect", [
     ("class", "image-placeholder"),
-    ("data-card", at.spot),
+    ("data-card", at.id.to_string()),
     ("x", @web.num(x)),
     ("y", @web.num(y)),
     ("width", @web.num(w)),
@@ -132,7 +132,7 @@ fn image(
   let mid = y + h / 2.0
   let label = @web.el(doc, "text", [
     ("class", "image-name"),
-    ("data-card", at.spot),
+    ("data-card", at.id.to_string()),
     ("x", @web.num(x + w / 2.0)),
     ("y", @web.num(if scene.image_hint is None { mid } else { mid - 7.0 })),
     ("text-anchor", "middle"),
@@ -165,7 +165,7 @@ fn code(
   // 織り込み済みなので、ここで足し直さない
   let bg = @web.el(doc, "rect", [
     ("class", "code-bg"),
-    ("data-card", at.spot),
+    ("data-card", at.id.to_string()),
     ("x", @web.num(x)),
     ("y", @web.num(y)),
     ("width", @web.num(w)),
@@ -181,7 +181,7 @@ fn code(
   for i, _ in lines {
     let line = @web.el(doc, "text", [
       ("class", "code-line"),
-      ("data-card", at.spot),
+      ("data-card", at.id.to_string()),
       ("x", @web.num(@map.normal.pad + 1.0)),
       (
         "y",
@@ -219,7 +219,7 @@ fn rule(doc : @dom.Document, at : Spot) -> Array[@dom.Element] {
   [
     @web.el(doc, "line", [
       ("class", "break"),
-      ("data-card", at.spot),
+      ("data-card", at.id.to_string()),
       ("x1", @web.num(x)),
       ("y1", @web.num(y + h / 2.0)),
       ("x2", @web.num(x + w)),
@@ -283,7 +283,7 @@ pub fn draw_card(
   at : Spot,
   scene : Scene,
 ) -> Array[@dom.Element] {
-  let body = match c {
+  let body = match c.kind {
     Link(title~, url~) => link(doc, title, url, at)
     Svg(markup~) => inline_svg(doc, markup, at)
     Image(path~, name~) => image(doc, path, name, at, scene)

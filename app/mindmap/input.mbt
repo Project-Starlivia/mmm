@@ -406,7 +406,7 @@ fn Mindmap::bind_click(self : Mindmap) -> Unit {
     }
     match @web.attr_in(e, "[data-card]", "data-card") {
       Some(spot) => {
-        match self.block_at(spot) {
+        match int_of(spot) {
           Some(id) =>
             (self.host.set_picked)(
               if (self.host.picked)() == Some(id) {
@@ -440,7 +440,7 @@ fn Mindmap::bind_click(self : Mindmap) -> Unit {
     }
     match @web.attr_in(e, "[data-card]", "data-card") {
       Some(spot) => {
-        match self.block_at(spot) {
+        match int_of(spot) {
           Some(id) => {
             @web.prevent(e)
             self.edit_card(id)

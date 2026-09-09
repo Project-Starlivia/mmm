@@ -362,7 +362,8 @@ pub fn keyed_card(l : Layout, picked : Int, k : Key) -> Intent? {
     return Some(Pick(id=None))
   }
   guard owner_of(l, picked) is Some((owner, index)) else { return None }
-  let blocks = owner.node.blocks
+  // 隣は**描かれているカード**の隣 — カードにならなかった中身は飛ばす
+  let cards = owner.cards
   // 消した後に持ち主を選ぶのは core の focus
   let remove : Intent = Op(op=Delete(ids=[picked]), edit=false)
   if (k.key == "Delete" || k.key == "Backspace") && !k.mod {
@@ -374,7 +375,7 @@ pub fn keyed_card(l : Layout, picked : Int, k : Key) -> Intent? {
   }
   if (k.key == "ArrowDown" || k.key == "ArrowUp") && !k.mod && !k.alt {
     let i = if k.key == "ArrowDown" { index + 1 } else { index - 1 }
-    return blocks.get(i).map(b => Pick(id=Some(b.id)))
+    return cards.get(i).map(c => Pick(id=Some(c.id)))
   }
   if k.key == "ArrowLeft" && !k.mod {
     return Some(
@@ -389,9 +390,9 @@ pub fn keyed_card(l : Layout, picked : Int, k : Key) -> Intent? {
       Op(op=MoveBlock(ids=[picked], at~), edit=false)
     }
     if k.key == "ArrowUp" {
-      return blocks.get(index - 1).map(p => moved(Before(block=p.id)))
+      return cards.get(index - 1).map(p => moved(Before(block=p.id)))
     }
-    return blocks.get(index + 1).map(n => moved(After(block=n.id)))
+    return cards.get(index + 1).map(n => moved(After(block=n.id)))
   }
   if k.mod && k.key == "Enter" {
     return Some(EditCard(id=picked))

@@ -33,7 +33,8 @@ pub(all) struct Box {
   mut y : Double
   w : Double
   h : Double
-  /// node.blocks から組んだもの。寸法に要るので持つ
+  /// node.blocks から組んだもの。カードにならない中身は入らないので、
+  /// **blocks と並びが揃わない**。1 枚ずつが出どころの id を持つ
   cards : Array[Card]
 } derive(Debug)
 
@@ -55,22 +56,23 @@ pub fn Box::rect(self : Box) -> Rect {
 pub fn card_rect(b : Box, i : Int) -> Rect? {
   guard i >= 0 && i < b.cards.length() else { return None }
   let c = b.cards[i]
-  let inset = card_inset(c)
-  let bleed = card_bleed(c)
+  let inset = card_inset(c.kind)
+  let bleed = card_bleed(c.kind)
   Some({
     x: normal.pad - bleed,
     y: row_top(b.cards, i) + inset,
     w: b.w - normal.pad * 2.0 + bleed * 2.0,
-    h: row_h(c) - inset * 2.0,
+    h: row_h(c.kind) - inset * 2.0,
   })
 }
 
 ///|
-/// その中身（ブロック id）を持つ箱と、その行の番号。畳まれて箱が無ければ None
+/// その中身から起きたカードを持つ箱と、そのカードの枚目。**探すのはカードの列**
+/// — 中身の列ではない。カードにならなかった中身と、畳まれて箱を失った中身は None
 pub fn owner_of(l : Layout, block : Int) -> (Box, Int)? {
   for b in l.boxes.values() {
-    for i, blk in b.node.blocks {
-      if blk.id == block {
+    for i, c in b.cards {
+      if c.id == block {
         return Some((b, i))
       }
     }
