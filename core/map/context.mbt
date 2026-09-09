@@ -150,18 +150,15 @@ fn adding(m : Menu) -> Array[Entry] {
 /// **anchor が無いなら why は付けない**（沈む理由は「選んでいない」こと自体が語る）。
 fn turning(m : Menu) -> Array[Entry] {
   [
+    // 畳みは 1 歩ずつ巡る（畳む → 開く → 外す）。行はキーと同じ 1 歩を名乗る
     item(
-      if m.folded() {
-        "Show (unfold)"
-      } else {
-        "Hide (fold)"
-      },
+      fold_label(m.node),
       if m.node is None {
         None
       } else {
-        m.press("H", true, false)
+        m.press("F", true, false)
       },
-      key="Shift+H",
+      key="Shift+F",
       mark=if m.folded() { "chevrons-up-down" } else { "chevrons-down-up" },
     ),
     match m.sel.anchor {

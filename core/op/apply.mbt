@@ -168,10 +168,21 @@ fn done(doc : @tree.Doc?, focus : Int?) -> Done? {
 
 ///|
 /// ラベルを替える。Implicit は見出しとして綴られる。
+/// 畳まれたノードの名前は summary（地図が出す字）なので、summary も同じ字にする —
+/// 手書きで食い違っていた 2 つの名前も、名を付け直せば 1 つに揃う
 fn rename(doc : @tree.Doc, id : Int, label : String) -> Done? {
   guard find(doc, id) is Some(n) else { return None }
   // Implicit は行を省いた空の見出しなので、名を付ければ見出しそのもの
-  let m = if n.mark is None { spell(n, label) } else { { ..n, label, } }
+  // （畳みは持てないので summary も無い）
+  let m = if n.mark is None {
+    spell(n, label)
+  } else {
+    {
+      ..n,
+      label,
+      fold: n.fold.map(f => ({ ..f, summary: Some(label), } : @tree.Fold)),
+    }
+  }
   done(splice(doc, id, _ => [m]), Some(id))
 }
 
