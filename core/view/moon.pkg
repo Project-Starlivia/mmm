@@ -1,5 +1,0 @@
-pkgtype(kind: "library")
-
-import {
-  "mmm/core/tree",
-}

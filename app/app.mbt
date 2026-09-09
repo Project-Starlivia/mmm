@@ -212,7 +212,7 @@ fn App::anchors_for(self : App, c : @read.Choice) -> @read.Anchors? {
 ///|
 /// 頭が言っている画像フォルダ（正規化済み）。無ければ None
 fn App::declared_folder(self : App) -> String? {
-  @read.image_folder(self.survey().view.frontmatter).bind(@read.normalize_path)
+  @read.image_folder(self.survey().doc.frontmatter).bind(@read.normalize_path)
 }
 
 ///|
@@ -536,11 +536,11 @@ fn App::set_declared(self : App, value : String) -> Unit {
   guard @read.normalize_path(value) is Some(next) else { return }
   let prev = self.declared_folder()
   let s = self.survey()
-  let sets = [[@read.set_image_folder(s.md, s.view.frontmatter, next)]]
+  let sets = [[@read.set_image_folder(s.md, s.doc.frontmatter, next)]]
   let mut md = @tree.patched(self.text(), sets[0])
   match prev {
     Some(prev) =>
-      for op in @read.retarget(s.view, prev, next) {
+      for op in @read.retarget(s.doc, prev, next) {
         let r = @op.edit(md, op)
         sets.push(r.edits)
         md = @tree.patched(md, r.edits)

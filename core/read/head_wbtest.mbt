@@ -4,13 +4,13 @@
 ///|
 /// md から宣言を引く
 fn folder_of(md : String) -> String? {
-  image_folder(survey(md).view.frontmatter)
+  image_folder(survey(md).doc.frontmatter)
 }
 
 ///|
 /// md の宣言を書き換えた後の全文
 fn written(md : String, value : String) -> String {
-  let e = set_image_folder(md, survey(md).view.frontmatter, value)
+  let e = set_image_folder(md, survey(md).doc.frontmatter, value)
   String::unsafe_substring(md, start=0, end=e.from) +
   e.insert +
   String::unsafe_substring(md, start=e.to, end=md.length())
@@ -107,7 +107,7 @@ test "set_image_folder → image_folder は往復する" {
 ///|
 test "retarget: 宣言の下にある画像だけを、新しい宣言の下へ移す操作列" {
   let md = "# r\n\n![a](./img/a.webp)\n\n![b](img/sub/b.png)\n\n![c](./other/c.webp)\n\n![d](https://x/d.png)\n"
-  assert_eq(retarget(survey(md).view, "./img/", "../pics/"), [
+  assert_eq(retarget(survey(md).doc, "./img/", "../pics/"), [
     SetBlock(
       id=3,
       content=Some(Image(alt="a", src="../pics/a.webp", title="")),
@@ -123,7 +123,7 @@ test "retarget: 宣言の下にある画像だけを、新しい宣言の下へ�
 
 ///|
 test "retarget: 宣言が ./ なら本文の相対パスは全部が対象。動いていなければ空" {
-  let v = survey("# r\n\n![](a.webp)\n\n![](./s/b.webp)\n\n![](../up.webp)\n").view
+  let v = survey("# r\n\n![](a.webp)\n\n![](./s/b.webp)\n\n![](../up.webp)\n").doc
   let srcs = retarget(v, "./", "./img/").map(op => {
     match op {
       SetBlock(content=Some(Image(src~, ..)), source=None, ..) => src
@@ -132,7 +132,7 @@ test "retarget: 宣言が ./ なら本文の相対パスは全部が対象。動
   })
   assert_eq(srcs, ["./img/a.webp", "./img/s/b.webp"])
   assert_eq(
-    retarget(survey("# r\n\n![](./img/a.webp)\n").view, "./img/", "./img/"),
+    retarget(survey("# r\n\n![](./img/a.webp)\n").doc, "./img/", "./img/"),
     [],
   )
 }

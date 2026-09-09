@@ -119,8 +119,8 @@ pub fn to_file_name(label : String) -> String {
 /// 最初の木の根を使う（View では根がいちばん大きい見出しで、木は文書順に
 /// 並ぶ）。Implicit（label 無し）は空と同じ。整形して何も残らなければ empty
 pub fn Survey::name(self : Survey) -> String {
-  guard self.view.roots.get(0) is Some(first) else { return empty_name }
-  let name = to_file_name(@map.label_of(first.node))
+  guard self.doc.roots.get(0) is Some(first) else { return empty_name }
+  let name = to_file_name(first.node.label)
   if name == "" {
     empty_name
   } else {

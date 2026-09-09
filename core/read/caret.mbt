@@ -55,7 +55,7 @@ priv struct Own {
 ///|
 fn owns(s : Survey) -> Array[Own] {
   let out = []
-  each_node(s.view, n => {
+  each_node(s.doc, n => {
     match s.spots.get(n.id) {
       Some(sp) => {
         let to = match n.children.get(0).bind(k => s.spots.get(k.id)) {
@@ -104,9 +104,9 @@ pub fn caret_ids(s : Survey, ranges : Array[Range]) -> Array[Int] {
 
 ///|
 /// 畳まれて埋もれたノード（fold のあるノードの子孫）。箱を持たないので選択に居られない
-pub fn buried(view : @view.View) -> Set[Int] {
+pub fn buried(doc : @tree.Doc) -> Set[Int] {
   let out : Set[Int] = Set([])
-  fn walk(n : @view.Node, under : Bool) -> Unit {
+  fn walk(n : @tree.Node, under : Bool) -> Unit {
     if under {
       out.add(n.id)
     }
@@ -115,7 +115,7 @@ pub fn buried(view : @view.View) -> Set[Int] {
     }
   }
 
-  for t in view.roots {
+  for t in doc.roots {
     walk(t.node, false)
   }
   out
@@ -126,9 +126,9 @@ pub fn buried(view : @view.View) -> Set[Int] {
 /// どちらもカードの行を持たないので、選んでも地図に印の出しようがない
 fn block_at(s : Survey, p : Int, gone : Set[Int]) -> Int? {
   let mut found : Int? = None
-  each_node(s.view, n => {
+  each_node(s.doc, n => {
     if !gone.contains(n.id) && n.fold is None {
-      for b in n.blocks {
+      for b in meant(n.body) {
         match s.spots.get(b.id) {
           Some(sp) => if sp.from <= p && p < sp.to { found = Some(b.id) }
           None => ()
@@ -148,7 +148,7 @@ pub fn chosen(
   caret : Caret,
   anchors : Anchors?,
 ) -> Choice {
-  let gone = buried(s.view)
+  let gone = buried(s.doc)
   let point = (p : Int) => caret_ids(s, [{ from: p, to: p, }]).get(0)
   let nodes = (ids : Array[Int], anchor : Int?) => {
     let set : Set[Int] = Set::from_array(ids)

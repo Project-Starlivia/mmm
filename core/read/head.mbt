@@ -164,11 +164,11 @@ pub fn set_image_folder(
 /// 動かすなら `./other/b.webp` は動かない。宣言が `./` のときは md の下に
 /// ある相対パスが全部対象になるが、それは「画像は md と同じ場所にある」と
 /// 宣言している状態なので、意味のとおり。外部 URL は `under` が外す
-pub fn retarget(view : @view.View, from : String, to : String) -> Array[@op.Op] {
+pub fn retarget(doc : @tree.Doc, from : String, to : String) -> Array[@op.Op] {
   let out : Array[@op.Op] = []
   guard from != to else { return out }
-  each_node(view, n => {
-    for b in n.blocks {
+  each_node(doc, n => {
+    for b in n.body {
       match b.content {
         Some(Image(alt~, src~, title~)) =>
           match under(src, from) {

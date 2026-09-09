@@ -76,7 +76,7 @@ fn copy_of(k : Key, cut : () -> Intent?) -> Intent? {
 }
 
 ///|
-fn node_of(l : Layout, id : Int?) -> @view.Node? {
+fn node_of(l : Layout, id : Int?) -> @tree.Node? {
   match id {
     Some(id) => l.boxes.get(id).map(b => b.node)
     None => None
@@ -141,20 +141,18 @@ priv struct Hand {
   k : Key
   /// 宛先。いくつ選んでいても、行が見るのはこれ 1 つ
   anchor : Int?
-  /// 宛先の名前。Implicit（綴りの無いノード）は無い
-  label : String?
+  /// 宛先の名前がまだ空。打ち始めればそのまま書ける。**Implicit は当てはまらない**
+  /// — 綴りの無いノードは、名前より先に綴りを当てる操作が要る
+  blank : Bool
 }
 
 ///|
 fn Hand::new(l : Layout, sel : Selection, k : Key) -> Hand {
   let anchor = sel.anchor
-  { l, sel, k, anchor, label: node_of(l, anchor).bind(n => n.label), }
-}
-
-///|
-/// 名前がまだ無い。打ち始めればそのまま書ける
-fn Hand::blank(self : Hand) -> Bool {
-  self.label == Some("")
+  let blank = node_of(l, anchor) is Some(n) &&
+    @tree.sign_of(n) is Some(_) &&
+    n.label == ""
+  { l, sel, k, anchor, blank, }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -226,7 +224,7 @@ fn entered(h : Hand) -> Answer {
   if h.k.shift {
     return Do(add(Before(node=anchor)))
   }
-  if h.blank() {
+  if h.blank {
     return Do(Edit(id=anchor, seed=None))
   }
   Do(add(After(node=anchor)))
@@ -285,7 +283,7 @@ fn folded(h : Hand) -> Answer {
 ///|
 /// 畳みの次の 1 歩。畳んでいなければ畳む（閉）、閉じていれば開く（子は出るが
 /// 畳みのまま）、開いていれば外す。右クリックの行も同じ 1 歩を名乗る
-pub fn fold_step(node : @view.Node, id : Int) -> Intent {
+pub fn fold_step(node : @tree.Node, id : Int) -> Intent {
   match node.fold {
     None => Op(op=Fold(id~, open=false), edit=false)
     Some({ open: false, .. }) => Op(op=Fold(id~, open=true), edit=false)
@@ -295,7 +293,7 @@ pub fn fold_step(node : @view.Node, id : Int) -> Intent {
 
 ///|
 /// 畳みの行の字。次の 1 歩を名乗る
-pub fn fold_label(node : @view.Node?) -> String {
+pub fn fold_label(node : @tree.Node?) -> String {
   match node {
     Some({ fold: Some({ open: false, .. }), .. }) => "Open (folded)"
     Some({ fold: Some(_), .. }) => "Unfold"
@@ -348,7 +346,7 @@ fn arrowed(h : Hand) -> Answer {
 /// 名前がまだ無いノードで字を打つ — そのまま書き始める。字は `e.key` のまま
 /// （CapsLock の正規化を通さない）。Space はパンに使うので除く。
 fn typed(h : Hand) -> Answer {
-  guard h.blank() && h.anchor is Some(anchor) else { return Pass }
+  guard h.blank && h.anchor is Some(anchor) else { return Pass }
   guard !h.k.mod && h.k.key.char_length() == 1 && h.k.key != " " else {
     return Pass
   }

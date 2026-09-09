@@ -3,7 +3,6 @@ pkgtype(kind: "library")
 import {
   "moonbitlang/core/json",
   "mmm/core/tree",
-  "mmm/core/view",
   "mmm/core/op",
   "mmm/core/map",
 }

@@ -1,25 +1,27 @@
-// View の木 → 箱の配置。寸法は数で渡すので、DOM 無しで置き方だけを固定できる。
+// 木 → 箱の配置。寸法は数で渡すので、DOM 無しで置き方だけを固定できる。
 
 ///|
 /// 全部 100 × 30
-fn size(_n : @view.Node, _cards : Array[Card], _buried : Int) -> Size {
+fn size(_n : @tree.Node, _cards : Array[Card], _buried : Int) -> Size {
   { w: 100, h: 30, }
 }
 
 ///|
+/// 綴りは既定で `#`。`mark=None` で Implicit（綴りの無いノード）
 fn node(
   id : Int,
   label : String,
-  children? : Array[@view.Node] = [],
+  children? : Array[@tree.Node] = [],
   fold? : @tree.Fold? = None,
-  blocks? : Array[@tree.Block] = [],
-) -> @view.Node {
-  { id, label: Some(label), fold, blocks, children, }
+  body? : Array[@tree.Block] = [],
+  mark? : @tree.Mark? = Some(@tree.atx),
+) -> @tree.Node {
+  { id, label, fold, body, children, mark, }
 }
 
 ///|
-fn root(n : @view.Node, sides? : Array[@tree.Side] = []) -> @view.Root {
-  { node: n, sides, }
+fn root(n : @tree.Node, sides? : Array[@tree.Side] = []) -> @tree.Root {
+  { node: n, sides, rules: [], }
 }
 
 ///|
@@ -185,7 +187,7 @@ test "線は親の育つ辺（ずらし込み）から出て、子の入る辺�
 /// **持ち主はカードの列から引く。** カードにならない中身（ここでは `mailto:`）を
 /// 先に置いても、後ろのカードの矩形は 1 枚目のまま — 添字で突き合わせない（#212）
 test "カードの矩形は箱の左上から見た座標。無い行は None" {
-  let blocks : Array[@tree.Block] = [
+  let body : Array[@tree.Block] = [
     {
       id: 8,
       source: None,
@@ -197,7 +199,7 @@ test "カードの矩形は箱の左上から見た座標。無い行は None" {
       content: Some(Link(text="t", href="https://x.example/", title="")),
     },
   ]
-  let l = layout([root(node(1, "r", blocks~))], size)
+  let l = layout([root(node(1, "r", body~))], size)
   let b = box(l, 1)
   assert_eq(b.cards, [
     { id: 9, kind: Link(title="t", url="https://x.example/"), },

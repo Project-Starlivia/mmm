@@ -21,7 +21,7 @@ fn many(ids : Array[Int], anchor : Int) -> Selection {
 }
 
 ///|
-/// r(2) → a(3), 空(4)。空は label ""
+/// r(2) → a(3), 空(4)。空は綴りのある label ""
 fn keys_l() -> Layout {
   layout(
     [
@@ -30,6 +30,15 @@ fn keys_l() -> Layout {
         Right,
       ]),
     ],
+    size,
+  )
+}
+
+///|
+/// r(2) → Implicit(3)。綴りが無いノードだけの木
+fn keys_gap() -> Layout {
+  layout(
+    [root(node(2, "r", children=[node(3, "", mark=None)]), sides=[Right])],
     size,
   )
 }
@@ -50,6 +59,18 @@ test "Enter — 名前のあるノードなら下に兄弟を足して編集、�
   assert_eq(keyed(l, one(4), k("Enter")), Some(Edit(id=4, seed=None)))
   // 何も選んでいなければ拾わない
   assert_eq(keyed(l, none, k("Enter")), None)
+}
+
+///|
+/// **Implicit は「空」ではない。** 綴りの無いノードは、名前より先に綴りを当てる
+/// 操作が要るので、埋めずに兄弟を足す。打ち始めもしない
+test "Enter と打鍵 — Implicit は埋める側に回らない" {
+  let g = keys_gap()
+  assert_eq(
+    keyed(g, one(3), k("Enter")),
+    Some(Op(op=AddNode(at=After(node=3), labels=[""]), edit=true)),
+  )
+  assert_eq(keyed(g, one(3), k("x")), None)
 }
 
 ///|
@@ -234,13 +255,7 @@ test "Shift+F は畳む → 開く → 外す、を巡る。Implicit も畳む�
       root(
         node(2, "r", children=[
           node(3, "a", fold=Some({ open: false, summary: Some("a"), })),
-          {
-            id: 4,
-            label: None,
-            fold: None,
-            blocks: [],
-            children: [node(5, "x")],
-          },
+          node(4, "", mark=None, children=[node(5, "x")]),
           node(6, "o", fold=Some({ open: true, summary: Some("o"), })),
         ]),
         sides=[Right, Right, Right],
@@ -298,7 +313,7 @@ fn keys_c() -> Layout {
   layout(
     [
       root(
-        node(2, "r", blocks=[
+        node(2, "r", body=[
           { id: 3, source: None, content: Some(ThematicBreak), },
           {
             id: 4,

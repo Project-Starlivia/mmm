@@ -24,13 +24,6 @@ pub fn mmm_tree_json(md : String) -> String {
 }
 
 ///|
-/// map が見る木。mmmTree から削っただけのもの。
-#export_name("mmmViewJson")
-pub fn mmm_view_json(md : String) -> String {
-  @view.project(@tree.parse(md)).to_json().stringify()
-}
-
-///|
 /// 型で言えない不変条件の破れ。**parse の出力は必ず空**になるはずで、
 /// 空でなければ読みのバグ。
 #export_name("mmmCheck")
@@ -377,7 +370,7 @@ pub fn mmm_cycle(
 pub fn mmm_layout(survey : @core.Any) -> @core.Any {
   @core.any(
     @map.layout(
-      read(survey).view.roots,
+      read(survey).doc.roots,
       @map.node_size(@mindmap.measure(@dom.document())),
     ),
   )

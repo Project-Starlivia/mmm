@@ -22,8 +22,8 @@ pub(all) struct Edge {
 
 ///|
 pub(all) struct Box {
-  /// View のノードそのまま。label / fold / blocks はここから読む
-  node : @view.Node
+  /// 木のノードそのまま。label / fold / body はここから読む — 綴り（mark）は見ない
+  node : @tree.Node
   parent : Edge?
   /// 畳んで埋もれた子孫の数（全部の子孫。種類で除かない）
   buried : Int
@@ -33,8 +33,8 @@ pub(all) struct Box {
   mut y : Double
   w : Double
   h : Double
-  /// node.blocks から組んだもの。カードにならない中身は入らないので、
-  /// **blocks と並びが揃わない**。1 枚ずつが出どころの id を持つ
+  /// node.body から組んだもの。カードにならない中身は入らないので、
+  /// **body と並びが揃わない**。1 枚ずつが出どころの id を持つ
   cards : Array[Card]
 } derive(Debug)
 
@@ -103,7 +103,7 @@ fn gap_before(i : Int) -> Double {
 
 ///|
 /// 子孫の数
-fn descendants(n : @view.Node) -> Int {
+fn descendants(n : @tree.Node) -> Int {
   let mut c = 0
   for k in n.children {
     c += 1 + descendants(k)
@@ -114,7 +114,7 @@ fn descendants(n : @view.Node) -> Int {
 ///|
 /// 見えている子。閉じた畳みの下は無い — 畳みの裁定はここ 1 つ。
 /// 開いた畳み（`<details open>`）の子は普通に出る
-fn kids_of(n : @view.Node) -> Array[@view.Node] {
+fn kids_of(n : @tree.Node) -> Array[@tree.Node] {
   if closed(n) {
     []
   } else {
@@ -152,12 +152,12 @@ priv struct Pass {
 }
 
 ///|
-fn Pass::twig_of(self : Pass, n : @view.Node) -> Twig {
+fn Pass::twig_of(self : Pass, n : @tree.Node) -> Twig {
   match self.twigs.get(n.id) {
     Some(t) => t
     None => {
       let folded = closed(n)
-      let cs = if folded { [] } else { cards(n.blocks) }
+      let cs = if folded { [] } else { cards(n.body) }
       let buried = if folded { descendants(n) } else { 0 }
       let t = { cards: cs, buried, size: (self.size)(n, cs, buried), }
       self.twigs[n.id] = t
@@ -167,7 +167,7 @@ fn Pass::twig_of(self : Pass, n : @view.Node) -> Twig {
 }
 
 ///|
-fn Pass::band_of(self : Pass, n : @view.Node) -> Band {
+fn Pass::band_of(self : Pass, n : @tree.Node) -> Band {
   match self.bands.get(n.id) {
     Some(b) => return b
     None => ()
@@ -190,13 +190,13 @@ fn Pass::band_of(self : Pass, n : @view.Node) -> Band {
 }
 
 ///|
-fn Pass::height_of(self : Pass, n : @view.Node) -> Double {
+fn Pass::height_of(self : Pass, n : @tree.Node) -> Double {
   self.band_of(n).h
 }
 
 ///|
 /// 子を 0 から積んだときの「第 1 子と最終子の中心の中点」
-fn Pass::stack_center(self : Pass, kids : Array[@view.Node]) -> Double {
+fn Pass::stack_center(self : Pass, kids : Array[@tree.Node]) -> Double {
   let mut y = 0.0
   let centers = []
   for i, k in kids {
@@ -209,13 +209,13 @@ fn Pass::stack_center(self : Pass, kids : Array[@view.Node]) -> Double {
 
 ///|
 /// 子の山を、その部分木の帯の上端から何 px 下に置くか
-fn Pass::slide_of(self : Pass, n : @view.Node) -> Double {
+fn Pass::slide_of(self : Pass, n : @tree.Node) -> Double {
   self.band_of(n).anchor - self.stack_center(kids_of(n))
 }
 
 ///|
 /// 子を縦に積んだときの高さ（あいだの隙間込み）
-fn Pass::stack_h(self : Pass, kids : Array[@view.Node]) -> Double {
+fn Pass::stack_h(self : Pass, kids : Array[@tree.Node]) -> Double {
   let mut sum = 0.0
   for i, k in kids {
     sum += self.height_of(k) + gap_before(i)
@@ -228,7 +228,7 @@ fn Pass::stack_h(self : Pass, kids : Array[@view.Node]) -> Double {
 /// 左向きなら右辺）。左右で式を分けないための座標。返すのは箱の中心の y
 fn Pass::place(
   self : Pass,
-  n : @view.Node,
+  n : @tree.Node,
   parent : Edge,
   near_x : Double,
   top : Double,
@@ -269,7 +269,7 @@ fn Pass::place(
 
 ///|
 /// その枝と子孫すべての箱を縦にずらす。側を根の中心へ揃えるため
-fn Pass::shift_subtree(self : Pass, n : @view.Node, dy : Double) -> Unit {
+fn Pass::shift_subtree(self : Pass, n : @tree.Node, dy : Double) -> Unit {
   match self.boxes.get(n.id) {
     Some(b) => b.y += dy
     None => ()
@@ -281,7 +281,7 @@ fn Pass::shift_subtree(self : Pass, n : @view.Node, dy : Double) -> Unit {
 
 ///|
 /// 根の子を側ごとに分ける（右, 左）。**sides を読むのはここだけ。** 足りなければ右
-fn split_sides(t : @view.Root) -> (Array[@view.Node], Array[@view.Node]) {
+fn split_sides(t : @tree.Root) -> (Array[@tree.Node], Array[@tree.Node]) {
   let right = []
   let left = []
   for i, k in kids_of(t.node) {
@@ -296,7 +296,7 @@ fn split_sides(t : @view.Root) -> (Array[@view.Node], Array[@view.Node]) {
 ///|
 /// 置いた側 1 つぶん。y0 は子の山の上端、h はその高さ
 priv struct Placed {
-  kids : Array[@view.Node]
+  kids : Array[@tree.Node]
   centers : Array[Double]
   mut y0 : Double
   h : Double
@@ -312,7 +312,7 @@ priv struct Placed {
 /// まとめてずらす
 fn Pass::place_tree(
   self : Pass,
-  t : @view.Root,
+  t : @tree.Root,
   top : Double,
 ) -> (Double, Double) {
   let root = t.node
@@ -355,8 +355,8 @@ fn Pass::place_tree(
 /// 側 1 つに子を積む。**縦は側の見積もり（span）の中で真ん中**に寄せる。
 fn Pass::stack_side(
   self : Pass,
-  root : @view.Node,
-  kids : Array[@view.Node],
+  root : @tree.Node,
+  kids : Array[@tree.Node],
   side : @tree.Side,
   size : Size,
   top : Double,
@@ -412,7 +412,7 @@ fn reach_of_tree(
 
 ///|
 /// 文書順に並べる（親が先）
-fn walk(n : @view.Node, order : Array[Int]) -> Unit {
+fn walk(n : @tree.Node, order : Array[Int]) -> Unit {
   order.push(n.id)
   for k in kids_of(n) {
     walk(k, order)
@@ -448,7 +448,7 @@ fn fan_out(boxes : Map[Int, Box]) -> Unit {
 }
 
 ///|
-pub fn layout(roots : Array[@view.Root], size : SizeOf) -> Layout {
+pub fn layout(roots : Array[@tree.Root], size : SizeOf) -> Layout {
   let p : Pass = { size, boxes: {}, order: [], twigs: {}, bands: {}, }
   let mut top = 0.0
   for t in roots {
