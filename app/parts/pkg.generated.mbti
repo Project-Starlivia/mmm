@@ -26,6 +26,8 @@ pub fn canvas_paint(@core.Any) -> Paint
 
 pub fn connect(String) -> Ask
 
+pub fn declaration(String, Field) -> Ask
+
 pub fn discard() -> Ask
 
 pub fn draw_form(@dom.Document, () -> Unit, (Board) -> Unit, paint? : ((@dom.Element) -> Paint)?) -> (@dom.Element, Board)
@@ -65,6 +67,8 @@ pub fn pane_hint(@dom.Document, String) -> @dom.Element
 pub fn pane_tool(@dom.Document, String) -> @dom.Element
 
 pub fn place() -> Ask
+
+pub fn redeclaration(Field) -> Ask
 
 pub fn rename(String) -> Ask
 

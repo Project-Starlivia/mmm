@@ -624,8 +624,10 @@ pub fn mmm_draw_form() -> @dom.Element {
 }
 
 ///|
-/// ts の並び（字か `{ value, check? }`）を Part に
-fn parts_of(v : @core.Any) -> Array[@parts.Part] {
+/// ts の並び（字か `{ value, check? }`）を Part に。`here`（置き場に既に在る
+/// 名前）を渡すと、欄は**本物の検査**を積む — 並べて見る道具が言葉を写さずに
+/// 済む。渡さなければ ts の `check` のまま
+fn parts_with(v : @core.Any, here : Set[String]?) -> Array[@parts.Part] {
   @core.array_from(v).map(x => {
     if @core.typeof_(x) == "string" {
       @parts.Text(x.cast())
@@ -633,14 +635,30 @@ fn parts_of(v : @core.Any) -> Array[@parts.Part] {
       let check = x._get("check")
       @parts.Blank({
         value: x._get("value").cast(),
-        check: if defined(check) {
-          Some(value => str_opt(check._invoke([@core.any(value)])))
-        } else {
-          None
+        check: match here {
+          Some(here) => Some(typed => @disk.image_name_problem(typed, here))
+          None =>
+            if defined(check) {
+              Some(value => str_opt(check._invoke([@core.any(value)])))
+            } else {
+              None
+            }
         },
       })
     }
   })
+}
+
+///|
+/// 宣言の欄。**検査は本物**（app/disk/images.mbt）— 並べて見る道具が言葉を
+/// 写さずに済むよう、だめな値を渡せばそのまま本物の理由が出る。
+/// `dirName` はフォルダの実名（末尾を照合する。計算できていれば渡さない）
+fn folder_field(args : @core.Any) -> @parts.Field {
+  let dir_name = str_opt(args._get("dirName"))
+  {
+    value: args._get("value").cast(),
+    check: Some(typed => @disk.folder_problem(typed, dir_name)),
+  }
 }
 
 ///|
@@ -651,8 +669,21 @@ fn named_ask(kind : String, args : @core.Any) -> @parts.Ask {
     "place" => @parts.place()
     "connect" => @parts.connect(args.cast())
     "rename" => @parts.rename(args.cast())
-    "imageName" =>
-      @parts.image_name(parts_of(args._get("shape")), args._get("shot").cast())
+    "imageName" => {
+      let taken = args._get("taken")
+      let here : Set[String]? = if defined(taken) {
+        Some(Set::from_array(@core.array_from(taken).map(x => x.cast())))
+      } else {
+        None
+      }
+      @parts.image_name(
+        parts_with(args._get("shape"), here),
+        args._get("shot").cast(),
+      )
+    }
+    "declaration" =>
+      @parts.declaration(args._get("folder").cast(), folder_field(args))
+    "redeclaration" => @parts.redeclaration(folder_field(args))
     _ => abort("知らないたずね: " + kind)
   }
 }
