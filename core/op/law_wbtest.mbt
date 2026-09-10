@@ -408,7 +408,7 @@ test "法則 — 触っていない字は変わらない" {
   let bad : Array[String] = []
   let mut n = 0
   for i, doc in corpus {
-    let (before, spans) = @tree.build(doc, @tree.read(doc))
+    let (before, spans) = @tree.build(doc)
     for id in ids(before) {
       // 名前の行を持たないもの（中身と Implicit）は地番が言う。Rename が
       // Implicit を綴れば行が 1 本増えるので、そこに「触っていない」は無い

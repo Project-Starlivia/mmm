@@ -11,7 +11,7 @@ pub(all) struct Survey {
 ///|
 /// 打鍵 1 回ぶんの読み。読みは打鍵ごとに 1 回に保つ
 pub fn survey(md : String) -> Survey {
-  let (doc, spots) = @tree.build(md, @tree.read(md))
+  let (doc, spots) = @tree.build(md)
   { md, doc, spots, }
 }
 

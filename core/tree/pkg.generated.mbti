@@ -14,7 +14,7 @@ pub let atx : Mark
 
 pub fn bare_path(String) -> String
 
-pub fn build(String, @markdown.Document) -> (Doc, Map[Int, Spot])
+pub fn build(String) -> (Doc, Map[Int, Spot])
 
 pub let bullet : Mark
 
