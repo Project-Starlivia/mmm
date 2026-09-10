@@ -16,6 +16,7 @@ fn fill(
   to~ : Int,
   source~ : String?,
 ) -> Unit {
+  keep(b, { from, to, }, Card(content~))
   let block : Block = { id: 0, content, source, }
   let at : Spot = { from, label: None, to, }
   if b.stack.is_empty() {
