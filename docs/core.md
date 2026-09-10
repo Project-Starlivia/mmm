@@ -116,8 +116,8 @@ ts には渡らない — 読み（`read/` の Survey = 木 + 地番 + 原文）
 `superpowers/specs/2026-09-08-layers-design.md`）。
 
 ```
-            read             build
-md ───────> mdAst ─────────> Doc + 地番                       @read.survey = read → build
+            read     notation        build
+md ───────> mdAst ──────> 記法構造 ──────> Doc + 地番          @read.survey = read → build
             write            unbuild
 md <─────── mdAst <───────── Doc                              serialize    = unbuild → write
                               │ check    Doc → 破れ
@@ -125,6 +125,10 @@ md <─────── mdAst <───────── Doc                
 md × Doc × 地番 × Doc ──merge──> 編集リスト                    = plan → verified（違えば全文）
 md × Op ──edit──> 編集リスト + focus                           = 読み → apply → merge → number
 ```
+
+`notation` は**読みの段の後半**で、新しい動詞ではない（`build` が呼ぶ。#205 で `read` が
+飲む）。読んだ塊に mmm の裁定を足して、**原文を隙間なく覆うひと切れの列**にする —
+深さ・境界・畳み・中身をそこで言い切るので、`build` は枠を積み直すだけになる。
 
 地図はその先。**配置** `木 + 寸法 ──layout──> Layout`（map/。字の実測は ts の canvas を
 閉包で受ける）、**描画** `Layout + 場面 ──draw──> SVG の差分`（app/mindmap。js だけ）。
@@ -200,7 +204,7 @@ mdAst だけを見る。
 **読みは md の字だけでも固定してある。** `corpus_wbtest.mbt` が、木の形の試験が読ませている
 md を全部集めた見本（166 通り）を、正規形・冪等・往復・破れの 4 つで押さえる。木の形
 （`json_inspect(parse(md))`）で言っている試験は `Doc` の型にぶら下がるが、こちらは md → md
-しか見ないので**内側の作りが変わっても生き残る**。正規形が入力と違う 21 通りは、そのまま
+しか見ないので**内側の作りが変わっても生き残る**。正規形が入力と違う 20 通りは、そのまま
 「何がどう正規化されるか」の一覧になっている。
 
 **名前は md の 1 行の原文。** 書く側は名前を md として読み直さず、生の行としてライブラリに
