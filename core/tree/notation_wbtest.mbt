@@ -54,7 +54,7 @@ test "見本 — 骨格の裁定は、いまの木と同じ" {
     }
     let got = StringBuilder()
     for p in notation(md).pieces {
-      guard p.verdict is Some(Line(depth~, label~, mark~)) else { continue }
+      guard p.verdict is Some(Line(depth~, label~, mark~, ..)) else { continue }
       got.write_string("\{depth} \{label} \{mark_sig(mark)}\n")
     }
     guard got.to_string() == want.to_string() else {
@@ -409,4 +409,56 @@ test "見本 — 記法構造の指紋" {
       #|
     ),
   )
+}
+
+///|
+/// **ひと切れの列だけで木が組める。** 組み立て（`assemble`）が出す木と地番が、
+/// いまの読み（`build`）と 1 欄も違わないこと。
+///
+/// **1 通りだけ違い、そちらが正しい。** 畳みの中に書かれた `---` は、いまの読みでは
+/// 畳みの外（畳んだノードの親の中身）へ出る — 保留した水平線を吐き出すのが
+/// `</details>` で枠を降ろした後になるため。記法構造は「中身は直前の `Line` が持つ」
+/// で位置のまま置くので、畳みの中に残る。その木を書き戻すと**入力と 1 バイトも
+/// 違わない**（いまの読みは `---` を畳みの手前へ動かす）。corpus の往復で崩れる
+/// 最後の 1 通りがこれ。
+test "見本 — ひと切れの列だけで、いまと同じ木が組める" {
+  // 畳みの角。**ここだけ違い、組み立てのほうが正しい**
+  let corner = "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n---\n\n</details>\n"
+  for md in read_corpus {
+    let (want, want_spans) = build(md, read(md))
+    let (got, got_spans) = assemble(notation(md))
+    let same = got == want
+    guard same != (md == corner) else {
+      if md == corner {
+        // 違いが消えたら、この但し書きはもう要らない
+        fail(
+          "畳みの角がいまの読みと一致した。上の但し書きを畳むこと",
+        )
+      }
+      let a = want.to_json().stringify()
+      let z = got.to_json().stringify()
+      fail("\{md.escape()}\n--- 読み\n\{a}\n--- 組み立て\n\{z}")
+    }
+    guard same else {
+      // 畳みの角。書き戻したら入力と同じになることだけを見る
+      guard serialize(got) == md else {
+        fail("畳みの角が入力に戻らない: \{serialize(got).escape()}")
+      }
+      continue
+    }
+    let ids = want_spans.keys().collect()
+    ids.sort()
+    for id in ids {
+      guard got_spans.get(id) == want_spans.get(id) else {
+        let a = want_spans.get(id).to_json().stringify()
+        let z = got_spans.get(id).to_json().stringify()
+        fail("\{md.escape()}: id \{id} の地番 \{a} と \{z}")
+      }
+    }
+    guard got_spans.size() == want_spans.size() else {
+      fail(
+        "\{md.escape()}: 地番の数 \{want_spans.size()} と \{got_spans.size()}",
+      )
+    }
+  }
 }

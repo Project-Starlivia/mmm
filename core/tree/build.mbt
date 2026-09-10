@@ -517,12 +517,27 @@ fn put(
     None => at
   }
   clear(b, level, mark)
+  // **閉じた後に残った高さ**。深さだけでは組み直せない — 列 0 の見出しが
+  // 開いている項目を閉じたか、境界が部分木を引き出したかは、ここでしか分からない
+  let under = b.stack.length()
   bridge(b, level)
   let at = match b.fold_at {
     Some(s) => s
     None => at
   }
-  keep(b, own_at, Line(depth=b.stack.length() + 1, label=at_label, mark~))
+  keep(
+    b,
+    own_at,
+    Line(
+      depth=b.stack.length() + 1,
+      under~,
+      label=at_label,
+      mark~,
+      text=label,
+      fold~,
+      at~,
+    ),
+  )
   // **そのブロック自身のノードは、最初に座る綴られた枠。** 手前の穴埋めは足場、
   // 後ろに続くのは入れ子の子（1 つの塊が項目を何段も積むことがある）
   if b.own == deep {
@@ -611,7 +626,7 @@ fn born(b : Build) -> (Side, String) {
   guard b.pend else { return (b.side, "") }
   // 境界になった水平線。書き戻しに要るのは綴りだけなので原文を控える
   let rule = carve(b.md, b.pend_from, b.pend_to)
-  keep(b, { from: b.pend_from, to: b.pend_to, }, Border)
+  keep(b, { from: b.pend_from, to: b.pend_to, }, Border(rule~))
   b.side = flipped(b.side)
   b.pend = false
   (b.side, rule)
