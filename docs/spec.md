@@ -19,7 +19,9 @@ core/   MoonBit — module `mmm/core`。文書モデルと地図の判断。**DO
         `check:core` の pure.ts が見張る）。意味は下の「文書モデル」、内部は core.md
   tree/         md.mbt が md との境界（read / serialize / fragment。ライブラリに触るのはここだけ）、
                 fold.mbt が畳みの綴りを裁いてひと切れの列にし（sift）、build.mbt が
-                mdAst → 木と地番、check.mbt が md に書けない並びを見つけ、
+                mdAst → 木と地番、notation.mbt が記法構造（読んだ md を原文を隙間なく
+                覆うひと切れの列で持つ。#205 の段 1。いまは試験だけが呼ぶ）、
+                check.mbt が md に書けない並びを見つけ、
                 unbuild.mbt が木 → mdAst、merge.mbt が前後の木の差を原文 md への
                 編集列にする。content.mbt は塊 1 枚の意味、text.mbt は md の意味を
                 知らない字と行の算術。md_wbtest.mbt が
