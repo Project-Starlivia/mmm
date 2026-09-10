@@ -32,6 +32,8 @@ pub fn md_ast_sig(String) -> String
 
 pub fn merge(String, Doc, Map[Int, Spot], Doc) -> Merged
 
+pub fn notation_sig(String) -> String
+
 pub fn number(Doc, Int) -> Int?
 
 pub fn parse(String) -> Doc

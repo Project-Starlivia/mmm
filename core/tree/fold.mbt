@@ -16,8 +16,15 @@ priv enum Slice {
   /// 畳みに関わらない、素の塊
   Plain(@markdown.Block)
   /// 畳まれたノードの見出し・項目の行。中身は普通に読む。
-  /// `at` は `<details>` 〜 `</details>` の原文の範囲（地番になる）
-  Folded(@markdown.Block, fold~ : Fold, at~ : @markdown.Span)
+  /// `at` は `<details>` 〜 `</details>` の原文の範囲（地番になる）。
+  /// `open_at` は開きの綴りそのものの範囲 — 綴りは木から落ちるが、記法構造は
+  /// その字も 1 枚として持つので、範囲だけ連れて回る
+  Folded(
+    @markdown.Block,
+    fold~ : Fold,
+    at~ : @markdown.Span,
+    open_at~ : @markdown.Span
+  )
   /// 綴りとして読めなかった領域。原文のまま中身になる。open / summary / body は
   /// GitHub が描くのと同じ読み取り（最初の開きと、その直後の名前と、閉じまでの間）。
   /// `from`・`to` は原文での範囲（地番になる）
@@ -667,19 +674,20 @@ fn stands(s : Sift, depth : Array[Depth], gone : Array[Bool], p : Pair) -> Bool 
 ///|
 /// 立った対が印を付ける骨格の行 → その畳みと、`<details>` 〜 `</details>` の
 /// 原文の範囲。印の無い行は None。
-fn marks(s : Sift, v : Stand) -> Array[(Fold, @markdown.Span)?] {
-  let out : Array[(Fold, @markdown.Span)?] = Array::make(
+fn marks(s : Sift, v : Stand) -> Array[(Fold, @markdown.Span, @markdown.Span)?] {
+  let out : Array[(Fold, @markdown.Span, @markdown.Span)?] = Array::make(
     s.blocks.length(),
     None,
   )
   for k, p in s.pairs {
     if v.folded[k] {
       let ob = s.spots[p.open].block
+      let open_at = block_span(s.blocks[ob])
       let at : @markdown.Span = {
-        from: block_span(s.blocks[ob]).from,
+        from: open_at.from,
         to: block_span(s.blocks[s.spots[p.close].block]).to,
       }
-      out[next(s.blocks, ob)] = Some((fold_of(s.spells[ob]), at))
+      out[next(s.blocks, ob)] = Some((fold_of(s.spells[ob]), at, open_at))
     }
   }
   out
@@ -734,7 +742,7 @@ fn raws(s : Sift, v : Stand) -> Array[Raw?] {
 fn arrange(
   s : Sift,
   v : Stand,
-  folds : Array[(Fold, @markdown.Span)?],
+  folds : Array[(Fold, @markdown.Span, @markdown.Span)?],
   raws : Array[Raw?],
 ) -> Array[Slice] {
   let out = []
@@ -755,7 +763,8 @@ fn arrange(
         } else {
           out.push(
             match folds[i] {
-              Some((fold, at)) => Folded(s.blocks[i], fold~, at~)
+              Some((fold, at, open_at)) =>
+                Folded(s.blocks[i], fold~, at~, open_at~)
               None => Plain(s.blocks[i])
             },
           )

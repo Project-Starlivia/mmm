@@ -158,6 +158,9 @@ priv struct Build {
   /// 項目の中は、その項目の深さを 0 とした文書（docs/spec.md「項目の中」）。
   /// 文書そのものを読んでいる間は 0
   mut base : Int
+  /// 下した裁定の控え（記法構造）。**木の組み立てには 1 つも効かない** —
+  /// 段 6 で判断そのものを読みの段へ移すまでの、網を張るための控え
+  pieces : Array[Piece]
 }
 
 ///|
@@ -186,6 +189,16 @@ fn Build::new(
     dry,
     owner: 0,
     base: 0,
+    pieces: [],
+  }
+}
+
+///|
+/// 裁定を 1 つ控える。深さを測るだけの空打ち（`dry`）では控えない —
+/// 本番と同じ裁定を 2 度書くことになる
+fn keep(b : Build, at : @markdown.Span, verdict : Verdict) -> Unit {
+  if !b.dry && at.to > at.from {
+    b.pieces.push({ at, verdict: Some(verdict), })
   }
 }
 
@@ -257,13 +270,17 @@ fn depths(
 fn lay(b : Build, cut : Slice, nest : Int) -> Unit {
   match cut {
     Plain(block) => take(b, block, nest)
-    Folded(block, fold~, at~) => {
+    Folded(block, fold~, at~, open_at~) => {
+      keep(b, open_at, FoldOpen(open=fold.open, summary=fold.summary))
       b.fold_at = Some(at)
       take(b, block, nest, fold=Some(fold))
       b.fold_at = None
       b.fold_roots.push(b.stack.length())
     }
-    Closed(..) => shut(b)
+    Closed(from~, to~) => {
+      keep(b, { from, to, }, FoldClose)
+      shut(b)
+    }
     Capsule(text~, open~, summary~, body~, from~, to~) => {
       // 中身が来たので、保留中の水平線は境界になれない
       spill(b)
@@ -378,6 +395,14 @@ fn items_take(
       fold~,
       at=it.span,
       at_label=face.at,
+      line=Some({
+        from: it.span.from,
+        to: if face.from > face.at {
+          face.from
+        } else {
+          face.at
+        },
+      }),
     )
     // **同じ列の項目は兄弟。** 境界は最初の項目を深さ 2 へ引き出すので、
     // 残りも引き出された先に並ぶ（数え直すと元の位置から数えてしまう）
@@ -481,14 +506,23 @@ fn put(
   fold~ : Fold?,
   at~ : @markdown.Span,
   at_label~ : Int,
+  line? : @markdown.Span? = None,
 ) -> Unit {
   let level = seat_level(b, level, mark)
+  // 控えるのは**行そのものの範囲**。地番（`at`）は項目なら部分木ぜんぶ、
+  // 畳まれた行なら `<details>` の範囲まで伸びるが、記法構造ではその外側は
+  // 別のひと切れなので、行は行の字だけを持つ
+  let own_at = match line {
+    Some(l) => l
+    None => at
+  }
   clear(b, level, mark)
   bridge(b, level)
   let at = match b.fold_at {
     Some(s) => s
     None => at
   }
+  keep(b, own_at, Line(depth=b.stack.length() + 1, label=at_label, mark~))
   // **そのブロック自身のノードは、最初に座る綴られた枠。** 手前の穴埋めは足場、
   // 後ろに続くのは入れ子の子（1 つの塊が項目を何段も積むことがある）
   if b.own == deep {
@@ -577,6 +611,7 @@ fn born(b : Build) -> (Side, String) {
   guard b.pend else { return (b.side, "") }
   // 境界になった水平線。書き戻しに要るのは綴りだけなので原文を控える
   let rule = carve(b.md, b.pend_from, b.pend_to)
+  keep(b, { from: b.pend_from, to: b.pend_to, }, Border)
   b.side = flipped(b.side)
   b.pend = false
   (b.side, rule)
