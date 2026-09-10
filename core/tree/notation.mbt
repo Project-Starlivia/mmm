@@ -352,3 +352,26 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
   }
   (doc, spans)
 }
+
+///|
+/// 記法構造 → md。**ひと切れの原文をそのまま継ぐ。**
+///
+/// ひと切れは原文を隙間なく覆うので、触っていない列を書けば**原文がそのまま返る**。
+/// それが記法構造の前提そのもの（md が真実で、木は派生）で、`serialize` のように
+/// 意味から綴り直す道とは別のもの。差し替えた piece を綴るのは反映の段。
+fn write_pieces(n : Notation) -> String {
+  let out = StringBuilder()
+  match n.frontmatter {
+    Some(f) => out.write_string(slice(n.md, f.span.from, f.span.to))
+    None => ()
+  }
+  for p in n.pieces {
+    out.write_string(slice(n.md, p.at.from, p.at.to))
+  }
+  out.to_string()
+}
+
+///|
+pub fn notation_back(md : String) -> String {
+  write_pieces(notation(md))
+}

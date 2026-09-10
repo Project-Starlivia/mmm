@@ -103,12 +103,13 @@ src/    TypeScript — **CodeMirror（md ペイン）だけ。** 文書の真実
   highlight.ts コードの色分け。CodeMirror の言語表を借りる。core の描画に閉包で渡す
   main.ts      入口。CodeMirror を立て、その読み書きを app（App）に閉包で渡し、
                1 トランザクションごとに cycle を呼ぶだけ
-test/   検証 — **ts に残るのは 3 本だけ**（判断は core へ移り、そちらは各科の
+test/   検証 — **ts に残るのは 4 本だけ**（判断は core へ移り、そちらは各科の
         `*_wbtest.mbt` が持つ）。app.test.ts は core の出入口の境界、
         state.test.ts は文書から導けるものが EditorState に居ること、
-        highlight.test.ts は囲いだけ守る判定。tools/ は pure.ts（core が DOM を
-        知らないことの見張り）と gen-load.ts（負荷サンプル生成）、fixtures/ は
-        その出力（読み手はまだ無い — #88）
+        highlight.test.ts は囲いだけ守る判定、notation.test.ts は記法構造が
+        原文を 1 バイトも落とさないこと（fixtures 7 本 523 KB で言う）。
+        tools/ は pure.ts（core が DOM を知らないことの見張り）と
+        gen-load.ts（負荷サンプル生成）、fixtures/ はその出力
 lab/    見るための道具（`pnpm run lab`）。index.html は md がどう読まれるか（mdAst /
         mmmTree と書き戻し）、parts/ は部品 × 状態 × テーマを 1 ページに
         並べたもの — 表 parts.ts（DOM の部品）と map.ts（本物の Mindmap を通す）が

@@ -701,3 +701,9 @@ pub fn mmm_ask_form(kind : String, args : @core.Any) -> @dom.Element {
 pub fn mmm_logo_svg(fill : String, dirty : Bool) -> String {
   @bar.logo_svg(fill, dirty)
 }
+
+///|
+#export_name("mmmNotationBack")
+pub fn mmm_notation_back(md : String) -> String {
+  @tree.notation_back(md)
+}
