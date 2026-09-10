@@ -421,3 +421,14 @@ test "畳みの中の水平線は、畳みの中に残る" {
   assert_eq(serialize(parse(md)), md)
   assert_eq(parse(serialize(parse(md))), parse(md))
 }
+
+///|
+/// **記法構造は原文を 1 バイトも落とさない。** 触っていない列を書けば原文がそのまま返る。
+/// 敷き詰めの法則を字の側から言い直したもので、範囲が 1 つでもずれていれば鳴る。
+/// 木から綴り直す `serialize` とは別の道（あちらは正規形を出すので入力と違いうる）。
+test "見本 — 触っていない記法構造を書けば、原文がそのまま返る" {
+  for md in read_corpus {
+    let back = write_pieces(notation(md))
+    guard back == md else { fail("\{md.escape()}\n  → \{back.escape()}") }
+  }
+}

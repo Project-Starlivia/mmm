@@ -22,6 +22,13 @@ export interface Survey {
 /** md を core に読ませる。読みのサイクルの唯一の入口 */
 export const survey = (md: string): Survey => Object(mbt.mmmSurvey(md));
 
+/**
+ * 触っていない記法構造を md へ書き戻したもの。**原文が 1 バイトも変わらずに返る** —
+ * 木から綴り直す `mmmSerialize` とは別の道（あちらは正規形なので入力と違いうる）。
+ * いまは網が呼ぶだけ（test/notation.test.ts）
+ */
+export const notationBack = (md: string): string => mbt.mmmNotationBack(md);
+
 /** id がノードのものか（中身の id なら false） */
 export const isNode = (s: Survey, id: number): boolean => mbt.mmmIsNode(s, id);
 

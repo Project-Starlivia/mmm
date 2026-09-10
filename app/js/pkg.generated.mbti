@@ -75,6 +75,8 @@ pub fn mmm_more_rows(@core.Any, @core.Any) -> @dom.Element
 
 pub fn mmm_node_at(FixedArray[Int], Int?) -> @core.Any
 
+pub fn mmm_notation_back(String) -> String
+
 pub fn mmm_nothing() -> @core.Any
 
 pub fn mmm_notice(String, String, Bool) -> @dom.Element
