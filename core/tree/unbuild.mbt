@@ -60,6 +60,193 @@ pub fn unbuild_prose(body : Array[Block]) -> @markdown.Document {
 }
 
 ///|
+/// 階層が言う隙間 — 正規形で、要素ごとに手前が空行で分かれるか。
+/// 合流の base と theirs はこれで、**正規形を書いて読み直す道は要らない**。
+///
+/// **下の walk と同じ順に歩く。** 正規形の塊はライブラリが必ず空行で分けるので、
+/// 分かれないのは 3 か所だけ:
+///
+/// - 文書の頭。frontmatter が在れば、その後ろは空行 1 つ（`serialize` が置く）
+/// - 詰めた列の 2 つ目からの兄弟（`loose` が偽）
+/// - 詰めた項目のラベルと最初の中身（`tight`）。ラベルが無ければ中身はマーカーの
+///   行に乗るので、項目自身の答えを継ぐ
+///
+/// 書く字が無い中身（check の `Wordless`）が在れば None — 正規形に塊が出ず要素が
+/// 並ばないので、合流は全文へ落ちる。
+fn parted(doc : Doc) -> Map[Int, Bool]? {
+  let p : Part = {
+    out: Map([]),
+    next: doc.frontmatter is Some(_),
+    torn: false,
+  }
+  for b in doc.body {
+    p.content(b)
+  }
+  p.nodes(doc.roots.map(r => r.node), [], inner=i => doc.roots[i].sides)
+  if p.torn {
+    None
+  } else {
+    Some(p.out)
+  }
+}
+
+///|
+/// 隙間を数える途中。
+priv struct Part {
+  out : Map[Int, Bool]
+  /// 次に置く塊の答え — 手前が空行で分かれるか
+  mut next : Bool
+  /// 書く字が無い中身に当たった
+  mut torn : Bool
+}
+
+///|
+/// 塊 1 つを置く。**ライブラリは塊を空行で分ける**ので、次の塊は必ず分かれる。
+/// 要素でない塊（側の水平線・畳みの角）は id を持たないが、頭の席は使う。
+fn Part::place(self : Part, id : Int?) -> Unit {
+  if id is Some(id) {
+    self.out[id] = self.next
+  }
+  self.next = true
+}
+
+///|
+/// 兄弟の列。`nodes` と同じ規則で列を割る（側が変わる・畳まれた項目・
+/// マーカーの種類が変わる）。綴りは隙間に効かないので `rules` は見ない。
+fn Part::nodes(
+  self : Part,
+  xs : Array[Node],
+  sides : Array[Side],
+  inner? : (Int) -> Array[Side] = _ => [],
+) -> Unit {
+  let run : Array[Node] = []
+  fn flush() {
+    if !run.is_empty() {
+      self.bullets(run)
+      run.clear()
+    }
+  }
+
+  let mut prev = Right
+  for i, x in xs {
+    let side = if i < sides.length() { sides[i] } else { prev }
+    if side != prev {
+      flush()
+      self.place(None)
+      prev = side
+    }
+    match x.mark {
+      Some(Item(marker~, ..)) if x.fold is None => {
+        if run is [first, ..] && kind_of(marker_of(first)) != kind_of(marker) {
+          flush()
+        }
+        run.push(x)
+      }
+      _ => {
+        flush()
+        self.node(x, inner(i))
+      }
+    }
+  }
+  flush()
+}
+
+///|
+/// ノード 1 つと、その部分木。`node` と同じ順。
+fn Part::node(self : Part, x : Node, sides : Array[Side]) -> Unit {
+  match x.mark {
+    Some(Item(..)) => self.wrap(x, () => self.bullets([x]))
+    Some(Heading(..)) =>
+      self.wrap(x, () => {
+        self.place(Some(x.id))
+        for b in x.body {
+          self.content(b)
+        }
+        self.nodes(x.children, sides)
+      })
+    // 飛び（Implicit）は行を持たないので、隙間は最初の要素のもの
+    None => {
+      self.nodes(x.children, sides)
+      if head_element(x) is Some(first) {
+        self.out[x.id] = self.out.get(first).unwrap_or(true)
+      }
+    }
+  }
+}
+
+///|
+/// 畳みは `<details>` と `</details>` の塊で部分木を挟む。どちらも塊なので、
+/// 中の頭も次の兄弟も必ず空行で分かれる。
+///
+/// **畳まれた行の隙間は、開きの手前のもの。** 地番が `<details>` から始まる
+/// （`put`）ので、合流が測る隙間もそこの手前。中で付いた答え（開きの塊で
+/// 分かれている）を、開き自身の答えで上書きする
+fn Part::wrap(self : Part, x : Node, inner : () -> Unit) -> Unit {
+  match x.fold {
+    None => inner()
+    Some(_) => {
+      let mine = self.next
+      self.place(None)
+      inner()
+      self.place(None)
+      self.out[x.id] = mine
+    }
+  }
+}
+
+///|
+/// 項目の列 1 つ。**塊は 1 つ**（`bullets` が生の塊で綴る）なので、兄弟の間の
+/// 空行はライブラリでなく読んだ詰め（`loose`）が決める。ラベルと中身の間は
+/// `tight`。どちらも `bullets` / `list_item` と同じ式。
+fn Part::bullets(self : Part, run : Array[Node]) -> Unit {
+  let tight = run
+    .iter()
+    .all(l => {
+      l.body.is_empty() &&
+      l.children.iter().all(c => c.fold is None) &&
+      !underlined(l)
+    })
+  let loose = run.iter().any(l => l.mark is Some(Item(loose=true, ..)))
+  let head = self.next
+  for i, l in run {
+    let mine = if i == 0 { head } else { loose }
+    self.out[l.id] = mine
+    // **項目の中は、その項目の深さを 0 とした文書。** ラベルが無ければ中身は
+    // マーカーの行に乗るので、隙間は項目自身のもの
+    self.next = if l.label == "" { mine } else { !tight }
+    for b in l.body {
+      self.content(b)
+    }
+    self.nodes(l.children, [])
+  }
+  self.next = true
+}
+
+///|
+/// 中身 1 枚。**書く字が無ければ塊が出ない** — `Details` も `source` も無い中身で、
+/// check の `Wordless`。そのときは隙間を言えないので折れる
+fn Part::content(self : Part, b : Block) -> Unit {
+  if b.source is Some(_) || !(b.content is (Some(Details(..)) | None)) {
+    self.place(Some(b.id))
+  } else {
+    self.torn = true
+  }
+}
+
+///|
+/// 部分木の最初の要素。飛び（Implicit）を下って最初の行を持つノード。
+/// 子の無い飛びは在り得ない（check が言う）ので None は来ない。
+fn head_element(x : Node) -> Int? {
+  if x.mark is Some(_) {
+    return Some(x.id)
+  }
+  match x.children.get(0) {
+    Some(k) => head_element(k)
+    None => None
+  }
+}
+
+///|
 /// 位置は持たない。mdAst の span は原文の座標で、組んだ木に原文は無い。
 let nowhere : @markdown.Span = @markdown.Span::empty()
 
