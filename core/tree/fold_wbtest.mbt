@@ -1201,13 +1201,16 @@ test "飾りの水平線が領域の中なら畳み" {
           "node": {
             "id": 2,
             "label": "r",
-            "body": [{ "id": 3, "content": "ThematicBreak", "source": "---" }],
+            "body": [],
             "children": [
               {
-                "id": 4,
+                "id": 3,
                 "label": "a",
                 "fold": { "open": false, "summary": "a" },
-                "body": [{ "id": 5, "source": "body" }],
+                "body": [
+                  { "id": 4, "source": "body" },
+                  { "id": 5, "content": "ThematicBreak", "source": "---" },
+                ],
                 "children": [],
                 "mark": ["Heading", { "setext": false, "closing": 0 }],
               },

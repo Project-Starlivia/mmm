@@ -139,8 +139,6 @@ test "見本 — 読んで書き戻した字" {
       #|  → "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n"
       #|"# r\n\n<details>\t<summary>s</summary>\n\n## a\n\n</details>\n"
       #|  → "# r\n\n<details>\n<summary>s</summary>\n\n## a\n\n</details>\n"
-      #|"# r\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n---\n\n</details>\n"
-      #|  → "# r\n\n---\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n</details>\n"
       #|"# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n</details></details>\n"
       #|  → "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n\n</details>\n\n</details>\n"
       #|"# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n</details>\n</details>\n"
@@ -181,8 +179,6 @@ test "見本 — 往復" {
   inspect(
     out.to_string(),
     content=(
-      #|"# r\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n---\n\n</details>\n"
-      #|  → "# r\n\n---\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n</details>\n"
       #|
     ),
   )
@@ -204,7 +200,6 @@ test "見本 — 破れ" {
     content=(
       #|"# r\n\n---\n\n# s\n"  [["BorderBreak",3]]
       #|"body\n\n---\n\n# a\n"  [["BorderBreak",3]]
-      #|"# r\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n---\n\n</details>\n"  [["BorderBreak",3]]
       #|
     ),
   )

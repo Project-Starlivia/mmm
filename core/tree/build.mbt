@@ -38,7 +38,7 @@ let no_line : Int = -1
 ///|
 /// md を木にする。
 pub fn parse(md : String) -> Doc {
-  build(md, read(md)).0
+  build(md).0
 }
 
 ///|
@@ -52,47 +52,17 @@ pub(all) struct Spot {
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// mdAst を mmmTree にする。ラベルは原文から切り出す（mmm はインラインを解釈しない）。
-/// 地番は Doc に載せず並べて返す — 載せると Doc が特定の原文に縛られ、
-/// 手で組む木に在り得ない欄が生える。
-pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
-  let b = Build::new(md, ast.definitions.map(d => d.span))
-  for cut in sift(md, ast.children, b.defs, 0) {
-    lay(b, cut, 0)
-  }
-  // 行き先の見出し・項目が来ないまま終わった水平線は、その場の中身に落ちる
-  spill(b)
-  let spans : Map[Int, Spot] = Map([])
-  let next = { val: doc_id + 1, }
-  // 文書の中身は最初の骨格より前にあるので、番号も地番も先に
-  spans[doc_id] = prose_at(b, ast.frontmatter)
-  number_blocks(b.body, next)
-  for i, at in b.body_at {
-    spans[b.body[i].id] = at
-  }
-  let doc : Doc = {
-    frontmatter: ast.frontmatter.map(f => f.raw),
-    body: b.body,
-    roots: b.roots.map(f => to_root(f, next, spans)),
-  }
-  (doc, spans)
-}
-
-///|
-/// 文書の散文の地番。frontmatter の尻から、最後の中身の尻まで。
-/// 中身が無ければ空の範囲。
-fn prose_at(b : Build, frontmatter : @markdown.Frontmatter?) -> Spot {
-  let from = match frontmatter {
-    Some(f) => f.span.to
-    None => 0
-  }
-  { from, label: None, to: if b.body_to > from { b.body_to } else { from }, }
+/// md を木にする。**裁定は読みの段が下している** — ここがやるのは piece の列から
+/// 枠を積み直すことだけ（`assemble`）。地番は Doc に載せず並べて返す — 載せると
+/// Doc が特定の原文に縛られ、手で組む木に在り得ない欄が生える。
+pub fn build(md : String) -> (Doc, Map[Int, Spot]) {
+  assemble(notation(md))
 }
 
 ///|
 /// 地番の指紋。`id[from,label,to]` を id 順に並べる。
 pub fn spans_sig(md : String) -> String {
-  let (_, spans) = build(md, read(md))
+  let (_, spans) = build(md)
   let ids = spans.keys().collect()
   ids.sort()
   ids
@@ -517,12 +487,27 @@ fn put(
     None => at
   }
   clear(b, level, mark)
+  // **閉じた後に残った高さ**。深さだけでは組み直せない — 列 0 の見出しが
+  // 開いている項目を閉じたか、境界が部分木を引き出したかは、ここでしか分からない
+  let under = b.stack.length()
   bridge(b, level)
   let at = match b.fold_at {
     Some(s) => s
     None => at
   }
-  keep(b, own_at, Line(depth=b.stack.length() + 1, label=at_label, mark~))
+  keep(
+    b,
+    own_at,
+    Line(
+      depth=b.stack.length() + 1,
+      under~,
+      label=at_label,
+      mark~,
+      text=label,
+      fold~,
+      at~,
+    ),
+  )
   // **そのブロック自身のノードは、最初に座る綴られた枠。** 手前の穴埋めは足場、
   // 後ろに続くのは入れ子の子（1 つの塊が項目を何段も積むことがある）
   if b.own == deep {
@@ -611,7 +596,7 @@ fn born(b : Build) -> (Side, String) {
   guard b.pend else { return (b.side, "") }
   // 境界になった水平線。書き戻しに要るのは綴りだけなので原文を控える
   let rule = carve(b.md, b.pend_from, b.pend_to)
-  keep(b, { from: b.pend_from, to: b.pend_to, }, Border)
+  keep(b, { from: b.pend_from, to: b.pend_to, }, Border(rule~))
   b.side = flipped(b.side)
   b.pend = false
   (b.side, rule)
