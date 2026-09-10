@@ -136,23 +136,33 @@ struct Notation {
   pieces : Array[Piece]
 }
 
-/// 塊 1 枚と、mmm がそれをどう読んだか
+/// 原文のひと続きと、mmm がそこに何を見たか
 struct Piece {
-  block : @markdown.Block      // 記法・綴り・span・trivia はここが持つ
-  verdict : Verdict?           // 無ければ読み解いていない
+  at : @markdown.Span          // 原文で受け持つ範囲
+  verdict : Verdict?           // 無ければ隙間（空行・落ちた綴り）
 }
 
-/// mmm がその塊に見た意味
+/// mmm がその範囲に見た意味
 enum Verdict {
   /// 骨格の行。深さは解決済み（`#` の本数でも入れ子の段数でもなく、積まれた深さ）。
-  /// `marker` と `loose` はライブラリから取れないので、ここが原文から測って持つ
-  Line(depth~ : Int, label~ : @markdown.Span, sign~ : Sign, marker~ : String, loose~ : Bool)
+  /// `marker` と `loose` はライブラリから取れないので、綴り（`Mark`）が原文から測って持つ
+  Line(depth~ : Int, label~ : Int, mark~ : Mark?)
   Border                                          // 側の変わり目
-  FoldOpen(open~ : Bool, summary~ : @markdown.Span?)
+  FoldOpen(open~ : Bool, summary~ : String?)
   FoldClose
   Card(content~ : Content?)                       // 中身。持ち主は直前の Line
 }
 ```
+
+**`Piece` は塊を持たない**（実装で分かった。段 1 で直した）。持たせると敷き詰められない —
+リンクの定義行は塊を持たず（ライブラリが `Document.definitions` に分ける）、読めなかった
+`<details>` の領域は塊を何枚もまたぎ、項目の行は `Block` ではなく `ListItem`、隙間を覆える
+のは `BlankLines` だけでその span は入れ子の項目の周りで壊れている。範囲だけを持ち、字は
+`md` から切り出す（#185 の「読んだ字は 1 か所」と同じ線）。
+
+**ラベルは頭だけ**（段 1 の時点）。範囲にするには `head_end` / `item_start` の測りを 1 つに
+束ねた `head_span` が要り、それは綴りを痩せさせる段で作る。頭は地番（`Spot.label`）と
+同じ値なので、いまの木と突き合わせられる。
 
 同じ `ThematicBreak` が `Border` にも `Card` にもなり、同じ `HtmlBlock` が `FoldOpen` にも
 `Card` にもなる。**どちらに読んだかを裁定が言う。**
@@ -241,19 +251,47 @@ piece に移り、後半（新しいものを綴る道）だけが残る。
 
 ### 段 1 — `read` を記法構造まで伸ばす。誰も呼ばない
 
-`read` の返りを `Notation` にする。今 `fold.mbt` が下している畳みの裁定と、`build` が
-積みながら出している深さ・境界・ラベルの判断を、piece の裁定へ移す。互いに呼び合う
-`standing` と `depths` は一緒に移す — 片方を `build` に残すと段をまたぐ再帰になる。
+`read` の隣に `notation(md)` を置く。`read` の返りはそのまま（`build` が読む）で、
+新しい入口が記法構造を返す。**呼ぶ者は試験だけ**なので、木も md も 1 つも変わらない。
 
-**この段がこの仕事の山。** 呼ぶ者がまだ居ないので、木も md も 1 つも変わらない。
+網 — piece の列の指紋を見本 166 通りで置き、**前の to と次の from が必ず合う**
+（原文を隙間なく覆う）ことと、**骨格の裁定がいまの木と同じことを言う**ことを見る。
+後ろ 2 つは `fail` で書く — `moon test -u` は `inspect` を黙って埋め直すので、法則を
+`inspect` で書くと判断を移した日に正解が自動で書き換わる。
 
-網 — piece の列の指紋（塊の種類・裁定・範囲）を見本 166 通りで新しく置き、
-**前の to と次の from が必ず合う**（原文を隙間なく覆う）ことを見る。
+**済み（2026-09-10、PR #224）。** 裁定は木を組む機械が下すそばから控える形で入れた。
+指紋・敷き詰め・木との突き合わせの 3 つが緑で、覆えていない字は 0 件。
+
+**判断の置き場は動かしていない。** `standing` は `fold.mbt`、深さ・境界・ラベルは
+`build.mbt` のまま。動かすのは段 2 と一緒 — `Build` は「裁定の状態（stack の高さ・side・
+pend・fold_at・fold_roots・owner・base）」と「組み立ての状態（roots・Frame の stack・body）」
+が 1 つの struct に同居していて、`clear` が積んである枠の綴りを読む（列 0 の見出しは開いて
+いる項目を閉じる）ので、**深さの stack を 2 つに割ると同じ状態を 2 か所が持つ**。
+`build` の入口が記法構造になる段 2 で、割るのではなく片方が消える。先に置き場だけ
+動かすと、同じコードが 2 度動いて段 2 の差分が読めなくなる。
+
+**この段で分かったこと。**
+
+- `Piece` は塊を持てない（上の型の但し書き）
+- 控える範囲は**行そのもの**。地番は項目なら部分木ぜんぶ、畳まれた行なら `<details>` の
+  範囲まで伸びる。部分木の範囲で控えると `- a
+  - b
+` の外側が内側を飲み、内側の
+  ひと切れが消える（木との突き合わせが実際に鳴った）
+- 畳みの開きの綴りは木から落ちるが、記法構造はその字も 1 枚として持つので、範囲を
+  `sift` から連れて回る（`Slice::Folded` の `open_at`）
+- `core/tree` に `Piece` と `Verdict` が私設の型として既に在った。`fold.mbt` の 2 つを
+  `Slice` / `Stand` に改名して明けた
 
 ### 段 2 — `build` の入口を記法構造にする。木は今のまま
 
 `build` が mdAst でなく `Notation` を読む。出す `Doc` は 1 欄も変えない — piece の字から
 `Mark` の 5 欄・`Block.source`・`Root.rules` を埋め直す。**段 5 で捨てる道を書くことになる。**
+
+**判断の置き場が動くのはここ。** 段 1 は控えるだけだったので、判断はまだ `fold.mbt` と
+`build.mbt` に在る。`build` が記法構造を読むようになれば、`Build` の裁定の欄（stack の
+高さ・side・pend・fold_at・fold_roots・owner・base）は**割るのではなく消える** —
+裁定はもう読みの段が下していて、組み立ては piece の列を歩くだけになる。
 
 それでも書くのは、**この段だけ既存の試験がまるごと網になる**から。読みの判断を全部
 移し替えた直後に「木が 1 つも変わっていない」と言えるのは、ここしかない。
@@ -317,10 +355,11 @@ op → 記法構造の編集 → md → 読み直す → 木を比べる
 試験に書いてある。
 
 ```
-core/tree/corpus_wbtest.mbt     読みの見本 166 通り                段 1〜3
-test/fixtures                   7 本 523 KB                       段 1〜3
-core/op/law_wbtest.mbt          見本 × 全 id × 全 op 1,700 通り    段 4
-core/tree/merge_law_wbtest.mbt  見本 × 全ノード × 変え方           段 4
+core/tree/corpus_wbtest.mbt      読みの見本 166 通り                段 1〜3
+core/tree/notation_wbtest.mbt    記法構造の指紋・敷き詰め・木と同じ  段 1〜6
+test/fixtures                    7 本 523 KB                       段 1〜3
+core/op/law_wbtest.mbt           見本 × 全 id × 全 op 1,700 通り    段 4
+core/tree/merge_law_wbtest.mbt   見本 × 全ノード × 変え方           段 4
 ```
 
 ## 型が手放すもの
