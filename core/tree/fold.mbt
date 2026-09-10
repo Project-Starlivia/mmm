@@ -10,8 +10,9 @@
 // タグの入れ子は元々そろっていないので、そろっている前提を持たない）。
 
 ///|
-/// 積む前のひと切れ。
-priv enum Piece {
+/// 積む前のひと切れ。**記法構造の `Piece` とは別物** — こちらは畳みを解いた
+/// 積む順の並びで、原文を隙間なく覆う約束は持たない（落ちた綴りは出てこない）。
+priv enum Slice {
   /// 畳みに関わらない、素の塊
   Plain(@markdown.Block)
   /// 畳まれたノードの見出し・項目の行。中身は普通に読む。
@@ -322,7 +323,7 @@ fn capsule(
   tail : Int,
   from : Int,
   upto : Int,
-) -> Piece {
+) -> Slice {
   let open = spots[head].tag.mark is Open(open=true)
   let mut summary = None
   let mut inner = spots[head].tag.to
@@ -528,7 +529,7 @@ fn sift(
   blocks : Array[@markdown.Block],
   defs : Array[@markdown.Span],
   nest : Int,
-) -> Array[Piece] {
+) -> Array[Slice] {
   let spells = blocks.map(b => spell_of(md, b))
   let spots = found(spells)
   let pairs = paired(spots)
@@ -555,9 +556,9 @@ fn sift(
 }
 
 ///|
-/// 裁定。**どの対が畳みとして立つか**と**どの塊が綴りとして落ちるか**は
+/// 畳みが立つかの裁定。**どの対が畳みとして立つか**と**どの塊が綴りとして落ちるか**は
 /// 互いに依るので、1 つの答えとして一緒に決まる（`standing`）。
-priv struct Verdict {
+priv struct Stand {
   /// 対ごと。立つ対は畳みになる
   folded : Array[Bool]
   /// 塊ごと。落ちる塊は綴りなので、ひと切れにならない
@@ -569,7 +570,7 @@ priv struct Verdict {
 /// そこに居るのが綴りか中身かは畳みが立つかに依るので、たがいに要る。
 /// 全部落ちる側から始めて、落ちないものが出るたびにやり直す。
 /// 落ちる塊は減る一方なので必ず止まる。**深さの空打ち（`depths`）を呼ぶのはここだけ。**
-fn standing(s : Sift) -> Verdict {
+fn standing(s : Sift) -> Stand {
   let n = s.blocks.length()
   let gone = Array::makei(n, i => s.spells[i].writes)
   let mut folded = s.pairs.map(_ => false)
@@ -666,7 +667,7 @@ fn stands(s : Sift, depth : Array[Depth], gone : Array[Bool], p : Pair) -> Bool 
 ///|
 /// 立った対が印を付ける骨格の行 → その畳みと、`<details>` 〜 `</details>` の
 /// 原文の範囲。印の無い行は None。
-fn marks(s : Sift, v : Verdict) -> Array[(Fold, @markdown.Span)?] {
+fn marks(s : Sift, v : Stand) -> Array[(Fold, @markdown.Span)?] {
   let out : Array[(Fold, @markdown.Span)?] = Array::make(
     s.blocks.length(),
     None,
@@ -699,7 +700,7 @@ priv struct Raw {
 ///|
 /// 立たなかった対が原文のまま持つ領域 → 始まりの塊で引く。
 /// 同じ塊から複数の対が始まるときは、**一番外**を採る。
-fn raws(s : Sift, v : Verdict) -> Array[Raw?] {
+fn raws(s : Sift, v : Stand) -> Array[Raw?] {
   let out : Array[Raw?] = Array::make(s.blocks.length(), None)
   for k, p in s.pairs {
     if v.folded[k] {
@@ -732,10 +733,10 @@ fn raws(s : Sift, v : Verdict) -> Array[Raw?] {
 /// 読めなかった領域は原文のまま 1 枚にする。
 fn arrange(
   s : Sift,
-  v : Verdict,
+  v : Stand,
   folds : Array[(Fold, @markdown.Span)?],
   raws : Array[Raw?],
-) -> Array[Piece] {
+) -> Array[Slice] {
   let out = []
   let mut i = 0
   while i < s.blocks.length() {
@@ -769,7 +770,7 @@ fn arrange(
 ///|
 /// その塊が、立った畳みの閉じか。1 つの塊が閉じを何本も持つことはあるので、
 /// **どれか 1 本でも立った対の閉じなら**その塊で部分木が終わる。
-fn closing(s : Sift, v : Verdict, block : Int) -> Bool {
+fn closing(s : Sift, v : Stand, block : Int) -> Bool {
   for k, p in s.pairs {
     if v.folded[k] && s.spots[p.close].block == block {
       return true
@@ -786,7 +787,7 @@ fn closing(s : Sift, v : Verdict, block : Int) -> Bool {
 /// **同じ行を 2 度は出さない** — 原文のまま持つ領域は定義ごと抱えるし、mdAst は
 /// 定義行を段落や見出しの範囲に含めることがある（項目の中の定義は、項目を
 /// 読み解くときに置かれる）。どこまでの原文がもうひと切れの中に入ったかで見る。
-fn restore(s : Sift, pieces : Array[Piece]) -> Array[Piece] {
+fn restore(s : Sift, pieces : Array[Slice]) -> Array[Slice] {
   let out = []
   let mut d = 0
   let mut carried = 0
@@ -818,7 +819,7 @@ fn restore(s : Sift, pieces : Array[Piece]) -> Array[Piece] {
 ///|
 /// ひと切れが原文で占める範囲。畳みは**骨格の行**の範囲で数える
 /// （`<details>` の開きは落ちた綴りで、その手前の定義行は開きの塊が引き受けた）。
-fn piece_span(p : Piece) -> @markdown.Span {
+fn piece_span(p : Slice) -> @markdown.Span {
   match p {
     Plain(b) => block_span(b)
     Folded(b, ..) => block_span(b)

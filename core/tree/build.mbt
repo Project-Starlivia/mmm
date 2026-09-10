@@ -57,8 +57,8 @@ pub(all) struct Spot {
 /// 手で組む木に在り得ない欄が生える。
 pub fn build(md : String, ast : @markdown.Document) -> (Doc, Map[Int, Spot]) {
   let b = Build::new(md, ast.definitions.map(d => d.span))
-  for piece in sift(md, ast.children, b.defs, 0) {
-    lay(b, piece, 0)
+  for cut in sift(md, ast.children, b.defs, 0) {
+    lay(b, cut, 0)
   }
   // 行き先の見出し・項目が来ないまま終わった水平線は、その場の中身に落ちる
   spill(b)
@@ -254,8 +254,8 @@ fn depths(
 
 ///|
 /// ひと切れを積む。畳みは見出し・項目の行に印を付けるか、中身の 1 枚になる。
-fn lay(b : Build, piece : Piece, nest : Int) -> Unit {
-  match piece {
+fn lay(b : Build, cut : Slice, nest : Int) -> Unit {
+  match cut {
     Plain(block) => take(b, block, nest)
     Folded(block, fold~, at~) => {
       b.fold_at = Some(at)
