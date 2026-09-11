@@ -42,3 +42,4 @@ results.
 ## Credits
 
 Menu and toolbar icons are from [Lucide](https://lucide.dev) (ISC License).
+The GitHub mark is from [Octicons](https://primer.style/octicons) (MIT License).

@@ -40,7 +40,7 @@ fn Mindmap::ring(self : Mindmap, ids : Array[Int]) -> Unit {
 /// **針を押したら、指している 1 つを中心へ。倍率は変えない。**
 /// `Home` / 隅の十字（`center_on_target`）は選択ぜんぶの外接を寄せるので、
 /// 複数選んでいると 2 つの手で中心へ来るものが違う — 針は自分が指したものへ行く（#129）
-pub fn Mindmap::goto_pointed(self : Mindmap) -> Unit {
+fn Mindmap::goto_pointed(self : Mindmap) -> Unit {
   guard self.pointed is Some(r) else { return }
   self.set_camera(@map.center_on(self.camera, r, self.pane_size()))
 }
@@ -124,7 +124,7 @@ fn Mindmap::clear_drop_mark(self : Mindmap) -> Unit {
 }
 
 ///|
-/// ファイルのドラッグ中、その画面の点に落ちる先を予告する（app/dnd.ts）。
+/// ファイルのドラッグ中、その画面の点に落ちる先を予告する（app/disk/drop.mbt）。
 /// None は予告を消す合図。当たった先のノードの id（無ければ None）を返す —
 /// ドラッグ中はノードの部分木を弾く理由が無いので、落とし先の判定は使わず
 /// `node_at` だけで決める

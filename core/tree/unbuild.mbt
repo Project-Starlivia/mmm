@@ -38,7 +38,7 @@ pub fn unbuild(doc : Doc) -> @markdown.Document {
 ///|
 /// 部分木 1 つを mdAst にする（断片）。`depth` はその根の見出しの深さ、
 /// `sides` と `rules` は Doc の根のときだけ在る。
-pub fn unbuild_node(
+fn unbuild_node(
   x : Node,
   depth : Int,
   sides : Array[Side],
@@ -51,7 +51,7 @@ pub fn unbuild_node(
 
 ///|
 /// 散文（骨格を持たない中身の列）を mdAst にする。
-pub fn unbuild_prose(body : Array[Block]) -> @markdown.Document {
+fn unbuild_prose(body : Array[Block]) -> @markdown.Document {
   let out = []
   for b in body {
     content(out, b)

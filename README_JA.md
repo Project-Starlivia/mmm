@@ -41,3 +41,4 @@ mmm 自体も成果物も無保証で、動作や内容の正しさを保証し�
 ## クレジット
 
 メニューや帯の絵は [Lucide](https://lucide.dev)（ISC License）からいただきました。
+GitHub の印は [Octicons](https://primer.style/octicons)（MIT License）からいただきました。

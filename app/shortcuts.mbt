@@ -47,7 +47,7 @@ fn in_dialog(e : @core.Any) -> Bool {
 }
 
 ///|
-pub fn init_shortcuts(doc : @dom.Document, deps : Shortcuts) -> Unit {
+fn init_shortcuts(doc : @dom.Document, deps : Shortcuts) -> Unit {
   // capture で拾う。CodeMirror などが先に食べてしまう前に決める
   @web.on_window(
     doc,

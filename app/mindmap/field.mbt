@@ -51,7 +51,7 @@ pub struct LabelField {
 }
 
 ///|
-pub fn LabelField::new(
+fn LabelField::new(
   doc : @dom.Document,
   pane : @dom.HTMLElement,
   measure : @map.Measure,
@@ -116,7 +116,7 @@ pub fn LabelField::editing(self : LabelField) -> Int? {
 
 ///|
 /// 開く。カーソルは末尾（全選択しない）。seed があればそれが最初の字
-pub fn LabelField::open(
+fn LabelField::open(
   self : LabelField,
   id : Int,
   l : @map.Layout,
@@ -140,7 +140,7 @@ pub fn LabelField::open(
 ///|
 /// 箱に追従する。書くたびに箱が変わるので、描き直しの後に呼ぶ。
 /// 箱が消えていれば（畳まれて埋もれた）閉じる
-pub fn LabelField::place(
+fn LabelField::place(
   self : LabelField,
   l : @map.Layout,
   cam : @map.Camera,
@@ -160,7 +160,7 @@ pub fn LabelField::place(
 
 ///|
 /// 閉じる。書くものは無い（もう書いてある）。二重に閉じても何も起きない
-pub fn LabelField::close(self : LabelField) -> Unit {
+fn LabelField::close(self : LabelField) -> Unit {
   guard self.id is Some(_) else { return }
   // 変換中にフォーカスが抜けたなら、未確定ぶんを取りこぼさない
   // （keydown は isComposing で早期リターンするので、ここに来るのは blur だけ）
@@ -184,7 +184,7 @@ fn LabelField::write(self : LabelField) -> Unit {
 ///|
 /// その中身から起きたカードの矩形（world）。カードにならない中身と、
 /// 持ち主が畳まれた中身は None
-pub fn card_rect_of(l : @map.Layout, block : Int) -> @map.Rect? {
+fn card_rect_of(l : @map.Layout, block : Int) -> @map.Rect? {
   guard @map.owner_of(l, block) is Some((b, i)) else { return None }
   guard @map.card_rect(b, i) is Some(r) else { return None }
   Some({ x: b.x + r.x, y: b.y + r.y, w: r.w, h: r.h, })
@@ -208,7 +208,7 @@ pub struct CardField {
 }
 
 ///|
-pub fn CardField::new(
+fn CardField::new(
   doc : @dom.Document,
   pane : @dom.HTMLElement,
   measure : @map.Measure,
@@ -271,7 +271,7 @@ pub fn CardField::editing(self : CardField) -> Int? {
 
 ///|
 /// 開く。`from` / `to` は最初に選んでおく範囲（無ければ末尾にカーソル）
-pub fn CardField::open(
+fn CardField::open(
   self : CardField,
   id : Int,
   l : @map.Layout,
@@ -294,7 +294,7 @@ pub fn CardField::open(
 
 ///|
 /// カードに追従する。書くたび・視点を動かすたびに呼ぶ。持ち主が畳まれてカードが無ければ閉じる
-pub fn CardField::place(
+fn CardField::place(
   self : CardField,
   l : @map.Layout,
   cam : @map.Camera,
@@ -343,7 +343,7 @@ fn CardField::paint(self : CardField) -> Unit {
 
 ///|
 /// 閉じる。値が開いたときと違えば `commit` を 1 回。二重に閉じても何も起きない
-pub fn CardField::close(self : CardField) -> Unit {
+fn CardField::close(self : CardField) -> Unit {
   guard self.id is Some(id) else { return }
   let v = @web.value(self.textarea)
   self.id = None

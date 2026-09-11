@@ -1386,7 +1386,6 @@ test "apply の結果は check を通る（境界は md が決めるので除く
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  // 512 → 543: 境界を断らなくなった分、→ 563: 文書へ中身を断らなくなった分
   inspect(some, content="563")
   json_inspect(bad, content=[])
 }

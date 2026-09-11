@@ -1,13 +1,9 @@
 // マップの DOM を差分で更新する層。**何を描くかは決めない** — レイアウトを
 // 受け取って、SVG をそれに合わせるだけ。
 //
-// 毎レンダで全消しして作り直していた頃は、1 打鍵ごとに数万個の SVG 要素を
-// 生成・破棄していて、それが入力遅延の実体だった。**DOM を触るのは値が変わった
-// ときだけ**にする — 要素の生成と破棄はもちろん、属性の書きもクラスの付け外しも。
-//
-// 「毎回書き換えても安い」は 5,000 ノードでは成り立たない（#64 で実測）。属性は
-// 前の値を控えて突き合わせていたが、クラスは 3 つとも毎回 toggle していて、
-// 打鍵 1 回で 15,000 回 DOM を触っていた。
+// **DOM を触るのは値が変わったときだけ** — 要素の生成と破棄はもちろん、属性の
+// 書きもクラスの付け外しも。「毎回書き換えても安い」は 5,000 ノードでは
+// 成り立たない（#64 で実測）。
 //
 // 差分の鍵は id。**id は文書順の位置**なので、上に 1 つ足せば以降が作り直される
 // だけで、正しさは壊れない（docs/core.md「id は読みのサイクルを越えて持たない」）。
@@ -67,8 +63,7 @@ pub struct Renderer {
   edge_els : Map[Int, @dom.Element]
   shapes : Map[Int, Shape]
   marks : Map[Int, Marks]
-  // 直前に書いた位置。同じ値の setAttribute はスタイル無効化を起こすだけ無駄
-  // （プロファイル上いちばん重い JS 呼び出しだった）。
+  // 直前に書いた位置。同じ値の setAttribute はスタイル無効化を起こすだけ無駄。
   //
   // **控えるのは字ではなく数。** 字で控えると、書かないと決めるためだけに
   // 打鍵ごとに全ノードぶんの数を整形して繋ぐことになる（エッジの d は
@@ -82,7 +77,7 @@ pub struct Renderer {
 }
 
 ///|
-pub fn Renderer::new(doc : @dom.Document) -> Renderer {
+fn Renderer::new(doc : @dom.Document) -> Renderer {
   {
     doc,
     edge_layer: @web.el(doc, "g", []),
@@ -100,12 +95,12 @@ pub fn Renderer::new(doc : @dom.Document) -> Renderer {
 
 ///|
 /// id を指定して要素を引く（書き出しに写す・印を付けるため）
-pub fn Renderer::node_el(self : Renderer, id : Int) -> @dom.Element? {
+fn Renderer::node_el(self : Renderer, id : Int) -> @dom.Element? {
   self.node_els.get(id)
 }
 
 ///|
-pub fn Renderer::edge_el(self : Renderer, id : Int) -> @dom.Element? {
+fn Renderer::edge_el(self : Renderer, id : Int) -> @dom.Element? {
   self.edge_els.get(id)
 }
 
@@ -113,7 +108,7 @@ pub fn Renderer::edge_el(self : Renderer, id : Int) -> @dom.Element? {
 /// 選ばれた箱に印を付ける。レイアウトを見直さない軽い塗り替え。
 /// 触るのは前回と変わった箱だけ — 矩形選択は pointermove ごとに来るので、
 /// 全箱を toggle すると 5000 ノードで 1 回に 5000 回 DOM を触る
-pub fn Renderer::paint(self : Renderer, sel : Array[Int]) -> Unit {
+fn Renderer::paint(self : Renderer, sel : Array[Int]) -> Unit {
   let next = Set::from_array(sel)
   for id in self.selected {
     if !next.contains(id) {
@@ -164,7 +159,7 @@ fn shape_of(b : @map.Box, scene : Scene) -> Shape {
 
 ///|
 /// 場面を DOM に写す。文書順（= 重なり順）も合わせる
-pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
+fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
   let doc = self.doc
   let l = scene.layout
   let seen : Set[Int] = Set([])

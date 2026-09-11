@@ -1,6 +1,6 @@
 // core の出口と入口。**形を整えるだけ** — 意味は 1 つも足さない。
 //
-// アプリは core が組む（core/main）。ts に残るのは CodeMirror（md ペイン）で、その
+// アプリは core が組む（app/app.mbt）。ts に残るのは CodeMirror（md ペイン）で、その
 // 読み書きを `Editor` の閉包で渡す。それ以外にここへ来るのは、EditorState の field
 // （state.ts）が読む問い合わせと、見本（lab）が置く部品だけ。
 //
@@ -154,7 +154,7 @@ export const ranges = (s: Survey, c: Choice): Range[] => {
 
 // ---- アプリ ----
 //
-// 束ねる場所は core/main。ts は CodeMirror の読み書きを閉包で渡し、1 トランザクションごとに
+// 束ねる場所は app/app.mbt。ts は CodeMirror の読み書きを閉包で渡し、1 トランザクションごとに
 // `cycle` を呼ぶ。編集列は `{ from, to, insert }` の並びで来る（CodeMirror の changes と同じ形）
 
 /** 編集 1 つ。from..to を insert に置き換える */
@@ -315,7 +315,7 @@ export const mapEditCard = (m: MapHandle, id: number): void => mbt.mmmMapEditCar
 export const contextMenu = (l: Layout, sel: Selection): HTMLDivElement =>
   div(mbt.mmmContextMenu(l, sel.ids, sel.anchor ?? undefined));
 
-/** 絵の名（Lucide の綴り）。表は core/parts/icons.mbt */
+/** 絵の名（Lucide の綴り）。表は app/parts/icons.mbt */
 export type IconName = string;
 
 /** その名前の絵。線で引き、色は currentColor */
@@ -324,7 +324,7 @@ export const icon = (name: IconName): SVGSVGElement => svgSvg(mbt.mmmIcon(name))
 /** 絵の名前の全部 */
 export const iconNames = (): IconName[] => [...mbt.mmmIconNames()];
 
-/** しらせの言葉。表は core/parts/notice.mbt */
+/** しらせの言葉。表は app/parts/notice.mbt */
 export type Failed = string;
 export type Blocked = string;
 

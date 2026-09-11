@@ -54,7 +54,7 @@ priv struct Lay {
 
 ///|
 /// これから座る枠の側と、その手前で側を変えた水平線の原文。
-/// **側を持つのは深さ 2 の枠だけ**（根の子）。`born` と同じ規則
+/// **側を持つのは深さ 2 の枠だけ**（根の子）。deem.mbt の `border` と同じ規則
 fn Lay::born(self : Lay) -> (Side, String) {
   guard self.stack.length() == 1 else { return (Right, "") }
   guard self.rule != "" else { return (self.side, "") }
@@ -65,7 +65,7 @@ fn Lay::born(self : Lay) -> (Side, String) {
 }
 
 ///|
-/// 積んである親の子にし、次の子の親にする。`seat` と同じ規則
+/// 積んである親の子にし、次の子の親にする。deem.mbt の `seat` と同じ規則
 fn Lay::seat(self : Lay, f : Frame) -> Unit {
   if self.stack.is_empty() {
     self.roots.push(f)
@@ -74,8 +74,6 @@ fn Lay::seat(self : Lay, f : Frame) -> Unit {
   }
   self.stack.push(f)
 }
-
-///|
 
 ///|
 fn flipped(s : Side) -> Side {

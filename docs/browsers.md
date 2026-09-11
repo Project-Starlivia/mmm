@@ -13,10 +13,10 @@ mmm は「**Chromium 系でしか動かない**と言い切る」と決めてい
 | OPFS | オリジン専用の実ファイルシステム。`navigator.storage.getDirectory()` が根を返す | WHATWG File System | **ある** |
 | ピッカー | `showOpenFilePicker` / `showSaveFilePicker` / `showDirectoryPicker` / `DataTransferItem.getAsFileSystemHandle` | WICG File System Access | **無い** |
 
-**欠けているのは入口だけで、扉の向こうの道具立ては同じ。** `io.ts` の `readDoc` /
-`write` も、`assets.ts` のパス解決（`getDirectoryHandle` → `getFileHandle` の連鎖）も、
+**欠けているのは入口だけで、扉の向こうの道具立ては同じ。** `disk.mbt` の読み書きも、
+`images.mbt` のパス解決（`getDirectoryHandle` → `getFileHandle` の連鎖）も、
 **ハンドルの出所を問わない**。実際 `.md` のドロップは既に、ピッカーではなく
-`getAsFileSystemHandle()` から来たハンドルを同じ `io.openHandle` へ流している。
+`getAsFileSystemHandle()` から来たハンドルを同じ `open_handle` へ流している。
 入口が 2 つあることは、下流にとって最初から見えていない。
 
 ## 分断線は「Chromium かどうか」。デスクトップ / モバイルではない
@@ -98,7 +98,7 @@ title で言う（`src/main.ts` の帯）。(b′) の枝ではなく、部品�
 ### OPFS は「動く道は 1 本」の懸念のどちらを解消し、どちらを悪化させるか
 
 - **「画像が死ぬ」→ 解消。** `.md` と画像が同じ木に並ぶので相対パスが生き、
-  `assets.ts` の構造がそのまま乗る
+  `images.mbt` の構造がそのまま乗る
 - **「実体はただの `.md` が壊れる」→ 悪化。** ダウンロード方式なら、ユーザーは
   「ダウンロードした」と自覚できる。OPFS だとアプリは「保存しました」と言い、
   帯に名前が出て、ファイルは**本物**で、しかし見つけられず、ブラウザに消され得る。

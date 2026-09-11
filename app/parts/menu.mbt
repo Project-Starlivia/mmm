@@ -147,7 +147,7 @@ fn note_box(doc : @dom.Document, texts : Array[String]) -> @dom.Element {
 /// `.menu` の器に行を並べる。**中身だけ** — どこに出すか・いつ閉じるかは
 /// 持たない。返るのは、入れ子を持つ行の「開く」動作（ArrowRight とホバーの
 /// 両方がこれを引く。2 つの入口が同じ判断をばらばらに持たない）
-pub fn fill(
+fn fill(
   el : @dom.Element,
   items : Array[Entry],
   ways : Ways,
@@ -253,8 +253,8 @@ pub fn fill(
       }
     })
     @web.listen(row, "click", _ => {
-      // **押せなさは、ここが持つ。** CSS の `pointer-events: none` で
-      // 止めていた頃は、同じ指定が hover まで殺していて理由が読めなかった
+      // **押せなさは、ここが持つ。** CSS の `pointer-events: none` だと
+      // hover まで死んで、理由が読めない
       if off {
         return
       }
@@ -376,7 +376,7 @@ pub fn Menu::new(doc : @dom.Document) -> Menu {
 /// 開いた直後に呼ぶ。**先頭の行へ焦点を移す。** トップレベルなら、閉じた
 /// ときに戻る先（そのとき焦点があった要素）もここで覚える — 呼ぶ側に
 /// 「開ける前の焦点を覚えておいて」と言わせない
-pub fn Menu::focus_first(self : Menu, on_row : Bool) -> Unit {
+fn Menu::focus_first(self : Menu, on_row : Bool) -> Unit {
   if self.parent is None {
     self.opener = @core.identity_option(self.doc.activeElement().as_any())
   }
@@ -541,7 +541,7 @@ fn Menu::draw(self : Menu) -> Unit {
 /// **開いたまま、いまの状態から並びを引き直す。** 行は作り直されるので、
 /// 焦点は同じ位置の行へ戻す — キーで辿っている途中に切り替えても、
 /// 手が置いてある場所は動かない
-pub fn Menu::respell(self : Menu) -> Unit {
+fn Menu::respell(self : Menu) -> Unit {
   let at = self.row_index()
   self.draw()
   guard at >= 0 else { return }
@@ -581,7 +581,7 @@ pub fn Menu::is_open(self : Menu) -> Bool {
 /// メニューの中で起きた出来事か（外を押したときだけ閉じるため）。
 /// **子メニューの中も自分の中**として数える — そうしないと、子を押した
 /// 瞬間に親が閉じ、閉じるついでに子まで畳まれて選べない
-pub fn Menu::contains(self : Menu, target : @core.Any) -> Bool {
+fn Menu::contains(self : Menu, target : @core.Any) -> Bool {
   let node : @dom.Node? = @core.identity_option(target)
   if self.el.contains(node) {
     return true
@@ -594,7 +594,7 @@ pub fn Menu::contains(self : Menu, target : @core.Any) -> Bool {
 
 ///|
 /// 親の行の右隣へ子を開く。器は使い回す（開くたびに作らない）
-pub fn Menu::open_sub(
+fn Menu::open_sub(
   self : Menu,
   row : @dom.Element,
   items : Array[Entry],
@@ -625,12 +625,12 @@ pub fn Menu::open_sub(
 /// いちばん上まで辿って閉じる。子から選んだら親も畳む。
 /// `restore_focus` は `hide` と同じ意味 — 選んで閉じるときは戻す
 /// （キー操作でも選んだ後は呼んだ場所へ）
-pub fn Menu::close(self : Menu, restore_focus : Bool) -> Unit {
+fn Menu::close(self : Menu, restore_focus : Bool) -> Unit {
   self.top().hide(restore_focus)
 }
 
 ///|
-pub fn Menu::close_sub(self : Menu) -> Unit {
+fn Menu::close_sub(self : Menu) -> Unit {
   match self.sub {
     Some(s) => {
       match s.opener_row {

@@ -19,13 +19,11 @@
 // 居なくなるから。旧 core はそれで往復を壊していた（字下げ行を段落と読み、
 // 書き戻すと見出しが生える）。
 //
-// 払った値段は **配布物で gzip +31KB**（591KB → 622KB。vite の dist で実測）。
-// 上流に parser だけを取る道は無く、MoonBit にパッケージ単位の DCE も無い。
-// 生の出力では +49KB だが、到達しないコードは rollup が落とす。
+// 値段は配布物で gzip +31KB（上流に parser だけを取る道は無い）。
 
 ///|
 /// md → 方言の mdAst。
-pub fn read(md : String) -> @markdown.Document {
+fn read(md : String) -> @markdown.Document {
   stretch(md, @markdown.parse(md).document)
 }
 
@@ -425,7 +423,7 @@ pub fn serialize(doc : Doc) -> String {
 
 ///|
 /// 部分木 1 つ → 正規形の md（断片）。合流が dirty の地番に差す。
-pub fn fragment(
+fn fragment(
   x : Node,
   depth : Int,
   sides : Array[Side],
@@ -436,7 +434,7 @@ pub fn fragment(
 
 ///|
 /// 散文 → 正規形の md。文書の頭（最初の骨格より前）の断片。
-pub fn prose(body : Array[Block]) -> String {
+fn prose(body : Array[Block]) -> String {
   write(unbuild_prose(body))
 }
 

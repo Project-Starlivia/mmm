@@ -24,7 +24,7 @@ pub fn hex_of(value : String) -> String? {
 /// いまのアクセントカラー。**綴りの源は style.css の `--accent` だけ**で、
 /// ここは読むだけ（既定色を他にも書くと、同じ数字が 2 か所になる）。
 /// 読んだ値は名乗らせず確かめる — 6 桁の hex でなければ None。
-/// 筆にする側（ts の app/draw.ts）も同じ 1 つを読む
+/// 筆にする側（draw.mbt）も同じ 1 つを読む
 pub fn accent(doc : @dom.Document) -> String? {
   hex_of(@web.css_var(doc, "--accent"))
 }

@@ -5,7 +5,7 @@
 // きた言語だけ**が後から読み込まれる — 最初のバンドルには入らない。
 //
 // 読み込みは非同期なので、初回は色の付かない状態で出し、読み終わったら
-// 描き直す。画像の読み込み（app/assets.ts）と同じ手口。
+// 描き直す。画像の読み込み（app/disk/images.mbt）と同じ手口。
 
 import { classHighlighter, highlightCode } from "@lezer/highlight";
 import { LanguageDescription, type Language } from "@codemirror/language";
@@ -101,7 +101,7 @@ export function tokenize(lines: string[], info: string): Token[][] {
  * 開きフェンスの行を読む。**対象は文書ではなく入力欄の中身**（コードカードを
  * その場で直しているときのバッファ）なので、コアには聞けない — 打っている
  * 途中の断片であって、まだ文書ではないため。規則だけはコア
- * （core/parser.mbt の fence_open）と同じにしてある: 行頭の空白は 3 つまで、
+ * の読み（mizchi/markdown のフェンス）と同じにしてある: 行頭の空白は 3 つまで、
  * フェンスは 3 本以上、バッククォートなら情報文字列にバッククォートを含めない。
  */
 function fenceOpen(line: string): { marker: string; info: string } | null {

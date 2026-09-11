@@ -43,7 +43,7 @@ pub(all) struct Host {
   tokens_block : (String) -> Array[Array[Token]]
   /// 言語の読み込みの世代。変われば描き直す
   epoch : () -> Int
-  /// しらせ（app/notice.ts の言葉）
+  /// しらせ（app/parts/notice.mbt の言葉）
   failed : (String) -> Unit
   /// ペインから帯へ抜ける（Escape）。Tab は子を足すのに使うので、キーボードだけで
   /// 帯やブラウザへ戻る道はこれ 1 つ

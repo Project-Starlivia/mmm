@@ -212,10 +212,6 @@ pub extern "js" fn revoke_url(url : String) -> Unit =
   #| (url) => URL.revokeObjectURL(url)
 
 ///|
-pub extern "js" fn blob_type(blob : @core.Any) -> String =
-  #| (blob) => blob.type
-
-///|
 /// 絵を webp に（もう webp ならそのまま）
 pub extern "js" fn to_webp(blob : @core.Any) -> @js_async.Promise[@core.Any] =
   #| async (blob) => {

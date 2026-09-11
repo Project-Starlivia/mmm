@@ -118,7 +118,7 @@ pub fn items_of(
 
 ///|
 /// 「何をするか」を実行する。意味は map/keys.mbt と map/context.mbt が持ち、ここは配線だけ
-pub fn Mindmap::act(self : Mindmap, intent : @map.Intent) -> Unit {
+fn Mindmap::act(self : Mindmap, intent : @map.Intent) -> Unit {
   match intent {
     Op(op~, edit~) => (self.host.apply)(op, edit) |> ignore
     Edit(id~, seed~) => self.begin_edit(id, seed) |> ignore

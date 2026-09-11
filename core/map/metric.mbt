@@ -5,7 +5,7 @@
 // ノードの「ラベル行」の寸法は、少なくとも 3 者が同じ値で見なければならない:
 //   1. レイアウト（node_size が箱の大きさを決める）
 //   2. SVG の描画（text 要素の font-size と x）
-//   3. 編集用の <input> オーバーレイ（ts の label.ts。出口の mmmMetrics で受ける）
+//   3. 編集用の <input> オーバーレイ（app/mindmap/field.mbt。寸法は place.mbt が数える）
 // 以前はこれが 3 箇所に散っていて、通常ノードは 13px/12、畳んだノードは
 // 計測 10px・CSS 11px・input 13px と食い違い、折り畳んだノードを編集すると
 // 文字がずれていた。font-size は CSS ではなく属性で入れて、CSS 側に同じ数字を持たせない。
@@ -45,7 +45,7 @@ pub let normal : Row = { px: 13, pad: 12, h: 30, }
 ///|
 /// 通常ノードの余白比（pad/字 = 0.92、行高/字 = 2.31）に寄せてある。
 /// 小さく見せたいからと詰めすぎると、+N バッジが窮屈になって読めない
-pub let hidden : Row = { px: 11, pad: 9, h: 24, }
+let hidden : Row = { px: 11, pad: 9, h: 24, }
 
 ///|
 /// 隙間。x は親子の間、y は兄弟の間、root は木と木の間
@@ -56,11 +56,11 @@ pub(all) struct Gap {
 } derive(Eq, Debug, ToJson)
 
 ///|
-pub let gap : Gap = { x: 45, y: 10, root: 34, }
+let gap : Gap = { x: 45, y: 10, root: 34, }
 
 ///|
 /// 畳んだノードはこれより広くならない
-pub let hidden_max_w = 150.0
+let hidden_max_w = 150.0
 
 // ---- カード行の寸法 ----
 
@@ -78,7 +78,7 @@ let img_row : Double = img_h + 12.0
 
 ///|
 /// 画像 / svg の中身はこれより狭くならない（余白抜き）
-pub let img_min_w = 200.0
+let img_min_w = 200.0
 
 ///|
 /// コードのプレビュー 1 行の高さ
@@ -106,11 +106,11 @@ pub let details_name = "Details"
 
 ///|
 /// ラベルが空のときに表示するプレースホルダ。表示箇所すべてがこれ 1 つを見る
-pub let empty_label = "(empty)"
+let empty_label = "(empty)"
 
 ///|
 /// カード 1 枚ぶんの高さ
-pub fn row_h(c : Kind) -> Double {
+fn row_h(c : Kind) -> Double {
   match c {
     Image(..) | Svg(..) => img_row
     Code(lines~, ..) => lines.length().to_double() * code_line + code_pad * 2.0
@@ -129,7 +129,7 @@ pub fn row_h(c : Kind) -> Double {
 ///|
 /// カード 1 枚の、行の枠から中身までの上下の余白。描くのも書き出すのも
 /// 同じ場所を指さないと 2px ずれる — 実際にずれた。数字を 2 か所に置かないための唯一の定義
-pub fn card_inset(c : Kind) -> Double {
+fn card_inset(c : Kind) -> Double {
   match c {
     Code(..) => 5
     Link(..) | Details(..) => 4
@@ -141,7 +141,7 @@ pub fn card_inset(c : Kind) -> Double {
 ///|
 /// カード 1 枚が、中身の箱から左右へはみ出す量。コードだけは背景をノードの
 /// 縁近くまで塗るので、その分だけ広い
-pub fn card_bleed(c : Kind) -> Double {
+fn card_bleed(c : Kind) -> Double {
   match c {
     Code(..) => 5
     _ => 0
@@ -155,10 +155,10 @@ pub fn label_font(row : Row) -> Font {
 }
 
 ///|
-pub let card_font : Font = { px: 12, mono: false, }
+let card_font : Font = { px: 12, mono: false, }
 
 ///|
-pub let mono_font : Font = { px: 11, mono: true, }
+let mono_font : Font = { px: 11, mono: true, }
 
 ///|
 /// 畳んだノードに出す字。**`<summary>` > ラベル**（spec「畳み」の表示名の規則。
@@ -182,10 +182,10 @@ pub fn closed(n : @tree.Node) -> Bool {
 
 ///|
 /// 畳みの印。閉じていれば ▷、開いていれば ▽（名前の前に付く）
-pub let fold_mark_closed = "▷ "
+let fold_mark_closed = "▷ "
 
 ///|
-pub let fold_mark_open = "▽ "
+let fold_mark_open = "▽ "
 
 ///|
 /// 開いた畳みの字。印 + 名前（summary）
@@ -216,7 +216,7 @@ pub fn display_label(label : String) -> String {
 /// **通常のノードは詰めない** — 使うのは折り畳み表示だけ（そこは「小さく畳む」
 /// ことが目的なので、長いラベルをそのまま出すと意味が無くなる）。
 /// 切り口が上位サロゲートなら 1 つ戻して、ペアを割らない
-pub fn clip_label(
+fn clip_label(
   label : String,
   font : Font,
   max_w : Double,
@@ -244,7 +244,7 @@ pub fn clip_label(
 
 ///|
 /// 折り畳んだ子孫の数を示すバッジ（無ければ空）
-pub fn collapsed_badge(buried : Int) -> String {
+fn collapsed_badge(buried : Int) -> String {
   if buried > 0 {
     "  +\{buried}"
   } else {

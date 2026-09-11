@@ -110,7 +110,7 @@ async fn raster(svg : @dom.Element, mime : String) -> @core.Any {
 ///
 /// SVG のコピーは `text/plain` にも同じものを載せる — Figma や Illustrator は
 /// 画像として受け取るより、SVG のソースを貼られたほうが確実に開く
-pub let ways : Array[Way] = [
+let ways : Array[Way] = [
   {
     id: "svg-file",
     short: "SVG",
@@ -158,7 +158,7 @@ pub let ways : Array[Way] = [
 
 ///|
 /// 覚えていた出し方。知らない値なら既定へ落とす
-pub fn way_of(saved : String?) -> Way {
+fn way_of(saved : String?) -> Way {
   match saved {
     Some(id) =>
       match ways.search_by(w => w.id == id) {
@@ -173,7 +173,7 @@ pub fn way_of(saved : String?) -> Way {
 /// そのやり方で 1 回出す。**出せたかを返す** — 済んだらヘッダーのボタンが
 /// チェックで答えるので、答えてよいかを呼ぶ側が知る必要がある。
 /// しくじりはここがしらせに出し、投げない（呼ぶ側に try を書かせない）
-pub async fn run(deps : ExportDeps, way : Way) -> Bool {
+async fn run(deps : ExportDeps, way : Way) -> Bool {
   (async fn() -> Bool {
     guard (deps.svg)() is Some(svg) else {
       // ボタンは沈めてあるので、ここへ来るのはキー（`Mod+E`）から。

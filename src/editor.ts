@@ -67,7 +67,7 @@ export class MdEditor {
 
   constructor(parent: HTMLElement, onUpdate: (state: EditorState, prev: EditorState | null) => void) {
     this.onUpdate = onUpdate;
-    // 空のときの言い出し。**マップと同じ器**（core/parts/hint.mbt）を、同じように
+    // 空のときの言い出し。**マップと同じ器**（app/parts/hint.mbt）を、同じように
     // ペインの真ん中へ浮かべる — CodeMirror の `placeholder` は 1 行目の
     // 頭に出るので、対のもう片方（マップの中央）と上下も寄せも揃わない。
     // 見えるのはこちらで、読み上げには下の `aria-placeholder` が答える

@@ -486,7 +486,7 @@ fn Mindmap::bind_context_menu(self : Mindmap) -> Unit {
 }
 
 ///|
-/// 地図の中だけで効くキー。全体のキーは app/shortcuts.ts
+/// 地図の中だけで効くキー。全体のキーは app/shortcuts.mbt
 fn Mindmap::bind_keys(self : Mindmap) -> Unit {
   let pane = self.pane.as_element()
   @web.listen(pane, "keydown", e => {

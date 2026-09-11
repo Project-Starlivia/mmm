@@ -44,7 +44,7 @@ pub(all) struct Ask {
 }
 
 ///|
-pub fn ask_of(
+fn ask_of(
   title : String,
   ok : String,
   note? : String? = None,
@@ -181,7 +181,7 @@ pub fn ask_form(
 ///
 /// 続きに渡るのは `<dialog>` の `returnValue` 由来: 進んだときだけ `"ok"`。
 /// Escape・背景・Cancel はすべて空文字（＝ 断り）に落ちる
-pub fn ask(doc : @dom.Document, a : Ask, k : (Array[String]?) -> Unit) -> Unit {
+fn ask(doc : @dom.Document, a : Ask, k : (Array[String]?) -> Unit) -> Unit {
   let dlg = doc.createElement("dialog")
   dlg.setAttribute("class", "ask")
   let (form, values) = ask_form(doc, a, () => @web.close_dialog(dlg))

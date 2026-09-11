@@ -542,11 +542,11 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
 - **web/** — DOM の小さな道具。js_browser に型の無い呼び出しを 1 行ずつ包み、他の package は
   `_get` / `_call` を書かない。結び付けの無い API（File System Access・IndexedDB・canvas の 2d・
   直列化・ラスタ化・クリップボード・ドラッグ）は `extern "js"` の 1 行で、Promise は js_async の型
-- **app/** — 帯と枠。持ち物（`persist.mbt`。localStorage の綴りはここだけで、外は名前で言う）、
+- **app/** — 帯と枠。持ち物（`prefs/prefs.mbt`。localStorage の綴りはここだけで、外は名前で言う）、
   ペインの出し分けと分割線（`panes.mbt`。居場所の算術は純粋で、試験は数だけ）、全体のキー、
-  テーマとアクセントカラーと favicon（`theme.mbt` / `logo.mbt`。ロゴの形の源はここ 1 つで、
+  テーマとアクセントカラーと favicon（`bar/theme.mbt`。ロゴの形の源はここ 1 つで、
   ビルド時の favicon も同じ関数から）、たずね（`ask.mbt` の器と `asks.mbt` の綴り）、
-  リンク（`share.mbt`。gzip → base64url。非同期は `moonbitlang/async/js_async` の Promise で出す —
+  リンク（`link.mbt`。gzip → base64url。非同期は `moonbitlang/async/js_async` の Promise で出す —
   作法は 2026-09-07-mbt-practice.md）、書き出し（`export.mbt`。出し方 4 通りの表と、ヘッダのボタンの
   言い分・頷き。出す口は web/ の 1 行）、お絵描き（`draw.mbt`。紙は手の並びの写像 `Sheet` で、
   載せ先 `Paint` は canvas の 2d か試験の記録）、帯の並び（`files.mbt` / `more.mbt`。純粋な表 —

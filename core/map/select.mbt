@@ -122,7 +122,7 @@ fn grown(b : Rect, pad : Double) -> Rect {
 ///|
 /// 箱 1 つの当たりの範囲（near, far）。`near` は pad の分、`far` はそれに端の伸びを
 /// 足したもの（near ⊆ far）
-pub fn reach_of(b : Box, r : Reach, parents : Set[Int]) -> (Rect, Rect) {
+fn reach_of(b : Box, r : Reach, parents : Set[Int]) -> (Rect, Rect) {
   let near = grown(b.rect(), r.pad)
   let out = if b.parent is Some(_) && !parents.contains(b.node.id) {
     r.edge
@@ -179,7 +179,7 @@ pub fn hit(l : Layout, x : Double, y : Double, reach : Reach) -> Int? {
 }
 
 ///|
-pub fn all(l : Layout) -> Selection {
+fn all(l : Layout) -> Selection {
   { ids: sorted(l.order), anchor: last(l.order), }
 }
 
@@ -193,7 +193,7 @@ pub(all) enum Arrow {
 
 ///|
 /// キーの名（`e.key`）が矢印なら
-pub fn arrow_of(key : String) -> Arrow? {
+fn arrow_of(key : String) -> Arrow? {
   match key {
     "ArrowUp" => Some(Up)
     "ArrowDown" => Some(Down)
@@ -222,7 +222,7 @@ fn depth_of(l : Layout, id : Int) -> Int {
 /// - 上下 … **同じ深さの列**を文書順に辿り、端でループする。兄弟に限らずいとこも含む
 /// - 左右 … **画面の向き**で読む。根と右の枝は ← が親・→ が子、左の枝は鏡像。
 ///   子が無ければ先頭へ回る（行き止まりで無反応になるより一周できるほうが迷わない）
-pub fn arrow(l : Layout, anchor : Int?, key : Arrow) -> Int? {
+fn arrow(l : Layout, anchor : Int?, key : Arrow) -> Int? {
   let order = l.order
   guard order.length() > 0 else { return None }
   guard anchor is Some(anchor) else { return Some(order[0]) }
@@ -259,7 +259,7 @@ pub fn arrow(l : Layout, anchor : Int?, key : Arrow) -> Int? {
 
 ///|
 /// Shift+矢印。行き先を足す。行き先が既に選ばれていれば、いま居た側を外して縮める
-pub fn extend_to(sel : Selection, next : Int) -> Selection {
+fn extend_to(sel : Selection, next : Int) -> Selection {
   // arrow は深さが 1 つしか無い列や、子の無いノードから回った先で anchor
   // 自身を返すことがある。そのまま外すと anchor が選択から消えてしまう
   guard sel.anchor != Some(next) else { return sel }
@@ -271,7 +271,7 @@ pub fn extend_to(sel : Selection, next : Int) -> Selection {
 
 ///|
 /// 親の id。根なら None
-pub fn parent_of(l : Layout, id : Int) -> Int? {
+fn parent_of(l : Layout, id : Int) -> Int? {
   match l.boxes.get(id) {
     Some(b) => b.parent.map(p => p.id)
     None => None
@@ -286,7 +286,7 @@ fn siblings_of(l : Layout, id : Int) -> Array[Int] {
 }
 
 ///|
-pub fn prev_sibling(l : Layout, id : Int) -> Int? {
+fn prev_sibling(l : Layout, id : Int) -> Int? {
   let s = siblings_of(l, id)
   match s.search(id) {
     Some(i) => if i > 0 { Some(s[i - 1]) } else { None }
@@ -295,7 +295,7 @@ pub fn prev_sibling(l : Layout, id : Int) -> Int? {
 }
 
 ///|
-pub fn next_sibling(l : Layout, id : Int) -> Int? {
+fn next_sibling(l : Layout, id : Int) -> Int? {
   let s = siblings_of(l, id)
   match s.search(id) {
     Some(i) => if i < s.length() - 1 { Some(s[i + 1]) } else { None }
@@ -305,7 +305,7 @@ pub fn next_sibling(l : Layout, id : Int) -> Int? {
 
 ///|
 /// ちょうど 1 つ選んでいる id。宛先が 1 つに決まる操作はこれを見る
-pub fn solo(sel : Selection) -> Int? {
+fn solo(sel : Selection) -> Int? {
   if sel.ids.length() == 1 {
     sel.anchor
   } else {

@@ -8,7 +8,7 @@
 // 宣言が無い文書は `./`（md と同じ場所）として読み書きする。**宣言を決める /
 // 直すのもここ**（`settle`）— ただし道具は宣言を黙って書き換えない。書くのは
 // 計算できたとき（`resolve`）と、人が箱で確定したときだけ。書き込みそのものは
-// md への操作なので `deps.declare` に渡す（ts の main.ts）。
+// md への操作なので `deps.set_declared` に渡す（App の `set_declared`）。
 
 ///|
 /// 読みに行ってよい絵の種類。**綴りはここ 1 つ**で、種類の判定も
@@ -27,7 +27,7 @@ let image_types : Array[(String, String)] = [
 
 ///|
 /// その名前が指す絵の種類。絵でなければ None
-pub fn image_type(name : String) -> String? {
+fn image_type(name : String) -> String? {
   guard name.rev_find(".") is Some(dot) && dot > 0 else { return None }
   let ext = String::unsafe_substring(name, start=dot + 1, end=name.length()).to_lower()
   for t in image_types {
@@ -44,7 +44,7 @@ pub fn image_type(name : String) -> String? {
 ///
 /// 「その綴りは宣言の下か」の判定は read の `under` が唯一の持ち主。
 /// ここが足すのは、**フォルダの中として受け取ってよいか**の柵だけ
-pub fn asset_target(declared : String, path : String) -> Array[String]? {
+fn asset_target(declared : String, path : String) -> Array[String]? {
   guard @read.under(path, declared) is Some(rest) else { return None }
   let parts = rest
     .split("/")
@@ -66,7 +66,7 @@ pub fn asset_target(declared : String, path : String) -> Array[String]? {
 
 ///|
 /// md に書く形。`./` を付ける。上へ出る道はそのまま
-pub fn md_path(rel : String) -> String {
+fn md_path(rel : String) -> String {
   if rel.has_prefix("../") {
     rel
   } else {
@@ -111,7 +111,7 @@ pub fn folder_problem(typed : String, dir_name : String?) -> String? {
 /// 選んだフォルダから md までの断片を、md から見たフォルダの相対に読み替える。
 /// `resolve` が返すのは「フォルダ → md」なので、**末尾のファイル名を除いた数**だけ
 /// 上へ戻る（`["notes","a.md"]` なら md は 1 段深いところに居るので `../`）
-pub fn folder_from_doc(segments : Array[String]) -> String {
+fn folder_from_doc(segments : Array[String]) -> String {
   let up = @cmp.maximum(0, segments.length() - 1)
   if up == 0 {
     "./"
@@ -128,7 +128,7 @@ pub fn folder_from_doc(segments : Array[String]) -> String {
 
 ///|
 /// 名前をフォルダの断片に割る（末尾が置くファイル）。`.webp` は落とす
-pub fn name_parts(typed : String) -> Array[String] {
+fn name_parts(typed : String) -> Array[String] {
   let t = typed.trim(chars=" \t\r\n").to_owned()
   let base = if t.to_lower().has_suffix(".webp") {
     String::unsafe_substring(t, start=0, end=t.length() - 5)
@@ -140,7 +140,7 @@ pub fn name_parts(typed : String) -> Array[String] {
 
 ///|
 /// その名前では置けない理由。置けるなら None
-pub fn name_problem(typed : String) -> String? {
+fn name_problem(typed : String) -> String? {
   let parts = name_parts(typed)
   guard parts.length() > 0 else { return Some("Give it a name") }
   if parts.any(p => p == "." || p == "..") {
@@ -553,7 +553,7 @@ pub async fn Images::connect(self : Images) -> Unit {
 ///|
 /// フォルダを指してもらう。**繋ぎ直しも選び直しも同じ一手** —
 /// 記録が無ければ宣言を決め、あって食い違えば直すか聞く（`settle`）。
-/// 保存されているかの確認は呼ぶ側（main.ts の駅）が済ませている
+/// 保存されているかの確認は呼ぶ側（App）が済ませている
 pub async fn Images::choose_folder(self : Images) -> Unit {
   (async fn() -> Unit {
     match self.pick() {

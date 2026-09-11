@@ -9,7 +9,7 @@
 
 ///|
 /// 見出しが無い / 整形して何も残らない文書の名前
-pub let empty_name = "empty"
+let empty_name = "empty"
 
 ///|
 /// 実際の上限は 255（ext4/APFS はバイト、NTFS は UTF-16 単位）。バイトで
@@ -88,7 +88,7 @@ fn trim_tail(s : String) -> String {
 /// `設計/検討` は `設計-検討`、`A: B` は `A-B` になる（空白はそのまま。
 /// ファイル名として正しいものを削る理由が無い）。
 /// 何も残らなければ空文字を返す — 呼び出し側が次の候補へ落ちる
-pub fn to_file_name(label : String) -> String {
+fn to_file_name(label : String) -> String {
   let parts : Array[String] = []
   let cur = StringBuilder()
   let flush = () => {

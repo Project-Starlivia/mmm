@@ -37,7 +37,7 @@ pub struct Mindmap {
   /// world 座標の層。Camera の変換はこれに掛ける
   world : @dom.Element
   renderer : Renderer
-  /// 白紙の言い出し（器は ts の app/hint.ts）
+  /// 白紙の言い出し（器は app/parts/hint.mbt）
   hint : @dom.Element
   indicator_el : @dom.Element
   /// 針がいま指している箱（world）。**押したとき頑張るのはこれ 1 つ** —
@@ -337,7 +337,7 @@ pub fn Mindmap::fit_view(self : Mindmap) -> Unit {
 
 ///|
 /// 選択（無ければ根）を画面の中心へ。拡大率は変えない
-pub fn Mindmap::center_on_target(self : Mindmap) -> Unit {
+fn Mindmap::center_on_target(self : Mindmap) -> Unit {
   let target = match @map.union(self.rects_of((self.host.selection)().ids)) {
     Some(r) => Some(r)
     None => @map.root_box(self.layout).map(b => b.rect())
@@ -384,7 +384,7 @@ fn Mindmap::follow_holder(self : Mindmap) -> Unit {
 
 ///|
 /// その場編集に入る。seed は最初の字。箱が無い（畳まれて埋もれた）ノードは開けない —
-/// 戻り値はそれを呼び出し側（main.ts の apply）に言うためのもの
+/// 戻り値はそれを呼び出し側（App の apply）に言うためのもの
 pub fn Mindmap::begin_edit(self : Mindmap, id : Int, seed : String?) -> Bool {
   guard self.layout.boxes.get(id) is Some(b) else { return false }
   self.label.open(id, self.layout, self.camera, b.node.label, seed)
@@ -445,7 +445,7 @@ pub fn Mindmap::set_grab(self : Mindmap, on : Bool) -> Unit {
 
 ///|
 /// 書き出しに写すもの。文書順の箱と、その線・ノードの要素。空なら箱が無い
-pub fn Mindmap::svg_parts(
+fn Mindmap::svg_parts(
   self : Mindmap,
 ) -> (Array[@map.Rect], Array[@dom.Element], Array[@dom.Element]) {
   let edges = []

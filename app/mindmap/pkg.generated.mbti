@@ -12,10 +12,6 @@ import {
 }
 
 // Values
-pub fn card_rect_of(@map.Layout, Int) -> @map.Rect?
-
-pub fn draw_card(@dom.Document, @map.Card, Spot, Scene) -> Array[@dom.Element]
-
 pub fn items_of(Array[@map.Entry], (@map.Intent) -> Unit) -> Array[@parts.Entry]
 
 pub fn measure(@dom.Document) -> (@map.Font, String) -> Double
@@ -35,11 +31,7 @@ pub struct CardField {
   mut id : Int?
   mut last : (@map.Layout, @map.Camera)?
 }
-pub fn CardField::close(Self) -> Unit
 pub fn CardField::editing(Self) -> Int?
-pub fn CardField::new(@dom.Document, @dom.HTMLElement, (@map.Font, String) -> Double, (String) -> Array[Array[Token]], (Int, String) -> Unit) -> Self
-pub fn CardField::open(Self, Int, @map.Layout, @map.Camera, String, Int?, Int?) -> Unit
-pub fn CardField::place(Self, @map.Layout, @map.Camera) -> Unit
 
 pub struct CardPick {
   el : @dom.Element
@@ -48,9 +40,6 @@ pub struct CardPick {
   circle : @dom.Element
   strokes : Array[@dom.Element]
 }
-pub fn CardPick::hide(Self) -> Unit
-pub fn CardPick::new(@dom.Document) -> Self
-pub fn CardPick::show(Self, Int, @map.Rect) -> Unit
 
 pub struct Dragging {
   ids : Array[Int]
@@ -90,11 +79,7 @@ pub struct LabelField {
   mut composing : Bool
   mut last : (@map.Layout, @map.Camera)?
 }
-pub fn LabelField::close(Self) -> Unit
 pub fn LabelField::editing(Self) -> Int?
-pub fn LabelField::new(@dom.Document, @dom.HTMLElement, (@map.Font, String) -> Double, (Int, String) -> Unit) -> Self
-pub fn LabelField::open(Self, Int, @map.Layout, @map.Camera, String, String?) -> Unit
-pub fn LabelField::place(Self, @map.Layout, @map.Camera) -> Unit
 
 pub struct Marks {
   root : Bool
@@ -137,18 +122,14 @@ pub struct Mindmap {
   drop_line : @dom.Element
   menu : @parts.Menu
 }
-pub fn Mindmap::act(Self, @map.Intent) -> Unit
 pub fn Mindmap::begin_edit(Self, Int, String?) -> Bool
-pub fn Mindmap::center_on_target(Self) -> Unit
 pub fn Mindmap::edit_card(Self, Int, from? : Int?, to? : Int?, text? : String?) -> Unit
 pub fn Mindmap::fit_view(Self) -> Unit
-pub fn Mindmap::goto_pointed(Self) -> Unit
 pub fn Mindmap::mark_file_drop(Self, @map.Pt?) -> Int?
 pub fn Mindmap::new(@dom.HTMLElement, Host) -> Self
 pub fn Mindmap::refresh_selection(Self) -> Unit
 pub fn Mindmap::render(Self) -> Unit
 pub fn Mindmap::set_grab(Self, Bool) -> Unit
-pub fn Mindmap::svg_parts(Self) -> (Array[@map.Rect], Array[@dom.Element], Array[@dom.Element])
 pub async fn Mindmap::to_svg(Self) -> @dom.Element?
 
 pub struct Panning {
@@ -177,11 +158,6 @@ pub struct Renderer {
   mut order : Array[Int]
   mut selected : @set.Set[Int]
 }
-pub fn Renderer::draw(Self, Scene) -> Unit
-pub fn Renderer::edge_el(Self, Int) -> @dom.Element?
-pub fn Renderer::new(@dom.Document) -> Self
-pub fn Renderer::node_el(Self, Int) -> @dom.Element?
-pub fn Renderer::paint(Self, Array[Int]) -> Unit
 
 pub(all) struct Scene {
   layout : @map.Layout

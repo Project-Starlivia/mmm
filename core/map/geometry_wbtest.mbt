@@ -1,5 +1,5 @@
 // 座標と線の形。マップの見た目はここから組み上がるので、
-// ドロップ判定（ts の drop.test.ts）が立つ土台として固定しておく。
+// ドロップ判定（drop_wbtest.mbt）が立つ土台として固定しておく。
 
 ///|
 let rect : Rect = { x: 10, y: 20, w: 100, h: 40, }
@@ -19,22 +19,6 @@ test "育つ辺と入る辺は、枝の向きで左右が入れ替わる" {
   assert_eq(rect.entry_edge(-1), rect.right())
   assert_eq(dir(Right), 1)
   assert_eq(dir(Left), -1)
-}
-
-///|
-test "点から線分までの距離。端より外なら端までの距離になる" {
-  let a : Pt = { x: 0, y: 0, }
-  let b : Pt = { x: 10, y: 0, }
-  assert_eq(dist_to_seg({ x: 5, y: 3, }, a, b), 3) // 真横
-  assert_eq(dist_to_seg({ x: -4, y: 0, }, a, b), 4) // 手前の外
-  assert_eq(dist_to_seg({ x: 14, y: 0, }, a, b), 4) // 先の外
-  assert_eq(dist_to_seg({ x: 3, y: 0, }, a, a), 3) // 長さ 0 の線分
-}
-
-///|
-test "折れ線の真ん中は、長さで測った中央" {
-  let pts : Array[Pt] = [{ x: 0, y: 0, }, { x: 10, y: 0, }, { x: 10, y: 10, }]
-  assert_eq(mid_of_polyline(pts), { x: 10, y: 0, })
 }
 
 ///|

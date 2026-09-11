@@ -12,7 +12,7 @@
 
 ///|
 /// 頭に置く「画像フォルダの場所」の設定名。**綴りはここ 1 つ**
-pub let image_folder_key = "image-folder"
+let image_folder_key = "image-folder"
 
 ///|
 /// トップレベルのキーの行なら、`:` の後ろ。字下げされた `  image-folder:` は

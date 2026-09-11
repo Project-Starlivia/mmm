@@ -4,11 +4,8 @@
 //
 // 座標はすべて u・v のローカル座標（親の出口が原点）で組む。
 //
-// 経路は「制御点 2 つをそのまま持つ三次ベジェ」1 種類のみ。かつては経路の種類
-// (quad/cubic/sweep/arc/line/diagonal/elbow/spine) や見た目の修飾
-// (先細り・手描き風ゆらぎ・破線・階層別の太さ・下線)を選べる調整パネルが
-// あったが、2026-08-15 にパネルごと撤去した。実際に選ばれ続けているのは
-// この 1 本だけだったので、生きている式だけへ畳んだ。
+// 経路は「制御点 2 つをそのまま持つ三次ベジェ」1 種類のみ — 形を選べるように
+// しても、選ばれ続けるのはこの 1 本だけだった。
 
 ///|
 /// 曲線の形。実文書の上で詰めた値（出発点は見本 Vector.svg）。
@@ -38,7 +35,7 @@ pub(all) enum Seg {
 ///|
 /// 親 → 子 の経路をローカル座標で組み立てる。du = 成長軸方向の距離、
 /// dv = 兄弟軸方向の段差。始点は常に (0,0)
-pub fn edge_segs(du : Double, dv : Double) -> Array[Seg] {
+fn edge_segs(du : Double, dv : Double) -> Array[Seg] {
   if dv.abs() < 0.5 {
     return [L(du, dv)] // 真横に並ぶ親子は直線
   }
@@ -55,44 +52,8 @@ pub fn edge_segs(du : Double, dv : Double) -> Array[Seg] {
 }
 
 ///|
-/// 折れ線に落とす（線分距離判定などに使う）。始点 (0,0) を含む
-pub fn flatten(segs : Array[Seg], per : Int) -> Array[Pt] {
-  let pts : Array[Pt] = [{ x: 0, y: 0, }]
-  let mut cu = 0.0
-  let mut cv = 0.0
-  for s in segs {
-    match s {
-      L(u, v) => {
-        pts.push({ x: u, y: v, })
-        cu = u
-        cv = v
-      }
-      C(au, av, bu, bv, eu, ev) => {
-        for i in 1..<=per {
-          let t = i.to_double() / per.to_double()
-          let m = 1.0 - t
-          pts.push({
-            x: m * m * m * cu +
-            3.0 * m * m * t * au +
-            3.0 * m * t * t * bu +
-            t * t * t * eu,
-            y: m * m * m * cv +
-            3.0 * m * m * t * av +
-            3.0 * m * t * t * bv +
-            t * t * t * ev,
-          })
-        }
-        cu = eu
-        cv = ev
-      }
-    }
-  }
-  pts
-}
-
-///|
 /// 数の綴り。JS の `${n}` と同じ — 整数なら小数点を出さず、-0 は 0
-pub fn num(v : Double) -> String {
+fn num(v : Double) -> String {
   if v == 0.0 {
     "0"
   } else {
@@ -102,7 +63,7 @@ pub fn num(v : Double) -> String {
 
 ///|
 /// 経路を d 属性の文字列にする。a は始点（world）
-pub fn segs_to_d(segs : Array[Seg], a : Pt) -> String {
+fn segs_to_d(segs : Array[Seg], a : Pt) -> String {
   let at = (u : Double, v : Double) => {
     "\{num(round2(a.x + u))} \{num(round2(a.y + v))}"
   }

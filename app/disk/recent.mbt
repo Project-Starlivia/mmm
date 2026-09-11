@@ -4,7 +4,7 @@
 // **札は参照 ID でしかない。** 中身は覗けず、実際のパスはブラウザの中にしか無い。
 // 触ってよいかはまた別の台帳（許可）で、指し先が消えていることもある。だからここが
 // 持っているのは**番号札**で、使えるかどうかは毎回下まで確かめる — **覚えているのは
-// 高速化であって、真実ではない**。札が死んでいれば、指し直しの駅（ts の app/assets.ts）へ落ちる。
+// 高速化であって、真実ではない**。札が死んでいれば、指し直しの駅（images.mbt の `choose_folder`）へ落ちる。
 //
 // 覚えるのは**知っている文書の一覧**だけ（`docs`）。1 行が 1 つの .md で、
 // その文書の画像フォルダを一緒に持つ。
@@ -14,8 +14,7 @@
 
 ///|
 /// 知っている文書 1 つ。**持つのは札だけ** — 「md から見てどこか」は .md の頭が
-/// 宣言する（read/head.mbt）。以前はここが `path` も持っていて、別マシンで開くと
-/// 宣言ごと消えていた。
+/// 宣言する（read/head.mbt）。
 ///
 /// `seen` は最後に触れた時刻。**あふれたら古いものから捨てる** — 番号札は
 /// 腐るので、際限なく貯めても当たらない札が増えるだけ
@@ -176,14 +175,14 @@ async fn Recent::save(self : Recent, rows : Array[Known]) -> Unit {
 
 ///|
 /// 知っている文書。**最後に触れた順** — Files の並びがそのままこれ
-pub async fn Recent::list(self : Recent) -> Array[Known] {
+async fn Recent::list(self : Recent) -> Array[Known] {
   self.rows()
 }
 
 ///|
 /// 開いた / 保存した。行が無ければ作り、あれば触れた印を新しくする。
 /// **画像フォルダは保つ** — 同じ文書に戻れば結び付きも戻る
-pub async fn Recent::opened(self : Recent, file : @web.FileHandle) -> Unit {
+async fn Recent::opened(self : Recent, file : @web.FileHandle) -> Unit {
   let rows = self.rows()
   let at = self.find(rows, file)
   let was = rows.get(at)
@@ -200,7 +199,7 @@ pub async fn Recent::opened(self : Recent, file : @web.FileHandle) -> Unit {
 
 ///|
 /// その文書の画像フォルダ。覚えていなければ None
-pub async fn Recent::folder_for(
+async fn Recent::folder_for(
   self : Recent,
   file : @web.FileHandle,
 ) -> @web.DirHandle? {
@@ -211,7 +210,7 @@ pub async fn Recent::folder_for(
 
 ///|
 /// 画像フォルダを覚える。行が無ければ作る
-pub async fn Recent::remember_folder(
+async fn Recent::remember_folder(
   self : Recent,
   file : @web.FileHandle,
   directory : @web.DirHandle,
@@ -227,10 +226,7 @@ pub async fn Recent::remember_folder(
 
 ///|
 /// 画像フォルダだけ忘れる（触って失敗した・指し先が消えた）。行は残す
-pub async fn Recent::forget_folder(
-  self : Recent,
-  file : @web.FileHandle,
-) -> Unit {
+async fn Recent::forget_folder(self : Recent, file : @web.FileHandle) -> Unit {
   let rows = self.rows()
   let at = self.find(rows, file)
   guard rows.get(at) is Some(row) else { return }
