@@ -294,7 +294,7 @@ fn typing(base : String, values : Array[String]) -> String {
 
 ///|
 /// 文書 1 つ。宣言と、その下の画像・外の画像
-fn sample(folder : String, x : String) -> String {
+fn declared(folder : String, x : String) -> String {
   "---\nimage-folder: \{folder}\n---\n\n# a\n\n![](\{x})\n\n![](./other/z.webp)\n"
 }
 
@@ -305,14 +305,14 @@ fn sample(folder : String, x : String) -> String {
 test "follow_declaration: 通った ./ は掴まない。宣言された ./ は掴む" {
   // `./p/` から `./img/` へ。途中で必ず `./` を通る
   assert_eq(
-    typing(sample("./p/", "./p/x.webp"), [
+    typing(declared("./p/", "./p/x.webp"), [
       "./p", "./", "./i", "./im", "./img", "./img/",
     ]),
-    sample("./img/", "./img/x.webp"),
+    declared("./img/", "./img/x.webp"),
   )
   // `./` から `./img/` へ。宣言が `./` なので `./other/z.webp` も下に居る
   assert_eq(
-    typing(sample("./", "./x.webp"), ["./i", "./im", "./img", "./img/"]),
+    typing(declared("./", "./x.webp"), ["./i", "./im", "./img", "./img/"]),
     "---\nimage-folder: ./img/\n---\n\n# a\n\n![](./img/x.webp)\n\n![](./img/other/z.webp)\n",
   )
 }
@@ -323,10 +323,10 @@ test "follow_declaration: 通った ./ は掴まない。宣言された ./ は�
 /// まま** — 追従が書き換えるのは本文だけで、頭は書いた人のもの
 test "follow_declaration: `.//` と打っても本文は畳まれた綴りで追う" {
   assert_eq(
-    typing(sample("./p/", "./p/x.webp"), [
+    typing(declared("./p/", "./p/x.webp"), [
       ".//", ".//i", ".//im", ".//img", ".//img/",
     ]),
-    sample(".//img/", "./img/x.webp"),
+    declared(".//img/", "./img/x.webp"),
   )
 }
 
@@ -334,7 +334,7 @@ test "follow_declaration: `.//` と打っても本文は畳まれた綴りで追
 /// **落ち着いた宣言だけを追う。** settled な宣言は `/` で終わる（`set_image_folder` が
 /// `normalize_path` の出力を書くので）。途中の綴りで動かすと地図がちらつくだけ
 test "follow_declaration: `/` で終わる宣言だけ追う" {
-  let base = sample("./p/", "./p/x.webp")
+  let base = declared("./p/", "./p/x.webp")
   for typing in ["./i", "./im", "./img", "."] {
     assert_eq(follow_declaration(base, retyped(base, typing)).length(), 0)
   }
@@ -344,7 +344,7 @@ test "follow_declaration: `/` で終わる宣言だけ追う" {
 ///|
 /// 動く理由が無いときは空。**打鍵ごとに呼ばれるので、空で帰る道がいちばん太い**
 test "follow_declaration: 引っ越していなければ空" {
-  let md = sample("./p/", "./p/x.webp")
+  let md = declared("./p/", "./p/x.webp")
   // 同じ宣言
   assert_eq(follow_declaration(md, md).length(), 0)
   // 頭が無い
@@ -352,6 +352,6 @@ test "follow_declaration: 引っ越していなければ空" {
   // 宣言を消した（空は宣言として読めない）
   assert_eq(follow_declaration(md, retyped(md, "")).length(), 0)
   // 宣言の下に画像が無い
-  let outside = sample("./p/", "./other/y.webp")
+  let outside = declared("./p/", "./other/y.webp")
   assert_eq(follow_declaration(outside, retyped(outside, "./img/")).length(), 0)
 }
