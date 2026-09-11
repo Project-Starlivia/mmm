@@ -1,7 +1,8 @@
 // md のカーソル、または地図の選択の位置が、どのノード（かカード）に掛かっているか。
 // DOM も文書の意味も知らない、区間の重なりだけの層。選択の規則はここにしか無い。
 //
-// 自身の文 = 地番の頭から最初の子の頭まで（中身は子より前に書かれる）。地番は
+// 自身の文 = 地番の頭から最初の子の頭まで、**と子の後ろに書かれた中身**（列 0 の
+// 塊は開いている項目を閉じるので、子より後ろに書かれることがある。#204）。地番は
 // 入れ子なので、これで「最も深いノード」が出る。子孫まで含む `to` で見ると、
 // カーソル 1 つでも根までの祖先が全部光り、選択と見分けが付かない（spec.md
 // 「選択の持ち主」）。
@@ -45,7 +46,9 @@ pub(all) enum Choice {
 pub let nothing : Choice = Nodes(sel=@map.none)
 
 ///|
-/// ノードの自身の文 `[from, to)`。Implicit は空なので入らない
+/// ノードの自身の文 `[from, to)`。**1 ノードが何本も持てる** — 子の後ろに
+/// 書かれた中身はその子の領分を跨がないので、区間が割れる（#204）。
+/// Implicit は空なので入らない
 priv struct Own {
   id : Int
   from : Int
@@ -56,19 +59,25 @@ priv struct Own {
 fn owns(s : Survey) -> Array[Own] {
   let out = []
   each_node(s.doc, n => {
-    match s.spots.get(n.id) {
-      Some(sp) => {
-        let to = match n.children.get(0).bind(k => s.spots.get(k.id)) {
-          Some(first) => first.from
-          None => sp.to
-        }
-        if to > sp.from {
-          out.push({ id: n.id, from: sp.from, to, })
-        }
+    guard s.spots.get(n.id) is Some(sp) else { return }
+    let to = match n.children.get(0).bind(k => s.spots.get(k.id)) {
+      Some(first) => first.from
+      None => sp.to
+    }
+    if to > sp.from {
+      out.push({ id: n.id, from: sp.from, to, })
+    }
+    // **子の後ろに書かれた中身も自分の文。** 列 0 の塊は開いている項目を閉じるので、
+    // 見出しの中身が子より後ろに書かれていることがある（#204）。1 本の区間では
+    // 言えないので、そういう塊は 1 つずつ足す
+    for b in n.body {
+      guard s.spots.get(b.id) is Some(at) else { continue }
+      if at.from >= to && at.to > at.from {
+        out.push({ id: n.id, from: at.from, to: at.to, })
       }
-      None => ()
     }
   })
+  out.sort_by_key(o => o.from)
   out
 }
 
@@ -76,7 +85,8 @@ fn owns(s : Survey) -> Array[Own] {
 /// 点に掛かる自身の文。掛からなければ None。
 ///
 /// **`owns` は from の昇順で、重なりが無い** — 親の文は最初の子の手前で終わり、
-/// 次の兄弟はその子孫の後ろから始まる。だから **`from` が `p` 以下の最後のもの
+/// 次の兄弟はその子孫の後ろから始まる。子の後ろに書かれた中身は子の領分を
+/// 跨がないので、そこも重ならない。だから **`from` が `p` 以下の最後のもの
 /// 1 つ**を見れば足りる。それが `p` を含まなければ、`p` はどの文にも掛からない
 /// （子の領分の中）。継ぎ目ちょうどの点では、その位置から始まるほうが最後になる
 /// ので、「始まる側 1 つ」がそのまま出る。
@@ -121,7 +131,8 @@ fn hits(all : Array[Own], r : Range) -> Array[Own] {
 }
 
 ///|
-/// その範囲たちが掛かるノードの id、文書順。無ければ空。
+/// その範囲たちが掛かるノードの id、原文の順。無ければ空。**1 つずつ** —
+/// 自身の文は 1 ノードで何本にも割れる（`Own`）。
 /// **`all` は呼ぶ側が 1 回だけ作る**（`owns`）— 点の数だけ作り直すと、それだけで
 /// ノード数に比例した仕事が点の数ぶん増える（#55）
 fn ids_at(all : Array[Own], ranges : Array[Range]) -> Array[Int] {
@@ -132,7 +143,10 @@ fn ids_at(all : Array[Own], ranges : Array[Range]) -> Array[Int] {
       picked.add(o.id)
     }
   }
-  all.filter(o => picked.contains(o.id)).map(o => o.id)
+  let seen : Set[Int] = Set([])
+  all
+  .filter(o => picked.contains(o.id) && seen.add_and_check(o.id))
+  .map(o => o.id)
 }
 
 ///|

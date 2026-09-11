@@ -19,9 +19,8 @@ priv struct Deem {
   /// 積んである骨格の綴り。**高さが深さ**で、中身は「項目か」を見るのに使う
   /// （列 0 の見出しは開いている項目を閉じる）。飛び（Implicit）は None
   stack : Array[Mark?]
-  /// 行き先待ちの水平線の範囲。**本数に意味は無い**ので 1 本しか持たない。
-  /// 境界になれば綴りを、飾りに落ちれば地番をここから切り出す
-  mut pend : @markdown.Span?
+  /// 行き先待ちの水平線。**本数に意味は無い**ので 1 本しか持たない
+  mut pend : Pend?
   /// いま積む骨格が畳まれているなら、その `<details>` 〜 `</details>` の範囲
   mut fold_at : @markdown.Span?
   /// まだ閉じていない畳みの、畳んだノードの深さ。**閉じは境界と同じ** —
@@ -75,6 +74,41 @@ fn Deem::new(
 fn keep(d : Deem, at : @markdown.Span, verdict : Verdict) -> Unit {
   if !d.dry && at.to > at.from {
     d.pieces.push({ at, verdict: Some(verdict), })
+  }
+}
+
+///|
+/// 行き先待ちの水平線。境界になれば綴りを、飾りに落ちれば中身をここから切り出す。
+/// **持ち主は書かれた所で決まる** — 落ちるのは後の裁定でも、座るのはこの位置で
+/// 開いていた枠（飛んだ先の枠ではない）
+priv struct Pend {
+  at : @markdown.Span
+  under : Int
+}
+
+///|
+/// 塊を 1 枚控える。**持ち主はここで決める** — 置くのは組み立てだが、
+/// 誰のものかは裁定なので `Deem` を離れさせない（#204）。書かれた所で決まるので、
+/// 落ちるのが後になる水平線だけは控えてあった持ち主を渡す（`Pend`）。
+fn card(
+  d : Deem,
+  at : @markdown.Span,
+  content~ : Content?,
+  source~ : String?,
+  under? : Int? = None,
+) -> Unit {
+  keep(d, at, Card(content~, source~, under=under.unwrap_or(holder(d))))
+}
+
+///|
+/// 塊が座る枠の深さ（0 なら文書）。**列 0 の塊は開いている項目を閉じる** —
+/// md では空行のあと列 0 へ出た字は列の外で、直前の項目ではなく見出しの節の
+/// 中身だから（#204）。項目の中で読んでいる塊（`base > 0`）はその項目のもの。
+fn holder(d : Deem) -> Int {
+  if d.base == 0 {
+    spine(d)
+  } else {
+    d.stack.length()
   }
 }
 
@@ -160,20 +194,18 @@ fn deem(d : Deem, cut : Cut, nest : Int) -> Unit {
     Capsule(text~, open~, summary~, body~, from~, to~) => {
       // 中身が来たので、保留中の水平線は境界になれない
       spill(d)
-      keep(
+      card(
         d,
         { from, to, },
         // `summary` は綴りの照合を原文でやるので、木へ渡すここで LF に揃える
         // （`text` と `body` は `carve` / `strip` が済ませている）
-        Card(
-          content=Some(Details(open~, summary=summary.map(lf), body~)),
-          source=Some(text),
-        ),
+        content=Some(Details(open~, summary=summary.map(lf), body~)),
+        source=Some(text),
       )
     }
     Text(text, from~, to~) => {
       spill(d)
-      keep(d, { from, to, }, Card(content=None, source=Some(text)))
+      card(d, { from, to, }, content=None, source=Some(text))
     }
   }
 }
@@ -209,13 +241,11 @@ fn take(
     // 保留せずその場に置く（保留すると、置く前に項目の枠が閉じられたとき
     // 帰る場所が無くなって文書へ落ちる）
     ThematicBreak(span~, ..) if nest > 0 =>
-      keep(
+      card(
         d,
         span,
-        Card(
-          content=Some(ThematicBreak),
-          source=Some(carve(d.md, span.from, span.to)),
-        ),
+        content=Some(ThematicBreak),
+        source=Some(carve(d.md, span.from, span.to)),
       )
     // 記法(`---` `***` `___`)も本数も差別しない。意味は常に「隣を区切る」で、
     // 行き先は**直後のブロックが何か**で決まる。ここでは保留するだけ
@@ -223,20 +253,18 @@ fn take(
       // 水平線が続くなら、手前の 1 本は境界になれない（直後が骨格でない）ので
       // その場の中身に落ちる。保留は 1 本しか持てないので、上書きの前に吐き出す
       spill(d)
-      d.pend = Some(span)
+      d.pend = Some({ at: span, under: holder(d), })
     }
     // 空行は綴りであってモデルには無い。serialize が正規形として置き直す
     BlankLines(..) => ()
     _ => {
       // 中身が来た時点で、保留中の水平線は境界になれない
       spill(d)
-      keep(
+      card(
         d,
         block_span(block),
-        Card(
-          content=content_of(d.md, block),
-          source=Some(verbatim(d.md, block)),
-        ),
+        content=content_of(d.md, block),
+        source=Some(verbatim(d.md, block)),
       )
     }
   }
@@ -363,8 +391,12 @@ fn inside(
 }
 
 ///|
-/// 列 0 の項目が座る枠の深さ。列 0 へ出た項目は開いている項目を閉じる
-/// （md でもそうなる）ので、見出しの背骨の底が座る枠になる。
+/// 見出しの背骨の底の深さ。**列 0 へ出たものは開いている項目を閉じる**
+/// （md でも空行のあと列 0 へ出た字は列の外）ので、そこが座る枠になる。
+/// 項目（`items_take`）・見出し（`clear`）・塊（`holder`）の 3 つが同じ規則で使う。
+///
+/// **`clear` の項目落としの前でも後でも同じ答えを出す** — 自分で落ちた分を
+/// 数えないので、どちらで呼んでも狂わない
 fn spine(d : Deem) -> Int {
   let mut h = d.stack.length()
   while h > 0 && d.stack[h - 1] is Some(Item(..)) {
@@ -481,7 +513,7 @@ fn bridge(d : Deem, level : Int) -> Unit {
 /// 深さ 2 の枠の手前だけ**（根の子）。裏返した先の側は控えない — 側を数え直すのは
 /// 組み立て（`Lay::born`）で、こちらは「ここが変わり目だ」と言うだけ。
 fn border(d : Deem) -> Unit {
-  guard d.stack.length() == 1 && d.pend is Some(at) else { return }
+  guard d.stack.length() == 1 && d.pend is Some({ at, .. }) else { return }
   // 書き戻しに要るのは綴りだけなので原文を控える
   keep(d, at, Border(rule=carve(d.md, at.from, at.to)))
   d.pend = None
@@ -515,13 +547,15 @@ fn[T] shut(stack : Array[T], fold_roots : Array[Int]) -> Unit {
 
 ///|
 /// 境界になれなかった水平線を、その場の中身として落とす。
-/// 書かれた位置がそのまま保たれる。
+/// **書かれた位置も持ち主もそのまま保たれる**（`Pend`）。
 fn spill(d : Deem) -> Unit {
-  guard d.pend is Some(at) else { return }
+  guard d.pend is Some({ at, under, }) else { return }
   d.pend = None
-  keep(
+  card(
     d,
     at,
-    Card(content=Some(ThematicBreak), source=Some(carve(d.md, at.from, at.to))),
+    content=Some(ThematicBreak),
+    source=Some(carve(d.md, at.from, at.to)),
+    under=Some(under),
   )
 }
