@@ -110,7 +110,7 @@ fn Menu::folded(self : Menu) -> Bool {
 /// キーを通さず `AddNode` を直に組む（Enter は名前の無いノードでは「埋める」に
 /// 化けるが、メニューの Below / Above はそれでは困る）。
 fn adding(m : Menu) -> Array[Entry] {
-  let at = (a : @op.NodePlace) => Op(op=AddNode(at=a, labels=[""]), edit=true)
+  let at = (a : @op.NodePlace) => Op(op=AddNode(at=a, label=""), edit=true)
   let sub = (label : String, key : String, intent : Intent?) => {
     (
       {

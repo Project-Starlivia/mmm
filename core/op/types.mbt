@@ -26,8 +26,8 @@ pub(all) enum BlockPlace {
 ///|
 /// 操作。1 つの値が 1 回の操作で、apply が木に当てる。
 pub(all) enum Op {
-  AddNode(at~ : NodePlace, labels~ : Array[String])
-  AddBlock(at~ : BlockPlace, content~ : @tree.Content?, source~ : String?)
+  AddNode(at~ : NodePlace, label~ : String)
+  AddBlock(at~ : BlockPlace, content~ : @tree.Content?)
   Rename(id~ : Int, label~ : String)
   SetBlock(id~ : Int, content~ : @tree.Content?, source~ : String?)
   MoveNode(ids~ : Array[Int], at~ : NodePlace)

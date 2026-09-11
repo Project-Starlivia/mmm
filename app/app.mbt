@@ -577,11 +577,7 @@ async fn App::attach_image(self : App, id : Int, blob : @core.Any) -> Unit {
     return
   }
   self.write(
-    AddBlock(
-      at=In(node=id),
-      content=Some(Image(alt="", src=rel, title="")),
-      source=None,
-    ),
+    AddBlock(at=In(node=id), content=Some(Image(alt="", src=rel, title=""))),
   )
 }
 

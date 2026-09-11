@@ -145,7 +145,7 @@ fn ops_for(all : Array[Int]) -> Array[Op] {
   }
   for to in seats {
     for at in node_seats(to) {
-      ops.push(AddNode(at~, labels=["n"]))
+      ops.push(AddNode(at~, label="n"))
       for
         md in [
           "# g\n\n- i\n", "- i\n  - j\n", "- i\n", "![](q.png)\n\ntext\n", "text\n",
@@ -154,7 +154,7 @@ fn ops_for(all : Array[Int]) -> Array[Op] {
       }
     }
     for at in block_seats(to) {
-      ops.push(AddBlock(at~, content=Some(ThematicBreak), source=None))
+      ops.push(AddBlock(at~, content=Some(ThematicBreak)))
     }
   }
   ops

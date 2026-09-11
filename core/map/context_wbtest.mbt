@@ -64,7 +64,7 @@ test "Add は押せば子、開けば 4 つ" {
   let add = row(items(ctx_l(), Selection::only(3)), "Add")
   assert_eq(
     add.intent,
-    Some(Op(op=AddNode(at=In(node=3, side=None), labels=[""]), edit=true)),
+    Some(Op(op=AddNode(at=In(node=3, side=None), label=""), edit=true)),
   )
   assert_eq(add.items.unwrap().map(i => i.label), [
     "Child", "Below", "Above", "Parent",
@@ -74,7 +74,7 @@ test "Add は押せば子、開けば 4 つ" {
   assert_eq(blank.label, "Below")
   assert_eq(
     blank.intent,
-    Some(Op(op=AddNode(at=After(node=4), labels=[""]), edit=true)),
+    Some(Op(op=AddNode(at=After(node=4), label=""), edit=true)),
   )
 }
 

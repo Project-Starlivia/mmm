@@ -47,7 +47,7 @@ fn op(o : @op.Op) -> Intent {
 ///|
 /// 空のラベルで足す。読めば label "" になり、そのまま打ち始める
 fn add(at : @op.NodePlace) -> Intent {
-  op(AddNode(at~, labels=[""]))
+  op(AddNode(at~, label=""))
 }
 
 ///|
