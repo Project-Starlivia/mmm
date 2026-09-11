@@ -573,7 +573,11 @@ html, body {
 
 /* 画面外にある対象(選択、無ければルート)を指す控えめな針。コンパスの針の
    ように細長いひし形 1 つ。**出っぱなし**になるので中央には浮かせず、
-   縁に貼って真ん中を塞がない(map/indicator.ts が位置と向きを計算する) */
+   縁に貼って真ん中を塞がない(core/map/indicator.mbt が位置と向きを計算する)。
+
+   **押せる**(指している 1 つを中心へ。#129)。当たり判定はひし形ではなく
+   要素の矩形なので、縁の 24×10px を塞ぐ — 針が出ているのは対象が画面外の
+   ときだけなので、そこに掴めるノードは居ない */
 .map-indicator {
   position: absolute;
   top: 0;
@@ -583,7 +587,9 @@ html, body {
   background: var(--accent);
   clip-path: polygon(0 50%, 38% 8%, 100% 50%, 38% 92%);
   opacity: 0.5;
-  pointer-events: none;
+  cursor: pointer;
+
+  &:hover { opacity: 1; }
 }
 
 /* 空のときの言い出し。**2 つのペインで同じ器**（app/hint.ts が組む）。
