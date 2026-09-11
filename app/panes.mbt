@@ -7,7 +7,9 @@
 // だから**矢印は向きを変えない**。`‹` はいつでも「分割線を左へ 1 つ」、
 // `›` はいつでも「右へ 1 つ」で、いま押せるかどうかだけが変わる（端では止まる）。
 //
-// どちらを出しているかは覚えない — 毎回、両方から始まる。
+// **居場所は覚える**（`prefs` の `panes`）。書くのは人が動かしたときだけで
+// （`go`）、幅が境目をまたいだときの射影は覚えた姿を上書きしない — あれは
+// 環境の都合であって、選んだ結果ではない。覚えが無ければ両方から始まる。
 //
 // **狭いときは「両方」が居場所から消える。** 並べられない幅で「両方」を
 // 残すと、CSS が片方を隠して**状態が 2 つになり食い違う** — 矢印は行けない
@@ -19,6 +21,30 @@ pub(all) struct Vis {
   md : Bool
   map : Bool
 } derive(Eq, Debug)
+
+///|
+/// その姿の綴り。CSS へ降ろす 1 属性（`#panes[data-show]`）と、覚える綴りは
+/// 同じ 3 つ — 居場所の数と揃う
+fn Vis::show(self : Vis) -> String {
+  if self.md && self.map {
+    "both"
+  } else if self.md {
+    "md"
+  } else {
+    "map"
+  }
+}
+
+///|
+/// 綴りから読み戻す。知らない綴りは None（覚えていないのと同じ）
+fn vis_of(show : String?) -> Vis? {
+  match show {
+    Some("both") => Some({ md: true, map: true, })
+    Some("md") => Some({ md: true, map: false, })
+    Some("map") => Some({ md: false, map: true, })
+    _ => None
+  }
+}
 
 ///|
 /// ペインの名指し
@@ -188,16 +214,7 @@ fn Panes::apply(self : Panes, want : Vis) -> Unit {
   self.vis = v
   @web.toggle_class(self.doc.documentElement(), "narrow", self.narrow())
   // 見え方は CSS へ 1 属性で降ろす（`#panes[data-show]`）。居場所と同じ 3 つ
-  self.panes_el.setAttribute(
-    "data-show",
-    if v.md && v.map {
-      "both"
-    } else if v.md {
-      "md"
-    } else {
-      "map"
-    },
-  )
+  self.panes_el.setAttribute("data-show", v.show())
   // 端では、その先が無いので押せない
   let spot = spot_of(list, v)
   @web.set_disabled(self.go_left, spot <= 0)
@@ -228,11 +245,19 @@ fn Panes::apply(self : Panes, want : Vis) -> Unit {
 }
 
 ///|
+/// 人が動かした一手。落ち着いた姿をそのまま覚える（狭くて「両方」に
+/// なれなかったなら、見えているほうを覚える）
+fn Panes::go(self : Panes, want : Vis) -> Unit {
+  self.apply(want)
+  @prefs.store(self.doc, "panes", self.vis.show())
+}
+
+///|
 /// 分割線を 1 つ動かす。端は動かない
 fn Panes::slide(self : Panes, step : Int) -> Unit {
   let list = self.spots()
   match list.get(spot_of(list, self.vis) + step) {
-    Some(next) => self.apply(next)
+    Some(next) => self.go(next)
     None => ()
   }
 }
@@ -240,7 +265,7 @@ fn Panes::slide(self : Panes, step : Int) -> Unit {
 ///|
 /// そのペインの表示 / 非表示
 fn Panes::toggle_vis(self : Panes, which : Pane) -> Unit {
-  self.apply(toggled(self.vis, which, self.spots()))
+  self.go(toggled(self.vis, which, self.spots()))
 }
 
 ///|
@@ -255,12 +280,12 @@ fn Panes::toggle(self : Panes) -> Unit {
   }
   if in_md {
     if !self.vis.map {
-      self.apply(toggled(self.vis, Map, self.spots()))
+      self.go(toggled(self.vis, Map, self.spots()))
     }
     @web.focus(self.map_pane)
   } else {
     if !self.vis.md {
-      self.apply(toggled(self.vis, Md, self.spots()))
+      self.go(toggled(self.vis, Md, self.spots()))
     }
     (self.focus_editor)()
   }
@@ -292,7 +317,7 @@ fn Panes::new(
     narrow: @web.match_media(doc, narrow_query),
     go_left,
     go_right,
-    vis: { md: true, map: true, },
+    vis: vis_of(@prefs.load(doc, "panes")).unwrap_or({ md: true, map: true, }),
     dragging: false,
   }
   @web.listen(go_left, "click", _ => p.slide(-1))
@@ -310,7 +335,7 @@ fn Panes::new(
       return
     }
     if !p.vis.md || !p.vis.map {
-      p.apply({ md: true, map: true, })
+      p.go({ md: true, map: true, })
       return
     }
     @web.toggle_class(splitter, "dragging", true)
@@ -336,7 +361,8 @@ fn Panes::new(
   @web.listen(splitter, "pointercancel", up)
   // 幅が境目をまたいだら、いまの見え方を新しい居場所へ射影し直す
   p.narrow.addChangeListener(_ => p.apply(p.vis))
-  // 押せる / 押せないを最初に一度そろえる（既定でも必ず通す）
+  // 覚えた姿を今の居場所へ射影し、押せる / 押せないをそろえる。
+  // **ここでは覚え直さない** — まだ誰も動かしていない
   p.apply(p.vis)
   p
 }
