@@ -42,3 +42,5 @@ mmm 自体も成果物も無保証で、動作や内容の正しさを保証し�
 
 メニューや帯の絵は [Lucide](https://lucide.dev)（ISC License）からいただきました。
 GitHub の印は [Octicons](https://primer.style/octicons)（MIT License）からいただきました。
+コードの字は [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono)（SIL Open Font
+License 1.1）をそのまま同梱しています（[src/fonts](src/fonts)）。

@@ -35,6 +35,15 @@ function favicon(): Plugin {
 // 他プロジェクトの既定ポート(5173等)と衝突しない専用ポート。
 export default defineConfig({
   plugins: [favicon()],
+  build: {
+    /**
+     * **字は必ずファイルで出す。** 既定では 4 kB 未満の資産が base64 で CSS に
+     * 埋まる。埋まると、初回描画を止める CSS が**誰も要らない subset の分だけ**
+     * 太る（キリル文字の拡張とベトナム語で 7 kB。#61）。ファイルで出せば
+     * `unicode-range` が要る人にだけ取らせる。
+     */
+    assetsInlineLimit: (file) => (file.endsWith(".woff2") ? false : undefined),
+  },
   server: {
     port: 13131,
     strictPort: true,
