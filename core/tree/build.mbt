@@ -491,8 +491,14 @@ fn put(
   // 開いている項目を閉じたか、境界が部分木を引き出したかは、ここでしか分からない
   let under = b.stack.length()
   bridge(b, level)
+  // 畳まれた行の地番は `<details>` の範囲まで伸びる。**伸びるのは畳んだ行 1 本だけ** —
+  // 項目は部分木ぜんぶが 1 枚の塊なので、下って積む子まで伸ばすと子の行が
+  // 見失われる（隙間も畳みの手前のものになる）
   let at = match b.fold_at {
-    Some(s) => s
+    Some(s) => {
+      b.fold_at = None
+      s
+    }
     None => at
   }
   keep(

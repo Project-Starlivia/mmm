@@ -3,12 +3,13 @@
 // 受け取るのは原文・前の Doc とその地番・後の Doc の 4 つで、返すのは編集列と
 // その検証の答え。後の Doc が誰にどう作られたか（操作・undo のスナップショット）は知らない。
 //
-// 形は**正規形を base にした 3-way merge**（recast と同じ）:
+// 形は**階層が言う隙間を base にした 3-way merge**:
 //
 //   ours   = 原文（ユーザーの流儀）   要素ごとに [手前の隙間, 本体] の範囲（地番）
-//   base   = 前の木の正規形            要素ごとに、手前に空行が有るか
-//   theirs = 後の木の正規形            同上
+//   base   = 前の木の階層             要素ごとに、手前が空行で分かれるか（`parted`）
+//   theirs = 後の木の階層             同上
 //
+// **隙間は階層で決まる**（`gap_wbtest`）ので、base も theirs も木から直に言える。
 // base → theirs の差（操作の差）だけを ours に写す。base と ours の差（流儀の差）は
 // 写さないので、触っていない所の書き方は残る。要素はノードの行（ラベル）と中身 1 枚で、
 // 位置合わせは id。**要素は手前の隙間（空行）を持つ** — 消えるときは隙間ごと消え、
@@ -102,9 +103,9 @@ priv struct Merge {
   old : Map[Int, Node]
   /// ours — 要素の手前の隙間の頭（空行が無ければ行頭）。前の木の id で引く
   gap : Map[Int, Int]
-  /// base — 正規形（前）で手前に空行が有るか。前の木の id で引く
+  /// base — 前の木の階層が言う、手前の空行。前の木の id で引く
   base : Map[Int, Bool]
-  /// theirs — 正規形（後）で手前に空行が有るか。後の木の id で引く
+  /// theirs — 後の木の階層が言う、手前の空行。後の木の id で引く
   theirs : Map[Int, Bool]
   out : Array[Edit]
 }
@@ -119,11 +120,11 @@ fn plan(
   after : Doc,
 ) -> Array[Edit]? {
   guard before.frontmatter == after.frontmatter else { return None }
-  // 木だけで分かる落ちは先に（正規形を書いて読み直す前に）
+  // 木だけで分かる落ちは先に
   let olds_n = before.roots.map(x => x.node)
   let news_n = after.roots.map(x => x.node)
   guard aligned(ids(olds_n), ids(news_n)) else { return None }
-  guard canon_gaps(before) is Some(base) && canon_gaps(after) is Some(theirs) else {
+  guard parted(before) is Some(base) && parted(after) is Some(theirs) else {
     return None
   }
   let r : Merge = {
@@ -176,45 +177,6 @@ fn plain(sides : Array[Side]) -> Bool {
 }
 
 ///|
-/// 要素（Implicit でないノードと中身）の id を文書順に。
-fn elements(doc : Doc) -> Array[Int] {
-  let out : Array[Int] = []
-  fn node(x : Node) {
-    if x.mark is Some(_) {
-      out.push(x.id)
-    }
-    for b in x.body {
-      out.push(b.id)
-    }
-    for k in x.children {
-      node(k)
-    }
-  }
-
-  for b in doc.body {
-    out.push(b.id)
-  }
-  for r in doc.roots {
-    node(r.node)
-  }
-  out
-}
-
-///|
-/// 部分木の最初の要素。Implicit を下って最初の行を持つノード。子の無い Implicit は
-/// 在り得ない（check が言う）ので None は来ないが、来れば theirs の既定に落ちて
-/// 検証が全文へ落とす
-fn head_element(x : Node) -> Int? {
-  if x.mark is Some(_) {
-    return Some(x.id)
-  }
-  match x.children.get(0) {
-    Some(k) => head_element(k)
-    None => None
-  }
-}
-
-///|
 /// ours の隙間 — 地番を持つものごとに、手前に続く空行の頭。Implicit の範囲の頭は
 /// 最初の子の頭なので、Implicit の隙間はその子の隙間。
 fn gaps(md : String, spans : Map[Int, Spot]) -> Map[Int, Int] {
@@ -223,40 +185,6 @@ fn gaps(md : String, spans : Map[Int, Spot]) -> Map[Int, Int] {
     out[id] = blank_start(md, line_start(md, s.from))
   }
   out
-}
-
-///|
-/// 正規形の隙間 — 木を正規形に書いて読み直し、要素ごとに手前に空行が有るかを見る。
-/// 要素は文書順に 1 対 1 で並ぶので、順に組にする。並ばなければ None（全文へ落ちる）。
-fn canon_gaps(doc : Doc) -> Map[Int, Bool]? {
-  let canon = serialize(doc)
-  let (read, spans) = build(canon)
-  let mine = elements(doc)
-  let theirs = elements(read)
-  guard mine.length() == theirs.length() else { return None }
-  let out : Map[Int, Bool] = Map([])
-  for i, id in mine {
-    let s = spans.get(theirs[i]).unwrap()
-    let head = line_start(canon, s.from)
-    out[id] = blank_start(canon, head) < head
-  }
-  // Implicit は行を持たないので、その隙間は最初の要素の隙間
-  fn implicit(x : Node) {
-    if x.mark is None {
-      match head_element(x) {
-        Some(first) => out[x.id] = out.get(first).unwrap_or(true)
-        None => ()
-      }
-    }
-    for k in x.children {
-      implicit(k)
-    }
-  }
-
-  for r in doc.roots {
-    implicit(r.node)
-  }
-  Some(out)
 }
 
 ///|

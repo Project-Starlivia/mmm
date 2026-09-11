@@ -76,7 +76,7 @@ test "見本 — 隙間は階層で決まる。決まらないのは 7 つの関
   }
   let keys = seen.keys().collect()
   keys.sort()
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let mut one = 0
   let mut many = 0
   for k in keys {
@@ -85,6 +85,7 @@ test "見本 — 隙間は階層で決まる。決まらないのは 7 つの関
     gs.sort()
     if gs.length() == 1 {
       one = one + 1
+      out.write_string("\{k}  \{gs[0]}\n")
     } else {
       many = many + 1
       out.write_string("\{k}\n")
@@ -97,6 +98,33 @@ test "見本 — 隙間は階層で決まる。決まらないのは 7 つの関
     "1 通りの鍵 \{one} / ぶれる鍵 \{many}\n\{out}",
     content=(
       #|1 通りの鍵 56 / ぶれる鍵 7
+      #|B → F  空行1
+      #|C → B  空行1
+      #|C → C  空行1
+      #|C → S  空行1
+      #|S → B  空行1
+      #|S → F  空行1
+      #|S → S  空行1
+      #|B → H2  空行1
+      #|B → H3  空行1
+      #|B → I2  空行1
+      #|C → H1  空行1
+      #|C → H2  空行1
+      #|C → H3  空行1
+      #|C → I2  空行1
+      #|F → H2  空行1
+      #|F → H3  空行1
+      #|F → H4  空行1
+      #|F → I2  空行1
+      #|H1 → B  空行1
+      #|H1 → C  空行1
+      #|H1 → F  空行1
+      #|H2 → B  空行1
+      #|H2 → C  空行1
+      #|H2 → F  空行1
+      #|H2 → S  空行1
+      #|H3 → B  空行1
+      #|H3 → F  空行1
       #|H3 → S
       #|    空行0  ×2
       #|    空行1  ×4
@@ -106,19 +134,148 @@ test "見本 — 隙間は階層で決まる。決まらないのは 7 つの関
       #|I1 → C
       #|    空行0  ×2
       #|    空行1  ×5
+      #|I1 → F  空行1
+      #|I2 → B  空行1
+      #|I2 → C  空行1
+      #|I2 → F  空行1
+      #|I2 → S  空行1
+      #|I3 → S  空行1
+      #|S → H2  空行1
+      #|S → H3  空行1
+      #|S → I2  空行1
+      #|H1 → H1  空行1
+      #|H1 → H2  空行1
+      #|H1 → H3  空行1
+      #|H1 → I2  空行1
+      #|H2 → H2  空行1
       #|H2 → H3
       #|    空行0  ×1
       #|    空行1  ×4
+      #|H2 → H4  空行1
+      #|H2 → I3  空行1
+      #|H3 → H2  空行1
+      #|H3 → H3  空行1
+      #|I1 → H1  空行1
+      #|I1 → H2  空行0
+      #|I1 → H3  空行1
+      #|I1 → I1  空行0
       #|I1 → I2
       #|    空行0  ×7
       #|    空行1  ×4
+      #|I2 → H2  空行1
+      #|I2 → H3  空行1
+      #|I2 → I2  空行0
       #|I2 → I3
       #|    空行0  ×4
       #|    空行1  ×4
+      #|I3 → H3  空行1
       #|I3 → I4
       #|    空行0  ×1
       #|    空行1  ×1
+      #|B → I2loose  空行1
+      #|I1loose → I1loose  空行1
+      #|I2loose → I2loose  空行1
       #|
     ),
   )
+}
+
+///|
+/// **正規形の隙間も、階層だけで言える。** 合流の base / theirs は `parted` が木から
+/// 直に答え、正規形を書いて読み直さない。ここはその答えを、実際に書いて読み直した
+/// 字（`spelt`）と突き合わせる — 我々が塊を分ける規則を変えても、ライブラリが
+/// 変えても鳴る。
+///
+/// 見本 166 通りと、**合流が実際に使う後の木** — 見本 11 通り × 全ノード × 全部の
+/// 変え方（`merge_law_wbtest` と同じ総当たり）。
+test "見本 — 階層が言う隙間は、正規形の字と一致する" {
+  let bad : Array[String] = []
+  let mut trees = 0
+  let mut asked = 0
+  fn look(doc : Doc, what : String) {
+    guard spelt(doc) is Some(want) else { return }
+    guard parted(doc) is Some(got) else {
+      bad.push("\{what}: parted が折れた")
+      return
+    }
+    trees = trees + 1
+    let keys = want.keys().collect()
+    keys.sort()
+    for id in keys {
+      asked = asked + 1
+      if got.get(id) != Some(want.get(id).unwrap()) {
+        bad.push(
+          "\{what}: id \{id} は 正規形 \{want.get(id).unwrap()} / 階層 \{got.get(id).to_json().stringify()}",
+        )
+      }
+    }
+  }
+
+  for md in read_corpus {
+    look(build(md).0, md.escape())
+  }
+  for md in corpus {
+    let (before, _) = build(md)
+    look(before, md.escape())
+    for id in all_ids(before) {
+      for how in [Relabel, Delete, Adopt, AddBlock, DropBlock, SetBlock, Swap] {
+        let after = changed(before, id, how)
+        if after == before || !check(after).is_empty() {
+          continue
+        }
+        look(after, "\{name(how)} \{id} in \{md.escape()}")
+      }
+    }
+  }
+  inspect(
+    "木 \{trees} / 要素 \{asked} / 違い \{bad.length()}\n" + bad.join("\n"),
+    content=(
+      #|木 306 / 要素 960 / 違い 0
+      #|
+    ),
+  )
+}
+
+///|
+/// 正規形の隙間を**字で**測る（試験の物差し）。木を正規形に書いて読み直し、要素ごとに
+/// 手前に空行が有るかを見る。要素は文書順に 1 対 1 で並ぶので順に組にする。
+/// 並ばなければ None — 合流もそこは全文へ落ちるので、突き合わせる相手が居ない。
+fn spelt(doc : Doc) -> Map[Int, Bool]? {
+  let canon = serialize(doc)
+  let (read, spans) = build(canon)
+  let mine = spelt_elements(doc)
+  let theirs = spelt_elements(read)
+  guard mine.length() == theirs.length() else { return None }
+  let out : Map[Int, Bool] = Map([])
+  for i, id in mine {
+    let s = spans.get(theirs[i]).unwrap()
+    let head = line_start(canon, s.from)
+    out[id] = blank_start(canon, head) < head
+  }
+  Some(out)
+}
+
+///|
+/// 要素（Implicit でないノードと中身）の id を文書順に。
+fn spelt_elements(doc : Doc) -> Array[Int] {
+  let out : Array[Int] = []
+  fn node(x : Node) {
+    if x.mark is Some(_) {
+      out.push(x.id)
+    }
+    for b in x.body {
+      out.push(b.id)
+    }
+    for k in x.children {
+      node(k)
+    }
+  }
+
+  for b in doc.body {
+    out.push(b.id)
+  }
+  for r in doc.roots {
+    node(r.node)
+  }
+  out
 }
