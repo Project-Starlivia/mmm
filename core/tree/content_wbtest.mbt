@@ -772,16 +772,59 @@ test "素の URL とオートリンク" {
 }
 
 ///|
+/// 塊 1 つの md を、貼る側と同じ道（地番を通して）で段に割る
+fn rung_list(md : String) -> Array[Rung]? {
+  let (doc, spots) = build(md)
+  guard doc.body.get(0) is Some(b) && spots.get(b.id) is Some(spot) else {
+    return None
+  }
+  rungs(md, spot)
+}
+
+///|
 /// 貼り付けは一番外の段落だけを行ごとにノードにする。段落かどうかは mdAst が言う。
 test "行に割れるのは段落だけ — それ以外の中身は行を持たない" {
-  assert_eq(lines("a\nb\n"), Some(["a", "b"]))
-  assert_eq(lines("  a  \r\n\r\n"), Some(["a"]))
-  assert_eq(lines("**a** and [b](c)\n"), Some(["**a** and [b](c)"]))
-  assert_eq(lines("| a | b |\n|---|---|\n| 1 | 2 |\n"), None)
-  assert_eq(lines("> q\n"), None)
-  assert_eq(lines("<div>x</div>\n"), None)
-  assert_eq(lines("```\nx\n```\n"), None)
-  assert_eq(lines(""), None)
+  assert_eq(
+    rung_list("a\nb\n"),
+    Some([{ col: 0, label: "a", }, { col: 0, label: "b", }]),
+  )
+  assert_eq(rung_list("  a  \r\n\r\n"), Some([{ col: 2, label: "a", }]))
+  assert_eq(
+    rung_list("**a** and [b](c)\n"),
+    Some([{ col: 0, label: "**a** and [b](c)", }]),
+  )
+  assert_eq(rung_list("| a | b |\n|---|---|\n| 1 | 2 |\n"), None)
+  assert_eq(rung_list("> q\n"), None)
+  assert_eq(rung_list("<div>x</div>\n"), None)
+  assert_eq(rung_list("```\nx\n```\n"), None)
+  assert_eq(rung_list(""), None)
+}
+
+///|
+/// **桁は原文から測る。** 塊の原文（`carve` 済み）では測れないものを押さえる —
+/// 1 行目より浅い行、タブ、空行の後ろの塊（#118）
+test "rungs: 桁は原文から測る — タブは 4 桁、空行の後ろも失わない" {
+  // タブ 1 つと空白 4 つは同じ深さ
+  assert_eq(
+    rung_list("a\n\tb\n"),
+    Some([{ col: 0, label: "a", }, { col: 4, label: "b", }]),
+  )
+  assert_eq(
+    rung_list("a\n    b\n"),
+    Some([{ col: 0, label: "a", }, { col: 4, label: "b", }]),
+  )
+  // 1 行目より浅い行。塊の原文では 1 行目と同じ桁に見える
+  assert_eq(
+    rung_list("  a\nb\n"),
+    Some([{ col: 2, label: "a", }, { col: 0, label: "b", }]),
+  )
+  // 空行で塊が割れても、2 つ目の塊は左余白を持ったまま測れる
+  let md = "a\n  b\n\n  c\n"
+  let (doc, spots) = build(md)
+  assert_eq(doc.body.map(b => rungs(md, spots.get(b.id).unwrap())), [
+    Some([{ col: 0, label: "a", }, { col: 2, label: "b", }]),
+    Some([{ col: 2, label: "c", }]),
+  ])
 }
 
 // ══════════════════════════════════════════════════════════════════
