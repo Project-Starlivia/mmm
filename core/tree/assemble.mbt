@@ -104,17 +104,21 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
       Some(Border(rule~)) => l.rule = rule
       Some(FoldOpen(..)) => l.opening = true
       Some(FoldClose) => shut(l.stack, l.fold_roots)
-      Some(Card(content~, source~)) => {
+      Some(Card(content~, source~, under~)) => {
         let block : Block = { id: 0, content, source, }
         let at : Spot = { from: p.at.from, label: None, to: p.at.to, }
-        if l.stack.is_empty() {
+        // **持ち主は裁定が言う**（`holder`）。積んである頂上とは限らない —
+        // 列 0 の塊は開いている項目を閉じるので、見出しの背骨の底のものになる。
+        // 枠は降ろさない — 降ろすのは骨格の行の仕事（`under`）で、ここで降ろすと
+        // 続く行の深さが読みと食い違う
+        if under == 0 {
           l.body.push(block)
           l.body_at.push(at)
           if at.to > l.body_to {
             l.body_to = at.to
           }
         } else {
-          let f = l.stack[l.stack.length() - 1]
+          let f = l.stack[under - 1]
           f.body.push(block)
           f.body_at.push(at)
         }

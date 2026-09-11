@@ -1,4 +1,7 @@
-// 骨格でないものが、いま積んでいるノードの中身になることを固定する。
+// 骨格でないものが、どのノードの中身になるかを固定する。
+//
+// **持ち主は桁が決める** — 積んである頂上のものだが、列 0 へ出た塊は開いている
+// 項目を閉じるので、見出しの背骨の底のものになる（#204）。
 //
 // 絵になるのは 4 つだけで、疑わしきは Raw（原文のまま）。
 
@@ -869,4 +872,79 @@ test "読み解いた中身は意味と原文の両方を持つ" {
       "source": "![alt](x.png)",
     },
   ])
+}
+
+// ---- 列 0 の塊は開いている項目を閉じる（#204）----
+//
+// md では、空行のあと列 0 へ出た字は列の外。**項目の中身ではなく、その節の中身。**
+// 綴り直すと中身は子より前に書かれるので、塊は手前の兄弟より上へ出る — 形が
+// md と一致することのほうを採る（#204「兄弟と兄弟の間に書かれた塊は、どこへ
+// 置いても 1 回は動く」）。
+
+///|
+/// **持ち主が変わるのは桁だけで決まる。** 字下げすれば項目の中身のまま。
+test "列 0 の塊は項目の外、字下げした塊は項目の中" {
+  let owner = (md : String) => {
+    let doc = parse(md)
+    let mine = (bs : Array[Block]) => {
+      bs.map(b => b.source.unwrap_or("")).join(" ")
+    }
+    fn walk(n : Node, out : Array[String]) {
+      out.push("\{n.label}: \{mine(n.body)}")
+      for k in n.children {
+        walk(k, out)
+      }
+    }
+
+    let out = ["文書: \{mine(doc.body)}"]
+    for t in doc.roots {
+      walk(t.node, out)
+    }
+    out.join(" / ")
+  }
+  inspect(
+    owner("# root\n\n- head\n\ntext\n"),
+    content="文書:  / root: text / head: ",
+  )
+  inspect(
+    owner("# root\n\n- head\n\n  text\n"),
+    content="文書:  / root:  / head: text",
+  )
+  // 見出しが無ければ持ち主は文書。入れ子は何段でも閉じる
+  inspect(owner("- a\n  - b\n\ntext\n"), content="文書: text / a:  / b: ")
+}
+
+///|
+/// 塊が上へ出るのは**正規形に落ちたときだけ**で、木は 1 回目から安定している
+/// （#204 の事実 1「動くのは桁だけ」が、動くのは並びだけになった）。
+test "列 0 の塊は書き戻しで手前の兄弟より上へ出て、そこで安定する" {
+  let once = serialize(parse("# root\n\n- head\n\ntext\n"))
+  inspect(once, content="# root\n\ntext\n\n- head\n")
+  assert_eq(serialize(parse(once)), once)
+  // 列 0 へ出た項目も同じ規則で閉じるので、`- c` は `- a` の兄弟に戻る
+  inspect(
+    serialize(parse("# root\n\n- a\n- b\n\ntext\n\n- c\n")),
+    content="# root\n\ntext\n\n- a\n- b\n- c\n",
+  )
+}
+
+///|
+/// 持ち主が変わっても**字は 1 ビットも落ちない**。畳みの中の塊は畳みの中に残る
+/// — 水平線は書かれた所で持ち主が決まるので、閉じで枠が降りても飛ばない。
+test "畳みの中の列 0 の塊は、畳みの中に残る" {
+  let md =
+    #|# r
+    #|
+    #|<details>
+    #|<summary>a</summary>
+    #|
+    #|## a
+    #|
+    #|body
+    #|
+    #|---
+    #|
+    #|</details>
+    #|
+  assert_eq(serialize(parse(md)), md)
 }

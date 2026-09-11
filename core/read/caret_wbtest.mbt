@@ -257,12 +257,15 @@ let placed : Array[String] = [
   "- a\n- b\n", "- a\n  - b\n    - c\n", "# r\n\n```\nx\n```\n\n## a\n", "---\nk: v\n---\n\n# r\n\n## a\n",
   "intro\n\n# a\n\n## b\n", "# r\n\n![](./x.webp)\n\n## a\n", "- # head\n\n  body\n",
   "# r\n\n<details>\n<summary>s</summary>\n\n## a\n\n</details>\n",
+  // #204 — 列 0 の塊は項目を閉じるので、中身が子より後ろに書かれる
+   "# r\n\n- head\n\ntext\n", "# r\n\n- a\n\ntext\n\n- b\n",
 ]
 
 ///|
 /// **昇順で、重なりが無い。** `hit_at` の二分探索はこれに乗っている。
 /// 親の文は最初の子の手前で終わり、次の兄弟はその子孫の後ろから始まるので
-/// 成り立つ — 崩れたら位置がどのノードに掛かるかが狂う
+/// 成り立つ。子の後ろに書かれた中身は区間を割るが、子の領分は跨がない（#204）
+/// — 崩れたら位置がどのノードに掛かるかが狂う
 test "owns: from の昇順で、重なりが無い" {
   let bad : Array[String] = []
   for md in placed {
@@ -309,4 +312,20 @@ test "hit_at: 全部を走った答えと一致する" {
     }
   }
   json_inspect(bad, content=[])
+}
+
+///|
+/// **子の後ろに書かれた中身も、その持ち主の文。** 列 0 の塊は開いている項目を
+/// 閉じるので、見出しの中身が子より後ろに書かれる（#204）。1 本の区間で
+/// 「頭から最初の子まで」と読むと、そこに立てたカーソルが何にも掛からない
+test "子の後ろに書かれた中身に立てたカーソルは、その持ち主に掛かる" {
+  // "# r\n\n- head\n\ntext\n" — r=2, text=3, head=4
+  let d = survey("# r\n\n- head\n\ntext\n")
+  assert_eq(ids_at(owns(d), point(1)), [2]) // 見出しの行
+  assert_eq(ids_at(owns(d), point(7)), [4]) // 項目の行
+  assert_eq(ids_at(owns(d), point(14)), [2]) // 子の後ろの text は r のもの
+  // 兄弟と兄弟の間に書かれていても同じ
+  let mid = survey("# r\n\n- a\n\ntext\n\n- b\n")
+  assert_eq(ids_at(owns(mid), point(12)), [2])
+  assert_eq(ids_at(owns(mid), point(19)), [5])
 }

@@ -11,7 +11,9 @@
 pub(all) struct Doc {
   /// frontmatter の原文。無ければ None
   frontmatter : String?
-  /// 最初の骨格より前の中身
+  /// 文書そのものの中身。**最初の骨格より前とは限らない** — 列 0 の塊は
+  /// 開いている項目を閉じるので、根の後ろに書かれたものも入る（#204）。
+  /// `serialize` は根より前に書くので、そこで並びが上へ寄る
   body : Array[Block]
   roots : Array[Root]
 } derive(Eq, Debug, ToJson)
