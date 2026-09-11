@@ -152,6 +152,8 @@ pub fn open_url(String) -> Unit
 
 pub fn paper_2d(@dom.Element, Double) -> @core.Any
 
+pub fn per_frame(@dom.Document, () -> Unit) -> () -> Unit
+
 pub fn pick_directory(@core.Any, String) -> @js_async.Promise[@core.Any]
 
 pub fn pick_open(@core.Any) -> @js_async.Promise[@core.Any]

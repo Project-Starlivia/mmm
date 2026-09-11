@@ -96,7 +96,10 @@ pub fn App::new(
   let app = () => late.val.unwrap()
   let images = @disk.Images::new(doc, disk, {
     failed: msg => @parts.failed(doc, msg),
-    refresh: () => app().map.render(),
+    // **1 フレームに 1 回だけ描き直す。** 絵が読めるのは 1 枚ずつで、100 枚の文書なら
+    // 100 回「描き直して」と言われる。どれも同じ「いまの絵で描き直せ」なので、
+    // 最後の 1 回で足りる（#77）
+    refresh: @web.per_frame(doc, () => app().map.render()),
     declared: () => app().declared_folder(),
     set_declared: value => app().set_declared(value),
   })
