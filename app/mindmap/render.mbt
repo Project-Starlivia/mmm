@@ -2,9 +2,12 @@
 // 受け取って、SVG をそれに合わせるだけ。
 //
 // 毎レンダで全消しして作り直していた頃は、1 打鍵ごとに数万個の SVG 要素を
-// 生成・破棄していて、それが入力遅延の実体だった。位置(transform)と class は
-// 毎回書き換えても安いが、**要素の生成と破棄は高い**ので、そこだけを
-// 「中身が変わったノード」に絞る。
+// 生成・破棄していて、それが入力遅延の実体だった。**DOM を触るのは値が変わった
+// ときだけ**にする — 要素の生成と破棄はもちろん、属性の書きもクラスの付け外しも。
+//
+// 「毎回書き換えても安い」は 5,000 ノードでは成り立たない（#64 で実測）。属性は
+// 前の値を控えて突き合わせていたが、クラスは 3 つとも毎回 toggle していて、
+// 打鍵 1 回で 15,000 回 DOM を触っていた。
 //
 // 差分の鍵は id。**id は文書順の位置**なので、上に 1 つ足せば以降が作り直される
 // だけで、正しさは壊れない（docs/core.md「id は読みのサイクルを越えて持たない」）。
@@ -25,6 +28,17 @@ pub(all) struct Scene {
   /// コードが描き直される
   epoch : Int
 }
+
+///|
+/// `g` に付ける、文書から決まるクラス。**変わったときだけ付け外しする** —
+/// 毎回 3 つ toggle すると 5,000 ノードで 1 打鍵に 15,000 回 DOM を触る。
+/// 選択の印（`selected`）はここに入れない — 塗るのは `paint` の仕事で、
+/// レイアウトを見直さない軽い道（矩形選択が pointermove ごとに通る）
+pub struct Marks {
+  root : Bool
+  folded : Bool
+  open : Bool
+} derive(Eq)
 
 ///|
 /// ノードの中身を作り直すかどうかの判定材料。値をそのまま持って、そのまま比べる
@@ -52,6 +66,7 @@ pub struct Renderer {
   node_els : Map[Int, @dom.Element]
   edge_els : Map[Int, @dom.Element]
   shapes : Map[Int, Shape]
+  marks : Map[Int, Marks]
   // 直前に書いた transform / d。同じ値の setAttribute はスタイル無効化を
   // 起こすだけ無駄なので書かない（プロファイル上いちばん重い JS 呼び出しだった）
   node_tf : Map[Int, String]
@@ -71,6 +86,7 @@ pub fn Renderer::new(doc : @dom.Document) -> Renderer {
     node_els: Map([]),
     edge_els: Map([]),
     shapes: Map([]),
+    marks: Map([]),
     node_tf: Map([]),
     edge_d: Map([]),
     order_sig: "",
@@ -147,8 +163,6 @@ fn shape_of(b : @map.Box, scene : Scene) -> Shape {
 pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
   let doc = self.doc
   let l = scene.layout
-  // 位置(transform)と class は毎回書き換えても安い。高いのは要素の生成と
-  // 破棄なので、そこは「中身が変わったノードだけ」に絞る
   let seen : Set[Int] = Set([])
   for id in l.order {
     guard l.boxes.get(id) is Some(b) else { continue }
@@ -194,7 +208,9 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
         ])
         self.node_layer.append(g.as_node())
         self.node_els[id] = g
-        self.shapes.remove(id) // 新規なので必ず中身を作る
+        // 新規なので、中身もクラスも必ず当てる
+        self.shapes.remove(id)
+        self.marks.remove(id)
         // 選んだまま消えて戻った箱（畳みを開いた等）。印は paint の差分の外
         if self.selected.contains(id) {
           @web.toggle_class(g, "selected", true)
@@ -202,11 +218,19 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
         g
       }
     }
-    // **文書から決まるクラスだけ**を、1 つずつ付け外しする
-    @web.toggle_class(g, "root", b.parent is None)
-    @web.toggle_class(g, "folded", n.fold is Some(_))
-    // 開いた畳み。畳みの印（破線）は残し、沈めない
-    @web.toggle_class(g, "open", n.fold is Some({ open: true, .. }))
+    // **文書から決まるクラスだけ**を、変わったときに付け外しする
+    // （`open` は開いた畳み。畳みの印（破線）は残し、沈めない）
+    let marks : Marks = {
+      root: b.parent is None,
+      folded: n.fold is Some(_),
+      open: n.fold is Some({ open: true, .. }),
+    }
+    if self.marks.get(id) != Some(marks) {
+      @web.toggle_class(g, "root", marks.root)
+      @web.toggle_class(g, "folded", marks.folded)
+      @web.toggle_class(g, "open", marks.open)
+      self.marks[id] = marks
+    }
     let tf = "translate(\{@web.num(b.x)} \{@web.num(b.y)})"
     if self.node_tf.get(id) != Some(tf) {
       g.setAttribute("transform", tf)
@@ -284,6 +308,7 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
     }
     self.node_els.remove(id)
     self.shapes.remove(id)
+    self.marks.remove(id)
     self.node_tf.remove(id)
   }
   let gone_edges = self.edge_els
