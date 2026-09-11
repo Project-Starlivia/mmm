@@ -237,6 +237,13 @@ pub extern "js" fn computed(e : @dom.Element, name : String) -> String =
   #| (e, name) => e.ownerDocument.defaultView.getComputedStyle(e).getPropertyValue(name).trim()
 
 ///|
+/// `<text>` が**いま描かれている**送り幅（この機械の字で）。`<text>` でなければ 0。
+/// 字列から測るのは `web/clip.mbt` の `text_width`（canvas）で、こちらは要素から読む。
+/// 書き出しに `textLength` として焼くと、字が無い機械でもその幅に収まる（#126）
+pub extern "js" fn drawn_width(e : @dom.Element) -> Double =
+  #| (e) => (typeof e.getComputedTextLength === "function" ? e.getComputedTextLength() : 0)
+
+///|
 /// 閉じて、答えを添える（`returnValue`）
 pub extern "js" fn close_with(dialog : @dom.Element, value : String) -> Unit =
   #| (d, v) => d.close(v)

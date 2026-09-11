@@ -56,6 +56,8 @@ pub fn download(@core.Any, String) -> Unit
 
 pub fn drag_files(@core.Any) -> FixedArray[String]
 
+pub fn drawn_width(@dom.Element) -> Double
+
 pub fn drop_hash(@dom.Document) -> Unit
 
 pub fn dropped_files(@core.Any) -> @js_async.Promise[FixedArray[FileHandle]]
