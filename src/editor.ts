@@ -19,7 +19,17 @@ import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language"
 import { oneDarkHighlightStyle, oneDarkTheme } from "@codemirror/theme-one-dark";
 import type * as core from "./app.ts";
 import { paneHint } from "./app.ts";
-import { choice, fields, focused, highlightRanges, holder, setAnchors, setHolder, tree } from "./state.ts";
+import {
+  choice,
+  fields,
+  focused,
+  followImageFolder,
+  highlightRanges,
+  holder,
+  setAnchors,
+  setHolder,
+  tree,
+} from "./state.ts";
 
 /**
  * CodeMirror へは **`dark` かどうかだけ**を渡す（自身の既定のスタイルが
@@ -99,6 +109,7 @@ export class MdEditor {
         fields,
         holder.init(() => held),
         highlightField,
+        followImageFolder,
         // トランザクションの無い更新（覗き窓・寸法・measure）は文書も選択も変えないので、
         // サイクルを回さない — スクロールのたびに地図を塗り直すことになる
         EditorView.updateListener.of((u) => {

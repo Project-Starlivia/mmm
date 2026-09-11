@@ -5,7 +5,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EditorState } from "@codemirror/state";
-import { anchors, choice, fields, focused, highlightRanges, holder, setAnchors, setHolder, tree } from "../src/state.ts";
+import { history, undo } from "@codemirror/commands";
+import {
+  anchors,
+  base,
+  choice,
+  fields,
+  focused,
+  followImageFolder,
+  highlightRanges,
+  holder,
+  setAnchors,
+  setHolder,
+  tree,
+} from "../src/state.ts";
 import * as core from "../src/app.ts";
 
 /** "# r\n\n## a\n\n## b\n": r=2 [0,2,16], a=3 [5,8,10], b=4 [11,14,16] */
@@ -93,6 +106,58 @@ test("highlightRanges — 薄塗りは地図が持つ間だけ。ノードは子
     .update({ effects: [setHolder.of("map"), setAnchors.of(core.cardAt(11))] }).state;
   assert.equal(core.card(card.field(choice)), 4);
   assert.deepEqual(highlightRanges(card), [{ from: 11, to: 21 }]);
+});
+
+// ---- 画像フォルダの追従（#57） ----
+
+/** 宣言と、その下の画像 1 枚・外の画像 1 枚 */
+const declared = (folder: string, x: string) =>
+  `---\nimage-folder: ${folder}\n---\n\n# a\n\n![](${x})\n\n![](./other/z.webp)\n`;
+
+const follows = (doc: string): EditorState =>
+  EditorState.create({ doc, extensions: [fields, followImageFolder, history()] });
+
+/** 宣言の値だけを打ち替える打鍵 1 回 */
+const retype = (s: EditorState, value: string): EditorState => {
+  const key = "image-folder: ";
+  const at = s.doc.toString().indexOf(key) + key.length;
+  return s.update({ changes: { from: at, to: s.doc.lineAt(at).to, insert: value } }).state;
+};
+
+test("base — 頭を触らなかった打鍵が基準を進め、触った打鍵は基準を保つ", () => {
+  const doc = declared("./p/", "./p/x.webp");
+  const s = follows(doc);
+  assert.equal(s.field(base), doc);
+  // 本文を足した打鍵は頭を触っていない → 基準が今の姿へ進む
+  const body = s.update({ changes: { from: s.doc.length, to: s.doc.length, insert: "\n足した\n" } }).state;
+  assert.equal(body.field(base), body.doc.toString());
+  // 宣言を打ち替えた打鍵は途中なので、基準は打ち始めの姿のまま
+  const typed = retype(body, "./");
+  assert.equal(typed.field(base), body.doc.toString());
+  assert.equal(retype(typed, "./i").field(base), body.doc.toString());
+});
+
+test("追従 — 1 字ずつ打ち替えても、通った ./ は無関係な画像を掴まない", () => {
+  let s = follows(declared("./p/", "./p/x.webp"));
+  for (const value of ["./p", "./", "./i", "./im", "./img", "./img/"]) s = retype(s, value);
+  assert.equal(s.doc.toString(), declared("./img/", "./img/x.webp"));
+});
+
+test("追従 — 打鍵と同じトランザクションなので Undo 1 手で宣言も本文も戻る", () => {
+  const doc = declared("./p/", "./p/x.webp");
+  const typed = retype(follows(doc), "./img/");
+  assert.equal(typed.doc.toString(), declared("./img/", "./img/x.webp"));
+  let back = typed;
+  assert.equal(
+    undo({
+      state: typed,
+      dispatch: (tr) => {
+        back = tr.state;
+      },
+    }),
+    true,
+  );
+  assert.equal(back.doc.toString(), doc);
 });
 
 test("anchorsOf — id と位置の往復。カードは中身の頭、無い id は null", () => {

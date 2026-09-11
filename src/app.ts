@@ -32,6 +32,20 @@ export const survey = (md: string): Survey => Object(mbt.mmmSurvey(md));
  */
 export const notationBack = (md: string): string => mbt.mmmNotationBack(md);
 
+/**
+ * 頭の `image-folder:` が `base` から引っ越したなら、本文の画像を追従させる編集の列
+ * （**順に当てる** — 前を当てた座標で次が言われる）。動いていなければ空。
+ *
+ * `base` は**打ち替えを始めた時の md**（1 打鍵前ではない。state.ts の `base` field）。
+ * **打鍵ごとに聞く**ので、空で帰る道は頭の 1 行しか読まない（core の
+ * `follow_declaration`）。編集を打鍵と同じトランザクションに足すのは editor.ts
+ */
+export const followDeclaration = (base: string, now: string): Edit[][] =>
+  list(mbt.mmmFollowDeclaration(base, now), (set) => list(set, editOne));
+
+/** 2 つの md が同じ頭（frontmatter）を持つか。追従の基準を捨てる合図（state.ts の `base`） */
+export const sameHead = (a: string, b: string): boolean => mbt.mmmSameHead(a, b);
+
 /** id がノードのものか（中身の id なら false） */
 export const isNode = (s: Survey, id: number): boolean => mbt.mmmIsNode(s, id);
 

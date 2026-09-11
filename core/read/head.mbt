@@ -160,30 +160,55 @@ pub fn set_image_folder(
 ///|
 /// 宣言フォルダの引っ越しに、本文の画像を追従させる操作列。
 ///
-/// 対象は「**いま宣言しているフォルダの下にある**画像」だけ。`./img/` から
+/// 対象は「**打ち始めに宣言していたフォルダの下にあった**画像」だけ。`./img/` から
 /// 動かすなら `./other/b.webp` は動かない。宣言が `./` のときは md の下に
 /// ある相対パスが全部対象になるが、それは「画像は md と同じ場所にある」と
-/// 宣言している状態なので、意味のとおり。外部 URL は `under` が外す
-pub fn retarget(doc : @tree.Doc, from : String, to : String) -> Array[@op.Op] {
+/// 宣言している状態なので、意味のとおり。外部 URL は `under` が外す。
+///
+/// **判定するのは `base` の綴り、書くのは `now` の木。** 引っ越しは 1 打鍵で
+/// 終わらない（`./p/` → `./img/` は `./` を通る）。前の姿を基準にすると、途中の
+/// `./` を見て「md の下の相対パス全部」を掴んでしまい、`./other/z.webp` まで
+/// 引っ越し先へ連れて行く。**基準を凍らせれば、`./p/` の下だったかどうかを
+/// 何回目の打鍵でも同じように問える**（#57）。
+///
+/// 書き込みは id 付きなので、判定する木と書く木が別でも成り立つ。ただし id は
+/// **同じ文書の中でだけ**同じものを指す。だから 2 つの錠を掛ける。
+/// - `now` に画像として残っている id だけを出す（途中で段落になった id を塗らない）
+/// - **綴りの尻尾が変わっていない id だけを出す。** 追従が書くのはフォルダの
+///   付け替えだけなので、尻尾（フォルダから下の残り）はどの段でも同じ。文書を
+///   丸ごと貼り替えた後なら別の画像が同じ id に座っているが、尻尾が合わないので
+///   触らない — **合っているなら、付け替えても名前は保たれる**
+pub fn retarget(
+  base : @tree.Doc,
+  now : @tree.Doc,
+  from : String,
+  to : String,
+) -> Array[@op.Op] {
   let out : Array[@op.Op] = []
   guard from != to else { return out }
-  each_node(doc, n => {
+  let was : Map[Int, String] = Map([])
+  each_node(base, n => {
     for b in n.body {
-      match b.content {
-        Some(Image(alt~, src~, title~)) =>
-          match under(src, from) {
-            Some(rest) =>
-              out.push(
-                SetBlock(
-                  id=b.id,
-                  content=Some(Image(alt~, src=to + rest, title~)),
-                  source=None,
-                ),
-              )
-            None => ()
-          }
-        _ => ()
+      if b.content is Some(Image(src~, ..)) {
+        was[b.id] = src
       }
+    }
+  })
+  each_node(now, n => {
+    for b in n.body {
+      guard b.content is Some(Image(alt~, src=at, title~)) else { continue }
+      guard was.get(b.id) is Some(src) &&
+        under(src, from) is Some(rest) &&
+        at.has_suffix(rest) else {
+        continue
+      }
+      out.push(
+        SetBlock(
+          id=b.id,
+          content=Some(Image(alt~, src=to + rest, title~)),
+          source=None,
+        ),
+      )
     }
   })
   out
@@ -249,4 +274,97 @@ pub fn under(path : String, folder : String) -> String? {
     guard part != ".." else { return None }
   }
   Some(tail)
+}
+
+///|
+/// 頭の原文（`---` の行に挟まれた中身。開きの次の行から閉じの手前まで、行ごとに
+/// `\n` 付き）。挟まれていなければ None。
+///
+/// **読みを 1 回も走らせずに測る。** ここは打鍵ごとに聞かれるので、`survey` を
+/// 通す余裕は無い。答えは `survey(md).doc.frontmatter` と一致する（試験がその
+/// 一致を押さえる）
+fn head_of(md : String) -> String? {
+  guard line_at(md, 0) is Some((line, next)) && fence(line) else { return None }
+  let body_from = next
+  let mut at = next
+  while at < md.length() {
+    guard line_at(md, at) is Some((line, next)) else { return None }
+    if fence(line) {
+      let body = String::unsafe_substring(md, start=body_from, end=at)
+      // 中身の無い頭（`---` が 2 行続く）はライブラリも頭と読まない
+      return if body == "" { None } else { Some(body) }
+    }
+    at = next
+  }
+  None
+}
+
+///|
+/// その行が `---` だけか。**空白とタブは許し、`\r` は許さない** —
+/// ライブラリが CRLF の頭を頭と読まないので、それに揃える（ai-docs/markdown.md）
+fn fence(line : String) -> Bool {
+  line.trim(chars=" \t") == "---"
+}
+
+///|
+/// `at` から 1 行と、次の行の頭。改行が無ければ最後の行
+fn line_at(md : String, at : Int) -> (String, Int)? {
+  guard at < md.length() else { return None }
+  let mut i = at
+  while i < md.length() && md[i] != '\n' {
+    i += 1
+  }
+  Some((String::unsafe_substring(md, start=at, end=i), i + 1))
+}
+
+///|
+/// 2 つの md が同じ頭を持つか。
+///
+/// **追従の基準をいつ捨てるかを決める 1 つの問い。** 頭を触らなかった打鍵は
+/// 引っ越しの途中ではないので、そこで基準が今の姿に移る。触った打鍵は途中なので
+/// 基準を保つ（#57。使うのは src/state.ts の `base`）
+pub fn same_head(a : String, b : String) -> Bool {
+  head_of(a) == head_of(b)
+}
+
+///|
+/// 宣言が `base` から引っ越したなら、本文の画像を追従させる編集の列
+/// （**順に当てる** — 前の編集を当てた座標で次が言われる）。動いていなければ空。
+///
+/// `base` は**打ち替えを始めた時の md**（1 打鍵前ではない）。理由は `retarget` に
+/// 書いた。ついでに、前の姿を基準にすると `./` から `./img/` へ打つ道が丸ごと
+/// 落ちる — 最後の 1 打鍵の手前が `./img` で、`normalize_path` がそれを `./img/` に
+/// 揃えるので、`from` と `to` が同じになって誰も動かない。
+///
+/// **判定は頭の 1 行だけで済む**ので、打鍵ごとに呼んでも読みは走らない。走るのは
+/// 実際に引っ越したときだけ。
+///
+/// **落ち着いた宣言だけを追う。** `set_image_folder` が書くのは `normalize_path` の
+/// 出力なので、settled な宣言は必ず `/` で終わる。終わっていない名前を追うと、
+/// 打っている途中の綴りが地図でちらつく。基準が凍っているので途中の姿はどれも
+/// 宣言と食い違わないが、見せる意味が無い。**代償は「`/` を付けずに止めた宣言は
+/// 追わない」**
+pub fn follow_declaration(
+  base : String,
+  now : String,
+) -> Array[Array[@tree.Edit]] {
+  let out : Array[Array[@tree.Edit]] = []
+  guard image_folder(head_of(now)) is Some(typed) && typed.has_suffix("/") else {
+    return out
+  }
+  guard normalize_path(typed) is Some(to) else { return out }
+  guard image_folder(head_of(base)).bind(normalize_path) is Some(from) &&
+    from != to else {
+    return out
+  }
+  let (base_doc, _) = @tree.build(base)
+  let (now_doc, _) = @tree.build(now)
+  let mut md = now
+  for op in retarget(base_doc, now_doc, from, to) {
+    let r = @op.edit(md, op)
+    guard r.edits.length() > 0 else { continue }
+    out.push(r.edits)
+    md = @tree.patched(md, r.edits)
+  }
+  out
 }

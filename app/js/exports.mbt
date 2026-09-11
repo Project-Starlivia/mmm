@@ -39,6 +39,28 @@ pub fn mmm_serialize(md : String) -> String {
 }
 
 ///|
+/// 頭の `image-folder:` が `base` から引っ越したなら、本文の画像を追従させる
+/// 編集の列（**順に当てる**）。動いていなければ空。
+///
+/// `base` は**打ち替えを始めた時の md**。1 打鍵前を基準にすると、途中で通る
+/// `./` が md の下の相対パスを全部掴む（#57）。ts はこれを打鍵と同じ
+/// トランザクションに足すので、Undo は 1 手のまま
+#export_name("mmmFollowDeclaration")
+pub fn mmm_follow_declaration(
+  base : String,
+  now : String,
+) -> Array[Array[@tree.Edit]] {
+  @read.follow_declaration(base, now)
+}
+
+///|
+/// 2 つの md が同じ頭を持つか。追従の基準をいつ捨てるかを決める（state.ts の `base`）
+#export_name("mmmSameHead")
+pub fn mmm_same_head(a : String, b : String) -> Bool {
+  @read.same_head(a, b)
+}
+
+///|
 /// 木を戻した mdAst の指紋。読みの指紋と並べて、どちらの段で形が変わったかを見る。
 #export_name("mmmUnbuildSig")
 pub fn mmm_unbuild_sig(md : String) -> String {
