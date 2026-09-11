@@ -138,11 +138,16 @@ fn name_of(v : Vis?) -> String {
 ///|
 /// 絵は下向きの chevron 1 つだけ。左右は回して作る（線を増やさない）
 fn arrow_button(doc : @dom.Document, left : Bool) -> @dom.Element {
-  let button = doc.createElement("button")
-  button.setAttribute("type", "button")
-  let svg = @parts.icon(doc, "chevron-down")
-  @web.toggle_class(svg, if left { "point-left" } else { "point-right" }, true)
-  button.append(svg.as_node())
+  let button = @parts.icon_button(doc, "chevron-down")
+  @web.toggle_class(
+    button.firstElementChild().unwrap(),
+    if left {
+      "point-left"
+    } else {
+      "point-right"
+    },
+    true,
+  )
   button
 }
 

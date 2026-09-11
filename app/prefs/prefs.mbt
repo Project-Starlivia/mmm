@@ -6,6 +6,7 @@
 //
 // 持ち物は名前で言う（`theme` / `color` / `way` / `grab`）。localStorage の綴り
 // （`mmm.*`）はここだけが知っていて、外は名前を渡す — 知らない名前は壊れている。
+// 文書は呼ぶ側が渡す（web/ と同じ作法。global に手を伸ばさない）
 
 ///|
 /// いま意味のある持ち物と、その綴り
@@ -29,39 +30,22 @@ fn key_of(name : String) -> String {
 }
 
 ///|
-/// この窓の文書。無ければ（試験の Node には global の window が無い）None。
-/// 呼ぶ側はどれも文書を持たないので、ここだけ global に手を伸ばす
-fn doc() -> @dom.Document? {
-  try @core.try_sync(() => @dom.window().document().as_any()) catch {
-    _ => None
-  } noraise {
-    d => Some(d.cast())
-  }
+pub fn store(doc : @dom.Document, name : String, value : String) -> Unit {
+  @web.storage_set(doc, key_of(name), value)
 }
 
 ///|
-pub fn store(name : String, value : String) -> Unit {
-  let key = key_of(name)
-  match doc() {
-    Some(d) => @web.storage_set(d, key, value)
-    None => ()
-  }
-}
-
-///|
-pub fn load(name : String) -> String? {
-  let key = key_of(name)
-  doc().bind(d => @web.storage_get(d, key))
+pub fn load(doc : @dom.Document, name : String) -> String? {
+  @web.storage_get(doc, key_of(name))
 }
 
 ///|
 /// 役目を終えた `mmm.*` を捨てる。消えたキーの名前を並べる移行リストは
 /// 増え続けて誰も消せなくなるので、持ち物のほうを宣言して残りを掃く。
-pub fn sweep() -> Unit {
-  guard doc() is Some(d) else { return }
-  for k in @web.storage_keys(d) {
+pub fn sweep(doc : @dom.Document) -> Unit {
+  for k in @web.storage_keys(doc) {
     if k.has_prefix("mmm.") && !owned.any(o => o.1 == k) {
-      @web.storage_remove(d, k)
+      @web.storage_remove(doc, k)
     }
   }
 }

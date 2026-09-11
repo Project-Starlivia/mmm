@@ -18,11 +18,7 @@ pub fn blocked(@dom.Document, String) -> Unit
 
 pub let blocked_words : Array[String]
 
-pub fn connect(String) -> Ask
-
 pub fn declaration(String, Field) -> Ask
-
-pub fn discard() -> Ask
 
 pub fn draw_form(@dom.Document, () -> Unit, (Board) -> Unit, paint? : ((@dom.Element) -> Paint)?) -> (@dom.Element, Board)
 
@@ -30,11 +26,19 @@ pub fn failed(@dom.Document, String) -> Unit
 
 pub let failed_words : Array[String]
 
+pub fn file_name(String) -> Ask
+
+pub fn folder_connection(String) -> Ask
+
 pub fn hex_of(String) -> String?
 
 pub fn icon(@dom.Document, String) -> @dom.Element
 
+pub fn icon_button(@dom.Document, String, title? : String, label? : String) -> @dom.Element
+
 pub fn image_name(Array[Part], String) -> Ask
+
+pub fn image_place() -> Ask
 
 pub fn is_icon(String) -> Bool
 
@@ -50,21 +54,21 @@ pub fn notice(@dom.Document, String, String, Bool) -> @dom.Element
 
 pub fn open_on_click(@dom.Element, () -> Array[Entry]) -> Unit
 
-pub fn pane_hint(@dom.Document, String) -> @dom.Element
+pub fn pane_hint(@dom.Document, Pane) -> @dom.Element
 
 pub fn pane_tool(@dom.Document, String) -> @dom.Element
 
-pub fn place() -> Ask
-
 pub fn redeclaration(Field) -> Ask
 
-pub fn rename(String) -> Ask
-
-pub fn row(String, key? : String?, mark? : String?, note? : (((Array[String]) -> Unit) -> Unit)?, disabled? : Disabled) -> Row
+pub fn row(String, key? : String?, mark? : String?, caveat? : (((Array[String]) -> Unit) -> Unit)?, disabled? : Disabled) -> Row
 
 pub fn rows(@dom.Document, Array[Entry]) -> @dom.Element
 
 pub async fn show_drawing(@dom.Document) -> @core.Any?
+
+pub fn unless(Bool, why? : String) -> Disabled
+
+pub fn unsaved_changes() -> Ask
 
 // Errors
 
@@ -130,6 +134,11 @@ pub(all) struct Paint {
   line : (String, Double, Array[Pt]) -> Unit
 }
 
+pub(all) enum Pane {
+  Md
+  Map
+}
+
 pub(all) enum Part {
   Text(String)
   Blank(Field)
@@ -148,7 +157,7 @@ pub(all) struct Row {
   label : String
   key : String?
   mark : String?
-  note : (((Array[String]) -> Unit) -> Unit)?
+  caveat : (((Array[String]) -> Unit) -> Unit)?
   disabled : Disabled
 }
 
@@ -171,5 +180,6 @@ pub(all) struct Ways {
 }
 
 // Type aliases
+pub type Caveat = ((Array[String]) -> Unit) -> Unit
 
 // Traits

@@ -65,7 +65,7 @@ pub(all) struct Files {
 pub(all) struct More {
   light : Bool
   grab : Bool
-  link_note : ((Array[String]) -> Unit) -> Unit
+  link_caveat : ((Array[String]) -> Unit) -> Unit
 }
 
 pub(all) struct MoreActs {
@@ -75,6 +75,7 @@ pub(all) struct MoreActs {
   toggle_theme : () -> Unit
   toggle_grab : () -> Unit
   copy_link : ((Bool) -> Unit) -> Unit
+  visit : (String) -> Unit
 }
 
 pub struct Name {
@@ -106,7 +107,7 @@ pub(all) struct Way {
   short : String
   mark : String
   label : String
-  out : async (@dom.Element, String) -> Unit
+  out : async (@dom.Document, @dom.Element, String) -> Unit
 }
 
 // Type aliases

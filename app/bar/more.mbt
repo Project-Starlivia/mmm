@@ -1,7 +1,7 @@
 // 帯の `⋯`。低頻度だが消したくないものの受け皿。3 つの塊 — 戻す / 見た目と手触り / 外に開く。
 //
 // 並びは純粋な表（files.mbt と同じ作り）。いまの状態を受けて行を返し、
-// 押されたら `MoreActs` を呼ぶだけ。外に開く先はここが知っていて、開くのも web/ の 1 行
+// 押されたら `MoreActs` を呼ぶだけ。外に開く先はここが知っていて、開くのは `visit`
 
 ///|
 /// リポジトリの行き先。ここ 1 か所
@@ -13,7 +13,7 @@ pub(all) struct More {
   /// 掴みやすさ（Easy grab）が入っているか
   grab : Bool
   /// リンクにまつわる押す前の但し書き。届いたら行に付く
-  link_note : ((Array[String]) -> Unit) -> Unit
+  link_caveat : @parts.Caveat
 }
 
 ///|
@@ -25,6 +25,8 @@ pub(all) struct MoreActs {
   toggle_grab : () -> Unit
   /// 写せたか。写せたことは押した行の絵が言う
   copy_link : ((Bool) -> Unit) -> Unit
+  /// 外の場所（URL）を別のタブで開く
+  visit : (String) -> Unit
 }
 
 ///|
@@ -66,15 +68,13 @@ pub fn more_menu(s : More, a : MoreActs) -> Array[@parts.Entry] {
     Sep,
     // 但し書きは待たずに開いて、届いたら埋まる（測るのに gzip が要る）
     Done(
-      @parts.row("Copy link", mark=Some("link"), note=Some(s.link_note)),
+      @parts.row("Copy link", mark=Some("link"), caveat=Some(s.link_caveat)),
       a.copy_link,
     ),
     Sep,
     Run(@parts.row("Shortcuts", mark=Some("keyboard")), () => {
-      @web.open_url(repo + "/blob/main/docs/shortcuts.md")
+      (a.visit)(repo + "/blob/main/docs/shortcuts.md")
     }),
-    Run(@parts.row("GitHub", mark=Some("mark-github")), () => {
-      @web.open_url(repo)
-    }),
+    Run(@parts.row("GitHub", mark=Some("mark-github")), () => (a.visit)(repo)),
   ]
 }

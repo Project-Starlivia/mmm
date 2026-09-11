@@ -8,7 +8,8 @@
 // （icons.mbt の `nod`）。そのうえで、起きなかった理由には**向きが 2 つ**ある。
 //
 //   failed  … こちらが果たせなかった。ほとんどはこちら
-//   blocked … 先へ進めない。**次の一手はそちらにある**
+//   blocked … 先へ進めない。**次の一手はそちらにある**（書き出すものが無い、
+//             貼る先のノードを選んでいない）
 //
 // **その向きを言うのは印の形で、色は増やさない。** 危険色を 1 つ足せば
 // 「その色＝まずいこと」を覚えてもらう話になるし、形なら、テーマにも色覚にも
@@ -36,8 +37,7 @@ pub let failed_words : Array[String] = [
   "Couldn't open the image folder", "Couldn't create a new file", "Couldn't rename the file",
   "Couldn't export", "Couldn't copy", "Couldn't copy the link", "Couldn't paste",
   "Couldn't read that as a link", "Couldn't add the drawing", "Couldn't open that card",
-  "Couldn't start editing — the node is folded", "Couldn't do that here", "Select a node to paste an image into",
-  "Select a node to paste a link into", no_file_access,
+  "Couldn't start editing — the node is folded", "Couldn't do that here", no_file_access,
 ]
 
 ///|
@@ -45,8 +45,11 @@ pub let failed_words : Array[String] = [
 pub let no_file_access = "This browser cannot open or save files"
 
 ///|
-/// 次の一手が相手にあるもの。いまは書き出すものが無いときの Mod+E だけ
-pub let blocked_words : Array[String] = ["Nothing to export yet"]
+/// 次の一手が相手にあるもの — 書き出すものが無い（Mod+E）、貼る先のノードを
+/// 選んでいない。どちらも「選べば通る」ことを相手へ向けて言う
+pub let blocked_words : Array[String] = [
+  "Nothing to export yet", "Select a node to paste an image into", "Select a node to paste a link into",
+]
 
 ///|
 /// body に置いた 1 つの器と、消す時計
@@ -59,20 +62,12 @@ priv struct Shown {
 let shown : Shown = { box: None, timer: None, }
 
 ///|
-/// 字のひと続き。**`span` は「意味を持たない字の一区切り」そのもの**なので、
-/// ここに `div` を置くと「段落だ」と嘘をつくことになる
-fn words(doc : @dom.Document, name : String, text : String) -> @dom.Element {
-  let el = doc.createElement("span")
-  el.setAttribute("class", name)
-  el.setTextContent(text)
-  el
-}
-
-///|
 /// しらせ 1 つぶん。器（`.notice`）ごと組んで返す — **置くのは呼ぶ側**。
 /// アプリは下の `show` が body に 1 個だけ置き、並べて見る道具はどこにでも置く。
 ///
 /// 中身は 3 つ。**入れ物は、意味を持つか CSS で言えない境目があるときだけ置く。**
+/// 字は `span` — 「意味を持たない字の一区切り」そのもので、`div` を置くと
+/// 「段落だ」と嘘をつくことになる
 ///
 ///   .icon  印（飾り。意味は role と字が持つので `aria-hidden`）
 ///   .lead  詫び（`blocked` では出さない）
@@ -83,16 +78,15 @@ pub fn notice(
   msg : String,
   apologize : Bool,
 ) -> @dom.Element {
-  let box = doc.createElement("div")
-  box.setAttribute("class", "notice")
+  let box = @web.html(doc, "div", "notice")
   // HTML に「しらせ」のタグは無い。`<output>` は `role="status"` に落ちる
   // ので、すぐ割り込む `alert` が要るこちらは div に role を載せる
   box.setAttribute("role", "alert")
   box.append(icon(doc, mark).as_node())
   if apologize {
-    box.append(words(doc, "lead", sorry).as_node())
+    box.append(@web.html_text(doc, "span", "lead", sorry).as_node())
   }
-  box.append(words(doc, "msg", msg).as_node())
+  box.append(@web.html_text(doc, "span", "msg", msg).as_node())
   box
 }
 

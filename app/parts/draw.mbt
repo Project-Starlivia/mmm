@@ -5,30 +5,14 @@
 // ドロップとまったく同じ `Images::save_to_disk` を通るので、WebP への変換も
 // 名前の確認も画像フォルダの結び付けも、そこ 1 か所が持ち続ける。
 //
-// 紙は**描いた順の並びの写像**として持つ（`Sheet`）。取り消しは末尾を落として
-// 描き直すだけ — 1 枚ずつ画像を控える形だと、720×440 の 2 倍解像度で
-// 1 手あたり 5MB になる。文書の undo が編集の集合を並べて再生するのと
-// 同じ考え方。
+// 紙は**描いた順の並びの写像**（sheet.mbt の `Sheet`）。ここが持つのは、それを
+// canvas に載せる道具立て（`Board`）と窓（`show_drawing`）。
 //
 // **道具は選ばせるのではなく、絞って並べる。** OS のカラーピッカーと生の
 // スライダーは「何でも選べます」としか言っておらず、選ぶ手間だけを渡して
 // くる。出すのは黒とアクセントカラーと消しゴム、そして 3 段の太さだけ。
 // ピッカーは**主役にはしない**が、筆の丸をダブルクリックか右クリックすれば
 // 出て、その筆の色を差し替えられる — 並びは 2 本のまま、色だけ好きに。
-
-///|
-/// 紙の中の座標（CSS ピクセル）
-pub(all) struct Pt {
-  x : Double
-  y : Double
-} derive(Eq, Debug)
-
-///|
-/// 描いた順に積む手。取り消しはこの並びの末尾を落とす
-pub(all) enum Stroke {
-  Line(Array[Pt], String, Double)
-  Clear
-} derive(Eq, Debug)
 
 ///|
 let width = 720.0
@@ -92,15 +76,6 @@ fn nibs_of(ink : Ink) -> Array[Double] {
 }
 
 ///|
-/// 手を載せる先。canvas の 2d が持つ 2 つの動きだけ（試験では記録に載せる）
-pub(all) struct Paint {
-  /// 紙の色で塗り潰す
-  fill : () -> Unit
-  /// 色・太さ・点の並びで線を引く
-  line : (String, Double, Array[Pt]) -> Unit
-}
-
-///|
 /// canvas の 2d に載せる
 fn canvas_paint(ctx : @core.Any) -> Paint {
   {
@@ -117,86 +92,10 @@ fn canvas_paint(ctx : @core.Any) -> Paint {
 }
 
 ///|
-/// 紙。手の並びと、それを載せる先
-pub struct Sheet {
-  strokes : Array[Stroke]
-  paint : Paint
-  mut drawing : Array[Pt]?
-}
-
-///|
-fn Sheet::new(paint : Paint) -> Sheet {
-  let self : Sheet = { strokes: [], paint, drawing: None, }
-  self.repaint()
-  self
-}
-
-///|
-/// 1 手ぶんを紙に載せる
-fn Sheet::put(self : Sheet, s : Stroke) -> Unit {
-  match s {
-    Clear => (self.paint.fill)()
-    Line(points, color, w) => (self.paint.line)(color, w, points)
-  }
-}
-
-///|
-/// 並びの通りに引き直す（取り消しと、消しゴムの後始末）
-fn Sheet::repaint(self : Sheet) -> Unit {
-  (self.paint.fill)()
-  for s in self.strokes {
-    self.put(s)
-  }
-}
-
-///|
-/// 一手の始まり（点を打つ）
-fn Sheet::begin(self : Sheet, p : Pt, color : String, w : Double) -> Unit {
-  let points = [p]
-  self.drawing = Some(points)
-  self.strokes.push(Line(points, color, w))
-  self.put(Line(points, color, w))
-}
-
-///|
-/// 一手の続き。引き足すのは最後の一区間だけ。全部引き直すのは取り消しのときでよい
-fn Sheet::draw_to(self : Sheet, p : Pt) -> Unit {
-  guard self.drawing is Some(points) else { return }
-  guard self.strokes[self.strokes.length() - 1] is Line(_, color, w) else {
-    return
-  }
-  let last = points[points.length() - 1]
-  points.push(p)
-  (self.paint.line)(color, w, [last, p])
-}
-
-///|
-fn Sheet::end(self : Sheet) -> Unit {
-  self.drawing = None
-}
-
-///|
-/// 最後の一手を戻す
-fn Sheet::undo(self : Sheet) -> Unit {
-  if self.strokes.length() == 0 {
-    return
-  }
-  self.strokes.pop() |> ignore
-  self.repaint()
-}
-
-///|
-/// クリアも手のひとつ。取り消しで戻せる
-fn Sheet::clear(self : Sheet) -> Unit {
-  self.strokes.push(Clear)
-  self.repaint()
-}
-
-///|
-fn button(doc : @dom.Document, label : String) -> @dom.Element {
-  let b = doc.createElement("button")
+/// 押しても送らないボタン（form の中に居る）。字は無くてもよい（太さの点）
+fn button(doc : @dom.Document, class : String, label : String) -> @dom.Element {
+  let b = @web.html_text(doc, "button", class, label)
   b.setAttribute("type", "button")
-  b.setTextContent(label)
   b
 }
 
@@ -228,17 +127,14 @@ fn[T] picker(
 /// ので、中に絵を入れる（紙の色で塗った丸は、明るいテーマで器と同じ色になって
 /// 消える）
 fn ink_face(doc : @dom.Document, ink : Ink) -> @dom.Element {
-  let b = doc.createElement("button")
-  b.setAttribute("type", "button")
   match ink {
     Eraser => {
+      let b = icon_button(doc, "eraser", title="Eraser")
       b.setAttribute("class", "ink eraser")
-      b.setAttribute("title", "Eraser")
-      b.setAttribute("aria-label", "Eraser")
-      b.append(icon(doc, "eraser").as_node())
+      b
     }
     Pen(pen) => {
-      b.setAttribute("class", "ink")
+      let b = button(doc, "ink", "")
       // 色そのものは道具の持ち物。CSS には形だけを置く
       let paint = () => {
         @web.set_style(b, "--swatch", pen.color)
@@ -251,9 +147,8 @@ fn ink_face(doc : @dom.Document, ink : Ink) -> @dom.Element {
       // 筆の値そのものを書き換えるので、選んでいる筆ならそのまま次の一手から効く。
       // **入力は丸に重ねて置く** — OS のピッカーは入力の箱の位置に出るので、
       // 箱が無い（`hidden`）と窓の隅に出る。見た目と押下は丸のもの（`.pick`）
-      let pick = doc.createElement("input")
+      let pick = @web.html(doc, "input", "pick")
       pick.setAttribute("type", "color")
-      pick.setAttribute("class", "pick")
       pick.setAttribute("tabindex", "-1")
       @web.listen(pick, "input", _ => {
         pen.color = @web.value(pick)
@@ -267,9 +162,9 @@ fn ink_face(doc : @dom.Document, ink : Ink) -> @dom.Element {
       @web.listen(b, "dblclick", open)
       @web.listen(b, "contextmenu", open)
       b.append(pick.as_node())
+      b
     }
   }
-  b
 }
 
 ///|
@@ -277,10 +172,7 @@ fn ink_face(doc : @dom.Document, ink : Ink) -> @dom.Element {
 /// （字で "2px" と書くより、出てくる線の太さが直に分かる）。
 /// 実際の大きさは選んでいるインクで変わるので、`--nib` は後から入れる
 fn nib_face(doc : @dom.Document) -> @dom.Element {
-  let b = doc.createElement("button")
-  b.setAttribute("type", "button")
-  b.setAttribute("class", "nib")
-  b
+  button(doc, "nib", "")
 }
 
 ///|
@@ -306,8 +198,7 @@ fn Board::new(
   doc : @dom.Document,
   paint? : (@dom.Element) -> Paint = canvas => paper_of(doc, canvas),
 ) -> Board {
-  let body = doc.createElement("div")
-  body.setAttribute("class", "draw")
+  let body = @web.html(doc, "div", "draw")
 
   // ---- 道具立て ----
   //
@@ -327,8 +218,7 @@ fn Board::new(
   ]
   let ink : Ref[Ink] = { val: inks[0], }
   let step : Ref[Int] = { val: default_step, }
-  let bar = doc.createElement("div")
-  bar.setAttribute("class", "tools")
+  let bar = @web.html(doc, "div", "tools")
   let nib_buttons = picker(pen_nibs, _ => nib_face(doc), default_step, (_, i) => {
     step.val = i
   })
@@ -342,8 +232,7 @@ fn Board::new(
       b.setAttribute("aria-label", size)
     }
   }
-  let ink_row = doc.createElement("div")
-  ink_row.setAttribute("class", "inks")
+  let ink_row = @web.html(doc, "div", "inks")
   for
     b in picker(inks, i => ink_face(doc, i), 0, (value, _) => {
       ink.val = value
@@ -351,17 +240,15 @@ fn Board::new(
     }) {
     ink_row.append(b.as_node())
   }
-  let nibs = doc.createElement("div")
-  nibs.setAttribute("class", "nibs")
+  let nibs = @web.html(doc, "div", "nibs")
   for b in nib_buttons {
     nibs.append(b.as_node())
   }
   sync_nibs()
-  let undo = button(doc, "Undo")
+  let undo = button(doc, "", "Undo")
   undo.setAttribute("title", "Mod+Z")
-  let clear = button(doc, "Clear")
-  let actions = doc.createElement("div")
-  actions.setAttribute("class", "group")
+  let clear = button(doc, "", "Clear")
+  let actions = @web.html(doc, "div", "group")
   actions.append(undo.as_node())
   actions.append(clear.as_node())
   bar.append(ink_row.as_node())
@@ -372,8 +259,7 @@ fn Board::new(
   // 絵の比は常に width:height（画素は dpr 倍）。表示だけは窓に入る大きさまで縮む
   // （CSS の max-width。高さは canvas 自身の比から決まる）
   let dpr = @cmp.minimum(@web.device_pixel_ratio(doc), max_dpr)
-  let canvas = doc.createElement("canvas")
-  canvas.setAttribute("class", "paper")
+  let canvas = @web.html(doc, "canvas", "paper")
   canvas.setAttribute("width", @web.num(width * dpr))
   canvas.setAttribute("height", @web.num(height * dpr))
   @web.set_style(canvas, "width", @web.px(width))
@@ -436,22 +322,18 @@ pub fn draw_form(
 ) -> (@dom.Element, Board) {
   let form = doc.createElement("form")
   form.setAttribute("method", "dialog")
-  form.append(p(doc, "title", "Draw").as_node())
-  form.append(p(doc, "note", "Mod+Enter to insert, Esc to discard").as_node())
+  form.append(@web.html_text(doc, "p", "title", "Draw").as_node())
+  form.append(
+    @web.html_text(doc, "p", "note", "Mod+Enter to insert, Esc to discard").as_node(),
+  )
   let board = match paint {
     Some(paint) => Board::new(doc, paint~)
     None => Board::new(doc)
   }
-  // 断りは左、進むは右（たずねと同じ並び）。進む側だけが色を持つ
-  let row = doc.createElement("div")
-  row.setAttribute("class", "row")
-  let no = button(doc, "Cancel")
-  let go = button(doc, "Insert")
-  go.setAttribute("class", "go")
-  @web.listen(no, "click", _ => cancel())
+  // 足元はたずねと同じ並び。進む側は送信ではなく、押せば板を渡す
+  let (row, go) = footer(doc, "Insert", "Cancel", cancel)
+  go.setAttribute("type", "button")
   @web.listen(go, "click", _ => insert(board))
-  row.append(no.as_node())
-  row.append(go.as_node())
   form.append(board.el.as_node())
   form.append(row.as_node())
   (form, board)
@@ -467,8 +349,7 @@ pub fn draw_form(
 pub async fn show_drawing(doc : @dom.Document) -> @core.Any? {
   // 器はたずねと同じ `<dialog class="ask">`。焦点の閉じ込め・Esc・後ろの幕は
   // ブラウザが持つので、ここでは書かない
-  let dlg = doc.createElement("dialog")
-  dlg.setAttribute("class", "ask")
+  let dlg = @web.html(doc, "dialog", "ask")
   // 閉じ方は `<dialog>` の 1 つ — Esc も Cancel も `close()` で、進んだとき
   // だけ `"ok"` を添える。絵を待つ間に Esc を押されても close は
   // 1 度しか起きないので、二重に返らない

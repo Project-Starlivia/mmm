@@ -1,12 +1,16 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "mmm/app/prefs"
 
+import {
+  "mizchi/js_browser/dom",
+}
+
 // Values
-pub fn load(String) -> String?
+pub fn load(@dom.Document, String) -> String?
 
-pub fn store(String, String) -> Unit
+pub fn store(@dom.Document, String, String) -> Unit
 
-pub fn sweep() -> Unit
+pub fn sweep(@dom.Document) -> Unit
 
 // Errors
 

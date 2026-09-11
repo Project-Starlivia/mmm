@@ -178,7 +178,7 @@ pub fn App::new(
     saved_name: None,
     recent: [],
     drawing_open: false,
-    grab: @prefs.load("grab") == Some("on"),
+    grab: @prefs.load(doc, "grab") == Some("on"),
   }
   late.val = Some(self)
   self.wire()
@@ -382,7 +382,7 @@ async fn App::offer_connect(self : App) -> Unit {
     return
   }
   let folder = self.declared_folder().unwrap_or("./")
-  let go = @parts.asked(self.doc, @parts.connect(folder))
+  let go = @parts.asked(self.doc, @parts.folder_connection(folder))
   // 箱を読んでいるあいだに移っていることもある。**繋ぐ直前にもう一度見る**
   if go is Some(_) && gen == self.gen {
     self.images.connect()
@@ -392,7 +392,7 @@ async fn App::offer_connect(self : App) -> Unit {
 ///|
 async fn App::confirm_discard(self : App) -> Bool {
   self.text() == self.saved_text ||
-  @parts.asked(self.doc, @parts.discard()) is Some(_)
+  @parts.asked(self.doc, @parts.unsaved_changes()) is Some(_)
 }
 
 ///|
@@ -428,7 +428,7 @@ async fn App::open_known(self : App, file : @web.FileHandle) -> Unit {
 /// いま開いているファイル**そのもの**の名前を変える。本文の見出しから導く名前とは別の話
 async fn App::rename_file(self : App) -> Unit {
   guard self.saved_name is Some(current) else { return }
-  guard @parts.asked(self.doc, @parts.rename(current)) is Some(typed) else {
+  guard @parts.asked(self.doc, @parts.file_name(current)) is Some(typed) else {
     return
   }
   let name = typed[0].trim(chars=" \t\r\n").to_owned()
@@ -561,7 +561,9 @@ async fn App::ensure_place(self : App) -> Bool {
   if self.saved_name is Some(_) {
     return true
   }
-  guard @parts.asked(self.doc, @parts.place()) is Some(_) else { return false }
+  guard @parts.asked(self.doc, @parts.image_place()) is Some(_) else {
+    return false
+  }
   self.save_file(true)
   self.saved_name is Some(_)
 }
@@ -642,7 +644,7 @@ fn App::paste(self : App) -> Unit {
       guard gen == self.gen else { return }
       if !@core.is_nullish(img) {
         guard anchor is Some(id) else {
-          @parts.failed(self.doc, "Select a node to paste an image into")
+          @parts.blocked(self.doc, "Select a node to paste an image into")
         }
         self.attach_image(id, img)
         return
@@ -681,7 +683,7 @@ fn App::folder_caption(self : App) -> String {
 fn App::set_grab(self : App, on : Bool) -> Unit {
   self.grab = on
   self.map.set_grab(on)
-  @prefs.store("grab", if on { "on" } else { "off" })
+  @prefs.store(self.doc, "grab", if on { "on" } else { "off" })
 }
 
 ///|
@@ -742,7 +744,7 @@ fn App::wire(self : App) -> Unit {
       {
         light: self.theme.is_light(),
         grab: self.grab,
-        link_note: k => @web.spawn(async fn() { k(self.link_note()) }),
+        link_caveat: k => @web.spawn(async fn() { k(self.link_note()) }),
       },
       {
         undo: self.ed.undo,
@@ -751,6 +753,7 @@ fn App::wire(self : App) -> Unit {
         toggle_theme: () => self.theme.toggle(),
         toggle_grab: () => self.set_grab(!self.grab),
         copy_link: k => @web.spawn(async fn() { k(self.copy_link()) }),
+        visit: url => @web.open_url(doc, url),
       },
     )
   })
@@ -805,7 +808,7 @@ fn App::wire(self : App) -> Unit {
 /// 本文の控えは持たない。IndexedDB に置くのはハンドルだけで、
 /// **起動時に勝手に開き直すことはしない** — 立ち上げたら常に空から始まる
 pub fn App::boot(self : App) -> Unit {
-  @prefs.sweep() // 役目を終えた localStorage のキーを捨てる
+  @prefs.sweep(self.doc) // 役目を終えた localStorage のキーを捨てる
   self.load_text("", None) // 空 = まだ何も無い。dirty も立たない
   let boot_gen = self.gen
   let hash = @web.hash(self.doc)

@@ -79,10 +79,12 @@ app/    MoonBit — module `mmm/app`。core に依存し、DOM を触る。試�
                 card(Card 1 枚 → SVG) / field(ラベルとカードの欄) / pick(選んでいるカードの枠と ×) /
                 host(外に頼るものの閉包) / measure(字の実測。canvas) / svg(全体を 1 枚の svg に写す)。
                 class と data-* は style.css との契約
-  parts/        器 — 文書を知らず、値を返す。icons(絵の唯一の源。Lucide の綴り) / notice(しらせ。言葉の表も) /
-                hint(空のときの言い出し) / tool(ペインの隅に浮く道具の器) / menu(メニューの器。行の形・入れ子・
-                キーで辿る・外を押せば閉じる) / ask(聞く器。<dialog>) / asks(聞くことの綴りの全部) /
-                draw(お絵描きの窓。紙は手の並びの写像) / color(アクセントカラーの読み。綴りの源は style.css)
+  parts/        器 — 文書を知らず、値を返す。icons(絵の唯一の源。Lucide の綴り。絵だけのボタンも) /
+                notice(しらせ。言葉の表も) / hint(空のときの言い出し) / tool(ペインの隅に浮く道具の器) /
+                entry(メニューの行の形 — 沈む理由・但し書き・入れ子。bar/ と mindmap/act が組む語彙) /
+                menu(メニューの器。置く・キーで辿る・外を押せば閉じる) / ask(聞く器。<dialog>) /
+                asks(聞くことの綴りの全部。名は聞いていることの主語) / sheet(紙。手の並びの写像、純粋) /
+                draw(お絵描きの道具と窓) / color(アクセントカラーの読み。綴りの源は style.css)
   web/          browser の API を 1 行ずつ包む。svg(要素を作る・写す) / dom(style・class・矩形・捕捉・欄の値・
                 出来事の的・窓) / fs(File System Access・IndexedDB) / blob(Blob と URL・焼き直し・ダウンロード) /
                 canvas(紙。2d の文脈と手・字の幅・ラスタ化) / clip(クリップボード・アドレス) / storage(localStorage) /
@@ -106,11 +108,12 @@ src/    TypeScript — **CodeMirror（md ペイン）だけ。** 文書の真実
   highlight.ts コードの色分け。CodeMirror の言語表を借りる。core の描画に閉包で渡す
   main.ts      入口。CodeMirror を立て、その読み書きを app（App）に閉包で渡し、
                1 トランザクションごとに cycle を呼ぶだけ
-test/   検証 — **ts に残るのは 3 本だけ**（判断は core へ移り、そちらは各科の
+test/   検証 — **ts に残るのは 4 本だけ**（判断は core へ移り、そちらは各科の
         `*_wbtest.mbt` が持つ）。app.test.ts は core の出入口の境界、
         state.test.ts は文書から導けるものが EditorState に居ること、
-        notation.test.ts は記法構造が
-        原文を 1 バイトも落とさないこと（fixtures 7 本 523 KB で言う）。
+        notation.test.ts は記法構造が原文を 1 バイトも落とさないこと
+        （fixtures 7 本 523 KB で言う）、notice.test.ts は呼ぶ側のしらせの綴りが
+        全部 notice.mbt の表に在ること（package の外から字面で照らす）。
         tools/ は pure.ts（core が DOM を知らないことの見張り）と
         gen-load.ts（負荷サンプル生成）、fixtures/ はその出力
 lab/    見るための道具（`pnpm run lab`）。index.html は md がどう読まれるか（mdAst /
@@ -306,9 +309,10 @@ Markdown の右上には書き方(# / n+ / -)が来る(**まだ無い** — #250
 
 **ほとんどは `failed`。** 「保存が先」も「リンクとして読めない」もこちら —
 置き場所を持たない文書に画像を収めると言ったのも、貼られた字をリンクとして
-読むと言ったのもこちらで、相手の不注意ではない。`blocked` は**書き出すものが
-無いときだけ**で、ボタンは沈めてあるのでキー(`Mod+E`)から来た人にしか出ない
-(触って読める言葉と同じものを出す)。
+読むと言ったのもこちらで、相手の不注意ではない。`blocked` は**次の一手が
+相手にあるときだけ** — 書き出すものが無い(ボタンは沈めてあるのでキー(`Mod+E`)から
+来た人にしか出ない。触って読める言葉と同じものを出す)と、貼る先のノードを
+選んでいない(`Select a node to paste … into`。選べば通る)。
 
 書き出しだけは 2 つで**1 つの塊**に見せる — 1 つの操作の 2 面
 (出し方 / 選び直し)だから。ほかの帯のボタンと同じ枠なしの字のまま、

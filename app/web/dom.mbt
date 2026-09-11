@@ -3,15 +3,26 @@
 // `_call` を書かない** — 綴りの間違いはこの 1 か所でしか起きない。
 
 ///|
-/// HTML の要素を class 付きで作る
-pub fn html(
+/// HTML の要素を class 付きで作る。class が空なら付けない（空の属性を残さない）
+pub fn html(doc : @dom.Document, tag : String, class : String) -> @dom.Element {
+  let e = doc.createElement(tag)
+  if class != "" {
+    e.setAttribute("class", class)
+  }
+  e
+}
+
+///|
+/// class 付きの要素に字を入れて作る（`<p class="title">Draw</p>` のような、字だけの 1 つ）
+pub fn html_text(
   doc : @dom.Document,
   tag : String,
   class : String,
-) -> @dom.HTMLElement {
-  let e = doc.createElement(tag)
-  e.setAttribute("class", class)
-  @dom.HTMLElement::cast_from_element(e)
+  text : String,
+) -> @dom.Element {
+  let e = html(doc, tag, class)
+  e.setTextContent(text)
+  e
 }
 
 ///|
@@ -200,10 +211,8 @@ pub fn observe_resize(e : @dom.Element, f : () -> Unit) -> Unit {
 
 ///|
 /// 別のタブで開く
-pub fn open_url(url : String) -> Unit {
-  @dom.window()
-  .as_any()
-  ._call("open", [
+pub fn open_url(doc : @dom.Document, url : String) -> Unit {
+  window_of(doc)._call("open", [
     @core.any(url),
     @core.any("_blank"),
     @core.any("noopener,noreferrer"),

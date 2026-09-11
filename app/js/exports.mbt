@@ -537,7 +537,14 @@ pub fn mmm_blocked_words() -> FixedArray[String] {
 /// 空のときの言い出し（"md" / "map"）。md ペインは ts（editor.ts）がこれを浮かべる
 #export_name("mmmPaneHint")
 pub fn mmm_pane_hint(pane : String) -> @dom.Element {
-  @parts.pane_hint(@dom.document(), pane)
+  @parts.pane_hint(
+    @dom.document(),
+    match pane {
+      "md" => Md
+      "map" => Map
+      _ => abort("知らないペイン: " + pane)
+    },
+  )
 }
 
 ///|
@@ -589,7 +596,7 @@ fn more_of(v : @core.Any) -> @bar.More {
   {
     light: v._get("light").cast(),
     grab: v._get("grab").cast(),
-    link_note: k => {
+    link_caveat: k => {
       @web.after(v._get("linkNote"), texts => k(strings_of(texts)))
     },
   }
@@ -605,6 +612,7 @@ fn more_acts_of(v : @core.Any) -> @bar.MoreActs {
     toggle_theme: () => call("toggleTheme", []) |> ignore,
     toggle_grab: () => call("toggleGrab", []) |> ignore,
     copy_link: k => @web.after(call("copyLink", []), ok => k(ok.cast())),
+    visit: url => @web.open_url(@dom.document(), url),
   }
 }
 
@@ -687,10 +695,10 @@ fn folder_field(args : @core.Any) -> @parts.Field {
 /// 名前で引くたずね。args は名前ごと（connect / rename は字、imageName は { shape, shot }）
 fn named_ask(kind : String, args : @core.Any) -> @parts.Ask {
   match kind {
-    "discard" => @parts.discard()
-    "place" => @parts.place()
-    "connect" => @parts.connect(args.cast())
-    "rename" => @parts.rename(args.cast())
+    "discard" => @parts.unsaved_changes()
+    "place" => @parts.image_place()
+    "connect" => @parts.folder_connection(args.cast())
+    "rename" => @parts.file_name(args.cast())
     "imageName" => {
       let taken = args._get("taken")
       let here : Set[String]? = if defined(taken) {

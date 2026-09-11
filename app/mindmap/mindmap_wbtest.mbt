@@ -100,7 +100,7 @@ struct Stand {
 fn stand(md? : String = sample_md) -> Stand {
   let win = @test_utils.create_happy_window()
   let doc = win.document()
-  let pane = @web.html(doc, "div", "")
+  let pane = @dom.HTMLElement::cast_from_element(@web.html(doc, "div", ""))
   doc.body().unwrap().append(pane.as_node())
   let stub = Stub::new(md)
   let map = Mindmap::new(pane, stub.host())

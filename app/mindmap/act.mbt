@@ -91,11 +91,7 @@ pub fn items_of(
       it.label,
       key=it.key,
       mark=it.mark.filter(@parts.is_icon),
-      disabled=match (it.intent, it.why) {
-        (Some(_), _) => No
-        (None, Some(why)) => Why(why)
-        (None, None) => Yes
-      },
+      disabled=@parts.unless(it.intent is Some(_), why?=it.why),
     )
     let run = it.intent.map(i => () => act(i))
     match it.items {

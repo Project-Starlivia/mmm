@@ -68,15 +68,16 @@ pub extern "js" fn text_width(
 /// **大きさが上限に収まることは呼ぶ側の責任**（`fit`）— canvas は超えた分を
 /// 黙って切るか null を返すだけで、何も言わない。絵にできなければ拒む
 pub extern "js" fn rasterize(
+  doc : @dom.Document,
   text : String,
   mime : String,
   px_w : Int,
   px_h : Int,
 ) -> @js_async.Promise[@core.Any] =
-  #| (text, mime, px_w, px_h) => new Promise((ok, no) => {
-  #|   const img = new Image();
+  #| (doc, text, mime, px_w, px_h) => new Promise((ok, no) => {
+  #|   const img = new doc.defaultView.Image();
   #|   img.onload = () => {
-  #|     const canvas = document.createElement("canvas");
+  #|     const canvas = doc.createElement("canvas");
   #|     canvas.width = px_w; canvas.height = px_h;
   #|     canvas.getContext("2d").drawImage(img, 0, 0, px_w, px_h);
   #|     canvas.toBlob((blob) => (blob ? ok(blob) : no(new Error("could not rasterize"))), mime);

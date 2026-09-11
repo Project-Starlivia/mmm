@@ -16,6 +16,26 @@ fn row_of(e : @parts.Entry) -> String {
 }
 
 ///|
+/// 並びの中の絵の名の全部（行の頭と見出し、入れ子の中も）
+fn marks_of(es : Array[@parts.Entry]) -> Array[String] {
+  let out = []
+  for e in es {
+    let (mark, inner) = match e {
+      Run(r, _) | Done(r, _) | Flip(r, _) => (r.mark, [])
+      Sub(r, items, _) => (r.mark, items)
+      Caption(_, m) => (m, [])
+      Sep => (None, [])
+    }
+    match mark {
+      Some(m) => out.push(m)
+      None => ()
+    }
+    out.append(marks_of(inner))
+  }
+  out
+}
+
+///|
 let nop : () -> Unit = () => ()
 
 ///|
@@ -103,9 +123,10 @@ test "more_menu: 3 つの塊。テーマと掴みやすさの行は切り替え�
       copied += 1
       k(true)
     },
+    visit: _ => (),
   }
   let dark = more_menu(
-    { light: false, grab: false, link_note: k => k([]), },
+    { light: false, grab: false, link_caveat: k => k([]), },
     acts,
   )
   assert_eq(dark.map(row_of), [
@@ -113,7 +134,7 @@ test "more_menu: 3 つの塊。テーマと掴みやすさの行は切り替え�
     "---", "Shortcuts", "GitHub",
   ])
   let light = more_menu(
-    { light: true, grab: true, link_note: k => k(["Images won't travel"]), },
+    { light: true, grab: true, link_caveat: k => k(["Images won't travel"]), },
     acts,
   )
   assert_eq(light[4] |> row_of, "Dark theme")
@@ -121,9 +142,35 @@ test "more_menu: 3 つの塊。テーマと掴みやすさの行は切り替え�
   guard light[7] is Done(r, go) else { fail("Copy link が Done でない") }
   assert_eq(r.mark, Some("link"))
   let notes = []
-  r.note.unwrap()(n => notes.push(n))
+  r.caveat.unwrap()(n => notes.push(n))
   assert_eq(notes, [["Images won't travel"]])
   let mut ok = false
   go(v => ok = v)
   assert_eq((copied, ok), (1, true))
+}
+
+///|
+/// 帯の表が言う絵の名は、どれも parts/icons.mbt の表に在る（綴りの食い違いは開いた瞬間に落ちる）
+test "帯の並びの絵は全部 icons の表に在る" {
+  let more : MoreActs = {
+    undo: nop,
+    redo: nop,
+    pick_color: nop,
+    toggle_theme: nop,
+    toggle_grab: nop,
+    copy_link: _ => (),
+    visit: _ => (),
+  }
+  let all = marks_of(files_menu(saved, file_acts)) +
+    marks_of(
+      more_menu({ light: false, grab: false, link_caveat: _ => (), }, more),
+    ) +
+    marks_of(
+      more_menu({ light: true, grab: true, link_caveat: _ => (), }, more),
+    ) +
+    marks_of(export_ways(deps(false), None))
+  assert_true(all.length() > 0)
+  for m in all {
+    assert_true(@parts.is_icon(m), msg="知らない絵: " + m)
+  }
 }
