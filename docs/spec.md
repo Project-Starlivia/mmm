@@ -117,10 +117,10 @@ test/   検証 — **ts に残るのは 4 本だけ**（判断は core へ移り
         `*_wbtest.mbt` が持つ）。app.test.ts は core の出入口の境界、
         state.test.ts は文書から導けるものが EditorState に居ること、
         notation.test.ts は記法構造が原文を 1 バイトも落とさないこと
-        （fixtures 7 本 523 KB で言う）、notice.test.ts は呼ぶ側のしらせの綴りが
+        （大きさの見本 5 本で言い、その 5 本が名乗る大きさも主張する）、notice.test.ts は呼ぶ側のしらせの綴りが
         全部 notice.mbt の表に在ること（package の外から字面で照らす）。
         tools/ は pure.ts（core が DOM を知らないことの見張り）と
-        gen-load.ts（負荷サンプル生成）、fixtures/ はその出力
+        gen-load.ts（大きさの見本の生成。記法の変化は core の見本が持つ）、fixtures/ はその出力
 lab/    見るための道具（`pnpm run lab`）。index.html は md がどう読まれるか（mdAst /
         mmmTree と書き戻し）、parts/ は部品 × 状態 × テーマを 1 ページに
         並べたもの — 表 parts.ts（DOM の部品）と map.ts（本物の Mindmap を通す）が

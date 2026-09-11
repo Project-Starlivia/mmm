@@ -2,7 +2,10 @@
 // 試験は Doc の型にぶら下がっているが、ここは md → md しか見ないので、内側の作りが
 // 変わっても生き残る。**型を壊しても、ここが通れば同じ mmm。**
 //
-// 見本は木の形の試験が読ませている md を全部集めたもの（181 通り）。
+// 見本は木の形の試験が読ませている md を全部集めたもの（188 通り）。#88 で負荷の
+// 見本にしか無かった記法（~~~ / フェンスの中の見出し / タブ / 末尾空白 / 表 /
+// 素の URL / 脚注）もここへ吸わせた。**記法の変化はここが言い、大きさは
+// test/fixtures が言う。**
 // 押さえるのは 4 つ:
 //
 //   正規形     読んで書き戻した字。**読み方の答えがそのまま出る**
@@ -95,6 +98,12 @@ let read_corpus : Array[String] = [
   "###### f\n\n####### g\n", "",
   // 境界の綴り（`___`）と、列のマーカー・番号（#84。飛んだ番号も読んだまま）
    "# a\n\n## b\n\n___\n\n## c\n", "# a\n\n* b\n* c\n", "# a\n\n1. b\n2. c\n", "# a\n\n1. b\n3. c\n",
+  // #88 — 負荷見本にしか無かった記法。**大きさではなく記法の変化**はここで言う。
+  // チルダのフェンス / フェンスの中の見出しと水平線 / タブ区切りの見出し /
+  // 末尾空白付きの見出し / 表 / 素の URL の行 / 脚注（読み解かないので Raw に落ちる）
+   "# a\n\n~~~\n## not a heading\n~~~\n", "# a\n\n```md\n# not a heading\n---\n```\n",
+  "##\ta\n", "## a  \n", "# a\n\n| x | y |\n|---|---|\n| 1 | 2 |\n", "# a\n\nhttps://x.example/\n",
+  "# a\n\ntext[^1]\n\n[^1]: note\n",
 ]
 
 ///|
@@ -152,6 +161,10 @@ test "見本 — 読んで書き戻した字" {
       #|  → "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n\n</details>\n\n</details>\n"
       #|"# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n\n<details>\n<summary>z</summary>\n\n#### z\n</details>\n</details>\n</details>\n"
       #|  → "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n\n<details>\n<summary>z</summary>\n\n#### z\n\n</details>\n\n</details>\n\n</details>\n"
+      #|"##\ta\n"
+      #|  → "## a\n"
+      #|"## a  \n"
+      #|  → "## a\n"
       #|
     ),
   )

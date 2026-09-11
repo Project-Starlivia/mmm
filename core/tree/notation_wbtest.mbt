@@ -437,6 +437,20 @@ test "見本 — 記法構造の指紋" {
       #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,1.,3,tight) Line[10,15](2,13,2.,3,tight)
       #|"# a\n\n1. b\n3. c\n"
       #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,1.,3,tight) Line[10,15](2,13,3.,3,tight)
+      #|"# a\n\n~~~\n## not a heading\n~~~\n"
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Card[5,30]["Code",{"info":"","text":"## not a heading\n"}]
+      #|"# a\n\n```md\n# not a heading\n---\n```\n"
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Card[5,35]["Code",{"info":"md","text":"# not a heading\n---\n"}]
+      #|"##\ta\n"
+      #|  → Line[0,5](2,3,#0)
+      #|"## a  \n"
+      #|  → Line[0,7](2,3,#0)
+      #|"# a\n\n| x | y |\n|---|---|\n| 1 | 2 |\n"
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Card[5,35]
+      #|"# a\n\nhttps://x.example/\n"
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Card[5,24]["Link",{"text":"https://x.example/","href":"https://x.example/","title":""}]
+      #|"# a\n\ntext[^1]\n\n[^1]: note\n"
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Card[5,14] Blank[14,15] Card[15,26]
       #|
     ),
   )

@@ -240,8 +240,8 @@ export const paneHint = (pane: "md" | "map"): HTMLDivElement => div(mbt.mmmPaneH
  * 木から綴り直す `serialize` とは別の道（あちらは正規形なので入力と違いうる）。
  *
  * **API ではなく物差し。** 呼ぶのは網だけ（test/notation.test.ts）で、それが面を跨ぐのは
- * fixtures がディスクに在って MoonBit から読めないから。消すと 523 KB の実文書が
- * 敷き詰めの法則から外れる（見本 166 通りは短くて作られたものなので代わりにならない）
+ * fixtures がディスクに在って MoonBit から読めないから。消すと大きさの見本が
+ * 敷き詰めの法則から外れる（見本 188 通りは短くて作られたものなので代わりにならない）
  */
 export const notationBack = (md: string): string => mbt.mmmNotationBack(md);
 
