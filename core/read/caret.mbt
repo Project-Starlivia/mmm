@@ -73,26 +73,59 @@ fn owns(s : Survey) -> Array[Own] {
 }
 
 ///|
-/// 1 つの範囲に掛かる自身の文。**閉じ際は中と見なす** — 区間は半開だが、カーソルは
-/// その位置に立てる。半開で読むと文書の末尾では何にも掛からず、追記しているあいだ
-/// 印が出ない。**点が継ぎ目ちょうどなら始まる側 1 つ** — 両側を返すと、地図へ移った
-/// 直後の Delete が 2 つ消す。範囲なら掛かる全部
-fn hits(all : Array[Own], r : Range) -> Array[Own] {
-  let on = all.filter(o => o.from <= r.to && o.to >= r.from)
-  guard r.from == r.to else { return on }
-  let starting = on.filter(o => o.from == r.from)
-  if starting.length() > 0 {
-    starting
+/// 点に掛かる自身の文。掛からなければ None。
+///
+/// **`owns` は from の昇順で、重なりが無い** — 親の文は最初の子の手前で終わり、
+/// 次の兄弟はその子孫の後ろから始まる。だから **`from` が `p` 以下の最後のもの
+/// 1 つ**を見れば足りる。それが `p` を含まなければ、`p` はどの文にも掛からない
+/// （子の領分の中）。継ぎ目ちょうどの点では、その位置から始まるほうが最後になる
+/// ので、「始まる側 1 つ」がそのまま出る。
+///
+/// **走らずに探す。** 矩形選択は選んだ点ぜんぶを打鍵ごとに解き直すので、1 点ごとに
+/// 全ノードを走ると O(ノード数 × 点の数) になる — 5000 ノードで 144 個選んだとき
+/// 1 打鍵 12.6ms を実測した（#55）。順が崩れれば二分探索は誤るので、
+/// `caret_wbtest.mbt` が見本ぜんぶで昇順・重なり無しを押さえる
+fn hit_at(all : Array[Own], p : Int) -> Own? {
+  let mut lo = 0
+  let mut hi = all.length()
+  while lo < hi {
+    let mid = (lo + hi) / 2
+    if all[mid].from <= p {
+      lo = mid + 1
+    } else {
+      hi = mid
+    }
+  }
+  guard lo > 0 else { return None }
+  let o = all[lo - 1]
+  if o.to >= p {
+    Some(o)
   } else {
-    on
+    None
   }
 }
 
 ///|
-/// その範囲たちが掛かるノードの id、文書順。無ければ空
-fn caret_ids(s : Survey, ranges : Array[Range]) -> Array[Int] {
+/// 1 つの範囲に掛かる自身の文。**閉じ際は中と見なす** — 区間は半開だが、カーソルは
+/// その位置に立てる。半開で読むと文書の末尾では何にも掛からず、追記しているあいだ
+/// 印が出ない。**点が継ぎ目ちょうどなら始まる側 1 つ**（`hit_at`）— 両側を返すと、
+/// 地図へ移った直後の Delete が 2 つ消す。範囲なら掛かる全部
+fn hits(all : Array[Own], r : Range) -> Array[Own] {
+  guard r.from == r.to else {
+    return all.filter(o => o.from <= r.to && o.to >= r.from)
+  }
+  match hit_at(all, r.from) {
+    Some(o) => [o]
+    None => []
+  }
+}
+
+///|
+/// その範囲たちが掛かるノードの id、文書順。無ければ空。
+/// **`all` は呼ぶ側が 1 回だけ作る**（`owns`）— 点の数だけ作り直すと、それだけで
+/// ノード数に比例した仕事が点の数ぶん増える（#55）
+fn ids_at(all : Array[Own], ranges : Array[Range]) -> Array[Int] {
   guard ranges.length() > 0 else { return [] }
-  let all = owns(s)
   let picked : Set[Int] = Set([])
   for r in ranges {
     for o in hits(all, r) {
@@ -149,7 +182,9 @@ pub fn chosen(
   anchors : Anchors?,
 ) -> Choice {
   let gone = buried(s.doc)
-  let point = (p : Int) => caret_ids(s, [{ from: p, to: p, }]).get(0)
+  // **自身の文の並びは 1 回だけ作る。** 下の `point` は選んだ点ぜんぶに当たる（#55）
+  let all = owns(s)
+  let point = (p : Int) => hit_at(all, p).map(o => o.id)
   let nodes = (ids : Array[Int], anchor : Int?) => {
     let set : Set[Int] = Set::from_array(ids)
     let kept = set.iter().filter(id => !gone.contains(id)).collect()
@@ -161,7 +196,7 @@ pub fn chosen(
     Nodes(sel={ ids: kept, anchor: a, })
   }
   if holder is Md {
-    return nodes(caret_ids(s, caret.ranges), point(caret.head))
+    return nodes(ids_at(all, caret.ranges), point(caret.head))
   }
   match anchors {
     None => nothing

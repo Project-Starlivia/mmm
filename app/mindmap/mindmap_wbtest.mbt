@@ -248,16 +248,19 @@ test "md が持つ間は輪。輪は箱の 3px 内側で、本数は選択の数
 }
 
 ///|
-test "背景をなぞると矩形選択（触れた箱を全部）" {
-  with_doc(d => {
-    let s = stand(d)
-    s.fire("PointerEvent", "pointerdown", 2, 2)
-    s.fire("PointerEvent", "pointermove", 800, 400)
-    assert_eq(s.stub.selection.ids, [2, 3, 4])
-    s.fire("PointerEvent", "pointerup", 800, 400)
-    // なぞったので解かない
-    assert_eq(s.stub.selection.ids, [2, 3, 4])
-  })
+/// **動きは 1 フレームに 1 回進む**（#55）。だから pointermove の効果を見る前に
+/// 1 フレーム待つ。離すときは待たずに流すので、pointerup の後は同期で読める
+async test "背景をなぞると矩形選択（触れた箱を全部）" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let s = stand(w.document())
+  s.fire("PointerEvent", "pointerdown", 2, 2)
+  s.fire("PointerEvent", "pointermove", 800, 400)
+  @dom.wait_animation_frame()
+  assert_eq(s.stub.selection.ids, [2, 3, 4])
+  s.fire("PointerEvent", "pointerup", 800, 400)
+  // なぞったので解かない
+  assert_eq(s.stub.selection.ids, [2, 3, 4])
 }
 
 ///|
@@ -278,34 +281,37 @@ test "キーは表へ。Enter は兄弟を足す Op、矢印は選び直し、Sp
 }
 
 ///|
-test "掴んで動かすと落とし先を予告し、離すと MoveNode。Escape は取り消し" {
-  with_doc(d => {
-    let s = stand(d)
-    let (ax, ay) = s.mid(3)
-    let (bx, by) = s.mid(4)
-    s.fire("PointerEvent", "pointerdown", ax, ay)
-    s.fire("PointerEvent", "pointermove", bx, by + 20.0)
-    assert_true(s.map.mode is Dragging({ drop: Some(_), .. }))
-    assert_true(@web.has_class(s.map.renderer.node_el(3).unwrap(), "dragging"))
-    let line = s.pane.as_element().querySelector(".drop-line").unwrap()
-    let parent = s.pane.as_element().querySelector(".drop-parent")
-    // 兄弟の隙間なら線、箱の上なら drop-parent — どちらか一方の印が出る
-    assert_true(
-      line.getAttribute("visibility") == Some("visible") || parent is Some(_),
-    )
-    s.fire("PointerEvent", "pointerup", bx, by + 20.0)
-    assert_true(s.map.mode is Idle)
-    assert_true(s.stub.applied.last() is Some(MoveNode(..)))
-    assert_false(@web.has_class(s.map.renderer.node_el(3).unwrap(), "dragging"))
-    // 取り消し
-    s.fire("PointerEvent", "pointerdown", ax, ay)
-    s.fire("PointerEvent", "pointermove", bx, by + 20.0)
-    let n = s.stub.applied.length()
-    s.press_key("Escape")
-    assert_true(s.map.mode is Idle)
-    assert_eq(s.stub.applied.length(), n)
-    assert_eq(line.getAttribute("visibility"), Some("hidden"))
-  })
+async test "掴んで動かすと落とし先を予告し、離すと MoveNode。Escape は取り消し" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let s = stand(w.document())
+  let (ax, ay) = s.mid(3)
+  let (bx, by) = s.mid(4)
+  s.fire("PointerEvent", "pointerdown", ax, ay)
+  s.fire("PointerEvent", "pointermove", bx, by + 20.0)
+  // 動きは 1 フレームに 1 回進む（#55）
+  @dom.wait_animation_frame()
+  assert_true(s.map.mode is Dragging({ drop: Some(_), .. }))
+  assert_true(@web.has_class(s.map.renderer.node_el(3).unwrap(), "dragging"))
+  let line = s.pane.as_element().querySelector(".drop-line").unwrap()
+  let parent = s.pane.as_element().querySelector(".drop-parent")
+  // 兄弟の隙間なら線、箱の上なら drop-parent — どちらか一方の印が出る
+  assert_true(
+    line.getAttribute("visibility") == Some("visible") || parent is Some(_),
+  )
+  s.fire("PointerEvent", "pointerup", bx, by + 20.0)
+  assert_true(s.map.mode is Idle)
+  assert_true(s.stub.applied.last() is Some(MoveNode(..)))
+  assert_false(@web.has_class(s.map.renderer.node_el(3).unwrap(), "dragging"))
+  // 取り消し
+  s.fire("PointerEvent", "pointerdown", ax, ay)
+  s.fire("PointerEvent", "pointermove", bx, by + 20.0)
+  @dom.wait_animation_frame()
+  let n = s.stub.applied.length()
+  s.press_key("Escape")
+  assert_true(s.map.mode is Idle)
+  assert_eq(s.stub.applied.length(), n)
+  assert_eq(line.getAttribute("visibility"), Some("hidden"))
 }
 
 ///|

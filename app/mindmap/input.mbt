@@ -72,9 +72,36 @@ fn Mindmap::bind_pointer(self : Mindmap) -> Unit {
     capture=true,
   )
   @web.listen(pane, "pointerdown", e => self.pointer_down(e))
-  @web.listen(pane, "pointermove", e => self.pointer_move(e))
-  @web.listen(pane, "pointerup", e => self.pointer_end(e))
-  @web.listen(pane, "pointercancel", e => self.pointer_end(e))
+  // **動きは 1 フレームに 1 回だけ進める。** マウスは 1 フレームに何度も
+  // pointermove を出すが、進むのは最後の 1 点で足りる。矩形選択はそのたびに
+  // 選択を書き、`chosen` が木を 2 回歩く（`owns` と `buried`）ので、回数が
+  // そのまま文書の大きさ × イベント数になる（#55）。
+  //
+  // **離すときは待たずに流す。** 溜めたまま pointerup を通すと、最後の 1 点が
+  // 効かないまま「動かさずに離した」と読まれ、矩形選択が選択を解いてしまう
+  let pending : Ref[@core.Any?] = { val: None, }
+  let run = () => {
+    match pending.val {
+      Some(e) => {
+        pending.val = None
+        self.pointer_move(e)
+      }
+      None => ()
+    }
+  }
+  let soon = @web.per_frame(pane.ownerDocument().unwrap(), run)
+  @web.listen(pane, "pointermove", e => {
+    pending.val = Some(e)
+    soon()
+  })
+  @web.listen(pane, "pointerup", e => {
+    run()
+    self.pointer_end(e)
+  })
+  @web.listen(pane, "pointercancel", e => {
+    run()
+    self.pointer_end(e)
+  })
 }
 
 ///|
