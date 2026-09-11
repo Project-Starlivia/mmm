@@ -97,16 +97,29 @@ fn Fake::editor(self : Fake) -> Editor {
 }
 
 ///|
-/// 手元の置き場（ディスクの代わり）。何も覚えていない
-fn memo_disk() -> @disk.Disk {
+/// 手元の置き場（ディスクの代わり）。既定は何も覚えていない。`known` を渡せば
+/// その名前の文書を覚えている台帳として立つ（立ち上がりの一覧。#277）。
+/// 並びは最後に触れた順なので、先に渡したものが新しい
+fn memo_disk(known : Array[String]) -> @disk.Disk {
   let table : Map[String, @core.Any] = Map([])
+  if known.length() > 0 {
+    table["docs"] = @core.any(
+      known.mapi((i, name) => {
+        @web.record([
+          ("doc", paper(name, "", _ => ()).as_any()),
+          ("directory", @core.null()),
+          ("seen", @core.any((known.length() - i).to_double())),
+        ])
+      }),
+    )
+  }
   @disk.Disk::new(
     @disk.Recent::new({
       read: fn(key) { table.get(key).unwrap_or(@core.null()) },
       write: fn(key, value) { table[key] = value },
       remove: fn(key) { table.remove(key) },
       same: fn(_, _) { false },
-      is_file: _ => false,
+      is_file: looks_like_file,
       is_dir: _ => false,
     }),
   )
@@ -137,7 +150,7 @@ fn mount(
 ///|
 /// index.html と同じ器を立て、App を組んで動かす。非同期の試験は閉じる閉包を
 /// 通れないので、これを手で持って `defer s.win.close()`。それ以外は `with_stand`
-fn stand() -> Stand {
+fn stand(known? : Array[String] = []) -> Stand {
   let win = @test_utils.create_happy_window()
   let doc = win.document()
   let body = doc.body().unwrap()
@@ -169,7 +182,7 @@ fn stand() -> Stand {
     log: [],
     hint: false,
   }
-  let app = App::new(doc, fake.editor(), memo_disk(), measure=(_, text) => {
+  let app = App::new(doc, fake.editor(), memo_disk(known), measure=(_, text) => {
     text.char_length().to_double() * 7.0
   })
   fake.app = Some(app)
@@ -409,4 +422,75 @@ async test "自動保存: 保存していない文書では、入っていても
   // しらせも出ない（書こうとして失敗したのではなく、行かなかった）
   assert_true(s.doc.querySelector(".notice") is None)
   assert_true(s.app.saved_name is None)
+}
+
+// ---- 立ち上がりの挨拶（#277）----
+
+///|
+/// いま出ているメニュー。**器は 1 個しか作れないものではない**ので、
+/// 帯のボタンの分も DOM に居る（出ていないものは畳まれている）
+fn shown_menu(s : Stand) -> @dom.Element {
+  let shown = s.doc
+    .querySelectorAll(".menu")
+    .filter(m => {
+      m.getAttribute("style").unwrap_or("").contains("display: block")
+    })
+  guard shown.length() == 1 else {
+    abort("出ているメニューが 1 つでない")
+  }
+  shown[0]
+}
+
+///|
+/// 札らしいか。手元の置き場には `FileSystemFileHandle` が無いので、形で見る
+extern "js" fn looks_like_file(v : @core.Any) -> Bool =
+  #| (v) => typeof v === "object" && v !== null && typeof v.name === "string"
+
+///|
+/// **覚えているものを真ん中に並べるだけ。** 開くのは人で、ほかを触れば消える。
+/// 器は他のメニューと同じなので、閉じ方もそれが持っている
+async test "立ち上がり: 覚えているものを真ん中に並べ、外を押せば消える" {
+  let s = stand(known=["ideas.md", "todo.md"])
+  defer s.win.close()
+  // 台帳は IndexedDB の向こうなので、届くまでに一拍ある
+  rest(s.doc, 5)
+  assert_true(s.app.greeting.is_open())
+  let box = shown_menu(s)
+  assert_eq(box.querySelectorAll("[role=menuitem]").map(r => r.textContent()), [
+    "ideas.md", "todo.md",
+  ])
+  assert_eq(box.querySelectorAll(".caption").map(c => c.textContent()), [
+    "Recent",
+  ])
+  // **押されて出たのではない**ので、出どころの座標は無い。真ん中に置く
+  // 画面 1024x768 の真ん中（happy-dom は大きさを測らないので、幅 0 の中央）
+  inspect(
+    shown_menu(s).getAttribute("style").unwrap_or(""),
+    content="display: block; left: 512px; top: 384px;",
+  )
+  // ほかを触れば消える
+  fire(s, s.doc.documentElement(), "PointerEvent", "pointerdown")
+  assert_false(s.app.greeting.is_open())
+}
+
+///|
+/// **文書が入れ替われば役目を終える。** 一覧から選んで開いた先で、
+/// 一覧が残っていては邪魔になる
+async test "立ち上がり: 文書が入れ替われば挨拶は引っ込む" {
+  let s = stand(known=["ideas.md"])
+  defer s.win.close()
+  rest(s.doc, 5)
+  assert_true(s.app.greeting.is_open())
+  s.app.open_known(paper("ideas.md", "# i\n", _ => ()))
+  assert_eq(s.fake.md, "# i\n")
+  assert_false(s.app.greeting.is_open())
+}
+
+///|
+/// 覚えているものが無ければ出さない（並べるものが無い）
+async test "立ち上がり: 何も覚えていなければ挨拶は出ない" {
+  let s = stand()
+  defer s.win.close()
+  rest(s.doc, 5)
+  assert_false(s.app.greeting.is_open())
 }

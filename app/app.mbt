@@ -78,6 +78,9 @@ pub struct App {
   mut grab : Bool
   /// 手が止まると自分で書くか（Files の Autosave。#275）
   mut autosave : Bool
+  /// 立ち上がりに真ん中へ出す、覚えているものの一覧（#277）。器は他のメニューと
+  /// 同じもので、閉じ方（外を押す・Escape・窓を離れる）もそれが持っている
+  greeting : @parts.Menu
   /// 「手が止まったら書く」の引き金。**束ねは 1 本**（頼むたびに作り直すと
   /// 待ち時間が引き直されず、連打の最中に書きに行く）
   write_soon : () -> Unit
@@ -196,6 +199,7 @@ pub fn App::new(
     drawing_open: false,
     grab: @prefs.load(doc, "grab") == Some("on"),
     autosave: @prefs.load(doc, "autosave") == Some("on"),
+    greeting: @parts.Menu::new(doc),
     write_soon: @web.after_quiet(doc, quiet, () => {
       @web.spawn(async fn() { app().save_file(false) })
     }),
@@ -408,6 +412,8 @@ fn App::load_text(self : App, next : String, name : String?) -> Unit {
   self.images.clear() // 画像のパスは（新しい）md からの相対
   (self.ed.set_text)(next) // → cycle
   self.map.fit_view()
+  // 文書が入れ替わったら、立ち上がりの挨拶は役目を終える
+  self.greeting.hide(false)
   // 文書が入れ替わった。**Recent の並びもここで引き直す**
   @web.spawn(async fn() { self.refresh_recent() })
 }
@@ -540,6 +546,26 @@ async fn App::new_file(self : App) -> Unit {
   self.saved_text = ""
   self.load_text("", None)
   (self.ed.focus)()
+}
+
+///|
+/// 覚えているものを真ん中に並べる。**開くのは人** — 一覧を出すだけで、
+/// 触れば許可を取り直して開き、ほかを触れば消える（#277）。
+/// 並びは Files の `Recent ▸` と同じ口から引く（同じものが 2 通りに見えない）
+fn App::greet(self : App) -> Unit {
+  self.greeting.show_middle(() => {
+    [
+      Caption("Recent", Some("clock")),
+      ..self.recent.mapi((i, f) => {
+        @parts.Entry::Run(@parts.row(f.name()), () => {
+          match self.recent.get(i) {
+            Some(file) => @web.spawn(async fn() { self.open_known(file) })
+            None => ()
+          }
+        })
+      }),
+    ]
+  })
 }
 
 ///|
@@ -871,7 +897,8 @@ fn App::wire_keys(self : App) -> Unit {
 ///|
 /// 動かす。**サイクルの出口（cycle）が繋がってから** — 最初の set_text がもう回す。
 /// 本文の控えは持たない。IndexedDB に置くのはハンドルだけで、
-/// **起動時に勝手に開き直すことはしない** — 立ち上げたら常に空から始まる
+/// **起動時に勝手に開き直すことはしない** — 立ち上げたら常に空から始まり、
+/// 覚えているものは真ん中に**並べて見せるだけ**（開くのは人。#277）
 pub fn App::boot(self : App) -> Unit {
   @prefs.sweep(self.doc) // 役目を終えた localStorage のキーを捨てる
   self.load_text("", None) // 空 = まだ何も無い。dirty も立たない
@@ -884,6 +911,15 @@ pub fn App::boot(self : App) -> Unit {
     @web.drop_hash(self.doc)
     if self.gen == boot_gen && self.text() == "" {
       self.load_text(shared, None)
+    }
+  })
+  // 覚えているものを真ん中に並べる。**空の文書のときだけ** — リンクで開いた
+  // ときや、待っているあいだに人が打ち始めたときは出さない（台帳は
+  // IndexedDB の向こうなので、届くまでに一拍ある）
+  @web.spawn(async fn() {
+    self.refresh_recent()
+    if self.gen == boot_gen && self.text() == "" && self.recent.length() > 0 {
+      self.greet()
     }
   })
   // フェンスの言語は後から読み込まれる。届いたら色を載せ直す

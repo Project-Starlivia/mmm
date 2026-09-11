@@ -35,8 +35,10 @@ pub struct Menu {
   mut openers : Array[(@dom.Element, () -> Unit)]
   /// 並びの作り方。**開くたび・綴り直すたびに引く** — いまの状態に合わせるため
   mut items : () -> Array[Entry]
-  /// 頼まれた場所。綴り直しで大きさが変わっても、寄せ直せるように覚えておく
-  mut at : (Double, Double)
+  /// 頼まれた場所。**無ければ画面の真ん中** — 押されて出たのではないものには
+  /// 出どころの座標が無い（立ち上がりに覚えているものを並べる。#277）。
+  /// 綴り直しで大きさが変わっても、寄せ直せるように覚えておく
+  mut at : (Double, Double)?
 }
 
 ///|
@@ -58,7 +60,7 @@ pub fn Menu::new(doc : @dom.Document) -> Menu {
     opener: None,
     openers: [],
     items: () => [],
-    at: (0.0, 0.0),
+    at: Some((0.0, 0.0)),
   }
   // 開いているあいだだけ付け外しする手もあるが、`hide` は何度呼んでも
   // 同じなので、付けっぱなしのほうが短い
@@ -76,6 +78,10 @@ pub fn Menu::new(doc : @dom.Document) -> Menu {
     }
   })
   @web.on_window(doc, "blur", _ => m.hide(false))
+  // **開いているあいだに窓の大きさが変われば置き直す。** 押して出る器では
+  // 起きないが、立ち上がりに出る一覧は**窓がまだ大きさを持たないうちに**
+  // 置かれることがある — そこでは真ん中が画面の外になる（実測した）
+  @web.on_window(doc, "resize", _ => if m.is_open() { m.respell() })
   @web.listen(el, "keydown", e => m.on_keydown(e))
   m
 }
@@ -215,7 +221,16 @@ pub fn Menu::show(
   items : () -> Array[Entry],
 ) -> Unit {
   self.items = items
-  self.at = (x, y)
+  self.at = Some((x, y))
+  self.draw()
+}
+
+///|
+/// 画面の真ん中に開く。**押されて出たのではないもの**のための口で、閉じ方は
+/// 同じ（外を押す・Escape・窓を離れる）
+pub fn Menu::show_middle(self : Menu, items : () -> Array[Entry]) -> Unit {
+  self.items = items
+  self.at = None
   self.draw()
 }
 
@@ -233,16 +248,18 @@ fn Menu::draw(self : Menu) -> Unit {
   @web.show(self.el, "block", true)
   let (w, h) = @web.offset_size(self.el)
   let (iw, ih) = @web.inner_size(self.doc)
-  @web.set_style(
-    self.el,
-    "left",
-    @web.px(@cmp.minimum(self.at.0, iw - w - margin)),
-  )
-  @web.set_style(
-    self.el,
-    "top",
-    @web.px(@cmp.minimum(self.at.1, ih - h - margin)),
-  )
+  // **画面の内側へ寄せる。** 押した所なら縁より内へ、真ん中なら半分の所へ。
+  // どちらも縁から `margin` は離す — 器が画面より大きいとき、真ん中は
+  // 負の桁になって左上が画面の外へ出る（窓の大きさが 0 で立ち上がることもある）
+  let inside = (v : Double, room : Double) => {
+    @cmp.maximum(margin, @cmp.minimum(v, room - margin))
+  }
+  let (x, y) = match self.at {
+    Some((x, y)) => (inside(x, iw - w), inside(y, ih - h))
+    None => (inside((iw - w) / 2.0, iw - w), inside((ih - h) / 2.0, ih - h))
+  }
+  @web.set_style(self.el, "left", @web.px(x))
+  @web.set_style(self.el, "top", @web.px(y))
 }
 
 ///|
