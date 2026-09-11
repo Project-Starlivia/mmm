@@ -40,6 +40,9 @@ pub struct Mindmap {
   /// 白紙の言い出し（器は app/parts/hint.mbt）
   hint : @dom.Element
   indicator_el : @dom.Element
+  /// 針がいま指している箱（world）。**押したとき頑張るのはこれ 1 つ** —
+  /// `Home` / 十字は選択ぜんぶの外接を寄せるので、手によって中心へ来るものが違う（#129）
+  mut pointed : @map.Rect?
   mut camera : @map.Camera
   mut layout : @map.Layout
   fingers : @map.Fingers
@@ -129,6 +132,9 @@ pub fn Mindmap::new(pane : @dom.HTMLElement, host : Host) -> Mindmap {
   @web.show(hint, "flex", false)
   pane.append(hint.as_node())
   let indicator_el = @web.html(doc, "div", "map-indicator").as_element()
+  indicator_el.setAttribute("role", "button")
+  indicator_el.setAttribute("title", "Bring it into view")
+  indicator_el.setAttribute("aria-label", "Bring the selection into view")
   @web.show(indicator_el, "block", false)
   pane.append(indicator_el.as_node())
   let tool = @parts.pane_tool(doc, "map-center")
@@ -146,6 +152,7 @@ pub fn Mindmap::new(pane : @dom.HTMLElement, host : Host) -> Mindmap {
     renderer,
     hint,
     indicator_el,
+    pointed: None,
     camera: { k: 1, tx: 60, ty: 60, },
     layout: place_layout(host),
     fingers: @map.Fingers::new(),
@@ -174,6 +181,11 @@ pub fn Mindmap::new(pane : @dom.HTMLElement, host : Host) -> Mindmap {
     menu: @parts.Menu::new(doc),
   }
   @web.listen(center, "click", _ => m.center_on_target())
+  // 針は押せる。**指している 1 つ**へ行く（隅の十字は選択ぜんぶの外接。#129）
+  @web.listen(m.indicator_el, "click", e => {
+    @web.stop(e)
+    m.goto_pointed()
+  })
   m.bind_wheel()
   m.bind_pointer()
   m.bind_click()
@@ -353,7 +365,21 @@ fn Mindmap::ensure_visible(self : Mindmap, id : Int) -> Unit {
 pub fn Mindmap::refresh_selection(self : Mindmap) -> Unit {
   self.paint_choice()
   self.follow_card()
+  self.follow_holder()
   self.update_indicator() // 針は選択を指す — 視点が動かなくても指し直す
+}
+
+///|
+/// **md が持つ間は、地図がカーソルを追う。** 追従は元は地図 → md の片側だけで、
+/// md を打ち進めると選択は画面外へ出たまま戻らず、針だけが縁を回っていた（#131）。
+///
+/// 寄せ方は `ensure_visible` と同じ「余白を持って入るまで」 — 中心へ置くと打鍵の
+/// たびに地図が跳ねて読めない。**入っているあいだは 1 ピクセルも動かない。**
+/// 追うのは anchor 1 つ（選択ぜんぶを入れると、広い選択で倍率の話になる）
+fn Mindmap::follow_holder(self : Mindmap) -> Unit {
+  guard (self.host.holder)() is Md else { return }
+  guard (self.host.selection)().anchor is Some(anchor) else { return }
+  self.ensure_visible(anchor)
 }
 
 ///|

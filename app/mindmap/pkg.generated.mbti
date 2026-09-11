@@ -109,6 +109,7 @@ pub struct Mindmap {
   renderer : Renderer
   hint : @dom.Element
   indicator_el : @dom.Element
+  mut pointed : @map.Rect?
   mut camera : @map.Camera
   mut layout : @map.Layout
   fingers : @map.Fingers
@@ -141,6 +142,7 @@ pub fn Mindmap::begin_edit(Self, Int, String?) -> Bool
 pub fn Mindmap::center_on_target(Self) -> Unit
 pub fn Mindmap::edit_card(Self, Int, from? : Int?, to? : Int?, text? : String?) -> Unit
 pub fn Mindmap::fit_view(Self) -> Unit
+pub fn Mindmap::goto_pointed(Self) -> Unit
 pub fn Mindmap::mark_file_drop(Self, @map.Pt?) -> Int?
 pub fn Mindmap::new(@dom.HTMLElement, Host) -> Self
 pub fn Mindmap::refresh_selection(Self) -> Unit
