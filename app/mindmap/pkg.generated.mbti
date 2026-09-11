@@ -170,9 +170,9 @@ pub struct Renderer {
   edge_els : Map[Int, @dom.Element]
   shapes : Map[Int, Shape]
   marks : Map[Int, Marks]
-  node_tf : Map[Int, String]
-  edge_d : Map[Int, String]
-  mut order_sig : String
+  node_at : Map[Int, @map.Pt]
+  edge_at : Map[Int, (@map.Pt, @map.Pt)]
+  mut order : Array[Int]
   mut selected : @set.Set[Int]
 }
 pub fn Renderer::draw(Self, Scene) -> Unit

@@ -67,12 +67,16 @@ pub struct Renderer {
   edge_els : Map[Int, @dom.Element]
   shapes : Map[Int, Shape]
   marks : Map[Int, Marks]
-  // 直前に書いた transform / d。同じ値の setAttribute はスタイル無効化を
-  // 起こすだけ無駄なので書かない（プロファイル上いちばん重い JS 呼び出しだった）
-  node_tf : Map[Int, String]
-  edge_d : Map[Int, String]
-  /// DOM の並び（= 重なり順）を直す判定用
-  mut order_sig : String
+  // 直前に書いた位置。同じ値の setAttribute はスタイル無効化を起こすだけ無駄
+  // （プロファイル上いちばん重い JS 呼び出しだった）。
+  //
+  // **控えるのは字ではなく数。** 字で控えると、書かないと決めるためだけに
+  // 打鍵ごとに全ノードぶんの数を整形して繋ぐことになる（エッジの d は
+  // `num` を 7 回呼ぶ）。数で控えれば、整形は本当に動いた箱だけになる
+  node_at : Map[Int, @map.Pt]
+  edge_at : Map[Int, (@map.Pt, @map.Pt)]
+  /// 直前に並べた DOM の順（= 文書順 = 重なり順）
+  mut order : Array[Int]
   /// 直前に paint で塗った id。箱が無いものも残す（戻ったとき draw が塗る）
   mut selected : Set[Int]
 }
@@ -87,9 +91,9 @@ pub fn Renderer::new(doc : @dom.Document) -> Renderer {
     edge_els: Map([]),
     shapes: Map([]),
     marks: Map([]),
-    node_tf: Map([]),
-    edge_d: Map([]),
-    order_sig: "",
+    node_at: Map([]),
+    edge_at: Map([]),
+    order: [],
     selected: Set([]),
   }
 }
@@ -181,10 +185,9 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
             p
           }
         }
-        let d = @map.edge_path(from, to)
-        if self.edge_d.get(id) != Some(d) {
-          path.setAttribute("d", d)
-          self.edge_d[id] = d
+        if self.edge_at.get(id) != Some((from, to)) {
+          path.setAttribute("d", @map.edge_path(from, to))
+          self.edge_at[id] = (from, to)
         }
       }
       None =>
@@ -192,7 +195,7 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
           Some(stale) => {
             stale.remove()
             self.edge_els.remove(id)
-            self.edge_d.remove(id)
+            self.edge_at.remove(id)
           }
           None => ()
         }
@@ -231,10 +234,13 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
       @web.toggle_class(g, "open", marks.open)
       self.marks[id] = marks
     }
-    let tf = "translate(\{@web.num(b.x)} \{@web.num(b.y)})"
-    if self.node_tf.get(id) != Some(tf) {
-      g.setAttribute("transform", tf)
-      self.node_tf[id] = tf
+    let at : @map.Pt = { x: b.x, y: b.y, }
+    if self.node_at.get(id) != Some(at) {
+      g.setAttribute(
+        "transform",
+        "translate(\{@web.num(at.x)} \{@web.num(at.y)})",
+      )
+      self.node_at[id] = at
     }
     let shape = shape_of(b, scene)
     if self.shapes.get(id) == Some(shape) {
@@ -309,7 +315,7 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
     self.node_els.remove(id)
     self.shapes.remove(id)
     self.marks.remove(id)
-    self.node_tf.remove(id)
+    self.node_at.remove(id)
   }
   let gone_edges = self.edge_els
     .keys()
@@ -324,19 +330,20 @@ pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
     // 値キャッシュも一緒に捨てる。残すと、畳んで戻したときに
     // 「テキストが元通り = 署名も元通り」で書き換えがスキップされ、
     // 作り直した空の <path> に d が入らないままエッジが消える
-    self.edge_d.remove(id)
+    self.edge_at.remove(id)
   }
 
   // DOM の並び = 重なり順。文書順が変わったときだけ並べ直す
-  // （既存要素の append は「移動」であって作り直しではない）
-  let sig = l.order.map(id => id.to_string()).join(",")
-  if sig != self.order_sig {
+  // （既存要素の append は「移動」であって作り直しではない）。
+  // **控えるのは id の列そのもの** — 署名の字にすると、比べるためだけに
+  // 打鍵ごとに全 id を整形して繋ぐことになる
+  if self.order != l.order {
     for id in l.order {
       match self.node_els.get(id) {
         Some(e) => self.node_layer.append(e.as_node())
         None => ()
       }
     }
-    self.order_sig = sig
+    self.order = l.order.copy()
   }
 }
