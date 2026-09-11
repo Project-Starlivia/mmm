@@ -1463,16 +1463,18 @@ test "項目の中の席の綴りは隣に従う" {
 }
 
 ///|
-/// 隣が居なければ**種類**は親に従う（項目の下は項目）が、**マーカーと桁**は親を見ず既定 —
-/// `sign_at` は親に落ち、`spell_at` は落ちない。`* a` の下に足せば `- n`。
-/// 揃えるかは別の問い（issue にする）。ここは今の答えを固定するだけ
-test "子の無い項目の下に足せば項目だが、マーカーは親のものでなく既定" {
+/// **隣が居なければ、種類も綴りも同じ相手（親）に従う**（`follows`。#243）。
+/// `* a` の下に足せば `* n` — 前は種類だけ親を継いで綴りが既定に落ち、`- n` が
+/// `* a` の子として書かれて同じ列にマーカーが混ざっていた
+test "子の無い項目の下に足せば、マーカーも親のもの" {
   let d = doc([root(item(2, "a", marker="*"))])
   assert_eq(
     apply(d, AddNode(at=In(node=2, side=None), label="n")),
     Some({
       doc: doc([
-        root(item(2, "a", marker="*", children=[item(3, "n")]), sides=[Right]),
+        root(item(2, "a", marker="*", children=[item(3, "n", marker="*")]), sides=[
+          Right,
+        ]),
       ]),
       focus: Some(3),
     }),
