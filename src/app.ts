@@ -132,7 +132,7 @@ export interface Edit {
 }
 
 /** md ペイン（CodeMirror）。core が頼むもの。色分けの塊（`Token`）は highlight.ts のもの */
-export interface Editor {
+interface Editor {
   text(): string;
   /** いまの読み（EditorState の field） */
   survey(): Survey;
@@ -255,7 +255,7 @@ export const isNode = (s: Survey, id: number): boolean => mbt.mmmIsNode(s, id);
 export const empty = (s: Survey): boolean => mbt.mmmEmpty(s);
 
 /** 地番。from..to が原文の範囲、label はラベルの頭（無いノードは null） */
-export interface Spot {
+interface Spot {
   from: number;
   label: number | null;
   to: number;
@@ -390,7 +390,7 @@ export interface FileActs {
 /** Files の行 */
 export const filesRows = (state: Files, acts: FileActs): HTMLDivElement => div(mbt.mmmFilesRows(state, acts));
 
-export interface More {
+interface More {
   light: boolean;
   /** 掴みやすさ（Easy grab）が入っているか */
   grab: boolean;
@@ -417,15 +417,11 @@ export const exportWays = (empty: boolean): HTMLDivElement => div(mbt.mmmExportW
 /** お絵描きの form */
 export const drawForm = (): HTMLFormElement => form(mbt.mmmDrawForm());
 
-/** 打てる欄。`check` はその値では進めない理由（進めるなら null）。打つそばから効く */
-export interface Field {
-  value: string;
-  check?: (value: string) => string | null;
-}
-
 /**
  * たずねの中身（form）だけ。並べ方は app/parts/asks.mbt（`named`）、args の読みは app/js/lab.mbt。
- * `connect` / `rename` は字、`imageName` は `{ shape: (string | Field)[], shot, taken? }`、
+ * `connect` / `rename` は字、`imageName` は
+ * `{ shape: (string | { value, check? })[], shot, taken? }`（`check` はその値では進めない
+ * 理由を返す閉包。進めるなら null）、
  * `declaration` は `{ folder, value, dirName? }`、`redeclaration` は `{ value }`。
  *
  * **欄の検査は本物を通す** — `declaration` / `redeclaration` は `dirName` を、
