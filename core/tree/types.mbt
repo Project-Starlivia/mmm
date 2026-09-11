@@ -17,6 +17,12 @@ pub(all) struct Doc {
 } derive(Eq, Debug, ToJson)
 
 ///|
+/// derive が作る `to_json` を method 形（`x.to_json()`）で呼ぶための宣言。
+/// **上流は「derive のメソッドが暗黙に昇格する挙動を将来やめる」と言っている**ので、
+/// 昇格に頼らず明示する — 無いと呼び出し側に非推奨の印が出る（#68）
+pub extend Doc with ToJson::{to_json}
+
+///|
 /// 木 1 本。**側を持つ唯一の型**で、根の子と 1 対 1 に並ぶ。
 /// 組にせず並走させているのは、`children` を全部の深さで `Array[Node]` の
 /// まま保つため（深さで型が変わると走査も操作も割れる）。
@@ -141,3 +147,9 @@ pub(all) enum Content {
   /// body は開き（と summary）の後ろから閉じの手前までの原文
   Details(open~ : Bool, summary~ : String?, body~ : String)
 } derive(Eq, Debug, ToJson, FromJson)
+
+///|
+/// derive が作る `to_json` を method 形（`x.to_json()`）で呼ぶための宣言。
+/// **上流は「derive のメソッドが暗黙に昇格する挙動を将来やめる」と言っている**ので、
+/// 昇格に頼らず明示する — 無いと呼び出し側に非推奨の印が出る（#68）
+pub extend Content with ToJson::{to_json}

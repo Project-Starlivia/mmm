@@ -49,6 +49,7 @@ pub(all) enum Op {
   Unfold(id~ : Int)
   Graft(at~ : NodePlace, md~ : String)
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Op::to_json(Self) -> Json
 
 // Type aliases
 

@@ -69,18 +69,21 @@ pub(all) enum Content {
   ThematicBreak
   Details(open~ : Bool, summary~ : String?, body~ : String)
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Content::to_json(Self) -> Json
 
 pub(all) struct Doc {
   frontmatter : String?
   body : Array[Block]
   roots : Array[Root]
 } derive(Eq, ToJson, @debug.Debug)
+pub fn Doc::to_json(Self) -> Json
 
 pub(all) struct Edit {
   from : Int
   to : Int
   insert : String
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Edit::to_json(Self) -> Json
 
 pub(all) enum Flaw {
   DupeId(Int)

@@ -42,6 +42,12 @@ pub(all) enum Op {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+/// derive が作る `to_json` を method 形（`x.to_json()`）で呼ぶための宣言。
+/// **上流は「derive のメソッドが暗黙に昇格する挙動を将来やめる」と言っている**ので、
+/// 昇格に頼らず明示する — 無いと呼び出し側に非推奨の印が出る（#68）
+pub extend Op with ToJson::{to_json}
+
+///|
 /// 操作後の木と、そこで選ぶべき id（消した後は None）。
 pub(all) struct Done {
   doc : @tree.Doc

@@ -14,7 +14,7 @@
     "test": "pnpm run core && node --test \"test/*.test.ts\"",
     "test:core": "moon test --target js",
     "check": "tsc --noEmit && tsc -p test --noEmit && tsc -p lab --noEmit",
-    "check:core": "moon check && moon fmt --check && moon info && git diff --exit-code -- '*pkg.generated.mbti' && node test/tools/pure.ts",
+    "check:core": "moon check --deny-warn && moon fmt --check && moon info && git diff --exit-code -- '*pkg.generated.mbti' && node test/tools/pure.ts",
     "fixtures": "node test/tools/gen-load.ts",
     "deploy": "pnpm run build && wrangler deploy",
     "deploy:dry": "pnpm run build && wrangler deploy --dry-run"

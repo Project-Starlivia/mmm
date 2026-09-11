@@ -164,6 +164,16 @@ ai-docs/ 実測の控え — moonbit.md は MoonBit の癖、codemirror.md は C
 上流が動いて赤くなったら、手元を上げて同じ commit で直す。赤くなる形は
 **整形の出す形が変わる**か**非推奨の印が増える**かのどちらか (#24)。
 
+**本番コードの警告は 0 で固定する** — `check:core` が `moon check --deny-warn` を通す。
+だから非推奨の印が 1 つ増えただけで CI が赤くなり、最新を追う決めが「気づける」形になる。
+`derive` が作るメソッドを method 形で呼ぶときは `pub extend T with Trait::{method}` を
+宣言する(上流は暗黙の昇格をやめると言っている。#68)。
+
+**既定で切れている診断は追わない。** `moon check --warn-list "+a"` は 469 件を出すが、
+その大半は宣言の側で同じ事実を数え直したもの(`implicit_impl_as_method` 158 件は
+`derive` の行そのもので、壊れるのは呼び出し側だけ)。**壊れる場所は既定の印が名指す**
+ので、そこを 0 に保つのが安い (#86 / #68)。
+
 ```
 pnpm install
 pnpm run dev        # コアをビルドしてから vite（http://localhost:13131）
