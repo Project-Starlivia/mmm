@@ -152,3 +152,26 @@ test "normalize_path / under" {
   assert_eq(under("../up.webp", "./"), None)
   assert_eq(under("./img/", "./img/"), None)
 }
+
+///|
+/// **続いた `/` は畳む。** 畳まないと `.//` の宣言が本文に `.//x.webp` を書き、
+/// それは裸にすると `/x.webp` = 絶対パスに見えるので `under` が外す —
+/// **その画像は二度と追従できなくなる**（#57 を作っている途中に実機で踏んだ）
+test "normalize_path: 続いた / は 1 つに畳む" {
+  assert_eq(normalize_path(".//"), Some("./"))
+  assert_eq(normalize_path(".///"), Some("./"))
+  assert_eq(normalize_path("./a//b/"), Some("./a/b/"))
+  assert_eq(normalize_path("a//"), Some("a/"))
+  assert_eq(normalize_path("//x"), None)
+  // **畳むのは断ってから。** 先に畳むと scheme が外れて URL が宣言として通る
+  assert_eq(normalize_path("https://x/"), None)
+  assert_eq(normalize_path("http://x/y/"), None)
+}
+
+///|
+/// 畳んだ宣言なら、本文の画像を追える。畳まないと `under` が外す
+test "normalize_path: 畳んだ宣言は under が拾える" {
+  let folder = normalize_path(".//").unwrap()
+  assert_eq(under("./x.webp", folder), Some("x.webp"))
+  assert_eq(under("x.webp", folder), Some("x.webp"))
+}
