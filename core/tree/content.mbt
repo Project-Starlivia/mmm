@@ -70,20 +70,50 @@ fn bare(text : String) -> Content? {
 }
 
 ///|
-/// 原文のまま持つ中身（Raw）が段落 1 つなら、その行の列（前後の空白と `\r` を
-/// 除き、空の行は落とす）。表・引用・HTML など段落でなければ None。
+/// 梯子の段 — 貼る 1 行と、その桁。桁が深ければ手前の行の子になる（`graft`）
+pub(all) struct Rung {
+  col : Int
+  label : String
+} derive(Eq, Debug, ToJson)
+
+///|
+/// その塊が段落 1 つなら、行ごとの桁と字（前後の空白と `\r` を除き、空の行は
+/// 落とす）。表・引用・HTML など段落でなければ None。
 /// 貼るとき、一番外の段落だけを「行ごとにノード」にするための問い —
 /// 段落かどうかは mdAst しか知らないので、ここで読み直す。
-pub fn lines(text : String) -> Array[String]? {
-  let blocks = read(text).children.filter(b => !(b is BlankLines(..)))
-  guard blocks is [Paragraph(..)] else { return None }
-  Some(
-    text
-    .split("\n")
-    .map(l => l.trim(chars=" \t\r").to_owned())
-    .filter(l => !l.is_empty())
-    .collect(),
-  )
+///
+/// **桁は原文から測る。** 塊が持つ原文（`Block.source`）では測れない — `carve` が
+/// 1 行目の桁を引いて塊ごとに基準を戻すので、1 行目より浅い行は 1 行目と同じ桁に
+/// 見え、空行の後の塊は左余白を失う。原文と地番から測れば、空行も塊の境も桁に
+/// 効かない（#118）
+pub fn rungs(md : String, spot : Spot) -> Array[Rung]? {
+  let blocks = read(slice(md, spot.from, spot.to)).children.filter(b => {
+    !(b is BlankLines(..))
+  })
+  // **字下げコードも段として読む。** 断片に容器は無いので、入った字は outline の
+  // 深さであってコードの記法ではない — 読まないと、枝の途中から写した断片が
+  // まるごと 1 枚のコードになり、ノードが 1 つも生えない。囲んだコード（```）は
+  // 書いた人がコードと言っているので中身のまま（#118）
+  guard blocks is [Paragraph(..)] || blocks is [IndentedCode(..)] else {
+    return None
+  }
+  let out = []
+  // 1 行目の桁は span の外（記法）にあるので、行の頭から測り直す
+  let mut at = line_start(md, spot.from)
+  while at < spot.to {
+    let end = line_end(md, at)
+    let stop = if end < spot.to { end } else { spot.to }
+    let label = slice(md, at, stop).trim(chars=" \t\r\n").to_owned()
+    if label != "" {
+      out.push({ col: inset(md, at), label, })
+    }
+    at = end
+  }
+  if out.is_empty() {
+    None
+  } else {
+    Some(out)
+  }
 }
 
 ///|

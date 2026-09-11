@@ -105,6 +105,62 @@ fn undent(md : String, at : Int) -> Int {
 }
 
 ///|
+/// その位置の行が、どれだけ入っているか（行頭の空白の桁）。**タブは次の 4 の
+/// 倍数まで進む** — CommonMark のタブ幅で、`undent` が置いている 4 と同じ。
+///
+/// `column` は字数で、こちらは幅。タブ 1 つと空白 4 つは同じ深さなので、貼った
+/// 字下げを段に読むには幅で測らないと、タブの outline が空白の outline より
+/// 浅く見える（#118）
+fn inset(md : String, at : Int) -> Int {
+  let mut i = line_start(md, at)
+  let mut n = 0
+  while i < md.length() {
+    let c = md[i]
+    if c == ' ' {
+      n = n + 1
+    } else if c == '\t' {
+      n = n + 4 - n % 4
+    } else {
+      break
+    }
+    i = i + 1
+  }
+  n
+}
+
+///|
+/// 断片の左余白を落とす（改行も LF に揃える）。
+///
+/// **断片に容器は無い。** 切り出した字の左余白は、切り出した**先**の容器であって
+/// 断片の中身ではない。読む側は塊ごとに同じことをしている（`carve`）ので、貼る側も
+/// 同じ向きで揃える — 落とさないと、同じ外形の outline が「文書のどこから写したか」
+/// で違う木になる。
+///
+/// これが無いと、4 桁以上入った行で始まる断片は字下げコードとして読まれ、**outline の
+/// 枝を写しただけでノードが 1 つも生えない**（タブ 1 つでも起きる）。落とす代償は、
+/// 字下げだけのコードを写したときにそれもノードになること — 囲んだコード（```）は
+/// 中身として残る（#118）
+pub fn dedent(text : String) -> String {
+  let md = lf(text)
+  let lines = md.split("\n").map(l => l.to_owned()).collect()
+  let mut margin = -1
+  for l in lines {
+    guard l.trim(chars=" \t") != "" else { continue }
+    let n = inset(l, 0)
+    if margin < 0 || n < margin {
+      margin = n
+    }
+  }
+  guard margin > 0 else { return md }
+  let out = lines.map(l => {
+    guard l.trim(chars=" \t") != "" else { return "" }
+    let n = inset(l, 0)
+    pad(n - margin) + l.trim_start(chars=" \t").to_owned()
+  })
+  out.join("\n")
+}
+
+///|
 /// 行頭からの桁。容器の字下げの幅になる。
 fn column(md : String, at : Int) -> Int {
   let mut i = at

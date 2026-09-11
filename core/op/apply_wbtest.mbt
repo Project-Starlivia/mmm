@@ -1123,6 +1123,96 @@ test "Graft の一番外 — 段落は行ごとにノード、中身は直前の
 }
 
 ///|
+/// 貼った字下げは階層になる。**桁が深ければ手前の行の子、同じか浅ければ一番近い
+/// 手前の段の隣**（#118）。タブは 4 桁で、空白 4 つと同じ深さ
+test "Graft は貼った字下げを階層に読む — 桁の梯子" {
+  let d = doc([root(h(2, "r"))])
+  let grown = (md : String) => {
+    match apply(d, Graft(at=NodePlace::In(node=2, side=None), md~)) {
+      Some({ doc: got, .. }) => got.roots[0].node.children
+      None => []
+    }
+  }
+  // 2 桁ずつ深く
+  assert_eq(grown("a\n  b\n    c\n"), [
+    h(3, "a", children=[h(4, "b", children=[h(5, "c")])]),
+  ])
+  // タブ 1 つは空白 4 つと同じ深さ
+  assert_eq(grown("a\n\tb\n"), [h(3, "a", children=[h(4, "b")])])
+  assert_eq(grown("a\n    b\n"), [h(3, "a", children=[h(4, "b")])])
+  // 一度も見ていない桁へ浅くなったら、一番近い手前の段の隣
+  assert_eq(grown("a\n    b\n  c\n"), [
+    h(3, "a", children=[h(4, "b"), h(5, "c")]),
+  ])
+  // 桁 0 へ戻れば兄弟。根の隣ではなく、貼り先の子として並ぶ
+  assert_eq(grown("a\n  b\nc\n"), [h(3, "a", children=[h(4, "b")]), h(5, "c")])
+}
+
+///|
+/// **空行は段を作らず、開いている段も閉じない。** 梯子は空行をまたいで立つので、
+/// 空行の有無で木が変わらない（#118 の決め「コピペの空行は単に空行」）
+test "Graft は空行をまたいでも同じ木 — 空行は桁に効かない" {
+  let d = doc([root(h(2, "r"))])
+  let grown = (md : String) => {
+    match apply(d, Graft(at=NodePlace::In(node=2, side=None), md~)) {
+      Some({ doc: got, .. }) => got.roots[0].node.children
+      None => []
+    }
+  }
+  let want = [h(3, "a", children=[h(4, "b"), h(5, "c")])]
+  assert_eq(grown("a\n  b\n  c\n"), want)
+  assert_eq(grown("a\n  b\n\n  c\n"), want)
+  assert_eq(grown("a\n  b\n  \n  c\n"), want)
+}
+
+///|
+/// **断片の左余白は切り出した先の容器。** 落とさないと 4 桁以上入った枝の写しが
+/// 字下げコードとして読まれ、ノードが 1 つも生えない（#118）
+test "Graft は断片の左余白を落とす — 枝の途中から写しても木になる" {
+  let d = doc([root(h(2, "r"))])
+  let grown = (md : String) => {
+    match apply(d, Graft(at=NodePlace::In(node=2, side=None), md~)) {
+      Some({ doc: got, .. }) => got.roots[0].node.children
+      None => []
+    }
+  }
+  // outline の枝を 4 桁目から写した形。続きが桁 0 へ戻っても、余白は断片ぜんぶで
+  // 揃って落ちるので相対の深さが残る
+  assert_eq(grown("    Child A\n        grandchild\nNext top branch\n"), [
+    h(3, "Child A", children=[h(4, "grandchild")]),
+    h(5, "Next top branch"),
+  ])
+  // タブで写した枝も同じ
+  assert_eq(grown("\ta\n\t\tb\n"), [h(3, "a", children=[h(4, "b")])])
+}
+
+///|
+/// 中身は**一番深い開いている段**のものになる。「直前に生えたノードのもの」を
+/// 木にした形（#118）
+test "Graft の中身は、一番深い開いている段の中身" {
+  let d = doc([root(h(2, "r"))])
+  assert_eq(
+    apply(
+      d,
+      Graft(at=NodePlace::In(node=2, side=None), md="a\n  b\n\n![](p.png)\n"),
+    ),
+    Some({
+      doc: doc([
+        root(
+          h(2, "r", children=[
+            h(3, "a", children=[
+              h(4, "b", body=[pic(6, source=Some("![](p.png)"))]),
+            ]),
+          ]),
+          sides=[Right],
+        ),
+      ]),
+      focus: Some(3),
+    }),
+  )
+}
+
+///|
 /// 断片が持ち込むのは形だけ。綴りは席が決める（`sign_at`）。
 test "Graft は席の綴りで差す — 見出しの列では見出し、項目の列では項目" {
   // 子が見出しの見出しへ項目 — 見出しの直後の項目は飲み込まれるので、綴り替えないと書けない
@@ -1328,7 +1418,7 @@ test "apply の結果は check を通る（境界は md が決めるので除く
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="469")
+  inspect(some, content="502")
   json_inspect(bad, content=[])
 }
 

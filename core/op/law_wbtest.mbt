@@ -149,6 +149,8 @@ fn ops_for(all : Array[Int]) -> Array[Op] {
       for
         md in [
           "# g\n\n- i\n", "- i\n  - j\n", "- i\n", "![](q.png)\n\ntext\n", "text\n",
+          // 字下げの梯子（#118）。深い行が子になっても法則は破れない
+           "a\n  b\n",
         ] {
         ops.push(Graft(at~, md~))
       }
@@ -203,7 +205,7 @@ test "法則 — 形が一致すれば focus は同じ部分木を指し、一�
   }
   json_inspect(bad, content=[])
   // 全部 None に潰れる退化を落とすための下限チェック
-  inspect(some, content="2194")
+  inspect(some, content="2407")
   // md が形を決めた回数。0 なら法則の 2 つ目の道が死んでいる
   inspect(decided, content="41")
 }
@@ -326,7 +328,7 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   }
   json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
-  inspect(n, content="2109")
+  inspect(n, content="2322")
 }
 
 ///|

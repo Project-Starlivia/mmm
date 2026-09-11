@@ -20,11 +20,11 @@ pub let bullet : Mark
 
 pub fn check(Doc) -> Array[Flaw]
 
+pub fn dedent(String) -> String
+
 pub let deepest : Int
 
 pub let doc_id : Int
-
-pub fn lines(String) -> Array[String]?
 
 pub fn md_ast_sig(String) -> String
 
@@ -39,6 +39,8 @@ pub fn number(Doc, Int) -> Int?
 pub fn parse(String) -> Doc
 
 pub fn patched(String, Array[Edit]) -> String
+
+pub fn rungs(String, Spot) -> Array[Rung]?
 
 pub fn serialize(Doc) -> String
 
@@ -122,6 +124,11 @@ pub(all) struct Root {
   node : Node
   sides : Array[Side]
   rules : Array[String]
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Rung {
+  col : Int
+  label : String
 } derive(Eq, ToJson, @debug.Debug)
 
 pub(all) enum Side {
