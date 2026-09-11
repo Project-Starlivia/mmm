@@ -105,10 +105,13 @@ test "has はノードにも中身にも応える" {
 }
 
 ///|
-test "siblings は同じ親の子の id、文書順。根なら根どうし" {
+test "siblings は同じ親の子の id、文書順。根なら根どうし。中身には応えない" {
   json_inspect(siblings(sample(), 6), content=[4, 6])
   json_inspect(siblings(sample(), 2), content=[2, 8])
   json_inspect(siblings(sample(), 99), content=[])
+  // 中身。`parent` は持ち主（2 / 6）を返すが、兄弟を持つのはノードだけ
+  json_inspect(siblings(sample(), 3), content=[])
+  json_inspect(siblings(sample(), 7), content=[])
 }
 
 ///|
