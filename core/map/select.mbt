@@ -17,7 +17,7 @@ pub let none : Selection = { ids: [], anchor: None, }
 
 ///|
 /// その 1 つだけ
-fn Selection::only(id : Int) -> Selection {
+pub fn Selection::only(id : Int) -> Selection {
   { ids: [id], anchor: Some(id), }
 }
 

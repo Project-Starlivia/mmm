@@ -11,6 +11,8 @@ import {
 // Values
 pub let card_border : Double
 
+pub let card_font : Font
+
 pub fn card_place(Rect, Camera, Int, Double) -> Placement
 
 pub fn card_rect(Box, Int) -> Rect?
@@ -41,7 +43,9 @@ pub fn edge_path(Pt, Pt) -> String
 
 pub let exact : Reach
 
-pub fn fit(Array[Rect], Pane, Double) -> Camera?
+pub fn far(Pt, Double, Double) -> Bool
+
+pub fn fit(Array[Rect], Pane, margin? : Double) -> Camera?
 
 pub fn fold_name(@tree.Node) -> String
 
@@ -51,15 +55,19 @@ pub fn hidden_label(@tree.Node, Int, (Font, String) -> Double) -> String
 
 pub fn hit(Layout, Double, Double, Reach) -> Int?
 
+pub let hold_ms : Int
+
 pub fn indicator_for(Rect, Camera, Pane) -> Indicator
 
 pub fn is_lost(Array[Rect], Camera, Pane) -> Bool
 
+pub fn is_url(String) -> Bool
+
 pub fn items(Layout, Selection) -> Array[Entry]
 
-pub fn keyed(Layout, Selection, Key) -> Intent?
+pub fn keyed(Layout, Selection, Key) -> Answer
 
-pub fn keyed_card(Layout, Int, Key) -> Intent?
+pub fn keyed_card(Layout, Int, Key) -> Answer
 
 pub let label_border : Double
 
@@ -79,13 +87,15 @@ pub let none : Selection
 
 pub let normal : Row
 
+pub let note_font : Font
+
 pub fn open_label(@tree.Node) -> String
 
 pub fn owner_of(Layout, Int) -> (Box, Int)?
 
 pub fn pan_by(Camera, Double, Double) -> Camera
 
-pub fn pan_to_show(Camera, Rect, Pane, Double) -> Camera
+pub fn pan_to_show(Camera, Rect, Pane, margin? : Double) -> Camera
 
 pub fn pinch(Camera, Span, Span) -> Camera
 
@@ -99,6 +109,10 @@ pub fn row_top(Array[Card], Int) -> Double
 
 pub fn rubber(Layout, Rect) -> Selection
 
+pub fn subtree(Layout, Array[Int]) -> Array[Int]
+
+pub let tiny_font : Font
+
 pub fn to_world(Camera, Double, Double) -> Pt
 
 pub fn union(Array[Rect]) -> Rect?
@@ -108,6 +122,12 @@ pub fn zoom_at(Camera, Double, Double, Double) -> Camera
 // Errors
 
 // Types and methods
+pub(all) enum Answer {
+  Pass
+  Do(Intent)
+  Stop
+} derive(Eq, @debug.Debug)
+
 pub(all) enum Arrow {
   Up
   Down
@@ -276,6 +296,7 @@ pub(all) struct Selection {
   ids : Array[Int]
   anchor : Int?
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Selection::only(Int) -> Self
 
 pub(all) struct Size {
   w : Double

@@ -5,8 +5,14 @@
 // リンクカードを直したい人はこのファイルの `link` だけを見ればよい。
 //
 // 置き場所は自分では数えない — `@map.card_rect` が唯一の出所で、選んだ枠も
-// 入力欄も同じ数を使う。class と data-* は ts の style.css とハンドラとの契約 —
-// 変えない。`data-card` はカードが出た**中身の id** 1 つ（枚目は入れない）。
+// 入力欄も同じ数を使う。字の大きさも `@map` の字（card_font / note_font / tiny_font /
+// mono_font）を属性で入れ、CSS に同じ数字を持たせない（metric.mbt の決め）。
+// class と data-* は ts の style.css とハンドラとの契約 — 変えない。
+// `data-card` はカードが出た**中身の id** 1 つ（枚目は入れない）。
+
+///|
+/// カードが出た中身の id を出す属性。input.mbt が読み、style.css が当たり判定に使う契約
+let data_card = "data-card"
 
 ///|
 /// カード 1 枚を置く場所
@@ -22,22 +28,83 @@ pub(all) struct Spot {
 }
 
 ///|
+/// `data-card` の属性。押せばこの中身が選ばれる
+fn Spot::mark(self : Spot) -> (String, String) {
+  (data_card, self.id.to_string())
+}
+
+///|
 /// コードの色分けの 1 塊。`cls` が空なら色の付かない地の文
 pub(all) struct Token {
   text : String
   cls : String
 }
 
+// ---- 矩形と線を書く。数は core の Rect のまま、SVG の属性にするのはここだけ ----
+
+///|
+/// 要素をその矩形にぴったり被せる（x / y / width / height）
+fn cover(e : @dom.Element, r : @map.Rect) -> Unit {
+  @web.set_rect(e, r.x, r.y, r.w, r.h)
+}
+
+///|
+/// 矩形を持つ要素（rect / image）を、その矩形に置いて作る
+fn rect_el(
+  doc : @dom.Document,
+  tag : String,
+  attrs : Array[(String, String)],
+  r : @map.Rect,
+) -> @dom.Element {
+  let e = @web.el(doc, tag, attrs)
+  cover(e, r)
+  e
+}
+
+///|
+/// 線を引いて作る
+fn line_el(
+  doc : @dom.Document,
+  attrs : Array[(String, String)],
+  x1 : Double,
+  y1 : Double,
+  x2 : Double,
+  y2 : Double,
+) -> @dom.Element {
+  let e = @web.el(doc, "line", attrs)
+  @web.set_line(e, x1, y1, x2, y2)
+  e
+}
+
+///|
+/// 字の要素。大きさは core の字で決まり、属性で入れる
+fn text_el(
+  doc : @dom.Document,
+  attrs : Array[(String, String)],
+  font : @map.Font,
+  x : Double,
+  y : Double,
+  text : String,
+) -> @dom.Element {
+  let e = @web.el(doc, "text", attrs)
+  e.setAttribute("font-size", font.px.to_string())
+  e.setAttribute("x", @web.num(x))
+  e.setAttribute("y", @web.num(y))
+  e.setTextContent(text)
+  e
+}
+
 ///|
 /// 行と行のあいだの仕切り。種類によらず引く
 fn separator(doc : @dom.Document, at : Spot) -> @dom.Element {
-  @web.el(doc, "line", [
-    ("class", "sep"),
-    ("x1", @web.num(@map.normal.pad - 4.0)),
-    ("y1", @web.num(at.row_y)),
-    ("x2", @web.num(at.box_w - @map.normal.pad + 4.0)),
-    ("y2", @web.num(at.row_y)),
-  ])
+  line_el(
+    doc,
+    [("class", "sep")],
+    @map.normal.pad - 4.0,
+    at.row_y,
+    at.box_w - @map.normal.pad + 4.0,
+    at.row_y,
+  )
 }
 
 ///|
@@ -46,15 +113,7 @@ fn separator(doc : @dom.Document, at : Spot) -> @dom.Element {
 /// カードいっぱいの透明な面が要る。SVG の `text` はインクにしか当たらないので、
 /// 敷かないと字の隙間を押したときに何も選べない。
 fn hit_face(doc : @dom.Document, at : Spot) -> @dom.Element {
-  let { x, y, w, h, } = at.rect
-  @web.el(doc, "rect", [
-    ("class", "card-hit"),
-    ("data-card", at.id.to_string()),
-    ("x", @web.num(x)),
-    ("y", @web.num(y)),
-    ("width", @web.num(w)),
-    ("height", @web.num(h)),
-  ])
+  rect_el(doc, "rect", [("class", "card-hit"), at.mark()], at.rect)
 }
 
 ///|
@@ -66,12 +125,14 @@ fn link(
 ) -> Array[@dom.Element] {
   let { x, y, w, h, } = at.rect
   let hit = hit_face(doc, at)
-  let text = @web.el(doc, "text", [
-    ("class", "link-row"),
-    ("x", @web.num(x)),
-    ("y", @web.num(y + h / 2.0)),
-  ])
-  text.setTextContent(title)
+  let text = text_el(
+    doc,
+    [("class", "link-row")],
+    @map.card_font,
+    x,
+    y + h / 2.0,
+    title,
+  )
   let tip = @web.el(doc, "title", [])
   tip.setTextContent(url)
   let open = @web.el(doc, "text", [
@@ -89,16 +150,12 @@ fn link(
 ///|
 /// 絵を 1 枚。インライン SVG もローカル画像も、貼り方はここだけ
 fn picture(doc : @dom.Document, href : String, at : Spot) -> @dom.Element {
-  let { x, y, w, h, } = at.rect
-  @web.el(doc, "image", [
-    ("data-card", at.id.to_string()),
-    ("x", @web.num(x)),
-    ("y", @web.num(y)),
-    ("width", @web.num(w)),
-    ("height", @web.num(h)),
-    ("preserveAspectRatio", "xMidYMid meet"),
-    ("href", href),
-  ])
+  rect_el(
+    doc,
+    "image",
+    [at.mark(), ("preserveAspectRatio", "xMidYMid meet"), ("href", href)],
+    at.rect,
+  )
 }
 
 ///|
@@ -127,36 +184,42 @@ fn image(
   // まだ読めていない（握っていない / ファイルが無い）。読めたときに配置が
   // 飛ばないよう、同じ大きさの場所取りを置く
   let { x, y, w, h, } = at.rect
-  let box = @web.el(doc, "rect", [
-    ("class", "image-placeholder"),
-    ("data-card", at.id.to_string()),
-    ("x", @web.num(x)),
-    ("y", @web.num(y)),
-    ("width", @web.num(w)),
-    ("height", @web.num(h)),
-  ])
+  let box = rect_el(
+    doc,
+    "rect",
+    [("class", "image-placeholder"), at.mark()],
+    at.rect,
+  )
   // **黙って空にしない。** 読めない理由は 4 通りあるのに症状は 1 つなので、
   // 場所取りが自分で言う。握っていないだけなら、ここが入口も兼ねる
   let mid = y + h / 2.0
-  let label = @web.el(doc, "text", [
-    ("class", "image-name"),
-    ("data-card", at.id.to_string()),
-    ("x", @web.num(x + w / 2.0)),
-    ("y", @web.num(if scene.image_hint is None { mid } else { mid - 7.0 })),
-    ("text-anchor", "middle"),
-  ])
-  label.setTextContent(name)
+  let label = text_el(
+    doc,
+    [("class", "image-name"), at.mark(), ("text-anchor", "middle")],
+    @map.note_font,
+    x + w / 2.0,
+    if scene.image_hint is None {
+      mid
+    } else {
+      mid - 7.0
+    },
+    name,
+  )
   guard scene.image_hint is Some(hint) else { return [box, label] }
   // 入口は**この字だけ**。場所取りそのものは選択のままにしておく
   // （2 つの意味を 1 つの当たり判定に乗せない）
-  let connect = @web.el(doc, "text", [
-    ("class", "image-connect"),
-    ("data-connect", "1"),
-    ("x", @web.num(x + w / 2.0)),
-    ("y", @web.num(mid + 8.0)),
-    ("text-anchor", "middle"),
-  ])
-  connect.setTextContent(hint)
+  let connect = text_el(
+    doc,
+    [
+      ("class", "image-connect"),
+      ("data-connect", "1"),
+      ("text-anchor", "middle"),
+    ],
+    @map.tiny_font,
+    x + w / 2.0,
+    mid + 8.0,
+    hint,
+  )
   [box, label, connect]
 }
 
@@ -168,17 +231,9 @@ fn code(
   at : Spot,
   scene : Scene,
 ) -> Array[@dom.Element] {
-  let { x, y, w, h, } = at.rect
   // 背景は左右にも張り出す（コードは箱の縁まで塗る）。張り出しは矩形に
   // 織り込み済みなので、ここで足し直さない
-  let bg = @web.el(doc, "rect", [
-    ("class", "code-bg"),
-    ("data-card", at.id.to_string()),
-    ("x", @web.num(x)),
-    ("y", @web.num(y)),
-    ("width", @web.num(w)),
-    ("height", @web.num(h)),
-  ])
+  let bg = rect_el(doc, "rect", [("class", "code-bg"), at.mark()], at.rect)
   if lang != "" {
     let tip = @web.el(doc, "title", [])
     tip.setTextContent(lang)
@@ -187,20 +242,17 @@ fn code(
   let out = [bg]
   let tokens = (scene.tokens)(lines, lang)
   for i, _ in lines {
-    let line = @web.el(doc, "text", [
-      ("class", "code-line"),
-      ("data-card", at.id.to_string()),
-      ("x", @web.num(@map.normal.pad + 1.0)),
-      (
-        "y",
-        @web.num(
-          at.row_y +
-          @map.code_pad +
-          i.to_double() * @map.code_line +
-          @map.code_line / 2.0,
-        ),
-      ),
-    ])
+    let line = text_el(
+      doc,
+      [("class", "code-line"), at.mark()],
+      @map.mono_font,
+      @map.normal.pad + 1.0,
+      at.row_y +
+      @map.code_pad +
+      i.to_double() * @map.code_line +
+      @map.code_line / 2.0,
+      "",
+    )
     // 幅の判断は素の文字列で行い、色の付いた塊をそこへ合わせる
     for t in tokens[i] {
       let span = @web.el(
@@ -225,14 +277,14 @@ fn code(
 fn rule(doc : @dom.Document, at : Spot) -> Array[@dom.Element] {
   let { x, y, w, h, } = at.rect
   [
-    @web.el(doc, "line", [
-      ("class", "break"),
-      ("data-card", at.id.to_string()),
-      ("x1", @web.num(x)),
-      ("y1", @web.num(y + h / 2.0)),
-      ("x2", @web.num(x + w)),
-      ("y2", @web.num(y + h / 2.0)),
-    ]),
+    line_el(
+      doc,
+      [("class", "break"), at.mark()],
+      x,
+      y + h / 2.0,
+      x + w,
+      y + h / 2.0,
+    ),
   ]
 }
 
@@ -249,18 +301,24 @@ fn details(
   let x = at.rect.x
   let row_mid = at.row_y + @map.details_row / 2.0 // summary の行の中心
   let hit = hit_face(doc, at)
-  let mark = @web.el(doc, "text", [
-    ("class", "details-mark"),
-    ("x", @web.num(x)),
-    ("y", @web.num(row_mid)),
-  ])
-  mark.setTextContent(if open { "▾" } else { "▸" })
-  let name = @web.el(doc, "text", [
-    ("class", "details-row"),
-    ("x", @web.num(x + @map.details_indent)),
-    ("y", @web.num(row_mid)),
-  ])
-  name.setTextContent(
+  let mark = text_el(
+    doc,
+    [("class", "details-mark")],
+    @map.tiny_font,
+    x,
+    row_mid,
+    if open {
+      "▾"
+    } else {
+      "▸"
+    },
+  )
+  let name = text_el(
+    doc,
+    [("class", "details-row")],
+    @map.card_font,
+    x + @map.details_indent,
+    row_mid,
     match summary {
       Some(s) => s
       None => @map.details_name
@@ -270,16 +328,16 @@ fn details(
   guard open else { return out }
   let top = at.row_y + @map.details_row
   for i, text in lines {
-    let line = @web.el(doc, "text", [
-      ("class", "details-line"),
-      ("x", @web.num(x + @map.details_indent)),
-      (
-        "y",
-        @web.num(top + i.to_double() * @map.code_line + @map.code_line / 2.0),
+    out.push(
+      text_el(
+        doc,
+        [("class", "details-line")],
+        @map.note_font,
+        x + @map.details_indent,
+        top + i.to_double() * @map.code_line + @map.code_line / 2.0,
+        text,
       ),
-    ])
-    line.setTextContent(text)
-    out.push(line)
+    )
   }
   out
 }

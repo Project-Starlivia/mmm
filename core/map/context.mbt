@@ -72,7 +72,10 @@ fn Menu::new(l : Layout, sel : Selection) -> Menu {
 ///|
 /// そのキーを押したのと同じ Intent。
 fn Menu::press(self : Menu, key : String, shift : Bool, mod : Bool) -> Intent? {
-  keyed(self.l, self.sel, { key, shift, mod, alt: false, })
+  match keyed(self.l, self.sel, { key, shift, mod, alt: false, }) {
+    Do(i) => Some(i)
+    _ => None
+  }
 }
 
 ///|

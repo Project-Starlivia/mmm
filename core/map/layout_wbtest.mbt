@@ -211,3 +211,23 @@ test "カードの矩形は箱の左上から見た座標。無い行は None" {
   assert_eq(owner_of(l, 8) is None, true)
   assert_eq(owner_of(l, 7) is None, true)
 }
+
+///|
+test "subtree は選んだものとその子孫を文書順に。無い id は落ちる" {
+  // r(1) → a(2) → c(3), b(4)
+  let l = layout(
+    [
+      root(
+        node(1, "r", children=[
+          node(2, "a", children=[node(3, "c")]),
+          node(4, "b"),
+        ]),
+      ),
+    ],
+    size,
+  )
+  assert_eq(subtree(l, [2]), [2, 3])
+  assert_eq(subtree(l, [4, 2]), [2, 3, 4])
+  assert_eq(subtree(l, [1]), [1, 2, 3, 4])
+  assert_eq(subtree(l, [9]), [])
+}

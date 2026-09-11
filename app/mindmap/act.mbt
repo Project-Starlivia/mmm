@@ -2,30 +2,13 @@
 // 意味は map/ が持ち、ここは配線だけ
 
 ///|
-/// `https?://` で始まり、空白を含まない
-fn is_url(s : String) -> Bool {
-  guard s.has_prefix("http://") || s.has_prefix("https://") else {
-    return false
-  }
-  let scheme = if s.has_prefix("https://") { 8 } else { 7 }
-  guard s.length() > scheme else { return false }
-  for i in 0..<s.length() {
-    let c = s[i]
-    if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
-      return false
-    }
-  }
-  true
-}
-
-///|
 /// クリップボードの URL をリンクカードにして足し、題（`[]` の中）を打つ。
-/// URL として読めなければ `failed`（core にも聞かない — Mod+V は raw を core に
-/// 読ませるが、ここは「URL か否か」だけを見て、違えば言う）
+/// URL として読めなければ `failed`（Mod+V は raw を core に読ませるが、ここは
+/// core の `is_url` で「URL か否か」だけを見て、違えば言う）
 fn Mindmap::add_link(self : Mindmap, id : Int) -> Unit {
   (self.host.read_clipboard)(raw => {
     let url = raw.trim(chars=" \t\r\n").to_owned()
-    guard is_url(url) else {
+    guard @map.is_url(url) else {
       (self.host.failed)("Couldn't read that as a link")
       return
     }
@@ -71,7 +54,7 @@ fn Mindmap::open_menu(self : Mindmap, x : Double, y : Double) -> Unit {
   }
   let sel = (self.host.selection)()
   if !sel.ids.contains(id) {
-    (self.host.set_selection)({ ids: [id], anchor: Some(id), }, false)
+    (self.host.set_selection)(@map.Selection::only(id), false)
   }
   self.menu.show(x, y, () => {
     items_of(@map.items(self.layout, (self.host.selection)()), i => self.act(i))

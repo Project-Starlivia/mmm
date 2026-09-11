@@ -37,7 +37,6 @@ fn put(
 /// ラベルの欄。開く / 打つたびに rename / 閉じる。値の意味は持たない
 pub struct LabelField {
   input : @dom.Element
-  pane : @dom.HTMLElement
   measure : @map.Measure
   rename : (Int, String) -> Unit
   /// 読みのサイクルを越えて id を持つ唯一の場所。Rename は木の形を変えず番号を
@@ -63,7 +62,6 @@ fn LabelField::new(
   pane.append(input.as_node())
   let f : LabelField = {
     input,
-    pane,
     measure,
     rename,
     id: None,
@@ -196,7 +194,6 @@ pub struct CardField {
   box : @dom.Element
   highlight : @dom.Element
   textarea : @dom.Element
-  pane : @dom.HTMLElement
   measure : @map.Measure
   /// コードの色分け。実体は ts の highlight（CodeMirror の言語表）
   tokens : (String) -> Array[Array[Token]]
@@ -229,7 +226,6 @@ fn CardField::new(
     box,
     highlight,
     textarea,
-    pane,
     measure,
     tokens,
     commit,

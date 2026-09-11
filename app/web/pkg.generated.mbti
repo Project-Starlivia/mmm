@@ -204,6 +204,10 @@ pub fn set_disabled(@dom.Element, Bool) -> Unit
 
 pub fn set_drop_effect(@core.Any, String) -> Unit
 
+pub fn set_line(@dom.Element, Double, Double, Double, Double) -> Unit
+
+pub fn set_rect(@dom.Element, Double, Double, Double, Double) -> Unit
+
 pub fn set_style(@dom.Element, String, String) -> Unit
 
 pub fn set_value(@dom.Element, String) -> Unit
@@ -227,6 +231,8 @@ pub fn storage_set(@dom.Document, String, String) -> Unit
 pub fn stroke_line(@core.Any, String, Double, FixedArray[Double]) -> Unit
 
 pub let svg_ns : String
+
+pub fn svg_show(@dom.Element, Bool) -> Unit
 
 pub fn target_in(@core.Any, String) -> @dom.Element?
 
