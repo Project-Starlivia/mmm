@@ -207,13 +207,13 @@ test "綴り — 水平線は読んだ字のまま。境界も飾りもコード
 }
 
 ///|
-/// 読みは CRLF を含む md も受けるが（`方言 — CRLF でも…`）、書きは LF だけ。
-/// 塊の中身は読んだ原文なので、その中の CRLF だけが残る。
+/// 読みは CRLF を含む md も受けるが（`方言 — CRLF でも…`）、**書きは LF だけ。
+/// 塊の中身も揃う** — 木が抱える字は LF だけという不変量（#207）。
 test "綴り — 書き戻しの改行は LF だけ" {
   inspect(serialize(parse("# a\r\n\r\n## b\r\n")), content="# a\n\n## b\n")
   inspect(
     serialize(parse("# a\r\n\r\n```\r\nx\r\n```\r\n")),
-    content="# a\n\n```\r\nx\r\n```\n",
+    content="# a\n\n```\nx\n```\n",
   )
 }
 

@@ -360,7 +360,8 @@ fn strip(md : String, from : Int, to : Int) -> String {
   while z > a && blank(md[z - 1]) {
     z = z - 1
   }
-  slice(md, a, z)
+  // 木が抱える字は LF だけ（`carve` と同じ不変量）
+  lf(slice(md, a, z))
 }
 
 ///|
@@ -439,8 +440,10 @@ fn ahead_of(
 /// ので、ここは読むだけ。
 fn fold_of(s : Spell) -> Fold {
   let open = s.tags[0].mark is Open(open=true)
+  // 木が抱える字は LF だけ。綴りの照合（`Found.ok`）は原文のままやるので、
+  // 揃えるのは木へ渡すここ
   let summary = if s.tags.length() > 1 && s.tags[1].mark is Name(text) {
-    Some(text)
+    Some(lf(text))
   } else {
     None
   }

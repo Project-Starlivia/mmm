@@ -420,8 +420,11 @@ test "項目の中の Raw も列 0 に揃う" {
 }
 
 ///|
-/// 読んだ原文は切り出しの中でも字のまま（書き足す改行は LF だけ）。
-test "CRLF は切り出しの中でも保たれる" {
+/// **切り出しは改行を LF に揃える**（#207）。読んだ字をそのまま持つのが原則だが、
+/// 改行だけは例外 — 木が抱える字は LF だけという不変量で、これが無いと CRLF の
+/// 文書を書き戻したとき 1 つの文書の中で改行が混ざる。原文そのもの（地番と
+/// 記法構造の書き戻し）は `slice` を使うので、1 バイトも変わらない。
+test "切り出しの中の CRLF は LF に揃う" {
   json_inspect(
     parse("# r\r\n\r\n<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>\r\n"),
     content={
@@ -435,7 +438,7 @@ test "CRLF は切り出しの中でも保たれる" {
               {
                 "id": 3,
                 "content": ["Details", { "open": false, "body": "## h" }],
-                "source": "<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>",
+                "source": "<details class=\"x\">\n\n## h\n\n</details>",
               },
             ],
             "children": [],

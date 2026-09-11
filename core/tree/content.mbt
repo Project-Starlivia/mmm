@@ -9,10 +9,12 @@
 /// 持つので、ここで字を抱えない。骨格と区切りはここへ来ない。
 fn content_of(md : String, block : @markdown.Block) -> Content? {
   match block {
-    FencedCode(info~, code~, ..) => Some(Code(info~, text=code))
+    // 中身の字はライブラリから来るので、ここで LF に揃える
+    // （`carve` を通らない唯一の道。「木が抱える字は LF だけ」）
+    FencedCode(info~, code~, ..) => Some(Code(info~, text=lf(code)))
     // インデントコードの意味はフェンスと同じ。記法（字下げ 4 桁）は `source` が持つので、
     // 書き戻せば字下げのまま（方言が span に 4 桁を戻している。#206）
-    IndentedCode(code~, ..) => Some(Code(info="", text=code))
+    IndentedCode(code~, ..) => Some(Code(info="", text=lf(code)))
     HtmlBlock(html~, ..) => if is_svg(html) { Some(Svg(html)) } else { None }
     Paragraph(children~, span~, ..) => sole(md, span, children)
     _ => None

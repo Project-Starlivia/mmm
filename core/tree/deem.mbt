@@ -168,7 +168,12 @@ fn deem(d : Deem, cut : Slice, nest : Int) -> Unit {
       keep(
         d,
         { from, to, },
-        Card(content=Some(Details(open~, summary~, body~)), source=Some(text)),
+        // `summary` は綴りの照合を原文でやるので、木へ渡すここで LF に揃える
+        // （`text` と `body` は `carve` / `strip` が済ませている）
+        Card(
+          content=Some(Details(open~, summary=summary.map(lf), body~)),
+          source=Some(text),
+        ),
       )
     }
     Text(text, from~, to~) => {

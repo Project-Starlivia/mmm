@@ -114,19 +114,19 @@ test "見本 — 読んで書き戻した字" {
       #|"# a\r\n\r\n## b\r\n"
       #|  → "# a\n\n## b\n"
       #|"- aaa\r\n  bbb\r\n"
-      #|  → "- aaa\r\n  bbb\n"
+      #|  → "- aaa\n  bbb\n"
       #|"* \n  * \n    * \n"
       #|  → "*\n  * *\n"
       #|"- \n  - \n    - \n"
       #|  → "-\n  - -\n"
       #|"aaa\r\nbbb\r\n===\r\n"
-      #|  → "aaa\r\nbbb\n===\n"
+      #|  → "aaa\nbbb\n===\n"
       #|"- x\n  # n\n  ## s\n"
       #|  → "- x\n  # n\n\n  ## s\n"
       #|"---\nk: v\n---\n# a\n"
       #|  → "---\nk: v\n---\n\n# a\n"
       #|"# a\r\n\r\n```\r\nx\r\n```\r\n"
-      #|  → "# a\n\n```\r\nx\r\n```\n"
+      #|  → "# a\n\n```\nx\n```\n"
       #|"# r\n\n- b\n\n  - c\n\n### x\n"
       #|  → "# r\n\n- b\n  - c\n\n### x\n"
       #|"- \n  - \n    - \n      - \n"
@@ -134,7 +134,7 @@ test "見本 — 読んで書き戻した字" {
       #|"- a\n\n  - b\n\n  text\n\n  - c\n"
       #|  → "- a\n  - b\n\n    text\n  - c\n"
       #|"# r\r\n\r\n<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>\r\n"
-      #|  → "# r\n\n<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>\n"
+      #|  → "# r\n\n<details class=\"x\">\n\n## h\n\n</details>\n"
       #|"# r\n\n<details><summary>a</summary>\n\n## a\n\n</details>\n"
       #|  → "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n"
       #|"# r\n\n<details>\t<summary>s</summary>\n\n## a\n\n</details>\n"
@@ -148,6 +148,26 @@ test "見本 — 読んで書き戻した字" {
       #|
     ),
   )
+}
+
+///|
+/// **木が抱える字は LF だけ**（#207）。読んだ原文はそのまま持つのが原則だが、改行は
+/// 例外 — 混ざったまま持つと、書き戻した md の中で改行が 2 通りになる。
+///
+/// 揃えるのは木へ渡す所だけ（`carve` / `strip` と、ライブラリから来る字）。**原文その
+/// ものは 1 バイトも変えない** — 地番は原文の位置を指し、記法構造の書き戻しは
+/// `slice` で切るので、どちらも CR をそのまま返す（`見本 — 触っていない記法構造を…`）。
+/// 木を JSON に落として見るので、**字を持つ欄を 1 つも取りこぼさない**
+/// （label / source / content / rules / frontmatter / summary）。
+test "見本 — 木が抱える字に CR は無い" {
+  let bad : Array[String] = []
+  for md in read_corpus {
+    // JSON は CR を 2 文字の `\r` に綴る
+    if parse(md).to_json().stringify().contains("\\r") {
+      bad.push(md.escape())
+    }
+  }
+  json_inspect(bad, content=[])
 }
 
 ///|

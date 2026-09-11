@@ -442,6 +442,9 @@ pub fn prose(body : Array[Block]) -> String {
 
 ///|
 /// mdAst → md。**改行は LF だけ**（spec「文字コードと改行」）。
+///
+/// ここで剥がすことはしない。**木が抱える字はもう LF だけ**（読みが `carve` / `strip` と
+/// ライブラリの境目で揃えている）なので、綴り直した字も LF になる。
 fn write(ast : @markdown.Document) -> String {
   @markdown.serialize(ast)
 }
