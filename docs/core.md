@@ -387,7 +387,8 @@ design.md「状態と拍」）。打鍵ごとの core 呼び出しは `mmmSurvey
 ## 操作
 
 `op/` が `apply(doc, op) -> Done?` で Doc を Doc にする。md も CodeMirror も知らない
-純粋な関数で、`None` は「できない操作」。表に出るのはこれと型だけ。
+純粋な関数で、`None` は「できない操作」。表に出るのは境界の `edit`（下記）と型だけで、
+`apply` は package の中に居る。
 
 ```
 NodePlace  = Before(node~)  | After(node~)  | In(node~, side: Side?)   // ノードの席。子の列

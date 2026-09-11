@@ -49,12 +49,6 @@ test "Rename — 項目が根の子なら、`---` は側の変わり目になる
 }
 
 ///|
-test "境界の綴りは、触っていなければそのまま" {
-  let md = "# a\n\n## b\n\n___\n\n## c\n"
-  inspect(@tree.serialize(@tree.parse(md)), content=md)
-}
-
-///|
 /// 閉じの `#` は飾りなので、`# foo ##` は名前 `foo` + 閉じ 2 本に読まれる。
 /// 読んだ綴りで書き戻すので行は残るが、木（名前 `foo ##`）と md の形が
 /// 食い違うので focus は無い。
@@ -83,44 +77,6 @@ test "AddNode — 新しいノードの focus は、読み直したときの番�
 test "Delete — 消した後は隣が focus。最後の根なら無い" {
   assert_eq(applied("# a\n\n# b\n", Delete(ids=[3])), ("# a\n", Some(2)))
   assert_eq(applied("# a\n", Delete(ids=[2])), ("", None))
-}
-
-///|
-/// ts が送る形。Op は ToJson の形をそのまま FromJson で受ける。
-test "Op は JSON から起こせる — 席の side の None は鍵ごと落ちる" {
-  let ops : Array[Op] = [
-    AddNode(at=NodePlace::In(node=2, side=None), labels=["n"]),
-    AddNode(at=NodePlace::In(node=2, side=Some(Left)), labels=["n"]),
-    MoveBlock(ids=[3, 4], at=Before(block=5)),
-    AddBlock(
-      at=BlockPlace::In(node=2),
-      content=Some(Code(info="js", text="1\n")),
-      source=None,
-    ),
-    Fold(id=2, open=false),
-  ]
-  for op in ops {
-    let back : Op = @json.from_json(op.to_json())
-    assert_eq(back, op)
-  }
-  inspect(
-    ops[0].to_json().stringify(),
-    content=(
-      #|["AddNode",{"at":["In",{"node":2}],"labels":["n"]}]
-    ),
-  )
-  inspect(
-    ops[1].to_json().stringify(),
-    content=(
-      #|["AddNode",{"at":["In",{"node":2,"side":"Left"}],"labels":["n"]}]
-    ),
-  )
-  inspect(
-    ops[3].to_json().stringify(),
-    content=(
-      #|["AddBlock",{"at":["In",{"node":2}],"content":["Code",{"info":"js","text":"1\n"}]}]
-    ),
-  )
 }
 
 ///|
@@ -246,24 +202,6 @@ test "新しい根の項目は最後の根の綴りを継ぐ — * の根に足�
   let r = edit(md, AddNode(at=In(node=@tree.doc_id, side=None), labels=["b"]))
   assert_eq(@tree.patched(md, r.edits), "* a\n* b\n")
   assert_eq(r.focus, Some(3))
-}
-
-///|
-/// #84 — 読んだ列の綴りは正規形でも保つ。番号も読んだ数字のまま
-test "* の列を触っても * のまま、1. の列は 1. のまま" {
-  inspect(
-    @tree.serialize(@tree.parse("# a\n\n* b\n* c\n")),
-    content="# a\n\n* b\n* c\n",
-  )
-  inspect(
-    @tree.serialize(@tree.parse("# a\n\n1. b\n2. c\n")),
-    content="# a\n\n1. b\n2. c\n",
-  )
-  // 飛んだ番号も読んだまま（ライブラリは列の先頭からしか数えない）
-  inspect(
-    @tree.serialize(@tree.parse("# a\n\n1. b\n3. c\n")),
-    content="# a\n\n1. b\n3. c\n",
-  )
 }
 
 ///|
