@@ -52,16 +52,6 @@ pub(all) struct FileActs {
 }
 
 ///|
-/// 沈む理由。押せるなら No
-fn unless(ok : Bool, why : String) -> @parts.Disabled {
-  if ok {
-    No
-  } else {
-    Why(why)
-  }
-}
-
-///|
 pub fn files_menu(s : Files, a : FileActs) -> Array[@parts.Entry] {
   let access = @parts.no_file_access
   [
@@ -75,7 +65,7 @@ pub fn files_menu(s : Files, a : FileActs) -> Array[@parts.Entry] {
         "Open",
         key=Some("Mod+O"),
         mark=Some("folder-open"),
-        disabled=unless(s.can_open, access),
+        disabled=@parts.unless(s.can_open, why=access),
       ),
       a.open,
     ),
@@ -84,7 +74,7 @@ pub fn files_menu(s : Files, a : FileActs) -> Array[@parts.Entry] {
       @parts.row(
         "Recent",
         mark=Some("clock"),
-        disabled=unless(s.recent.length() > 0, "Nothing opened yet"),
+        disabled=@parts.unless(s.recent.length() > 0, why="Nothing opened yet"),
       ),
       s.recent.mapi((i, name) => Run(@parts.row(name), () => (a.open_recent)(i))),
       None,
@@ -94,7 +84,7 @@ pub fn files_menu(s : Files, a : FileActs) -> Array[@parts.Entry] {
         "Save",
         key=Some("Mod+S"),
         mark=Some("save"),
-        disabled=unless(s.can_save, access),
+        disabled=@parts.unless(s.can_save, why=access),
       ),
       a.save,
     ),
@@ -103,7 +93,7 @@ pub fn files_menu(s : Files, a : FileActs) -> Array[@parts.Entry] {
       @parts.row(
         "Save as",
         key=Some("Mod+Shift+S"),
-        disabled=unless(s.can_save, access),
+        disabled=@parts.unless(s.can_save, why=access),
       ),
       a.save_as,
     ),
@@ -111,9 +101,9 @@ pub fn files_menu(s : Files, a : FileActs) -> Array[@parts.Entry] {
       @parts.row(
         "Rename",
         mark=Some("pencil"),
-        disabled=match rename_problem(s.can_rename, s.saved_name is Some(_)) {
-          Some(why) => Why(why)
-          None => No
+        disabled={
+          let problem = rename_problem(s.can_rename, s.saved_name is Some(_))
+          @parts.unless(problem is None, why?=problem)
         },
       ),
       a.rename,
@@ -125,7 +115,7 @@ pub fn files_menu(s : Files, a : FileActs) -> Array[@parts.Entry] {
       @parts.row(
         "Choose folder",
         mark=Some("folder"),
-        disabled=unless(s.can_choose_folder, access),
+        disabled=@parts.unless(s.can_choose_folder, why=access),
       ),
       a.choose_folder,
     ),

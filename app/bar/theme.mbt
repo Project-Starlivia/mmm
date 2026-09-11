@@ -47,7 +47,7 @@ fn Theme::apply_color(self : Theme, hex : String) -> Unit {
   @web.set_style(self.doc.documentElement(), "--accent", c)
   self.favicon_color = c
   self.apply_favicon()
-  @prefs.store("color", c)
+  @prefs.store(self.doc, "color", c)
 }
 
 ///|
@@ -59,7 +59,7 @@ pub fn Theme::is_light(self : Theme) -> Bool {
 fn Theme::apply_theme(self : Theme, light : Bool) -> Unit {
   @web.toggle_class(self.doc.documentElement(), "light", light)
   (self.set_editor_theme)(!light)
-  @prefs.store("theme", if light { "light" } else { "dark" })
+  @prefs.store(self.doc, "theme", if light { "light" } else { "dark" })
 }
 
 ///|
@@ -140,13 +140,13 @@ pub fn Theme::new(
   // ---- 復元 ----
   // localStorage の中身は何でもありうる（人が書き替えられるし、昔の版が
   // 別の値を入れているかもしれない）。名乗らせずに確かめる
-  let light = match @prefs.load("theme") {
+  let light = match @prefs.load(doc, "theme") {
     Some("light") => true
     Some("dark") => false
     _ => @web.matches(@web.match_media(doc, "(prefers-color-scheme: light)"))
   }
   t.apply_theme(light)
-  t.apply_color(@prefs.load("color").unwrap_or(base))
+  t.apply_color(@prefs.load(doc, "color").unwrap_or(base))
   t
 }
 

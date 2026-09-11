@@ -235,6 +235,30 @@ pub fn label(
 }
 
 ///|
+/// 絵だけのボタン。`type="button"`（form の中で送信にならない）。名乗りは `title` と
+/// `aria-label` — 読み上げの名（`label`）が無ければ title をそのまま名乗る。
+/// どちらも無ければ名乗らない（後から状態で付け替えるもの — ペインの矢印）
+pub fn icon_button(
+  doc : @dom.Document,
+  name : String,
+  title? : String,
+  label? : String,
+) -> @dom.Element {
+  let b = doc.createElement("button")
+  b.setAttribute("type", "button")
+  match title {
+    Some(t) => b.setAttribute("title", t)
+    None => ()
+  }
+  match (label, title) {
+    (Some(l), _) | (None, Some(l)) => b.setAttribute("aria-label", l)
+    (None, None) => ()
+  }
+  b.append(icon(doc, name).as_node())
+  b
+}
+
+///|
 /// ぐるぐるを出すまでの間。**ここを過ぎて初めて「待たされている」**
 /// — 大半の一手はこれより速く終わり、出してすぐ消せば点滅にしかならない
 let wait = 200

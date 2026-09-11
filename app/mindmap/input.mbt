@@ -422,7 +422,8 @@ fn Mindmap::bind_click(self : Mindmap) -> Unit {
       None => ()
     }
     match @web.attr_in(e, ".link-open", "data-url") {
-      Some(url) if url != "" => @web.open_url(url)
+      Some(url) if url != "" =>
+        @web.open_url(self.pane.ownerDocument().unwrap(), url)
       _ => ()
     }
   })

@@ -43,47 +43,50 @@ test "export_ways: 落とすと写すのあいだに線。空なら全部沈み�
 }
 
 ///|
-async test "run: 出すものが無ければ blocked、出し口がしくじれば failed。どちらも投げない" {
+/// 非同期の中なので、窓は `with_doc` を通らず手で持つ（閉じる閉包は async を呼べない）
+async test "export_once: 出すものが無ければ blocked、出し口がしくじれば failed。どちらも投げない" {
   let blocked = []
-  assert_false(run(deps(true, blocked~), ways[0]))
+  assert_false(export_once(deps(true, blocked~), ways[0]))
   assert_eq(blocked, ["Nothing to export yet"])
   let w = @test_utils.create_happy_window()
   defer w.close()
   let svg = @web.el(w.document(), "svg", [("width", "0"), ("height", "0")])
   let failed = []
   // 大きさが読めない（0）ので raster が投げる → failed
-  assert_false(run(deps(false, svg=Some(svg), failed~), ways[1]))
+  assert_false(export_once(deps(false, svg=Some(svg), failed~), ways[1]))
   assert_eq(failed, ["Couldn't export"])
 }
 
 ///|
 test "Export: ボタンはいまの出し方（字 + 行き先の絵）を言う。空なら `▾` も一緒に沈み、理由は title" {
-  let w = @test_utils.create_happy_window()
-  defer w.close()
-  let doc = w.document()
-  let button = doc.createElement("button")
-  let way_button = doc.createElement("button")
-  let mut empty = true
-  let d : ExportDeps = {
-    svg: fn() { None },
-    name: () => "n.md",
-    failed: _ => (),
-    blocked: _ => (),
-    empty: () => empty,
-  }
-  let e = Export::new(doc, d, button, way_button)
-  assert_eq(button.textContent(), "SVG")
-  assert_eq(button.querySelectorAll("svg").length(), 1)
-  assert_eq(button.getAttribute("title"), Some("Nothing to export yet"))
-  assert_eq(way_button.getAttribute("title"), Some("Nothing to export yet"))
-  assert_eq(way_button.querySelectorAll("svg").length(), 1)
-  empty = false
-  e.refresh()
-  assert_eq(
-    button.getAttribute("title"),
-    Some("Export the whole Mindmap — Download SVG"),
-  )
-  assert_eq(way_button.getAttribute("aria-label"), Some("Choose how to export"))
+  with_doc(doc => {
+    let button = doc.createElement("button")
+    let way_button = doc.createElement("button")
+    let mut empty = true
+    let d : ExportDeps = {
+      svg: fn() { None },
+      name: () => "n.md",
+      failed: _ => (),
+      blocked: _ => (),
+      empty: () => empty,
+    }
+    let e = Export::new(doc, d, button, way_button)
+    assert_eq(button.textContent(), "SVG")
+    assert_eq(button.querySelectorAll("svg").length(), 1)
+    assert_eq(button.getAttribute("title"), Some("Nothing to export yet"))
+    assert_eq(way_button.getAttribute("title"), Some("Nothing to export yet"))
+    assert_eq(way_button.querySelectorAll("svg").length(), 1)
+    empty = false
+    e.refresh()
+    assert_eq(
+      button.getAttribute("title"),
+      Some("Export the whole Mindmap — Download SVG"),
+    )
+    assert_eq(
+      way_button.getAttribute("aria-label"),
+      Some("Choose how to export"),
+    )
+  })
 }
 
 // ══════════════════════════════════════════════════════════════════

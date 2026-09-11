@@ -47,8 +47,12 @@ pub extern "js" fn convert(
 ///|
 /// ダウンロードさせる。click() の直後に revoke するとダウンロードが始まる前に
 /// URL が消えることがあるので、次のタスクまで待つ
-pub extern "js" fn download(blob : @core.Any, name : String) -> Unit =
-  #| (blob, name) => { const a = document.createElement("a"); const url = URL.createObjectURL(blob);
+pub extern "js" fn download(
+  doc : @dom.Document,
+  blob : @core.Any,
+  name : String,
+) -> Unit =
+  #| (doc, blob, name) => { const a = doc.createElement("a"); const url = URL.createObjectURL(blob);
   #|   a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
 
 ///|

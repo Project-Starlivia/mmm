@@ -28,7 +28,7 @@ let hold = 1500
 
 ///|
 pub(all) struct ExportDeps {
-  /// 全体の SVG。空なら None
+  /// 全体の SVG。空なら None。出し口はこの要素の文書を通る
   svg : async () -> @dom.Element?
   /// ダウンロード名の元になる、いまのファイル名
   name : () -> String
@@ -48,7 +48,7 @@ pub(all) struct Way {
   short : String
   mark : String
   label : String
-  out : async (@dom.Element, String) -> Unit
+  out : async (@dom.Document, @dom.Element, String) -> Unit
 }
 
 ///|
@@ -88,7 +88,11 @@ fn pixels(v : Double, scale : Double) -> Int {
 
 ///|
 /// SVG を絵にする。大きさが読めなければ投げる
-async fn raster(svg : @dom.Element, mime : String) -> @core.Any {
+async fn raster(
+  doc : @dom.Document,
+  svg : @dom.Element,
+  mime : String,
+) -> @core.Any {
   let size = (n : String) => {
     @string.parse_double(svg.getAttribute(n).unwrap_or("")) catch {
       _ => 0.0
@@ -98,7 +102,7 @@ async fn raster(svg : @dom.Element, mime : String) -> @core.Any {
   let h = size("height")
   guard w > 0.0 && h > 0.0 else { fail("書き出す大きさが読めない") }
   let s = fit(w, h, scale, mime)
-  @web.rasterize(@web.serialize(svg), mime, pixels(w, s), pixels(h, s)).wait()
+  @web.rasterize(doc, @web.serialize(svg), mime, pixels(w, s), pixels(h, s)).wait()
 }
 
 ///|
@@ -116,8 +120,9 @@ let ways : Array[Way] = [
     short: "SVG",
     mark: "download",
     label: "Download SVG",
-    out: fn(svg, base) {
+    out: fn(doc, svg, base) {
       @web.download(
+        doc,
         @web.text_blob(@web.serialize(svg), "image/svg+xml"),
         base + ".svg",
       )
@@ -128,8 +133,8 @@ let ways : Array[Way] = [
     short: "WebP",
     mark: "download",
     label: "Download WebP",
-    out: async fn(svg, base) {
-      @web.download(raster(svg, "image/webp"), base + ".webp")
+    out: async fn(doc, svg, base) {
+      @web.download(doc, raster(doc, svg, "image/webp"), base + ".webp")
     },
   },
   {
@@ -137,8 +142,8 @@ let ways : Array[Way] = [
     short: "PNG",
     mark: "copy",
     label: "Copy PNG",
-    out: async fn(svg, _) {
-      @web.clipboard_write(["image/png"], [raster(svg, "image/png")]).wait()
+    out: async fn(doc, svg, _) {
+      @web.clipboard_write(doc, ["image/png"], [raster(doc, svg, "image/png")]).wait()
     },
   },
   {
@@ -146,9 +151,9 @@ let ways : Array[Way] = [
     short: "SVG",
     mark: "copy",
     label: "Copy SVG",
-    out: async fn(svg, _) {
+    out: async fn(doc, svg, _) {
       let text = @web.serialize(svg)
-      @web.clipboard_write(["image/svg+xml", "text/plain"], [
+      @web.clipboard_write(doc, ["image/svg+xml", "text/plain"], [
         @web.text_blob(text, "image/svg+xml"),
         @web.text_blob(text, "text/plain"),
       ]).wait()
@@ -173,7 +178,7 @@ fn way_of(saved : String?) -> Way {
 /// そのやり方で 1 回出す。**出せたかを返す** — 済んだらヘッダーのボタンが
 /// チェックで答えるので、答えてよいかを呼ぶ側が知る必要がある。
 /// しくじりはここがしらせに出し、投げない（呼ぶ側に try を書かせない）
-async fn run(deps : ExportDeps, way : Way) -> Bool {
+async fn export_once(deps : ExportDeps, way : Way) -> Bool {
   (async fn() -> Bool {
     guard (deps.svg)() is Some(svg) else {
       // ボタンは沈めてあるので、ここへ来るのはキー（`Mod+E`）から。
@@ -181,7 +186,7 @@ async fn run(deps : ExportDeps, way : Way) -> Bool {
       (deps.blocked)(nothing)
       return false
     }
-    (way.out)(svg, @read.bare((deps.name)()))
+    (way.out)(svg.ownerDocument().unwrap(), svg, @read.bare((deps.name)()))
     true
   })() catch {
     _ => {
@@ -208,16 +213,12 @@ pub fn export_ways(
     if i == 2 {
       entries.push(@parts.Sep)
     }
-    let disabled : @parts.Disabled = if (deps.empty)() {
-      Why(nothing)
-    } else {
-      No
-    }
+    let disabled = @parts.unless(!(deps.empty)(), why=nothing)
     entries.push(
       @parts.Run(@parts.row(way.label, mark=Some(way.mark), disabled~), () => {
         match header {
           Some(h) => h(way)
-          None => @web.spawn(async fn() { run(deps, way) |> ignore })
+          None => @web.spawn(async fn() { export_once(deps, way) |> ignore })
         }
       }),
     )
@@ -253,7 +254,7 @@ pub fn Export::new(
     deps,
     button,
     way_button,
-    way: way_of(@prefs.load("way")),
+    way: way_of(@prefs.load(doc, "way")),
     back: None,
   }
   self.refresh()
@@ -315,7 +316,7 @@ fn Export::undo(self : Export) -> Unit {
 /// かもしれないので、必ず通す
 fn Export::fire(self : Export, chosen : Way) -> Unit {
   @parts.nod(
-    k => @web.spawn(async fn() { k(run(self.deps, chosen)) }),
+    k => @web.spawn(async fn() { k(export_once(self.deps, chosen)) }),
     mark => self.put(mark),
     ok => {
       if ok {
@@ -335,7 +336,7 @@ fn Export::fire(self : Export, chosen : Way) -> Unit {
 /// 選び直して出す。次からの既定にもなる
 fn Export::pick(self : Export, chosen : Way) -> Unit {
   self.way = chosen
-  @prefs.store("way", chosen.id)
+  @prefs.store(self.doc, "way", chosen.id)
   self.refresh()
   self.fire(chosen)
 }

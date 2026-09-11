@@ -115,7 +115,7 @@ pub fn Mindmap::new(pane : @dom.HTMLElement, host : Host) -> Mindmap {
   world.append(drop_line.as_node())
   svg.append(world.as_node())
   pane.append(svg.as_node())
-  let rubber = @web.html(doc, "div", "rubber").as_element()
+  let rubber = @web.html(doc, "div", "rubber")
   pane.append(rubber.as_node())
   let label = LabelField::new(doc, pane, host.measure, (id, label) => {
     (host.apply)(Rename(id~, label~), false) |> ignore
@@ -128,21 +128,22 @@ pub fn Mindmap::new(pane : @dom.HTMLElement, host : Host) -> Mindmap {
     |> ignore
   })
   // md からの始め方は md ペイン自身が同じ器で言う
-  let hint = @parts.pane_hint(doc, "map")
+  let hint = @parts.pane_hint(doc, Map)
   @web.show(hint, "flex", false)
   pane.append(hint.as_node())
-  let indicator_el = @web.html(doc, "div", "map-indicator").as_element()
+  let indicator_el = @web.html(doc, "div", "map-indicator")
   indicator_el.setAttribute("role", "button")
   indicator_el.setAttribute("title", "Bring it into view")
   indicator_el.setAttribute("aria-label", "Bring the selection into view")
   @web.show(indicator_el, "block", false)
   pane.append(indicator_el.as_node())
   let tool = @parts.pane_tool(doc, "map-center")
-  let center = doc.createElement("button")
-  center.setAttribute("type", "button")
-  center.setAttribute("title", "Center the view — Home")
-  center.setAttribute("aria-label", "Center the view")
-  center.append(@parts.icon(doc, "crosshair").as_node())
+  let center = @parts.icon_button(
+    doc,
+    "crosshair",
+    title="Center the view — Home",
+    label="Center the view",
+  )
   tool.append(center.as_node())
   pane.append(tool.as_node())
   let m : Mindmap = {

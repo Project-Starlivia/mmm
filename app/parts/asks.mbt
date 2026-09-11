@@ -2,6 +2,10 @@
 // 知らず、聞く場所（app/app.mbt / app/disk/images.mbt）は綴りを持たない。並べて
 // 見る道具もここを読む。値が要るものは引数で受ける（聞く時点で決まるもの）。
 //
+// **名は聞いていることの主語**（`asked(doc, image_name(…))` = 画像の名前を聞く）。
+// 動詞にすると `connect(folder)` が「folder を繋ぐ」と読め、`rename` が
+// `Disk::rename` の隣で別のことを言う。
+//
 // **欄の検査の言葉はここに来ない。** 「なぜ進めないか」は条件と一体で
 // （`app/disk/images.mbt` の `folder_problem` / `name_problem` /
 // `image_name_problem`）、切り離すと条件を足したときに言葉を付け忘れる。
@@ -10,13 +14,13 @@
 
 ///|
 /// 未保存の文書を捨てて先へ進むか
-pub fn discard() -> Ask {
+pub fn unsaved_changes() -> Ask {
   ask_of("Discard unsaved changes?", "Discard")
 }
 
 ///|
 /// 画像を置く前に .md を保存してもらう。**壁ではなく駅** — 行程を先に見せる
-pub fn place() -> Ask {
+pub fn image_place() -> Ask {
   ask_of(
     "Images need a place on disk. Save the .md, then pick a folder.", "Save the .md…",
   )
@@ -24,7 +28,7 @@ pub fn place() -> Ask {
 
 ///|
 /// 開いた文書に画像があり、まだフォルダを握っていない
-pub fn connect(folder : String) -> Ask {
+pub fn folder_connection(folder : String) -> Ask {
   ask_of(
     "Connect the image folder?",
     "Connect…",
@@ -34,8 +38,8 @@ pub fn connect(folder : String) -> Ask {
 }
 
 ///|
-/// ディスク上のファイルの名前を変える
-pub fn rename(name : String) -> Ask {
+/// ディスク上のファイルの新しい名前
+pub fn file_name(name : String) -> Ask {
   ask_of("New file name", "Rename", parts=[Blank({ value: name, check: None, })])
 }
 

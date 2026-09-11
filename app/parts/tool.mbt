@@ -7,8 +7,7 @@
 
 ///|
 pub fn pane_tool(doc : @dom.Document, name : String) -> @dom.Element {
-  let box = doc.createElement("div")
-  box.setAttribute("class", "pane-tool " + name)
+  let box = @web.html(doc, "div", "pane-tool " + name)
   @web.listen(box, "pointerdown", e => @web.stop(e))
   box
 }

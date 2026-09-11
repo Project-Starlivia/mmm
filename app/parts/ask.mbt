@@ -56,11 +56,24 @@ fn ask_of(
 }
 
 ///|
-fn p(doc : @dom.Document, class : String, text : String) -> @dom.Element {
-  let e = doc.createElement("p")
-  e.setAttribute("class", class)
-  e.setTextContent(text)
-  e
+/// 足元のボタンの並び。**断りは左、進むは右。進む側だけが色を持つ**（`.go`）。
+/// 断る側は `type="button"` — 送らず、呼ぶ側の `on_cancel` に任せる（器を閉じる係は器が持つ）。
+/// 進む側をどう走らせるかは呼ぶ側が決めるので、行と一緒に返す
+/// （たずねは dialog の送信そのもの、お絵描きは押せば板を渡す）
+fn footer(
+  doc : @dom.Document,
+  ok : String,
+  cancel : String,
+  on_cancel : () -> Unit,
+) -> (@dom.Element, @dom.Element) {
+  let row = @web.html(doc, "div", "row")
+  let no = @web.html_text(doc, "button", "", cancel)
+  no.setAttribute("type", "button")
+  @web.listen(no, "click", _ => on_cancel())
+  let go = @web.html_text(doc, "button", "go", ok)
+  row.append(no.as_node())
+  row.append(go.as_node())
+  (row, go)
 }
 
 ///|
@@ -77,16 +90,15 @@ pub fn ask_form(
 ) -> (@dom.Element, () -> Array[String]) {
   let form = doc.createElement("form")
   form.setAttribute("method", "dialog") // 送ると dialog が閉じ、押したボタンの value が returnValue
-  form.append(p(doc, "title", a.title).as_node())
+  form.append(@web.html_text(doc, "p", "title", a.title).as_node())
   match a.note {
-    Some(n) => form.append(p(doc, "note", n).as_node())
+    Some(n) => form.append(@web.html_text(doc, "p", "note", n).as_node())
     None => ()
   }
   // 何の話かを見せる絵。字より先に置く — 名前を聞かれている相手が、読む前に分かる
   match a.preview {
     Some(src) => {
-      let img = doc.createElement("img")
-      img.setAttribute("class", "shot")
+      let img = @web.html(doc, "img", "shot")
       img.setAttribute("src", src)
       img.setAttribute("alt", "")
       form.append(img.as_node())
@@ -97,8 +109,7 @@ pub fn ask_form(
   // 何の一部なのかが読めなくなる
   let inputs : Array[(@dom.Element, ((String) -> String?)?)] = []
   if a.parts.length() > 0 {
-    let row = doc.createElement("div")
-    row.setAttribute("class", "parts")
+    let row = @web.html(doc, "div", "parts")
     for part in a.parts {
       match part {
         Blank(f) => {
@@ -113,11 +124,7 @@ pub fn ask_form(
           row.append(input.as_node())
           inputs.push((input, f.check))
         }
-        Text(t) => {
-          let span = doc.createElement("span")
-          span.setTextContent(t)
-          row.append(span.as_node())
-        }
+        Text(t) => row.append(@web.html_text(doc, "span", "", t).as_node())
       }
     }
     form.append(row.as_node())
@@ -127,24 +134,15 @@ pub fn ask_form(
   // `aria-live` は要る側だけに付ける — 何も言わない要素を読み上げの
   // 監視対象に加えても、黙って何も起きないだけ
   let checked = inputs.any(i => i.1 is Some(_))
-  let bad = p(doc, "bad", "")
+  let bad = @web.html(doc, "p", "bad")
   bad.setAttribute("hidden", "")
   if checked {
     bad.setAttribute("aria-live", "polite")
     form.append(bad.as_node())
   }
-  let row = doc.createElement("div")
-  row.setAttribute("class", "row")
-  let no = doc.createElement("button")
-  no.setAttribute("type", "button") // 送らない。閉じるだけ（returnValue は空のまま）
-  no.setTextContent(a.cancel.unwrap_or("Cancel"))
-  @web.listen(no, "click", _ => cancel())
-  let go = doc.createElement("button")
-  go.setAttribute("class", "go")
+  // 進む側は送信そのもの — 押したボタンの value（`"ok"`）が returnValue になる
+  let (row, go) = footer(doc, a.ok, a.cancel.unwrap_or("Cancel"), cancel)
   go.setAttribute("value", "ok")
-  go.setTextContent(a.ok)
-  row.append(no.as_node())
-  row.append(go.as_node())
   form.append(row.as_node())
   // 打つそばから見直す。**進めない理由がある間は、進む道そのものを閉じる** —
   // ボタンが沈めば Enter でも送られない（送信は無効なボタンからは起きない）。
@@ -182,8 +180,7 @@ pub fn ask_form(
 /// 続きに渡るのは `<dialog>` の `returnValue` 由来: 進んだときだけ `"ok"`。
 /// Escape・背景・Cancel はすべて空文字（＝ 断り）に落ちる
 fn ask(doc : @dom.Document, a : Ask, k : (Array[String]?) -> Unit) -> Unit {
-  let dlg = doc.createElement("dialog")
-  dlg.setAttribute("class", "ask")
+  let dlg = @web.html(doc, "dialog", "ask")
   let (form, values) = ask_form(doc, a, () => @web.close_dialog(dlg))
   dlg.append(form.as_node())
   match doc.body() {

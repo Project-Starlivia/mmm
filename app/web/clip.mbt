@@ -19,11 +19,12 @@ pub extern "js" fn write_clipboard(
 ///|
 /// クリップボードに 1 品を置く。`types[i]` の中身が `blobs[i]`
 pub extern "js" fn clipboard_write(
+  doc : @dom.Document,
   types : FixedArray[String],
   blobs : FixedArray[@core.Any],
 ) -> @js_async.Promise[Unit] =
-  #| (types, blobs) => { const item = {}; types.forEach((t, i) => { item[t] = blobs[i]; });
-  #|   return navigator.clipboard.write([new ClipboardItem(item)]); }
+  #| (doc, types, blobs) => { const item = {}; types.forEach((t, i) => { item[t] = blobs[i]; });
+  #|   const w = doc.defaultView; return w.navigator.clipboard.write([new w.ClipboardItem(item)]); }
 
 ///|
 /// クリップボードの絵（最初の image/*）。無い / 読めない / 断られたら null

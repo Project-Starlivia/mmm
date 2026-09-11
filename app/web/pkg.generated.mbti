@@ -34,7 +34,7 @@ pub fn client_rect(@dom.Element) -> @dom.DOMRect
 
 pub fn clipboard_image(@dom.Document) -> @js_async.Promise[@core.Any]
 
-pub fn clipboard_write(FixedArray[String], FixedArray[@core.Any]) -> @js_async.Promise[Unit]
+pub fn clipboard_write(@dom.Document, FixedArray[String], FixedArray[@core.Any]) -> @js_async.Promise[Unit]
 
 pub fn close_dialog(@dom.Element) -> Unit
 
@@ -54,7 +54,7 @@ pub fn detail(@core.Any) -> Int
 
 pub fn device_pixel_ratio(@dom.Document) -> Double
 
-pub fn download(@core.Any, String) -> Unit
+pub fn download(@dom.Document, @core.Any, String) -> Unit
 
 pub fn drag_files(@core.Any) -> FixedArray[String]
 
@@ -92,7 +92,9 @@ pub fn hash(@dom.Document) -> String
 
 pub fn head(@dom.Document) -> @dom.Element
 
-pub fn html(@dom.Document, String, String) -> @dom.HTMLElement
+pub fn html(@dom.Document, String, String) -> @dom.Element
+
+pub fn html_text(@dom.Document, String, String, String) -> @dom.Element
 
 pub fn idb_close(@core.Any) -> Unit
 
@@ -148,7 +150,7 @@ pub fn offset_size(@dom.Element) -> (Double, Double)
 
 pub fn on_window(@dom.Document, String, (@core.Any) -> Unit, capture? : Bool) -> Unit
 
-pub fn open_url(String) -> Unit
+pub fn open_url(@dom.Document, String) -> Unit
 
 pub fn paper_2d(@dom.Element, Double) -> @core.Any
 
@@ -170,7 +172,7 @@ pub fn px(Double) -> String
 
 pub fn query_permission(@core.Any, String) -> @js_async.Promise[String]
 
-pub fn rasterize(String, String, Int, Int) -> @js_async.Promise[@core.Any]
+pub fn rasterize(@dom.Document, String, String, Int, Int) -> @js_async.Promise[@core.Any]
 
 pub fn read_clipboard(@dom.Document) -> @js_async.Promise[String]
 
