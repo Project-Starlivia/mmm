@@ -2,7 +2,7 @@
 // 試験は Doc の型にぶら下がっているが、ここは md → md しか見ないので、内側の作りが
 // 変わっても生き残る。**型を壊しても、ここが通れば同じ mmm。**
 //
-// 見本は木の形の試験が読ませている md を全部集めたもの（170 通り）。
+// 見本は木の形の試験が読ませている md を全部集めたもの（181 通り）。
 // 押さえるのは 4 つ:
 //
 //   正規形     読んで書き戻した字。**読み方の答えがそのまま出る**
@@ -88,6 +88,11 @@ let read_corpus : Array[String] = [
   "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<details open>\n<summary>a1</summary>\n\n### a1\n\n</details>\n\n</details>\n",
   "# a\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n\n<details class=\"z\">\n<summary>c</summary>\n\n## c\n\n</details>\n",
   "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n\n<details>\n<summary>z</summary>\n\n#### z\n</details>\n</details>\n</details>\n",
+  // 破れの見本（check_wbtest.mbt から）— 深さの飛び・空の文書・7 本目の `#`・info 付きのフェンス
+   "# a\n\n## b\n\n### c\n", "# r\n\n#### z\n", "- a\n  - b\n", "# r\n\n---\n\n### x\n",
+  "# r\n\n<details>\n\n## h\n\nbody\n\n</details>\n", "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n",
+  "# r\n\n<!-- x -->\n", "text\n\n![a](b.png)\n\n# a\n", "# a\n\n```js\nx\n```\n",
+  "###### f\n\n####### g\n", "",
   // 境界の綴り（`___`）と、列のマーカー・番号（#84。飛んだ番号も読んだまま）
    "# a\n\n## b\n\n___\n\n## c\n", "# a\n\n* b\n* c\n", "# a\n\n1. b\n2. c\n", "# a\n\n1. b\n3. c\n",
 ]
