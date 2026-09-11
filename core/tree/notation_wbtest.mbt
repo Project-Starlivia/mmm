@@ -407,6 +407,14 @@ test "見本 — 記法構造の指紋" {
       #|  → Line[0,4](1,2,#0) Blank[4,5] Card[5,54]["Details",{"open":false,"summary":"b","body":"## b"}] Blank[54,55] Card[55,114]["Details",{"open":false,"summary":"c","body":"## c"}]
       #|"# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n\n<details>\n<summary>z</summary>\n\n#### z\n</details>\n</details>\n</details>\n"
       #|  → Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"x") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Fold[43,74](-,"y") Blank[74,75] Line[75,81](3,79,#0) Blank[81,82] Fold[82,113](-,"z") Blank[113,114] Line[114,121](4,119,#0) Shut[121,154]
+      #|"# a\n\n## b\n\n___\n\n## c\n"
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Line[16,21](2,19,#0)
+      #|"# a\n\n* b\n* c\n"
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,9](2,7,*,2,tight) Line[9,13](2,11,*,2,tight)
+      #|"# a\n\n1. b\n2. c\n"
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,1.,3,tight) Line[10,15](2,13,2.,3,tight)
+      #|"# a\n\n1. b\n3. c\n"
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,1.,3,tight) Line[10,15](2,13,3.,3,tight)
       #|
     ),
   )

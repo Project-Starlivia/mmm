@@ -103,3 +103,18 @@ test "has はノードにも中身にも応える" {
   assert_true(has(sample(), 7))
   assert_false(has(sample(), 99))
 }
+
+///|
+test "siblings は同じ親の子の id、文書順。根なら根どうし" {
+  json_inspect(siblings(sample(), 6), content=[4, 6])
+  json_inspect(siblings(sample(), 2), content=[2, 8])
+  json_inspect(siblings(sample(), 99), content=[])
+}
+
+///|
+test "ancestors は近いほうから。根なら空、中身なら持ち主から" {
+  json_inspect(ancestors(sample(), 5), content=[4, 2])
+  json_inspect(ancestors(sample(), 2), content=[])
+  json_inspect(ancestors(sample(), 7), content=[6, 2])
+  json_inspect(ancestors(sample(), 99), content=[])
+}
