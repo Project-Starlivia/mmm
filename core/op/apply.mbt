@@ -301,25 +301,44 @@ fn neighbor(doc : @tree.Doc, at : NodePlace) -> @tree.Node? {
 }
 
 ///|
-/// 席の綴りの種類。隣に従い、隣が居なければ親に従う（項目の下は項目、それ以外は
-/// 見出し。根が無い文書は見出し）。席が無ければ None。
-fn sign_at(doc : @tree.Doc, at : NodePlace) -> @tree.Sign? {
+/// **席が綴りを借りる相手。** 隣が居れば隣、居なければ In の先（親）。
+///
+/// 落ち方を 1 つにしてある — 種類（`sign_at`）と綴り（`spell_at`）が別々に落ちると、
+/// 子の居ない `* a` の下で**種類だけ親を継ぎ、マーカーは既定に落ちて** `- b` が
+/// `* a` の子として書かれる。同じ列にマーカーが混ざる（#243）。
+///
+/// 文書（`doc_id`）は綴りを持たないので、根が 1 つも無ければ None
+fn follows(doc : @tree.Doc, at : NodePlace) -> @tree.Node? {
   match neighbor(doc, at) {
-    Some(n) => Some(sign_or_heading(n))
+    Some(n) => Some(n)
     None =>
       match at {
-        In(node~, ..) if node == @tree.doc_id => Some(Heading)
-        In(node~, ..) => find(doc, node).map(sign_or_heading)
+        In(node~, ..) if node != @tree.doc_id => find(doc, node)
         _ => None
       }
   }
 }
 
 ///|
-/// 席の項目の綴り（マーカー・字下げ幅・詰め）。隣が項目でなければ `@tree.bullet` —
-/// 種類と違い、親には従わない。
+/// 席の綴りの種類。借りる相手に従う（項目の下は項目、それ以外は見出し。
+/// 根が無い文書は見出し）。席が無ければ None。
+fn sign_at(doc : @tree.Doc, at : NodePlace) -> @tree.Sign? {
+  match follows(doc, at) {
+    Some(n) => Some(sign_or_heading(n))
+    None =>
+      if at is In(node~, ..) && node == @tree.doc_id {
+        Some(Heading)
+      } else {
+        None
+      }
+  }
+}
+
+///|
+/// 席の項目の綴り（マーカー・字下げ幅・詰め）。借りる相手が項目でなければ
+/// `@tree.bullet`。**種類と同じ相手から借りる**（`follows`。#243）
 fn spell_at(doc : @tree.Doc, at : NodePlace) -> @tree.Mark {
-  match neighbor(doc, at).bind(n => n.mark) {
+  match follows(doc, at).bind(n => n.mark) {
     Some(Item(..) as m) => m
     _ => @tree.bullet
   }
