@@ -193,7 +193,7 @@ pnpm run dev        # コアをビルドしてから vite（http://localhost:131
 
 ```
 pnpm run deploy       # ビルドしてから配る
-pnpm run deploy:dry   # 配らずに設定と中身だけ確かめる
+pnpm run deploy:dry   # ビルドしてから、配らずに設定と中身だけ確かめる
 ```
 
 **`main` に入ったものは GitHub Actions が自動で配る**（`.github/workflows/ci.yml`）。
