@@ -10,6 +10,16 @@ fn dir(side : @tree.Side) -> Int {
 }
 
 ///|
+/// 伸びる向き → 側（`dir` の逆）。符号を側に戻すのもここだけ
+fn side_of(dir : Int) -> @tree.Side {
+  if dir == 1 {
+    Right
+  } else {
+    Left
+  }
+}
+
+///|
 pub(all) struct Pt {
   x : Double
   y : Double
