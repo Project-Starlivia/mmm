@@ -41,6 +41,23 @@ fn separator(doc : @dom.Document, at : Spot) -> @dom.Element {
 }
 
 ///|
+/// 当たり判定の面。**字しか描かないカードに敷く** — 絵や背景を持つ 3 種（画像・
+/// コード・SVG）はそれ自身が面になるが、リンクと `<details>` は文字だけなので、
+/// カードいっぱいの透明な面が要る。SVG の `text` はインクにしか当たらないので、
+/// 敷かないと字の隙間を押したときに何も選べない。
+fn hit_face(doc : @dom.Document, at : Spot) -> @dom.Element {
+  let { x, y, w, h, } = at.rect
+  @web.el(doc, "rect", [
+    ("class", "card-hit"),
+    ("data-card", at.id.to_string()),
+    ("x", @web.num(x)),
+    ("y", @web.num(y)),
+    ("width", @web.num(w)),
+    ("height", @web.num(h)),
+  ])
+}
+
+///|
 fn link(
   doc : @dom.Document,
   title : String,
@@ -48,16 +65,7 @@ fn link(
   at : Spot,
 ) -> Array[@dom.Element] {
   let { x, y, w, h, } = at.rect
-  // 当たり判定の面。他の 3 種は絵や背景がその役をするが、リンクは文字しか
-  // 描かないので、行いっぱいの透明な面を敷く
-  let hit = @web.el(doc, "rect", [
-    ("class", "link-hit"),
-    ("data-card", at.id.to_string()),
-    ("x", @web.num(x)),
-    ("y", @web.num(y)),
-    ("width", @web.num(w)),
-    ("height", @web.num(h)),
-  ])
+  let hit = hit_face(doc, at)
   let text = @web.el(doc, "text", [
     ("class", "link-row"),
     ("x", @web.num(x)),
@@ -240,6 +248,7 @@ fn details(
 ) -> Array[@dom.Element] {
   let x = at.rect.x
   let row_mid = at.row_y + @map.details_row / 2.0 // summary の行の中心
+  let hit = hit_face(doc, at)
   let mark = @web.el(doc, "text", [
     ("class", "details-mark"),
     ("x", @web.num(x)),
@@ -257,7 +266,7 @@ fn details(
       None => @map.details_name
     },
   )
-  let out = [mark, name]
+  let out = [hit, mark, name]
   guard open else { return out }
   let top = at.row_y + @map.details_row
   for i, text in lines {
