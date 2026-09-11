@@ -494,3 +494,21 @@ async test "立ち上がり: 何も覚えていなければ挨拶は出ない" {
   rest(s.doc, 5)
   assert_false(s.app.greeting.is_open())
 }
+
+///|
+/// **捨てるものが無ければ聞かない。** `||` の右に async を置くと短絡しないので、
+/// この形は書いた側から見て正しく見えるまま壊れる（#295）
+async test "捨てる確認: 汚れていなければ、たずねは開かず、そのまま進む" {
+  let s = stand()
+  defer s.win.close()
+  let done = @js_async.Promise::from_async(async fn() { s.app.new_file() })
+  assert_true(s.doc.querySelector("dialog.ask") is None)
+  done.wait()
+  // 保存してから打っていない文書も同じ（保存済みの字と一致している）
+  s.fake.change("# r\n")
+  s.app.saved_text = "# r\n"
+  let again = @js_async.Promise::from_async(async fn() { s.app.new_file() })
+  assert_true(s.doc.querySelector("dialog.ask") is None)
+  again.wait()
+  assert_eq(s.fake.md, "")
+}

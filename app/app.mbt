@@ -452,7 +452,12 @@ async fn App::offer_connect(self : App) -> Unit {
 
 ///|
 async fn App::confirm_discard(self : App) -> Bool {
-  self.text() == self.saved_text ||
+  // **`||` の右に async を置かない。** 短絡しないので、捨てるものが無くても
+  // たずねが開く（#295。左辺が定数なら畳まれるので、書いている側からは
+  // 短絡して見える）
+  if self.text() == self.saved_text {
+    return true
+  }
   @parts.asked(self.doc, @parts.unsaved_changes()) is Some(_)
 }
 
