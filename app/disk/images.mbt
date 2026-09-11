@@ -230,8 +230,13 @@ fn Images::forget(self : Images) -> Unit {
 /// 触ってよいか。`ask` なら、まだなら（断られていても）聞き直す — 聞けるのは
 /// 押した瞬間だけで、押されたことがその資格になる。`mode` は "read" / "readwrite"
 async fn permission(h : @web.DirHandle, mode : String, ask~ : Bool) -> Bool {
-  @web.query_permission(h.as_any(), mode).wait() == "granted" ||
-  (ask && @web.request_permission(h.as_any(), mode).wait() == "granted")
+  // **`||` / `&&` の右に async を置かない。** 短絡しないので、既に下りている
+  // 許可でも聞き直し、`ask=false` でも聞いてしまう（#295）
+  if @web.query_permission(h.as_any(), mode).wait() == "granted" {
+    return true
+  }
+  guard ask else { return false }
+  @web.request_permission(h.as_any(), mode).wait() == "granted"
 }
 
 ///|

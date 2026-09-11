@@ -80,6 +80,9 @@ pub fn mmm_open(p : @js_async.Promise[String]) -> @js_async.Promise[String] {
 
 ## 予約語と罠（0.10.11）
 
+- **`||` / `&&` の右に async を置くと短絡しない。** 答えは正しいが右も走るので、
+  副作用が出る（たずねが開く・許可を聞き直す）。左辺が定数なら畳まれて短絡するため、
+  **書いている側からは短絡して見える**。`if 左辺 { return true }` と分ける（#295）
 - 予約語: `local` `move` `extend` `derive` `where` `export` `method` `ref` `type`。
   引数名・欄名に使えない（警告ではなく後で壊れる）
 - `Ref::new` は deprecated → `let r : Ref[Int] = { val: 0 }`
