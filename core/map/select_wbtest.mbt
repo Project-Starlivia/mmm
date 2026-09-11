@@ -75,7 +75,7 @@ test "矩形 — 触れる箱を全部。anchor は文書順の最後" {
 ///|
 test "点 — どの箱に居るか。外なら None" {
   let l = sel_l()
-  let a = box(l, 2)
+  let a = box(l, 2).rect
   assert_eq(hit(l, a.x + 1.0, a.y + 1.0, grow(0)), Some(2))
   assert_eq(hit(l, a.x + a.w + 1.0, a.y, grow(0)), None)
 }

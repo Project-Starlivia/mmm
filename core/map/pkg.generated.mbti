@@ -11,8 +11,6 @@ import {
 // Values
 pub let card_border : Double
 
-pub let card_font_px : Double
-
 pub fn card_place(Rect, Camera, Int, Double) -> Placement
 
 pub fn card_rect(Box, Int) -> Rect?
@@ -71,6 +69,8 @@ pub fn label_place(Box, Camera, Double) -> Placement
 
 pub fn layout(Array[@tree.Root], (@tree.Node, Array[Card], Int) -> Size) -> Layout
 
+pub let mono_font : Font
+
 pub fn nearest(Array[Rect], Camera, Pane) -> Rect?
 
 pub fn node_size((Font, String) -> Double) -> (@tree.Node, Array[Card], Int) -> Size
@@ -117,16 +117,12 @@ pub(all) enum Arrow {
 
 pub(all) struct Box {
   node : @tree.Node
-  parent : Edge?
+  parent : Parent?
   buried : Int
   mut fan : Double
-  x : Double
-  mut y : Double
-  w : Double
-  h : Double
+  mut rect : Rect
   cards : Array[Card]
 } derive(@debug.Debug)
-pub fn Box::rect(Self) -> Rect
 
 pub(all) struct Camera {
   k : Double
@@ -143,11 +139,6 @@ pub(all) enum Drop {
   Node(id~ : Int, pos~ : Int)
   Side(root~ : Int, left~ : Bool)
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
-
-pub(all) struct Edge {
-  id : Int
-  side : @tree.Side
-} derive(Eq, ToJson, @debug.Debug)
 
 pub(all) enum Entry {
   Item(Item)
@@ -237,6 +228,11 @@ pub(all) struct Pane {
   width : Double
   height : Double
 } derive(Eq, @debug.Debug)
+
+pub(all) struct Parent {
+  id : Int
+  side : @tree.Side
+} derive(Eq, ToJson, @debug.Debug)
 
 pub(all) struct Placement {
   left : Double

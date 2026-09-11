@@ -8,10 +8,7 @@ fn place_box() -> Box {
     parent: None,
     buried: 0,
     fan: 0,
-    x: 10,
-    y: 20,
-    w: 100,
-    h: 30,
+    rect: { x: 10, y: 20, w: 100, h: 30, },
     cards: [],
   }
 }

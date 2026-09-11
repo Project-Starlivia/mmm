@@ -15,6 +15,8 @@ test "段差があれば三次ベジェ 1 本" {
 
 ///|
 test "d 属性は始点から始まり、終点で終わる" {
+  // du 100, dv 40。h1 = (100 × 0.08, 40 × 0.27) = (8, 10.8) → 18 30.8、
+  // h2 = (100 − 100 × 0.58, 40 − 40 × 0.05) = (42, 38) → 52 58
   assert_eq(
     edge_path({ x: 10, y: 20, }, { x: 110, y: 60, }),
     "M 10 20 C 18 30.8, 52 58, 110 60",
@@ -26,10 +28,10 @@ test "d 属性は始点から始まり、終点で終わる" {
 }
 
 ///|
-test "数の綴りは JS と同じ。整数は小数点なし、-0 は 0" {
-  assert_eq(num(1.0), "1")
-  assert_eq(num(1.5), "1.5")
-  assert_eq(num(-0.0), "0")
-  assert_eq(num(round2(-0.001)), "0")
-  assert_eq(num(0.07), "0.07")
+test "d 属性の数は web の num（JS の `${n}`）と同じ字 — 整数は小数点なし、-0 は 0" {
+  assert_eq(1.0.to_string(), "1")
+  assert_eq(1.5.to_string(), "1.5")
+  assert_eq((-0.0).to_string(), "0")
+  assert_eq(round2(-0.001).to_string(), "0")
+  assert_eq(0.07.to_string(), "0.07")
 }

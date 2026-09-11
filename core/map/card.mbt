@@ -6,7 +6,7 @@
 //
 // **カードは自分が出た中身の id を持つ。** 分類は全域ではない（外部の画像・
 // http 以外のリンクは落ちる）ので、カードの列は中身の列より短くなりうる。
-// 添字で 2 つの列を突き合わせると別のカードを掴む — 実際に掴んでいた（#212）。
+// 添字で 2 つの列を突き合わせると別のカードを掴む（#212）。
 
 ///|
 /// ラベルの下に積むカード 1 枚。**それが出た中身の id を持つ** —
@@ -63,16 +63,11 @@ fn host_of(href : String) -> String {
       break
     }
   }
-  let mut auth = slice(href, start, end)
-  match auth.rev_find("@") {
-    Some(i) => auth = slice(auth, i + 1, auth.length())
-    None => ()
-  }
-  match auth.find(":") {
-    Some(i) => auth = slice(auth, 0, i)
-    None => ()
-  }
-  auth.to_lower()
+  let auth = slice(href, start, end)
+  let host = auth
+    .rev_find("@")
+    .map_or(auth, i => slice(auth, i + 1, auth.length()))
+  host.find(":").map_or(host, i => slice(host, 0, i)).to_lower()
 }
 
 ///|
@@ -114,13 +109,10 @@ fn alpha(c : UInt16) -> Bool {
 ///|
 /// パスの最後の要素。Windows のパスは `\` 区切りでも来る
 fn last_segment(path : String) -> String {
-  let mut from = 0
-  for i in 0..<path.length() {
-    if path[i] == '/' || path[i] == '\\' {
-      from = i + 1
-    }
+  match @cmp.maximum(path.rev_find("/"), path.rev_find("\\")) {
+    Some(i) => slice(path, i + 1, path.length())
+    None => path
   }
-  slice(path, from, path.length())
 }
 
 ///|
@@ -137,12 +129,7 @@ fn lines_of(text : String) -> Array[String] {
     .map(l => l.to_owned().replace_all(old="\t", new="  "))
     .collect()
   guard lines.length() > code_max_lines else { return lines }
-  let out = []
-  for i in 0..<(code_max_lines - 1) {
-    out.push(lines[i])
-  }
-  out.push("…")
-  out
+  lines[:code_max_lines - 1].to_owned() + ["…"]
 }
 
 ///|
@@ -163,14 +150,9 @@ fn card_of(c : @tree.Content) -> Kind? {
 /// カードにならない中身（読み解いていない・外部の画像・http 以外のリンク）は
 /// 飛ばす。だからこそ 1 枚ずつが出どころの id を連れる
 fn cards(blocks : Array[@tree.Block]) -> Array[Card] {
-  let out = []
-  for b in blocks {
-    match b.content.bind(card_of) {
-      Some(kind) => out.push({ id: b.id, kind, })
-      None => ()
-    }
-  }
-  out
+  blocks.filter_map(b => {
+    b.content.bind(card_of).map(kind => { id: b.id, kind, })
+  })
 }
 
 ///|

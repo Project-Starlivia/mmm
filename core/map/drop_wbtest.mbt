@@ -23,14 +23,14 @@ fn drop_at(l : Layout, at : Pt, dragging? : Array[Int] = []) -> Drop? {
 ///|
 test "箱の中心 → その子" {
   let l = drop_l()
-  assert_eq(drop_at(l, box(l, 2).rect().center()), Some(Node(id=2, pos=0)))
+  assert_eq(drop_at(l, box(l, 2).rect.center()), Some(Node(id=2, pos=0)))
 }
 
 ///|
 test "箱の上下の帯 → 直前 / 直後" {
   let l = drop_l()
-  let a = box(l, 2)
-  let c = a.rect().center()
+  let a = box(l, 2).rect
+  let c = a.center()
   assert_eq(drop_at(l, { x: c.x, y: a.y - 10.0, }), Some(Node(id=2, pos=1)))
   // 下は gap.y ぶんしか空いていない（b がすぐ下）ので、a に近い範囲で当てる
   assert_eq(
@@ -42,8 +42,8 @@ test "箱の上下の帯 → 直前 / 直後" {
 ///|
 test "箱の外側ゾーン（成長する側）→ 子" {
   let l = drop_l()
-  let a = box(l, 2)
-  let c = a.rect().center()
+  let a = box(l, 2).rect
+  let c = a.center()
   // 帯（slop）の外・外側ゾーン（reach）の内で当てる
   assert_eq(
     drop_at(l, { x: a.x + a.w + 30.0, y: c.y, }),
@@ -54,8 +54,8 @@ test "箱の外側ゾーン（成長する側）→ 子" {
 ///|
 test "根の外側 / 根の箱の中（中心より右） → 側・右（子が居る側）" {
   let l = drop_l()
-  let r = box(l, 1)
-  let c = r.rect().center()
+  let r = box(l, 1).rect
+  let c = r.center()
   assert_eq(
     drop_at(l, { x: r.x + r.w + 10.0, y: c.y, }),
     Some(Side(root=1, left=false)),
@@ -69,8 +69,8 @@ test "根の外側 / 根の箱の中（中心より右） → 側・右（子が
 ///|
 test "根の左外側（子が居ない側） → 側・左" {
   let l = drop_l()
-  let r = box(l, 1)
-  let c = r.rect().center()
+  let r = box(l, 1).rect
+  let c = r.center()
   assert_eq(
     drop_at(l, { x: r.x - 10.0, y: c.y, }),
     Some(Side(root=1, left=true)),
@@ -87,7 +87,7 @@ test "掴んでいる部分木は落とし先から外れる" {
   // a(2) を掴んだままその中心へ落としても、a 自身は候補に出ない
   let l = drop_l()
   assert_eq(
-    drop_at(l, box(l, 2).rect().center(), dragging=[2]),
+    drop_at(l, box(l, 2).rect.center(), dragging=[2]),
     Some(Node(id=3, pos=1)),
   )
 }

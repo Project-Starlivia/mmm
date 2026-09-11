@@ -37,6 +37,41 @@ fn Rect::center(self : Rect) -> Pt {
 }
 
 ///|
+/// 少しでも重なるか（辺が触れるだけでは重ならない）
+fn Rect::overlaps(self : Rect, o : Rect) -> Bool {
+  self.x < o.x + o.w &&
+  o.x < self.x + self.w &&
+  self.y < o.y + o.h &&
+  o.y < self.y + self.h
+}
+
+///|
+/// 点から箱までの、軸ごとの距離。中なら 0
+fn Rect::gap_to(self : Rect, p : Pt) -> (Double, Double) {
+  (
+    @cmp.maximum(@cmp.maximum(self.x - p.x, 0.0), p.x - (self.x + self.w)),
+    @cmp.maximum(@cmp.maximum(self.y - p.y, 0.0), p.y - (self.y + self.h)),
+  )
+}
+
+///|
+/// 点が箱の中か（辺の上も中）
+fn Rect::contains(self : Rect, p : Pt) -> Bool {
+  self.gap_to(p) == (0.0, 0.0)
+}
+
+///|
+/// 四方へ pad だけ広げた箱
+fn Rect::grown(self : Rect, pad : Double) -> Rect {
+  {
+    x: self.x - pad,
+    y: self.y - pad,
+    w: self.w + pad * 2.0,
+    h: self.h + pad * 2.0,
+  }
+}
+
+///|
 /// 複数の箱を包む最小の箱。1 つも無ければ None
 pub fn union(boxes : Array[Rect]) -> Rect? {
   guard boxes.length() > 0 else { return None }
@@ -53,10 +88,6 @@ pub fn union(boxes : Array[Rect]) -> Rect? {
   Some({ x: x0, y: y0, w: x1 - x0, h: y1 - y0, })
 }
 
-// 箱の左右の辺の中点。線が箱に触れるのはここだけで、任意方向へ出る一般形は
-// 要らない。**どちらの辺が「子へ出る」役でどちらが「親から入る」役かは、
-// その枝の向き（dir）で決まる** — 右の枝ならこの並びのまま、左の枝なら逆になる。
-
 ///|
 /// 右辺の中点
 fn Rect::right(self : Rect) -> Pt {
@@ -69,12 +100,10 @@ pub fn Rect::left(self : Rect) -> Pt {
   { x: self.x, y: self.y + self.h / 2.0, }
 }
 
-// dir（右 = 1 / 左 = -1）を受けて左右どちらの辺を使うか決める箇所は、
-// 育つ辺と入る辺のこの 2 つだけにする。**鏡映（左右の入れ替え）を書いていいのはここだけ**
-// — 呼び出し側は「育つ辺」「入る辺」としか言わない。
-
 ///|
-/// 箱から、その枝が dir 方向へ**育っていく**辺の中点
+/// 箱から、その枝が dir 方向へ**育っていく**辺の中点。線が箱に触れるのは左右の辺の
+/// 中点だけで、どちらが「子へ出る」役かは枝の向きで決まる — **鏡映（左右の入れ替え）を
+/// 書いていいのはここと `entry_edge` だけ**。呼び出し側は「育つ辺」「入る辺」としか言わない
 fn Rect::growth_edge(self : Rect, dir : Int) -> Pt {
   if dir == 1 {
     self.right()

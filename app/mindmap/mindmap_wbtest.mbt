@@ -155,7 +155,10 @@ fn click_at(s : Stand, x : Double, y : Double, shift? : Bool = false) -> Unit {
 fn mid(s : Stand, id : Int) -> (Double, Double) {
   let b = s.map.layout.boxes.get(id).unwrap()
   let c = s.map.camera
-  (b.x * c.k + c.tx + b.w / 2.0, b.y * c.k + c.ty + b.h / 2.0)
+  (
+    b.rect.x * c.k + c.tx + b.rect.w / 2.0,
+    b.rect.y * c.k + c.ty + b.rect.h / 2.0,
+  )
 }
 
 ///|
@@ -216,8 +219,8 @@ test "md が持つ間は輪。輪は箱の 3px 内側で、本数は選択の数
   let rings = s.pane.as_element().querySelectorAll(".caret-ring")
   assert_eq(rings.length(), 2)
   let b = s.map.layout.boxes.get(2).unwrap()
-  assert_eq(rings[0].getAttribute("x"), Some(@web.num(b.x + 3.0)))
-  assert_eq(rings[0].getAttribute("width"), Some(@web.num(b.w - 6.0)))
+  assert_eq(rings[0].getAttribute("x"), Some(@web.num(b.rect.x + 3.0)))
+  assert_eq(rings[0].getAttribute("width"), Some(@web.num(b.rect.w - 6.0)))
   assert_false(@web.has_class(s.map.renderer.node_el(3).unwrap(), "selected"))
   s.stub.selection = @map.none
   s.map.refresh_selection()

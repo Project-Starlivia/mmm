@@ -313,7 +313,7 @@ fn Mindmap::rects_of(self : Mindmap, ids : Array[Int]) -> Array[@map.Rect] {
   let out = []
   for id in ids {
     match self.layout.boxes.get(id) {
-      Some(b) => out.push(b.rect())
+      Some(b) => out.push(b.rect)
       None => ()
     }
   }
@@ -340,7 +340,7 @@ pub fn Mindmap::fit_view(self : Mindmap) -> Unit {
 fn Mindmap::center_on_target(self : Mindmap) -> Unit {
   let target = match @map.union(self.rects_of((self.host.selection)().ids)) {
     Some(r) => Some(r)
-    None => @map.root_box(self.layout).map(b => b.rect())
+    None => @map.root_box(self.layout).map(b => b.rect)
   }
   match target {
     Some(r) => self.set_camera(@map.center_on(self.camera, r, self.pane_size()))
@@ -354,7 +354,7 @@ fn Mindmap::ensure_visible(self : Mindmap, id : Int) -> Unit {
   match self.layout.boxes.get(id) {
     Some(b) =>
       self.set_camera(
-        @map.pan_to_show(self.camera, b.rect(), self.pane_size(), show_margin),
+        @map.pan_to_show(self.camera, b.rect, self.pane_size(), show_margin),
       )
     None => ()
   }

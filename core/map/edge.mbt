@@ -52,21 +52,10 @@ fn edge_segs(du : Double, dv : Double) -> Array[Seg] {
 }
 
 ///|
-/// 数の綴り。JS の `${n}` と同じ — 整数なら小数点を出さず、-0 は 0
-fn num(v : Double) -> String {
-  if v == 0.0 {
-    "0"
-  } else {
-    v.to_string()
-  }
-}
-
-///|
-/// 経路を d 属性の文字列にする。a は始点（world）
+/// 経路を d 属性の文字列にする。a は始点（world）。数の綴りは `Double::to_string` の
+/// まま — web の `num`（JS の `${n}`）と同じ字になる（整数は小数点なし、-0 は 0）
 fn segs_to_d(segs : Array[Seg], a : Pt) -> String {
-  let at = (u : Double, v : Double) => {
-    "\{num(round2(a.x + u))} \{num(round2(a.y + v))}"
-  }
+  let at = (u : Double, v : Double) => "\{round2(a.x + u)} \{round2(a.y + v)}"
   let d = StringBuilder()
   d.write_string("M \{at(0, 0)}")
   for s in segs {
