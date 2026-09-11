@@ -6,6 +6,7 @@ import {
   "mmm/app/bar",
   "mmm/app/disk",
   "mmm/app/mindmap",
+  "mmm/app/parts",
   "mmm/app/web",
   "mmm/core/map",
   "mmm/core/read",
@@ -36,6 +37,7 @@ pub struct App {
   mut drawing_open : Bool
   mut grab : Bool
   mut autosave : Bool
+  greeting : @parts.Menu
   write_soon : () -> Unit
 }
 pub fn App::boot(Self) -> Unit

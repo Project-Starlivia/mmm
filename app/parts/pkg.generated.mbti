@@ -124,12 +124,13 @@ pub struct Menu {
   mut opener : @dom.Element?
   mut openers : Array[(@dom.Element, () -> Unit)]
   mut items : () -> Array[Entry]
-  mut at : (Double, Double)
+  mut at : (Double, Double)?
 }
 pub fn Menu::hide(Self, Bool) -> Unit
 pub fn Menu::is_open(Self) -> Bool
 pub fn Menu::new(@dom.Document) -> Self
 pub fn Menu::show(Self, Double, Double, () -> Array[Entry]) -> Unit
+pub fn Menu::show_middle(Self, () -> Array[Entry]) -> Unit
 
 pub(all) struct Paint {
   fill : () -> Unit
