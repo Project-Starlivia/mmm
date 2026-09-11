@@ -1,15 +1,16 @@
-// 負荷サンプル生成器。test/fixtures/*.md を作り直す（7 本とも上書きする）。
+// 大きさの見本の生成器。test/fixtures/*.md を作り直す（5 本とも上書きする）。
 // 使い方: node test/tools/gen-load.ts [出力ディレクトリ]
 // 既定の出力先は test/fixtures/ 。
 //
+// **記法の変化はここには無い。** それは core の見本（corpus_wbtest.mbt）が言う。
+// ここが持つのは大きさだけ — 深さ・幅・ノード数・1 ノードの中身の大きさ（#88）。
+//
 // 生成するもの:
 //   wide.md    直下 2000 ノード（幅広型）
-//   deep.md    深さ 200（深型）
+//   deep.md    深さ 200（深型。6 段目から下は項目の入れ子）
 //   mixed.md   5000 ノード（混合型）
 //   fat.md     1 ノードに 10000 文字の添付コンテンツ
 //   rich.md    コードブロックと表が多い文書
-// 加えて、パーサの境界を踏むための小さな種も出す:
-//   gnarly.md  フェンス・区切り・コメント・CRLF などの境界が混ざったもの
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -49,12 +50,22 @@ function words(rand: () => number, n: number): string {
 }
 
 // ---- deep: 深さ 200 の一本鎖 ----
+//
+// **見出しでは深くならない。** 見出しは 6 段までで、7 本目以降の `#` は見出しでは
+// なくただの段落（#91 / #19「見出しは 6 段、階層そのものは無限」）。`#` を増やして
+// いた頃のこの見本は 200 段のつもりで **6 ノード**しか作っていなかった（#88）。
+// 階層が無限なのは項目の側なので、6 段目から下は項目の入れ子で伸ばす。
 {
   const rand = rng(2);
   const L = [];
-  for (let d = 1; d <= 200; d++) {
+  const heads = 6;
+  for (let d = 1; d <= heads; d++) {
     L.push(`${"#".repeat(d)} 深さ ${d} ${words(rand, 2)}`, "");
   }
+  for (let d = heads + 1; d <= 200; d++) {
+    L.push(`${"  ".repeat(d - heads - 1)}- 深さ ${d} ${words(rand, 2)}`);
+  }
+  L.push("");
   writeFileSync(join(outDir, "deep.md"), L.join("\n"), "utf8");
 }
 
@@ -113,71 +124,8 @@ function words(rand: () => number, n: number): string {
   writeFileSync(join(outDir, "rich.md"), L.join("\n"), "utf8");
 }
 
-// ---- gnarly: パーサ境界の詰め合わせ（計測ではなく往復テスト用の種） ----
-{
-  const parts = [
-    "# gnarly",
-    "",
-    "## フェンスの中に見出しと区切り",
-    "",
-    "```md",
-    "# これは見出しではない",
-    "---",
-    "<!--",
-    "```",
-    "",
-    "## チルダのフェンス",
-    "",
-    "~~~",
-    "## これも見出しではない",
-    "~~~",
-    "",
-    "## 本文中の水平線",
-    "",
-    "text",
-    "",
-    "---",
-    "",
-    "more text",
-    "",
-    "## 深さが飛ぶ",
-    "",
-    "##### 3段飛ばし",
-    "",
-    "## 空ラベル",
-    "",
-    "##",
-    "",
-    "## 末尾空白付き   ",
-    "",
-    "## タブ区切り",
-    "",
-    "##\tタブのあと",
-    "",
-    "## setext 風",
-    "",
-    "見出しのようなもの",
-    "===",
-    "",
-    "## HTML コメント",
-    "",
-    "<!--",
-    "### 隠されたノード",
-    "-->",
-    "",
-    "## 2 つ目のルート",
-    "",
-    "# もうひとつの #",
-    "",
-    "## 最後",
-    "",
-  ];
-  writeFileSync(join(outDir, "gnarly.md"), parts.join("\n"), "utf8");
-  // CRLF 版
-  writeFileSync(join(outDir, "gnarly-crlf.md"), parts.join("\r\n"), "utf8");
-}
 
 console.log("生成先:", outDir);
-for (const f of ["wide.md", "deep.md", "mixed.md", "fat.md", "rich.md", "gnarly.md", "gnarly-crlf.md"]) {
+for (const f of ["wide.md", "deep.md", "mixed.md", "fat.md", "rich.md"]) {
   console.log(" -", f);
 }
