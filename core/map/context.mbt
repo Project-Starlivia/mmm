@@ -1,9 +1,9 @@
 // 右クリックメニューの行。何をするかは Intent で言い、沈む行は理由を持つ。
 // キーの表（keys.mbt）と同じ作り方を引き、意味を 2 か所に書かない。
-// 器（並べる・置く・閉じる）は ts の menu.ts。
+// 器（並べる・置く・閉じる）は app/parts/menu.mbt。
 
 ///|
-/// 1 行。`mark` は絵の名（ts の icons.ts の表）。intent が None なら沈む（why が理由）
+/// 1 行。`mark` は絵の名（app/parts/icons.mbt の表）。intent が None なら沈む（why が理由）
 pub(all) struct Item {
   label : String
   key : String?

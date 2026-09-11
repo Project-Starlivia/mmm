@@ -3,11 +3,11 @@ import { type Plugin, defineConfig } from "vite";
 import { mmmLogoSvg } from "./_build/js/release/build/mmm/app/js/js.js";
 
 /**
- * 素の favicon を `/favicon.svg` に置く。形の源は core/app/logo.mbt、色の源は
+ * 素の favicon を `/favicon.svg` に置く。形の源は app/bar/theme.mbt の logo_svg、色の源は
  * style.css の `--accent` — どちらも実行時と同じ 1 つを読む（静的ファイルを
  * 手で置くと源が 2 つになり、以前 favicon だけ左右が反転していたのと同じ
  * 事故になる）。JS が走る前からタブに出て、`/favicon.ico` の 404 も消える。
- * 色と未保存の印は theme.ts が data URL で上書きする。
+ * 色と未保存の印は同じ theme.mbt が data URL で上書きする。
  */
 function favicon(): Plugin {
   const file = "favicon.svg";

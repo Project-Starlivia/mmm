@@ -14,7 +14,7 @@ pub struct Theme {
 }
 
 ///|
-/// index.html の素の favicon（同じ logo.mbt からビルド時に吐いたもの）を、
+/// index.html の素の favicon（同じ `logo_svg` からビルド時に吐いたもの）を、
 /// 色と印の入った data URL で上書きする。実値で埋める必要がある
 fn Theme::apply_favicon(self : Theme) -> Unit {
   let doc = self.doc
@@ -98,7 +98,7 @@ pub fn Theme::new(
   guard @parts.accent(doc) is Some(base) else {
     abort("style.css の --accent が読めない")
   }
-  // ロゴの形の源は logo.mbt ひとつ。帯 も favicon もここから作る
+  // ロゴの形の源は `logo_path` ひとつ。帯 も favicon もここから作る
   // （静的ファイルに複製すると、以前のように片方だけ左右が反転していても
   // 誰も気づけない）。色は currentColor = --accent
   logo.insertAdjacentHTML("beforeend", logo_inner("currentColor"))

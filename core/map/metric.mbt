@@ -5,7 +5,7 @@
 // ノードの「ラベル行」の寸法は、少なくとも 3 者が同じ値で見なければならない:
 //   1. レイアウト（node_size が箱の大きさを決める）
 //   2. SVG の描画（text 要素の font-size と x）
-//   3. 編集用の <input> オーバーレイ（ts の label.ts。出口の mmmMetrics で受ける）
+//   3. 編集用の <input> オーバーレイ（app/mindmap/field.mbt。寸法は place.mbt が数える）
 // 以前はこれが 3 箇所に散っていて、通常ノードは 13px/12、畳んだノードは
 // 計測 10px・CSS 11px・input 13px と食い違い、折り畳んだノードを編集すると
 // 文字がずれていた。font-size は CSS ではなく属性で入れて、CSS 側に同じ数字を持たせない。

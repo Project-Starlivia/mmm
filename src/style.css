@@ -36,7 +36,7 @@
      透ける面（`--accent-soft`）も、ノードの箱のように地の上へ不透明に塗る面も
      同じ濃さになる。同じ選択を 2 つのペインで見せているのに、濃さが違う
      理由が無い。
-     テーマでも変えない: ライト用に薄くした宣言を持っていたが、app/theme.ts が
+     テーマでも変えない: ライト用に薄くした宣言を持っていたが、app/bar/theme.mbt が
      置くインラインに必ず負けていて一度も効いていなかった（誰も見たことの
      ない濃さだった）。アクセントカラーは `--accent` にだけ入る */
   --accent-mix: 20%;
@@ -47,7 +47,7 @@
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   --veil: rgba(0, 0, 0, 0.45);
   --font: "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
-  /* コードの字。**綴りはここ 1 つ** — 測る側（map/metrics.ts）も同じものを見る */
+  /* コードの字。**綴りはここ 1 つ** — 測る側（app/mindmap/measure.mbt）も同じものを見る */
   --mono: "JetBrains Mono", Consolas, "SF Mono", "Cascadia Code", Menlo, monospace;
   /* コードの色。既存の ink/accent とは別系統で、暗い地に載る想定 */
   --tok-keyword: #c792ea;
@@ -258,7 +258,7 @@ html, body {
 /* まだ走っていると言う絵。**回っていることだけが中身**なので、止めては
    意味が無い（切れ目のある輪なのは、閉じた輪では回っても止まって見えるため）。
 
-   出すのは `icons.ts` の `nod` が決める — 押してすぐではなく、待たされて
+   出すのは `app/parts/icons.mbt` の `nod` が決める — 押してすぐではなく、待たされて
    いると分かってから。ほとんどの一手はその前に終わるので、普段は出ない */
 .icon.spun {
   transform-origin: center;
@@ -307,7 +307,7 @@ html, body {
 
 /* ========== ペインの割り付け ========== */
 
-/* どちらを出しているか。`app/panes.ts` の居場所がそのまま `data-show` に
+/* どちらを出しているか。`app/panes.mbt` の居場所がそのまま `data-show` に
    降りてくる（both / md / map）。**言うのはこの 1 属性だけ** — ペインごとの
    旗と器の旗を別々に持つと、同じ事実を 2 か所で言うことになる */
 #panes { display: flex; flex: 1; min-height: 0; }
@@ -519,7 +519,7 @@ html, body {
 #panes[data-show="md"] .pane-switch { left: auto; right: calc(var(--bar) + var(--inset)); transform: none; }
 #panes[data-show="map"] .pane-switch { left: var(--w); transform: none; }
 
-/* 狭いときは、居場所が 2 つしか無い（`app/panes.ts` の `spotsFor`）。
+/* 狭いときは、居場所が 2 つしか無い（`app/panes.mbt` の `spots_for`）。
    **分割線は線としての性質だけを落とす** — 動かせない境目を「掴めます」と
    いう顔で見せない。要素は 0 幅で残す: flex がそれを縁まで押し出すので、
    `.pane-switch` は今までどおり同じ 1 か所に居られる（角と角に分けると、
@@ -549,7 +549,7 @@ html, body {
 
 #map-pane { flex: 1; min-width: 200px; }
 
-/* マップの器そのもの。**何個でも立つ**（mindmap.ts が自分の pane に付ける） */
+/* マップの器そのもの。**何個でも立つ**（app/mindmap/mindmap.mbt が自分の pane に付ける） */
 .map-pane {
   position: relative;
   overflow: hidden;
@@ -573,7 +573,7 @@ html, body {
 
 /* 画面外にある対象(選択、無ければルート)を指す控えめな針。コンパスの針の
    ように細長いひし形 1 つ。**出っぱなし**になるので中央には浮かせず、
-   縁に貼って真ん中を塞がない(map/indicator.ts が位置と向きを計算する) */
+   縁に貼って真ん中を塞がない(core/map/indicator.mbt が位置と向きを計算する) */
 .map-indicator {
   position: absolute;
   top: 0;
@@ -586,7 +586,7 @@ html, body {
   pointer-events: none;
 }
 
-/* 空のときの言い出し。**2 つのペインで同じ器**（app/hint.ts が組む）。
+/* 空のときの言い出し。**2 つのペインで同じ器**（app/parts/hint.mbt が組む）。
    出る条件も 1 つ（まだノードが無い）。押せないし、選べない */
 .pane-hint {
   position: absolute;
@@ -610,8 +610,7 @@ html, body {
 
 /* ========== 親子をつなぐ線 ========== */
 
-/* 線の太さはここが唯一の宣言。以前は同じ 1.7 が map/edge.ts にもあり、
-   render() が毎レンダで style へ書き戻していた */
+/* 線の太さはここが唯一の宣言（core/map/edge.mbt は形だけを持つ） */
 .edge {
   fill: none;
   stroke: var(--edge);
@@ -620,7 +619,7 @@ html, body {
 }
 
 /* ========== ノードとカード ==========
-   形は map/render.ts と map/drawCard.ts が作る。ここが持つのは、
+   形は app/mindmap/render.mbt と card.mbt が作る。ここが持つのは、
    状態で変わるだけの定数（角丸・色・破線）。 */
 
 .node {
@@ -637,11 +636,11 @@ html, body {
   }
   &.root rect.box { stroke-width: 2; stroke: var(--node-border-strong); }
 
-  /* ---- ドラッグ（付けるのは mindmap.ts）---- */
+  /* ---- ドラッグ（付けるのは app/mindmap/input.mbt と marks.mbt）---- */
   &.dragging { opacity: 0.4; }
   &.drop-parent rect.box { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; }
 
-  /* ---- 選択（付けるのは map/render.ts の paintSelection）---- */
+  /* ---- 選択（付けるのは app/mindmap/render.mbt の paint）---- */
   &.selected rect.box {
     stroke: var(--accent);
     stroke-width: 2;
@@ -655,7 +654,7 @@ html, body {
     user-select: none;
   }
   & text.label {
-    /* font-size は map/metrics.ts の rowOf() が属性で入れる（数字を2箇所に置かない） */
+    /* font-size は core/map/metric.mbt の row_of() が決め、app/mindmap/render.mbt が属性で入れる（数字を2箇所に置かない） */
     fill: var(--ink);
     white-space: pre;
 
@@ -799,7 +798,7 @@ html, body {
   pointer-events: none;
 }
 
-/* 兄弟へ挿入する予告（付けるのは mindmap.ts）。visibility で消す —
+/* 兄弟へ挿入する予告（付けるのは app/mindmap/marks.mbt）。visibility で消す —
    display だと SVG の attribute と CSS の入り乱れが増える */
 .drop-line {
   stroke: var(--accent);
@@ -808,14 +807,14 @@ html, body {
   pointer-events: none;
 }
 
-/* ラベルのその場編集。位置と寸法は map/label.ts が world から計算して style に
-   入れる（ズームに追従する）。ここに書くとラベルと入力欄で字の位置がずれる */
+/* ラベルのその場編集。位置と寸法は core/map/place.mbt が world から計算し、
+   app/mindmap/field.mbt が style に入れる（ズームに追従する）。ここに書くとラベルと入力欄で字の位置がずれる */
 .label-editor {
   position: absolute;
   display: none;
   box-sizing: border-box;
   font-family: var(--font);
-  /* 太さは map/label.ts の LABEL_BORDER が place() で入れる。labelPlacement()
+  /* 太さは core/map/place.mbt の label_border を field.mbt の place() が入れる。label_place()
      の寸法計算がその値を前提にしているので、太さの源はここではなくあちら */
   border-style: solid;
   border-color: var(--accent);
@@ -828,7 +827,7 @@ html, body {
 
 /* カードのその場編集。裏に色付きの層（.highlight）、表に透明な textarea を
    重ねる。字がずれないよう、font と padding と line-height は入れ物側で
-   1 回だけ決めて両方に継がせる。寸法は map/card.ts の cardPlacement が
+   1 回だけ決めて両方に継がせる。寸法は core/map/place.mbt の card_place が
    唯一の定義（place() がズーム込みで書き込む） */
 .card-editor {
   position: absolute;
@@ -943,7 +942,7 @@ html, body {
   &.on { opacity: 1; transform: translate(-50%, 0); }
 
   /* 中身は 3 つ。**入れ物は、意味を持つか CSS で言えない境目があるときだけ**
-     置いてある（app/notice.ts）。
+     置いてある（app/parts/notice.mbt）。
 
        .icon  印
        .lead  詫び（`blocked` では出ない）
@@ -1053,7 +1052,7 @@ html, body {
   }
 }
 
-/* ========== お絵描き（app/draw.ts） ==========
+/* ========== お絵描き（app/parts/draw.mbt） ==========
    たずね（.ask）の中に載る。窓・題・足元のボタンは .ask のもので、ここが
    持つのは描くための道具と紙だけ。紙の色はキャンバス自身が最初に塗る —
    CSS にも置くと、出来上がる画像の色と同じ数字を 2 か所に持つことになる */
@@ -1081,7 +1080,7 @@ html, body {
   /* Undo と Clear だけは 1 つの塊。継ぎ目は帯の書き出しと同じ `.group` */
   & .group { margin-left: auto; }
 
-  /* インクの丸。色は draw.ts が `--swatch` で渡す（綴りは 1 か所） */
+  /* インクの丸。色は draw.mbt が `--swatch` で渡す（綴りは 1 か所） */
   & .ink {
     position: relative; /* 色の入力（.pick）を重ねる座標系 */
     width: 22px;
@@ -1145,7 +1144,7 @@ html, body {
 
   & .paper {
     display: block;
-    /* 窓が狭ければ縮む。出来上がる絵の大きさは変わらない（draw.ts が持つ） */
+    /* 窓が狭ければ縮む。出来上がる絵の大きさは変わらない（draw.mbt が持つ） */
     max-width: 100%;
     height: auto;
     border: 1px solid var(--line);
@@ -1182,7 +1181,7 @@ html, body {
     /* 行の頭の絵。字より控えめに座らせる（絵の無い行も、同じ大きさの
        空欄（.icon だが中身が無い）を置くので頭出しが揃う） */
     & > .icon { margin-right: -10px; color: var(--ink-dim); flex: none; }
-    /* 済んだ行。絵がチェックに差し替わる（menu.ts）。**色は増やさず**、
+    /* 済んだ行。絵がチェックに差し替わる（app/parts/menu.mbt）。**色は増やさず**、
        淡さをやめるだけで「いま起きた」と言う — 並びの中で 1 行だけ濃い */
     & > .icon.drawn { color: var(--ink); }
     /* 字は伸びて、キーの表示を右端へ押しやる。**折り返させない** —
@@ -1240,7 +1239,7 @@ html, body {
        ものは、もう指してはいない */
     &:hover, &:focus-visible { background: var(--accent-soft); }
     &:focus { outline: none; }
-    /* **触れるが、効かない。** 押せなさは menu.ts が `aria-disabled` で言う
+    /* **触れるが、効かない。** 押せなさは app/parts/menu.mbt が `aria-disabled` で言う
        （読み上げにも同じ 1 つで届く。`pointer-events` で止めると hover まで
        死んで、`title` の理由が読めない）。
        起きないことを佇まいで言うため、地は光らせずカーソルも変えない */
@@ -1279,13 +1278,13 @@ html, body {
 
 /* ========== 狭いとき ==========
    **どちらのペインを出すかは、ここでは決めない。** 居場所（狭ければ
-   「md だけ / マップだけ」の 2 つ）を持つのは `app/panes.ts` の
-   `spotsFor` / `project` / `toggled` で、結果は `#panes[data-show]` として
+   「md だけ / マップだけ」の 2 つ）を持つのは `app/panes.mbt` の
+   `spots_for` / `project` / `toggled` で、結果は `#panes[data-show]` として
    降りてくる — 隠す規則は幅に関わらず 1 つきり（上の `#panes`）。
    ここに残るのは、狭さそのものから決まる詰め方だけ。
 
    幅で振る舞いを変えるものは `<html class="narrow">` を見る（`720px` の
-   唯一の源は `app/panes.ts` の `matchMedia`）。この照会が持つのは、
+   唯一の源は `app/panes.mbt` の `narrow_query`）。この照会が持つのは、
    クラスを要さない純粋な見た目だけ。 */
 
 @media (max-width: 720px) {

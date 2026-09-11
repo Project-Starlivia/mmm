@@ -2,7 +2,7 @@
 //
 // **持つのは見た目と手触りの好みだけ**（テーマ・アクセントカラー・書き出しのやり方・
 // 掴みやすさ）。文書の控えもファイルハンドルも持たない（ハンドルは IndexedDB の
-// ts の app/handles.ts が扱う）。
+// app/disk/recent.mbt が扱う）。
 //
 // 持ち物は名前で言う（`theme` / `color` / `way` / `grab`）。localStorage の綴り
 // （`mmm.*`）はここだけが知っていて、外は名前を渡す — 知らない名前は壊れている。
@@ -12,7 +12,7 @@
 let owned : Array[(String, String)] = [
   ("theme", "mmm.theme"),
   ("color", "mmm.color"),
-  // 最後に選んだ書き出しのやり方（export.ts が持ち主）
+  // 最後に選んだ書き出しのやり方（bar/export.mbt が持ち主）
   ("way", "mmm.exportWay"),
   // 掴みやすさ（⋯ の Easy grab）。"on" のときだけ広い
   ("grab", "mmm.grab"),
@@ -73,8 +73,6 @@ pub fn load(name : String) -> String? {
 ///|
 /// 役目を終えた `mmm.*` を捨てる。消えたキーの名前を並べる移行リストは
 /// 増え続けて誰も消せなくなるので、持ち物のほうを宣言して残りを掃く。
-/// これまでに捨てたもの: text / savedText（.md と二重の真実になる）、
-/// fileName / eol（読めば分かる）、panes / folderQuiet / edgeTune / migrated
 pub fn sweep() -> Unit {
   guard storage() is Some(s) else { return }
   quietly(() => {

@@ -8,7 +8,7 @@
 // 宣言が無い文書は `./`（md と同じ場所）として読み書きする。**宣言を決める /
 // 直すのもここ**（`settle`）— ただし道具は宣言を黙って書き換えない。書くのは
 // 計算できたとき（`resolve`）と、人が箱で確定したときだけ。書き込みそのものは
-// md への操作なので `deps.declare` に渡す（ts の main.ts）。
+// md への操作なので `deps.set_declared` に渡す（App の `set_declared`）。
 
 ///|
 /// 読みに行ってよい絵の種類。**綴りはここ 1 つ**で、種類の判定も
@@ -553,7 +553,7 @@ pub async fn Images::connect(self : Images) -> Unit {
 ///|
 /// フォルダを指してもらう。**繋ぎ直しも選び直しも同じ一手** —
 /// 記録が無ければ宣言を決め、あって食い違えば直すか聞く（`settle`）。
-/// 保存されているかの確認は呼ぶ側（main.ts の駅）が済ませている
+/// 保存されているかの確認は呼ぶ側（App）が済ませている
 pub async fn Images::choose_folder(self : Images) -> Unit {
   (async fn() -> Unit {
     match self.pick() {

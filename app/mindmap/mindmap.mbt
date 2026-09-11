@@ -37,7 +37,7 @@ pub struct Mindmap {
   /// world 座標の層。Camera の変換はこれに掛ける
   world : @dom.Element
   renderer : Renderer
-  /// 白紙の言い出し（器は ts の app/hint.ts）
+  /// 白紙の言い出し（器は app/parts/hint.mbt）
   hint : @dom.Element
   indicator_el : @dom.Element
   mut camera : @map.Camera
@@ -358,7 +358,7 @@ pub fn Mindmap::refresh_selection(self : Mindmap) -> Unit {
 
 ///|
 /// その場編集に入る。seed は最初の字。箱が無い（畳まれて埋もれた）ノードは開けない —
-/// 戻り値はそれを呼び出し側（main.ts の apply）に言うためのもの
+/// 戻り値はそれを呼び出し側（App の apply）に言うためのもの
 pub fn Mindmap::begin_edit(self : Mindmap, id : Int, seed : String?) -> Bool {
   guard self.layout.boxes.get(id) is Some(b) else { return false }
   self.label.open(id, self.layout, self.camera, b.node.label, seed)

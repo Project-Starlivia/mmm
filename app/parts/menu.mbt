@@ -253,8 +253,8 @@ pub fn fill(
       }
     })
     @web.listen(row, "click", _ => {
-      // **押せなさは、ここが持つ。** CSS の `pointer-events: none` で
-      // 止めていた頃は、同じ指定が hover まで殺していて理由が読めなかった
+      // **押せなさは、ここが持つ。** CSS の `pointer-events: none` だと
+      // hover まで死んで、理由が読めない
       if off {
         return
       }

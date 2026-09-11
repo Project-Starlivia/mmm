@@ -1,6 +1,6 @@
 // 入口。**ts に残るのは CodeMirror（md ペイン）だけ** — 文書の真実はその中の文字列で、
 // 文書から導けるもの（core の読み・地図の選択の位置・持ち主・選択）は EditorState の
-// field（state.ts）に居る。束ねるのは core（core/main）で、ここは CodeMirror の読み書きを
+// field（state.ts）に居る。束ねるのは core（app/app.mbt）で、ここは CodeMirror の読み書きを
 // 閉包で渡し、1 トランザクションごとにサイクルを回すだけ。
 
 // style.css は index.html の <link> で読む（FOUC を避けるため head 側）
