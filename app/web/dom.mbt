@@ -196,7 +196,7 @@ pub fn same(a : @dom.Element, b : @dom.Element) -> Bool {
 
 ///|
 /// その文書の窓（happy-dom は global に window を持たないので、文書から辿る）
-pub fn window_of(doc : @dom.Document) -> @core.Any {
+fn window_of(doc : @dom.Document) -> @core.Any {
   doc.as_any()._get("defaultView")
 }
 

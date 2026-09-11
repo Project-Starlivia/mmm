@@ -8,7 +8,7 @@
 
 ///|
 /// 改名する相手そのものがディスクに無い（保存したらもう改名する必要が無いので、駅にならない）
-pub let nothing_to_rename = "Save the .md first — nothing on disk to rename yet"
+let nothing_to_rename = "Save the .md first — nothing on disk to rename yet"
 
 ///|
 /// その環境が改名を持たない。どのブラウザが、とは言わない（名指しは移り変わる）
@@ -16,7 +16,7 @@ pub let no_rename_here = "This browser can't rename files"
 
 ///|
 /// 改名できない理由。Files の Rename の行と、帯の名乗りの title が同じ言葉を使う。できるなら None
-pub fn rename_problem(can_rename : Bool, saved : Bool) -> String? {
+fn rename_problem(can_rename : Bool, saved : Bool) -> String? {
   if !can_rename {
     Some(no_rename_here)
   } else if !saved {

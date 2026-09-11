@@ -24,8 +24,6 @@ pub let deepest : Int
 
 pub let doc_id : Int
 
-pub fn fragment(Node, Int, Array[Side], Array[String]) -> String
-
 pub fn lines(String) -> Array[String]?
 
 pub fn md_ast_sig(String) -> String
@@ -42,10 +40,6 @@ pub fn parse(String) -> Doc
 
 pub fn patched(String, Array[Edit]) -> String
 
-pub fn prose(Array[Block]) -> String
-
-pub fn read(String) -> @markdown.Document
-
 pub fn serialize(Doc) -> String
 
 pub fn shape(Doc) -> Doc
@@ -55,10 +49,6 @@ pub fn sign_of(Node) -> Sign?
 pub fn spans_sig(String) -> String
 
 pub fn unbuild(Doc) -> @markdown.Document
-
-pub fn unbuild_node(Node, Int, Array[Side], Array[String]) -> @markdown.Document
-
-pub fn unbuild_prose(Array[Block]) -> @markdown.Document
 
 // Errors
 

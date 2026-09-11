@@ -77,7 +77,7 @@ pub struct Renderer {
 }
 
 ///|
-pub fn Renderer::new(doc : @dom.Document) -> Renderer {
+fn Renderer::new(doc : @dom.Document) -> Renderer {
   {
     doc,
     edge_layer: @web.el(doc, "g", []),
@@ -95,12 +95,12 @@ pub fn Renderer::new(doc : @dom.Document) -> Renderer {
 
 ///|
 /// id を指定して要素を引く（書き出しに写す・印を付けるため）
-pub fn Renderer::node_el(self : Renderer, id : Int) -> @dom.Element? {
+fn Renderer::node_el(self : Renderer, id : Int) -> @dom.Element? {
   self.node_els.get(id)
 }
 
 ///|
-pub fn Renderer::edge_el(self : Renderer, id : Int) -> @dom.Element? {
+fn Renderer::edge_el(self : Renderer, id : Int) -> @dom.Element? {
   self.edge_els.get(id)
 }
 
@@ -108,7 +108,7 @@ pub fn Renderer::edge_el(self : Renderer, id : Int) -> @dom.Element? {
 /// 選ばれた箱に印を付ける。レイアウトを見直さない軽い塗り替え。
 /// 触るのは前回と変わった箱だけ — 矩形選択は pointermove ごとに来るので、
 /// 全箱を toggle すると 5000 ノードで 1 回に 5000 回 DOM を触る
-pub fn Renderer::paint(self : Renderer, sel : Array[Int]) -> Unit {
+fn Renderer::paint(self : Renderer, sel : Array[Int]) -> Unit {
   let next = Set::from_array(sel)
   for id in self.selected {
     if !next.contains(id) {
@@ -159,7 +159,7 @@ fn shape_of(b : @map.Box, scene : Scene) -> Shape {
 
 ///|
 /// 場面を DOM に写す。文書順（= 重なり順）も合わせる
-pub fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
+fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
   let doc = self.doc
   let l = scene.layout
   let seen : Set[Int] = Set([])

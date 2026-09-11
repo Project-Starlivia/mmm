@@ -8,7 +8,6 @@ import {
   "mmm/app/mindmap",
   "mmm/app/web",
   "mmm/core/map",
-  "mmm/core/op",
   "mmm/core/read",
   "mmm/core/tree",
   "moonbitlang/core/debug",
@@ -16,22 +15,6 @@ import {
 
 // Values
 pub fn focus_bar(@dom.Document) -> Unit
-
-pub async fn from_hash(String) -> String?
-
-pub fn has_images(String) -> Bool
-
-pub fn init_shortcuts(@dom.Document, Shortcuts) -> Unit
-
-pub let link_warn_length : Int
-
-pub fn project(Vis, Array[Vis]) -> Vis
-
-pub fn spots_for(Bool) -> Array[Vis]
-
-pub async fn to_hash(String) -> String
-
-pub fn toggled(Vis, Pane, Array[Vis]) -> Vis
 
 // Errors
 
@@ -54,7 +37,6 @@ pub struct App {
   mut drawing_open : Bool
   mut grab : Bool
 }
-pub fn App::apply(Self, @op.Op, Bool) -> Int?
 pub fn App::boot(Self) -> Unit
 pub fn App::cycle(Self, @read.Survey?, Bool) -> Unit
 pub fn App::new(@dom.Document, Editor, @disk.Disk, measure? : (@map.Font, String) -> Double) -> Self
@@ -99,9 +81,6 @@ pub struct Panes {
   mut vis : Vis
   mut dragging : Bool
 }
-pub fn Panes::new(@dom.Element, @dom.Element, @dom.Element, @dom.Element, () -> Unit) -> Self
-pub fn Panes::toggle(Self) -> Unit
-pub fn Panes::toggle_vis(Self, Pane) -> Unit
 
 pub(all) struct Shortcuts {
   save : (Bool) -> Unit

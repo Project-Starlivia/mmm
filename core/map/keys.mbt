@@ -283,7 +283,7 @@ fn folded(h : Hand) -> Answer {
 ///|
 /// 畳みの次の 1 歩。畳んでいなければ畳む（閉）、閉じていれば開く（子は出るが
 /// 畳みのまま）、開いていれば外す。右クリックの行も同じ 1 歩を名乗る
-pub fn fold_step(node : @tree.Node, id : Int) -> Intent {
+fn fold_step(node : @tree.Node, id : Int) -> Intent {
   match node.fold {
     None => Op(op=Fold(id~, open=false), edit=false)
     Some({ open: false, .. }) => Op(op=Fold(id~, open=true), edit=false)
@@ -293,7 +293,7 @@ pub fn fold_step(node : @tree.Node, id : Int) -> Intent {
 
 ///|
 /// 畳みの行の字。次の 1 歩を名乗る
-pub fn fold_label(node : @tree.Node?) -> String {
+fn fold_label(node : @tree.Node?) -> String {
   match node {
     Some({ fold: Some({ open: false, .. }), .. }) => "Open (folded)"
     Some({ fold: Some(_), .. }) => "Unfold"

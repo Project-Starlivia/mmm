@@ -31,7 +31,7 @@ pub(all) enum Pane {
 /// 分割線の居場所。左端 = md が無い / 真ん中 = 両方 / 右端 = マップが無い。
 /// **狭いときは真ん中が消えて 2 つになる** — 左から右へ並ぶ順は変わらない
 /// ので、`‹` は狭くても「分割線を左へ 1 つ」のまま
-pub fn spots_for(narrow : Bool) -> Array[Vis] {
+fn spots_for(narrow : Bool) -> Array[Vis] {
   let map_only : Vis = { md: false, map: true, }
   let md_only : Vis = { md: true, map: false, }
   if narrow {
@@ -45,7 +45,7 @@ pub fn spots_for(narrow : Bool) -> Array[Vis] {
 /// 要求された見え方を、いまの居場所へ射影する。**居場所に無い形は 2 つだけ** —
 /// 「両方消えた」と、狭いときの「両方」。どちらも**マップを必ず残し、md は
 /// 残せるなら残す**（この道具がマップのために在るから）
-pub fn project(v : Vis, list : Array[Vis]) -> Vis {
+fn project(v : Vis, list : Array[Vis]) -> Vis {
   for s in list {
     if s == v {
       return s
@@ -83,7 +83,7 @@ fn spot_of(list : Array[Vis], v : Vis) -> Int {
 /// - **出す。** 居場所が 2 つ（狭い）なら「両方」という置き場が無いので、
 ///   そのペイン 1 枚だけになる。3 つ（広い）なら相方はそのまま、その
 ///   ペインを足すだけ
-pub fn toggled(v : Vis, which : Pane, list : Array[Vis]) -> Vis {
+fn toggled(v : Vis, which : Pane, list : Array[Vis]) -> Vis {
   let (on, other) = match which {
     Md => (v.md, v.map)
     Map => (v.map, v.md)
@@ -235,13 +235,13 @@ fn Panes::slide(self : Panes, step : Int) -> Unit {
 
 ///|
 /// そのペインの表示 / 非表示
-pub fn Panes::toggle_vis(self : Panes, which : Pane) -> Unit {
+fn Panes::toggle_vis(self : Panes, which : Pane) -> Unit {
   self.apply(toggled(self.vis, which, self.spots()))
 }
 
 ///|
 /// Mod+/: もう片方のペインへ。隠れていれば出す
-pub fn Panes::toggle(self : Panes) -> Unit {
+fn Panes::toggle(self : Panes) -> Unit {
   let active : @dom.Element? = @core.identity_option(
     self.doc.activeElement().as_any(),
   )
@@ -265,7 +265,7 @@ pub fn Panes::toggle(self : Panes) -> Unit {
 ///|
 /// 分割線の矢印を付け、スプリッタを掴めるようにする。**md 側のフォーカスは
 /// CodeMirror が持つので注入**
-pub fn Panes::new(
+fn Panes::new(
   md_pane : @dom.Element,
   map_pane : @dom.Element,
   panes_el : @dom.Element,

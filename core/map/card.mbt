@@ -162,7 +162,7 @@ fn card_of(c : @tree.Content) -> Kind? {
 /// ノード 1 つぶんのカード。並びは中身のまま、**枚数は中身の数と揃わない** —
 /// カードにならない中身（読み解いていない・外部の画像・http 以外のリンク）は
 /// 飛ばす。だからこそ 1 枚ずつが出どころの id を連れる
-pub fn cards(blocks : Array[@tree.Block]) -> Array[Card] {
+fn cards(blocks : Array[@tree.Block]) -> Array[Card] {
   let out = []
   for b in blocks {
     match b.content.bind(card_of) {

@@ -27,7 +27,7 @@ fn to_screen(b : Rect, cam : Camera) -> Rect {
 
 ///|
 /// その箱がペインに少しでも重なっているか
-pub fn is_visible(b : Rect, cam : Camera, pane : Pane) -> Bool {
+fn is_visible(b : Rect, cam : Camera, pane : Pane) -> Bool {
   let s = to_screen(b, cam)
   s.x < pane.width && s.x + s.w > 0.0 && s.y < pane.height && s.y + s.h > 0.0
 }

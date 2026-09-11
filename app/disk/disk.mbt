@@ -50,7 +50,7 @@ async fn Disk::use_(self : Disk, file : @web.FileHandle) -> Doc {
 }
 
 ///|
-pub fn Disk::current_file(self : Disk) -> @web.FileHandle? {
+fn Disk::current_file(self : Disk) -> @web.FileHandle? {
   self.current
 }
 

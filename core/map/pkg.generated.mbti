@@ -6,39 +6,20 @@ import {
   "mmm/core/tree",
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
-  "moonbitlang/core/set",
 }
 
 // Values
-pub fn all(Layout) -> Selection
-
-pub fn arrow(Layout, Int?, Arrow) -> Int?
-
-pub fn arrow_of(String) -> Arrow?
-
-pub fn card_bleed(Kind) -> Double
-
 pub let card_border : Double
 
-pub let card_font : Font
-
 pub let card_font_px : Double
-
-pub fn card_inset(Kind) -> Double
-
-pub let card_pad : Double
 
 pub fn card_place(Rect, Camera, Int, Double) -> Placement
 
 pub fn card_rect(Box, Int) -> Rect?
 
-pub fn cards(Array[@tree.Block]) -> Array[Card]
-
 pub fn center_on(Camera, Rect, Pane) -> Camera
 
 pub fn click(Selection, Int, Modifier, Array[Int]) -> Selection
-
-pub fn clip_label(String, Font, Double, (Font, String) -> Double) -> String
 
 pub fn closed(@tree.Node) -> Bool
 
@@ -46,19 +27,13 @@ pub let code_line : Double
 
 pub let code_pad : Double
 
-pub fn collapsed_badge(Int) -> String
-
 pub let details_indent : Double
 
 pub let details_name : String
 
 pub let details_row : Double
 
-pub fn dir(@tree.Side) -> Int
-
 pub fn display_label(String) -> String
-
-pub fn dist_to_seg(Pt, Pt, Pt) -> Double
 
 pub fn drop_op(Drop, Array[Int]) -> @op.Op
 
@@ -66,47 +41,21 @@ pub fn edge_ends(Layout, Int) -> (Pt, Pt)?
 
 pub fn edge_path(Pt, Pt) -> String
 
-pub fn edge_segs(Double, Double) -> Array[Seg]
-
-pub let empty_label : String
-
 pub let exact : Reach
-
-pub fn extend_to(Selection, Int) -> Selection
 
 pub fn fit(Array[Rect], Pane, Double) -> Camera?
 
-pub fn flatten(Array[Seg], Int) -> Array[Pt]
-
-pub fn fold_label(@tree.Node?) -> String
-
-pub let fold_mark_closed : String
-
-pub let fold_mark_open : String
-
 pub fn fold_name(@tree.Node) -> String
-
-pub fn fold_step(@tree.Node, Int) -> Intent
-
-pub let gap : Gap
 
 pub let grab : Reach
 
-pub let hidden : Row
-
 pub fn hidden_label(@tree.Node, Int, (Font, String) -> Double) -> String
 
-pub let hidden_max_w : Double
-
 pub fn hit(Layout, Double, Double, Reach) -> Int?
-
-pub let img_min_w : Double
 
 pub fn indicator_for(Rect, Camera, Pane) -> Indicator
 
 pub fn is_lost(Array[Rect], Camera, Pane) -> Bool
-
-pub fn is_visible(Rect, Camera, Pane) -> Bool
 
 pub fn items(Layout, Selection) -> Array[Entry]
 
@@ -118,31 +67,17 @@ pub let label_border : Double
 
 pub fn label_font(Row) -> Font
 
-pub let label_min_pad : Double
-
 pub fn label_place(Box, Camera, Double) -> Placement
 
 pub fn layout(Array[@tree.Root], (@tree.Node, Array[Card], Int) -> Size) -> Layout
 
-pub let max_zoom : Double
-
-pub fn mid_of_polyline(Array[Pt]) -> Pt
-
-pub let min_zoom : Double
-
-pub let mono_font : Font
-
 pub fn nearest(Array[Rect], Camera, Pane) -> Rect?
-
-pub fn next_sibling(Layout, Int) -> Int?
 
 pub fn node_size((Font, String) -> Double) -> (@tree.Node, Array[Card], Int) -> Size
 
 pub let none : Selection
 
 pub let normal : Row
-
-pub fn num(Double) -> String
 
 pub fn open_label(@tree.Node) -> String
 
@@ -152,21 +87,11 @@ pub fn pan_by(Camera, Double, Double) -> Camera
 
 pub fn pan_to_show(Camera, Rect, Pane, Double) -> Camera
 
-pub fn parent_of(Layout, Int) -> Int?
-
 pub fn pinch(Camera, Span, Span) -> Camera
-
-pub fn prev_sibling(Layout, Int) -> Int?
-
-pub fn reach_of(Box, Reach, @set.Set[Int]) -> (Rect, Rect)
 
 pub fn resolve(Layout, Pt, Array[Int]) -> Drop?
 
 pub fn root_box(Layout) -> Box?
-
-pub fn round2(Double) -> Double
-
-pub fn row_h(Kind) -> Double
 
 pub fn row_of(@tree.Node) -> Row
 
@@ -174,17 +99,11 @@ pub fn row_top(Array[Card], Int) -> Double
 
 pub fn rubber(Layout, Rect) -> Selection
 
-pub fn segs_to_d(Array[Seg], Pt) -> String
-
-pub fn solo(Selection) -> Int?
-
 pub fn to_world(Camera, Double, Double) -> Pt
 
 pub fn union(Array[Rect]) -> Rect?
 
 pub fn zoom_at(Camera, Double, Double, Double) -> Camera
-
-pub fn zoom_to(Camera, Double, Double, Double) -> Camera
 
 // Errors
 
@@ -344,11 +263,7 @@ pub(all) struct Rect {
   w : Double
   h : Double
 } derive(Eq, ToJson, @debug.Debug)
-pub fn Rect::center(Self) -> Pt
-pub fn Rect::entry_edge(Self, Int) -> Pt
-pub fn Rect::growth_edge(Self, Int) -> Pt
 pub fn Rect::left(Self) -> Pt
-pub fn Rect::right(Self) -> Pt
 
 pub(all) struct Row {
   px : Int

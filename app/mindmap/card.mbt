@@ -286,7 +286,7 @@ fn details(
 
 ///|
 /// カード 1 枚ぶんの要素。仕切り線を含む、並べればよい形で返す
-pub fn draw_card(
+fn draw_card(
   doc : @dom.Document,
   c : @map.Card,
   at : Spot,

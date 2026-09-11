@@ -9,25 +9,13 @@ import {
 }
 
 // Values
-pub fn asset_target(String, String) -> Array[String]?
-
-pub fn folder_from_doc(Array[String]) -> String
-
 pub fn folder_problem(String, String?) -> String?
 
 pub fn idb_store() -> Store
 
 pub fn image_name_problem(String, @set.Set[String]) -> String?
 
-pub fn image_type(String) -> String?
-
 pub fn init_drop(@dom.Document, Drop) -> Unit
-
-pub fn md_path(String) -> String
-
-pub fn name_parts(String) -> Array[String]
-
-pub fn name_problem(String) -> String?
 
 // Errors
 
@@ -42,7 +30,6 @@ pub struct Disk {
   mut current : @web.FileHandle?
 }
 pub fn Disk::close(Self) -> Unit
-pub fn Disk::current_file(Self) -> @web.FileHandle?
 pub fn Disk::new(Recent) -> Self
 pub async fn Disk::open_dialog(Self) -> Doc?
 pub async fn Disk::open_handle(Self, @web.FileHandle) -> Doc
@@ -100,12 +87,7 @@ pub struct Recent {
   store : Store
   mut inherited : Bool
 }
-pub async fn Recent::folder_for(Self, @web.FileHandle) -> @web.DirHandle?
-pub async fn Recent::forget_folder(Self, @web.FileHandle) -> Unit
-pub async fn Recent::list(Self) -> Array[Known]
 pub fn Recent::new(Store) -> Self
-pub async fn Recent::opened(Self, @web.FileHandle) -> Unit
-pub async fn Recent::remember_folder(Self, @web.FileHandle, @web.DirHandle) -> Unit
 
 pub(all) struct Store {
   read : async (String) -> @core.Any

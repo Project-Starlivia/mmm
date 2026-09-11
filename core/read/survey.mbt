@@ -25,7 +25,7 @@ fn meant(body : Array[@tree.Block]) -> Array[@tree.Block] {
 ///|
 /// 木のノードを文書順に（親が先）。**`doc.body` は歩かない** —
 /// 最初の骨格より前の散文はノードではない
-pub fn each_node(doc : @tree.Doc, f : (@tree.Node) -> Unit) -> Unit {
+fn each_node(doc : @tree.Doc, f : (@tree.Node) -> Unit) -> Unit {
   fn walk(n : @tree.Node) -> Unit {
     f(n)
     for k in n.children {

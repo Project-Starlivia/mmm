@@ -284,7 +284,7 @@ fn App::choose(self : App, next : @read.Choice, reveal : Bool) -> Unit {
 ///
 /// focus はノードとも中身とも限らない。ノードで `edit` ならその場編集を開く。
 /// 呼び出し側が続けられるよう focus を返す（Link / Code が使う）
-pub fn App::apply(self : App, op : @op.Op, edit : Bool) -> Int? {
+fn App::apply(self : App, op : @op.Op, edit : Bool) -> Int? {
   let r = @op.edit(self.text(), op)
   // core は断りを「編集なし・focus なし」で言う。編集が無くても focus が在るのは、
   // 何も変わらなかった操作（同じ名前への Rename など）で、しらせは出さない

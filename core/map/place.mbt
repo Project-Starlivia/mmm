@@ -21,7 +21,7 @@ pub let label_border = 2.0
 
 ///|
 /// 余白をいくら縮めても、これだけは残す（字が縁に貼り付かないように）
-pub let label_min_pad = 2.0
+let label_min_pad = 2.0
 
 ///|
 /// 入力欄をノードのラベル行に**ぴったり**重ねる。`text_w` は world 単位で実測した
@@ -48,7 +48,7 @@ pub let card_border = 2.0
 
 ///|
 /// カードの入力欄の内側の余白（world の単位）
-pub let card_pad = 5.0
+let card_pad = 5.0
 
 ///|
 /// カードの入力欄の字の大きさ（world の単位。カードのコードと同じ）

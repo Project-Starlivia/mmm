@@ -14,8 +14,6 @@ pub fn after(@core.Any, (@core.Any) -> Unit) -> Unit
 
 pub fn attr_in(@core.Any, String, String) -> String?
 
-pub fn blob_type(@core.Any) -> String
-
 pub fn can_choose_folder() -> Bool
 
 pub fn can_open() -> Bool
@@ -184,8 +182,6 @@ pub fn set_style(@dom.Element, String, String) -> Unit
 
 pub fn set_value(@dom.Element, String) -> Unit
 
-pub fn settled(@core.Any) -> @js_async.Promise[@core.Any]
-
 pub fn show(@dom.Element, String, Bool) -> Unit
 
 pub fn show_modal(@dom.Element) -> Unit
@@ -213,8 +209,6 @@ pub fn toggle_class(@dom.Element, String, Bool) -> Unit
 pub fn value(@dom.Element) -> String
 
 pub fn warn_unload(@core.Any) -> Unit
-
-pub fn window_of(@dom.Document) -> @core.Any
 
 pub fn write_blob(FileHandle, @core.Any) -> @js_async.Promise[Unit]
 

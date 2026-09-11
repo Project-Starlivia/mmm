@@ -2,7 +2,7 @@
 
 ///|
 /// 側 → 伸びる向き（右 = 1 / 左 = -1）。**側を符号にするのはここだけ**
-pub fn dir(side : @tree.Side) -> Int {
+fn dir(side : @tree.Side) -> Int {
   match side {
     Right => 1
     Left => -1
@@ -26,13 +26,13 @@ pub(all) struct Rect {
 
 ///|
 /// d 属性を短く保つための丸め（見た目は変わらない）
-pub fn round2(v : Double) -> Double {
+fn round2(v : Double) -> Double {
   (v * 100.0).round() / 100.0
 }
 
 ///|
 /// 箱の中心
-pub fn Rect::center(self : Rect) -> Pt {
+fn Rect::center(self : Rect) -> Pt {
   { x: self.x + self.w / 2.0, y: self.y + self.h / 2.0, }
 }
 
@@ -59,7 +59,7 @@ pub fn union(boxes : Array[Rect]) -> Rect? {
 
 ///|
 /// 右辺の中点
-pub fn Rect::right(self : Rect) -> Pt {
+fn Rect::right(self : Rect) -> Pt {
   { x: self.x + self.w, y: self.y + self.h / 2.0, }
 }
 
@@ -75,7 +75,7 @@ pub fn Rect::left(self : Rect) -> Pt {
 
 ///|
 /// 箱から、その枝が dir 方向へ**育っていく**辺の中点
-pub fn Rect::growth_edge(self : Rect, dir : Int) -> Pt {
+fn Rect::growth_edge(self : Rect, dir : Int) -> Pt {
   if dir == 1 {
     self.right()
   } else {
@@ -85,49 +85,10 @@ pub fn Rect::growth_edge(self : Rect, dir : Int) -> Pt {
 
 ///|
 /// 箱へ、dir 方向の枝が**入ってくる**辺の中点（`growth_edge` の反対側）
-pub fn Rect::entry_edge(self : Rect, dir : Int) -> Pt {
+fn Rect::entry_edge(self : Rect, dir : Int) -> Pt {
   if dir == 1 {
     self.left()
   } else {
     self.right()
   }
-}
-
-///|
-/// 点 p から線分 ab までの距離
-pub fn dist_to_seg(p : Pt, a : Pt, b : Pt) -> Double {
-  let vx = b.x - a.x
-  let vy = b.y - a.y
-  let len2 = vx * vx + vy * vy
-  let t = if len2 == 0.0 {
-    0.0
-  } else {
-    @cmp.maximum(
-      0.0,
-      @cmp.minimum(1.0, ((p.x - a.x) * vx + (p.y - a.y) * vy) / len2),
-    )
-  }
-  @math.hypot(p.x - (a.x + vx * t), p.y - (a.y + vy * t))
-}
-
-///|
-/// 折れ線の、長さで測った真ん中の点。見た目の中央と一致する
-pub fn mid_of_polyline(pts : Array[Pt]) -> Pt {
-  let mut total = 0.0
-  for i in 1..<pts.length() {
-    total += @math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
-  }
-  let mut acc = 0.0
-  for i in 1..<pts.length() {
-    let seg = @math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
-    if acc + seg >= total / 2.0 {
-      let t = if seg == 0.0 { 0.0 } else { (total / 2.0 - acc) / seg }
-      return {
-        x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t,
-        y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t,
-      }
-    }
-    acc += seg
-  }
-  pts[pts.length() - 1]
 }

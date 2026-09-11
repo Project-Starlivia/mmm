@@ -24,7 +24,7 @@ pub struct CardPick {
 }
 
 ///|
-pub fn CardPick::new(doc : @dom.Document) -> CardPick {
+fn CardPick::new(doc : @dom.Document) -> CardPick {
   let el_ = @web.el(doc, "g", [("class", "card-pick"), ("visibility", "hidden")])
   let frame = @web.el(doc, "rect", [("class", "frame")])
   let delete = @web.el(doc, "g", [("class", "delete")])
@@ -42,7 +42,7 @@ pub fn CardPick::new(doc : @dom.Document) -> CardPick {
 ///|
 /// `rect` にぴったり被せる。`id` は × を押されたときに誰を消すかで、`data-delete` として
 /// 出す（当たり判定は座標から辿るため）
-pub fn CardPick::show(self : CardPick, id : Int, rect : @map.Rect) -> Unit {
+fn CardPick::show(self : CardPick, id : Int, rect : @map.Rect) -> Unit {
   self.el.setAttribute("visibility", "visible")
   self.frame.setAttribute("x", @web.num(rect.x))
   self.frame.setAttribute("y", @web.num(rect.y))
@@ -66,7 +66,7 @@ pub fn CardPick::show(self : CardPick, id : Int, rect : @map.Rect) -> Unit {
 }
 
 ///|
-pub fn CardPick::hide(self : CardPick) -> Unit {
+fn CardPick::hide(self : CardPick) -> Unit {
   self.el.setAttribute("visibility", "hidden")
   // 隠れていても当たり判定の印は残るので、消しておく
   self.delete.removeAttribute("data-delete")

@@ -5,7 +5,7 @@
 
 ///|
 /// リポジトリの行き先。ここ 1 か所
-pub let repo = "https://github.com/Project-Starlivia/mmm"
+let repo = "https://github.com/Project-Starlivia/mmm"
 
 ///|
 pub(all) struct More {

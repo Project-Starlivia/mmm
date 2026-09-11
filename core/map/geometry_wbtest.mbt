@@ -22,22 +22,6 @@ test "育つ辺と入る辺は、枝の向きで左右が入れ替わる" {
 }
 
 ///|
-test "点から線分までの距離。端より外なら端までの距離になる" {
-  let a : Pt = { x: 0, y: 0, }
-  let b : Pt = { x: 10, y: 0, }
-  assert_eq(dist_to_seg({ x: 5, y: 3, }, a, b), 3) // 真横
-  assert_eq(dist_to_seg({ x: -4, y: 0, }, a, b), 4) // 手前の外
-  assert_eq(dist_to_seg({ x: 14, y: 0, }, a, b), 4) // 先の外
-  assert_eq(dist_to_seg({ x: 3, y: 0, }, a, a), 3) // 長さ 0 の線分
-}
-
-///|
-test "折れ線の真ん中は、長さで測った中央" {
-  let pts : Array[Pt] = [{ x: 0, y: 0, }, { x: 10, y: 0, }, { x: 10, y: 10, }]
-  assert_eq(mid_of_polyline(pts), { x: 10, y: 0, })
-}
-
-///|
 test "座標は小数 2 桁に丸める（d 属性を短く保つため）" {
   assert_eq(round2(1.23456), 1.23)
   assert_eq(round2(-1.005), -1)
