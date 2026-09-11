@@ -7,13 +7,10 @@ fn doc(roots : Array[@tree.Root], body? : Array[@tree.Block] = []) -> @tree.Doc 
 }
 
 ///|
-/// 境界の綴りは書き戻すためだけのもので、操作は作らない。既定は側と同じ数の空。
-fn root(
-  node : @tree.Node,
-  sides? : Array[@tree.Side] = [],
-  rules? : Array[String] = Array::make(sides.length(), ""),
-) -> @tree.Root {
-  { node, sides, rules, }
+/// 境界の綴りは書き戻すためだけのもので、操作は作らない。**綴りは側と同じ数の空** —
+/// 綴りを指す試験が要るときに任意引数を戻す（#86）。
+fn root(node : @tree.Node, sides? : Array[@tree.Side] = []) -> @tree.Root {
+  { node, sides, rules: Array::make(sides.length(), ""), }
 }
 
 ///|
@@ -35,8 +32,6 @@ fn item(
   body? : Array[@tree.Block] = [],
   fold? : @tree.Fold? = None,
   marker? : String = "-",
-  offset? : Int = 2,
-  loose? : Bool = false,
 ) -> @tree.Node {
   {
     id,
@@ -44,7 +39,7 @@ fn item(
     fold,
     body,
     children,
-    mark: Some(Item(marker~, offset~, loose~)),
+    mark: Some(Item(marker~, offset=2, loose=false)),
   }
 }
 
