@@ -1,0 +1,11 @@
+# Cloudflare（Workers static assets）が読む配り方の表。ここに書いた行は
+# **静的ファイルの応答にだけ**付く — この配り先は Worker のコードを持たない
+# （wrangler.jsonc に `main` が無い）ので、返るものは全部これを通る。
+#
+# https://developers.cloudflare.com/workers/static-assets/headers/
+
+# vite が名前に中身のハッシュを入れるのは `assets/` の下だけ。**中身が変われば
+# 名前が変わる**ので、同じ名前のものは永遠に同じ中身。確かめに行く理由が無い。
+# immutable が無いと、ブラウザは再読み込みのたびに 304 の往復をする
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
