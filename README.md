@@ -43,3 +43,5 @@ results.
 
 Menu and toolbar icons are from [Lucide](https://lucide.dev) (ISC License).
 The GitHub mark is from [Octicons](https://primer.style/octicons) (MIT License).
+The code face is [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono)
+(SIL Open Font License 1.1), bundled as-is in [src/fonts](src/fonts).

@@ -10,14 +10,9 @@
     <!-- CSS は head で読む。JS 経由の注入だと当たるまでの一瞬 unstyled が
          見える（dev で顕著）。vite が dev では render-blocking で配り、
          build ではハッシュ付きに差し替える。 -->
-    <!-- コードの字。**外へ 1 本だけ通信する**（swap なので、届くまでは
-         下の stack で読める。オフラインでもそのまま動く） -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap"
-    />
+    <!-- コードの字は style.css の `@font-face` が手元のファイルから出す。
+         **外へは 1 本も出ない** — 借りていた頃は `<head>` の stylesheet が
+         1 本増え、その CSS が届くまで初回描画が止まっていた（#61） -->
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
