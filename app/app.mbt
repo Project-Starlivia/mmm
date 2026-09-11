@@ -540,7 +540,8 @@ fn App::set_declared(self : App, value : String) -> Unit {
   let mut md = @tree.patched(self.text(), sets[0])
   match prev {
     Some(prev) =>
-      for op in @read.retarget(s.doc, prev, next) {
+      // 判定は宣言を書く前の木、書くのは書いた後の木（`retarget`）
+      for op in @read.retarget(s.doc, @tree.build(md).0, prev, next) {
         let r = @op.edit(md, op)
         sets.push(r.edits)
         md = @tree.patched(md, r.edits)

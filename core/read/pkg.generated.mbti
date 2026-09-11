@@ -20,6 +20,8 @@ pub fn carry(Anchors, (Int) -> Int) -> Anchors
 
 pub fn chosen(Survey, Holder, Caret, Anchors?) -> Choice
 
+pub fn follow_declaration(String, String) -> Array[Array[@tree.Edit]]
+
 pub fn image_folder(String?) -> String?
 
 pub fn is_markdown(String) -> Bool
@@ -32,7 +34,9 @@ pub let nothing : Choice
 
 pub fn ranges(Survey, Choice) -> Array[Range]
 
-pub fn retarget(@tree.Doc, String, String) -> Array[@op.Op]
+pub fn retarget(@tree.Doc, @tree.Doc, String, String) -> Array[@op.Op]
+
+pub fn same_head(String, String) -> Bool
 
 pub fn set_image_folder(String, String?, String) -> @tree.Edit
 

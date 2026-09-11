@@ -4,6 +4,7 @@ package "mmm/app/js"
 import {
   "mizchi/js/core",
   "mizchi/js_browser/dom",
+  "mmm/core/tree",
 }
 
 // Values
@@ -47,6 +48,8 @@ pub fn mmm_files_rows(@core.Any, @core.Any) -> @dom.Element
 
 pub fn mmm_find(@core.Any, String) -> Int?
 
+pub fn mmm_follow_declaration(String, String) -> Array[Array[@tree.Edit]]
+
 pub fn mmm_icon(String) -> @dom.Element
 
 pub fn mmm_icon_names() -> FixedArray[String]
@@ -86,6 +89,8 @@ pub fn mmm_pane_hint(String) -> @dom.Element
 pub fn mmm_ranges(@core.Any, @core.Any) -> FixedArray[Int]
 
 pub fn mmm_same_choice(@core.Any, @core.Any) -> Bool
+
+pub fn mmm_same_head(String, String) -> Bool
 
 pub fn mmm_selection(@core.Any) -> @core.Any
 
