@@ -73,27 +73,29 @@ fn nodes(ids : Array[Int], anchor : Int?) -> Choice {
 ///|
 test "最も深いノードだけ。自身の文は地番の頭から最初の子の頭まで" {
   let d = sample()
-  assert_eq(caret_ids(d, point(1)), [2])
-  assert_eq(caret_ids(d, point(7)), [3])
-  assert_eq(caret_ids(d, point(12)), [3]) // hello の中
-  assert_eq(caret_ids(d, point(20)), [5])
+  assert_eq(ids_at(owns(d), point(1)), [2])
+  assert_eq(ids_at(owns(d), point(7)), [3])
+  assert_eq(ids_at(owns(d), point(12)), [3]) // hello の中
+  assert_eq(ids_at(owns(d), point(20)), [5])
 }
 
 ///|
 test "閉じ際は中と見なす。点が継ぎ目ちょうどなら始まる側 1 つ" {
   let d = sample()
-  assert_eq(caret_ids(d, point(5)), [3]) // r の文が閉じ、a が始まる → a
-  assert_eq(caret_ids(d, point(17)), [3]) // a の文の閉じ際。b は 18 から
-  assert_eq(caret_ids(d, point(23)), [5]) // 文書の末尾で追記中も出る
+  assert_eq(ids_at(owns(d), point(5)), [3]) // r の文が閉じ、a が始まる → a
+  assert_eq(ids_at(owns(d), point(17)), [3]) // a の文の閉じ際。b は 18 から
+  assert_eq(ids_at(owns(d), point(23)), [5]) // 文書の末尾で追記中も出る
 }
 
 ///|
 test "範囲と複数カーソルは掛かるもの全部。無ければ空" {
   let d = sample()
-  assert_eq(caret_ids(d, [{ from: 1, to: 20, }]), [2, 3, 5])
-  assert_eq(caret_ids(d, [{ from: 1, to: 1, }, { from: 20, to: 20, }]), [2, 5])
-  assert_eq(caret_ids(d, [{ from: 5, to: 6, }]), [2, 3]) // 範囲なら継ぎ目の両側
-  assert_eq(caret_ids(d, []), [])
+  assert_eq(ids_at(owns(d), [{ from: 1, to: 20, }]), [2, 3, 5])
+  assert_eq(ids_at(owns(d), [{ from: 1, to: 1, }, { from: 20, to: 20, }]), [
+    2, 5,
+  ])
+  assert_eq(ids_at(owns(d), [{ from: 5, to: 6, }]), [2, 3]) // 範囲なら継ぎ目の両側
+  assert_eq(ids_at(owns(d), []), [])
 }
 
 ///|
@@ -110,8 +112,8 @@ test "Implicit は行が無く自身の文が空なので掛からない" {
       (4, 5, Some(9), 11),
     ]),
   )
-  assert_eq(caret_ids(gap, point(7)), [4])
-  assert_eq(caret_ids(gap, point(5)), [4])
+  assert_eq(ids_at(owns(gap), point(7)), [4])
+  assert_eq(ids_at(owns(gap), point(5)), [4])
 }
 
 ///|
@@ -244,4 +246,67 @@ test "carry — 位置を写す。点も並びも基点も同じ写像で" {
     NodeAt(at=[], anchor=None),
   )
   assert_eq(carry(CardAt(at=11), shift), CardAt(at=14))
+}
+
+// ---- 二分探索の前提（#55） ----
+
+///|
+/// 位置の試験に使う見本。入れ子・項目・中身・畳み・頭を混ぜる
+let placed : Array[String] = [
+  "# r\n", "# r\n\nhello\n", "# r\n\n## a\n\n## b\n", "# r\n\n## a\n\n### x\n\n## b\n",
+  "- a\n- b\n", "- a\n  - b\n    - c\n", "# r\n\n```\nx\n```\n\n## a\n", "---\nk: v\n---\n\n# r\n\n## a\n",
+  "intro\n\n# a\n\n## b\n", "# r\n\n![](./x.webp)\n\n## a\n", "- # head\n\n  body\n",
+  "# r\n\n<details>\n<summary>s</summary>\n\n## a\n\n</details>\n",
+]
+
+///|
+/// **昇順で、重なりが無い。** `hit_at` の二分探索はこれに乗っている。
+/// 親の文は最初の子の手前で終わり、次の兄弟はその子孫の後ろから始まるので
+/// 成り立つ — 崩れたら位置がどのノードに掛かるかが狂う
+test "owns: from の昇順で、重なりが無い" {
+  let bad : Array[String] = []
+  for md in placed {
+    let all = owns(survey(md))
+    for i in 1..<all.length() {
+      let a = all[i - 1]
+      let b = all[i]
+      if b.from < a.from {
+        bad.push("\{md.escape()}: from が戻る \{a.from} → \{b.from}")
+      }
+      if b.from < a.to {
+        bad.push(
+          "\{md.escape()}: 重なる [\{a.from},\{a.to}) と [\{b.from},\{b.to})",
+        )
+      }
+    }
+  }
+  json_inspect(bad, content=[])
+}
+
+///|
+/// **二分探索は、全部を走った答えと一致する。** 走る版（`hit_at` を入れる前の
+/// 形）を試験の中に残しておき、見本の全位置で突き合わせる
+test "hit_at: 全部を走った答えと一致する" {
+  let scanned = (all : Array[Own], p : Int) => {
+    let on = all.filter(o => o.from <= p && o.to >= p)
+    let starting = on.filter(o => o.from == p)
+    if starting.length() > 0 {
+      starting.get(0)
+    } else {
+      on.get(0)
+    }
+  }
+  let bad : Array[String] = []
+  for md in placed {
+    let all = owns(survey(md))
+    for p in 0..<=md.length() {
+      // 無いときは -1（並べて読めるように）
+      let fast = hit_at(all, p).map(o => o.id).unwrap_or(-1)
+      let slow = scanned(all, p).map(o => o.id).unwrap_or(-1)
+      if fast != slow {
+        bad.push("\{md.escape()} の \{p}: 二分 \{fast} / 走査 \{slow}")
+      }
+    }
+  }
+  json_inspect(bad, content=[])
 }
