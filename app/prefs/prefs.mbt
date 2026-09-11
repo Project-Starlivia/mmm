@@ -17,6 +17,8 @@ let owned : Array[(String, String)] = [
   ("way", "mmm.exportWay"),
   // 掴みやすさ（⋯ の Easy grab）。"on" のときだけ広い
   ("grab", "mmm.grab"),
+  // 最後に居た分割線の居場所（panes.mbt が持ち主。"both" / "md" / "map"）
+  ("panes", "mmm.panes"),
 ]
 
 ///|

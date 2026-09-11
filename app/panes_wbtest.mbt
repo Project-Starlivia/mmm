@@ -58,9 +58,21 @@ test "toggled: 狭いときは、出す / 引っ込めるをどう繰り返し�
 }
 
 ///|
-test "Panes: 矢印は分割線を左右に動かし、端で沈む。名前は着く先" {
-  let w = @test_utils.create_happy_window()
-  defer w.close()
+test "show と vis_of は往復する。知らない綴りは覚えていないのと同じ" {
+  for v in [both, md_only, map_only] {
+    assert_eq(vis_of(Some(v.show())), Some(v))
+  }
+  json_inspect([both.show(), md_only.show(), map_only.show()], content=[
+    "both", "md", "map",
+  ])
+  assert_eq(vis_of(None), None)
+  assert_eq(vis_of(Some("")), None)
+  assert_eq(vis_of(Some("none")), None)
+}
+
+///|
+/// 枠を組む。覚えは毎回まっさらから
+fn stage(w : @dom.Window, show? : String) -> (Panes, @dom.Element, Ref[Int]) {
   let d = w.document()
   let body = d.body().unwrap()
   let mk = (id : String) => {
@@ -73,8 +85,45 @@ test "Panes: 矢印は分割線を左右に動かし、端で沈む。名前は�
   let map = mk("map-pane")
   let panes = mk("panes")
   let splitter = mk("splitter")
+  match show {
+    Some(x) => @prefs.store(d, "panes", x)
+    None => @web.storage_remove(d, "mmm.panes")
+  }
   let focused : Ref[Int] = { val: 0, }
-  let p = Panes::new(md, map, panes, splitter, () => focused.val += 1)
+  (Panes::new(md, map, panes, splitter, () => focused.val += 1), panes, focused)
+}
+
+///|
+test "Panes: 覚えた姿から始まる。覚えが無ければ両方" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  for show in ["md", "map", "both"] {
+    let (_, panes, _) = stage(w, show~)
+    assert_eq(panes.getAttribute("data-show"), Some(show))
+  }
+  let (_, panes, _) = stage(w)
+  assert_eq(panes.getAttribute("data-show"), Some("both"))
+}
+
+///|
+test "Panes: 人が動かした姿だけを覚える" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let d = w.document()
+  let (p, _, _) = stage(w)
+  // 組んだだけでは書かない — まだ誰も動かしていない
+  assert_eq(@prefs.load(d, "panes"), None)
+  p.toggle_vis(Md)
+  assert_eq(@prefs.load(d, "panes"), Some("map"))
+  p.slide(1)
+  assert_eq(@prefs.load(d, "panes"), Some("both"))
+}
+
+///|
+test "Panes: 矢印は分割線を左右に動かし、端で沈む。名前は着く先" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let (p, panes, _) = stage(w)
   assert_eq(panes.getAttribute("data-show"), Some("both"))
   assert_eq(p.go_left.getAttribute("aria-label"), Some("Mindmap only"))
   assert_eq(p.go_right.getAttribute("aria-label"), Some("Markdown only"))

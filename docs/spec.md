@@ -64,7 +64,7 @@ app/    MoonBit — module `mmm/app`。core に依存し、DOM を触る。試�
   shortcuts.mbt 全体のキー
   link.mbt      本文を URL に載せる / 戻す（gzip → base64url。非同期は js_async の Promise）と、
                 リンクの押す前の但し書き（純粋。画像が居るかは read に聞く）
-  prefs/        持ち物（theme / color / way / grab）。localStorage の綴りはここだけ
+  prefs/        持ち物（theme / color / way / grab / panes）。localStorage の綴りはここだけ
   bar/          帯（index.html の `#bar`）。bar(帯へ焦点を落とす — Escape の抜け先) / files(Files の並び) /
                 more(⋯ の並び) / export(書き出し — ボタンと出し方 4 通り・出し口) /
                 theme(ロゴ・アクセントカラー・ライト/ダーク・favicon) /
@@ -1017,7 +1017,10 @@ Markdown 無し   ←   両方   →   Mindmap 無し
 最中に一番使うため。`Ctrl+数字`(タブ切替) / `Ctrl+J`(ダウンロード) /
 `Ctrl+Shift+R`(再読込) はブラウザの予約で、`Ctrl+\` は JIS 配列で位置が
 変わる — 消去法で残るのが `Alt+数字`(JetBrains と同じ体系)。
-どちらを出しているかは覚えない — 起動は毎回、両方から。
+**どちらを出しているかは覚える**（`mmm.panes`。"both" / "md" / "map" の 3 つで、
+CSS へ降ろす `data-show` と同じ綴り）。書くのは人が動かしたときだけで、幅が
+境目をまたいだときの射影は覚えた姿を上書きしない — あれは環境の都合であって、
+選んだ結果ではない。覚えが無ければ両方から始まる。
 
 ### 選択の持ち主
 
@@ -1174,7 +1177,8 @@ CodeMirror は読み込んだ文書の改行を内部で LF に正規化する�
   (`#md-pane` の並び) — テーマの中で当てると、ダークでは後から重なる
   one-dark に負けて md だけ地が浮く。one-dark に任せてあるのは**コードの字の
   色**だけで、その配色は Mindmap のコードカードが持つ `--tok-*` とも揃えてある
-- localStorage に残すのは**テーマとアクセントカラーだけ**。本文の控えは持たない
+- localStorage に残すのは**見た目と手触りの好みだけ**（テーマ・アクセントカラー・
+  書き出しのやり方・掴みやすさ・分割線の居場所）。本文の控えは持たない
   — 持てばディスクの .md と二重の真実になる
 - IndexedDB に置くのは**ハンドル**(ディスクへの指し示し)だけ。中身は覗けず
   (`JSON.stringify` は `{}`)、実際のパスはブラウザの中にしか無い —
