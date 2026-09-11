@@ -109,3 +109,12 @@ pub fn bare_path(path : String) -> String {
     None => path
   }
 }
+
+///|
+fn skip_blank(md : String, from : Int, to : Int) -> Int {
+  let mut p = from
+  while p < to && (md[p] == ' ' || md[p] == '	') {
+    p = p + 1
+  }
+  p
+}
