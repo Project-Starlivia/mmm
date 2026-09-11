@@ -58,7 +58,7 @@ fn Mindmap::update_indicator(self : Mindmap) -> Unit {
   } else if sel.length() > 0 {
     @map.nearest(sel, self.camera, pane)
   } else {
-    @map.root_box(self.layout).map(b => b.rect())
+    @map.root_box(self.layout).map(b => b.rect)
   }
   self.pointed = target
   guard target is Some(r) else {
@@ -88,9 +88,9 @@ fn Mindmap::paint_drop(self : Mindmap) -> Unit {
         self.mark_drop_parent(id)
       } else {
         guard self.layout.boxes.get(id) is Some(b) else { return }
-        let y = if pos == 1 { b.y } else { b.y + b.h }
-        self.drop_line.setAttribute("x1", @web.num(b.x))
-        self.drop_line.setAttribute("x2", @web.num(b.x + b.w))
+        let y = if pos == 1 { b.rect.y } else { b.rect.y + b.rect.h }
+        self.drop_line.setAttribute("x1", @web.num(b.rect.x))
+        self.drop_line.setAttribute("x2", @web.num(b.rect.x + b.rect.w))
         self.drop_line.setAttribute("y1", @web.num(y))
         self.drop_line.setAttribute("y2", @web.num(y))
         self.drop_line.setAttribute("visibility", "visible")

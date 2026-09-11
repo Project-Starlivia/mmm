@@ -11,11 +11,6 @@ fn k(
 }
 
 ///|
-fn one(id : Int) -> Selection {
-  { ids: [id], anchor: Some(id), }
-}
-
-///|
 fn many(ids : Array[Int], anchor : Int) -> Selection {
   { ids, anchor: Some(anchor), }
 }
@@ -53,10 +48,13 @@ let empty_op : Intent = Op(
 test "Enter — 名前のあるノードなら下に兄弟を足して編集、空なら足さずに埋める" {
   let l = keys_l()
   assert_eq(
-    keyed(l, one(3), k("Enter")),
+    keyed(l, Selection::only(3), k("Enter")),
     Some(Op(op=AddNode(at=After(node=3), labels=[""]), edit=true)),
   )
-  assert_eq(keyed(l, one(4), k("Enter")), Some(Edit(id=4, seed=None)))
+  assert_eq(
+    keyed(l, Selection::only(4), k("Enter")),
+    Some(Edit(id=4, seed=None)),
+  )
   // 何も選んでいなければ拾わない
   assert_eq(keyed(l, none, k("Enter")), None)
 }
@@ -67,25 +65,25 @@ test "Enter — 名前のあるノードなら下に兄弟を足して編集、�
 test "Enter と打鍵 — Implicit は埋める側に回らない" {
   let g = keys_gap()
   assert_eq(
-    keyed(g, one(3), k("Enter")),
+    keyed(g, Selection::only(3), k("Enter")),
     Some(Op(op=AddNode(at=After(node=3), labels=[""]), edit=true)),
   )
-  assert_eq(keyed(g, one(3), k("x")), None)
+  assert_eq(keyed(g, Selection::only(3), k("x")), None)
 }
 
 ///|
 test "Shift+Enter は上に兄弟。Tab は子。Shift+Tab は親で包む。どれも編集開始" {
   let l = keys_l()
   assert_eq(
-    keyed(l, one(3), k("Enter", shift=true)),
+    keyed(l, Selection::only(3), k("Enter", shift=true)),
     Some(Op(op=AddNode(at=Before(node=3), labels=[""]), edit=true)),
   )
   assert_eq(
-    keyed(l, one(3), k("Tab")),
+    keyed(l, Selection::only(3), k("Tab")),
     Some(Op(op=AddNode(at=In(node=3, side=None), labels=[""]), edit=true)),
   )
   assert_eq(
-    keyed(l, one(3), k("Tab", shift=true)),
+    keyed(l, Selection::only(3), k("Tab", shift=true)),
     Some(Op(op=Wrap(id=3, label=""), edit=true)),
   )
 }
@@ -100,7 +98,10 @@ test "ノードが 1 つも無ければ Enter は最初の根" {
 ///|
 test "Mod+Enter は anchor の編集開始。いくつ選んでいても同じ" {
   let l = keys_l()
-  assert_eq(keyed(l, one(3), k("Enter", mod=true)), Some(Edit(id=3, seed=None)))
+  assert_eq(
+    keyed(l, Selection::only(3), k("Enter", mod=true)),
+    Some(Edit(id=3, seed=None)),
+  )
   assert_eq(
     keyed(l, many([3, 4], 4), k("Enter", mod=true)),
     Some(Edit(id=4, seed=None)),
@@ -111,14 +112,17 @@ test "Mod+Enter は anchor の編集開始。いくつ選んでいても同じ" 
 ///|
 test "空のノードで字を打てば、その字から編集。名前があれば何もしない。Space は除く" {
   let l = keys_l()
-  assert_eq(keyed(l, one(4), k("x")), Some(Edit(id=4, seed=Some("x"))))
   assert_eq(
-    keyed(l, one(4), k("X", shift=true)),
+    keyed(l, Selection::only(4), k("x")),
+    Some(Edit(id=4, seed=Some("x"))),
+  )
+  assert_eq(
+    keyed(l, Selection::only(4), k("X", shift=true)),
     Some(Edit(id=4, seed=Some("X"))),
   )
-  assert_eq(keyed(l, one(3), k("x")), None)
-  assert_eq(keyed(l, one(4), k(" ")), None)
-  assert_eq(keyed(l, one(4), k("q", mod=true)), None)
+  assert_eq(keyed(l, Selection::only(3), k("x")), None)
+  assert_eq(keyed(l, Selection::only(4), k(" ")), None)
+  assert_eq(keyed(l, Selection::only(4), k("q", mod=true)), None)
 }
 
 ///|
@@ -149,35 +153,38 @@ test "複数選んでいても宛先は anchor — 1 つ選んでいるときと
 test "矢印は select、Shift+矢印は伸ばす、Esc は解除、Mod+A は全部、Home は寄せ" {
   let l = keys_l()
   assert_eq(
-    keyed(l, one(3), k("ArrowDown")),
-    Some(Select(sel=one(4), reveal=true)),
+    keyed(l, Selection::only(3), k("ArrowDown")),
+    Some(Select(sel=Selection::only(4), reveal=true)),
   )
   assert_eq(
-    keyed(l, one(3), k("ArrowDown", shift=true)),
+    keyed(l, Selection::only(3), k("ArrowDown", shift=true)),
     Some(Select(sel=many([3, 4], 4), reveal=true)),
   )
-  assert_eq(keyed(l, one(3), k("Escape")), Some(Select(sel=none, reveal=false)))
   assert_eq(
-    keyed(l, one(3), k("a", mod=true)),
+    keyed(l, Selection::only(3), k("Escape")),
+    Some(Select(sel=none, reveal=false)),
+  )
+  assert_eq(
+    keyed(l, Selection::only(3), k("a", mod=true)),
     Some(Select(sel=many([2, 3, 4], 4), reveal=false)),
   )
-  assert_eq(keyed(l, one(3), k("Home")), Some(Center))
+  assert_eq(keyed(l, Selection::only(3), k("Home")), Some(Center))
   // 根で ← は行き先が無い → 拾わない
-  assert_eq(keyed(l, one(2), k("ArrowLeft")), None)
+  assert_eq(keyed(l, Selection::only(2), k("ArrowLeft")), None)
 }
 
 ///|
 test "拾わないキーは None（ブラウザに渡す）" {
   let l = keys_l()
-  assert_eq(keyed(l, one(3), k("F5")), None)
-  assert_eq(keyed(l, one(3), k("Enter", alt=true)), None)
+  assert_eq(keyed(l, Selection::only(3), k("F5")), None)
+  assert_eq(keyed(l, Selection::only(3), k("Enter", alt=true)), None)
 }
 
 ///|
 test "Delete は選択を消す。隣を選ぶのは core の focus" {
   let l = keys_l()
   assert_eq(
-    keyed(l, one(3), k("Delete")),
+    keyed(l, Selection::only(3), k("Delete")),
     Some(Op(op=Delete(ids=[3]), edit=false)),
   )
   assert_eq(
@@ -192,29 +199,29 @@ test "Mod+C は写す。Mod+X は写してから Delete と同じ消し方" {
   let l = keys_l()
   assert_eq(keyed(l, many([3, 4], 4), k("c", mod=true)), Some(Copy(cut=None)))
   assert_eq(
-    keyed(l, one(3), k("x", mod=true)),
+    keyed(l, Selection::only(3), k("x", mod=true)),
     Some(Copy(cut=Some(Op(op=Delete(ids=[3]), edit=false)))),
   )
   // 何も選んでいなければ拾わない（ブラウザに渡す）
   assert_eq(keyed(l, none, k("c", mod=true)), None)
   assert_eq(keyed(l, none, k("x", mod=true)), None)
   // Shift の組は別の意味に空けておく
-  assert_eq(keyed(l, one(3), k("C", mod=true, shift=true)), None)
+  assert_eq(keyed(l, Selection::only(3), k("C", mod=true, shift=true)), None)
 }
 
 ///|
 test "Alt+↑↓ は塊を前の兄弟の前 / 次の兄弟の後ろへ。端では拾わない" {
   let l = keys_l()
   assert_eq(
-    keyed(l, one(4), k("ArrowUp", alt=true)),
+    keyed(l, Selection::only(4), k("ArrowUp", alt=true)),
     Some(Op(op=MoveNode(ids=[4], at=Before(node=3)), edit=false)),
   )
   assert_eq(
-    keyed(l, one(3), k("ArrowDown", alt=true)),
+    keyed(l, Selection::only(3), k("ArrowDown", alt=true)),
     Some(Op(op=MoveNode(ids=[3], at=After(node=4)), edit=false)),
   )
-  assert_eq(keyed(l, one(3), k("ArrowUp", alt=true)), None)
-  assert_eq(keyed(l, one(4), k("ArrowDown", alt=true)), None)
+  assert_eq(keyed(l, Selection::only(3), k("ArrowUp", alt=true)), None)
+  assert_eq(keyed(l, Selection::only(4), k("ArrowDown", alt=true)), None)
 }
 
 ///|
@@ -264,31 +271,37 @@ test "Shift+F は畳む → 開く → 外す、を巡る。Implicit も畳む�
     size,
   )
   assert_eq(
-    keyed(f, one(2), k("F", shift=true)),
+    keyed(f, Selection::only(2), k("F", shift=true)),
     Some(Op(op=Fold(id=2, open=false), edit=false)),
   )
   assert_eq(
-    keyed(f, one(3), k("F", shift=true)),
+    keyed(f, Selection::only(3), k("F", shift=true)),
     Some(Op(op=Fold(id=3, open=true), edit=false)),
   )
   assert_eq(
-    keyed(f, one(6), k("F", shift=true)),
+    keyed(f, Selection::only(6), k("F", shift=true)),
     Some(Op(op=Unfold(id=6), edit=false)),
   )
   assert_eq(
-    keyed(f, one(4), k("F", shift=true)),
+    keyed(f, Selection::only(4), k("F", shift=true)),
     Some(Op(op=Fold(id=4, open=false), edit=false)),
   )
   assert_eq(keyed(f, none, k("F", shift=true)), None)
-  assert_eq(keyed(f, one(2), k("H", shift=true)), None)
+  assert_eq(keyed(f, Selection::only(2), k("H", shift=true)), None)
 }
 
 ///|
 test "Shift+L / Shift+C / Shift+D は 1 つ選んでいるときだけ拾う" {
   let l = keys_l()
-  assert_eq(keyed(l, one(3), k("L", shift=true)), Some(AddLink(id=3)))
-  assert_eq(keyed(l, one(3), k("C", shift=true)), Some(AddCode(id=3)))
-  assert_eq(keyed(l, one(3), k("D", shift=true)), Some(Draw(id=3)))
+  assert_eq(
+    keyed(l, Selection::only(3), k("L", shift=true)),
+    Some(AddLink(id=3)),
+  )
+  assert_eq(
+    keyed(l, Selection::only(3), k("C", shift=true)),
+    Some(AddCode(id=3)),
+  )
+  assert_eq(keyed(l, Selection::only(3), k("D", shift=true)), Some(Draw(id=3)))
   assert_eq(keyed(l, many([3, 4], 4), k("L", shift=true)), None)
   assert_eq(keyed(l, none, k("L", shift=true)), None)
 }
@@ -296,12 +309,12 @@ test "Shift+L / Shift+C / Shift+D は 1 つ選んでいるときだけ拾う" {
 ///|
 test "Mod+V は貼り付け。anchor が無くても拾う" {
   let l = keys_l()
-  assert_eq(keyed(l, one(3), k("v", mod=true)), Some(Paste))
+  assert_eq(keyed(l, Selection::only(3), k("v", mod=true)), Some(Paste))
   assert_eq(keyed(l, none, k("v", mod=true)), Some(Paste))
   // 大文字でも同じ（key 自体は大文字で来ることがある）
   assert_eq(keyed(l, none, k("V", mod=true)), Some(Paste))
   // Shift+Mod+V は別の意味に空けておく（貼り付けとして拾わない）
-  assert_eq(keyed(l, one(3), k("v", mod=true, shift=true)), None)
+  assert_eq(keyed(l, Selection::only(3), k("v", mod=true, shift=true)), None)
 }
 
 // ---- keyed_card — カードを選んでいるときの表 ----
@@ -342,15 +355,16 @@ test "keyed_card: Delete / Backspace はそのカードを消す（持ち主を�
 }
 
 ///|
-test "keyed_card: ↑↓ は隣のカードを選ぶ。端では拾わない。← は持ち主のノード" {
+test "keyed_card: ↑↓ は隣のカードを選ぶ。端では拾うが動かない。← は持ち主のノード" {
   let c = keys_c()
   assert_eq(keyed_card(c, 3, k("ArrowDown")), Some(Pick(id=Some(5))))
+  // 端は Stop — 次の行へ落とさない（#244）。`keyed` と同じく、Stop は None で表に出る
   assert_eq(keyed_card(c, 5, k("ArrowDown")), None)
   assert_eq(keyed_card(c, 5, k("ArrowUp")), Some(Pick(id=Some(3))))
   assert_eq(keyed_card(c, 3, k("ArrowUp")), None)
   assert_eq(
     keyed_card(c, 3, k("ArrowLeft")),
-    Some(Select(sel=one(2), reveal=false)),
+    Some(Select(sel=Selection::only(2), reveal=false)),
   )
 }
 
@@ -388,9 +402,6 @@ test "keyed_card: Mod+Enter はその場編集。Escape は外す。Mod+C / Mod+
 /// **Escape は 1 段ずつ外へ。** 選んでいれば解き、解くものが無ければ帯へ抜ける。
 /// ペインは Tab を飲む（子を足す・字下げ）ので、キーボードだけで帯へ戻る道はこれ 1 つ
 test "Escape は選択を解き、解くものが無ければ帯へ抜ける" {
-  let l = keys_l()
-  assert_eq(keyed(l, one(3), k("Escape")), Some(Select(sel=none, reveal=false)))
-  assert_eq(keyed(l, none, k("Escape")), Some(Leave))
-  // カードを選んでいれば、まず外す（その次の Escape で抜ける）
-  assert_eq(keyed_card(keys_c(), 3, k("Escape")), Some(Pick(id=None)))
+  // 選んでいるときの Escape と、カードの Escape は上の表が当てている
+  assert_eq(keyed(keys_l(), none, k("Escape")), Some(Leave))
 }

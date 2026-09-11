@@ -187,7 +187,7 @@ fn LabelField::write(self : LabelField) -> Unit {
 fn card_rect_of(l : @map.Layout, block : Int) -> @map.Rect? {
   guard @map.owner_of(l, block) is Some((b, i)) else { return None }
   guard @map.card_rect(b, i) is Some(r) else { return None }
-  Some({ x: b.x + r.x, y: b.y + r.y, w: r.w, h: r.h, })
+  Some({ x: b.rect.x + r.x, y: b.rect.y + r.y, w: r.w, h: r.h, })
 }
 
 ///|
@@ -309,7 +309,7 @@ fn CardField::place(
     .split("\n")
     .map(x => x.to_owned())
     .collect()
-  let font : @map.Font = { px: @map.card_font_px.to_int(), mono: true, }
+  let font = @map.mono_font
   let mut widest = 0.0
   for line in lines {
     widest = @cmp.maximum(widest, (self.measure)(font, line))

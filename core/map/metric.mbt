@@ -6,9 +6,8 @@
 //   1. レイアウト（node_size が箱の大きさを決める）
 //   2. SVG の描画（text 要素の font-size と x）
 //   3. 編集用の <input> オーバーレイ（app/mindmap/field.mbt。寸法は place.mbt が数える）
-// 以前はこれが 3 箇所に散っていて、通常ノードは 13px/12、畳んだノードは
-// 計測 10px・CSS 11px・input 13px と食い違い、折り畳んだノードを編集すると
-// 文字がずれていた。font-size は CSS ではなく属性で入れて、CSS 側に同じ数字を持たせない。
+// 1 つでも別の数字を持つと、編集に入った瞬間に文字がずれる。font-size は CSS ではなく
+// 属性で入れて、CSS 側に同じ数字を持たせない。
 
 ///|
 /// 字。大きさは core が決め、綴り（family）は ts が CSS の `--font` / `--mono` から読む
@@ -89,6 +88,14 @@ pub let code_line = 15.0
 pub let code_pad = 8.0
 
 ///|
+/// コード行の字の後ろに残す幅。右の縁に貼り付かせない
+let code_tail = 12.0
+
+///|
+/// リンク行の題の後ろに残す幅。開く印 ↗ がここに立つ
+let link_tail = 22.0
+
+///|
 /// 装飾の水平線の行の高さ
 let rule_row = 12.0
 
@@ -128,13 +135,13 @@ fn row_h(c : Kind) -> Double {
 
 ///|
 /// カード 1 枚の、行の枠から中身までの上下の余白。描くのも書き出すのも
-/// 同じ場所を指さないと 2px ずれる — 実際にずれた。数字を 2 か所に置かないための唯一の定義
+/// 同じ場所を指す唯一の定義 — 別の数字を持てば 2px ずれる
 fn card_inset(c : Kind) -> Double {
   match c {
-    Code(..) => 5
-    Link(..) | Details(..) => 4
-    Break => 2
-    Image(..) | Svg(..) => 6
+    Code(..) => 5.0
+    Link(..) | Details(..) => 4.0
+    Break => 2.0
+    Image(..) | Svg(..) => 6.0
   }
 }
 
@@ -143,8 +150,8 @@ fn card_inset(c : Kind) -> Double {
 /// 縁近くまで塗るので、その分だけ広い
 fn card_bleed(c : Kind) -> Double {
   match c {
-    Code(..) => 5
-    _ => 0
+    Code(..) => 5.0
+    _ => 0.0
   }
 }
 
@@ -158,7 +165,8 @@ pub fn label_font(row : Row) -> Font {
 let card_font : Font = { px: 12, mono: false, }
 
 ///|
-let mono_font : Font = { px: 11, mono: true, }
+/// コードの字。カードの入力欄も同じ字で打つ
+pub let mono_font : Font = { px: 11, mono: true, }
 
 ///|
 /// 畳んだノードに出す字。**`<summary>` > ラベル**（spec「畳み」の表示名の規則。
@@ -270,7 +278,7 @@ pub fn hidden_label(n : @tree.Node, buried : Int, measure : Measure) -> String {
 /// 箱の上から数えて、i 枚目のカードの上端はどこか。カードはラベル行の下に
 /// 積むので、i = 枚数なら積み終わり = 箱の高さそのものになる。
 /// 「行 i は縦のどこか」を数えるのはここだけ — 描画も当たり判定も落とし先も
-/// 同じ積み方を見る（散らばっていた頃、余白が 2px ずれた）
+/// 同じ積み方を見る（別々に数えれば余白が 2px ずれる）
 pub fn row_top(cards : Array[Card], i : Int) -> Double {
   let mut y = normal.h
   for k in 0..<i {
@@ -306,7 +314,7 @@ pub fn node_size(measure : Measure) -> SizeOf {
         Image(..) | Svg(..) => w = @cmp.maximum(w, img_min_w)
         Code(lines~, ..) =>
           for ln in lines {
-            w = @cmp.maximum(w, measure(mono_font, ln) + 12.0)
+            w = @cmp.maximum(w, measure(mono_font, ln) + code_tail)
           }
         Details(open~, summary~, lines~) => {
           let name = match summary {
@@ -321,7 +329,7 @@ pub fn node_size(measure : Measure) -> SizeOf {
           }
         }
         Link(title~, ..) =>
-          w = @cmp.maximum(w, measure(card_font, title) + 22.0)
+          w = @cmp.maximum(w, measure(card_font, title) + link_tail)
         Break => ()
       }
     }

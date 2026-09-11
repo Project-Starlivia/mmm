@@ -13,23 +13,12 @@ pub(all) struct Indicator {
 
 ///|
 /// 縁からの余白(px)。角ぎりぎりに張り付かせない
-let indicator_margin = 20.0
-
-///|
-fn to_screen(b : Rect, cam : Camera) -> Rect {
-  {
-    x: b.x * cam.k + cam.tx,
-    y: b.y * cam.k + cam.ty,
-    w: b.w * cam.k,
-    h: b.h * cam.k,
-  }
-}
+let margin = 20.0
 
 ///|
 /// その箱がペインに少しでも重なっているか
 fn is_visible(b : Rect, cam : Camera, pane : Pane) -> Bool {
-  let s = to_screen(b, cam)
-  s.x < pane.width && s.x + s.w > 0.0 && s.y < pane.height && s.y + s.h > 0.0
+  cam.to_screen(b).overlaps({ x: 0, y: 0, w: pane.width, h: pane.height, })
 }
 
 ///|
@@ -52,9 +41,9 @@ pub fn nearest(boxes : Array[Rect], cam : Camera, pane : Pane) -> Rect? {
   let mut best : Rect? = None
   let mut least = @double.infinity
   for b in boxes {
-    let s = to_screen(b, cam)
-    let dx = s.x + s.w / 2.0 - cx
-    let dy = s.y + s.h / 2.0 - cy
+    let c = cam.to_screen(b).center()
+    let dx = c.x - cx
+    let dy = c.y - cy
     let d = dx * dx + dy * dy
     if d < least {
       least = d
@@ -66,15 +55,15 @@ pub fn nearest(boxes : Array[Rect], cam : Camera, pane : Pane) -> Rect? {
 
 ///|
 /// 対象を指す針の画面位置と向き。ペイン中心から対象への直線が、
-/// 縁の内側（`indicator_margin`）と交わる点に置く
+/// 縁の内側（`margin`）と交わる点に置く
 pub fn indicator_for(target : Rect, cam : Camera, pane : Pane) -> Indicator {
-  let s = to_screen(target, cam)
+  let c = cam.to_screen(target).center()
   let cx = pane.width / 2.0
   let cy = pane.height / 2.0
-  let dx = s.x + s.w / 2.0 - cx
-  let dy = s.y + s.h / 2.0 - cy
-  let hw = @cmp.maximum(1.0, cx - indicator_margin)
-  let hh = @cmp.maximum(1.0, cy - indicator_margin)
+  let dx = c.x - cx
+  let dy = c.y - cy
+  let hw = @cmp.maximum(1.0, cx - margin)
+  let hh = @cmp.maximum(1.0, cy - margin)
   let scale = if dx == 0.0 && dy == 0.0 {
     0.0
   } else {
