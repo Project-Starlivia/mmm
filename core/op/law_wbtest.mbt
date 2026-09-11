@@ -49,7 +49,7 @@ fn ids(doc : @tree.Doc) -> Array[Int] {
 
 ///|
 /// id の部分木（または中身）の、id を消した姿。focus が同じものを指すかを見る。
-fn bare(doc : @tree.Doc, id : Int) -> Json? {
+fn shape_of(doc : @tree.Doc, id : Int) -> Json? {
   let found : Ref[Json?] = { val: None, }
   fn blocks(bs : Array[@tree.Block]) {
     for b in bs {
@@ -102,49 +102,61 @@ fn strip(x : @tree.Node) -> Json {
 }
 
 ///|
+/// ノードの席、構築子ぜんぶ。side は Some も None も
+fn node_seats(to : Int) -> Array[NodePlace] {
+  [
+    Before(node=to),
+    After(node=to),
+    In(node=to, side=Some(Left)),
+    In(node=to, side=None),
+  ]
+}
+
+///|
+/// 中身の席、構築子ぜんぶ
+fn block_seats(to : Int) -> Array[BlockPlace] {
+  [Before(block=to), After(block=to), In(node=to)]
+}
+
+///|
+/// 全 id × Op の作り方 × 席の構築子。席の相手は全 id と文書（doc_id）
 fn ops_for(all : Array[Int]) -> Array[Op] {
   let ops : Array[Op] = []
+  let seats = [..all, @tree.doc_id]
   for id in all {
     ops.push(Rename(id~, label="z"))
     // 書けば別の形に読まれる名前。形の食い違いに触れるのはこの 1 つだけ
     ops.push(Rename(id~, label="---"))
     ops.push(Fold(id~, open=false))
+    ops.push(Fold(id~, open=true))
     ops.push(Unfold(id~))
     ops.push(Delete(ids=[id]))
     ops.push(Wrap(id~, label="w"))
     ops.push(FlipSide(id~))
     ops.push(SetBlock(id~, content=Some(ThematicBreak), source=None))
-    for to in all {
-      ops.push(MoveNode(ids=[id], at=Before(node=to)))
-      ops.push(MoveNode(ids=[id], at=After(node=to)))
-      ops.push(MoveNode(ids=[id], at=NodePlace::In(node=to, side=Some(Left))))
-      ops.push(MoveBlock(ids=[id], at=Before(block=to)))
-      ops.push(MoveBlock(ids=[id], at=BlockPlace::In(node=to)))
-      ops.push(AddNode(at=After(node=to), labels=["n"]))
-      ops.push(
-        AddBlock(
-          at=BlockPlace::In(node=to),
-          content=Some(ThematicBreak),
-          source=None,
-        ),
-      )
-      ops.push(Graft(at=NodePlace::In(node=to, side=None), md="# g\n\n- i\n"))
-      ops.push(Graft(at=NodePlace::In(node=to, side=None), md="- i\n  - j\n"))
-      ops.push(Graft(at=After(node=to), md="![](q.png)\n\ntext\n"))
+    for to in seats {
+      for at in node_seats(to) {
+        ops.push(MoveNode(ids=[id], at~))
+      }
+      for at in block_seats(to) {
+        ops.push(MoveBlock(ids=[id], at~))
+      }
     }
   }
-  ops.push(
-    AddNode(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["n"]),
-  )
-  ops.push(
-    AddBlock(
-      at=BlockPlace::In(node=@tree.doc_id),
-      content=Some(ThematicBreak),
-      source=None,
-    ),
-  )
-  ops.push(Graft(at=NodePlace::In(node=@tree.doc_id, side=None), md="- i\n"))
-  ops.push(Graft(at=NodePlace::In(node=@tree.doc_id, side=None), md="text\n"))
+  for to in seats {
+    for at in node_seats(to) {
+      ops.push(AddNode(at~, labels=["n"]))
+      for
+        md in [
+          "# g\n\n- i\n", "- i\n  - j\n", "- i\n", "![](q.png)\n\ntext\n", "text\n",
+        ] {
+        ops.push(Graft(at~, md~))
+      }
+    }
+    for at in block_seats(to) {
+      ops.push(AddBlock(at~, content=Some(ThematicBreak), source=None))
+    }
+  }
   ops
 }
 
@@ -174,7 +186,7 @@ test "法則 — 形が一致すれば focus は同じ部分木を指し、一�
           match (done.focus, r.focus) {
             (None, None) => ()
             (Some(f), Some(g)) =>
-              if bare(done.doc, f) != bare(after, g) {
+              if shape_of(done.doc, f) != shape_of(after, g) {
                 bad.push(
                   "\{what}: focus \{f} → \{g} が別のものを指す",
                 )
@@ -191,35 +203,9 @@ test "法則 — 形が一致すれば focus は同じ部分木を指し、一�
   }
   json_inspect(bad, content=[])
   // 全部 None に潰れる退化を落とすための下限チェック
-  inspect(some, content="1705")
+  inspect(some, content="2194")
   // md が形を決めた回数。0 なら法則の 2 つ目の道が死んでいる
-  inspect(decided, content="100")
-}
-
-///|
-/// その中身の持ち主。ノードの id なら None
-fn owner_of(doc : @tree.Doc, block : Int) -> Int? {
-  let found : Ref[Int?] = { val: None, }
-  fn blocks(owner : Int, bs : Array[@tree.Block]) {
-    for b in bs {
-      if b.id == block {
-        found.val = Some(owner)
-      }
-    }
-  }
-
-  fn node(x : @tree.Node) {
-    blocks(x.id, x.body)
-    for k in x.children {
-      node(k)
-    }
-  }
-
-  blocks(@tree.doc_id, doc.body)
-  for r in doc.roots {
-    node(r.node)
-  }
-  found.val
+  inspect(decided, content="41")
 }
 
 ///|
@@ -248,38 +234,6 @@ fn under_fold(doc : @tree.Doc, id : Int) -> Bool {
 }
 
 ///|
-/// ノードの親の id。根なら doc_id。中身と知らない id は None
-fn parent_of(doc : @tree.Doc, id : Int) -> Int? {
-  let found : Ref[Int?] = { val: None, }
-  fn node(x : @tree.Node, above : Int) {
-    if x.id == id {
-      found.val = Some(above)
-    }
-    for k in x.children {
-      node(k, x.id)
-    }
-  }
-
-  for r in doc.roots {
-    node(r.node, @tree.doc_id)
-  }
-  found.val
-}
-
-///|
-/// f が id の祖先か（親も含む。doc_id は祖先に数えない）
-fn is_ancestor(doc : @tree.Doc, f : Int, id : Int) -> Bool {
-  let mut cur = parent_of(doc, id)
-  while cur is Some(p) && p != @tree.doc_id {
-    if p == f {
-      return true
-    }
-    cur = parent_of(doc, p)
-  }
-  false
-}
-
-///|
 test "法則 — Delete の focus は消えていない兄弟か祖先（中身なら持ち主）で、畳みの中に埋もれていない" {
   let bad : Array[String] = []
   let mut n = 0
@@ -288,11 +242,11 @@ test "法則 — Delete の focus は消えていない兄弟か祖先（中身�
     for id in ids(before) {
       guard apply(before, Delete(ids=[id])) is Some(done) else { continue }
       let what = "\{i} Delete \{id}"
-      let block_owner = owner_of(before, id)
+      let block_owner = owner(before, block=id)
       match done.focus {
         None => {
           let sole_root = before.roots.length() == 1 &&
-            parent_of(before, id) == Some(@tree.doc_id)
+            parent(before, id) == Some(@tree.doc_id)
           if !sole_root && block_owner != Some(@tree.doc_id) {
             bad.push("\{what}: focus が無い")
           }
@@ -304,17 +258,17 @@ test "法則 — Delete の focus は消えていない兄弟か祖先（中身�
             continue
           }
           let near = match block_owner {
-            Some(o) => o == f || is_ancestor(before, f, o)
+            Some(o) => o == f || ancestors(before, o).contains(f)
             None =>
-              parent_of(before, f) == parent_of(before, id) ||
-              is_ancestor(before, f, id)
+              parent(before, f) == parent(before, id) ||
+              ancestors(before, id).contains(f)
           }
           if !near {
             bad.push("\{what}: focus \{f} は兄弟でも祖先でもない")
           }
           // under_fold は自分自身も数えるので、親に聞けば「埋もれている」だけが出る
           // （focus 自身が畳まれているのは埋もれていない）
-          match parent_of(done.doc, f) {
+          match parent(done.doc, f) {
             Some(p) if p != @tree.doc_id && under_fold(done.doc, p) =>
               bad.push("\{what}: focus \{f} は埋もれている")
             _ => ()
@@ -372,7 +326,7 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   }
   json_inspect(bad, content=[])
   // 網の広さ。corpus か ops_for を触れば動く
-  inspect(n, content="1663")
+  inspect(n, content="2109")
 }
 
 ///|

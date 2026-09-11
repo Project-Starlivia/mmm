@@ -43,7 +43,7 @@ fn reading(doc : @tree.Doc, spots : Map[Int, @tree.Spot]) -> Survey {
 
 ///|
 /// "# r\n\n## a\n\nhello\n\n## b\n"
-fn doc() -> Survey {
+fn sample() -> Survey {
   reading(
     tree([node(2, "r", children=[node(3, "a"), node(5, "b")])]),
     spots([
@@ -72,7 +72,7 @@ fn nodes(ids : Array[Int], anchor : Int?) -> Choice {
 
 ///|
 test "最も深いノードだけ。自身の文は地番の頭から最初の子の頭まで" {
-  let d = doc()
+  let d = sample()
   assert_eq(caret_ids(d, point(1)), [2])
   assert_eq(caret_ids(d, point(7)), [3])
   assert_eq(caret_ids(d, point(12)), [3]) // hello の中
@@ -81,7 +81,7 @@ test "最も深いノードだけ。自身の文は地番の頭から最初の�
 
 ///|
 test "閉じ際は中と見なす。点が継ぎ目ちょうどなら始まる側 1 つ" {
-  let d = doc()
+  let d = sample()
   assert_eq(caret_ids(d, point(5)), [3]) // r の文が閉じ、a が始まる → a
   assert_eq(caret_ids(d, point(17)), [3]) // a の文の閉じ際。b は 18 から
   assert_eq(caret_ids(d, point(23)), [5]) // 文書の末尾で追記中も出る
@@ -89,7 +89,7 @@ test "閉じ際は中と見なす。点が継ぎ目ちょうどなら始まる�
 
 ///|
 test "範囲と複数カーソルは掛かるもの全部。無ければ空" {
-  let d = doc()
+  let d = sample()
   assert_eq(caret_ids(d, [{ from: 1, to: 20, }]), [2, 3, 5])
   assert_eq(caret_ids(d, [{ from: 1, to: 1, }, { from: 20, to: 20, }]), [2, 5])
   assert_eq(caret_ids(d, [{ from: 5, to: 6, }]), [2, 3]) // 範囲なら継ぎ目の両側
@@ -142,12 +142,12 @@ fn hidden() -> Survey {
 ///|
 test "buried — 畳まれたノードの子孫。畳まれたノード自身は入らない" {
   assert_eq(buried(hidden().doc).iter().collect(), [4])
-  assert_eq(buried(doc().doc).length(), 0)
+  assert_eq(buried(sample().doc).length(), 0)
 }
 
 ///|
-test "derive — md が持つ間はカーソルから。anchor は主カーソルの頭のノード" {
-  let d = doc()
+test "md が持つ間は選択はカーソルから。anchor は主カーソルの頭のノード" {
+  let d = sample()
   assert_eq(chosen(d, Md, caret(12), None), nodes([3], Some(3)))
   assert_eq(chosen(d, Md, caret(1, to=20), None), nodes([2, 3, 5], Some(5)))
   // anchors が在っても見ない
@@ -160,8 +160,8 @@ test "derive — md が持つ間はカーソルから。anchor は主カーソ�
 }
 
 ///|
-test "derive — 地図が持つ間は位置から。点はラベルの頭、カードは中身の頭" {
-  let d = doc()
+test "地図が持つ間は選択は位置から。点はラベルの頭、カードは中身の頭" {
+  let d = sample()
   assert_eq(
     chosen(d, Map, caret(1), Some(NodeAt(at=[8, 21], anchor=Some(21)))),
     nodes([3, 5], Some(5)),

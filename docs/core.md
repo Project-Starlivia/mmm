@@ -387,7 +387,8 @@ design.md「状態と拍」）。打鍵ごとの core 呼び出しは `mmmSurvey
 ## 操作
 
 `op/` が `apply(doc, op) -> Done?` で Doc を Doc にする。md も CodeMirror も知らない
-純粋な関数で、`None` は「できない操作」。表に出るのはこれと型だけ。
+純粋な関数で、`None` は「できない操作」。表に出るのは境界の `edit`（下記）と型だけで、
+`apply` は package の中に居る。
 
 ```
 NodePlace  = Before(node~)  | After(node~)  | In(node~, side: Side?)   // ノードの席。子の列
@@ -539,8 +540,8 @@ docs/superpowers/specs/2026-09-06-map-core-design.md）。CodeMirror が DOM を
   落とされたファイルの振り分け（`drop.mbt`。ドラッグ中は種類だけで受ける / 断るを言い、`.md` は開き、
   画像はノードの上だけ）。札（`FileHandle` / `DirHandle`）は `#external` の持ち手で、
   中は覗かない。**置き場に入れる行は素の object に組み直す** — MoonBit の Option は JS の値ではない
-- **web/** — DOM の小さな道具。js_browser に型の無い呼び出しを 1 行ずつ包み、他の package は
-  `_get` / `_call` を書かない。結び付けの無い API（File System Access・IndexedDB・canvas の 2d・
+- **web/** — DOM の小さな道具。js_browser に型の無い呼び出しを 1 行ずつ包み、web と js 以外の
+  package は `_get` / `_call` を書かない（js は出口で、JS の値に組む側）。結び付けの無い API（File System Access・IndexedDB・canvas の 2d・
   直列化・ラスタ化・クリップボード・ドラッグ）は `extern "js"` の 1 行で、Promise は js_async の型
 - **app/** — 帯と枠。持ち物（`prefs/prefs.mbt`。localStorage の綴りはここだけで、外は名前で言う）、
   ペインの出し分けと分割線（`panes.mbt`。居場所の算術は純粋で、試験は数だけ）、全体のキー、

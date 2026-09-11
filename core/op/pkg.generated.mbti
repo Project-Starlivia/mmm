@@ -8,8 +8,6 @@ import {
 }
 
 // Values
-pub fn apply(@tree.Doc, Op) -> Done?
-
 pub fn edit(String, Op) -> Edited
 
 // Errors

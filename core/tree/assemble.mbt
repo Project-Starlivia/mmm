@@ -103,14 +103,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
       None => ()
       Some(Border(rule~)) => l.rule = rule
       Some(FoldOpen(..)) => l.opening = true
-      Some(FoldClose) =>
-        match l.fold_roots.pop() {
-          Some(root) =>
-            while l.stack.length() >= root && !l.stack.is_empty() {
-              ignore(l.stack.unsafe_pop())
-            }
-          None => ()
-        }
+      Some(FoldClose) => shut(l.stack, l.fold_roots)
       Some(Card(content~, source~)) => {
         let block : Block = { id: 0, content, source, }
         let at : Spot = { from: p.at.from, label: None, to: p.at.to, }
@@ -126,7 +119,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
           f.body_at.push(at)
         }
       }
-      Some(Line(depth~, under~, label~, mark~, text~, fold~, at~)) => {
+      Some(Line(depth~, under~, label~, at_label~, mark~, fold~, at~)) => {
         // 新しい木は側を持たない。**保留の綴りはもう中身に落ちている**
         // （裁定の側の `spill` が `Card` として出しているので、ここでは捨てるだけ）
         if depth == 1 {
@@ -156,7 +149,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
         let (side, rule) = l.born()
         l.seat({
           mark,
-          label: text,
+          label,
           fold,
           body: [],
           kids: [],
@@ -164,7 +157,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
           rule,
           from: at.from,
           to: at.to,
-          at_label: label,
+          at_label,
           body_at: [],
         })
         if l.opening {
@@ -175,7 +168,8 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
     }
   }
   let spans : Map[Int, Spot] = Map([])
-  let next = { val: doc_id + 1, }
+  // 番号を配る箱。木を歩きながら文書順に振る
+  let next : Ref[Int] = { val: doc_id + 1, }
   let from = match n.frontmatter {
     Some(f) => f.span.to
     None => 0
@@ -204,7 +198,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
 
 ///|
 /// 森の 1 本を根にする。子の側と境界の綴りは積むときに決まっている。
-fn to_root(f : Frame, next : Counter, spans : Map[Int, Spot]) -> Root {
+fn to_root(f : Frame, next : Ref[Int], spans : Map[Int, Spot]) -> Root {
   {
     node: to_node(f, next, spans),
     sides: f.kids.map(k => k.side),
@@ -216,7 +210,7 @@ fn to_root(f : Frame, next : Counter, spans : Map[Int, Spot]) -> Root {
 /// 枠をノードにし、番号と地番を配る。綴りはそのまま運ぶ。
 /// **番号は文書順**（自分 → 中身 → 子）なので行きがけに振り、**地番は子が
 /// 揃ってからでないと決まらない**ので帰りがけに置く。
-fn to_node(f : Frame, next : Counter, spans : Map[Int, Spot]) -> Node {
+fn to_node(f : Frame, next : Ref[Int], spans : Map[Int, Spot]) -> Node {
   let id = next.val
   next.val = id + 1
   // 中身は子より前に書かれているので、先に振る
@@ -227,6 +221,16 @@ fn to_node(f : Frame, next : Counter, spans : Map[Int, Spot]) -> Node {
   let children = f.kids.map(k => to_node(k, next, spans))
   spans[id] = frame_at(f, children, spans)
   { id, label: f.label, fold: f.fold, body: f.body, children, mark: f.mark, }
+}
+
+///|
+/// 中身へ、ノードと同じ列で文書順の番号を振る。読み解かなかったものにも
+/// 振るので、View が Raw を落としても残りの番号は動かない。
+fn number_blocks(body : Array[Block], next : Ref[Int]) -> Unit {
+  for i, x in body {
+    body[i] = { id: next.val, content: x.content, source: x.source, }
+    next.val = next.val + 1
+  }
 }
 
 ///|

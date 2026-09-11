@@ -53,12 +53,6 @@ pub fn spans_sig(md : String) -> String {
 pub let doc_id : Int = 1
 
 ///|
-/// 番号を配る箱。木を歩きながら文書順に振る。
-priv struct Counter {
-  mut val : Int
-}
-
-///|
 /// id のノード・中身が、文書順に振り直されたら得る番号。読みと同じ振り方
 /// （文書の中身 → 根ごとに ノード → その中身 → 子）なので、木を書き戻して
 /// 読み直したときの id を先に言える。操作の後の focus を読み替えるのに使う。
@@ -67,7 +61,7 @@ pub fn number(doc : Doc, id : Int) -> Int? {
   if id == doc_id {
     return Some(doc_id)
   }
-  let next = { val: doc_id + 1, }
+  let next : Ref[Int] = { val: doc_id + 1, }
   fn blocks(body : Array[Block]) -> Int? {
     for b in body {
       if b.id == id {
@@ -107,14 +101,4 @@ pub fn number(doc : Doc, id : Int) -> Int? {
     }
   }
   None
-}
-
-///|
-/// 中身へ、ノードと同じ列で文書順の番号を振る。読み解かなかったものにも
-/// 振るので、View が Raw を落としても残りの番号は動かない。
-fn number_blocks(body : Array[Block], next : Counter) -> Unit {
-  for i, x in body {
-    body[i] = { id: next.val, content: x.content, source: x.source, }
-    next.val = next.val + 1
-  }
 }

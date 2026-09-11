@@ -133,36 +133,3 @@ export function tokenizeBlock(text: string): Token[][] {
   const inner = body.length > 0 ? tokenize(body, open.info) : [];
   return [plain(lines[0]), ...inner, ...(closed ? [plain(lines[last])] : [])];
 }
-
-/**
- * 囲い（開き・閉じのバッククォート）が壊れる編集か。
- * **言語名は守らない** — そこはフェンスの一部だが、直せることがその場で
- * 編集する理由の半分なので、意図して開けてある。
- *
- * 挿入と削除で守る形が違う。削除は「閉じの手前の改行」まで含めないと
- * 閉じが前の行にくっつくが、挿入で同じ範囲を塞ぐと、**本文の最終行の
- * 末尾に打てなくなる**（その位置は改行の直前と同じ番号になる）。
- */
-export function touchesFence(text: string, from: number, to: number): boolean {
-  const lines = text.split("\n");
-  const open = fenceOpen(lines[0] ?? "");
-  if (!open) return false;
-  const openEnd = lines[0].indexOf(open.marker) + open.marker.length;
-  // 閉じの開始位置。閉じていなければ -1（`tail` を後から取り直すと
-  // `null` でないことを言い直すはめになるので、ここで畳む）
-  const tail = lines.length > 1 ? lines[lines.length - 1] : null;
-  const closeStart =
-    tail !== null && closesFence(tail, open.marker)
-      ? text.length - tail.length
-      : -1;
-  const closed = closeStart !== -1;
-  if (from === to) {
-    // 挿入。囲いの中へ割り込むか、開きより前へ押し出すものだけ止める
-    if (from < openEnd) return true;
-    return closed && from >= closeStart;
-  }
-  // 削除・置換。閉じは手前の改行ごと守る
-  const spans: [number, number][] = [[0, openEnd]];
-  if (closed) spans.push([closeStart - 1, text.length]);
-  return spans.some(([a, b]) => from < b && to > a);
-}
