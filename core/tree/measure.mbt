@@ -12,7 +12,7 @@
 ///
 /// インラインの span は**中身に対する 0 始まりの相対**なので、原文の
 /// どこから中身が始まるかは自分で数える。実測（`# a` / `#   a` / `# a #` /
-/// setext）は probe_wbtest.mbt に固定してある。
+/// setext）は md_wbtest.mbt に固定してある。
 fn head_label(
   md : String,
   span : @markdown.Span,

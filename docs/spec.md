@@ -126,8 +126,8 @@ docs/   記録 — spec.md はこのファイル、core.md は文書モデルの
         origin.md は最初の企画メモ、freedom.md は「自由な Mindmap」との
         線引き（絵と画像の置き場所がそこから決まる）、pictures.md は地図が
         見せるものの線引き（単語と絵。md の何を絵と見て、散文をなぜ出さないか）、
-        superpowers/ は段ごとの設計（specs/）と計画（plans/）の日付付きの記録
-        （コードのコメントが「決めは …」と指す先）
+        superpowers/ は段ごとの設計（specs/。コードのコメントが「決めは …」と指す先）と
+        計画（plans/）の日付付きの記録
 ai-docs/ 実測の控え — moonbit.md は MoonBit の癖、codemirror.md は CodeMirror 6 の
         癖、markdown.md は mizchi/markdown の癖（方言が直したもの・直していないもの・
         直さないと決めたもの）、sources.md は知見の在り処と取り方。あてにしない前提の覚書

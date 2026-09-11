@@ -39,10 +39,10 @@ map と同じ表から出す。棚卸しは [ai-docs/codemirror.md](../ai-docs/c
 - **Delete の focus**（edit） — 消した後の focus は消えていない兄弟か祖先（中身なら持ち主）で、
   畳みの中に埋もれていない。無いのは最後の根と文書の散文を消したときだけ
 - **id の順 = 文書順**（ts） — 読みは文書順に番号を振るので、id の大小がそのまま文書順。
-  select.ts の並べ替えと `Layout.order` はこれに頼る
+  core/map/select.mbt の並べ替えと `Layout.order` はこれに頼る
 - **中身は子より前に書かれる**（ts） — ノードの自身の文は地番の頭から最初の子の頭まで。core/read/caret.mbt はこれに頼る
 - **選択に居るのは箱のあるものだけ**（chosen） — 畳まれて埋もれたノードは選択に入らない
-- **選択を書くのは持ち主の操作だけ**（core/main） — `apply` は focus を選ぶ。`write`（投下・宣言・
+- **選択を書くのは持ち主の操作だけ**（app/app.mbt） — `apply` は focus を選ぶ。`write`（投下・宣言・
   画像の保存）は md を書くだけで選択に触らない
 
 ## 同一性は focus 1 本

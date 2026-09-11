@@ -1,7 +1,7 @@
 {
   // テストは Node で動く（DOM は無い）。src の型だけ借りる。
   // "dom" lib は型定義だけの話で実行時の DOM の有無とは関係ない —
-  // assets.ts 等 DOM 依存のファイルから純粋な関数だけを import
+  // src/app.ts 等 DOM 依存のファイルから純粋な関数だけを import
   // するときに、そのファイルの他の部分の型チェックが通るように要る。
   "extends": "../tsconfig.json",
   "compilerOptions": {

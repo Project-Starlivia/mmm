@@ -525,7 +525,7 @@ async fn App::copy_link(self : App) -> Bool {
   }
 }
 
-// ---------- 画像（ローカルファースト。実装は file/images.mbt） ----------
+// ---------- 画像（ローカルファースト。実装は disk/images.mbt） ----------
 
 ///|
 /// 宣言を頭に書く。頭を書いただけでは本文は古い場所を指したまま。**宣言と本文は同じ 1 つの
@@ -663,7 +663,7 @@ fn App::paste(self : App) -> Unit {
 }
 
 ///|
-/// 画像フォルダの状態。**言葉は宣言と許可の 2 つだけ**（file/images.mbt の冒頭が
+/// 画像フォルダの状態。**言葉は宣言と許可の 2 つだけ**（disk/images.mbt の冒頭が
 /// 名付けたもの）。許可が無いときは宣言のパスを出す — どこを指していて届いて
 /// いないのかが見えないと、直しようがない
 fn App::folder_caption(self : App) -> String {
@@ -761,7 +761,7 @@ fn App::wire(self : App) -> Unit {
     }
   })
 
-  // 落とされたファイル（file/dnd.mbt）
+  // 落とされたファイル（disk/drop.mbt）
   @disk.init_drop(doc, {
     open_markdown: async fn(file) {
       guard self.confirm_discard() else { return }

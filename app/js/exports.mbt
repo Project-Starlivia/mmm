@@ -4,7 +4,7 @@
 // 木も箱も core から出ない。境界は数・文字列・真偽・持ち手（MoonBit の値を
 // そのまま JS へ渡し、そのまま受け取る）だけ — 読みも選択もその位置も持ち手で往復する。
 //
-// アプリそのものは `mmmMain` が組む（core/main）。ts に残るのは CodeMirror（md ペイン）で、
+// アプリそのものは `mmmMain` が組む（app/app.mbt）。ts に残るのは CodeMirror（md ペイン）で、
 // その読み書きを閉包で渡す。それ以外の出口は、見本（lab）と EditorState の field
 // （state.ts）が読むぶんだけ。どの段で壊れたかを切り分けるために、mdAst・mmmTree・View も出す。
 
@@ -275,7 +275,7 @@ fn selection_of(o : @core.Any) -> @map.Selection {
 
 // ---- アプリ ----
 //
-// 束ねる場所（core/main）。ts が渡すのは CodeMirror の読み書き（`Editor`）だけ。
+// 束ねる場所（app/app.mbt）。ts が渡すのは CodeMirror の読み書き（`Editor`）だけ。
 // 編集列は素の object（`{ from, to, insert }`）の並びで渡る
 
 ///|
