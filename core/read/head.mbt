@@ -202,7 +202,12 @@ fn has_scheme(s : String) -> Bool {
 
 ///|
 /// 宣言の綴りを揃える。空・絶対パス・URL は None（宣言として読めない）。
-/// `\` は `/` に、`.` は `./` に、末尾には `/` を揃える
+/// `\` は `/` に、`.` は `./` に、末尾には `/` を揃える。
+///
+/// **続いた `/` は 1 つに畳む。** `.//` と `./` は同じ場所なのに、畳まないと
+/// `.//x.webp` という綴りが本文に入る。それは裸にすると `/x.webp` = 絶対パスに
+/// 見えるので `under` がどのフォルダの下でもないと言い、**一度そう書かれた画像は
+/// 二度と追従できない**。宣言を `.//` と打つだけで起きる
 pub fn normalize_path(value : String) -> String? {
   let trimmed = value.trim(chars=" \t\r\n").to_owned()
   guard trimmed != "" else { return None }
@@ -210,7 +215,12 @@ pub fn normalize_path(value : String) -> String? {
   if path == "." {
     path = "./"
   }
+  // **畳むのは断ってから。** 先に畳むと `https://x/` が `https:/x/` になって
+  // scheme が外れ、URL が宣言として通ってしまう
   guard !path.has_prefix("/") && !has_scheme(path) else { return None }
+  while path.contains("//") {
+    path = path.replace_all(old="//", new="/")
+  }
   Some(if path.has_suffix("/") { path } else { path + "/" })
 }
 
