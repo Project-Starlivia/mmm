@@ -1,4 +1,5 @@
-// 印。選択の塗り・輪・針・落とし先の線。値は host が持ち、ここは塗るだけ
+// 印。選択の塗り・輪・針・落とし先の線。値は host が持ち、ここは塗るだけ。
+// **DOM を触るのは値が変わったときだけ**（render.mbt と同じ流儀。#249）
 
 ///|
 /// 選択を塗る。md が持つ間は**輪**（箱の内側）、地図が持つ間は **selected**（枠）。
@@ -12,9 +13,11 @@ fn Mindmap::paint_choice(self : Mindmap) -> Unit {
 
 ///|
 /// 輪を、掛かっているノードの**内側**へ重ねる。箱の無い（畳まれて埋もれた）ノードには
-/// 出さない。本数が変わったときだけ作り足す / 捨てる
+/// 出さない。本数が変わったときだけ作り足す / 捨て、置く矩形が変わったときだけ書く
 fn Mindmap::ring(self : Mindmap, ids : Array[Int]) -> Unit {
-  let boxes = self.rects_of(ids)
+  let boxes = rects_in(self.layout, ids)
+  guard boxes != self.ringed else { return }
+  self.ringed = boxes
   while self.caret_rings.length() > boxes.length() {
     match self.caret_rings.pop() {
       Some(r) => r.remove()
@@ -28,11 +31,12 @@ fn Mindmap::ring(self : Mindmap, ids : Array[Int]) -> Unit {
     self.caret_rings.push(ring)
   }
   for i, b in boxes {
-    let ring = self.caret_rings[i]
-    ring.setAttribute("x", @web.num(b.x + ring_inset))
-    ring.setAttribute("y", @web.num(b.y + ring_inset))
-    ring.setAttribute("width", @web.num(b.w - ring_inset * 2.0))
-    ring.setAttribute("height", @web.num(b.h - ring_inset * 2.0))
+    cover(self.caret_rings[i], {
+      x: b.x + ring_inset,
+      y: b.y + ring_inset,
+      w: b.w - ring_inset * 2.0,
+      h: b.h - ring_inset * 2.0,
+    })
   }
 }
 
@@ -46,12 +50,16 @@ fn Mindmap::goto_pointed(self : Mindmap) -> Unit {
 }
 
 ///|
-/// 見失った選択（無ければ根）を控えめな針で指す。決めは map/indicator.mbt が持つ
+/// 見失った選択（無ければ根）を控えめな針で指す。決めは map/indicator.mbt が持つ。
+/// 視点も選択もペインも前と同じなら、当て直さない
 fn Mindmap::update_indicator(self : Mindmap) -> Unit {
   let pane = self.pane_size()
-  let sel = self.rects_of((self.host.selection)().ids)
+  let ids = (self.host.selection)().ids
+  guard self.aimed != Some((self.camera, ids, pane)) else { return }
+  self.aimed = Some((self.camera, ids.copy(), pane))
+  let sel = rects_in(self.layout, ids)
   // 見失ったかは、選択があれば選択の話。無ければ文書の話
-  let watched = if sel.length() > 0 { sel } else { self.all_rects() }
+  let watched = if sel.length() > 0 { sel } else { self.all }
   // 指す先は、選択ならいちばん近いやつ。無ければ根 — 帰る場所は 1 つでいい
   let target = if !@map.is_lost(watched, self.camera, pane) {
     None
@@ -78,20 +86,17 @@ fn Mindmap::update_indicator(self : Mindmap) -> Unit {
 
 ///|
 /// 落とし先の印を今の drop に合わせる。前の印は消してから塗り直す
-fn Mindmap::paint_drop(self : Mindmap) -> Unit {
+fn Mindmap::paint_drop(self : Mindmap, drop : @map.Drop?) -> Unit {
   self.clear_drop_mark()
-  match self.drop {
+  match drop {
     None => ()
     Some(Side(root~, ..)) => self.mark_drop_parent(root)
     Some(Node(id~, slot=Into)) => self.mark_drop_parent(id)
     Some(Node(id~, slot~)) => {
       guard self.layout.boxes.get(id) is Some(b) else { return }
       let y = if slot is Before { b.rect.y } else { b.rect.y + b.rect.h }
-      self.drop_line.setAttribute("x1", @web.num(b.rect.x))
-      self.drop_line.setAttribute("x2", @web.num(b.rect.x + b.rect.w))
-      self.drop_line.setAttribute("y1", @web.num(y))
-      self.drop_line.setAttribute("y2", @web.num(y))
-      self.drop_line.setAttribute("visibility", "visible")
+      @web.set_line(self.drop_line, b.rect.x, y, b.rect.x + b.rect.w, y)
+      @web.svg_show(self.drop_line, true)
     }
   }
 }
@@ -118,7 +123,7 @@ fn Mindmap::clear_drop_mark(self : Mindmap) -> Unit {
     }
     None => ()
   }
-  self.drop_line.setAttribute("visibility", "hidden")
+  @web.svg_show(self.drop_line, false)
 }
 
 ///|

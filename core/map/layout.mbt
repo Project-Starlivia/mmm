@@ -99,6 +99,20 @@ pub fn owner_of(l : Layout, block : Int) -> (Box, Int)? {
 }
 
 ///|
+/// 選んだものとその子孫（文書順）。掴んで動かすとき、落とし先から外す部分木
+pub fn subtree(l : Layout, ids : Array[Int]) -> Array[Int] {
+  let set : Set[Int] = Set::from_array(ids)
+  // order は親が子より先なので、前から 1 回なめれば「親が部分木に居るか」で決まる
+  for id in l.order {
+    guard l.boxes.get(id) is Some(b) else { continue }
+    if b.parent is Some(p) && set.contains(p.id) {
+      set.add(id)
+    }
+  }
+  l.order.filter(id => set.contains(id))
+}
+
+///|
 /// 最初の木の根。無ければ None（空文書）
 pub fn root_box(l : Layout) -> Box? {
   for id in l.order {

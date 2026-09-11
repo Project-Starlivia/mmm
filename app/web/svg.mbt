@@ -20,6 +20,42 @@ pub fn el(
 }
 
 ///|
+/// 矩形の 4 つの属性（rect / image）
+pub fn set_rect(
+  e : @dom.Element,
+  x : Double,
+  y : Double,
+  w : Double,
+  h : Double,
+) -> Unit {
+  e.setAttribute("x", num(x))
+  e.setAttribute("y", num(y))
+  e.setAttribute("width", num(w))
+  e.setAttribute("height", num(h))
+}
+
+///|
+/// 線の両端
+pub fn set_line(
+  e : @dom.Element,
+  x1 : Double,
+  y1 : Double,
+  x2 : Double,
+  y2 : Double,
+) -> Unit {
+  e.setAttribute("x1", num(x1))
+  e.setAttribute("y1", num(y1))
+  e.setAttribute("x2", num(x2))
+  e.setAttribute("y2", num(y2))
+}
+
+///|
+/// SVG の要素を見せる / 隠す。`visibility` で — display だと CSS との入り乱れが増える
+pub fn svg_show(e : @dom.Element, on : Bool) -> Unit {
+  e.setAttribute("visibility", if on { "visible" } else { "hidden" })
+}
+
+///|
 /// 要素をそのまま字にする（SVG の書き出し）
 pub extern "js" fn serialize(e : @dom.Element) -> String =
   #| (e) => new XMLSerializer().serializeToString(e)

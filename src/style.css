@@ -733,7 +733,8 @@ html, body {
     user-select: none;
   }
   & text.label {
-    /* font-size は core/map/metric.mbt の row_of() が決め、app/mindmap/render.mbt が属性で入れる（数字を2箇所に置かない） */
+    /* font-size は core/map/metric.mbt が決め、app/mindmap の render.mbt / card.mbt が
+       属性で入れる（数字を 2 箇所に置かない）。↗ だけは測らない字なのでここ */
     fill: var(--ink);
     white-space: pre;
 
@@ -753,7 +754,6 @@ html, body {
 
   /* ---- リンクのカード ---- */
   & text.link-row {
-    font-size: 12px;
     fill: var(--ink);
     pointer-events: none;
   }
@@ -775,13 +775,11 @@ html, body {
     rx: 6px;
   }
   & text.image-name {
-    font-size: 11px;
     fill: var(--ink-dim);
   }
   /* 読めない場所取りの入口。**押せると分かる姿にする** — 淡いままだと
      ただの説明書きに見え、押されない */
   & text.image-connect {
-    font-size: 10px;
     fill: var(--accent);
     cursor: pointer;
     text-decoration: underline;
@@ -797,7 +795,6 @@ html, body {
   }
   & text.code-line {
     font-family: var(--mono);
-    font-size: 11px;
     fill: var(--ink);
     white-space: pre;
   }
@@ -808,9 +805,9 @@ html, body {
   & text.details-mark,
   & text.details-row,
   & text.details-line { pointer-events: none; }
-  & text.details-mark { font-size: 10px; fill: var(--ink-dim); dominant-baseline: central; }
-  & text.details-row { font-size: 12px; fill: var(--ink-dim); dominant-baseline: central; }
-  & text.details-line { font-size: 11px; fill: var(--ink); white-space: pre; dominant-baseline: central; }
+  & text.details-mark { fill: var(--ink-dim); dominant-baseline: central; }
+  & text.details-row { fill: var(--ink-dim); dominant-baseline: central; }
+  & text.details-line { fill: var(--ink); white-space: pre; dominant-baseline: central; }
 
   /* 畳んだノード（core の Fold）。畳みの印は破線。閉じていれば小さく沈め、
      開いていれば（`<details open>`）子が出るので沈めない */

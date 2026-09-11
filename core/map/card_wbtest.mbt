@@ -117,3 +117,14 @@ test "bare は先頭の ./ だけを落とす" {
 test "読み解かなかった中身はカードにならない" {
   assert_eq(cards([{ id: 1, content: None, source: Some("<x>"), }]), [])
 }
+
+///|
+test "is_url — https?:// の後ろが在り、空白を含まない字だけ" {
+  assert_true(is_url("https://x.example/a?b=c"))
+  assert_true(is_url("http://x"))
+  assert_false(is_url("https://"))
+  assert_false(is_url("ftp://x.example"))
+  assert_false(is_url("https://x.example/a b"))
+  assert_false(is_url("https://x.example\n"))
+  assert_false(is_url("not a url"))
+}

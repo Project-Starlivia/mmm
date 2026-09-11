@@ -57,3 +57,13 @@ test "only: 0 本なら None、1 本ならその位置、2 本なら None。離�
   f.up(2)
   assert_eq(f.only(), Some({ x: 30, y: 40, }))
 }
+
+///|
+test "far — 押した点から 8px を越えて動けば「なぞった」。手前と丁度は押したまま" {
+  let from : Pt = { x: 10, y: 10, }
+  assert_false(far(from, 10, 10))
+  assert_false(far(from, 18, 10))
+  assert_true(far(from, 18.1, 10))
+  assert_true(far(from, 16, 16))
+  assert_false(far(from, 15, 15))
+}

@@ -4,23 +4,7 @@
 // クリック・矩形・矢印・右クリック・長押し）と、見失った先を指す針だけ。
 // **選択の値は持たない** — 入力を選択の値にして host へ渡し、host の値を塗るだけ。
 // 値は EditorState の field（ts の state.ts）。判断（当たり・落とし先・キーの表・矢印・
-// 寄せ・針）は全部 map/。ここはそれを DOM の出来事に繋ぐ。
-
-///|
-/// 全体を収めるときの余白（画面 px）
-let fit_margin = 60.0
-
-///|
-/// 矢印で辿るとき、選んだ箱が縁から離れている距離（画面 px）
-let show_margin = 40.0
-
-///|
-/// 長押しが右クリックメニューに化けるまでの間（ms）
-let hold_ms = 500
-
-///|
-/// 押した点からこれだけ動けば「なぞった」（画面 px）
-let slop = 8.0
+// 寄せ・針・押した点からの遠さ）は全部 map/。ここはそれを DOM の出来事に繋ぐ。
 
 ///|
 /// 輪を箱の内側へ入れる量
@@ -29,6 +13,48 @@ let ring_inset = 3.0
 ///|
 /// 背景の格子 1 目盛り（world）
 let grid = 18.0
+
+///|
+/// ポインタの手。**互いに両立しない 5 つを 1 つの値で持つ** — 押しながら矩形選択、
+/// のような組み合わせは書けない。Space と長押しの印は手ではなく「次の出来事をどう
+/// 読むか」なので、ここには入れない（`space_held` / `menu_by_hold`）
+priv enum Mode {
+  Idle
+  /// マウスで箱を押した。動かせば Dragging。`tap` なら動かさず離せば選ぶ —
+  /// 選んでいる箱をそのまま押したとき（押した瞬間に畳むと、複数選択を掴んで動かす手が無くなる）
+  Pressed(Press, tap~ : Bool)
+  /// 指で箱を押した。動かせば Dragging、動かさず離せば選ぶ、待てばメニュー（右クリックの代わり）
+  Holding(Press, @global.Timer)
+  Panning(Panning)
+  /// 背景をなぞっている。`size` は引いた大きさ（画面 px）— 離したとき「なぞったか」を見る
+  Rubber(start~ : @map.Pt, size~ : (Double, Double))
+  Dragging(Dragging)
+}
+
+///|
+/// 押したノードと、押した画面の点
+priv struct Press {
+  id : Int
+  at : @map.Pt
+}
+
+///|
+/// パンの始まり。押した画面の点と、そのときの視点
+priv struct Panning {
+  px : Double
+  py : Double
+  ox : Double
+  oy : Double
+}
+
+///|
+/// 動かしているノード。ids は選んだ全部（文書順）、subtree はその子孫込み（落とし先から外す）
+priv struct Dragging {
+  ids : Array[Int]
+  subtree : Array[Int]
+  /// 今の落とし先の予告。無ければ離しても何もしない
+  mut drop : @map.Drop?
+}
 
 ///|
 pub struct Mindmap {
@@ -43,10 +69,16 @@ pub struct Mindmap {
   /// 針がいま指している箱（world）。**押したとき頑張るのはこれ 1 つ** —
   /// `Home` / 十字は選択ぜんぶの外接を寄せるので、手によって中心へ来るものが違う（#129）
   mut pointed : @map.Rect?
+  /// 直前に針を当てた条件（視点・選択・ペイン）。同じなら当て直さない —
+  /// 矩形選択は pointermove ごとに選択を書き、そのたび refresh_selection が来る（#249）
+  mut aimed : (@map.Camera, Array[Int], @map.Pane)?
   mut camera : @map.Camera
   mut layout : @map.Layout
+  /// 在る箱ぜんぶの矩形（world）。針が見張るのに要り、集めるのは O(ノード) なので
+  /// レイアウトを置いたときに 1 度だけ
+  mut all : Array[@map.Rect]
   fingers : @map.Fingers
-  mut panning : Panning?
+  priv mut mode : Mode
   mut fit_pending : Bool
   /// ペインの画面上の矩形。None なら次に読む。resize でしか変わらない（アプリは
   /// スクロールしない）ので ResizeObserver が捨てる。毎イベント読み直すと、直前に
@@ -56,12 +88,10 @@ pub struct Mindmap {
   /// カーソルの輪の層。world に浮かぶ別の印（ノードの子にすると、動くたびに中身が作り直される）
   caret_layer : @dom.Element
   caret_rings : Array[@dom.Element]
+  /// 直前に輪を置いた矩形。同じなら書かない
+  mut ringed : Array[@map.Rect]
   /// 矩形選択の面（画面 px）。始点は pane の左上から
   rubber : @dom.Element
-  mut rubber_start : @map.Pt?
-  /// 矩形選択で引いた大きさ（画面 px）。離したとき「なぞったか」を見る
-  mut rubber_size : (Double, Double)
-  mut tapped : Press?
   mut grab : Bool
   /// Space を押している間、左ドラッグはパン
   mut space_held : Bool
@@ -69,18 +99,10 @@ pub struct Mindmap {
   card : CardField
   /// 選んでいるカードに被せる枠と ×。world に浮かぶ 1 個の印
   pick : CardPick
-  /// 長押しの待ち時計。無ければ待っていない
-  mut hold : @global.Timer?
-  /// 長押しを起こした指の押した場所。動かせば捨てる
-  mut hold_at : @map.Pt?
   /// 直前に開いたメニューが長押しから来たか。続く contextmenu を握り潰すため
   mut menu_by_hold : Bool
-  /// マウスで掴んだ候補。slop を越えたら start_drag へ化ける
-  mut drag_cand : Press?
-  mut dragging : Dragging?
-  /// 今の落とし先の予告。無ければ離しても何もしない
-  mut drop : @map.Drop?
   /// 予告で drop-parent を付けている箱の id。次の予告や後片付けで外す
+  /// （ノードのドラッグと、ファイルのドラッグの両方が付ける）
   mut drop_parent : Int?
   /// 兄弟へ挿入する予告の線。world に浮かぶ
   drop_line : @dom.Element
@@ -94,6 +116,12 @@ fn place_layout(host : Host) -> @map.Layout {
 }
 
 ///|
+/// 在る箱の矩形（world）。無い id は飛ばす
+fn rects_in(l : @map.Layout, ids : Array[Int]) -> Array[@map.Rect] {
+  ids.filter_map(id => l.boxes.get(id).map(b => b.rect))
+}
+
+///|
 /// ペインを地図の器にする
 pub fn Mindmap::new(pane : @dom.HTMLElement, host : Host) -> Mindmap {
   let doc = pane.ownerDocument().unwrap()
@@ -102,10 +130,8 @@ pub fn Mindmap::new(pane : @dom.HTMLElement, host : Host) -> Mindmap {
   let svg = @web.el(doc, "svg", [("class", "map-svg")])
   let world = @web.el(doc, "g", [])
   let caret_layer = @web.el(doc, "g", [])
-  let drop_line = @web.el(doc, "line", [
-    ("class", "drop-line"),
-    ("visibility", "hidden"),
-  ])
+  let drop_line = @web.el(doc, "line", [("class", "drop-line")])
+  @web.svg_show(drop_line, false)
   let renderer = Renderer::new(doc)
   let pick = CardPick::new(doc)
   world.append(renderer.edge_layer.as_node())
@@ -146,6 +172,7 @@ pub fn Mindmap::new(pane : @dom.HTMLElement, host : Host) -> Mindmap {
   )
   tool.append(center.as_node())
   pane.append(tool.as_node())
+  let layout = place_layout(host)
   let m : Mindmap = {
     pane,
     host,
@@ -154,29 +181,24 @@ pub fn Mindmap::new(pane : @dom.HTMLElement, host : Host) -> Mindmap {
     hint,
     indicator_el,
     pointed: None,
+    aimed: None,
     camera: { k: 1, tx: 60, ty: 60, },
-    layout: place_layout(host),
+    layout,
+    all: rects_in(layout, layout.order),
     fingers: @map.Fingers::new(),
-    panning: None,
+    mode: Idle,
     fit_pending: false,
     rect: None,
     caret_layer,
     caret_rings: [],
+    ringed: [],
     rubber,
-    rubber_start: None,
-    rubber_size: (0, 0),
-    tapped: None,
     grab: false,
     space_held: false,
     label,
     card,
     pick,
-    hold: None,
-    hold_at: None,
     menu_by_hold: false,
-    drag_cand: None,
-    dragging: None,
-    drop: None,
     drop_parent: None,
     drop_line,
     menu: @parts.Menu::new(doc),
@@ -262,16 +284,6 @@ fn Mindmap::follow_card(self : Mindmap) -> Unit {
 }
 
 ///|
-/// 属性の数字。読めなければ None
-fn int_of(s : String) -> Int? {
-  try @string.parse_int(s) catch {
-    _ => None
-  } noraise {
-    v => Some(v)
-  }
-}
-
-///|
 fn Mindmap::apply_camera(self : Mindmap) -> Unit {
   let { k, tx, ty, } = self.camera
   self.world.setAttribute(
@@ -289,6 +301,8 @@ pub fn Mindmap::render(self : Mindmap) -> Unit {
   let s = (self.host.survey)()
   @web.show(self.hint, "flex", s.empty())
   self.layout = place_layout(self.host)
+  self.all = rects_in(self.layout, self.layout.order)
+  self.aimed = None // 箱が動いたので、針は当て直す
   self.renderer.draw({
     layout: self.layout,
     measure: self.host.measure,
@@ -304,24 +318,6 @@ pub fn Mindmap::render(self : Mindmap) -> Unit {
 }
 
 ///|
-fn Mindmap::all_rects(self : Mindmap) -> Array[@map.Rect] {
-  self.rects_of(self.layout.order)
-}
-
-///|
-/// 在る箱の矩形（world）。無い id は飛ばす
-fn Mindmap::rects_of(self : Mindmap, ids : Array[Int]) -> Array[@map.Rect] {
-  let out = []
-  for id in ids {
-    match self.layout.boxes.get(id) {
-      Some(b) => out.push(b.rect)
-      None => ()
-    }
-  }
-  out
-}
-
-///|
 pub fn Mindmap::fit_view(self : Mindmap) -> Unit {
   let pane = self.pane_size()
   // まだ大きさが無い（隠れている / 起動直後）なら、付いてから改めて
@@ -330,7 +326,7 @@ pub fn Mindmap::fit_view(self : Mindmap) -> Unit {
     return
   }
   self.fit_pending = false
-  match @map.fit(self.all_rects(), pane, fit_margin) {
+  match @map.fit(self.all, pane) {
     Some(c) => self.set_camera(c)
     None => ()
   }
@@ -339,7 +335,8 @@ pub fn Mindmap::fit_view(self : Mindmap) -> Unit {
 ///|
 /// 選択（無ければ根）を画面の中心へ。拡大率は変えない
 fn Mindmap::center_on_target(self : Mindmap) -> Unit {
-  let target = match @map.union(self.rects_of((self.host.selection)().ids)) {
+  let target = match
+    @map.union(rects_in(self.layout, (self.host.selection)().ids)) {
     Some(r) => Some(r)
     None => @map.root_box(self.layout).map(b => b.rect)
   }
@@ -354,9 +351,7 @@ fn Mindmap::center_on_target(self : Mindmap) -> Unit {
 fn Mindmap::ensure_visible(self : Mindmap, id : Int) -> Unit {
   match self.layout.boxes.get(id) {
     Some(b) =>
-      self.set_camera(
-        @map.pan_to_show(self.camera, b.rect, self.pane_size(), show_margin),
-      )
+      self.set_camera(@map.pan_to_show(self.camera, b.rect, self.pane_size()))
     None => ()
   }
 }
@@ -461,5 +456,5 @@ fn Mindmap::svg_parts(
       None => ()
     }
   }
-  (self.all_rects(), edges, nodes)
+  (self.all, edges, nodes)
 }

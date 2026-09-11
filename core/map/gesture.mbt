@@ -8,6 +8,20 @@
 // 出すのは `Span`。だから値として試験できる。
 
 ///|
+/// 押した点からこれだけ動けば「なぞった」（画面 px）。手前なら押したまま
+let stray = 8.0
+
+///|
+/// 長押しが右クリックメニューに化けるまでの間（ms）
+pub let hold_ms = 500
+
+///|
+/// 押した点 `from` から (x, y) まで、slop を越えて動いたか
+pub fn far(from : Pt, x : Double, y : Double) -> Bool {
+  @math.hypot(x - from.x, y - from.y) > stray
+}
+
+///|
 pub struct Fingers {
   at : Map[Int, Pt]
   /// 組にする 2 本。**途中で入れ替えない** — 入れ替わると地図が跳ぶ

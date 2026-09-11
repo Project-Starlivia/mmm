@@ -66,19 +66,19 @@ let cam_box : Rect = { x: 100, y: 100, w: 120, h: 30, }
 
 ///|
 test "既に見えている箱では動かない" {
-  assert_eq(pan_to_show(v, cam_box, pane, 40), v)
+  assert_eq(pan_to_show(v, cam_box, pane, margin=40), v)
 }
 
 ///|
 test "左と上へはみ出していれば、余白のぶんだけ入れる" {
-  let c = pan_to_show({ k: 1, tx: -150, ty: -120, }, cam_box, pane, 40)
+  let c = pan_to_show({ k: 1, tx: -150, ty: -120, }, cam_box, pane, margin=40)
   assert_eq(cam_box.x * c.k + c.tx, 40)
   assert_eq(cam_box.y * c.k + c.ty, 40)
 }
 
 ///|
 test "右と下へはみ出していれば、外縁が余白の内側に入る" {
-  let c = pan_to_show({ k: 1, tx: 760, ty: 580, }, cam_box, pane, 40)
+  let c = pan_to_show({ k: 1, tx: 760, ty: 580, }, cam_box, pane, margin=40)
   assert_eq(cam_box.x * c.k + c.tx + cam_box.w * c.k, pane.width - 40.0)
   assert_eq(cam_box.y * c.k + c.ty + cam_box.h * c.k, pane.height - 40.0)
 }
@@ -86,7 +86,7 @@ test "右と下へはみ出していれば、外縁が余白の内側に入る" 
 ///|
 test "寄せても倍率は変えない（キーで辿るたびに拡大したりしない）" {
   assert_eq(
-    pan_to_show({ k: 0.5, tx: -900, ty: -900, }, cam_box, pane, 40).k,
+    pan_to_show({ k: 0.5, tx: -900, ty: -900, }, cam_box, pane, margin=40).k,
     0.5,
   )
 }
@@ -96,7 +96,7 @@ test "全部を収める見え方は、中身の中心をペインの中心に�
   let c = fit(
     [{ x: 0, y: 0, w: 100, h: 40, }, { x: 300, y: 200, w: 100, h: 40, }],
     pane,
-    60,
+    margin=60,
   ).unwrap()
   let cx = 200.0
   let cy = 120.0
@@ -106,14 +106,14 @@ test "全部を収める見え方は、中身の中心をペインの中心に�
 
 ///|
 test "小さい文書でも 1 倍を超えて寄らない。大きい文書は収まるまで引くが、下限では止まる。箱が無ければ決めない" {
-  assert_eq(fit([{ x: 0, y: 0, w: 10, h: 10, }], pane, 60).unwrap().k, 1)
-  let wide = fit([{ x: 0, y: 0, w: 4000, h: 100, }], pane, 60).unwrap()
+  assert_eq(fit([{ x: 0, y: 0, w: 10, h: 10, }], pane, margin=60).unwrap().k, 1)
+  let wide = fit([{ x: 0, y: 0, w: 4000, h: 100, }], pane, margin=60).unwrap()
   assert_true(wide.k < 1.0 && wide.k > min_zoom)
   assert_eq(
-    fit([{ x: 0, y: 0, w: 400000, h: 100, }], pane, 60).unwrap().k,
+    fit([{ x: 0, y: 0, w: 400000, h: 100, }], pane, margin=60).unwrap().k,
     min_zoom,
   )
-  assert_true(fit([], pane, 60) is None)
+  assert_true(fit([], pane, margin=60) is None)
 }
 
 ///|

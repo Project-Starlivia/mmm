@@ -35,6 +35,14 @@ let max_zoom = 3.0
 let zoom_rate = 0.0022
 
 ///|
+/// 全体を収めるときの余白（画面 px）
+let fit_margin = 60.0
+
+///|
+/// 矢印で辿るとき、選んだ箱が縁から離れている距離（画面 px）
+let show_margin = 40.0
+
+///|
 /// 画面の点を world に戻す（座標はペインの左上から測ったもの）
 pub fn to_world(cam : Camera, x : Double, y : Double) -> Pt {
   { x: (x - cam.tx) / cam.k, y: (y - cam.ty) / cam.k, }
@@ -91,7 +99,7 @@ pub fn pan_to_show(
   cam : Camera,
   b : Rect,
   pane : Pane,
-  margin : Double,
+  margin? : Double = show_margin,
 ) -> Camera {
   let s = cam.to_screen(b)
   let mut tx = cam.tx
@@ -112,7 +120,11 @@ pub fn pan_to_show(
 ///|
 /// 全部が入る見え方。**拡大はしない**（1 倍を超えて寄ると、小さい文書ほど
 /// 間延びして見える）。箱が無ければ None
-pub fn fit(boxes : Array[Rect], pane : Pane, margin : Double) -> Camera? {
+pub fn fit(
+  boxes : Array[Rect],
+  pane : Pane,
+  margin? : Double = fit_margin,
+) -> Camera? {
   guard union(boxes) is Some(r) else { return None }
   let kx = (pane.width - margin * 2.0) / @cmp.maximum(1.0, r.w)
   let ky = (pane.height - margin * 2.0) / @cmp.maximum(1.0, r.h)

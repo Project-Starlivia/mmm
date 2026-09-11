@@ -2,7 +2,6 @@
 package "mmm/app/mindmap"
 
 import {
-  "mizchi/js/builtins/global",
   "mizchi/js_browser/dom",
   "mmm/app/parts",
   "mmm/core/map",
@@ -23,7 +22,6 @@ pub struct CardField {
   box : @dom.Element
   highlight : @dom.Element
   textarea : @dom.Element
-  pane : @dom.HTMLElement
   measure : (@map.Font, String) -> Double
   tokens : (String) -> Array[Array[Token]]
   commit : (Int, String) -> Unit
@@ -39,11 +37,7 @@ pub struct CardPick {
   delete : @dom.Element
   circle : @dom.Element
   strokes : Array[@dom.Element]
-}
-
-pub struct Dragging {
-  ids : Array[Int]
-  subtree : Array[Int]
+  mut shown : (Int, @map.Rect)?
 }
 
 pub(all) struct Host {
@@ -72,7 +66,6 @@ pub(all) struct Host {
 
 pub struct LabelField {
   input : @dom.Element
-  pane : @dom.HTMLElement
   measure : (@map.Font, String) -> Double
   rename : (Int, String) -> Unit
   mut id : Int?
@@ -95,32 +88,27 @@ pub struct Mindmap {
   hint : @dom.Element
   indicator_el : @dom.Element
   mut pointed : @map.Rect?
+  mut aimed : (@map.Camera, Array[Int], @map.Pane)?
   mut camera : @map.Camera
   mut layout : @map.Layout
+  mut all : Array[@map.Rect]
   fingers : @map.Fingers
-  mut panning : Panning?
   mut fit_pending : Bool
   mut rect : @dom.DOMRect?
   caret_layer : @dom.Element
   caret_rings : Array[@dom.Element]
+  mut ringed : Array[@map.Rect]
   rubber : @dom.Element
-  mut rubber_start : @map.Pt?
-  mut rubber_size : (Double, Double)
-  mut tapped : Press?
   mut grab : Bool
   mut space_held : Bool
   label : LabelField
   card : CardField
   pick : CardPick
-  mut hold : @global.Timer?
-  mut hold_at : @map.Pt?
   mut menu_by_hold : Bool
-  mut drag_cand : Press?
-  mut dragging : Dragging?
-  mut drop : @map.Drop?
   mut drop_parent : Int?
   drop_line : @dom.Element
   menu : @parts.Menu
+  // private fields
 }
 pub fn Mindmap::begin_edit(Self, Int, String?) -> Bool
 pub fn Mindmap::edit_card(Self, Int, from? : Int?, to? : Int?, text? : String?) -> Unit
@@ -131,19 +119,6 @@ pub fn Mindmap::refresh_selection(Self) -> Unit
 pub fn Mindmap::render(Self) -> Unit
 pub fn Mindmap::set_grab(Self, Bool) -> Unit
 pub async fn Mindmap::to_svg(Self) -> @dom.Element?
-
-pub struct Panning {
-  px : Double
-  py : Double
-  ox : Double
-  oy : Double
-}
-
-pub struct Press {
-  id : Int
-  x : Double
-  y : Double
-}
 
 pub struct Renderer {
   doc : @dom.Document

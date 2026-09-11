@@ -81,7 +81,7 @@ fn node_of(l : Layout, id : Int?) -> @tree.Node? {
 }
 
 ///|
-/// キー 1 回ぶん。None は拾わない（ブラウザに渡す）。
+/// キー 1 回ぶん。Pass は拾わない（ブラウザに渡す）。
 ///
 /// - **宛先は anchor。** いくつ選んでいても同じ（複数選択で Enter を押しても、anchor に
 ///   対する Enter と同じことが起きる）
@@ -89,7 +89,7 @@ fn node_of(l : Layout, id : Int?) -> @tree.Node? {
 ///   そのノードの編集に入り、字を打てばその字から書ける（Enter を挟まない）
 /// - ノードが 1 つも無ければ、Enter は最初の根
 /// - Tab / Shift+Tab は 1 つなら足す・包む、複数なら段下げ・上げ（先頭の前の兄弟の子へ / 先頭の親の後ろへ）
-pub fn keyed(l : Layout, sel : Selection, k : Key) -> Intent? {
+pub fn keyed(l : Layout, sel : Selection, k : Key) -> Answer {
   // `reordered` が先頭なのは Alt をそこで閉じるため、`pasted` が早いのは貼るのに
   // anchor が要らないため
   table(Hand::new(l, sel, k), [
@@ -99,30 +99,31 @@ pub fn keyed(l : Layout, sel : Selection, k : Key) -> Intent? {
 }
 
 ///|
-/// **上から順に当て、キーを名乗った行で終わる。** None は拾わない
-fn[H] table(h : H, rows : Array[(H) -> Answer]) -> Intent? {
+/// **上から順に当て、キーを名乗った行で終わる。** どの行も名乗らなければ Pass
+fn[H] table(h : H, rows : Array[(H) -> Answer]) -> Answer {
   for row in rows {
     match row(h) {
-      Do(i) => return Some(i)
-      Stop => return None
       Pass => ()
+      a => return a
     }
   }
-  None
+  Pass
 }
 
 ///|
 /// 行の答え。**「拾わない」と「拾ったが、いまはできない」は別。** 後者を次の行へ
 /// 落とすと、キーが 2 つの意味を持ってしまう（Alt+↑ が動かせないときに素の矢印として
 /// 選択を動かす、Shift+L が 2 つ選んでいるときに名前の頭文字として打たれる）。
-priv enum Answer {
+/// 表の外へもそのまま出す — 地図は Pass だけをブラウザに渡し、Stop は握る
+/// （端の ↓ でページがスクロールしない。#244）
+pub(all) enum Answer {
   /// このキーは自分のものではない。次の行へ
   Pass
   /// 拾った
   Do(Intent)
   /// 拾ったが、いまはできない。次の行へは落とさない
   Stop
-}
+} derive(Eq, Debug)
 
 ///|
 /// 拾った行の答え。できなければそこで止まる。
@@ -350,10 +351,10 @@ fn typed(h : Hand) -> Answer {
 
 ///|
 /// カードを選んでいるときのキー 1 回ぶん。`keyed` と同じ表の読み方
-pub fn keyed_card(l : Layout, picked : Int, k : Key) -> Intent? {
+pub fn keyed_card(l : Layout, picked : Int, k : Key) -> Answer {
   // 外すのに持ち主は要らない（畳まれて箱が無くても、ここから抜けられる）
-  guard k.key != "Escape" else { return Some(Pick(id=None)) }
-  guard owner_of(l, picked) is Some((owner, index)) else { return None }
+  guard k.key != "Escape" else { return Do(Pick(id=None)) }
+  guard owner_of(l, picked) is Some((owner, index)) else { return Pass }
   table({ k, picked, owner: owner.node.id, cards: owner.cards, index, }, [
     card_reordered, card_copied, card_deleted, card_stepped, card_left, card_edited,
   ])

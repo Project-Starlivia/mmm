@@ -37,11 +37,25 @@ pub(all) enum Kind {
 let code_max_lines = 6
 
 ///|
+/// `http(s)://` で始まるか
+fn http(s : String) -> Bool {
+  s.has_prefix("http://") || s.has_prefix("https://")
+}
+
+///|
+/// 貼った字を URL として読めるか — `https?://` の後ろが在り、空白を含まない。
+/// クリップボードをリンクカードにするときの門（違えば core に読ませず、言うだけ）
+pub fn is_url(s : String) -> Bool {
+  guard http(s) && s.find("://") is Some(i) && i + 3 < s.length() else {
+    return false
+  }
+  !s.iter().any(c => c == ' ' || c == '\t' || c == '\n' || c == '\r')
+}
+
+///|
 /// `http(s)` のリンクだけ
 fn link_card(text : String, href : String) -> Kind? {
-  guard href.has_prefix("http://") || href.has_prefix("https://") else {
-    return None
-  }
+  guard http(href) else { return None }
   let host = host_of(href)
   guard host != "" else { return None }
   Some(Link(title=if text == "" { host } else { text }, url=href))

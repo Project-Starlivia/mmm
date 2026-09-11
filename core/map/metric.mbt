@@ -162,7 +162,16 @@ pub fn label_font(row : Row) -> Font {
 }
 
 ///|
-let card_font : Font = { px: 12, mono: false, }
+/// カードの行の字（リンクの題・details の summary）
+pub let card_font : Font = { px: 12, mono: false, }
+
+///|
+/// カードの添えの字（画像の名・details の中身）。コードと同じ大きさで、字体が違う
+pub let note_font : Font = { px: 11, mono: false, }
+
+///|
+/// いちばん小さな字（画像の「繋ぐ」・details の ▸）。測らない — 場所は決まっている
+pub let tiny_font : Font = { px: 10, mono: false, }
 
 ///|
 /// コードの字。カードの入力欄も同じ字で打つ
@@ -324,7 +333,7 @@ pub fn node_size(measure : Measure) -> SizeOf {
           w = @cmp.maximum(w, measure(card_font, name) + details_indent)
           if open {
             for ln in lines {
-              w = @cmp.maximum(w, measure(card_font, ln) + details_indent)
+              w = @cmp.maximum(w, measure(note_font, ln) + details_indent)
             }
           }
         }

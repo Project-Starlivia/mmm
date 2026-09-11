@@ -14,7 +14,6 @@ import {
 }
 
 // Values
-pub fn focus_bar(@dom.Document) -> Unit
 
 // Errors
 
@@ -73,7 +72,6 @@ pub struct Panes {
   md_pane : @dom.Element
   map_pane : @dom.Element
   panes_el : @dom.Element
-  splitter : @dom.Element
   focus_editor : () -> Unit
   narrow : @dom.MediaQueryList
   go_left : @dom.Element
