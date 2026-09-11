@@ -1,6 +1,7 @@
 // ディスクの口。File System Access API と IndexedDB の、型の無い呼び出しを 1 行ずつ包む。
 // 結び付けの無い API なので `extern "js"` で書き、Promise は js_async の型で返す。
 // 取り消し（ピッカーの AbortError）は**値**（null）にして返す — 断りは例外ではない。
+// IndexedDB に置く行は素の object（`record` / `field`）— 何を置くかは台帳（app/disk/recent）が決める
 
 ///|
 /// ファイルの札（FileSystemFileHandle）。中は覗けず、指し先はブラウザの中にしか無い
@@ -82,7 +83,22 @@ pub extern "js" fn can_rename() -> Bool =
   #| () => typeof FileSystemFileHandle !== "undefined" && typeof FileSystemFileHandle.prototype.move === "function"
 
 ///|
-/// ファイルを 1 つ選ぶ。取り消しは null。`types` はピッカーの受け付ける種類
+/// ピッカーの受け付ける種類（`showOpenFilePicker` の `types`）。1 つの説明に、MIME 1 つと拡張子の並び
+pub fn file_types(
+  description : String,
+  mime : String,
+  exts : Array[String],
+) -> @core.Any {
+  let accept = @core.new_object()
+  accept._set(mime, @core.any(exts))
+  let kind = @core.new_object()
+  kind._set("description", @core.any(description))
+  kind._set("accept", accept)
+  @core.any([kind])
+}
+
+///|
+/// ファイルを 1 つ選ぶ。取り消しは null。`types` は `file_types`
 pub extern "js" fn pick_open(types : @core.Any) -> @js_async.Promise[@core.Any] =
   #| (types) => window.showOpenFilePicker({ multiple: false, types })
   #|   .then(([f]) => f ?? null)
@@ -143,9 +159,37 @@ pub extern "js" fn idb_close(db : @core.Any) -> Unit =
   #| (db) => db.close()
 
 ///|
-/// 今の時刻（ms）
-pub extern "js" fn now() -> Double =
-  #| () => Date.now()
+/// `idb_run` に渡す手 — 1 つ読む
+pub fn idb_get(key : String) -> (@core.Any) -> @core.Any {
+  s => s._call("get", [@core.any(key)])
+}
+
+///|
+/// 1 つ置く（あれば書き換える）
+pub fn idb_put(key : String, value : @core.Any) -> (@core.Any) -> @core.Any {
+  s => s._call("put", [value, @core.any(key)])
+}
+
+///|
+pub fn idb_delete(key : String) -> (@core.Any) -> @core.Any {
+  s => s._call("delete", [@core.any(key)])
+}
+
+///|
+/// 置き場に入れる素の object。MoonBit の Option は JS の値ではない — 無い箱は呼ぶ側が null にして渡す
+pub fn record(fields : Array[(String, @core.Any)]) -> @core.Any {
+  let o = @core.new_object()
+  for f in fields {
+    o._set(f.0, f.1)
+  }
+  o
+}
+
+///|
+/// 素の object の欄。無ければ undefined
+pub fn field(o : @core.Any, name : String) -> @core.Any {
+  o._get(name)
+}
 
 ///|
 pub fn DirHandle::name(self : DirHandle) -> String {
@@ -191,40 +235,24 @@ pub extern "js" fn resolve_path(
   #| (d, f) => d.resolve(f)
 
 ///|
-/// フォルダの中身。`[name, dirHandle | null]` の並び（null は ファイル）
-pub extern "js" fn list_entries(d : DirHandle) -> @js_async.Promise[@core.Any] =
+/// フォルダの中の 1 つ。フォルダならその札、ファイルなら None
+pub(all) struct Entry {
+  name : String
+  directory : DirHandle?
+}
+
+///|
+extern "js" fn list_entries(d : DirHandle) -> @js_async.Promise[@core.Any] =
   #| async (d) => { const out = []; for await (const [name, h] of d.entries()) out.push([name, h.kind === "directory" ? h : null]); return out; }
 
 ///|
-/// ファイルを読んで objectURL に（種類は名前から決めたもの）
-pub extern "js" fn read_url(
-  f : FileHandle,
-  mime : String,
-) -> @js_async.Promise[String] =
-  #| (f, type) => f.getFile().then((b) => b.arrayBuffer()).then((buf) => URL.createObjectURL(new Blob([buf], { type })))
-
-///|
-pub extern "js" fn object_url(blob : @core.Any) -> String =
-  #| (blob) => URL.createObjectURL(blob)
-
-///|
-pub extern "js" fn revoke_url(url : String) -> Unit =
-  #| (url) => URL.revokeObjectURL(url)
-
-///|
-/// 絵を webp に（もう webp ならそのまま）
-pub extern "js" fn to_webp(blob : @core.Any) -> @js_async.Promise[@core.Any] =
-  #| async (blob) => {
-  #|   if (blob.type === "image/webp") return blob;
-  #|   const bitmap = await createImageBitmap(blob);
-  #|   try {
-  #|     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-  #|     canvas.getContext("2d").drawImage(bitmap, 0, 0);
-  #|     const out = await canvas.convertToBlob({ type: "image/webp", quality: 0.92 });
-  #|     if (out.type !== "image/webp") throw new Error("webp conversion failed");
-  #|     return out;
-  #|   } finally { bitmap.close(); }
-  #| }
+/// フォルダの中身
+pub async fn entries(d : DirHandle) -> Array[Entry] {
+  @core.array_from(list_entries(d).wait()).map(e => {
+    name: e._get_by_index(0).cast(),
+    directory: @core.identity_option(e._get_by_index(1)),
+  })
+}
 
 ///|
 pub extern "js" fn write_blob(
@@ -232,9 +260,3 @@ pub extern "js" fn write_blob(
   blob : @core.Any,
 ) -> @js_async.Promise[Unit] =
   #| (f, blob) => f.createWritable().then(async (s) => { try { await s.write(blob); } finally { await s.close(); } })
-
-///|
-/// いまの時刻の綴り（`2026-09-07-153012`）
-pub extern "js" fn stamp() -> String =
-  #| () => { const d = new Date(), two = (v) => String(v).padStart(2, "0");
-  #|   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}-${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`; }

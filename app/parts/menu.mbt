@@ -356,7 +356,7 @@ pub fn Menu::new(doc : @dom.Document) -> Menu {
   // 同じなので、付けっぱなしのほうが短い
   let root = doc.documentElement()
   @web.listen(root, "pointerdown", e => {
-    if !m.contains(e._get("target")) {
+    if !m.contains(@web.event_target(e)) {
       m.hide(false)
     }
   })
@@ -571,10 +571,7 @@ pub fn Menu::hide(self : Menu, restore_focus : Bool) -> Unit {
 ///|
 /// いま開いているか。同じボタンを押し直して閉じたい呼び出し側のため
 pub fn Menu::is_open(self : Menu) -> Bool {
-  @dom.css_style_from_val(self.el.as_any()._get("style")).get_property_value(
-    "display",
-  ) ==
-  "block"
+  @web.is_shown(self.el)
 }
 
 ///|

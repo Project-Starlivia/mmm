@@ -7,4 +7,8 @@ import {
   "mizchi/js_browser/dom",
 }
 
+import {
+  "mizchi/js_browser/test_utils",
+} for "wbtest"
+
 supported_targets = "js"

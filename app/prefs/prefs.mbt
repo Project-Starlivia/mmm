@@ -29,33 +29,21 @@ fn key_of(name : String) -> String {
 }
 
 ///|
-/// localStorage。容量オーバーや無効化で例外が飛ぶので（読むのも書くのも —
-/// private mode やポリシーで無効化された環境では getItem も投げる）、触るたびに
-/// ここを通す。無ければ None
-fn storage() -> @core.Any? {
-  try @core.try_sync(() => @dom.window().localStorage()) catch {
+/// この窓の文書。無ければ（試験の Node には global の window が無い）None。
+/// 呼ぶ側はどれも文書を持たないので、ここだけ global に手を伸ばす
+fn doc() -> @dom.Document? {
+  try @core.try_sync(() => @dom.window().document().as_any()) catch {
     _ => None
   } noraise {
-    s => Some(s)
-  }
-}
-
-///|
-fn quietly(f : () -> @core.Any) -> @core.Any? {
-  try @core.try_sync(f) catch {
-    _ => None
-  } noraise {
-    v => Some(v)
+    d => Some(d.cast())
   }
 }
 
 ///|
 pub fn store(name : String, value : String) -> Unit {
   let key = key_of(name)
-  match storage() {
-    Some(s) =>
-      quietly(() => s._call("setItem", [@core.any(key), @core.any(value)]))
-      |> ignore
+  match doc() {
+    Some(d) => @web.storage_set(d, key, value)
     None => ()
   }
 }
@@ -63,25 +51,17 @@ pub fn store(name : String, value : String) -> Unit {
 ///|
 pub fn load(name : String) -> String? {
   let key = key_of(name)
-  guard storage() is Some(s) else { return None }
-  guard quietly(() => s._call("getItem", [@core.any(key)])) is Some(v) else {
-    return None
-  }
-  @core.identity_option(v)
+  doc().bind(d => @web.storage_get(d, key))
 }
 
 ///|
 /// 役目を終えた `mmm.*` を捨てる。消えたキーの名前を並べる移行リストは
 /// 増え続けて誰も消せなくなるので、持ち物のほうを宣言して残りを掃く。
 pub fn sweep() -> Unit {
-  guard storage() is Some(s) else { return }
-  quietly(() => {
-    for k in @core.object_keys(s) {
-      if k.has_prefix("mmm.") && !owned.any(o => o.1 == k) {
-        s._call("removeItem", [@core.any(k)]) |> ignore
-      }
+  guard doc() is Some(d) else { return }
+  for k in @web.storage_keys(d) {
+    if k.has_prefix("mmm.") && !owned.any(o => o.1 == k) {
+      @web.storage_remove(d, k)
     }
-    @core.undefined()
-  })
-  |> ignore
+  }
 }

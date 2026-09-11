@@ -32,11 +32,7 @@ pub(all) struct Shortcuts {
 /// その場の入力欄（ラベル欄など）にフォーカスが在るか。ネイティブの欄は自分の
 /// Undo/Redo を持つので、そこでは全体のショートカットに譲る（docs/shortcuts.md）
 fn in_field(e : @core.Any) -> Bool {
-  let tag : String? = @core.identity_option(e._get("target")._get("tagName"))
-  match tag {
-    Some("INPUT") | Some("TEXTAREA") => true
-    _ => false
-  }
+  @web.target_in(e, "input, textarea") is Some(_)
 }
 
 ///|

@@ -14,6 +14,8 @@ pub fn after(@core.Any, (@core.Any) -> Unit) -> Unit
 
 pub fn attr_in(@core.Any, String, String) -> String?
 
+pub fn blob_type(@core.Any) -> String
+
 pub fn can_choose_folder() -> Bool
 
 pub fn can_open() -> Bool
@@ -40,6 +42,8 @@ pub fn close_with(@dom.Element, String) -> Unit
 
 pub fn computed(@dom.Element, String) -> String
 
+pub fn convert(@core.Any, String, Double) -> @js_async.Promise[@core.Any]
+
 pub fn css_var(@dom.Document, String) -> String
 
 pub fn data_url(String) -> @js_async.Promise[String]
@@ -62,9 +66,17 @@ pub fn dropped_files(@core.Any) -> @js_async.Promise[FixedArray[FileHandle]]
 
 pub fn el(@dom.Document, String, Array[(String, String)]) -> @dom.Element
 
+pub async fn entries(DirHandle) -> Array[Entry]
+
+pub fn event_target(@core.Any) -> @core.Any
+
 pub fn event_type(@core.Any) -> String
 
+pub fn field(@core.Any, String) -> @core.Any
+
 pub fn file_of(FileHandle) -> @js_async.Promise[@core.Any]
+
+pub fn file_types(String, String, Array[String]) -> @core.Any
 
 pub fn fill_rect(@core.Any, String, Double, Double) -> Unit
 
@@ -84,9 +96,15 @@ pub fn html(@dom.Document, String, String) -> @dom.HTMLElement
 
 pub fn idb_close(@core.Any) -> Unit
 
+pub fn idb_delete(String) -> (@core.Any) -> @core.Any
+
 pub fn idb_ensure_store(@core.Any, String) -> Unit
 
+pub fn idb_get(String) -> (@core.Any) -> @core.Any
+
 pub fn idb_open(String, Int, (@core.Any) -> Unit) -> @js_async.Promise[@core.Any]
+
+pub fn idb_put(String, @core.Any) -> (@core.Any) -> @core.Any
 
 pub fn idb_run(@core.Any, String, String, (@core.Any) -> @core.Any) -> @js_async.Promise[@core.Any]
 
@@ -98,15 +116,17 @@ pub fn is_dir_handle(@core.Any) -> Bool
 
 pub fn is_file_handle(@core.Any) -> Bool
 
+pub fn is_shown(@dom.Element) -> Bool
+
 pub fn is_touch(@core.Any) -> Bool
 
 pub fn keyboard(@core.Any) -> @dom.KeyboardEvent
 
 pub fn left_window(@core.Any) -> Bool
 
-pub fn list_entries(DirHandle) -> @js_async.Promise[@core.Any]
-
 pub fn listen(@dom.Element, String, (@core.Any) -> Unit, capture? : Bool) -> Unit
+
+pub fn local_time(Double) -> FixedArray[Int]
 
 pub fn match_media(@dom.Document, String) -> @dom.MediaQueryList
 
@@ -156,6 +176,8 @@ pub fn read_text(FileHandle) -> @js_async.Promise[String]
 
 pub fn read_url(FileHandle, String) -> @js_async.Promise[String]
 
+pub fn record(Array[(String, @core.Any)]) -> @core.Any
+
 pub fn request_permission(@core.Any, String) -> @js_async.Promise[String]
 
 pub fn resolve_path(DirHandle, FileHandle) -> @js_async.Promise[@core.Any]
@@ -188,9 +210,15 @@ pub fn show_modal(@dom.Element) -> Unit
 
 pub fn spawn(async () -> Unit) -> Unit
 
-pub fn stamp() -> String
-
 pub fn stop(@core.Any) -> Unit
+
+pub fn storage_get(@dom.Document, String) -> String?
+
+pub fn storage_keys(@dom.Document) -> FixedArray[String]
+
+pub fn storage_remove(@dom.Document, String) -> Unit
+
+pub fn storage_set(@dom.Document, String, String) -> Unit
 
 pub fn stroke_line(@core.Any, String, Double, FixedArray[Double]) -> Unit
 
@@ -201,8 +229,6 @@ pub fn target_in(@core.Any, String) -> @dom.Element?
 pub fn text_blob(String, String) -> @core.Any
 
 pub fn text_width(@dom.Document, String, String) -> Double
-
-pub fn to_webp(@core.Any) -> @js_async.Promise[@core.Any]
 
 pub fn toggle_class(@dom.Element, String, Bool) -> Unit
 
@@ -223,6 +249,11 @@ pub fn write_text(FileHandle, String) -> @js_async.Promise[Unit]
 pub type DirHandle
 pub fn DirHandle::as_any(Self) -> @core.Any
 pub fn DirHandle::name(Self) -> String
+
+pub(all) struct Entry {
+  name : String
+  directory : DirHandle?
+}
 
 #external
 pub type FileHandle

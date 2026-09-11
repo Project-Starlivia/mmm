@@ -9,159 +9,8 @@
 // 直すのもここ**（`settle`）— ただし道具は宣言を黙って書き換えない。書くのは
 // 計算できたとき（`resolve`）と、人が箱で確定したときだけ。書き込みそのものは
 // md への操作なので `deps.set_declared` に渡す（App の `set_declared`）。
-
-///|
-/// 読みに行ってよい絵の種類。**綴りはここ 1 つ**で、種類の判定も
-/// `<image>` に載せる MIME も同じ表から引く
-let image_types : Array[(String, String)] = [
-  ("webp", "image/webp"),
-  ("png", "image/png"),
-  ("jpg", "image/jpeg"),
-  ("jpeg", "image/jpeg"),
-  ("gif", "image/gif"),
-  ("avif", "image/avif"),
-  ("svg", "image/svg+xml"),
-  ("bmp", "image/bmp"),
-  ("ico", "image/x-icon"),
-]
-
-///|
-/// その名前が指す絵の種類。絵でなければ None
-fn image_type(name : String) -> String? {
-  guard name.rev_find(".") is Some(dot) && dot > 0 else { return None }
-  let ext = String::unsafe_substring(name, start=dot + 1, end=name.length()).to_lower()
-  for t in image_types {
-    if t.0 == ext {
-      return Some(t.1)
-    }
-  }
-  None
-}
-
-///|
-/// md に書かれたパスが、宣言した保存パスの下に収まるか。
-/// 収まればフォルダからの相対を断片で返し、外れていれば None。
-///
-/// 「その綴りは宣言の下か」の判定は read の `under` が唯一の持ち主。
-/// ここが足すのは、**フォルダの中として受け取ってよいか**の柵だけ
-fn asset_target(declared : String, path : String) -> Array[String]? {
-  guard @read.under(path, declared) is Some(rest) else { return None }
-  let parts = rest
-    .split("/")
-    .map(p => p.to_owned())
-    .filter(p => p != "")
-    .collect()
-  guard parts.length() > 0 else { return None }
-  // フォルダの外へ出る綴りは受け取らない（宣言の外は見に行かない）
-  if parts.any(p => p == "." || p == "..") {
-    return None
-  }
-  // **絵でないものは読みに行かない。** `![](notes.txt)` と書けば、マップに
-  // 何も出ないまま中身が読まれ、書き出した SVG に base64 で載ってしまう
-  // （`<image>` は描けなくてもデータは埋まる）。宣言したフォルダの中に
-  // 限られるとはいえ、絵を置く場所として渡したフォルダなので、絵だけ見る
-  guard image_type(parts[parts.length() - 1]) is Some(_) else { return None }
-  Some(parts)
-}
-
-///|
-/// md に書く形。`./` を付ける。上へ出る道はそのまま
-fn md_path(rel : String) -> String {
-  if rel.has_prefix("../") {
-    rel
-  } else {
-    "./" + @tree.bare_path(rel)
-  }
-}
-
-// ---- 宣言 ----
-
-///|
-/// **宣言の綴りとして通らない理由。** 通るなら None。
-///
-/// `dir_name` は、末尾に来るはずの**選んだフォルダの実名**。`resolve` が効かな
-/// かったとき — つまり選んだフォルダは md を含んでいない — 末尾のフォルダ名は
-/// 必ず選んだものと一致するはずで、一致しなければ打ち間違い。`./`（md と同じ
-/// 場所）もこの場では矛盾になる。
-///
-/// 位置が計算できたとき（選んだフォルダが md を含む）は None を渡す。宣言は
-/// `./` や `../` の形で、末尾に実名は来ないので照合しようが無い。
-///
-/// 深さ（`../` が何段か）だけは確かめようが無い — 札から親は辿れない。
-/// **確かめられる嘘は全部止めて、確かめられないところだけ人を信じる**
-pub fn folder_problem(typed : String, dir_name : String?) -> String? {
-  guard @read.normalize_path(typed) is Some(norm) else {
-    return Some("Use a path relative to the .md")
-  }
-  guard dir_name is Some(name) else { return None }
-  let last = norm
-    .split("/")
-    .map(p => p.to_owned())
-    .filter(p => p != "")
-    .collect()
-    .last()
-  if last == Some(name) {
-    None
-  } else {
-    Some("The folder you picked is named \{name}")
-  }
-}
-
-///|
-/// 選んだフォルダから md までの断片を、md から見たフォルダの相対に読み替える。
-/// `resolve` が返すのは「フォルダ → md」なので、**末尾のファイル名を除いた数**だけ
-/// 上へ戻る（`["notes","a.md"]` なら md は 1 段深いところに居るので `../`）
-fn folder_from_doc(segments : Array[String]) -> String {
-  let up = @cmp.maximum(0, segments.length() - 1)
-  if up == 0 {
-    "./"
-  } else {
-    "../".repeat(up)
-  }
-}
-
-// ---- 画像の名前 ----
 //
-// **決めるのも咎めるのも 1 か所**。`name_problem` はたずね箱が打鍵のたびに
-// 呼び、`name_parts` は通った値だけを受け取る — だめな値がここから先へ
-// 進むことは無いので、書き込む側で二度確かめない。
-
-///|
-/// 名前をフォルダの断片に割る（末尾が置くファイル）。`.webp` は落とす
-fn name_parts(typed : String) -> Array[String] {
-  let t = typed.trim(chars=" \t\r\n").to_owned()
-  let base = if t.to_lower().has_suffix(".webp") {
-    String::unsafe_substring(t, start=0, end=t.length() - 5)
-  } else {
-    t
-  }
-  base.split("/").map(p => p.to_owned()).filter(p => p != "").collect()
-}
-
-///|
-/// その名前では置けない理由。置けるなら None
-fn name_problem(typed : String) -> String? {
-  let parts = name_parts(typed)
-  guard parts.length() > 0 else { return Some("Give it a name") }
-  if parts.any(p => p == "." || p == "..") {
-    return Some("Folder names cannot be . or ..")
-  }
-  let joined = parts.join("")
-  for i in 0..<joined.length() {
-    let c = joined[i]
-    if c == '\\' ||
-      c == ':' ||
-      c == '*' ||
-      c == '?' ||
-      c == '"' ||
-      c == '<' ||
-      c == '>' ||
-      c == '|' {
-      return Some("A file name cannot contain \{c.to_char().unwrap()}")
-    }
-  }
-  None
-}
+// 置き場と名前の柵（純粋）は path.mbt。
 
 // ---- 握り ----
 
@@ -179,7 +28,7 @@ pub(all) struct ImageDeps {
 }
 
 ///|
-/// いま握っているもの。**セッションの持ち物**で、覚えているのは札だけ（handles）。
+/// いま握っているもの。**セッションの持ち物**で、覚えているのは札だけ（recent）。
 /// `doc` を組で持つのは、握りが「**この md** から見た**あのフォルダ**」という対でしか
 /// 意味を持たないから
 pub(all) struct Binding {
@@ -200,28 +49,23 @@ priv struct Picked {
 ///|
 pub struct Images {
   doc : @dom.Document
-  io : Disk
+  disk : Disk
   deps : ImageDeps
   /// path → objectURL。None は「引きに行ったが無い / まだ」
   urls : Map[String, String?]
-  mut cached : Binding?
-  /// `cached` を引いたか（引いて無かった、と、まだ引いていない、を分ける）
-  mut cached_known : Bool
+  /// 握りの控え。None は「まだ引いていない」、Some(None) は「引いたが無い」
+  mut cached : Binding??
   /// 直近に確かめた「読めているか」。描くたびに同期で聞かれるので覚えておく
   mut live : Bool
 }
 
 ///|
-pub fn Images::new(doc : @dom.Document, io : Disk, deps : ImageDeps) -> Images {
-  {
-    doc,
-    io,
-    deps,
-    urls: Map([]),
-    cached: None,
-    cached_known: false,
-    live: false,
-  }
+pub fn Images::new(
+  doc : @dom.Document,
+  disk : Disk,
+  deps : ImageDeps,
+) -> Images {
+  { doc, disk, deps, urls: Map([]), cached: None, live: false, }
 }
 
 ///|
@@ -243,35 +87,33 @@ fn Images::release_urls(self : Images) -> Unit {
 
 ///|
 async fn Images::stored_binding(self : Images) -> Binding? {
-  if self.cached_known {
-    return self.cached
+  if self.cached is Some(b) {
+    return b
   }
-  // **札は文書ごと**（handles）。別の .md を開いても前の結び付きは残る
-  let b = match self.io.current_file() {
+  // **札は文書ごと**（recent）。別の .md を開いても前の結び付きは残る
+  let b = match self.disk.current_file() {
     Some(file) =>
-      match self.io.handles.folder_for(file) {
+      match self.disk.recent.folder_for(file) {
         Some(directory) => Some({ doc: file, directory, })
         None => None
       }
     None => None
   }
-  self.cached = b
-  self.cached_known = true
+  self.cached = Some(b)
   b
 }
 
 ///|
 /// フォルダを指してもらい、握る。取りやめは None
 async fn Images::pick(self : Images) -> Picked? {
-  guard self.io.current_file() is Some(file) else { return None }
+  guard self.disk.current_file() is Some(file) else { return None }
   guard @web.can_choose_folder() else { return None }
   let picked = @web.pick_directory(file.as_any(), "readwrite").wait()
   guard !@core.is_nullish(picked) else { return None }
   let directory : @web.DirHandle = picked.cast()
   let binding : Binding = { doc: file, directory, }
-  self.io.handles.remember_folder(file, directory)
-  self.cached = Some(binding)
-  self.cached_known = true
+  self.disk.recent.remember_folder(file, directory)
+  self.cached = Some(Some(binding))
   self.live = true
   // 選んだフォルダが md を含んでいれば、md から見た位置は**計算できる**。
   // 含まなければ手がかりはフォルダ名だけ
@@ -299,30 +141,6 @@ fn field_of(p : Picked) -> @parts.Field {
   {
     value: p.computed.unwrap_or(p.guess),
     check: Some(typed => folder_problem(typed, dir_name)),
-  }
-}
-
-///|
-/// その名前では**置けない**理由。名前そのものの検査（`name_problem`）に、
-/// **置き場に同じ名前が居るか**を足したもの。置けるなら None。
-/// `here` はそのフォルダに既に在る名前（小文字、`.webp` 込み）。
-///
-/// 1 つの関数にしてあるのは、貼る側と並べて見る道具が**同じ検査を通す**ため —
-/// 言葉を写すと、条件を足したときに片方だけ古くなる
-pub fn image_name_problem(typed : String, here : Set[String]) -> String? {
-  match name_problem(typed) {
-    Some(why) => Some(why)
-    None => {
-      let parts = name_parts(typed)
-      guard parts.last() is Some(last) else { return None }
-      let head = parts.iter().take(parts.length() - 1).collect()
-      head.push(last + ".webp")
-      if here.contains(head.join("/").to_lower()) {
-        Some("That name is taken")
-      } else {
-        None
-      }
-    }
   }
 }
 
@@ -397,11 +215,11 @@ async fn Images::settle(
 /// 握りが腐った。**捨てて、繋ぎ直しの駅へ落とす** — 腐ったまま持っていると
 /// 次も同じところで失敗する。宣言は md に残るので、指し直せば戻る
 fn Images::forget(self : Images) -> Unit {
-  self.cached = None
-  self.cached_known = true
+  self.cached = Some(None)
   self.live = false
-  match self.io.current_file() {
-    Some(file) => @web.spawn(async fn() { self.io.handles.forget_folder(file) })
+  match self.disk.current_file() {
+    Some(file) =>
+      @web.spawn(async fn() { self.disk.recent.forget_folder(file) })
     None => ()
   }
   self.release_urls()
@@ -409,18 +227,11 @@ fn Images::forget(self : Images) -> Unit {
 }
 
 ///|
-async fn granted(h : @web.DirHandle, mode : String) -> Bool {
-  @web.query_permission(h.as_any(), mode).wait() == "granted"
-}
-
-///|
-async fn allowed(h : @web.DirHandle, mode : String) -> Bool {
-  let state = @web.query_permission(h.as_any(), mode).wait()
-  state == "granted" ||
-  (
-    state == "prompt" &&
-    @web.request_permission(h.as_any(), mode).wait() == "granted"
-  )
+/// 触ってよいか。`ask` なら、まだなら（断られていても）聞き直す — 聞けるのは
+/// 押した瞬間だけで、押されたことがその資格になる。`mode` は "read" / "readwrite"
+async fn permission(h : @web.DirHandle, mode : String, ask~ : Bool) -> Bool {
+  @web.query_permission(h.as_any(), mode).wait() == "granted" ||
+  (ask && @web.request_permission(h.as_any(), mode).wait() == "granted")
 }
 
 ///|
@@ -429,7 +240,7 @@ async fn allowed(h : @web.DirHandle, mode : String) -> Bool {
 async fn Images::ensure_binding(self : Images) -> (Binding, @parts.Field?)? {
   match self.stored_binding() {
     Some(binding) => {
-      if allowed(binding.directory, "readwrite") {
+      if permission(binding.directory, "readwrite", ask=true) {
         return Some((binding, None))
       }
       // 許可が下りない札は腐っている。捨ててから指し直してもらう
@@ -460,7 +271,7 @@ async fn nested_file(
 async fn Images::load_asset(self : Images, path : String) -> Unit {
   guard self.stored_binding() is Some(binding) else { return }
   guard asset_target(self.declared_path(), path) is Some(parts) else { return }
-  guard granted(binding.directory, "read") else { return }
+  guard permission(binding.directory, "read", ask=false) else { return }
   // 種類は名前から引く（`asset_target` を通った時点で必ず絵）
   let mime = image_type(parts[parts.length() - 1]).unwrap_or("image/webp")
   // 不在・許可待ち — 場所取りのまま
@@ -493,7 +304,6 @@ pub fn Images::image_url(self : Images, path : String) -> String? {
 pub fn Images::clear(self : Images) -> Unit {
   self.release_urls()
   self.cached = None
-  self.cached_known = false
   self.live = false
   // 捨てたその場で引き直す。`folder_name` は同期で答えるしかなく、
   // 「まだ引いていない」と「無い」を区別できない — 人が
@@ -504,7 +314,7 @@ pub fn Images::clear(self : Images) -> Unit {
 ///|
 /// いま結び付いている画像フォルダの名前。未設定なら None
 pub fn Images::folder_name(self : Images) -> String? {
-  self.cached.map(b => b.directory.name())
+  self.cached.bind(c => c).map(b => b.directory.name())
 }
 
 ///|
@@ -517,7 +327,7 @@ pub fn Images::readable(self : Images) -> Bool {
 /// いま画像を読める状態か。**繋ぎ直しの箱を出すかの判定**。札を引き直し、許可まで見る
 pub async fn Images::connected(self : Images) -> Bool {
   self.live = match self.stored_binding() {
-    Some(b) => granted(b.directory, "read")
+    Some(b) => permission(b.directory, "read", ask=false)
     None => false
   }
   self.live
@@ -531,8 +341,7 @@ pub async fn Images::connect(self : Images) -> Unit {
   let ok = (async fn() -> Unit {
     match self.stored_binding() {
       Some(b) =>
-        if @web.request_permission(b.directory.as_any(), "readwrite").wait() ==
-          "granted" {
+        if permission(b.directory, "readwrite", ask=true) {
           self.live = true
           self.release_urls()
           (self.deps.refresh)()
@@ -574,21 +383,32 @@ pub async fn Images::choose_folder(self : Images) -> Unit {
 async fn taken(dir : @web.DirHandle) -> Set[String] {
   let out : Set[String] = Set([])
   async fn walk(d : @web.DirHandle, prefix : String) -> Unit {
-    let entries = @core.array_from(@web.list_entries(d).wait())
-    for e in entries {
-      let name : String = e._get_by_index(0).cast()
-      let sub = e._get_by_index(1)
-      let path = prefix + name
-      if @core.is_nullish(sub) {
-        out.add(path.to_lower())
-      } else {
-        walk(sub.cast(), path + "/")
+    for e in @web.entries(d) {
+      let path = prefix + e.name
+      match e.directory {
+        None => out.add(path.to_lower())
+        Some(sub) => walk(sub, path + "/")
       }
     }
   }
 
   walk(dir, "") catch {
     _ => () // 数えられない — 警告が出ないだけ
+  }
+  out
+}
+
+///|
+let webp_quality = 0.92
+
+///|
+/// 置く絵は webp。もう webp ならそのまま、違えば焼き直す — 焼けなければ拒む
+/// （ブラウザが webp を書けないと、頼んだ種類と違う絵が黙って出る）
+async fn as_webp(blob : @core.Any) -> @core.Any {
+  guard @web.blob_type(blob) != "image/webp" else { return blob }
+  let out = @web.convert(blob, "image/webp", webp_quality).wait()
+  guard @web.blob_type(out) == "image/webp" else {
+    fail("webp conversion failed")
   }
   out
 }
@@ -608,37 +428,23 @@ pub async fn Images::save_to_disk(self : Images, blob : @core.Any) -> String? {
   let shot = @web.object_url(blob)
   let here = taken(binding.directory)
   let name : @parts.Field = {
-    value: @web.stamp(),
+    value: stamp(@web.local_time(@web.now())),
     check: Some(typed => image_name_problem(typed, here)),
   }
-  // **分かっているところは字、分からないところだけ欄。** 位置が決まって
-  // いれば（宣言、または計算できた）`./pics/` はただの字で、打てるのは名前だけ
-  let place : @parts.Part = match folder {
-    Some(f) => Blank(f)
-    None => Text(self.declared_path())
-  }
-  let shape : Array[@parts.Part] = [
-    Text("![]("),
-    place,
-    Blank(name),
-    Text(".webp)"),
-  ]
+  let (shape, read) = image_form(folder, self.declared_path(), name)
   let out = @parts.asked(self.doc, @parts.image_name(shape, shot))
   @web.revoke_url(shot)
   guard out is Some(values) else { return None }
-  // 欄の並び順は `shape` の並び順。位置の欄があるなら先に居る
-  let typed = match folder {
-    Some(f) => {
-      self.set_declared(values.get(0).unwrap_or(f.value))
-      values.get(1).unwrap_or("")
-    }
-    None => values.get(0).unwrap_or("")
+  let (place, typed) = read(values)
+  match place {
+    Some(p) => self.set_declared(p)
+    None => ()
   }
   let parts = name_parts(typed)
   guard parts.last() is Some(last) else { return None }
   parts[parts.length() - 1] = last + ".webp"
   let written = (async fn() -> String {
-    let webp = @web.to_webp(blob).wait()
+    let webp = as_webp(blob)
     let file = nested_file(binding.directory, parts, true)
     @web.write_blob(file, webp).wait()
     let rel = self.declared_path() + parts.join("/")

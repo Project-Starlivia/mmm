@@ -98,3 +98,54 @@ test "folder_problem: 末尾が選んだフォルダの実名と一致すれば�
     Some("Use a path relative to the .md"),
   )
 }
+
+///|
+test "image_name_problem: 名前の柵に、置き場に同じ名前が居るかを足す（小文字・.webp 込みで照合）" {
+  let here : Set[String] = Set::from_array(["shot.webp", "pics/a.webp"])
+  assert_eq(image_name_problem("shot", here), Some("That name is taken"))
+  assert_eq(image_name_problem("Shot.WEBP", here), Some("That name is taken"))
+  assert_eq(image_name_problem("pics/a", here), Some("That name is taken"))
+  assert_eq(image_name_problem("a", here), None)
+  assert_eq(image_name_problem("pics/b", here), None)
+  // 名前そのものの柵が先
+  assert_eq(image_name_problem("", here), Some("Give it a name"))
+  assert_eq(
+    image_name_problem("a:b", here),
+    Some("A file name cannot contain :"),
+  )
+}
+
+///|
+test "stamp: 年-月-日-時分秒。1 桁は 0 で埋める" {
+  assert_eq(stamp([2026, 9, 7, 15, 30, 12]), "2026-09-07-153012")
+  assert_eq(stamp([2026, 12, 31, 0, 5, 9]), "2026-12-31-000509")
+}
+
+///|
+fn blanks(shape : Array[@parts.Part]) -> Array[String] {
+  shape.filter_map(p => {
+    match p {
+      Blank(f) => Some(f.value)
+      Text(_) => None
+    }
+  })
+}
+
+///|
+test "image_form: 位置が決まっていれば名前だけの欄、決まっていなければ位置の欄が先。答えの読み方も並びに従う" {
+  let name : @parts.Field = { value: "shot", check: None, }
+  let (fixed, read) = image_form(None, "./pics/", name)
+  assert_eq(blanks(fixed), ["shot"])
+  assert_eq(fixed.length(), 4)
+  assert_eq(read(["a"]), (None, "a"))
+  assert_eq(read([]), (None, ""))
+  let (asked, read) = image_form(
+    Some({ value: "../pics/", check: None, }),
+    "./",
+    name,
+  )
+  assert_eq(blanks(asked), ["../pics/", "shot"])
+  assert_eq(read(["../p/", "b"]), (Some("../p/"), "b"))
+  // 欄が足りなければ既定に倒す
+  assert_eq(read([]), (Some("../pics/"), ""))
+}

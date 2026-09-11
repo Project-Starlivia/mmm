@@ -1,5 +1,9 @@
 // 紙（canvas）の道具。2d の文脈は不透明な持ち手で、載せる手は 2 つ —
 // 塗り潰すか、線を引くか。太さ・色は手ごとに渡す。
+//
+// 2d の文脈は用ごとに別 — 描く紙（`paper_2d`。dpr 倍・丸い端）、字を測る紙
+// （`text_width`。文書に 1 枚を持ち回す）、SVG を絵に焼く紙（`rasterize`。
+// 絵の画素数に合わせて毎回作る）。1 枚を使い回すと、倍率と大きさが互いに邪魔をする
 
 ///|
 /// 描く文脈。dpr 倍の画素に CSS ピクセルで描けるよう倍率を掛け、線の端と角を丸める。
@@ -45,6 +49,38 @@ pub extern "js" fn canvas_blob(
   #| (c, type, q) => new Promise((ok) => c.toBlob(ok, type, q))
 
 ///|
-/// 押したことにする（隠したピッカーを開く・ボタンのふるまいをキーから通す）
-pub extern "js" fn click(e : @dom.Element) -> Unit =
-  #| (e) => e.click()
+/// 字の幅（canvas の measureText）。`font` は CSS の綴り（`16px sans-serif`）。
+/// 測る紙は文書に 1 枚（`__mmmMeasure`）— 測るたびに作ると、地図 1 枚で何百と作る
+pub extern "js" fn text_width(
+  doc : @dom.Document,
+  font : String,
+  text : String,
+) -> Double =
+  #| (doc, font, text) => {
+  #|   const ctx = (doc.__mmmMeasure ??= doc.createElement("canvas").getContext("2d"));
+  #|   if (!ctx) throw new Error("no 2d context");
+  #|   ctx.font = font; return ctx.measureText(text).width;
+  #| }
+
+///|
+/// SVG の字を、指定した px の絵にする。`blob:` の参照を残していると canvas が
+/// 汚れて toBlob が投げるので、呼ぶ側が先に data URL へ埋め直しておく。
+/// **大きさが上限に収まることは呼ぶ側の責任**（`fit`）— canvas は超えた分を
+/// 黙って切るか null を返すだけで、何も言わない。絵にできなければ拒む
+pub extern "js" fn rasterize(
+  text : String,
+  mime : String,
+  px_w : Int,
+  px_h : Int,
+) -> @js_async.Promise[@core.Any] =
+  #| (text, mime, px_w, px_h) => new Promise((ok, no) => {
+  #|   const img = new Image();
+  #|   img.onload = () => {
+  #|     const canvas = document.createElement("canvas");
+  #|     canvas.width = px_w; canvas.height = px_h;
+  #|     canvas.getContext("2d").drawImage(img, 0, 0, px_w, px_h);
+  #|     canvas.toBlob((blob) => (blob ? ok(blob) : no(new Error("could not rasterize"))), mime);
+  #|   };
+  #|   img.onerror = () => no(new Error("svg could not be drawn"));
+  #|   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}`;
+  #| })

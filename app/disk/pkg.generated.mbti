@@ -26,7 +26,7 @@ pub(all) struct Binding {
 }
 
 pub struct Disk {
-  handles : Recent
+  recent : Recent
   mut current : @web.FileHandle?
 }
 pub fn Disk::close(Self) -> Unit
@@ -34,7 +34,7 @@ pub fn Disk::new(Recent) -> Self
 pub async fn Disk::open_dialog(Self) -> Doc?
 pub async fn Disk::open_handle(Self, @web.FileHandle) -> Doc
 pub async fn Disk::open_known(Self, @web.FileHandle) -> Doc?
-pub async fn Disk::recent(Self) -> Array[@web.FileHandle]
+pub async fn Disk::remembered(Self) -> Array[@web.FileHandle]
 pub async fn Disk::rename(Self, String) -> String?
 pub async fn Disk::save(Self, String) -> Unit
 pub async fn Disk::save_as(Self, String, String) -> Doc?
@@ -60,11 +60,10 @@ pub(all) struct ImageDeps {
 
 pub struct Images {
   doc : @dom.Document
-  io : Disk
+  disk : Disk
   deps : ImageDeps
   urls : Map[String, String?]
-  mut cached : Binding?
-  mut cached_known : Bool
+  mut cached : Binding??
   mut live : Bool
 }
 pub async fn Images::choose_folder(Self) -> Unit
