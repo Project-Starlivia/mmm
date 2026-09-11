@@ -96,6 +96,12 @@ pub fn LabelField::new(@dom.Document, @dom.HTMLElement, (@map.Font, String) -> D
 pub fn LabelField::open(Self, Int, @map.Layout, @map.Camera, String, String?) -> Unit
 pub fn LabelField::place(Self, @map.Layout, @map.Camera) -> Unit
 
+pub struct Marks {
+  root : Bool
+  folded : Bool
+  open : Bool
+} derive(Eq)
+
 pub struct Mindmap {
   pane : @dom.HTMLElement
   host : Host
@@ -163,6 +169,7 @@ pub struct Renderer {
   node_els : Map[Int, @dom.Element]
   edge_els : Map[Int, @dom.Element]
   shapes : Map[Int, Shape]
+  marks : Map[Int, Marks]
   node_tf : Map[Int, String]
   edge_d : Map[Int, String]
   mut order_sig : String
