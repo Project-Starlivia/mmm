@@ -144,11 +144,11 @@ fn attempt(doc : @tree.Doc, op : Op) -> Done? {
     Fold(id~, open~) => fold(doc, id, open)
     Unfold(id~) => unfold(doc, id)
     Delete(ids~) => delete(doc, ids)
-    AddNode(at~, labels~) => add_node(doc, at, labels)
+    AddNode(at~, label~) => add_node(doc, at, label)
     Wrap(id~, label~) => wrap(doc, id, label)
     MoveNode(ids~, at~) => move_node(doc, ids, at)
     FlipSide(id~) => flip(doc, id)
-    AddBlock(at~, content~, source~) => add_block(doc, at, content, source)
+    AddBlock(at~, content~) => add_block(doc, at, content)
     SetBlock(id~, content~, source~) => set_block(doc, id, content, source)
     MoveBlock(ids~, at~) => move_block(doc, ids, at)
     Graft(at~, md~) => graft(doc, at, md)
@@ -375,13 +375,9 @@ fn implant(
 
 ///|
 /// 新しいノードを差す。
-fn add_node(doc : @tree.Doc, at : NodePlace, labels : Array[String]) -> Done? {
-  guard !labels.is_empty() else { return None }
-  let first = fresh(doc)
-  done(
-    implant(doc, at, labels.mapi((k, label) => make(first + k, label))),
-    Some(first),
-  )
+fn add_node(doc : @tree.Doc, at : NodePlace, label : String) -> Done? {
+  let id = fresh(doc)
+  done(implant(doc, at, [make(id, label)]), Some(id))
 }
 
 ///|
@@ -594,10 +590,9 @@ fn add_block(
   doc : @tree.Doc,
   at : BlockPlace,
   content : @tree.Content?,
-  source : String?,
 ) -> Done? {
   guard owner_at(doc, at) is Some(o) else { return None }
-  let b : @tree.Block = { id: fresh(doc), content, source, }
+  let b : @tree.Block = { id: fresh(doc), content, source: None, }
   done(body(doc, node=o, bs => put(bs, at, [b])), Some(b.id))
 }
 

@@ -9,15 +9,13 @@ test "Op は JSON の値になり、JSON から起こせる" {
     AddBlock(
       at=BlockPlace::Before(block=7),
       content=Some(Code(info="js", text="x")),
-      source=None,
     ),
-    AddNode(at=NodePlace::In(node=2, side=None), labels=["n"]),
-    AddNode(at=NodePlace::In(node=2, side=Some(Left)), labels=["n"]),
+    AddNode(at=NodePlace::In(node=2, side=None), label="n"),
+    AddNode(at=NodePlace::In(node=2, side=Some(Left)), label="n"),
     MoveBlock(ids=[3, 4], at=Before(block=5)),
     AddBlock(
       at=BlockPlace::In(node=2),
       content=Some(Code(info="js", text="1\n")),
-      source=None,
     ),
     Fold(id=2, open=false),
   ]
@@ -39,11 +37,11 @@ test "Op は JSON の値になり、JSON から起こせる" {
   ])
   json_inspect(ops[3], content=[
     "AddNode",
-    { "at": ["In", { "node": 2 }], "labels": ["n"] },
+    { "at": ["In", { "node": 2 }], "label": "n" },
   ])
   json_inspect(ops[4], content=[
     "AddNode",
-    { "at": ["In", { "node": 2, "side": "Left" }], "labels": ["n"] },
+    { "at": ["In", { "node": 2, "side": "Left" }], "label": "n" },
   ])
   json_inspect(ops[6], content=[
     "AddBlock",

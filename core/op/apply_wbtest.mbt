@@ -234,7 +234,7 @@ test "Delete したノードの focus は次の兄弟 → 前の兄弟 → 親�
 test "AddNode は隣の前後と子の末尾。綴りは隣に従う" {
   let d = doc([root(h(2, "r", children=[h(3, "a")]), sides=[Left])])
   assert_eq(
-    apply(d, AddNode(at=NodePlace::After(node=3), labels=["b"])),
+    apply(d, AddNode(at=NodePlace::After(node=3), label="b")),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(3, "a"), h(4, "b")]), sides=[Left, Left]),
@@ -243,20 +243,16 @@ test "AddNode は隣の前後と子の末尾。綴りは隣に従う" {
     }),
   )
   assert_eq(
-    apply(d, AddNode(at=NodePlace::Before(node=3), labels=["b", "c"])),
+    apply(d, AddNode(at=NodePlace::Before(node=3), label="b")),
     Some({
       doc: doc([
-        root(h(2, "r", children=[h(4, "b"), h(5, "c"), h(3, "a")]), sides=[
-          Left,
-          Left,
-          Left,
-        ]),
+        root(h(2, "r", children=[h(4, "b"), h(3, "a")]), sides=[Left, Left]),
       ]),
       focus: Some(4),
     }),
   )
   assert_eq(
-    apply(d, AddNode(at=NodePlace::In(node=3, side=None), labels=[""])),
+    apply(d, AddNode(at=NodePlace::In(node=3, side=None), label="")),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(3, "a", children=[h(4, "")])]), sides=[Left]),
@@ -265,7 +261,7 @@ test "AddNode は隣の前後と子の末尾。綴りは隣に従う" {
     }),
   )
   assert_eq(
-    apply(d, AddNode(at=NodePlace::In(node=2, side=Some(Right)), labels=["b"])),
+    apply(d, AddNode(at=NodePlace::In(node=2, side=Some(Right)), label="b")),
     Some({
       doc: doc([
         root(h(2, "r", children=[h(3, "a"), h(4, "b")]), sides=[Left, Right]),
@@ -279,7 +275,7 @@ test "AddNode は隣の前後と子の末尾。綴りは隣に従う" {
 test "AddNode の綴り: 項目の隣は項目、項目の下は項目、見出しの下で子が無ければ見出し" {
   let d = doc([root(h(2, "r", children=[item(3, "a")]), sides=[Right])])
   assert_eq(
-    apply(d, AddNode(at=NodePlace::After(node=3), labels=["b"])),
+    apply(d, AddNode(at=NodePlace::After(node=3), label="b")),
     Some({
       doc: doc([
         root(h(2, "r", children=[item(3, "a"), item(4, "b")]), sides=[
@@ -291,7 +287,7 @@ test "AddNode の綴り: 項目の隣は項目、項目の下は項目、見出�
     }),
   )
   assert_eq(
-    apply(d, AddNode(at=NodePlace::In(node=3, side=None), labels=["b"])),
+    apply(d, AddNode(at=NodePlace::In(node=3, side=None), label="b")),
     Some({
       doc: doc([
         root(h(2, "r", children=[item(3, "a", children=[item(4, "b")])]), sides=[
@@ -302,7 +298,7 @@ test "AddNode の綴り: 項目の隣は項目、項目の下は項目、見出�
     }),
   )
   assert_eq(
-    apply(d, AddNode(at=NodePlace::In(node=2, side=None), labels=["b"])),
+    apply(d, AddNode(at=NodePlace::In(node=2, side=None), label="b")),
     Some({
       doc: doc([
         root(h(2, "r", children=[item(3, "a"), item(4, "b")]), sides=[
@@ -315,7 +311,7 @@ test "AddNode の綴り: 項目の隣は項目、項目の下は項目、見出�
   )
   let e = doc([root(h(2, "r"))])
   assert_eq(
-    apply(e, AddNode(at=NodePlace::In(node=2, side=None), labels=["b"])),
+    apply(e, AddNode(at=NodePlace::In(node=2, side=None), label="b")),
     Some({
       doc: doc([root(h(2, "r", children=[h(3, "b")]), sides=[Right])]),
       focus: Some(3),
@@ -328,7 +324,7 @@ test "AddNode を doc_id にすれば新しい根。空の文書にも" {
   assert_eq(
     apply(
       doc([]),
-      AddNode(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["r"]),
+      AddNode(at=NodePlace::In(node=@tree.doc_id, side=None), label="r"),
     ),
     Some({ doc: doc([root(h(2, "r"))]), focus: Some(2), }),
   )
@@ -338,19 +334,15 @@ test "AddNode を doc_id にすれば新しい根。空の文書にも" {
 test "AddNode を doc_id にすれば最後の根の綴りに従う" {
   let d = doc([root(item(2, "a"))])
   assert_eq(
-    apply(
-      d,
-      AddNode(at=NodePlace::In(node=@tree.doc_id, side=None), labels=["b"]),
-    ),
+    apply(d, AddNode(at=NodePlace::In(node=@tree.doc_id, side=None), label="b")),
     Some({ doc: doc([root(item(2, "a")), root(item(3, "b"))]), focus: Some(3), }),
   )
 }
 
 ///|
-test "AddNode は空のラベル列と知らない id に None" {
+test "AddNode は知らない id に None" {
   let d = doc([root(h(2, "r"))])
-  assert_eq(apply(d, AddNode(at=NodePlace::After(node=2), labels=[])), None)
-  assert_eq(apply(d, AddNode(at=NodePlace::After(node=9), labels=["a"])), None)
+  assert_eq(apply(d, AddNode(at=NodePlace::After(node=9), label="a")), None)
 }
 
 ///|
@@ -585,7 +577,7 @@ test "Implicit は見出しの直後に来れば綴られる" {
   )
   // 新しい隣も同じ
   assert_eq(
-    apply(d, AddNode(at=Before(node=4), labels=["n"])),
+    apply(d, AddNode(at=Before(node=4), label="n")),
     Some({
       doc: doc([
         root(
@@ -840,10 +832,7 @@ test "AddBlock は隣の前後と body の末尾" {
   ])
   let c : @tree.Content = Code(info="", text="x")
   assert_eq(
-    apply(
-      d,
-      AddBlock(at=BlockPlace::After(block=3), content=Some(c), source=None),
-    ),
+    apply(d, AddBlock(at=BlockPlace::After(block=3), content=Some(c))),
     Some({
       doc: doc([
         root(h(2, "r", body=[pic(3), code(5)], children=[h(4, "a")]), sides=[
@@ -854,10 +843,7 @@ test "AddBlock は隣の前後と body の末尾" {
     }),
   )
   assert_eq(
-    apply(
-      d,
-      AddBlock(at=BlockPlace::Before(block=3), content=Some(c), source=None),
-    ),
+    apply(d, AddBlock(at=BlockPlace::Before(block=3), content=Some(c))),
     Some({
       doc: doc([
         root(h(2, "r", body=[code(5), pic(3)], children=[h(4, "a")]), sides=[
@@ -868,7 +854,7 @@ test "AddBlock は隣の前後と body の末尾" {
     }),
   )
   assert_eq(
-    apply(d, AddBlock(at=BlockPlace::In(node=4), content=Some(c), source=None)),
+    apply(d, AddBlock(at=BlockPlace::In(node=4), content=Some(c))),
     Some({
       doc: doc([
         root(h(2, "r", body=[pic(3)], children=[h(4, "a", body=[code(5)])]), sides=[
@@ -879,14 +865,7 @@ test "AddBlock は隣の前後と body の末尾" {
     }),
   )
   assert_eq(
-    apply(
-      d,
-      AddBlock(
-        at=BlockPlace::In(node=@tree.doc_id),
-        content=Some(c),
-        source=None,
-      ),
-    ),
+    apply(d, AddBlock(at=BlockPlace::In(node=@tree.doc_id), content=Some(c))),
     Some({
       doc: doc(
         [root(h(2, "r", body=[pic(3)], children=[h(4, "a")]), sides=[Right])],
@@ -902,21 +881,15 @@ test "AddBlock は Implicit・ノードの id・知らない id に None" {
   let d = doc([root(h(2, "r", children=[gap(3, [h(4, "x")])]), sides=[Right])])
   let c : @tree.Content = Code(info="", text="x")
   assert_eq(
-    apply(d, AddBlock(at=BlockPlace::In(node=3), content=Some(c), source=None)),
+    apply(d, AddBlock(at=BlockPlace::In(node=3), content=Some(c))),
     None,
   )
   assert_eq(
-    apply(
-      d,
-      AddBlock(at=BlockPlace::After(block=4), content=Some(c), source=None),
-    ),
+    apply(d, AddBlock(at=BlockPlace::After(block=4), content=Some(c))),
     None,
   )
   assert_eq(
-    apply(
-      d,
-      AddBlock(at=BlockPlace::After(block=9), content=Some(c), source=None),
-    ),
+    apply(d, AddBlock(at=BlockPlace::After(block=9), content=Some(c))),
     None,
   )
 }
@@ -1248,7 +1221,7 @@ fn six(tail : Array[@tree.Node]) -> @tree.Doc {
 ///|
 test "AddNode は 6 段目の下なら項目で足す" {
   assert_eq(
-    apply(six([]), AddNode(at=NodePlace::In(node=7, side=None), labels=["g"])),
+    apply(six([]), AddNode(at=NodePlace::In(node=7, side=None), label="g")),
     Some({ doc: six([item(8, "g")]), focus: Some(8), }),
   )
 }
@@ -1371,7 +1344,7 @@ test "項目の中の席の綴りは隣に従う" {
   // 子の無い項目の下は項目
   let lone = doc([root(item(2, "i"))])
   assert_eq(
-    apply(lone, AddNode(at=In(node=2, side=None), labels=["n"])),
+    apply(lone, AddNode(at=In(node=2, side=None), label="n")),
     Some({
       doc: doc([root(item(2, "i", children=[item(3, "n")]), sides=[Right])]),
       focus: Some(3),
@@ -1380,7 +1353,7 @@ test "項目の中の席の綴りは隣に従う" {
   // 中に見出しが書かれていれば、その隣も見出し
   let inner = doc([root(item(2, "i", children=[h(3, "x")]), sides=[Right])])
   assert_eq(
-    apply(inner, AddNode(at=After(node=3), labels=["n"])),
+    apply(inner, AddNode(at=After(node=3), label="n")),
     Some({
       doc: doc([
         root(item(2, "i", children=[h(3, "x"), h(4, "n")]), sides=[Right, Right]),
@@ -1406,7 +1379,7 @@ test "項目の中の席の綴りは隣に従う" {
 test "子の無い項目の下に足せば項目だが、マーカーは親のものでなく既定" {
   let d = doc([root(item(2, "a", marker="*"))])
   assert_eq(
-    apply(d, AddNode(at=In(node=2, side=None), labels=["n"])),
+    apply(d, AddNode(at=In(node=2, side=None), label="n")),
     Some({
       doc: doc([
         root(item(2, "a", marker="*", children=[item(3, "n")]), sides=[Right]),

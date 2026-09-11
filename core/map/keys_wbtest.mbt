@@ -40,7 +40,7 @@ fn keys_gap() -> Layout {
 
 ///|
 let empty_op : Intent = Op(
-  op=AddNode(at=In(node=@tree.doc_id, side=None), labels=[""]),
+  op=AddNode(at=In(node=@tree.doc_id, side=None), label=""),
   edit=true,
 )
 
@@ -49,7 +49,7 @@ test "Enter — 名前のあるノードなら下に兄弟を足して編集、�
   let l = keys_l()
   assert_eq(
     keyed(l, Selection::only(3), k("Enter")),
-    Some(Op(op=AddNode(at=After(node=3), labels=[""]), edit=true)),
+    Some(Op(op=AddNode(at=After(node=3), label=""), edit=true)),
   )
   assert_eq(
     keyed(l, Selection::only(4), k("Enter")),
@@ -66,7 +66,7 @@ test "Enter と打鍵 — Implicit は埋める側に回らない" {
   let g = keys_gap()
   assert_eq(
     keyed(g, Selection::only(3), k("Enter")),
-    Some(Op(op=AddNode(at=After(node=3), labels=[""]), edit=true)),
+    Some(Op(op=AddNode(at=After(node=3), label=""), edit=true)),
   )
   assert_eq(keyed(g, Selection::only(3), k("x")), None)
 }
@@ -76,11 +76,11 @@ test "Shift+Enter は上に兄弟。Tab は子。Shift+Tab は親で包む。ど
   let l = keys_l()
   assert_eq(
     keyed(l, Selection::only(3), k("Enter", shift=true)),
-    Some(Op(op=AddNode(at=Before(node=3), labels=[""]), edit=true)),
+    Some(Op(op=AddNode(at=Before(node=3), label=""), edit=true)),
   )
   assert_eq(
     keyed(l, Selection::only(3), k("Tab")),
-    Some(Op(op=AddNode(at=In(node=3, side=None), labels=[""]), edit=true)),
+    Some(Op(op=AddNode(at=In(node=3, side=None), label=""), edit=true)),
   )
   assert_eq(
     keyed(l, Selection::only(3), k("Tab", shift=true)),
@@ -142,7 +142,7 @@ test "複数選んでいても宛先は anchor — 1 つ選んでいるときと
   // anchor に名前があれば後ろに足す
   assert_eq(
     keyed(l, many([3, 4], 3), k("Enter")),
-    Some(Op(op=AddNode(at=After(node=3), labels=[""]), edit=true)),
+    Some(Op(op=AddNode(at=After(node=3), label=""), edit=true)),
   )
   // anchor が空なら「埋めるが先」も同じに効く
   assert_eq(keyed(l, many([3, 4], 4), k("Enter")), Some(Edit(id=4, seed=None)))

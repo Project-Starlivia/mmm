@@ -390,13 +390,7 @@ test "act: 選び直しは reveal で寄せ、Copy は写せたときだけ cut�
   s.map.act(AddLink(id=3))
   assert_true(
     s.stub.applied.last()
-    is Some(
-      AddBlock(
-        content=Some(Link(href="https://example.com/x", ..)),
-        source=None,
-        ..
-      )
-    ),
+    is Some(AddBlock(content=Some(Link(href="https://example.com/x", ..)), ..)),
   )
   s.map.act(Paste)
   assert_eq(s.stub.pasted, 1)

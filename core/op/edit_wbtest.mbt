@@ -68,7 +68,7 @@ test "できない操作 — 編集は無く、focus も無い" {
 test "AddNode — 新しいノードの focus は、読み直したときの番号" {
   // 操作は max+1 の 4 を振るが、a と b の間に差さるので読み直せば 3
   assert_eq(
-    applied("# a\n\n# b\n", AddNode(at=After(node=2), labels=["n"])),
+    applied("# a\n\n# b\n", AddNode(at=After(node=2), label="n")),
     ("# a\n\n# n\n\n# b\n", Some(3)),
   )
 }
@@ -164,7 +164,7 @@ test "Graft — 貼った `---` は境界。md が形を決め、focus は無い
   )
   // md ペインで末尾に `---` を書いてから隣に足す操作も、同じ 1 つの解釈
   assert_eq(
-    applied("# r\n\n## a\n\n---\n", AddNode(at=After(node=3), labels=["b"])),
+    applied("# r\n\n## a\n\n---\n", AddNode(at=After(node=3), label="b")),
     ("# r\n\n## a\n\n---\n\n## b\n", None),
   )
 }
@@ -189,7 +189,7 @@ test "Graft — 貼った順は崩れない。中身は直前に生えたノー�
 /// #84 — 差すものの綴りは席が決める。隣が `*` の列なら `*`
 test "新しい項目は隣の綴りを継ぐ — * の列に足せば *" {
   assert_eq(
-    applied("# a\n\n* b\n", AddNode(at=After(node=3), labels=["c"])),
+    applied("# a\n\n* b\n", AddNode(at=After(node=3), label="c")),
     ("# a\n\n* b\n* c\n", Some(4)),
   )
 }
@@ -199,7 +199,7 @@ test "新しい項目は隣の綴りを継ぐ — * の列に足せば *" {
 /// 詰まった列に足せば詰まったまま（#203）
 test "新しい根の項目は最後の根の綴りを継ぐ — * の根に足せば *" {
   let md = "* a\n"
-  let r = edit(md, AddNode(at=In(node=@tree.doc_id, side=None), labels=["b"]))
+  let r = edit(md, AddNode(at=In(node=@tree.doc_id, side=None), label="b"))
   assert_eq(@tree.patched(md, r.edits), "* a\n* b\n")
   assert_eq(r.focus, Some(3))
 }

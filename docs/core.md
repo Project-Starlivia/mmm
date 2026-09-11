@@ -394,8 +394,8 @@ design.md「状態と拍」）。打鍵ごとの core 呼び出しは `mmmSurvey
 NodePlace  = Before(node~)  | After(node~)  | In(node~, side: Side?)   // ノードの席。子の列
 BlockPlace = Before(block~) | After(block~) | In(node~)                 // 中身の席。body の列
 
-Op = AddNode(at: NodePlace, labels)   | AddBlock(at: BlockPlace, content)
-   | Rename(id, label)            | SetBlock(id, content)
+Op = AddNode(at: NodePlace, label)    | AddBlock(at: BlockPlace, content)
+   | Rename(id, label)            | SetBlock(id, content, source)
    | MoveNode(ids, at: NodePlace)     | MoveBlock(ids, at: BlockPlace)
    | Delete(ids)                  // ノードも中身も
    | Wrap(id, label) | FlipSide(id) | Fold(id, open) | Unfold(id)
