@@ -25,16 +25,20 @@ jobs:
       # MoonBit は公式の GitHub Action が無いので、配布スクリプトで入れる。
       # 置き場所は $HOME/.moon/bin で、PATH に通すのはこちらの仕事。
       #
-      # **版を固定する。** 既定は「そのとき最新」なので、こちらが 1 行も
-      # 書かない日に赤くなる（整形の出す形も非推奨の印も版で変わる）。
-      # 書いてあるのは **moonc の版**（`moon version --all` の 2 行目）で、
-      # 配布物の名前になっているのはこちら。moon 側の日付では引けない。
-      # 上げるときは手元も一緒に上げて、整形し直したものを同じ commit で出す
+      # **最新を追う。** `latest` と書いてあるのは既定と同じだが、選んだ結果で
+      # あって書き忘れではないことを残すため。版を固定すると「動いていた頃」を
+      # 抱え、上げる引き金を人が覚えていなければならない。常に今の処理系に
+      # 合わせ、赤くなったら直す（#24。上流の repo も全部この向き）。
+      #
+      # 赤くなる形は 2 つ。**整形の出す形が変わって `moon fmt --check` が
+      # 落ちる**か、**非推奨の印が増える**か。どちらも手元を `latest` に上げ、
+      # 直したものを同じ commit で出す。下の `moon version --all` が、その回に
+      # 何が入ったかを言う（効くのは 2 行目の moonc）
       - name: Install MoonBit
         run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s 0.10.11+6ff76a5f9
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s latest
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
-      - run: moon version
+      - run: moon version --all
 
       # 入れたてのランナーには mooncakes の索引が無い。無いまま解決に入ると
       # 「module was not found in the registry」で止まる（moon install は

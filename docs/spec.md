@@ -158,6 +158,12 @@ ai-docs/ 実測の控え — moonbit.md は MoonBit の癖、codemirror.md は C
 必要: Node.js、pnpm、[MoonBit toolchain](https://www.moonbitlang.com/download)
 (`moon` が PATH にあること)
 
+**MoonBit は最新を追う。** CI も手元も `latest` で、版はどこにも固定しない
+(`moon.mod` に処理系の版を書く欄が無いので、固定するなら CI の 1 行になる —
+そうすると「動いていた頃」を抱え、上げる引き金を人が覚えていなければならない)。
+上流が動いて赤くなったら、手元を上げて同じ commit で直す。赤くなる形は
+**整形の出す形が変わる**か**非推奨の印が増える**かのどちらか (#24)。
+
 ```
 pnpm install
 pnpm run dev        # コアをビルドしてから vite（http://localhost:13131）
