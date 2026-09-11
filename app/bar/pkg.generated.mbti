@@ -50,6 +50,7 @@ pub(all) struct FileActs {
   open_recent : (Int) -> Unit
   save : () -> Unit
   save_as : () -> Unit
+  toggle_autosave : () -> Unit
   rename : () -> Unit
   choose_folder : () -> Unit
 }
@@ -57,6 +58,7 @@ pub(all) struct FileActs {
 pub(all) struct Files {
   saved_name : String?
   recent : Array[String]
+  autosave : Bool
   can_open : Bool
   can_save : Bool
   can_rename : Bool

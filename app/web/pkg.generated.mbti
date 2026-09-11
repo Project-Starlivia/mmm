@@ -12,6 +12,8 @@ pub fn address(@dom.Document) -> String
 
 pub fn after(@core.Any, (@core.Any) -> Unit) -> Unit
 
+pub fn after_quiet(@dom.Document, Int, () -> Unit) -> () -> Unit
+
 pub fn attr_in(@core.Any, String, String) -> String?
 
 pub fn blob_type(@core.Any) -> String
