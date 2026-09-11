@@ -19,12 +19,9 @@ priv struct Deem {
   /// 積んである骨格の綴り。**高さが深さ**で、中身は「項目か」を見るのに使う
   /// （列 0 の見出しは開いている項目を閉じる）。飛び（Implicit）は None
   stack : Array[Mark?]
-  /// 行き先待ちの水平線が有るか。**本数に意味は無い**ので Bool で持つ
-  mut pend : Bool
-  /// その水平線の頭。飾りに落ちたとき地番に入れる
-  mut pend_from : Int
-  /// その水平線の尻。飾りに落ちたとき地番に入れる
-  mut pend_to : Int
+  /// 行き先待ちの水平線の範囲。**本数に意味は無い**ので 1 本しか持たない。
+  /// 境界になれば綴りを、飾りに落ちれば地番をここから切り出す
+  mut pend : @markdown.Span?
   /// いま積む骨格が畳まれているなら、その `<details>` 〜 `</details>` の範囲
   mut fold_at : @markdown.Span?
   /// まだ閉じていない畳みの、畳んだノードの深さ。**閉じは境界と同じ** —
@@ -60,9 +57,7 @@ fn Deem::new(
     md,
     defs,
     stack: [],
-    pend: false,
-    pend_from: 0,
-    pend_to: 0,
+    pend: None,
     fold_at: None,
     fold_roots: [],
     top: deep,
@@ -127,7 +122,7 @@ fn depths(
     if gone[i] {
       // 落ちる綴りでも、畳みの開きと閉じは深さを動かす（本番の `deem` と同じ）
       if closes[i] {
-        shut(d)
+        shut(d.stack, d.fold_roots)
       }
       if opens[i] {
         opening = true
@@ -148,7 +143,7 @@ fn depths(
 
 ///|
 /// ひと切れを積む。畳みは見出し・項目の行に印を付けるか、中身の 1 枚になる。
-fn deem(d : Deem, cut : Slice, nest : Int) -> Unit {
+fn deem(d : Deem, cut : Cut, nest : Int) -> Unit {
   match cut {
     Plain(block) => take(d, block, nest)
     Folded(block, fold~, at~, open_at~) => {
@@ -160,7 +155,7 @@ fn deem(d : Deem, cut : Slice, nest : Int) -> Unit {
     }
     Closed(from~, to~) => {
       keep(d, { from, to, }, FoldClose)
-      shut(d)
+      shut(d.stack, d.fold_roots)
     }
     Capsule(text~, open~, summary~, body~, from~, to~) => {
       // 中身が来たので、保留中の水平線は境界になれない
@@ -208,8 +203,8 @@ fn take(
         at_label=head_start(d.md, span, style),
       )
     }
-    BulletList(items~, ..) => items_take(d, items, nest, fold~)
-    OrderedList(items~, ..) => items_take(d, items, nest, fold~)
+    BulletList(items~, ..) => items_take(d, items, nest, fold)
+    OrderedList(items~, ..) => items_take(d, items, nest, fold)
     // 区切りは**根の領土の隙間**でだけ側の変わり目になる。項目の中は中身なので
     // 保留せずその場に置く（保留すると、置く前に項目の枠が閉じられたとき
     // 帰る場所が無くなって文書へ落ちる）
@@ -228,9 +223,7 @@ fn take(
       // 水平線が続くなら、手前の 1 本は境界になれない（直後が骨格でない）ので
       // その場の中身に落ちる。保留は 1 本しか持てないので、上書きの前に吐き出す
       spill(d)
-      d.pend = true
-      d.pend_from = span.from
-      d.pend_to = span.to
+      d.pend = Some(span)
     }
     // 空行は綴りであってモデルには無い。serialize が正規形として置き直す
     BlankLines(..) => ()
@@ -255,7 +248,7 @@ fn items_take(
   d : Deem,
   items : Array[@markdown.ListItem],
   nest : Int,
-  fold? : Fold? = None,
+  fold : Fold?,
 ) -> Unit {
   let loose = item_gaps(d.md, items)
   // **項目の深さは、この列が座る枠の 1 つ下。** 入れ子の段数や `#` の数から
@@ -393,7 +386,7 @@ fn put(
   at_label~ : Int,
   line? : @markdown.Span? = None,
 ) -> Unit {
-  let level = seat_level(d, level, mark)
+  let seated = seat_level(d, level, mark)
   // 控えるのは**行そのものの範囲**。地番（`at`）は項目なら部分木ぜんぶ、
   // 畳まれた行なら `<details>` の範囲まで伸びるが、記法構造ではその外側は
   // 別のひと切れなので、行は行の字だけを持つ
@@ -401,15 +394,15 @@ fn put(
     Some(l) => l
     None => at
   }
-  clear(d, level, mark)
+  clear(d, seated, mark)
   // **閉じた後に残った高さ**。深さだけでは組み直せない — 列 0 の見出しが
   // 開いている項目を閉じたか、境界が部分木を引き出したかは、ここでしか分からない
   let under = d.stack.length()
-  bridge(d, level)
+  bridge(d, seated)
   // 畳まれた行の地番は `<details>` の範囲まで伸びる。**伸びるのは畳んだ行 1 本だけ** —
   // 項目は部分木ぜんぶが 1 枚の塊なので、下って積む子まで伸ばすと子の行が
   // 見失われる（隙間も畳みの手前のものになる）
-  let at = match d.fold_at {
+  let extent = match d.fold_at {
     Some(s) => {
       d.fold_at = None
       s
@@ -422,11 +415,11 @@ fn put(
     Line(
       depth=d.stack.length() + 1,
       under~,
-      label=at_label,
+      label~,
+      at_label~,
       mark~,
-      text=label,
       fold~,
-      at~,
+      at=extent,
     ),
   )
   // **そのブロック自身のノードは、最初に座る綴られた枠。** 手前の穴埋めは足場、
@@ -443,7 +436,7 @@ fn put(
 /// 項目は相対記法なので深さが導出値で、引き出し先に合わせて置き直せる
 /// （見出しは絶対座標なので動かせず、足りない深さを Implicit が埋める）。
 fn seat_level(d : Deem, level : Int, mark : Mark?) -> Int {
-  if d.pend && mark is Some(Item(..)) {
+  if d.pend is Some(_) && mark is Some(Item(..)) {
     2
   } else {
     level
@@ -464,7 +457,7 @@ fn clear(d : Deem, level : Int, mark : Mark?) -> Unit {
   }
   if level == 1 || d.stack.is_empty() {
     spill(d)
-  } else if d.pend {
+  } else if d.pend is Some(_) {
     while d.stack.length() > 1 {
       ignore(d.stack.unsafe_pop())
     }
@@ -488,14 +481,10 @@ fn bridge(d : Deem, level : Int) -> Unit {
 /// 深さ 2 の枠の手前だけ**（根の子）。裏返した先の側は控えない — 側を数え直すのは
 /// 組み立て（`Lay::born`）で、こちらは「ここが変わり目だ」と言うだけ。
 fn border(d : Deem) -> Unit {
-  guard d.stack.length() == 1 && d.pend else { return }
+  guard d.stack.length() == 1 && d.pend is Some(at) else { return }
   // 書き戻しに要るのは綴りだけなので原文を控える
-  keep(
-    d,
-    { from: d.pend_from, to: d.pend_to, },
-    Border(rule=carve(d.md, d.pend_from, d.pend_to)),
-  )
-  d.pend = false
+  keep(d, at, Border(rule=carve(d.md, at.from, at.to)))
+  d.pend = None
 }
 
 ///|
@@ -514,10 +503,13 @@ fn seat(d : Deem, mark : Mark?) -> Unit {
 /// 降ろす（領域は部分木を過不足なく覆うので、閉じの後ろはその外）。
 /// 続く骨格は畳んだノードの兄弟から測り、深い見出しは Implicit が間を埋める。
 /// 側は裏返らない — 裏返すのは `---` だけ。
-fn shut(d : Deem) -> Unit {
-  guard d.fold_roots.pop() is Some(root) else { return }
-  while d.stack.length() >= root && !d.stack.is_empty() {
-    ignore(d.stack.unsafe_pop())
+///
+/// **降ろし方は 1 つ。** 裁定（`Deem`）も深さの空打ち（`depths`）も組み立て（`Lay`）も
+/// 同じ規則で降ろす — 違う前提で積むと畳みの判定がずれる
+fn[T] shut(stack : Array[T], fold_roots : Array[Int]) -> Unit {
+  guard fold_roots.pop() is Some(root) else { return }
+  while stack.length() >= root && !stack.is_empty() {
+    ignore(stack.unsafe_pop())
   }
 }
 
@@ -525,15 +517,11 @@ fn shut(d : Deem) -> Unit {
 /// 境界になれなかった水平線を、その場の中身として落とす。
 /// 書かれた位置がそのまま保たれる。
 fn spill(d : Deem) -> Unit {
-  if d.pend {
-    d.pend = false
-    keep(
-      d,
-      { from: d.pend_from, to: d.pend_to, },
-      Card(
-        content=Some(ThematicBreak),
-        source=Some(carve(d.md, d.pend_from, d.pend_to)),
-      ),
-    )
-  }
+  guard d.pend is Some(at) else { return }
+  d.pend = None
+  keep(
+    d,
+    at,
+    Card(content=Some(ThematicBreak), source=Some(carve(d.md, at.from, at.to))),
+  )
 }

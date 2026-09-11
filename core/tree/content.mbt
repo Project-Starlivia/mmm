@@ -61,9 +61,8 @@ fn bare(text : String) -> Content? {
   // scheme だけの字は行き先が無い
   guard text.length() > scheme else { return None }
   for i = scheme; i < text.length(); i = i + 1 {
-    let c = text[i]
     // 空白が混ざれば URL 1 つの行ではない
-    if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+    if space(text[i]) {
       return None
     }
   }
@@ -100,7 +99,7 @@ fn inline_text(
   }
   let a = from + span_of(children[0]).from
   let z = from + span_of(children[children.length() - 1]).to
-  String::unsafe_substring(md, start=a, end=z)
+  slice(md, a, z)
 }
 
 ///|

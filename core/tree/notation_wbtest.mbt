@@ -53,8 +53,10 @@ test "見本 — 骨格の裁定は、いまの木と同じ" {
     }
     let got = StringBuilder()
     for p in notation(md).pieces {
-      guard p.verdict is Some(Line(depth~, label~, mark~, ..)) else { continue }
-      got.write_string("\{depth} \{label} \{mark_sig(mark)}\n")
+      guard p.verdict is Some(Line(depth~, at_label~, mark~, ..)) else {
+        continue
+      }
+      got.write_string("\{depth} \{at_label} \{mark_sig(mark)}\n")
     }
     guard got.to_string() == want.to_string() else {
       fail("\{md.escape()}\n--- 木\n\{want}--- 記法\n\{got}")

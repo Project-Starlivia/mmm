@@ -137,7 +137,7 @@ fn Part::nodes(
     }
     match x.mark {
       Some(Item(marker~, ..)) if x.fold is None => {
-        if run is [first, ..] && kind_of(marker_of(first)) != kind_of(marker) {
+        if splits(run, marker) {
           flush()
         }
         run.push(x)
@@ -196,17 +196,11 @@ fn Part::wrap(self : Part, x : Node, inner : () -> Unit) -> Unit {
 
 ///|
 /// 項目の列 1 つ。**塊は 1 つ**（`bullets` が生の塊で綴る）なので、兄弟の間の
-/// 空行はライブラリでなく読んだ詰め（`loose`）が決める。ラベルと中身の間は
-/// `tight`。どちらも `bullets` / `list_item` と同じ式。
+/// 空行はライブラリでなく読んだ詰め（`loose_of`）が決める。ラベルと中身の間は
+/// `tight_of`。
 fn Part::bullets(self : Part, run : Array[Node]) -> Unit {
-  let tight = run
-    .iter()
-    .all(l => {
-      l.body.is_empty() &&
-      l.children.iter().all(c => c.fold is None) &&
-      !underlined(l)
-    })
-  let loose = run.iter().any(l => l.mark is Some(Item(loose=true, ..)))
+  let tight = tight_of(run)
+  let loose = loose_of(run)
   let head = self.next
   for i, l in run {
     let mine = if i == 0 { head } else { loose }
@@ -286,7 +280,7 @@ fn nodes(
     }
     match x.mark {
       Some(Item(marker~, ..)) if x.fold is None => {
-        if run is [first, ..] && kind_of(marker_of(first)) != kind_of(marker) {
+        if splits(run, marker) {
           flush()
         }
         run.push(x)
@@ -352,20 +346,11 @@ fn wrap(out : Array[@markdown.Block], fold : Fold?, inner : () -> Unit) -> Unit 
 /// 詰めを読める者がライブラリに居ないので、包み（`HtmlBlock`）の中だけ自分で
 /// 綴る。文書の中での並びと前後の空行はライブラリのまま。
 ///
-/// 空行は 2 か所に要る。**項目と項目の間**は、読んだ列が loose だったとき。
-/// **ラベルと中身の間**は、ラベルと入れ子の列だけの項目が並ぶとき以外（`tight`）—
-/// 中身は空行で分けないと段落に飲み込まれ、畳まれた子の `<details>` は空行で
-/// 終わる塊なので、分けないと次の項目を飲み込む。ラベルの直後の空の項目も
-/// 分ける（`underlined`）— 正規形は並びで変わる。
+/// 空行は 2 か所に要る。**項目と項目の間**は `loose_of`、**ラベルと中身の間**は
+/// `tight_of` が言う。
 fn bullets(run : Array[Node]) -> @markdown.Block {
-  let tight = run
-    .iter()
-    .all(l => {
-      l.body.is_empty() &&
-      l.children.iter().all(c => c.fold is None) &&
-      !underlined(l)
-    })
-  let loose = run.iter().any(l => l.mark is Some(Item(loose=true, ..)))
+  let tight = tight_of(run)
+  let loose = loose_of(run)
   let sb = StringBuilder()
   for i, l in run {
     if i > 0 && loose {
@@ -377,15 +362,38 @@ fn bullets(run : Array[Node]) -> @markdown.Block {
 }
 
 ///|
+/// 列のラベルと中身を詰めて書けるか — ラベルと入れ子の列だけの項目が並ぶとき。
+/// 中身は空行で分けないと段落に飲み込まれ、畳まれた子の `<details>` は空行で
+/// 終わる塊なので、分けないと次の項目を飲み込む。ラベルの直後の空の項目も
+/// 分ける（`underlined`）— 正規形は並びで変わる
+fn tight_of(run : Array[Node]) -> Bool {
+  run
+  .iter()
+  .all(l => {
+    l.body.is_empty() &&
+    l.children.iter().all(c => c.fold is None) &&
+    !underlined(l)
+  })
+}
+
+///|
+/// 項目の間に空行を置くか — 読んだ列が loose だったとき。
+fn loose_of(run : Array[Node]) -> Bool {
+  run.iter().any(l => l.mark is Some(Item(loose=true, ..)))
+}
+
+///|
+/// このマーカーで列が割れるか — 種類が列の頭と違うとき。
+/// 種類が変われば md でもそこで別の列になるので、書くときも割る。
+fn splits(run : Array[Node], marker : String) -> Bool {
+  run is [first, ..] && kind_of(marker_of(first)) != kind_of(marker)
+}
+
+///|
 /// マーカーの種類。番号なら尻の 1 字（`.` か `)`）、でなければマーカーそのもの。
-/// 種類が変われば md でもそこで列が割れるので、書くときも割る。
 fn kind_of(marker : String) -> String {
   if marker.length() > 0 && marker[0] >= '0' && marker[0] <= '9' {
-    String::unsafe_substring(
-      marker,
-      start=marker.length() - 1,
-      end=marker.length(),
-    )
+    slice(marker, marker.length() - 1, marker.length())
   } else {
     marker
   }
