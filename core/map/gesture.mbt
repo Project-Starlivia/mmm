@@ -30,10 +30,7 @@ pub fn Fingers::pinching(self : Fingers) -> Bool {
 /// （実機では、残った指の pointerdown は来ない）
 pub fn Fingers::only(self : Fingers) -> Pt? {
   guard self.at.length() == 1 else { return None }
-  for p in self.at.values() {
-    return Some(p)
-  }
-  None
+  self.at.values().head()
 }
 
 ///|

@@ -133,8 +133,8 @@ fn Renderer::paint(self : Renderer, sel : Array[Int]) -> Unit {
 fn shape_of(b : @map.Box, scene : Scene) -> Shape {
   let n = b.node
   {
-    w: b.w,
-    h: b.h,
+    w: b.rect.w,
+    h: b.rect.h,
     folded: @map.closed(n),
     buried: b.buried,
     epoch: scene.epoch,
@@ -229,7 +229,7 @@ fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
       @web.toggle_class(g, "open", marks.open)
       self.marks[id] = marks
     }
-    let at : @map.Pt = { x: b.x, y: b.y, }
+    let at : @map.Pt = { x: b.rect.x, y: b.rect.y, }
     if self.node_at.get(id) != Some(at) {
       g.setAttribute(
         "transform",
@@ -248,8 +248,8 @@ fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
     g.append(
       @web.el(doc, "rect", [
         ("class", "box"),
-        ("width", @web.num(b.w)),
-        ("height", @web.num(b.h)),
+        ("width", @web.num(b.rect.w)),
+        ("height", @web.num(b.rect.h)),
       ]).as_node(),
     )
     let folded = @map.closed(n)
@@ -291,7 +291,7 @@ fn Renderer::draw(self : Renderer, scene : Scene) -> Unit {
       let at : Spot = {
         rect,
         row_y: @map.row_top(b.cards, i),
-        box_w: b.w,
+        box_w: b.rect.w,
         id: c.id,
       }
       for e in draw_card(doc, c, at, scene) {

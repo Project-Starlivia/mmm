@@ -32,9 +32,9 @@ fn box(l : Layout, id : Int) -> Box {
 ///|
 test "根は x = 0 で親を持たず、子は右へ gap.x 離れて親に繋がる" {
   let l = layout([root(node(1, "r", children=[node(2, "a")]))], size)
-  assert_eq(box(l, 1).x, 0)
+  assert_eq(box(l, 1).rect.x, 0)
   assert_eq(box(l, 1).parent, None)
-  assert_eq(box(l, 2).x, 100.0 + gap.x)
+  assert_eq(box(l, 2).rect.x, 100.0 + gap.x)
   assert_eq(box(l, 2).parent, Some({ id: 1, side: Right, }))
 }
 
@@ -45,9 +45,9 @@ test "親は第 1 子と最終子の中心の中点に立つ" {
     size,
   )
   // 子の中心は 15, 55, 95（高さ 30 + 隙間 10）。中点 55 → 上端 40
-  assert_eq(box(l, 1).y, 40)
-  assert_eq(box(l, 2).y, 0)
-  assert_eq(box(l, 4).y, 80)
+  assert_eq(box(l, 1).rect.y, 40)
+  assert_eq(box(l, 2).rect.y, 0)
+  assert_eq(box(l, 4).rect.y, 80)
 }
 
 ///|
@@ -64,9 +64,9 @@ test "側は根の子が sides から受け、孫は親から継ぐ" {
     ],
     size,
   )
-  assert_eq(box(l, 3).x, -gap.x - 100.0)
+  assert_eq(box(l, 3).rect.x, -gap.x - 100.0)
   assert_eq(box(l, 3).parent, Some({ id: 1, side: Left, }))
-  assert_eq(box(l, 4).x, box(l, 3).x - gap.x - 100.0)
+  assert_eq(box(l, 4).rect.x, box(l, 3).rect.x - gap.x - 100.0)
   assert_eq(box(l, 4).parent, Some({ id: 3, side: Left, }))
 }
 
@@ -128,8 +128,8 @@ test "順は文書順（親が先、子はその後）" {
 ///|
 test "木は縦に積まれ、隙間は gap.root" {
   let l = layout([root(node(1, "a")), root(node(2, "b"))], size)
-  assert_eq(box(l, 1).y, 0)
-  assert_eq(box(l, 2).y, 30.0 + gap.root)
+  assert_eq(box(l, 1).rect.y, 0)
+  assert_eq(box(l, 2).rect.y, 30.0 + gap.root)
   assert_eq(root_box(l).unwrap().node.id, 1)
 }
 
@@ -146,14 +146,11 @@ test "左右の側は、それぞれの中点が根の中心に乗る" {
     size,
   )
   // 右は a だけ（中心 15 → 根の中心 15）。左は b, c（中心 15, 55 → 中点 35）を 15 へ寄せる
-  let r = box(l, 1).rect().center().y
-  assert_eq(box(l, 2).rect().center().y, r)
-  assert_eq(
-    (box(l, 3).rect().center().y + box(l, 4).rect().center().y) / 2.0,
-    r,
-  )
+  let r = box(l, 1).rect.center().y
+  assert_eq(box(l, 2).rect.center().y, r)
+  assert_eq((box(l, 3).rect.center().y + box(l, 4).rect.center().y) / 2.0, r)
   // 上へはみ出したぶんは押し下げられ、木は 0 から始まる
-  assert_eq(box(l, 3).y, 0)
+  assert_eq(box(l, 3).rect.y, 0)
 }
 
 ///|

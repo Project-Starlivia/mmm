@@ -41,6 +41,17 @@ pub fn to_world(cam : Camera, x : Double, y : Double) -> Pt {
 }
 
 ///|
+/// world の箱を画面（ペインの左上から測った px）に写す。`to_world` の逆
+fn Camera::to_screen(self : Camera, r : Rect) -> Rect {
+  {
+    x: r.x * self.k + self.tx,
+    y: r.y * self.k + self.ty,
+    w: r.w * self.k,
+    h: r.h * self.k,
+  }
+}
+
+///|
 /// 倍率だけを限界に収める
 fn clamp_zoom(k : Double) -> Double {
   @cmp.minimum(max_zoom, @cmp.maximum(min_zoom, k))
@@ -82,21 +93,18 @@ pub fn pan_to_show(
   pane : Pane,
   margin : Double,
 ) -> Camera {
-  let x = b.x * cam.k + cam.tx
-  let y = b.y * cam.k + cam.ty
-  let w = b.w * cam.k
-  let h = b.h * cam.k
+  let s = cam.to_screen(b)
   let mut tx = cam.tx
   let mut ty = cam.ty
-  if x < margin {
-    tx += margin - x
-  } else if x + w > pane.width - margin {
-    tx -= x + w - (pane.width - margin)
+  if s.x < margin {
+    tx += margin - s.x
+  } else if s.x + s.w > pane.width - margin {
+    tx -= s.x + s.w - (pane.width - margin)
   }
-  if y < margin {
-    ty += margin - y
-  } else if y + h > pane.height - margin {
-    ty -= y + h - (pane.height - margin)
+  if s.y < margin {
+    ty += margin - s.y
+  } else if s.y + s.h > pane.height - margin {
+    ty -= s.y + s.h - (pane.height - margin)
   }
   { k: cam.k, tx, ty, }
 }

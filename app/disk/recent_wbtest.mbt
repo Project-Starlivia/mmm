@@ -64,12 +64,12 @@ fn names(rows : Array[Known]) -> Array[String] {
 async test "opened: 行が無ければ作り、あれば前へ。画像フォルダは保つ" {
   let m : Memo = { table: Map([]), log: [], }
   let h = Recent::new(memo_store(m))
-  assert_eq(h.list().length(), 0)
+  assert_eq(h.rows().length(), 0)
   h.opened(file(1, "a.md"))
   h.opened(file(2, "b.md"))
-  assert_eq(names(h.list()), ["b.md", "a.md"])
+  assert_eq(names(h.rows()), ["b.md", "a.md"])
   h.remember_folder(file(1, "a.md"), dir(9))
-  assert_eq(names(h.list()), ["a.md", "b.md"])
+  assert_eq(names(h.rows()), ["a.md", "b.md"])
   assert_true(h.folder_for(file(1, "a.md")) is Some(_))
   assert_true(h.folder_for(file(2, "b.md")) is None)
   // 開き直しても結び付きは残る
@@ -78,7 +78,7 @@ async test "opened: 行が無ければ作り、あれば前へ。画像フォル
   assert_true(h.folder_for(file(1, "a.md")) is Some(_))
   h.forget_folder(file(1, "a.md"))
   assert_true(h.folder_for(file(1, "a.md")) is None)
-  assert_eq(names(h.list()), ["a.md", "b.md"])
+  assert_eq(names(h.rows()), ["a.md", "b.md"])
 }
 
 ///|
@@ -88,7 +88,7 @@ async test "あふれたら古いものから捨てる（20 行）" {
   for i in 0..<25 {
     h.opened(file(i, "f\{i}.md"))
   }
-  let rows = h.list()
+  let rows = h.rows()
   assert_eq(rows.length(), 20)
   assert_eq(rows[0].doc.name(), "f24.md")
   assert_eq(rows[19].doc.name(), "f5.md")
@@ -102,7 +102,7 @@ async test "前の版の鍵（file / assets）を 1 行に読み替え、古い�
   old._set("directory", handle(7, "pics", true))
   m.table["assets"] = old
   let h = Recent::new(memo_store(m))
-  let rows = h.list()
+  let rows = h.rows()
   assert_eq(names(rows), ["old.md"])
   assert_true(rows[0].directory is Some(_))
   assert_false(m.table.contains("file"))
@@ -110,7 +110,7 @@ async test "前の版の鍵（file / assets）を 1 行に読み替え、古い�
   assert_true(m.table.contains("docs"))
   // 2 度目は docs から
   m.log.clear()
-  h.list() |> ignore
+  h.rows() |> ignore
   assert_eq(m.log, ["read docs"])
 }
 
@@ -125,7 +125,7 @@ async test "壊れた行は落とす（型は名乗らせず確かめる）。�
   good._set("seen", @core.any(1.0))
   m.table["docs"] = @core.any([bad, good, @core.any(42)])
   let h = Recent::new(memo_store(m))
-  let rows = h.list()
+  let rows = h.rows()
   assert_eq(names(rows), ["ok.md"])
   assert_true(rows[0].directory is None)
 }

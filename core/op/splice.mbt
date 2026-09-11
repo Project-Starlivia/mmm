@@ -66,14 +66,21 @@ fn rules_for(y : @tree.Node, old : @tree.Root) -> Array[String] {
 }
 
 ///|
+/// 根の子の側。書かれていない所は Right（`sides` は子と並走するが、短ければ
+/// 足りない所は `---` が書かれていないということ）。
+fn side_at(r : @tree.Root, j : Int) -> @tree.Side {
+  r.sides.get(j).unwrap_or(@tree.Right)
+}
+
+///|
 /// 根 1 本。子の列と sides・rules を並走して組み直す。
 fn rebuild_root(s : Splice, r : @tree.Root) -> @tree.Root {
   let out = []
   let sides = []
   let rules = []
   for i, x in r.node.children {
-    let side = if i < r.sides.length() { r.sides[i] } else { @tree.Right }
-    let rule = if i < r.rules.length() { r.rules[i] } else { "" }
+    let side = side_at(r, i)
+    let rule = r.rules.get(i).unwrap_or("")
     // 席なら、その側と綴りを返された数だけ複製する
     for y in rebuild_child(s, x) {
       out.push(y)
@@ -137,14 +144,7 @@ fn append(
   for i, r in doc.roots {
     if r.node.id == node {
       let n = with_kids(r.node, nodes)
-      let s = match side {
-        Some(s) => s
-        None =>
-          match r.sides.last() {
-            Some(s) => s
-            None => @tree.Right
-          }
-      }
+      let s = side.unwrap_or(side_at(r, r.node.children.length() - 1))
       let sides = r.sides.copy()
       let rules = r.rules.copy()
       for _ in nodes {

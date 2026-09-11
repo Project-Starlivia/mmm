@@ -47,7 +47,7 @@ fn card(kind : Kind) -> Card {
 }
 
 ///|
-test "row_top は i 枚目の上端。i = 枚数なら箱の高さ" {
+test "カードはラベル行の下に積む。i 枚目の上端は手前の行の高さの和、積み終わりが箱の高さ" {
   let cards = [card(Link(title="", url="")), card(Break)]
   assert_eq(row_top(cards, 0), 30)
   assert_eq(row_top(cards, 1), 56)
@@ -58,6 +58,9 @@ test "row_top は i 枚目の上端。i = 枚数なら箱の高さ" {
 test "箱の幅はいちばん広い行の実測 + 左右の余白、高さはラベル行 + カード行" {
   let size = node_size(seven)
   assert_eq(size(leaf("ab"), [], 0), { w: 38, h: 30, })
+  // w: いちばん広いのはリンク行 7 + link_tail 22 = 29（ラベル 14、コード 7 + code_tail 12 = 19）
+  //    + normal.pad 12 × 2 = 53
+  // h: ラベル 30 + リンク 26 + コード 2 行 × 15 + code_pad 8 × 2 = 102
   assert_eq(
     size(
       leaf("ab"),

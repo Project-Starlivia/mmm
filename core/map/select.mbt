@@ -2,7 +2,8 @@
 // DOM も地図も知らない — 地図は入力を値にして渡し、返った値を塗るだけ。
 // 決めは docs/superpowers/specs/2026-09-04-select-design.md と spec.md「Mindmap 側」。
 //
-// id は文書順の通し番号なので、数の順がそのまま文書順。
+// id は文書順の通し番号なので、数の順がそのまま文書順。`Layout.order` はその順に
+// 並んでいる（親が先、増える一方）ので、その切り出しは並べ直さない。
 
 ///|
 /// 選んでいるノード（文書順）と、範囲選択・矢印の基点
@@ -13,6 +14,12 @@ pub(all) struct Selection {
 
 ///|
 pub let none : Selection = { ids: [], anchor: None, }
+
+///|
+/// その 1 つだけ
+fn Selection::only(id : Int) -> Selection {
+  { ids: [id], anchor: Some(id), }
+}
 
 ///|
 pub(all) enum Modifier {
@@ -31,11 +38,6 @@ fn sorted(ids : Array[Int]) -> Array[Int] {
 }
 
 ///|
-fn last(ids : Array[Int]) -> Int? {
-  ids.last()
-}
-
-///|
 /// 選ぶ。`Shift` は anchor から文書順に範囲（anchor は動かない）、`Mod` は足す・外す
 pub fn click(
   sel : Selection,
@@ -50,7 +52,7 @@ pub fn click(
       } else {
         sorted(sel.ids + [id])
       }
-      { ids, anchor: if ids.contains(id) { Some(id) } else { last(ids) }, }
+      { ids, anchor: if ids.contains(id) { Some(id) } else { ids.last() }, }
     }
     Shift =>
       match sel.anchor {
@@ -58,13 +60,13 @@ pub fn click(
           match (order.search(anchor), order.search(id)) {
             (Some(a), Some(b)) => {
               let (lo, hi) = if a < b { (a, b) } else { (b, a) }
-              { ids: sorted(order[lo:hi + 1].to_owned()), anchor: sel.anchor, }
+              { ids: order[lo:hi + 1].to_owned(), anchor: sel.anchor, }
             }
-            _ => { ids: [id], anchor: Some(id), }
+            _ => Selection::only(id)
           }
-        None => { ids: [id], anchor: Some(id), }
+        None => Selection::only(id)
       }
-    Plain => { ids: [id], anchor: Some(id), }
+    Plain => Selection::only(id)
   }
 }
 
@@ -73,27 +75,11 @@ pub fn click(
 pub fn rubber(l : Layout, r : Rect) -> Selection {
   let ids = l.order.filter(id => {
     match l.boxes.get(id) {
-      Some(b) =>
-        b.x < r.x + r.w && r.x < b.x + b.w && b.y < r.y + r.h && r.y < b.y + b.h
+      Some(b) => b.rect.overlaps(r)
       None => false
     }
   })
-  { ids, anchor: last(ids), }
-}
-
-///|
-/// 点から矩形までの、軸ごとの距離。中なら 0
-fn gap_to(r : Rect, x : Double, y : Double) -> (Double, Double) {
-  (
-    @cmp.maximum(@cmp.maximum(r.x - x, 0.0), x - (r.x + r.w)),
-    @cmp.maximum(@cmp.maximum(r.y - y, 0.0), y - (r.y + r.h)),
-  )
-}
-
-///|
-fn inside(r : Rect, x : Double, y : Double) -> Bool {
-  let (dx, dy) = gap_to(r, x, y)
-  dx == 0.0 && dy == 0.0
+  { ids, anchor: ids.last(), }
 }
 
 ///|
@@ -115,15 +101,10 @@ pub let exact : Reach = { pad: 0, edge: 0, }
 pub let grab : Reach = { pad: 41, edge: 63, }
 
 ///|
-fn grown(b : Rect, pad : Double) -> Rect {
-  { x: b.x - pad, y: b.y - pad, w: b.w + pad * 2.0, h: b.h + pad * 2.0, }
-}
-
-///|
 /// 箱 1 つの当たりの範囲（near, far）。`near` は pad の分、`far` はそれに端の伸びを
 /// 足したもの（near ⊆ far）
 fn reach_of(b : Box, r : Reach, parents : Set[Int]) -> (Rect, Rect) {
-  let near = grown(b.rect(), r.pad)
+  let near = b.rect.grown(r.pad)
   let out = if b.parent is Some(_) && !parents.contains(b.node.id) {
     r.edge
   } else {
@@ -137,11 +118,22 @@ fn reach_of(b : Box, r : Reach, parents : Set[Int]) -> (Rect, Rect) {
 }
 
 ///|
+/// 点に当たった箱 1 つ。dx / dy は見た目の箱からの軸ごとの距離
+priv struct Hit {
+  id : Int
+  dx : Double
+  dy : Double
+  /// 端の伸び（far）だけで届いた
+  far_only : Bool
+}
+
+///|
 /// world の点がどの箱に居るか。当たりは見た目の箱を `reach` の分だけ広げた範囲。
 /// 複数の範囲に入れば見た目の箱に近い方 — ふつうは直線距離。ただし端の伸び（far）
 /// だけで届く箱が居るときは行で読む: y の近さ、同じなら x の近さ（端の伸びは横に長く、
 /// 直線距離では隣の行の箱に負けてしまうため）。同じ近さなら文書順の後ろ。外なら None
 pub fn hit(l : Layout, x : Double, y : Double, reach : Reach) -> Int? {
+  let p : Pt = { x, y, }
   let parents : Set[Int] = Set([])
   for b in l.boxes.values() {
     match b.parent {
@@ -149,38 +141,37 @@ pub fn hit(l : Layout, x : Double, y : Double, reach : Reach) -> Int? {
       None => ()
     }
   }
-  // (id, dx, dy, far だけで届いたか)
-  let found : Array[(Int, Double, Double, Bool)] = []
+  let found : Array[Hit] = []
   for id in l.order {
     guard l.boxes.get(id) is Some(b) else { continue }
     let (near, far) = reach_of(b, reach, parents)
-    guard inside(far, x, y) else { continue }
-    let (dx, dy) = gap_to(b.rect(), x, y)
-    found.push((id, dx, dy, !inside(near, x, y)))
+    guard far.contains(p) else { continue }
+    let (dx, dy) = b.rect.gap_to(p)
+    found.push({ id, dx, dy, far_only: !near.contains(p), })
   }
   guard found.length() > 0 else { return None }
-  let rowwise = found.iter().any(f => f.3)
-  let key = (f : (Int, Double, Double, Bool)) => {
+  let rowwise = found.iter().any(h => h.far_only)
+  let key = (h : Hit) => {
     if rowwise {
-      (f.2, f.1)
+      (h.dy, h.dx)
     } else {
-      (@math.hypot(f.1, f.2), 0.0)
+      (@math.hypot(h.dx, h.dy), 0.0)
     }
   }
   // 文書順の後ろが勝つよう、同じ近さでは後ろで置き換える
   let mut best = found[0]
-  for f in found[1:] {
-    let (a, b) = (key(f), key(best))
+  for h in found[1:] {
+    let (a, b) = (key(h), key(best))
     if a.0 < b.0 || (a.0 == b.0 && a.1 <= b.1) {
-      best = f
+      best = h
     }
   }
-  Some(best.0)
+  Some(best.id)
 }
 
 ///|
 fn all(l : Layout) -> Selection {
-  { ids: sorted(l.order), anchor: last(l.order), }
+  { ids: l.order.copy(), anchor: l.order.last(), }
 }
 
 ///|
@@ -243,18 +234,19 @@ fn arrow(l : Layout, anchor : Int?, key : Arrow) -> Int? {
   if to_parent {
     return cur.parent.map(p => p.id)
   }
-  let kid = order
-    .iter()
-    .find_first(id => {
-      match l.boxes.get(id) {
-        Some(b) => b.parent is Some(p) && p.id == anchor
-        None => false
-      }
-    })
-  match kid {
-    Some(k) => Some(k)
-    None => Some(order[0])
-  }
+  Some(kids_in(l, Some(anchor)).get(0).unwrap_or(order[0]))
+}
+
+///|
+/// 矢印で選択を動かす。Shift なら行き先を足す。行けなければ None
+fn step(sel : Selection, l : Layout, key : Arrow, shift : Bool) -> Selection? {
+  arrow(l, sel.anchor, key).map(next => {
+    if shift {
+      extend_to(sel, next)
+    } else {
+      Selection::only(next)
+    }
+  })
 }
 
 ///|
@@ -270,19 +262,9 @@ fn extend_to(sel : Selection, next : Int) -> Selection {
 }
 
 ///|
-/// 親の id。根なら None
-fn parent_of(l : Layout, id : Int) -> Int? {
-  match l.boxes.get(id) {
-    Some(b) => b.parent.map(p => p.id)
-    None => None
-  }
-}
-
-///|
 /// 同じ親の子（根なら根どうし）を文書順に
 fn siblings_of(l : Layout, id : Int) -> Array[Int] {
-  let p = parent_of(l, id)
-  l.order.filter(x => parent_of(l, x) == p)
+  kids_in(l, parent_of(l, id))
 }
 
 ///|

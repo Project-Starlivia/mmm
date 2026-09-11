@@ -77,10 +77,7 @@ fn copy_of(k : Key, cut : () -> Intent?) -> Intent? {
 
 ///|
 fn node_of(l : Layout, id : Int?) -> @tree.Node? {
-  match id {
-    Some(id) => l.boxes.get(id).map(b => b.node)
-    None => None
-  }
+  id.bind(id => l.boxes.get(id)).map(b => b.node)
 }
 
 ///|
@@ -93,15 +90,18 @@ fn node_of(l : Layout, id : Int?) -> @tree.Node? {
 /// - ノードが 1 つも無ければ、Enter は最初の根
 /// - Tab / Shift+Tab は 1 つなら足す・包む、複数なら段下げ・上げ（先頭の前の兄弟の子へ / 先頭の親の後ろへ）
 pub fn keyed(l : Layout, sel : Selection, k : Key) -> Intent? {
-  let h = Hand::new(l, sel, k)
-  // **上から順に当て、キーを名乗った行で終わる。** `reordered` が先頭なのは
-  // Alt をそこで閉じるため、`pasted` が早いのは貼るのに anchor が要らないため
-  for
-    row in (
-      [
-        reordered, pasted, copied, attached, entered, tabbed, deleted, folded, escaped,
-        centered, chose_all, arrowed, typed,
-      ] : Array[(Hand) -> Answer]) {
+  // `reordered` が先頭なのは Alt をそこで閉じるため、`pasted` が早いのは貼るのに
+  // anchor が要らないため
+  table(Hand::new(l, sel, k), [
+    reordered, pasted, copied, attached, entered, tabbed, deleted, folded, escaped,
+    centered, chose_all, arrowed, typed,
+  ])
+}
+
+///|
+/// **上から順に当て、キーを名乗った行で終わる。** None は拾わない
+fn[H] table(h : H, rows : Array[(H) -> Answer]) -> Intent? {
+  for row in rows {
     match row(h) {
       Do(i) => return Some(i)
       Stop => return None
@@ -333,12 +333,7 @@ fn chose_all(h : Hand) -> Answer {
 /// 矢印 — 選択を動かす。Shift なら伸ばす。
 fn arrowed(h : Hand) -> Answer {
   guard arrow_of(h.k.key) is Some(a) && !h.k.mod else { return Pass }
-  guard arrow(h.l, h.anchor, a) is Some(next) else { return Stop }
-  let sel = if h.k.shift {
-    extend_to(h.sel, next)
-  } else {
-    { ids: [next], anchor: Some(next), }
-  }
+  guard step(h.sel, h.l, a, h.k.shift) is Some(sel) else { return Stop }
   Do(Select(sel~, reveal=true))
 }
 
@@ -354,46 +349,89 @@ fn typed(h : Hand) -> Answer {
 }
 
 ///|
+/// カードを選んでいるときのキー 1 回ぶん。`keyed` と同じ表の読み方
 pub fn keyed_card(l : Layout, picked : Int, k : Key) -> Intent? {
   // 外すのに持ち主は要らない（畳まれて箱が無くても、ここから抜けられる）
-  if k.key == "Escape" {
-    return Some(Pick(id=None))
-  }
+  guard k.key != "Escape" else { return Some(Pick(id=None)) }
   guard owner_of(l, picked) is Some((owner, index)) else { return None }
-  // 隣は**描かれているカード**の隣 — カードにならなかった中身は飛ばす
-  let cards = owner.cards
-  // 消した後に持ち主を選ぶのは core の focus
-  let remove : Intent = Op(op=Delete(ids=[picked]), edit=false)
-  if (k.key == "Delete" || k.key == "Backspace") && !k.mod {
-    return Some(remove)
+  table({ k, picked, owner: owner.node.id, cards: owner.cards, index, }, [
+    card_reordered, card_copied, card_deleted, card_stepped, card_left, card_edited,
+  ])
+}
+
+///|
+/// カードを選んでいるときの手元。隣は**描かれているカード**の隣 —
+/// カードにならなかった中身は飛ばす
+priv struct Deck {
+  k : Key
+  /// 選んでいる中身の id
+  picked : Int
+  /// 持ち主のノード
+  owner : Int
+  /// 持ち主のカードの列と、その中の枚目
+  cards : Array[Card]
+  index : Int
+}
+
+///|
+/// 選んでいるカードを消す。消した後に持ち主を選ぶのは core の focus
+fn Deck::remove(self : Deck) -> Intent {
+  Op(op=Delete(ids=[self.picked]), edit=false)
+}
+
+///|
+/// Alt+↑↓ — 前後のカードの前後へ並べ替え。Alt はここで閉じる（`reordered` と同じ）
+fn card_reordered(d : Deck) -> Answer {
+  guard d.k.alt else { return Pass }
+  guard d.k.key == "ArrowUp" || d.k.key == "ArrowDown" else { return Stop }
+  guard !d.k.mod else { return Stop }
+  let moved = (at : @op.BlockPlace) => {
+    Op(op=MoveBlock(ids=[d.picked], at~), edit=false)
   }
-  match copy_of(k, () => Some(remove)) {
-    Some(c) => return Some(c)
-    None => ()
+  if d.k.key == "ArrowUp" {
+    return claimed(d.cards.get(d.index - 1).map(p => moved(Before(block=p.id))))
   }
-  if (k.key == "ArrowDown" || k.key == "ArrowUp") && !k.mod && !k.alt {
-    let i = if k.key == "ArrowDown" { index + 1 } else { index - 1 }
-    return cards.get(i).map(c => Pick(id=Some(c.id)))
+  claimed(d.cards.get(d.index + 1).map(n => moved(After(block=n.id))))
+}
+
+///|
+/// Mod+C / Mod+X — そのカードを写す・切り取る
+fn card_copied(d : Deck) -> Answer {
+  match copy_of(d.k, () => Some(d.remove())) {
+    Some(c) => Do(c)
+    None => Pass
   }
-  if k.key == "ArrowLeft" && !k.mod {
-    return Some(
-      Select(
-        sel={ ids: [owner.node.id], anchor: Some(owner.node.id), },
-        reveal=false,
-      ),
-    )
+}
+
+///|
+/// Delete / Backspace — そのカードを消す
+fn card_deleted(d : Deck) -> Answer {
+  guard (d.k.key == "Delete" || d.k.key == "Backspace") && !d.k.mod else {
+    return Pass
   }
-  if k.alt && (k.key == "ArrowUp" || k.key == "ArrowDown") && !k.mod {
-    let moved = (at : @op.BlockPlace) => {
-      Op(op=MoveBlock(ids=[picked], at~), edit=false)
-    }
-    if k.key == "ArrowUp" {
-      return cards.get(index - 1).map(p => moved(Before(block=p.id)))
-    }
-    return cards.get(index + 1).map(n => moved(After(block=n.id)))
+  Do(d.remove())
+}
+
+///|
+/// ↑↓ — 隣のカードを選ぶ。端では拾うが動かない（#244）
+fn card_stepped(d : Deck) -> Answer {
+  guard (d.k.key == "ArrowDown" || d.k.key == "ArrowUp") && !d.k.mod else {
+    return Pass
   }
-  if k.mod && k.key == "Enter" {
-    return Some(EditCard(id=picked))
-  }
-  None
+  let i = if d.k.key == "ArrowDown" { d.index + 1 } else { d.index - 1 }
+  claimed(d.cards.get(i).map(c => Pick(id=Some(c.id))))
+}
+
+///|
+/// ← — 持ち主のノードへ戻る
+fn card_left(d : Deck) -> Answer {
+  guard d.k.key == "ArrowLeft" && !d.k.mod else { return Pass }
+  Do(Select(sel=Selection::only(d.owner), reveal=false))
+}
+
+///|
+/// Mod+Enter — その場で直す
+fn card_edited(d : Deck) -> Answer {
+  guard d.k.mod && d.k.key == "Enter" else { return Pass }
+  Do(EditCard(id=d.picked))
 }

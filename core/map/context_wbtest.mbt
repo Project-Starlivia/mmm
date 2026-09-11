@@ -40,7 +40,7 @@ fn row(es : Array[Entry], label : String) -> Item {
 
 ///|
 test "並び — Add / Rename / Fold / Flip side / Link / Code / Draw / Copy / Cut / Paste / Delete" {
-  assert_eq(labels(items(ctx_l(), one(3))), [
+  assert_eq(labels(items(ctx_l(), Selection::only(3))), [
     "Add", "Rename", "—", "Open (folded)", "Flip side", "—", "Link", "Code",
     "Draw", "—", "Copy", "Cut", "Paste", "—", "Delete",
   ])
@@ -61,7 +61,7 @@ test "Copy / Cut はキーと同じ Intent。選んでいなければ沈み、Pa
 
 ///|
 test "Add は押せば子、開けば 4 つ" {
-  let add = row(items(ctx_l(), one(3)), "Add")
+  let add = row(items(ctx_l(), Selection::only(3)), "Add")
   assert_eq(
     add.intent,
     Some(Op(op=AddNode(at=In(node=3, side=None), labels=[""]), edit=true)),
@@ -70,7 +70,7 @@ test "Add は押せば子、開けば 4 つ" {
     "Child", "Below", "Above", "Parent",
   ])
   // 名前の無いノードでも Below は「足す」（Enter のように「埋める」へ化けない）
-  let blank = row(items(ctx_l(), one(4)), "Add").items.unwrap()[1]
+  let blank = row(items(ctx_l(), Selection::only(4)), "Add").items.unwrap()[1]
   assert_eq(blank.label, "Below")
   assert_eq(
     blank.intent,
@@ -91,15 +91,15 @@ test "複数選択では宛先が 1 つの行が沈む。Delete は沈まない"
 ///|
 test "Implicit も畳める。根は側を持たない" {
   assert_eq(
-    row(items(ctx_l(), one(4)), "Fold").intent,
+    row(items(ctx_l(), Selection::only(4)), "Fold").intent,
     Some(Op(op=Fold(id=4, open=false), edit=false)),
   )
   assert_eq(
-    row(items(ctx_l(), one(2)), "Flip side").why,
+    row(items(ctx_l(), Selection::only(2)), "Flip side").why,
     Some("The root has no side"),
   )
   assert_eq(
-    row(items(ctx_l(), one(5)), "Flip side").intent,
+    row(items(ctx_l(), Selection::only(5)), "Flip side").intent,
     Some(Op(op=FlipSide(id=5), edit=false)),
   )
 }

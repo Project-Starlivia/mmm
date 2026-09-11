@@ -46,7 +46,7 @@ pub(all) struct Editor {
 pub struct App {
   doc : @dom.Document
   ed : Editor
-  io : @disk.Disk
+  disk : @disk.Disk
   map : @mindmap.Mindmap
   images : @disk.Images
   theme : @bar.Theme
@@ -81,11 +81,11 @@ fn el(doc : @dom.Document, id : String) -> @dom.Element {
 }
 
 ///|
-/// 組む。`io` はディスクの窓口、`measure` は字の実測（試験は手元の置き場と数を渡す）
+/// 組む。`disk` はディスクの窓口、`measure` は字の実測（試験は手元の置き場と数を渡す）
 pub fn App::new(
   doc : @dom.Document,
   ed : Editor,
-  io : @disk.Disk,
+  disk : @disk.Disk,
   measure? : @map.Measure = @mindmap.measure(doc),
 ) -> App {
   let md_pane = el(doc, "md-pane")
@@ -94,7 +94,7 @@ pub fn App::new(
   // 組み上がってから動くものなので、後から入る自分を通して呼ぶ
   let late : Ref[App?] = { val: None, }
   let app = () => late.val.unwrap()
-  let images = @disk.Images::new(doc, io, {
+  let images = @disk.Images::new(doc, disk, {
     failed: msg => @parts.failed(doc, msg),
     refresh: () => app().map.render(),
     declared: () => app().declared_folder(),
@@ -160,7 +160,7 @@ pub fn App::new(
   let self : App = {
     doc,
     ed,
-    io,
+    disk,
     map,
     images,
     theme,
@@ -398,7 +398,7 @@ async fn App::open_file(self : App) -> Unit {
   guard @web.can_open() else { @parts.failed(self.doc, @parts.no_file_access) }
   (async fn() -> Unit {
     guard self.confirm_discard() else { return }
-    match self.io.open_dialog() {
+    match self.disk.open_dialog() {
       Some(opened) => self.apply_doc(opened)
       None => ()
     }
@@ -412,7 +412,7 @@ async fn App::open_file(self : App) -> Unit {
 async fn App::open_known(self : App, file : @web.FileHandle) -> Unit {
   (async fn() -> Unit {
     guard self.confirm_discard() else { return }
-    match self.io.open_known(file) {
+    match self.disk.open_known(file) {
       Some(opened) => self.apply_doc(opened)
       None => ()
     }
@@ -433,7 +433,7 @@ async fn App::rename_file(self : App) -> Unit {
     return
   }
   (async fn() -> Unit {
-    match self.io.rename(name) {
+    match self.disk.rename(name) {
       Some(next) => {
         self.saved_name = Some(next)
         self.show_name()
@@ -454,7 +454,7 @@ async fn App::save_file(self : App, as_new : Bool) -> Unit {
       guard @web.can_save_as() else {
         @parts.failed(self.doc, @parts.no_file_access)
       }
-      guard self.io.save_as(self.doc_name(), self.text()) is Some(saved) else { // キャンセル
+      guard self.disk.save_as(self.doc_name(), self.text()) is Some(saved) else { // キャンセル
         return
       }
       self.saved_name = Some(saved.name) // ここで初めて名前が決まる
@@ -465,7 +465,7 @@ async fn App::save_file(self : App, as_new : Bool) -> Unit {
       @web.spawn(async fn() { self.refresh_recent() })
       @web.spawn(async fn() { self.offer_connect() })
     } else {
-      self.io.save(self.text())
+      self.disk.save(self.text())
     }
     self.saved_text = self.text()
     self.update_dirty()
@@ -478,7 +478,7 @@ async fn App::save_file(self : App, as_new : Bool) -> Unit {
 /// 新しい文書。いまの文書は捨て、ファイルハンドルも手放す
 async fn App::new_file(self : App) -> Unit {
   guard self.confirm_discard() else { return }
-  self.io.close()
+  self.disk.close()
   self.saved_text = ""
   self.load_text("", None)
   (self.ed.focus)()
@@ -486,7 +486,7 @@ async fn App::new_file(self : App) -> Unit {
 
 ///|
 async fn App::refresh_recent(self : App) -> Unit {
-  self.recent = self.io.recent() catch { _ => [] }
+  self.recent = self.disk.remembered() catch { _ => [] }
 }
 
 // ---------- リンク ----------
@@ -766,7 +766,7 @@ fn App::wire(self : App) -> Unit {
   @disk.init_drop(doc, {
     open_markdown: async fn(file) {
       guard self.confirm_discard() else { return }
-      self.apply_doc(self.io.open_handle(file))
+      self.apply_doc(self.disk.open_handle(file))
     },
     add_image: async fn(blob, node) { self.attach_image(node, blob) },
     mark_drop: at => {

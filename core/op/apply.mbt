@@ -10,21 +10,19 @@
 /// 綴り替え、Implicit を綴れば直る破れは mend が繕い、残れば断る。
 /// cap が先 — 天井を越えた見出しは mend には直せない。
 /// 例外は境界（`BorderBreak`）だけ — 書けば md が境界と読むので、形は読み直しが決める。
-pub fn apply(doc : @tree.Doc, op : Op) -> Done? {
+fn apply(doc : @tree.Doc, op : Op) -> Done? {
   guard attempt(doc, op) is Some(d) else { return None }
   guard mend(cap(d.doc)) is Some(doc) else { return None }
   Some({ doc, focus: d.focus.filter(f => has(doc, f)), })
 }
 
 ///|
-/// 部分木をその綴りで書き直す。形（ラベル・中身・子・畳み・飛び）は保ち、綴りだけ替える。
+/// 部分木をその綴りで書き直す。形（ラベル・中身・子・畳み・飛び）は保ち、綴りだけ替える —
+/// **読んだ綴りは保ち**、種類が変わるものだけ新しく作る綴りで書く。
 /// 項目にするとき、飛び（Implicit）は行を省けないので空の項目として綴る（`- - b`）。
 /// 見出しにするとき、Implicit はそのまま — 省いたままで読めない席かは check と mend が見る。
 /// 決めは docs/superpowers/specs/2026-09-06-paste-design.md
 fn respell(n : @tree.Node, sign : @tree.Sign) -> @tree.Node {
-  // **読んだ綴りは保つ。** 種類が変わるものだけ、新しく作る綴りで書く。
-  // 飛び（Implicit）は行を省けないので項目にするときだけ空の項目として綴り、
-  // 見出しにするときはそのまま（省いたままで読めない席かは check と mend が見る）
   let mark : @tree.Mark? = match (sign, n.mark) {
     (Item, Some(Item(..))) | (Heading, Some(Heading(..))) => n.mark
     (Item, _) => Some(@tree.bullet)
@@ -278,18 +276,14 @@ fn delete(doc : @tree.Doc, ids : Array[Int]) -> Done? {
 }
 
 ///|
-/// その綴りで空のノードを作る。項目の綴りは既定で、席のものは `spelled` が当てる。
-fn make(sign : @tree.Sign, id : Int, label : String) -> @tree.Node {
-  let mark = match sign {
-    Heading => @tree.atx
-    Item => @tree.bullet
-  }
-  { id, label, fold: None, body: [], children: [], mark: Some(mark), }
+/// 新しいノード。持ち込むのは形（ラベル）だけで、綴りは席が決める（`implant`）。
+fn make(id : Int, label : String) -> @tree.Node {
+  { id, label, fold: None, body: [], children: [], mark: Some(@tree.atx), }
 }
 
 ///|
 /// その綴りの種類。飛び（Implicit）は行を省いた空の見出しなので見出し。
-fn sign_of(n : @tree.Node) -> @tree.Sign {
+fn sign_or_heading(n : @tree.Node) -> @tree.Sign {
   match @tree.sign_of(n) {
     Some(s) => s
     None => Heading
@@ -297,54 +291,38 @@ fn sign_of(n : @tree.Node) -> @tree.Sign {
 }
 
 ///|
-/// この下に足すときの綴り。末尾の子がいればそれに、いなければ親に従う
-/// （項目の下は項目、それ以外は見出し）。
-fn sign_in(n : @tree.Node) -> @tree.Sign {
-  match n.children.last() {
-    Some(c) => sign_of(c)
-    None => sign_of(n)
-  }
-}
-
-///|
-/// 席の綴り。新しく差すもの・運ぶものはこれに従う（「綴りは席が決める」）。
-/// Before / After は隣の綴り、In は末尾の子の綴り、子が無ければ親（項目なら項目、
-/// それ以外は見出し）、In(doc_id) は最後の根（無ければ見出し）。席が無ければ None。
-fn sign_at(doc : @tree.Doc, at : NodePlace) -> @tree.Sign? {
+/// 席の隣 — 差すもの・運ぶものが綴りを継ぐ相手。Before / After は隣そのもの、
+/// In は末尾の子、In(doc_id) は最後の根。居なければ None（席が無い・子が無い・根が無い）。
+fn neighbor(doc : @tree.Doc, at : NodePlace) -> @tree.Node? {
   match at {
-    Before(node~) => find(doc, node).map(sign_of)
-    After(node~) => find(doc, node).map(sign_of)
-    In(node~, ..) =>
-      if node == @tree.doc_id {
-        Some(
-          match doc.roots.last() {
-            Some(r) => sign_of(r.node)
-            None => @tree.Heading
-          },
-        )
-      } else {
-        find(doc, node).map(sign_in)
+    Before(node~) | After(node~) => find(doc, node)
+    In(node~, ..) if node == @tree.doc_id => doc.roots.last().map(r => r.node)
+    In(node~, ..) => find(doc, node).bind(n => n.children.last())
+  }
+}
+
+///|
+/// 席の綴りの種類。隣に従い、隣が居なければ親に従う（項目の下は項目、それ以外は
+/// 見出し。根が無い文書は見出し）。席が無ければ None。
+fn sign_at(doc : @tree.Doc, at : NodePlace) -> @tree.Sign? {
+  match neighbor(doc, at) {
+    Some(n) => Some(sign_or_heading(n))
+    None =>
+      match at {
+        In(node~, ..) if node == @tree.doc_id => Some(Heading)
+        In(node~, ..) => find(doc, node).map(sign_or_heading)
+        _ => None
       }
   }
 }
 
 ///|
-/// 席の項目の綴り（マーカー・字下げ幅・詰め）。`sign_at` と同じ席の見方で、
-/// Before / After は隣、In は末尾の子、In(doc_id) は最後の根。
-/// 項目が居なければ既定（`-` / 2 / 詰まった列）。
-fn spell_at(doc : @tree.Doc, at : NodePlace) -> (String, Int, Bool) {
-  let near = match at {
-    Before(node~) | After(node~) => find(doc, node)
-    In(node~, ..) =>
-      if node == @tree.doc_id {
-        doc.roots.last().map(r => r.node)
-      } else {
-        find(doc, node).bind(n => n.children.last())
-      }
-  }
-  match near.map(x => x.mark) {
-    Some(Some(Item(marker~, offset~, loose~))) => (marker, offset, loose)
-    _ => ("-", 2, false)
+/// 席の項目の綴り（マーカー・字下げ幅・詰め）。隣が項目でなければ `@tree.bullet` —
+/// 種類と違い、親には従わない。
+fn spell_at(doc : @tree.Doc, at : NodePlace) -> @tree.Mark {
+  match neighbor(doc, at).bind(n => n.mark) {
+    Some(Item(..) as m) => m
+    _ => @tree.bullet
   }
 }
 
@@ -366,35 +344,44 @@ fn step(marker : String, n : Int) -> String {
 
 ///|
 /// その席に座る項目の綴り。k 番目の新入りは番号を k + 1 だけ進める。
-fn spelled(n : @tree.Node, spell : (String, Int, Bool), k : Int) -> @tree.Node {
-  guard n.mark is Some(Item(..)) else { return n }
-  {
-    ..n,
-    mark: Some(Item(marker=step(spell.0, k + 1), offset=spell.1, loose=spell.2)),
+fn spelled(n : @tree.Node, mark : @tree.Mark, k : Int) -> @tree.Node {
+  match (n.mark, mark) {
+    (Some(Item(..)), Item(marker~, offset~, loose~)) =>
+      { ..n, mark: Some(Item(marker=step(marker, k + 1), offset~, loose~)), }
+    _ => n
   }
 }
 
 ///|
 /// 席が指している id。
-fn anchor(at : NodePlace) -> Int {
-  match at {
-    Before(node~) => node
-    After(node~) => node
-    In(node~, ..) => node
+fn NodePlace::id(self : NodePlace) -> Int {
+  match self {
+    Before(node~) | After(node~) | In(node~, ..) => node
   }
 }
 
 ///|
-/// 新しいノードを差す。綴りは席が決める（`sign_at` / `spell_at`）。
+/// 席の綴りで差す。差すもの・運ぶものは形だけを持ち込み、種類（`sign_at`）も
+/// マーカーと桁（`spell_at`）も席が決める。席が無ければ None。
+fn implant(
+  doc : @tree.Doc,
+  at : NodePlace,
+  nodes : Array[@tree.Node],
+) -> @tree.Doc? {
+  guard sign_at(doc, at) is Some(sign) else { return None }
+  let mark = spell_at(doc, at)
+  place(doc, at, nodes.mapi((k, n) => spelled(respell(n, sign), mark, k)))
+}
+
+///|
+/// 新しいノードを差す。
 fn add_node(doc : @tree.Doc, at : NodePlace, labels : Array[String]) -> Done? {
   guard !labels.is_empty() else { return None }
-  guard sign_at(doc, at) is Some(sign) else { return None }
-  let spell = spell_at(doc, at)
   let first = fresh(doc)
-  let news = labels.mapi((k, label) => {
-    spelled(make(sign, first + k, label), spell, k)
-  })
-  done(place(doc, at, news), Some(first))
+  done(
+    implant(doc, at, labels.mapi((k, label) => make(first + k, label))),
+    Some(first),
+  )
 }
 
 ///|
@@ -441,6 +428,35 @@ fn take(
 }
 
 ///|
+/// 中身を文書順に抜き取る。抜いたものは taken に、残りの木を返す。
+fn take_blocks(
+  doc : @tree.Doc,
+  ids : Array[Int],
+  taken : Array[@tree.Block],
+) -> @tree.Doc? {
+  let mut cur = doc
+  for id in ids {
+    guard owner(cur, block=id) is Some(o) else { return None }
+    let pulled = body(cur, node=o, fn(bs) {
+      let out = []
+      for b in bs {
+        if b.id == id {
+          taken.push(b)
+        } else {
+          out.push(b)
+        }
+      }
+      out
+    })
+    match pulled {
+      Some(d) => cur = d
+      None => return None
+    }
+  }
+  Some(cur)
+}
+
+///|
 /// 席に差す。
 fn place(
   doc : @tree.Doc,
@@ -462,15 +478,10 @@ fn move_node(doc : @tree.Doc, ids : Array[Int], at : NodePlace) -> Done? {
     guard find(doc, id) is Some(_) else { return None }
   }
   let picked = pick(doc, ids)
-  guard !within(doc, anchor(at), picked) else { return None }
+  guard !within(doc, at.id(), picked) else { return None }
   let taken = []
   guard take(doc, picked, taken) is Some(rest) else { return None }
-  guard sign_at(rest, at) is Some(sign) else { return None }
-  let spell = spell_at(rest, at)
-  done(
-    place(rest, at, taken.mapi((k, n) => spelled(respell(n, sign), spell, k))),
-    Some(picked[0]),
-  )
+  done(implant(rest, at, taken), Some(picked[0]))
 }
 
 ///|
@@ -487,39 +498,24 @@ fn flipped(s : @tree.Side) -> @tree.Side {
 fn flip(doc : @tree.Doc, id : Int) -> Done? {
   guard seat(doc, id) is Some(path) else { return None }
   let r = doc.roots[path[0]]
-  match path.length() {
-    1 => reside(doc, path[0], r.sides.map(flipped), id)
+  let turned = match path.length() {
+    1 => Some(reside(doc, path[0], r.sides.map(flipped)))
     2 => {
       let sides = r.sides.copy()
-      sides[path[1]] = flipped(side_of(r, path[1]))
-      reside(doc, path[0], sides, id)
+      sides[path[1]] = flipped(side_at(r, path[1]))
+      Some(reside(doc, path[0], sides))
     }
-    depth => haul(doc, r, id, side=flipped(side_of(r, path[1])), depth~)
+    depth => haul(doc, r, id, side=flipped(side_at(r, path[1])), depth~)
   }
-}
-
-///|
-/// 根の子の側。書かれていない所は Right（`sides` は子と並走するが、
-/// 短くても足りない所は `---` が書かれていないということ）。
-fn side_of(r : @tree.Root, j : Int) -> @tree.Side {
-  if j < r.sides.length() {
-    r.sides[j]
-  } else {
-    @tree.Right
-  }
+  done(turned, Some(id))
 }
 
 ///|
 /// 根の側を置き換える。**側は根のもの**なので、書き換わるのは `sides` だけ。
-fn reside(
-  doc : @tree.Doc,
-  at : Int,
-  sides : Array[@tree.Side],
-  focus : Int,
-) -> Done? {
+fn reside(doc : @tree.Doc, at : Int, sides : Array[@tree.Side]) -> @tree.Doc {
   let roots = doc.roots.copy()
   roots[at] = { ..roots[at], sides, }
-  Some({ doc: { ..doc, roots, }, focus: Some(focus), })
+  { ..doc, roots, }
 }
 
 ///|
@@ -531,7 +527,7 @@ fn haul(
   id : Int,
   side~ : @tree.Side,
   depth~ : Int,
-) -> Done? {
+) -> @tree.Doc? {
   let taken = []
   guard take(doc, [id], taken) is Some(rest) else { return None }
   let mut next = fresh(doc)
@@ -549,7 +545,7 @@ fn haul(
       next = next + 1
     }
   }
-  done(append(rest, node=r.node.id, side~, [wrapped]), Some(id))
+  append(rest, node=r.node.id, side~, [wrapped])
 }
 
 ///|
@@ -586,10 +582,9 @@ fn put(
 
 ///|
 /// 席の持ち主。Before / After は隣の持ち主、In はそのノード。
-fn holder(doc : @tree.Doc, at : BlockPlace) -> Int? {
+fn owner_at(doc : @tree.Doc, at : BlockPlace) -> Int? {
   match at {
-    Before(block~) => owner(doc, block~)
-    After(block~) => owner(doc, block~)
+    Before(block~) | After(block~) => owner(doc, block~)
     In(node~) => Some(node)
   }
 }
@@ -601,7 +596,7 @@ fn add_block(
   content : @tree.Content?,
   source : String?,
 ) -> Done? {
-  guard holder(doc, at) is Some(o) else { return None }
+  guard owner_at(doc, at) is Some(o) else { return None }
   let b : @tree.Block = { id: fresh(doc), content, source, }
   done(body(doc, node=o, bs => put(bs, at, [b])), Some(b.id))
 }
@@ -625,46 +620,27 @@ fn set_block(
 }
 
 ///|
-/// 中身を動かす。文書順を保って持ち主ごとに抜き、席に差す。
+/// 席が指している id。
+fn BlockPlace::id(self : BlockPlace) -> Int {
+  match self {
+    Before(block~) | After(block~) => block
+    In(node~) => node
+  }
+}
+
+///|
+/// 中身を動かす。文書順を保って抜き、席に差す。
 fn move_block(doc : @tree.Doc, ids : Array[Int], at : BlockPlace) -> Done? {
   guard !ids.is_empty() else { return None }
   for id in ids {
     guard owner(doc, block=id) is Some(_) else { return None }
   }
   let picked = pick(doc, ids)
-  guard !picked.contains(anchor_block(at)) else { return None }
+  guard !picked.contains(at.id()) else { return None }
   let taken = []
-  let mut cur = doc
-  for id in picked {
-    guard owner(cur, block=id) is Some(o) else { return None }
-    let pulled = body(cur, node=o, fn(bs) {
-      let out = []
-      for b in bs {
-        if b.id == id {
-          taken.push(b)
-        } else {
-          out.push(b)
-        }
-      }
-      out
-    })
-    match pulled {
-      Some(d) => cur = d
-      None => return None
-    }
-  }
-  guard holder(cur, at) is Some(o) else { return None }
-  done(body(cur, node=o, bs => put(bs, at, taken)), Some(picked[0]))
-}
-
-///|
-/// 席が指している id。
-fn anchor_block(at : BlockPlace) -> Int {
-  match at {
-    Before(block~) => block
-    After(block~) => block
-    In(node~) => node
-  }
+  guard take_blocks(doc, picked, taken) is Some(rest) else { return None }
+  guard owner_at(rest, at) is Some(o) else { return None }
+  done(body(rest, node=o, bs => put(bs, at, taken)), Some(picked[0]))
 }
 
 ///|
@@ -695,11 +671,10 @@ fn shift(n : @tree.Node, by : Int) -> @tree.Node {
 fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   let sub = @tree.parse(md)
   guard !(sub.roots.is_empty() && sub.body.is_empty()) else { return None }
-  guard sign_at(doc, at) is Some(sign) else { return None }
   let host = match at {
     In(node~, ..) => node
     _ => {
-      guard parent(doc, anchor(at)) is Some(p) else { return None }
+      guard parent(doc, at.id()) is Some(p) else { return None }
       p
     }
   }
@@ -710,7 +685,6 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   // 行のノードは文書に無い番号から、断片の id はその先へ寄せる
   let first = fresh(doc)
   let by = first + count_lines(cut) - (@tree.doc_id + 1)
-  let spell = spell_at(doc, at)
   // 一番外は順に読む。中身は直前に生えたノードのもの（文書の読みと同じ —
   // 骨格の行の後ろの中身はその行のもの）で、手前にノードが無ければ貼り先の中身
   let heads : Array[@tree.Node] = []
@@ -719,7 +693,7 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
     match p {
       Lines(ls) =>
         for label in ls {
-          heads.push(make(sign, first + heads.length(), label))
+          heads.push(make(first + heads.length(), label))
         }
       Card(b) => {
         let blk : @tree.Block = {
@@ -734,13 +708,11 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
       }
     }
   }
-  let subs = peel(sub.roots.map(r => r.node)).map(n => {
-    respell(shift(n, by), sign)
-  })
-  let nodes = [..heads, ..subs].mapi((k, n) => spelled(n, spell, k))
+  let nodes = [
+    ..heads,
+    ..peel(sub.roots.map(r => r.node)).map(n => shift(n, by)),
+  ]
   let mut cur = doc
-  // 貼り先が文書なら文書の散文（最初の骨格より前）へ。マップには出ないが、
-  // 手で md の頭に書いたのと同じ形 — 見えないことは地図の都合で、断る理由にしない
   if !prose.is_empty() {
     guard body(cur, node=host, bs => [..bs, ..prose]) is Some(d) else {
       return None
@@ -750,7 +722,7 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   if nodes.is_empty() {
     return Some({ doc: cur, focus: Some(prose[0].id), })
   }
-  done(place(cur, at, nodes), Some(nodes[0].id))
+  done(implant(cur, at, nodes), Some(nodes[0].id))
 }
 
 ///|

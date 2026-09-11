@@ -98,7 +98,7 @@ fn Fake::editor(self : Fake) -> Editor {
 
 ///|
 /// 手元の置き場（ディスクの代わり）。何も覚えていない
-fn memo_io() -> @disk.Disk {
+fn memo_disk() -> @disk.Disk {
   let table : Map[String, @core.Any] = Map([])
   @disk.Disk::new(
     @disk.Recent::new({
@@ -156,7 +156,7 @@ fn stand() -> Stand {
     log: [],
     hint: false,
   }
-  let app = App::new(doc, fake.editor(), memo_io(), measure=(_, text) => {
+  let app = App::new(doc, fake.editor(), memo_disk(), measure=(_, text) => {
     text.char_length().to_double() * 7.0
   })
   fake.app = Some(app)

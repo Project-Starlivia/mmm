@@ -15,7 +15,7 @@ let fan_band = 0.6
 
 ///|
 /// 親との繋がり。側は繋がりの性質なのでここに乗る（根は繋がりを持たない）
-pub(all) struct Edge {
+pub(all) struct Parent {
   id : Int
   side : @tree.Side
 } derive(Eq, Debug, ToJson)
@@ -24,17 +24,17 @@ pub(all) struct Edge {
 pub(all) struct Box {
   /// 木のノードそのまま。label / fold / body はここから読む — 綴り（mark）は見ない
   node : @tree.Node
-  parent : Edge?
-  /// 畳んで埋もれた子孫の数（全部の子孫。種類で除かない）
+  parent : Parent?
+  /// 畳んで埋もれた子孫の数（全部の子孫。種類で除かない）。
+  /// 描くために控えた値 — node から導けるが、描くたびに数え直さない
   buried : Int
   /// 親の辺の上での、付け根のずらし量(px)。兄弟と出口が重ならないように
   mut fan : Double
-  x : Double
-  mut y : Double
-  w : Double
-  h : Double
+  /// 置き場（world）。側を根の中心へ揃えるとき、まとめて動く
+  mut rect : Rect
   /// node.body から組んだもの。カードにならない中身は入らないので、
-  /// **body と並びが揃わない**。1 枚ずつが出どころの id を持つ
+  /// **body と並びが揃わない**。1 枚ずつが出どころの id を持つ。
+  /// 描くために控えた値 — node から導けるが、描くたびに組み直さない
   cards : Array[Card]
 } derive(Debug)
 
@@ -44,11 +44,6 @@ pub(all) struct Layout {
   order : Array[Int]
   boxes : Map[Int, Box]
 } derive(Debug)
-
-///|
-pub fn Box::rect(self : Box) -> Rect {
-  { x: self.x, y: self.y, w: self.w, h: self.h, }
-}
 
 ///|
 /// カード 1 枚の中身を置く矩形（**箱の左上から見た座標**）。
@@ -61,9 +56,32 @@ pub fn card_rect(b : Box, i : Int) -> Rect? {
   Some({
     x: normal.pad - bleed,
     y: row_top(b.cards, i) + inset,
-    w: b.w - normal.pad * 2.0 + bleed * 2.0,
+    w: b.rect.w - normal.pad * 2.0 + bleed * 2.0,
     h: row_h(c.kind) - inset * 2.0,
   })
+}
+
+///|
+/// 親の id。根なら None
+fn parent_of(l : Layout, id : Int) -> Int? {
+  l.boxes.get(id).bind(b => b.parent.map(p => p.id))
+}
+
+///|
+/// その親の、見えている子を文書順に（None なら根たち）
+fn kids_in(l : Layout, parent : Int?) -> Array[Int] {
+  l.order.filter(id => parent_of(l, id) == parent)
+}
+
+///|
+/// 同じ辺から出る子の列。(親の id, 向き) ごと — 根だけが左右の両辺から線を出す
+fn columns(boxes : Map[Int, Box]) -> Map[(Int, Int), Array[Box]] {
+  let out : Map[(Int, Int), Array[Box]] = Map([])
+  for b in boxes.values() {
+    guard b.parent is Some(p) else { continue }
+    out.get_or_init((p.id, dir(p.side)), () => []).push(b)
+  }
+  out
 }
 
 ///|
@@ -202,7 +220,7 @@ fn Pass::stack_center(self : Pass, kids : Array[@tree.Node]) -> Double {
   for i, k in kids {
     y += gap_before(i)
     centers.push(y + self.band_of(k).anchor)
-    y += self.band_of(k).h
+    y += self.height_of(k)
   }
   (centers[0] + centers[centers.length() - 1]) / 2.0
 }
@@ -229,7 +247,7 @@ fn Pass::stack_h(self : Pass, kids : Array[@tree.Node]) -> Double {
 fn Pass::place(
   self : Pass,
   n : @tree.Node,
-  parent : Edge,
+  parent : Parent,
   near_x : Double,
   top : Double,
 ) -> Double {
@@ -258,10 +276,7 @@ fn Pass::place(
     parent: Some(parent),
     buried,
     fan: 0,
-    x,
-    y: center_y - size.h / 2.0,
-    w: size.w,
-    h: size.h,
+    rect: { x, y: center_y - size.h / 2.0, w: size.w, h: size.h, },
     cards,
   }
   center_y
@@ -271,7 +286,7 @@ fn Pass::place(
 /// その枝と子孫すべての箱を縦にずらす。側を根の中心へ揃えるため
 fn Pass::shift_subtree(self : Pass, n : @tree.Node, dy : Double) -> Unit {
   match self.boxes.get(n.id) {
-    Some(b) => b.y += dy
+    Some(b) => b.rect = { ..b.rect, y: b.rect.y + dy, }
     None => ()
   }
   for k in kids_of(n) {
@@ -342,10 +357,7 @@ fn Pass::place_tree(
     parent: None,
     buried,
     fan: 0,
-    x: 0,
-    y: center_y - size.h / 2.0,
-    w: size.w,
-    h: size.h,
+    rect: { x: 0, y: center_y - size.h / 2.0, w: size.w, h: size.h, },
     cards,
   }
   reach_of_tree(placed, center_y, size.h)
@@ -423,26 +435,14 @@ fn walk(n : @tree.Node, order : Array[Int]) -> Unit {
 /// 付け根をずらすのは「**同じ辺から**出る線が 2 本以上」あるときだけ。
 /// 根は左右の両辺から線を出す唯一のノードなので、親 id だけでなく側でまとめる
 fn fan_out(boxes : Map[Int, Box]) -> Unit {
-  let groups : Map[(Int, Int), (Box, Array[Box])] = Map([])
-  for b in boxes.values() {
-    guard b.parent is Some(e) else { continue }
-    guard boxes.get(e.id) is Some(parent) else { continue }
-    let key = (e.id, dir(e.side))
-    match groups.get(key) {
-      Some((_, kids)) => kids.push(b)
-      None => groups[key] = (parent, [b])
-    }
-  }
-  for _, group in groups {
-    let (parent, kids) = group
-    if kids.length() < 2 {
+  for key, kids in columns(boxes) {
+    guard kids.length() >= 2 && boxes.get(key.0) is Some(parent) else {
       continue
     }
-    let band = parent.h * fan_band
-    let sorted = kids.copy()
-    sorted.sort_by((a, b) => a.rect().center().y.compare(b.rect().center().y))
-    for i, b in sorted {
-      b.fan = ((i.to_double() + 0.5) / sorted.length().to_double() - 0.5) * band
+    let band = parent.rect.h * fan_band
+    kids.sort_by((a, b) => a.rect.center().y.compare(b.rect.center().y))
+    for i, b in kids {
+      b.fan = ((i.to_double() + 0.5) / kids.length().to_double() - 0.5) * band
     }
   }
 }
@@ -474,7 +474,7 @@ pub fn edge_ends(l : Layout, id : Int) -> (Pt, Pt)? {
   guard l.boxes.get(parent.id) is Some(p) else { return None }
   // 線は「親の、子が伸びる側の辺」から出て「子の、親を向いた辺」へ入る
   let d = dir(parent.side)
-  let out = p.rect().growth_edge(d)
-  let into = b.rect().entry_edge(d)
+  let out = p.rect.growth_edge(d)
+  let into = b.rect.entry_edge(d)
   Some(({ x: out.x, y: out.y + b.fan, }, into))
 }

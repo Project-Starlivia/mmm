@@ -1,4 +1,4 @@
-// クリップボード・アドレス・字の幅。窓（`doc.defaultView`）から辿るので、
+// クリップボード・アドレス。窓（`doc.defaultView`）から辿るので、
 // 試験の DOM（happy-dom）でも同じ道を通る
 
 ///|
@@ -15,6 +15,15 @@ pub extern "js" fn write_clipboard(
   text : String,
 ) -> @js_async.Promise[Unit] =
   #| async (doc, text) => doc.defaultView.navigator.clipboard.writeText(text)
+
+///|
+/// クリップボードに 1 品を置く。`types[i]` の中身が `blobs[i]`
+pub extern "js" fn clipboard_write(
+  types : FixedArray[String],
+  blobs : FixedArray[@core.Any],
+) -> @js_async.Promise[Unit] =
+  #| (types, blobs) => { const item = {}; types.forEach((t, i) => { item[t] = blobs[i]; });
+  #|   return navigator.clipboard.write([new ClipboardItem(item)]); }
 
 ///|
 /// クリップボードの絵（最初の image/*）。無い / 読めない / 断られたら null
@@ -52,16 +61,3 @@ pub extern "js" fn drop_hash(doc : @dom.Document) -> Unit =
 /// 閉じる前に聞く（beforeunload の出来事に言う）
 pub extern "js" fn warn_unload(e : @core.Any) -> Unit =
   #| (e) => { e.preventDefault(); e.returnValue = ""; }
-
-///|
-/// 字の幅（canvas の measureText）。`font` は CSS の綴り（`16px sans-serif`）
-pub extern "js" fn text_width(
-  doc : @dom.Document,
-  font : String,
-  text : String,
-) -> Double =
-  #| (doc, font, text) => {
-  #|   const ctx = (doc.__mmmMeasure ??= doc.createElement("canvas").getContext("2d"));
-  #|   if (!ctx) throw new Error("no 2d context");
-  #|   ctx.font = font; return ctx.measureText(text).width;
-  #| }

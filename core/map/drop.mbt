@@ -48,9 +48,8 @@ let reach : Double = gap.x * 4.0 + 16.0
 
 ///|
 /// 子を優先するのは**親と子の列のあいだの通路**まで。次の列に入ったら、そこは
-/// その列の住人（前後への挿入）のもの。通路より広く取っていたころは、列 N の
-/// ノードが列 N+1 の兄弟挿入を横取りし、「下の兄弟にしたいのに隣の枝の子になる」
-/// が起きていた
+/// その列の住人（前後への挿入）のもの — 通路より広いと、列 N のノードが列 N+1 の
+/// 兄弟挿入を横取りする（「下の兄弟にしたいのに隣の枝の子になる」）
 let near : Double = gap.x
 
 ///|
@@ -62,12 +61,31 @@ let slack = 18.0
 /// `du` は**その枝が伸びる向き**を正とする（左の枝では左が正）ので、
 /// 外側ゾーンの式を左右で書き分けなくてよい
 fn offset(at : Pt, b : Box) -> (Double, Double, Double, Double) {
-  let c = b.rect().center()
+  let c = b.rect.center()
   let d = match b.parent {
     Some(p) => dir(p.side)
     None => 1
   }
-  ((at.x - c.x) * d.to_double(), at.y - c.y, b.w / 2.0, b.h / 2.0)
+  ((at.x - c.x) * d.to_double(), at.y - c.y, b.rect.w / 2.0, b.rect.h / 2.0)
+}
+
+///|
+/// 落とし先になれる箱（`reachable`）のうち、`score` がいちばん小さいもの。
+/// 同点なら先に見たほう。誰も居なければ (None, ∞)
+fn[T] Scene::best(
+  self : Scene,
+  ids : Array[Int],
+  score : (Box) -> (Double, T)?,
+) -> (T?, Double) {
+  let mut found : T? = None
+  let mut least = @double.infinity
+  for id in ids {
+    guard reachable(self, id) is Some(b) else { continue }
+    guard score(b) is Some((d, t)) && d < least else { continue }
+    least = d
+    found = Some(t)
+  }
+  (found, least)
 }
 
 ///|
@@ -81,25 +99,23 @@ fn offset(at : Pt, b : Box) -> (Double, Double, Double, Double) {
 /// 掴んでいるノードも数に入れる — ドラッグ中もその箱は元の場所に描かれた
 /// ままなので、見た目の上下端は動かない
 fn open_ends(s : Scene) -> (Set[Int], Set[Int]) {
-  let first : Map[(Int, Int), Box] = Map([])
-  let last : Map[(Int, Int), Box] = Map([])
-  for id in s.layout.order {
-    guard s.layout.boxes.get(id) is Some(b) else { continue }
-    guard b.parent is Some(p) else { continue } // 根に兄弟は無い
-    let key = (p.id, dir(p.side))
-    match first.get(key) {
-      Some(f) => if b.y < f.y { first[key] = b }
-      None => first[key] = b
+  let up : Set[Int] = Set([])
+  let down : Set[Int] = Set([])
+  for _, col in columns(s.layout.boxes) {
+    let mut first = col[0]
+    let mut last = col[0]
+    for b in col {
+      if b.rect.y < first.rect.y {
+        first = b
+      }
+      if b.rect.y + b.rect.h > last.rect.y + last.rect.h {
+        last = b
+      }
     }
-    match last.get(key) {
-      Some(l) => if b.y + b.h > l.y + l.h { last[key] = b }
-      None => last[key] = b
-    }
+    up.add(first.node.id)
+    down.add(last.node.id)
   }
-  (
-    Set::from_iter(first.values().map(b => b.node.id)),
-    Set::from_iter(last.values().map(b => b.node.id)),
-  )
+  (up, down)
 }
 
 ///|
@@ -110,20 +126,15 @@ fn open_ends(s : Scene) -> (Set[Int], Set[Int]) {
 /// これは箱の帯（前後への挿入）とまったく同じ読み方で、場所が通路に変わる
 /// だけ — 通路と子の列で意味が変わらないので、指した高さがそのまま着地点
 fn slot_among_kids(s : Scene, parent : Int) -> Target? {
-  let mut best = @double.infinity
-  let mut hit : Target? = None
-  for id in s.layout.order {
-    guard !s.dragging.contains(id) else { continue }
-    guard s.layout.boxes.get(id) is Some(b) else { continue }
-    guard b.parent is Some(p) && p.id == parent else { continue }
-    let c = b.rect().center()
-    let d = (s.at.y - c.y).abs()
-    if d < best {
-      best = d
-      hit = Some({ id, pos: if s.at.y < c.y { 1 } else { 2 }, })
-    }
-  }
-  hit
+  s.best(kids_in(s.layout, Some(parent)), b => {
+    let c = b.rect.center()
+    Some(
+      (
+        (s.at.y - c.y).abs(),
+        { id: b.node.id, pos: if s.at.y < c.y { 1 } else { 2 }, },
+      ),
+    )
+  }).0
 }
 
 ///|
@@ -136,23 +147,17 @@ fn slot_among_kids(s : Scene, parent : Int) -> Target? {
 /// ドラッグを諦める手が横だけになる
 fn find_open_end(s : Scene) -> Target? {
   let (up_ends, down_ends) = open_ends(s)
-  let mut best = @double.infinity
-  let mut hit : Target? = None
-  for id in s.layout.order {
-    guard !s.dragging.contains(id) else { continue }
-    guard s.layout.boxes.get(id) is Some(b) else { continue }
+  s.best(s.layout.order, b => {
     let (du, dv, hu, hv) = offset(s.at, b)
-    guard du.abs() <= hu + slop else { continue }
+    guard du.abs() <= hu + slop else { return None }
     let over = dv.abs() - hv
-    guard over > 0.0 && over <= open_band else { continue }
+    guard over > 0.0 && over <= open_band else { return None }
     let up = dv < 0.0
-    guard (if up { up_ends } else { down_ends }).contains(id) else { continue }
-    if over < best {
-      best = over
-      hit = Some({ id, pos: if up { 1 } else { 2 }, })
+    guard (if up { up_ends } else { down_ends }).contains(b.node.id) else {
+      return None
     }
-  }
-  hit
+    Some((over, { id: b.node.id, pos: if up { 1 } else { 2 }, }))
+  }).0
 }
 
 ///|
@@ -199,23 +204,17 @@ priv struct Zone {
 
 ///|
 /// 帯の中でいちばん近い相手。**帯は隣の兄弟と重なる**ので、最初に見つかった相手では
-/// なく近いほうを選ぶ（文書順で決めていたころは、親が違う子スタックの境目で
-/// どちらに倒れるかが実質その場の運になっていた）。
+/// なく近いほうを選ぶ — 文書順だと、親が違う子スタックの境目でどちらに倒れるかが運になる
 fn banded(s : Scene) -> Near {
-  let mut target : Target? = None
-  let mut best = @double.infinity
-  for id in s.layout.order {
-    guard reachable(s, id) is Some(b) else { continue }
+  let (target, dist) = s.best(s.layout.order, b => {
     let (du, dv, hu, hv) = offset(s.at, b)
-    guard du.abs() <= hu + slop && dv.abs() <= hv + band else { continue }
+    guard du.abs() <= hu + slop && dv.abs() <= hv + band else { return None }
     // 箱の中なら 0。外に出た分だけ距離が増える（兄弟軸のほうを重く見る）
     let dist = @cmp.maximum(0.0, du.abs() - hu) +
       @cmp.maximum(0.0, dv.abs() - hv) * 2.0
-    guard dist < best else { continue }
-    best = dist
-    target = Some({ id, pos: slot_of(b, dv, hv), })
-  }
-  { target, dist: best, }
+    Some((dist, { id: b.node.id, pos: slot_of(b, dv, hv), }))
+  })
+  { target, dist, }
 }
 
 ///|
@@ -235,33 +234,31 @@ fn slot_of(b : Box, dv : Double, hv : Double) -> Int {
 ///|
 /// 外側ゾーン — 箱の外、成長軸の方向へ少し出たところ。ここは「子にする」通路で、
 /// 縦の位置が**どの子の隣か**まで決める（通路は子の列そのものではないが、
-/// 子は縦に積まれるので縦は子の列と同じ意味を持つ。一律「末尾に足す」に潰していた
-/// ころは、通路のどこを指しても印が最後の子の下に 1 点で出ていた）。
+/// 子は縦に積まれるので縦は子の列と同じ意味を持つ — 一律「末尾に足す」だと、
+/// 通路のどこを指しても印が最後の子の下に 1 点で出る）。
 fn beyond(s : Scene) -> Zone {
-  let mut target : Target? = None
-  let mut best = @double.infinity
-  let mut edge = @double.infinity
-  for id in s.layout.order {
-    guard reachable(s, id) is Some(b) else { continue }
+  let (found, _) = s.best(s.layout.order, b => {
     let (du, dv, hu, hv) = offset(s.at, b)
     // 根は両方向に伸びる木の付け根なので、成長軸の判定を絶対値で見る
-    //（`local` の du は dir で片側だけ正にしてあるので、根では素のままだと右側しか拾えない）
+    //（`offset` の du は dir で片側だけ正にしてあるので、根では素のままだと右側しか拾えない）
     let is_root = b.parent is None
     let grow = if is_root { du.abs() } else { du }
     guard grow > hu && grow <= hu + reach && dv.abs() <= hv + slack else {
-      continue
+      return None
     }
-    let d = grow - hu + @cmp.maximum(0.0, dv.abs() - hv) * 2.0
-    guard d < best else { continue }
-    best = d
-    edge = grow - hu
+    let edge = grow - hu
     // 根は側の話が乗るので、子の列には割り込まない
-    target = match (if is_root { None } else { slot_among_kids(s, id) }) {
-      Some(t) => Some(t)
-      None => Some({ id, pos: 0, })
-    }
+    let target = (if is_root { None } else { slot_among_kids(s, b.node.id) }).unwrap_or({
+        id: b.node.id,
+        pos: 0,
+      },
+    )
+    Some((edge + @cmp.maximum(0.0, dv.abs() - hv) * 2.0, (target, edge)))
+  })
+  match found {
+    Some((target, edge)) => { target: Some(target), edge, }
+    None => { target: None, edge: @double.infinity, }
   }
-  { target, edge, }
 }
 
 ///|
@@ -281,7 +278,7 @@ fn landed(s : Scene, t : Target) -> Drop? {
   }
   guard b.parent is None else { return Some(Node(id=t.id, pos=0)) }
   // ポインタがその箱の中心より左か。**側を決めるのはここだけ**
-  Some(Side(root=t.id, left=s.at.x < b.rect().center().x))
+  Some(Side(root=t.id, left=s.at.x < b.rect.center().x))
 }
 
 ///|
