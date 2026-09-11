@@ -703,6 +703,9 @@ pub fn mmm_logo_svg(fill : String, dirty : Bool) -> String {
 }
 
 ///|
+/// 触っていない記法構造を md へ書き戻す。**API ではなく物差し** — 呼ぶのは
+/// `test/notation.test.ts` だけで、面を跨ぐのは fixtures（523 KB）が
+/// ディスクに在って MoonBit から読めないから。
 #export_name("mmmNotationBack")
 pub fn mmm_notation_back(md : String) -> String {
   @tree.notation_back(md)
