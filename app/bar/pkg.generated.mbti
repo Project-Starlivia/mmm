@@ -12,27 +12,11 @@ pub fn export_ways(ExportDeps, ((Way) -> Unit)?) -> Array[@parts.Entry]
 
 pub fn files_menu(Files, FileActs) -> Array[@parts.Entry]
 
-pub fn logo_inner(String) -> String
-
-pub let logo_path : String
-
 pub fn logo_svg(String, Bool) -> String
 
 pub fn more_menu(More, MoreActs) -> Array[@parts.Entry]
 
 pub let no_rename_here : String
-
-pub let nothing_to_rename : String
-
-pub fn rename_problem(Bool, Bool) -> String?
-
-pub let repo : String
-
-pub async fn run(ExportDeps, Way) -> Bool
-
-pub fn way_of(String?) -> Way
-
-pub let ways : Array[Way]
 
 // Errors
 

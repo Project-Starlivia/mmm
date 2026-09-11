@@ -10,19 +10,13 @@ import {
 // Values
 pub fn accent(@dom.Document) -> String?
 
-pub fn ask(@dom.Document, Ask, (Array[String]?) -> Unit) -> Unit
-
 pub fn ask_form(@dom.Document, Ask, () -> Unit) -> (@dom.Element, () -> Array[String])
-
-pub fn ask_of(String, String, note? : String?, cancel? : String?, parts? : Array[Part], preview? : String?) -> Ask
 
 pub async fn asked(@dom.Document, Ask) -> Array[String]?
 
 pub fn blocked(@dom.Document, String) -> Unit
 
 pub let blocked_words : Array[String]
-
-pub fn canvas_paint(@core.Any) -> Paint
 
 pub fn connect(String) -> Ask
 
@@ -36,10 +30,6 @@ pub fn failed(@dom.Document, String) -> Unit
 
 pub let failed_words : Array[String]
 
-pub fn fill(@dom.Element, Array[Entry], Ways) -> Array[(@dom.Element, () -> Unit)]
-
-pub let height : Double
-
 pub fn hex_of(String) -> String?
 
 pub fn icon(@dom.Document, String) -> @dom.Element
@@ -51,8 +41,6 @@ pub fn is_icon(String) -> Bool
 pub fn label(@dom.Document, String, String, Bool) -> Array[@dom.Node]
 
 pub fn names() -> Array[String]
-
-pub fn nibs_of(Ink) -> Array[Double]
 
 pub let no_file_access : String
 
@@ -78,8 +66,6 @@ pub fn rows(@dom.Document, Array[Entry]) -> @dom.Element
 
 pub async fn show_drawing(@dom.Document) -> @core.Any?
 
-pub let width : Double
-
 // Errors
 
 // Types and methods
@@ -97,9 +83,6 @@ pub struct Board {
   canvas : @dom.Element
   sheet : Sheet
 }
-pub fn Board::new(@dom.Document, paint? : (@dom.Element) -> Paint) -> Self
-pub async fn Board::picture(Self) -> @core.Any?
-pub fn Board::undo(Self) -> Unit
 
 pub(all) enum Disabled {
   No
@@ -137,15 +120,9 @@ pub struct Menu {
   mut items : () -> Array[Entry]
   mut at : (Double, Double)
 }
-pub fn Menu::close(Self, Bool) -> Unit
-pub fn Menu::close_sub(Self) -> Unit
-pub fn Menu::contains(Self, @core.Any) -> Bool
-pub fn Menu::focus_first(Self, Bool) -> Unit
 pub fn Menu::hide(Self, Bool) -> Unit
 pub fn Menu::is_open(Self) -> Bool
 pub fn Menu::new(@dom.Document) -> Self
-pub fn Menu::open_sub(Self, @dom.Element, Array[Entry]) -> Unit
-pub fn Menu::respell(Self) -> Unit
 pub fn Menu::show(Self, Double, Double, () -> Array[Entry]) -> Unit
 
 pub(all) struct Paint {
@@ -180,12 +157,6 @@ pub struct Sheet {
   paint : Paint
   mut drawing : Array[Pt]?
 }
-pub fn Sheet::begin(Self, Pt, String, Double) -> Unit
-pub fn Sheet::clear(Self) -> Unit
-pub fn Sheet::draw_to(Self, Pt) -> Unit
-pub fn Sheet::end(Self) -> Unit
-pub fn Sheet::new(Paint) -> Self
-pub fn Sheet::undo(Self) -> Unit
 
 pub(all) enum Stroke {
   Line(Array[Pt], String, Double)

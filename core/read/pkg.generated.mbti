@@ -7,7 +7,6 @@ import {
   "mmm/core/tree",
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
-  "moonbitlang/core/set",
 }
 
 // Values
@@ -17,21 +16,11 @@ pub fn anchors_of(Survey, Int?) -> Anchors?
 
 pub fn bare(String) -> String
 
-pub fn buried(@tree.Doc) -> @set.Set[Int]
-
-pub fn caret_ids(Survey, Array[Range]) -> Array[Int]
-
 pub fn carry(Anchors, (Int) -> Int) -> Anchors
 
 pub fn chosen(Survey, Holder, Caret, Anchors?) -> Choice
 
-pub fn each_node(@tree.Doc, (@tree.Node) -> Unit) -> Unit
-
-pub let empty_name : String
-
 pub fn image_folder(String?) -> String?
-
-pub let image_folder_key : String
 
 pub fn is_markdown(String) -> Bool
 
@@ -48,8 +37,6 @@ pub fn retarget(@tree.Doc, String, String) -> Array[@op.Op]
 pub fn set_image_folder(String, String?, String) -> @tree.Edit
 
 pub fn survey(String) -> Survey
-
-pub fn to_file_name(String) -> String
 
 pub fn under(String, String) -> String?
 

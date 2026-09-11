@@ -13,7 +13,7 @@ let prefix = "md="
 ///|
 /// この長さを超えたら「一部のアプリでは切られるかも」と伝える文字数。
 /// 拒否はしない — 相手側の実際の上限は mmm には分からないので、勝手に決めない
-pub let link_warn_length = 8000
+let link_warn_length = 8000
 
 ///|
 /// バイト列を stream（Compression / DecompressionStream）に通して集める。
@@ -66,7 +66,7 @@ fn from_base64url(value : String) -> @arraybuffer.Uint8Array? {
 
 ///|
 /// 本文を載せたフラグメント（`#md=...`）。URL の組み立ては呼び出し側
-pub async fn to_hash(text : String) -> String {
+async fn to_hash(text : String) -> String {
   let raw = @encoding.TextEncoder::new().encode(text)
   let gz = pipe(raw, @streams.CompressionStream::new("gzip").as_any()).wait()
   "#" + prefix + to_base64url(gz)
@@ -74,7 +74,7 @@ pub async fn to_hash(text : String) -> String {
 
 ///|
 /// `location.hash` から本文を取り出す。リンクでなければ・壊れていれば None
-pub async fn from_hash(hash : String) -> String? {
+async fn from_hash(hash : String) -> String? {
   guard hash.has_prefix("#" + prefix) else { return None }
   let value = String::unsafe_substring(
     hash,
@@ -91,7 +91,7 @@ pub async fn from_hash(hash : String) -> String? {
 ///|
 /// 画像を貼った行があるか。`![...](...)` — 画像は旅をしないので、
 /// Copy link の行に**押す前の但し書き**として出すのに使う
-pub fn has_images(text : String) -> Bool {
+fn has_images(text : String) -> Bool {
   let mut from = 0
   while index_of(text, "![", from) is Some(bang) {
     // `]` まで（`]` を含まない）、その直後が `(`、その先に `)`

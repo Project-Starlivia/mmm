@@ -31,10 +31,10 @@ pub(all) enum Stroke {
 } derive(Eq, Debug)
 
 ///|
-pub let width = 720.0
+let width = 720.0
 
 ///|
-pub let height = 440.0
+let height = 440.0
 
 ///|
 /// 紙の色。消しゴムはこの色で描く（出来上がりは透過を持たない WebP）
@@ -84,7 +84,7 @@ pub enum Ink {
 }
 
 ///|
-pub fn nibs_of(ink : Ink) -> Array[Double] {
+fn nibs_of(ink : Ink) -> Array[Double] {
   match ink {
     Eraser => eraser_nibs
     Pen(_) => pen_nibs
@@ -102,7 +102,7 @@ pub(all) struct Paint {
 
 ///|
 /// canvas の 2d に載せる
-pub fn canvas_paint(ctx : @core.Any) -> Paint {
+fn canvas_paint(ctx : @core.Any) -> Paint {
   {
     fill: () => @web.fill_rect(ctx, paper, width, height),
     line: (color, w, points) => {
@@ -125,7 +125,7 @@ pub struct Sheet {
 }
 
 ///|
-pub fn Sheet::new(paint : Paint) -> Sheet {
+fn Sheet::new(paint : Paint) -> Sheet {
   let self : Sheet = { strokes: [], paint, drawing: None, }
   self.repaint()
   self
@@ -151,7 +151,7 @@ fn Sheet::repaint(self : Sheet) -> Unit {
 
 ///|
 /// 一手の始まり（点を打つ）
-pub fn Sheet::begin(self : Sheet, p : Pt, color : String, w : Double) -> Unit {
+fn Sheet::begin(self : Sheet, p : Pt, color : String, w : Double) -> Unit {
   let points = [p]
   self.drawing = Some(points)
   self.strokes.push(Line(points, color, w))
@@ -160,7 +160,7 @@ pub fn Sheet::begin(self : Sheet, p : Pt, color : String, w : Double) -> Unit {
 
 ///|
 /// 一手の続き。引き足すのは最後の一区間だけ。全部引き直すのは取り消しのときでよい
-pub fn Sheet::draw_to(self : Sheet, p : Pt) -> Unit {
+fn Sheet::draw_to(self : Sheet, p : Pt) -> Unit {
   guard self.drawing is Some(points) else { return }
   guard self.strokes[self.strokes.length() - 1] is Line(_, color, w) else {
     return
@@ -171,13 +171,13 @@ pub fn Sheet::draw_to(self : Sheet, p : Pt) -> Unit {
 }
 
 ///|
-pub fn Sheet::end(self : Sheet) -> Unit {
+fn Sheet::end(self : Sheet) -> Unit {
   self.drawing = None
 }
 
 ///|
 /// 最後の一手を戻す
-pub fn Sheet::undo(self : Sheet) -> Unit {
+fn Sheet::undo(self : Sheet) -> Unit {
   if self.strokes.length() == 0 {
     return
   }
@@ -187,7 +187,7 @@ pub fn Sheet::undo(self : Sheet) -> Unit {
 
 ///|
 /// クリアも手のひとつ。取り消しで戻せる
-pub fn Sheet::clear(self : Sheet) -> Unit {
+fn Sheet::clear(self : Sheet) -> Unit {
   self.strokes.push(Clear)
   self.repaint()
 }
@@ -302,7 +302,7 @@ fn paper_of(doc : @dom.Document, canvas : @dom.Element) -> Paint {
 ///|
 /// 道具と紙を組む。**置くのは呼ぶ側** — アプリは窓に載せ、並べて見る道具は
 /// そのまま置く。`paint` は紙の載せ先（試験は記録に差し替える）
-pub fn Board::new(
+fn Board::new(
   doc : @dom.Document,
   paint? : (@dom.Element) -> Paint = canvas => paper_of(doc, canvas),
 ) -> Board {
@@ -414,13 +414,13 @@ pub fn Board::new(
 
 ///|
 /// 最後の一手を戻す（Mod+Z）
-pub fn Board::undo(self : Board) -> Unit {
+fn Board::undo(self : Board) -> Unit {
   self.sheet.undo()
 }
 
 ///|
 /// いまの絵。WebP が作れない環境では PNG へ落ちる（type が空になる）。作れなければ None
-pub async fn Board::picture(self : Board) -> @core.Any? {
+async fn Board::picture(self : Board) -> @core.Any? {
   @core.identity_option(
     @web.canvas_blob(self.canvas, "image/webp", 0.92).wait(),
   )

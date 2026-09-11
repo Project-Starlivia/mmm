@@ -90,7 +90,7 @@ fn hits(all : Array[Own], r : Range) -> Array[Own] {
 
 ///|
 /// その範囲たちが掛かるノードの id、文書順。無ければ空
-pub fn caret_ids(s : Survey, ranges : Array[Range]) -> Array[Int] {
+fn caret_ids(s : Survey, ranges : Array[Range]) -> Array[Int] {
   guard ranges.length() > 0 else { return [] }
   let all = owns(s)
   let picked : Set[Int] = Set([])
@@ -104,7 +104,7 @@ pub fn caret_ids(s : Survey, ranges : Array[Range]) -> Array[Int] {
 
 ///|
 /// 畳まれて埋もれたノード（fold のあるノードの子孫）。箱を持たないので選択に居られない
-pub fn buried(doc : @tree.Doc) -> Set[Int] {
+fn buried(doc : @tree.Doc) -> Set[Int] {
   let out : Set[Int] = Set([])
   fn walk(n : @tree.Node, under : Bool) -> Unit {
     if under {

@@ -25,7 +25,7 @@
 
 ///|
 /// md → 方言の mdAst。
-pub fn read(md : String) -> @markdown.Document {
+fn read(md : String) -> @markdown.Document {
   stretch(md, @markdown.parse(md).document)
 }
 
@@ -425,7 +425,7 @@ pub fn serialize(doc : Doc) -> String {
 
 ///|
 /// 部分木 1 つ → 正規形の md（断片）。合流が dirty の地番に差す。
-pub fn fragment(
+fn fragment(
   x : Node,
   depth : Int,
   sides : Array[Side],
@@ -436,7 +436,7 @@ pub fn fragment(
 
 ///|
 /// 散文 → 正規形の md。文書の頭（最初の骨格より前）の断片。
-pub fn prose(body : Array[Block]) -> String {
+fn prose(body : Array[Block]) -> String {
   write(unbuild_prose(body))
 }
 

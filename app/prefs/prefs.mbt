@@ -19,7 +19,7 @@ let owned : Array[(String, String)] = [
 ]
 
 ///|
-pub fn key_of(name : String) -> String {
+fn key_of(name : String) -> String {
   for o in owned {
     if o.0 == name {
       return o.1

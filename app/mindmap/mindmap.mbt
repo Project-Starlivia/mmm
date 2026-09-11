@@ -337,7 +337,7 @@ pub fn Mindmap::fit_view(self : Mindmap) -> Unit {
 
 ///|
 /// 選択（無ければ根）を画面の中心へ。拡大率は変えない
-pub fn Mindmap::center_on_target(self : Mindmap) -> Unit {
+fn Mindmap::center_on_target(self : Mindmap) -> Unit {
   let target = match @map.union(self.rects_of((self.host.selection)().ids)) {
     Some(r) => Some(r)
     None => @map.root_box(self.layout).map(b => b.rect())
@@ -445,7 +445,7 @@ pub fn Mindmap::set_grab(self : Mindmap, on : Bool) -> Unit {
 
 ///|
 /// 書き出しに写すもの。文書順の箱と、その線・ノードの要素。空なら箱が無い
-pub fn Mindmap::svg_parts(
+fn Mindmap::svg_parts(
   self : Mindmap,
 ) -> (Array[@map.Rect], Array[@dom.Element], Array[@dom.Element]) {
   let edges = []

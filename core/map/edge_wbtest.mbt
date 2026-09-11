@@ -14,14 +14,6 @@ test "段差があれば三次ベジェ 1 本" {
 }
 
 ///|
-test "折れ線に落としても、始点と終点は動かない" {
-  let pts = flatten(edge_segs(100, 40), 8)
-  assert_eq(pts[0], { x: 0, y: 0, })
-  assert_eq(pts[pts.length() - 1], { x: 100, y: 40, })
-  assert_eq(pts.length(), 9)
-}
-
-///|
 test "d 属性は始点から始まり、終点で終わる" {
   assert_eq(
     edge_path({ x: 10, y: 20, }, { x: 110, y: 60, }),

@@ -25,10 +25,10 @@ pub(all) struct Pane {
 
 ///|
 /// 縮小・拡大の限界。これ以上は字も線も意味を失う
-pub let min_zoom = 0.15
+let min_zoom = 0.15
 
 ///|
-pub let max_zoom = 3.0
+let max_zoom = 3.0
 
 ///|
 /// ホイール 1 目盛りあたりの倍率の効き
@@ -50,7 +50,7 @@ fn clamp_zoom(k : Double) -> Double {
 /// その点を基点に、倍率を `k` にする。**その点の下にある world の位置が
 /// 動かない**ように平行移動を合わせる — 合わせないと、拡大するたびに
 /// 見ていた場所が画面の外へ逃げる
-pub fn zoom_to(cam : Camera, x : Double, y : Double, k : Double) -> Camera {
+fn zoom_to(cam : Camera, x : Double, y : Double, k : Double) -> Camera {
   let next = clamp_zoom(k)
   let ratio = next / cam.k
   { k: next, tx: x - (x - cam.tx) * ratio, ty: y - (y - cam.ty) * ratio, }

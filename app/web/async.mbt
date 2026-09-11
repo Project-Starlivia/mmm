@@ -19,8 +19,3 @@ pub extern "js" fn promise_of(
   f : ((@core.Any) -> Unit) -> Unit,
 ) -> @js_async.Promise[@core.Any] =
   #| (f) => new Promise((ok) => f(ok))
-
-///|
-/// 何であれ Promise に（ts の閉包が返したものを待てるように）
-pub extern "js" fn settled(v : @core.Any) -> @js_async.Promise[@core.Any] =
-  #| (v) => Promise.resolve(v)
