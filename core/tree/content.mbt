@@ -1,39 +1,8 @@
-// 骨格でないものは、いま積んでいるノードの中身になる。
+// 骨格でないものは中身（`Card`）と裁定され、組み立てが直前の行に配る。
 //
 // 絵になるのは 4 つ（画像・リンク・コード・SVG）だけで、**疑わしきは読み解かない**。
 // 読み解かなければ意味は空で、原文が `source` に残る — 読み解かないと決めることが、
 // 「意味を 1 ビットも失わない」の実体になる。
-
-///|
-/// 中身を、いま積んでいるノードに足す。骨格がまだ無ければ文書の散文になる。
-/// id は割り付けの直前に文書順で振るので、ここでは 0 を置く。
-/// `from`・`to` はその中身の原文での範囲で、`to` は持ち主の地番もそこまで伸ばす。
-/// `source` は読んだ原文 — 書き戻しはこれをそのまま返す。
-fn fill(
-  b : Build,
-  content : Content?,
-  from~ : Int,
-  to~ : Int,
-  source~ : String?,
-) -> Unit {
-  keep(b, { from, to, }, Card(content~, source~))
-  let block : Block = { id: 0, content, source, }
-  let at : Spot = { from, label: None, to, }
-  if b.stack.is_empty() {
-    b.body.push(block)
-    b.body_at.push(at)
-    if to > b.body_to {
-      b.body_to = to
-    }
-    return
-  }
-  // 飛び（Implicit）は綴りが無いので中身も持てないが、put は必ず実体を最後に
-  // 積むので、ここに積まれるのは実体の枠だけ。持ち主の範囲がここまで伸びることは
-  // `body_at` が言うので、枠は書き換えない（`to_node` が足す）
-  let f = b.stack[b.stack.length() - 1]
-  f.body.push(block)
-  f.body_at.push(at)
-}
 
 ///|
 /// mdAst のブロック 1 枚の意味。**読み解けなければ None** — 原文は `source` が

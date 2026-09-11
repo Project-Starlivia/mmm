@@ -1,15 +1,15 @@
-// mdAst → mmmTree。mmm の解釈はここにしか無い。
+// md → 裁定 → 木。mmm の解釈はここにしか無い。
 //
 // 骨格（見出しと項目）を深さで積み上げる。深さが飛んだら、間を Implicit が
 // 埋める — 飛びは構造なので保存し、綴りが無いことだけを型で表す。
 //
-// 積むあいだは深さだけを見る平らな Frame で持ち、根と側の割り付け
-// への割り付けは最後に 1 回だけやる。深さ 1 / 2 / 3 以降で型が違うので、
-// その違いをここへ閉じ込める。
+// **読み（`Build`）が出すのは裁定だけ。** 木を組むのは `assemble`（notation.mbt）で、
+// ひと切れの列を歩いて平らな `Frame` に積み直す。深さ 1 / 2 / 3 以降で型が違うので、
+// 根と側への割り付けは最後に 1 回だけやり、その違いをここへ閉じ込める。
 
 ///|
-/// 積み上げ中のノード。深さは stack の高さが持つので、自分では持たない。
-/// **作ったら変えない。** 番号と地番は導けるので持たず、`to_node` が配る。
+/// 組み立て中のノード（`assemble` の持ち物）。深さは stack の高さが持つので、
+/// 自分では持たない。番号と地番は導けるので持たず、`to_node` が配る。
 priv struct Frame {
   /// 行に書かれていた綴り。飛び（Implicit）は None
   mark : Mark?
@@ -86,22 +86,18 @@ pub fn spans_sig(md : String) -> String {
 pub let doc_id : Int = 1
 
 ///|
-/// 積み上げの途中。**深さを持つのは `stack` だけ** — 見出しの `#` の数を
-/// 控えると、境界が枠を引き出したあとに元の数から数えてしまう。
+/// 読みの途中。**出すのは裁定だけ** — 木は `assemble` がひと切れの列から組むので、
+/// ここで枠を積んでも捨てることになる。
+///
+/// **深さを持つのは `stack` だけ** — 見出しの `#` の数を控えると、境界が枠を
+/// 引き出したあとに元の数から数えてしまう。
 priv struct Build {
   md : String
   /// 文書ぜんぶのリンクの定義行。項目の中を読み解くときに切り出して渡す
   defs : Array[@markdown.Span]
-  roots : Array[Frame]
-  stack : Array[Frame]
-  /// 最初の骨格より前の散文
-  body : Array[Block]
-  /// その散文と並走する地番
-  body_at : Array[Spot]
-  /// その散文の尻（地番）
-  mut body_to : Int
-  /// 次の子の側。木が変わるたびに右へ戻る
-  mut side : Side
+  /// 積んである骨格の綴り。**高さが深さ**で、中身は「項目か」を見るのに使う
+  /// （列 0 の見出しは開いている項目を閉じる）。飛び（Implicit）は None
+  stack : Array[Mark?]
   /// 行き先待ちの水平線が有るか。**本数に意味は無い**ので Bool で持つ
   mut pend : Bool
   /// その水平線の頭。飾りに落ちたとき地番に入れる
@@ -128,13 +124,12 @@ priv struct Build {
   /// 項目の中は、その項目の深さを 0 とした文書（docs/spec.md「項目の中」）。
   /// 文書そのものを読んでいる間は 0
   mut base : Int
-  /// 下した裁定の控え（記法構造）。**木の組み立てには 1 つも効かない** —
-  /// 段 6 で判断そのものを読みの段へ移すまでの、網を張るための控え
+  /// 下した裁定。**これがこの機械の出力ぜんぶ**（`notation` が敷き詰めて列にする）
   pieces : Array[Piece]
 }
 
 ///|
-/// 積み始め。`dry` は深さを測るだけの空打ち（畳みを見ず、項目の中も読み解かない）。
+/// 読み始め。`dry` は深さを測るだけの空打ち（畳みを見ず、項目の中も読み解かない）。
 fn Build::new(
   md : String,
   defs : Array[@markdown.Span],
@@ -143,12 +138,7 @@ fn Build::new(
   {
     md,
     defs,
-    roots: [],
     stack: [],
-    body: [],
-    body_at: [],
-    body_to: 0,
-    side: Right,
     pend: false,
     pend_from: 0,
     pend_to: 0,
@@ -254,17 +244,15 @@ fn lay(b : Build, cut : Slice, nest : Int) -> Unit {
     Capsule(text~, open~, summary~, body~, from~, to~) => {
       // 中身が来たので、保留中の水平線は境界になれない
       spill(b)
-      fill(
+      keep(
         b,
-        Some(Details(open~, summary~, body~)),
-        from~,
-        to~,
-        source=Some(text),
+        { from, to, },
+        Card(content=Some(Details(open~, summary~, body~)), source=Some(text)),
       )
     }
     Text(text, from~, to~) => {
       spill(b)
-      fill(b, None, from~, to~, source=Some(text))
+      keep(b, { from, to, }, Card(content=None, source=Some(text)))
     }
   }
 }
@@ -300,12 +288,13 @@ fn take(
     // 保留せずその場に置く（保留すると、置く前に項目の枠が閉じられたとき
     // 帰る場所が無くなって文書へ落ちる）
     ThematicBreak(span~, ..) if nest > 0 =>
-      fill(
+      keep(
         b,
-        Some(ThematicBreak),
-        from=span.from,
-        to=span.to,
-        source=Some(carve(b.md, span.from, span.to)),
+        span,
+        Card(
+          content=Some(ThematicBreak),
+          source=Some(carve(b.md, span.from, span.to)),
+        ),
       )
     // 記法(`---` `***` `___`)も本数も差別しない。意味は常に「隣を区切る」で、
     // 行き先は**直後のブロックが何か**で決まる。ここでは保留するだけ
@@ -322,13 +311,13 @@ fn take(
     _ => {
       // 中身が来た時点で、保留中の水平線は境界になれない
       spill(b)
-      let s = block_span(block)
-      fill(
+      keep(
         b,
-        content_of(b.md, block),
-        from=s.from,
-        to=s.to,
-        source=Some(verbatim(b.md, block)),
+        block_span(block),
+        Card(
+          content=content_of(b.md, block),
+          source=Some(verbatim(b.md, block)),
+        ),
       )
     }
   }
@@ -459,7 +448,7 @@ fn inside(
 /// （md でもそうなる）ので、見出しの背骨の底が座る枠になる。
 fn spine(b : Build) -> Int {
   let mut h = b.stack.length()
-  while h > 0 && b.stack[h - 1].mark is Some(Item(..)) {
+  while h > 0 && b.stack[h - 1] is Some(Item(..)) {
     h = h - 1
   }
   h
@@ -519,20 +508,8 @@ fn put(
   if b.own == deep {
     b.own = b.stack.length() + 1
   }
-  let (side, rule) = born(b)
-  seat(b, {
-    mark,
-    label,
-    fold,
-    body: [],
-    kids: [],
-    side,
-    rule,
-    from: at.from,
-    to: at.to,
-    at_label,
-    body_at: [],
-  })
+  border(b)
+  seat(b, mark)
 }
 
 ///|
@@ -555,13 +532,12 @@ fn seat_level(b : Build, level : Int, mark : Mark?) -> Int {
 fn clear(b : Build, level : Int, mark : Mark?) -> Unit {
   if b.base == 0 && mark is Some(Heading(..)) {
     while b.stack.length() > 0 &&
-          b.stack[b.stack.length() - 1].mark is Some(Item(..)) {
+          b.stack[b.stack.length() - 1] is Some(Item(..)) {
       ignore(b.stack.unsafe_pop())
     }
   }
   if level == 1 || b.stack.is_empty() {
     spill(b)
-    b.side = Right
   } else if b.pend {
     while b.stack.length() > 1 {
       ignore(b.stack.unsafe_pop())
@@ -576,57 +552,35 @@ fn clear(b : Build, level : Int, mark : Mark?) -> Unit {
 /// 足りない深さを Implicit で埋める（飛びは綴りであって、無ではない）。
 fn bridge(b : Build, level : Int) -> Unit {
   while b.stack.length() < level - 1 {
-    let (side, rule) = born(b)
-    seat(b, {
-      mark: None,
-      label: "",
-      fold: None,
-      body: [],
-      kids: [],
-      side,
-      rule,
-      from: no_line,
-      to: no_line,
-      at_label: no_line,
-      body_at: [],
-    })
+    border(b)
+    seat(b, None)
   }
 }
 
 ///|
-/// これから座る枠の側と、その手前で側を変えた水平線の原文。
-/// **側を持つのは深さ 2 の枠だけ**（根の子）で、境界になった水平線はここで
-/// 綴りを譲り、側を裏返す。深い枠と根は側を持たないので Right のまま。
-fn born(b : Build) -> (Side, String) {
-  guard b.stack.length() == 1 else { return (Right, "") }
-  guard b.pend else { return (b.side, "") }
-  // 境界になった水平線。書き戻しに要るのは綴りだけなので原文を控える
-  let rule = carve(b.md, b.pend_from, b.pend_to)
-  keep(b, { from: b.pend_from, to: b.pend_to, }, Border(rule~))
-  b.side = flipped(b.side)
+/// 保留中の水平線を、これから座る枠の手前の境界にする。**側の変わり目になれるのは
+/// 深さ 2 の枠の手前だけ**（根の子）。裏返した先の側は控えない — 側を数え直すのは
+/// 組み立て（`Lay::born`）で、こちらは「ここが変わり目だ」と言うだけ。
+fn border(b : Build) -> Unit {
+  guard b.stack.length() == 1 && b.pend else { return }
+  // 書き戻しに要るのは綴りだけなので原文を控える
+  keep(
+    b,
+    { from: b.pend_from, to: b.pend_to, },
+    Border(rule=carve(b.md, b.pend_from, b.pend_to)),
+  )
   b.pend = false
-  (b.side, rule)
 }
 
 ///|
-/// これから座る枠の深さを控える（一番浅いものだけ）。深さは stack の高さが持つ。
-fn sink(b : Build) -> Unit {
+/// 枠を 1 つ積む。深さは高さが持つので、載せるのは綴りだけ。
+/// **一番浅い深さはここで控える** — 1 枚の塊が枠を何段も積むので、後から測れない。
+fn seat(b : Build, mark : Mark?) -> Unit {
   let depth = b.stack.length() + 1
   if depth < b.top {
     b.top = depth
   }
-}
-
-///|
-/// 積んである親の子にし、次の子の親にする。親が居なければ森の 1 本として生やす。
-fn seat(b : Build, f : Frame) -> Unit {
-  sink(b)
-  if b.stack.is_empty() {
-    b.roots.push(f)
-  } else {
-    b.stack[b.stack.length() - 1].kids.push(f)
-  }
-  b.stack.push(f)
+  b.stack.push(mark)
 }
 
 ///|
@@ -656,12 +610,13 @@ fn shut(b : Build) -> Unit {
 fn spill(b : Build) -> Unit {
   if b.pend {
     b.pend = false
-    fill(
+    keep(
       b,
-      Some(ThematicBreak),
-      from=b.pend_from,
-      to=b.pend_to,
-      source=Some(carve(b.md, b.pend_from, b.pend_to)),
+      { from: b.pend_from, to: b.pend_to, },
+      Card(
+        content=Some(ThematicBreak),
+        source=Some(carve(b.md, b.pend_from, b.pend_to)),
+      ),
     )
   }
 }
