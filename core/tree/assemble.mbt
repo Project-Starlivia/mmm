@@ -196,7 +196,8 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
     spans[l.body[i].id] = at
   }
   let doc : Doc = {
-    frontmatter: n.frontmatter.map(f => f.raw),
+    // frontmatter の字もライブラリから来る。木が抱える字は LF だけ
+    frontmatter: n.frontmatter.map(f => lf(f.raw)),
     body: l.body,
     roots: l.roots.map(f => to_root(f, next, spans)),
   }

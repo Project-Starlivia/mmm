@@ -7,6 +7,9 @@
 /// （深く入れ子にすると、切り出しを読み直したとき字下げコードに化ける）。
 /// 1 行目は mdAst の span がもう剥がしているので、残りの行を同じだけ揃える。
 /// 末尾の改行も記法なので落とす。
+///
+/// **改行は LF に揃える**（`lf`）— 「木が抱える字は LF だけ」という不変量。原文を
+/// そのまま返す道（記法構造の書き戻し、地番）は `slice` を使うので影響しない。
 fn carve(md : String, from : Int, to : Int) -> String {
   let mut z = to
   while z > from && (md[z - 1] == '\n' || md[z - 1] == '\r') {
@@ -14,7 +17,7 @@ fn carve(md : String, from : Int, to : Int) -> String {
   }
   let indent = column(md, from)
   if indent == 0 {
-    return String::unsafe_substring(md, start=from, end=z)
+    return lf(String::unsafe_substring(md, start=from, end=z))
   }
   let out = StringBuilder()
   let mut i = from
@@ -34,7 +37,7 @@ fn carve(md : String, from : Int, to : Int) -> String {
     head = c == '\n'
     i = i + 1
   }
-  out.to_string()
+  lf(out.to_string())
 }
 
 ///|
@@ -117,4 +120,31 @@ fn skip_blank(md : String, from : Int, to : Int) -> Int {
     p = p + 1
   }
   p
+}
+
+///|
+/// 改行を LF に揃えた形。**書くときだけ通す** — 読みは原文を 1 バイトも変えない
+/// （`carve` も記法構造の書き戻しも CR をそのまま返す）。
+///
+/// CommonMark では裸の CR も行の終わりなので、`\r\n` も単独の `\r` も LF にする。
+fn lf(text : String) -> String {
+  if !text.contains("\r") {
+    return text
+  }
+  let out = StringBuilder()
+  let n = text.length()
+  let mut i = 0
+  while i < n {
+    let c = text[i]
+    if c == '\r' {
+      out.write_char('\n')
+      if i + 1 < n && text[i + 1] == '\n' {
+        i = i + 1
+      }
+    } else {
+      out.write_substring(text, i, 1)
+    }
+    i = i + 1
+  }
+  out.to_string()
 }

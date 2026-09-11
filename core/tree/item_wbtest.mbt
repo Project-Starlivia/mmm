@@ -342,7 +342,7 @@ test "CRLF でもラベルは末尾まで残る" {
       {
         "node": {
           "id": 2,
-          "label": "aaa\r\nbbb",
+          "label": "aaa\nbbb",
           "body": [],
           "children": [],
           "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],

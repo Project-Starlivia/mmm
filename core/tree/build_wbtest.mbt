@@ -355,7 +355,7 @@ test "setext のラベルも末尾まで残る" {
       {
         "node": {
           "id": 2,
-          "label": "aaa\r\nbbb",
+          "label": "aaa\nbbb",
           "body": [],
           "children": [],
           "mark": ["Heading", { "setext": true, "closing": 0 }],
