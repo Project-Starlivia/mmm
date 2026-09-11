@@ -60,9 +60,26 @@ pub fn init_drop(doc : @dom.Document, deps : Drop) -> Unit {
     let node = (deps.mark_drop)(point_of(e))
     (deps.mark_drop)(None) |> ignore
     let files = @web.dropped_files(e)
+    // **落ちた数は待つ前に数える。** 最初の await で drop の出来事が終わり、
+    // 以後 items は空に見える（web/drag.mbt）
+    let dropped = @web.drag_files(e).length()
     @js_async.Promise::from_async(async fn() {
       (async fn() -> Unit {
         let list = Array::from_fixed_array(files.wait())
+        // **落ちたのに 1 つも札にならなかった。黙って捨てない。**
+        // ピッカーを持たないブラウザには `getAsFileSystemHandle` が無いので
+        // 項目が全部こぼれる（docs/browsers.md の (b′)）。フォルダを落とした
+        // ときも札はフォルダのもので、ファイルとしては残らない
+        if list.is_empty() && dropped > 0 {
+          (deps.failed)(
+            if @web.can_open() {
+              "Couldn't open the dropped file"
+            } else {
+              @parts.no_file_access
+            },
+          )
+          return
+        }
         match list.search_by(f => @read.is_markdown(f.name())) {
           Some(i) => {
             (deps.open_markdown)(list[i])

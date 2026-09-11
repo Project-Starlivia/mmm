@@ -47,7 +47,7 @@ pub fn Name::show(
   }
   // **押せるときだけ押せる顔をする。** 理由は Files の Rename の行と同じものを使う。
   // 押せなさは `aria-disabled` の 1 つで言う（見た目も読み上げも同じ源）
-  match rename_problem(@web.can_rename(), saved) {
+  match rename_problem(@web.can_save_as(), @web.can_rename(), saved) {
     Some(why) => {
       self.filename.setAttribute("title", why)
       self.filename.setAttribute("aria-disabled", "true")
