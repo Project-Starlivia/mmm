@@ -159,7 +159,11 @@ fn has(doc : @tree.Doc, id : Int) -> Bool {
 
 ///|
 /// 同じ親の子の id、文書順。根なら根どうし。中身には応えない（空）。
+///
+/// **先にノードであることを確かめる。** `parent` は中身にも応える（持ち主を返す）
+/// ので、そのまま頼ると中身の id に持ち主の子の列を返してしまう。
 fn siblings(doc : @tree.Doc, id : Int) -> Array[Int] {
+  guard find(doc, id) is Some(_) else { return [] }
   match parent(doc, id) {
     Some(p) if p != @tree.doc_id =>
       match find(doc, p) {

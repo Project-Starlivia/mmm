@@ -230,19 +230,18 @@ fn erase(doc : @tree.Doc, id : Int) -> @tree.Doc? {
 /// 埋もれたノードには落ちない。
 fn heirs(doc : @tree.Doc, id : Int) -> Array[Int] {
   let out : Array[Int] = []
-  if owner(doc, block=id) is None {
-    let sibs = siblings(doc, id)
-    match sibs.search(id) {
-      Some(i) => {
-        for k in (i + 1)..<sibs.length() {
-          out.push(sibs[k])
-        }
-        for k in 0..<i {
-          out.push(sibs[i - 1 - k])
-        }
+  // 中身は `siblings` が空を返す（兄弟を持つのはノードだけ）
+  let sibs = siblings(doc, id)
+  match sibs.search(id) {
+    Some(i) => {
+      for k in (i + 1)..<sibs.length() {
+        out.push(sibs[k])
       }
-      None => ()
+      for k in 0..<i {
+        out.push(sibs[i - 1 - k])
+      }
     }
+    None => ()
   }
   for a in ancestors(doc, id) {
     out.push(a)
