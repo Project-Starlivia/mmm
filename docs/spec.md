@@ -120,7 +120,8 @@ test/   検証 — **ts に残るのは 4 本だけ**（判断は core へ移り
         （大きさの見本 5 本で言い、その 5 本が名乗る大きさも主張する）、notice.test.ts は呼ぶ側のしらせの綴りが
         全部 notice.mbt の表に在ること（package の外から字面で照らす）。
         tools/ は pure.ts（core が DOM を知らないことの見張り）と
-        exports.ts（外から呼ばれない export が無いことの見張り。#78）と
+        exports.ts（core の出口の線の見張り — 外から呼ばれない `export` が無いこと #78 と、
+        本番が `src/app.ts` の「試験と見本の面」を 1 つも読まないこと #252。見るのは import）と
         gen-load.ts（大きさの見本の生成。記法の変化は core の見本が持つ）、fixtures/ はその出力
 lab/    見るための道具（`pnpm run lab`）。index.html は md がどう読まれるか（mdAst /
         mmmTree と書き戻し）、parts/ は部品 × 状態 × テーマを 1 ページに
