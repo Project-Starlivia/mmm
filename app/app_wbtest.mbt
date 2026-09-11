@@ -203,10 +203,14 @@ fn Stand::nodes(self : Stand) -> Int {
 }
 
 ///|
-test "立ち上がりは空。名乗りは mmm / empty.md、言い出しが出て、書き出しは沈む。焦点は md へ" {
+/// **この試験はピッカーの無い環境で回る**（Node / happy-dom）。だから
+/// (b′)「正直な機能オフ」がそのまま見える — 名乗りに拡張子が付かず、`●` は
+/// 点かず、押せない理由はファイルを持てないことになる（docs/browsers.md）
+test "立ち上がりは空。名乗りは mmm / empty、言い出しが出て、書き出しは沈む。焦点は md へ" {
   with_stand(s => {
     assert_eq(s.doc.title(), "mmm")
-    assert_eq(s.text_of("filename"), "empty.md")
+    // 持てないブラウザでは `.md` を付けない
+    assert_eq(s.text_of("filename"), "empty")
     assert_true(s.fake.hint)
     assert_eq(s.nodes(), 0)
     assert_eq(
@@ -217,26 +221,28 @@ test "立ち上がりは空。名乗りは mmm / empty.md、言い出しが出�
       s.doc.getElementById("export").unwrap().getAttribute("title"),
       Some("Nothing to export yet"),
     )
-    // Node には改名の口が無いので、名乗りはその理由で沈む
+    // 押せない理由は**根の深いほう** — 改名を持たないより前に、持てない
     assert_eq(
       s.doc.getElementById("filename").unwrap().getAttribute("title"),
-      Some(@bar.no_rename_here),
+      Some(@parts.no_file_access),
     )
     assert_eq(s.fake.log[1:], ["set_text", "focus"])
   })
 }
 
 ///|
-test "打てば木が生まれ、地図が描かれ、名乗りが変わり、未保存の印が立ち、書き出しが開く" {
+test "打てば木が生まれ、地図が描かれ、名乗りが変わり、書き出しが開く。印は持てるときだけ" {
   with_stand(s => {
     s.fake.change("# r\n\n## a\n")
     assert_eq(s.nodes(), 2)
-    assert_eq(s.doc.title(), "r.md - mmm")
-    assert_eq(s.text_of("filename"), "r.md")
+    assert_eq(s.doc.title(), "r - mmm")
+    assert_eq(s.text_of("filename"), "r")
     assert_false(s.fake.hint)
+    // **`●` は点かない。** ピッカーが無いので保存する道が無く、点けば
+    // 消える手段の無い印になる（docs/browsers.md の (b′)）
     assert_eq(
       s.doc.getElementById("dirty").unwrap().getAttribute("hidden"),
-      None,
+      Some(""),
     )
     assert_eq(
       s.doc.getElementById("export").unwrap().getAttribute("title"),

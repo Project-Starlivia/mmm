@@ -90,7 +90,7 @@ test "files_menu: 保存していなければ見出しは not saved yet、Recent
 }
 
 ///|
-test "files_menu: ファイルを扱えない環境では開く・保存・フォルダが同じ 1 つの理由で沈む。改名はその環境の理由" {
+test "files_menu: ファイルを扱えない環境では、改名もふくめて全部が同じ 1 つの理由で沈む" {
   let rows = files_menu(
     {
       ..saved,
@@ -105,9 +105,20 @@ test "files_menu: ファイルを扱えない環境では開く・保存・フ�
   assert_eq(rows[2] |> row_of, "Open" + why)
   assert_eq(rows[4] |> row_of, "Save" + why)
   assert_eq(rows[5] |> row_of, "Save as" + why)
-  assert_eq(rows[6] |> row_of, "Rename (off: " + no_rename_here + ")")
+  // **改名も同じ理由。** ファイルを持てないのだから、改名できないのは
+  // 「この環境が改名を持たない」より前の話（docs/browsers.md の (b′)）
+  assert_eq(rows[6] |> row_of, "Rename" + why)
   assert_eq(rows[8] |> row_of, "Choose folder" + why)
-  assert_eq(rename_problem(true, true), None)
+}
+
+///|
+/// 改名できない理由は**根の深い順**に出る。持てない → 改名を持たない → まだ無い
+test "rename_problem: 深い理由が浅い理由を隠す" {
+  assert_eq(rename_problem(false, false, false), Some(@parts.no_file_access))
+  assert_eq(rename_problem(false, true, true), Some(@parts.no_file_access))
+  assert_eq(rename_problem(true, false, true), Some(no_rename_here))
+  assert_eq(rename_problem(true, true, false), Some(nothing_to_rename))
+  assert_eq(rename_problem(true, true, true), None)
 }
 
 ///|

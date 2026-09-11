@@ -15,9 +15,16 @@ let nothing_to_rename = "Save the .md first — nothing on disk to rename yet"
 pub let no_rename_here = "This browser can't rename files"
 
 ///|
-/// 改名できない理由。Files の Rename の行と、帯の名乗りの title が同じ言葉を使う。できるなら None
-fn rename_problem(can_rename : Bool, saved : Bool) -> String? {
-  if !can_rename {
+/// 改名できない理由。Files の Rename の行と、帯の名乗りの title が同じ言葉を使う。
+/// できるなら None。
+///
+/// **根の深い順に言う。** ファイルを持てないブラウザに「先に保存して」と言っても、
+/// 保存する道が無い（docs/browsers.md の (b′)）。`can_hold` はそのブラウザが
+/// ファイルを持てるか — 証拠は保存の入口があること
+fn rename_problem(can_hold : Bool, can_rename : Bool, saved : Bool) -> String? {
+  if !can_hold {
+    Some(@parts.no_file_access)
+  } else if !can_rename {
     Some(no_rename_here)
   } else if !saved {
     Some(nothing_to_rename)
@@ -102,7 +109,11 @@ pub fn files_menu(s : Files, a : FileActs) -> Array[@parts.Entry] {
         "Rename",
         mark=Some("pencil"),
         disabled={
-          let problem = rename_problem(s.can_rename, s.saved_name is Some(_))
+          let problem = rename_problem(
+            s.can_save,
+            s.can_rename,
+            s.saved_name is Some(_),
+          )
           @parts.unless(problem is None, why?=problem)
         },
       ),

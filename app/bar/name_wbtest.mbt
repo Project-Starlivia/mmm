@@ -14,8 +14,9 @@ test "Name: 名前とタブ、改名できない理由、未保存の印。押�
     name.show("empty.md", false, false)
     assert_eq(doc.title(), "mmm")
     assert_eq(filename.textContent(), "empty.md")
-    // Node には改名の口が無いので、その理由で沈む
-    assert_eq(filename.getAttribute("title"), Some(no_rename_here))
+    // Node にはピッカーも改名の口も無い。**根の深いほうを言う** —
+    // ファイルを持てないのだから、改名を持たないのはその後の話
+    assert_eq(filename.getAttribute("title"), Some(@parts.no_file_access))
     assert_eq(filename.getAttribute("aria-disabled"), Some("true"))
     name.show("r.md", true, false)
     assert_eq(doc.title(), "r.md - mmm")

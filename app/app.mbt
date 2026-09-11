@@ -239,6 +239,19 @@ fn App::doc_name(self : App) -> String {
   self.saved_name.unwrap_or(self.survey().name() + ".md")
 }
 
+///|
+/// この文書がディスクに居られるか。
+///
+/// **居られないブラウザでは、帯も印も警告もファイルの話をしない**
+/// （docs/browsers.md の (b′)「正直な機能オフ」）。ピッカーが無ければ保存の
+/// 入口そのものが無いので、`●` は消える手段が無いまま点き続け、閉じるたびの
+/// 警告は解消する手段が無いまま出続け、帯の `xxx.md` は**これから存在しようも
+/// ないファイル**の名前になる。断り書きだけ出してシェルが反対のことを言う形を、
+/// この 1 つの問いで閉じる
+fn App::can_hold(self : App) -> Bool {
+  @web.can_save_as() || self.saved_name is Some(_)
+}
+
 // ---------- サイクル ----------
 
 ///|
@@ -340,7 +353,7 @@ fn App::write(self : App, op : @op.Op) -> Unit {
 /// 未保存の印。**判定はここ 1 つ**で、帯の `●` とタブの favicon の両方が
 /// 同じ答えを見る（別々に数えると、片方だけ古い状態のまま残る）
 fn App::update_dirty(self : App) -> Unit {
-  self.name.set_dirty(self.text() != self.saved_text)
+  self.name.set_dirty(self.can_hold() && self.text() != self.saved_text)
 }
 
 ///|
@@ -348,7 +361,14 @@ fn App::update_dirty(self : App) -> Unit {
 /// タブは名前を持つ文書のときだけ名乗る（`filename.md - mmm`）
 fn App::show_name(self : App) -> Unit {
   let named = self.saved_name is Some(_) || !self.survey().empty()
-  self.name.show(self.doc_name(), named, self.saved_name is Some(_))
+  // **拡張子が付くのは、本当にファイルのときだけ。** 持てないブラウザでは
+  // 文書の名前だけを出す（`can_hold`）
+  let shown = if self.can_hold() {
+    self.doc_name()
+  } else {
+    self.survey().name()
+  }
+  self.name.show(shown, named, self.saved_name is Some(_))
 }
 
 ///|
@@ -764,7 +784,8 @@ fn App::wire_bar(self : App) -> Unit {
 /// 未保存のまま閉じようとしたら止める
 fn App::wire_unload(self : App) -> Unit {
   @web.on_window(self.doc, "beforeunload", e => {
-    if self.text() != self.saved_text {
+    // 解消する手段が無いなら止めない（`can_hold`）
+    if self.can_hold() && self.text() != self.saved_text {
       @web.warn_unload(e)
     }
   })
