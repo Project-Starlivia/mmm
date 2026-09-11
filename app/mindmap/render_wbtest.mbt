@@ -252,8 +252,11 @@ test "カードは仕切り線に続けて種類ごとの形で並び、data-car
   r.draw(scene([root(node(1, "r", body~))], image_hint=Some("connect")))
   let g = r.node_el(1).unwrap()
   assert_eq(g.querySelectorAll(".sep").length(), 6)
-  let hit = one(g, ".link-hit")
-  assert_eq(attr(hit, "data-card"), "5")
+  // 当たり判定の面は、字しか描かない 2 種（リンク 5 と details 9）が持つ。
+  // 絵や背景を持つ 3 種はそれ自身が面なので敷かない（#214）
+  let hits = g.querySelectorAll(".card-hit")
+  assert_eq(hits.length(), 2)
+  assert_eq(hits.map(h => attr(h, "data-card")), ["5", "9"])
   assert_eq(attr(one(g, ".link-open"), "data-url"), "https://x.example/p")
   assert_eq(one(g, ".link-row").textContent(), "t")
   assert_eq(one(g, ".code-bg title").textContent(), "js")
