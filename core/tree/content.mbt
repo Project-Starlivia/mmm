@@ -147,3 +147,25 @@ fn block_span(b : @markdown.Block) -> @markdown.Span {
     FootnoteDefinition(span~, ..) => span
   }
 }
+
+///|
+fn span_of(i : @markdown.Inline) -> @markdown.Span {
+  match i {
+    Text(span~, ..) => span
+    SoftBreak(span~) => span
+    HardBreak(span~, ..) => span
+    Emphasis(span~, ..) => span
+    Strong(span~, ..) => span
+    Strikethrough(span~, ..) => span
+    Code(span~, ..) => span
+    Directive(span~, ..) => span
+    WikiLink(span~, ..) => span
+    Link(span~, ..) => span
+    RefLink(span~, ..) => span
+    Autolink(span~, ..) => span
+    Image(span~, ..) => span
+    RefImage(span~, ..) => span
+    HtmlInline(span~, ..) => span
+    FootnoteReference(span~, ..) => span
+  }
+}
