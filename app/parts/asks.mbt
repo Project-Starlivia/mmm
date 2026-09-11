@@ -79,3 +79,27 @@ pub fn redeclaration(field : Field) -> Ask {
     parts=declaration_parts(field),
   )
 }
+
+///|
+/// 名で引く表。並べて見る道具（lab）が名で呼ぶ — **たずねを足したらここにも 1 行**。
+/// 名ごとに要るものだけ読む: `text` は connect の folder / rename の name / declaration の
+/// folder、`parts` と `shot` は imageName の並びと写し、`field` は declaration /
+/// redeclaration の欄。知らない名は壊れている
+pub fn named(
+  kind : String,
+  text~ : String,
+  parts~ : Array[Part],
+  shot~ : String,
+  field~ : Field,
+) -> Ask {
+  match kind {
+    "discard" => unsaved_changes()
+    "place" => image_place()
+    "connect" => folder_connection(text)
+    "rename" => file_name(text)
+    "imageName" => image_name(parts, shot)
+    "declaration" => declaration(text, field)
+    "redeclaration" => redeclaration(field)
+    _ => abort("知らないたずね: " + kind)
+  }
+}

@@ -8,9 +8,11 @@ import {
 }
 
 // Values
-pub fn export_ways(ExportDeps, ((Way) -> Unit)?) -> Array[@parts.Entry]
+pub fn export_ways(ExportHost, ((Way) -> Unit)?) -> Array[@parts.Entry]
 
 pub fn files_menu(Files, FileActs) -> Array[@parts.Entry]
+
+pub fn focus_bar(@dom.Document) -> Unit
 
 pub fn logo_svg(String, Bool) -> String
 
@@ -23,18 +25,18 @@ pub let no_rename_here : String
 // Types and methods
 pub struct Export {
   doc : @dom.Document
-  deps : ExportDeps
+  host : ExportHost
   button : @dom.Element
   way_button : @dom.Element
   mut way : Way
   mut back : @global.Timer?
 }
 pub fn Export::choose(Self) -> Unit
-pub fn Export::new(@dom.Document, ExportDeps, @dom.Element, @dom.Element) -> Self
+pub fn Export::new(@dom.Document, ExportHost, @dom.Element, @dom.Element) -> Self
 pub fn Export::refresh(Self) -> Unit
 pub fn Export::run(Self) -> Unit
 
-pub(all) struct ExportDeps {
+pub(all) struct ExportHost {
   svg : async () -> @dom.Element?
   name : () -> String
   failed : (String) -> Unit

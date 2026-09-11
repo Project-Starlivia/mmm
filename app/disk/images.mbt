@@ -8,15 +8,15 @@
 // 宣言が無い文書は `./`（md と同じ場所）として読み書きする。**宣言を決める /
 // 直すのもここ**（`settle`）— ただし道具は宣言を黙って書き換えない。書くのは
 // 計算できたとき（`resolve`）と、人が箱で確定したときだけ。書き込みそのものは
-// md への操作なので `deps.set_declared` に渡す（App の `set_declared`）。
+// md への操作なので `host.set_declared` に渡す（App の `set_declared`）。
 //
 // 置き場と名前の柵（純粋）は path.mbt。
 
 // ---- 握り ----
 
 ///|
-/// 外に頼るもの
-pub(all) struct ImageDeps {
+/// 外に頼るもの（値と動詞）
+pub(all) struct ImageHost {
   /// 果たせなかった（しらせの言葉）
   failed : (String) -> Unit
   /// 絵を引き直したので描き直す
@@ -50,7 +50,7 @@ priv struct Picked {
 pub struct Images {
   doc : @dom.Document
   disk : Disk
-  deps : ImageDeps
+  host : ImageHost
   /// path → objectURL。None は「引きに行ったが無い / まだ」
   urls : Map[String, String?]
   /// 握りの控え。None は「まだ引いていない」、Some(None) は「引いたが無い」
@@ -63,15 +63,15 @@ pub struct Images {
 pub fn Images::new(
   doc : @dom.Document,
   disk : Disk,
-  deps : ImageDeps,
+  host : ImageHost,
 ) -> Images {
-  { doc, disk, deps, urls: Map([]), cached: None, live: false, }
+  { doc, disk, host, urls: Map([]), cached: None, live: false, }
 }
 
 ///|
 /// 宣言が無いのは「md と同じ場所」。頭を持たない古い文書がそのまま読めるように、ここで倒す
 fn Images::declared_path(self : Images) -> String {
-  (self.deps.declared)().unwrap_or("./")
+  (self.host.declared)().unwrap_or("./")
 }
 
 ///|
@@ -121,7 +121,7 @@ async fn Images::pick(self : Images) -> Picked? {
     @web.resolve_path(directory, file).wait(),
   )
   self.release_urls()
-  (self.deps.refresh)()
+  (self.host.refresh)()
   Some({
     binding,
     computed: segments.map(folder_from_doc),
@@ -163,9 +163,9 @@ async fn Images::ask_declaration(
 ///|
 /// 宣言を書く。宣言が変われば「どのパスが読めるか」も変わるので、絵は引き直す
 fn Images::set_declared(self : Images, value : String) -> Unit {
-  (self.deps.set_declared)(value)
+  (self.host.set_declared)(value)
   self.release_urls()
-  (self.deps.refresh)()
+  (self.host.refresh)()
 }
 
 ///|
@@ -182,7 +182,7 @@ async fn Images::settle(
   p : Picked,
   inline : Bool,
 ) -> @parts.Field? {
-  match (self.deps.declared)() {
+  match (self.host.declared)() {
     None => {
       if p.computed is Some(c) {
         self.set_declared(c)
@@ -223,7 +223,7 @@ fn Images::forget(self : Images) -> Unit {
     None => ()
   }
   self.release_urls()
-  (self.deps.refresh)()
+  (self.host.refresh)()
 }
 
 ///|
@@ -283,7 +283,7 @@ async fn Images::load_asset(self : Images, path : String) -> Unit {
   }
   self.urls[path] = Some(url)
   self.live = true
-  (self.deps.refresh)()
+  (self.host.refresh)()
 }
 
 ///|
@@ -318,6 +318,20 @@ pub fn Images::folder_name(self : Images) -> String? {
 }
 
 ///|
+/// 画像フォルダの状態の一言（帯の Files の見出し）。`name` は握っているフォルダの名前
+/// （`folder_name`）、`declared` は頭の宣言。**言葉は宣言と許可の 2 つだけ**（冒頭）。
+/// 許可が無いときは宣言のパスを出す — どこを指していて届いていないのかが
+/// 見えないと、直しようがない
+pub fn folder_caption(name : String?, declared : String?) -> String {
+  match (name, declared) {
+    (None, None) => "no folder"
+    (None, Some(declared)) => declared + ", no access"
+    (Some(name), Some(_)) => name
+    (Some(name), None) => name + ", not declared"
+  }
+}
+
+///|
 /// いま画像が読めているか。**同期で答える** — 場所取りの字は描くたびに引かれるので、待てない
 pub fn Images::readable(self : Images) -> Bool {
   self.live
@@ -344,7 +358,7 @@ pub async fn Images::connect(self : Images) -> Unit {
         if permission(b.directory, "readwrite", ask=true) {
           self.live = true
           self.release_urls()
-          (self.deps.refresh)()
+          (self.host.refresh)()
           return
         }
       None => ()
@@ -354,7 +368,7 @@ pub async fn Images::connect(self : Images) -> Unit {
       None => ()
     }
   })() catch {
-    _ => (self.deps.failed)("Couldn't open the image folder")
+    _ => (self.host.failed)("Couldn't open the image folder")
   }
   ok
 }
@@ -370,7 +384,7 @@ pub async fn Images::choose_folder(self : Images) -> Unit {
       None => ()
     }
   })() catch {
-    _ => (self.deps.failed)("Couldn't open the image folder")
+    _ => (self.host.failed)("Couldn't open the image folder")
   }
 }
 
@@ -418,7 +432,7 @@ async fn as_webp(blob : @core.Any) -> @core.Any {
 pub async fn Images::save_to_disk(self : Images, blob : @core.Any) -> String? {
   let ready = self.ensure_binding() catch {
     _ => {
-      (self.deps.failed)("Couldn't open the image folder")
+      (self.host.failed)("Couldn't open the image folder")
       return None
     }
   }
@@ -460,7 +474,7 @@ pub async fn Images::save_to_disk(self : Images, blob : @core.Any) -> String? {
     _ => {
       // **触って失敗した握りは腐っている。** 抜かれた USB・消されたフォルダ
       // を掴んだまま持っていると、次も同じところで転ぶ
-      (self.deps.failed)("Couldn't save the image")
+      (self.host.failed)("Couldn't save the image")
       self.forget()
       return None
     }

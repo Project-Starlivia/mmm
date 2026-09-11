@@ -1,15 +1,25 @@
 // core の出口と入口。**形を整えるだけ** — 意味は 1 つも足さない。
 //
+// 面は 2 つ。**本番の面**（14 個。src/ が呼ぶ — `main` / `boot` / `cycle` と、EditorState の
+// field（state.ts）が読む問い合わせ、md ペインの言い出し）と、**試験と見本の面**（test/ と
+// lab/ だけが呼ぶ。読みの問い合わせ・位置の組み立て・見本の地図・器）。出口の側も同じ 2 つ
+// （app/js/exports.mbt と lab.mbt）。
+//
 // アプリは core が組む（app/app.mbt）。ts に残るのは CodeMirror（md ペイン）で、その
-// 読み書きを `Editor` の閉包で渡す。それ以外にここへ来るのは、EditorState の field
-// （state.ts）が読む問い合わせと、見本（lab）が置く部品だけ。
+// 読み書きを `Editor` の閉包で渡す。
 //
 // 木も箱も core から出ない。境界は数・文字列・真偽・持ち手（MoonBit の値を**中を見ずに**
 // 持ち、core にそのまま返す）と、選択の位置の小さな JSON。MoonBit の ToJson は Option の
 // None を鍵ごと落とし、enum を `["NodeAt", {…}]` の形で出す。その形を整えるのはここ 1 か所。
-// 信頼境界もここだけ — 型は名乗らせず確かめる。
+// 信頼境界もここだけ — 型は名乗らせず確かめる。`_build` を直に import するのは lab/lab.ts
+// （読みの段を並べる道具）と test/notice.test.ts（言葉の表）だけ
 
 import * as mbt from "../_build/js/release/build/mmm/app/js/js.js";
+import type { Token } from "./highlight.ts";
+
+// ============================================================================
+// 本番の面 — src/ が呼ぶ
+// ============================================================================
 
 // ---- 読み ----
 
@@ -21,16 +31,6 @@ export interface Survey {
 
 /** md を core に読ませる。読みのサイクルの唯一の入口 */
 export const survey = (md: string): Survey => Object(mbt.mmmSurvey(md));
-
-/**
- * 触っていない記法構造を md へ書き戻したもの。**原文が 1 バイトも変わらずに返る** —
- * 木から綴り直す `mmmSerialize` とは別の道（あちらは正規形なので入力と違いうる）。
- *
- * **API ではなく物差し。** 呼ぶのは網だけ（test/notation.test.ts）で、それが面を跨ぐのは
- * fixtures がディスクに在って MoonBit から読めないから。消すと 523 KB の実文書が
- * 敷き詰めの法則から外れる（見本 166 通りは短くて作られたものなので代わりにならない）
- */
-export const notationBack = (md: string): string => mbt.mmmNotationBack(md);
 
 /**
  * 頭の `image-folder:` が `base` から引っ越したなら、本文の画像を追従させる編集の列
@@ -46,32 +46,6 @@ export const followDeclaration = (base: string, now: string): Edit[][] =>
 /** 2 つの md が同じ頭（frontmatter）を持つか。追従の基準を捨てる合図（state.ts の `base`） */
 export const sameHead = (a: string, b: string): boolean => mbt.mmmSameHead(a, b);
 
-/** id がノードのものか（中身の id なら false） */
-export const isNode = (s: Survey, id: number): boolean => mbt.mmmIsNode(s, id);
-
-/** 木が 1 つも無い（白紙） */
-export const empty = (s: Survey): boolean => mbt.mmmEmpty(s);
-
-/** その id の地番。無い id は null */
-export const spot = (s: Survey, id: number): Spot | null =>
-  opt(mbt.mmmSpot(s, id), (v) => {
-    const [from, label, to] = nums(v, 3);
-    return { from, label: label < 0 ? null : label, to };
-  });
-
-/** 地番。from..to が原文の範囲、label はラベルの頭（無いノードは null） */
-export interface Spot {
-  from: number;
-  label: number | null;
-  to: number;
-}
-
-/** その字のノード（文書順で最初）。見本の md から id を引く */
-export const find = (s: Survey, label: string): number | null => mbt.mmmFind(s, label) ?? null;
-
-/** そのノードの中身の id、文書順 */
-export const blocks = (s: Survey, id: number): number[] => [...mbt.mmmBlocks(s, id)];
-
 // ---- 選択 ----
 //
 // 選択（`Choice`）とその位置（`Anchors`）は持ち手。EditorState の field が持ち、
@@ -83,15 +57,11 @@ export interface Selection {
   anchor: number | null;
 }
 
-export const NONE: Selection = { ids: [], anchor: null };
-
 declare const choiceBrand: unique symbol;
 /** 何を選んでいるか — ノードの並びか、カード 1 枚か（持ち手） */
 export interface Choice {
   readonly [choiceBrand]: never;
 }
-
-export const NOTHING: Choice = Object(mbt.mmmNothing());
 
 /** 同じものを選んでいるか */
 export const sameChoice = (a: Choice, b: Choice): boolean => mbt.mmmSameChoice(a, b);
@@ -141,23 +111,6 @@ export const anchorsOf = (s: Survey, id: number | null): Anchors | null => handl
 /** 位置を編集で写す。`at` は点の写し（CodeMirror の `changes.mapPos`） */
 export const carry = (a: Anchors, at: (p: number) => number): Anchors => Object(mbt.mmmCarry(a, at));
 
-/** ノードの位置（並びと基点）。見本と試験が組む */
-export const nodeAt = (at: number[], anchor: number | null): Anchors => Object(mbt.mmmNodeAt(at, anchor ?? undefined));
-/** カードの位置 */
-export const cardAt = (at: number): Anchors => Object(mbt.mmmCardAt(at));
-
-/** 位置の中身。試験が読む */
-export type AnchorsAt = { kind: "nodes"; at: number[]; anchor: number | null } | { kind: "card"; at: number };
-export const anchorsAt = (a: Anchors): AnchorsAt => {
-  const [tag, body] = tagged(JSON.parse(mbt.mmmAnchorsJson(a)));
-  const o = record(body);
-  if (tag === "NodeAt") {
-    return { kind: "nodes", at: field(o, "at", (x) => list(x, num)), anchor: option(o, "anchor", num) };
-  }
-  if (tag === "CardAt") return { kind: "card", at: field(o, "at", num) };
-  return bad(`知らない Anchors ${tag}`);
-};
-
 /** md 側で薄く塗る範囲。ノードは地番そのもの（子孫込み）、カードは中身の原文 */
 export const ranges = (s: Survey, c: Choice): Range[] => {
   const flat = mbt.mmmRanges(s, c);
@@ -178,13 +131,7 @@ export interface Edit {
   insert: string;
 }
 
-/** コードの色分けの 1 塊。`cls` が空なら色の付かない地の文 */
-export interface Token {
-  text: string;
-  cls: string;
-}
-
-/** md ペイン（CodeMirror）。core が頼むもの */
+/** md ペイン（CodeMirror）。core が頼むもの。色分けの塊（`Token`）は highlight.ts のもの */
 export interface Editor {
   text(): string;
   /** いまの読み（EditorState の field） */
@@ -279,10 +226,79 @@ export const boot = (a: App): void => mbt.mmmBoot(a);
 /** 1 トランザクション = 1 サイクル。`prev` は前の読み（文書を丸ごと入れ替えたなら null） */
 export const cycle = (a: App, prev: Survey | null, treeChanged: boolean): void => mbt.mmmCycle(a, prev, treeChanged);
 
-// ---- 見本（lab）が置くもの ----
+/** 空のときの言い出し。2 つのペインが同じ器を使う（md 側は editor.ts が浮かべる） */
+export const paneHint = (pane: "md" | "map"): HTMLDivElement => div(mbt.mmmPaneHint(pane));
+
+// ============================================================================
+// 試験と見本の面 — test/ と lab/ だけが呼ぶ（#252）。本番は 1 つも読まない
+// ============================================================================
+
+// ---- 読みと選択の問い合わせ ----
+
+/**
+ * 触っていない記法構造を md へ書き戻したもの。**原文が 1 バイトも変わらずに返る** —
+ * 木から綴り直す `serialize` とは別の道（あちらは正規形なので入力と違いうる）。
+ *
+ * **API ではなく物差し。** 呼ぶのは網だけ（test/notation.test.ts）で、それが面を跨ぐのは
+ * fixtures がディスクに在って MoonBit から読めないから。消すと 523 KB の実文書が
+ * 敷き詰めの法則から外れる（見本 166 通りは短くて作られたものなので代わりにならない）
+ */
+export const notationBack = (md: string): string => mbt.mmmNotationBack(md);
+
+/** 木を書き戻した正規形の md。冪等であることを test/notation.test.ts が言う */
+export const serialize = (md: string): string => mbt.mmmSerialize(md);
+
+/** id がノードのものか（中身の id なら false） */
+export const isNode = (s: Survey, id: number): boolean => mbt.mmmIsNode(s, id);
+
+/** 木が 1 つも無い（白紙） */
+export const empty = (s: Survey): boolean => mbt.mmmEmpty(s);
+
+/** 地番。from..to が原文の範囲、label はラベルの頭（無いノードは null） */
+export interface Spot {
+  from: number;
+  label: number | null;
+  to: number;
+}
+
+/** その id の地番。無い id は null */
+export const spot = (s: Survey, id: number): Spot | null =>
+  opt(mbt.mmmSpot(s, id), (v) => {
+    const [from, label, to] = nums(v, 3);
+    return { from, label: label < 0 ? null : label, to };
+  });
+
+/** その字のノード（文書順で最初）。見本の md から id を引く */
+export const find = (s: Survey, label: string): number | null => mbt.mmmFind(s, label) ?? null;
+
+/** そのノードの中身の id、文書順 */
+export const blocks = (s: Survey, id: number): number[] => [...mbt.mmmBlocks(s, id)];
+
+export const NONE: Selection = { ids: [], anchor: null };
+
+export const NOTHING: Choice = Object(mbt.mmmNothing());
+
+/** ノードの位置（並びと基点）。見本と試験が組む */
+export const nodeAt = (at: number[], anchor: number | null): Anchors => Object(mbt.mmmNodeAt(at, anchor ?? undefined));
+/** カードの位置 */
+export const cardAt = (at: number): Anchors => Object(mbt.mmmCardAt(at));
+
+/** 位置の中身。試験が読む */
+export const anchorsAt = (
+  a: Anchors,
+): { kind: "nodes"; at: number[]; anchor: number | null } | { kind: "card"; at: number } => {
+  const [tag, body] = tagged(JSON.parse(mbt.mmmAnchorsJson(a)));
+  const o = record(body);
+  if (tag === "NodeAt") {
+    return { kind: "nodes", at: field(o, "at", (x) => list(x, num)), anchor: option(o, "anchor", num) };
+  }
+  if (tag === "CardAt") return { kind: "card", at: field(o, "at", num) };
+  return bad(`知らない Anchors ${tag}`);
+};
+
+// ---- 見本の地図 ----
 //
-// 地図の器・右クリックの行・帯の並び・書き出しの並び・お絵描き・たずね・絵・しらせ。
-// 作ってもらって置くだけ
+// 文書は固定で、選択だけ動く。できないこと（書かない・貼らない・描かない）は app/js/lab.mbt が決める
 
 declare const layoutBrand: unique symbol;
 /** 読みを置いたもの（持ち手）。見本が右クリックの行を引くため */
@@ -325,9 +341,13 @@ export const mapBeginEdit = (m: MapHandle, id: number, seed: string | null): boo
   mbt.mmmMapBeginEdit(m, id, seed ?? undefined);
 export const mapEditCard = (m: MapHandle, id: number): void => mbt.mmmMapEditCard(m, id);
 
-/** 右クリックの行 */
+/** 右クリックの行（押しても走らない） */
 export const contextMenu = (l: Layout, sel: Selection): HTMLDivElement =>
   div(mbt.mmmContextMenu(l, sel.ids, sel.anchor ?? undefined));
+
+// ---- 器 ----
+//
+// 帯の並び・書き出しの並び・お絵描き・たずね・絵・しらせ。作ってもらって置くだけ
 
 /** 絵の名（Lucide の綴り）。表は app/parts/icons.mbt */
 export type IconName = string;
@@ -338,17 +358,11 @@ export const icon = (name: IconName): SVGSVGElement => svgSvg(mbt.mmmIcon(name))
 /** 絵の名前の全部 */
 export const iconNames = (): IconName[] => [...mbt.mmmIconNames()];
 
-/** しらせの言葉。表は app/parts/notice.mbt */
-export type Failed = string;
-export type Blocked = string;
-
 /** しらせ 1 つぶん。置くのは呼ぶ側 */
 export const notice = (mark: IconName, msg: string, sorry: boolean): HTMLDivElement => div(mbt.mmmNotice(mark, msg, sorry));
-export const failedWords = (): Failed[] => [...mbt.mmmFailedWords()];
-export const blockedWords = (): Blocked[] => [...mbt.mmmBlockedWords()];
-
-/** 空のときの言い出し。2 つのペインが同じ器を使う（md 側は editor.ts が浮かべる） */
-export const paneHint = (pane: "md" | "map"): HTMLDivElement => div(mbt.mmmPaneHint(pane));
+/** しらせの言葉。表は app/parts/notice.mbt */
+export const failedWords = (): string[] => [...mbt.mmmFailedWords()];
+export const blockedWords = (): string[] => [...mbt.mmmBlockedWords()];
 
 export interface Files {
   /** ディスク上の名前。まだ無ければ null */
@@ -381,7 +395,7 @@ export interface More {
   /** 掴みやすさ（Easy grab）が入っているか */
   grab: boolean;
   /** リンクにまつわる押す前の但し書き。届いたら行に付く */
-  linkNote: Promise<string[]>;
+  linkCaveat: Promise<string[]>;
 }
 
 export interface MoreActs {
@@ -408,11 +422,11 @@ export interface Field {
   value: string;
   check?: (value: string) => string | null;
 }
-/** 並べるもの。ただの字か、打てる欄か */
-export type Part = string | Field;
 
 /**
- * たずねの中身（form）だけ。並べ方は app/parts/asks.mbt。
+ * たずねの中身（form）だけ。並べ方は app/parts/asks.mbt（`named`）、args の読みは app/js/lab.mbt。
+ * `connect` / `rename` は字、`imageName` は `{ shape: (string | Field)[], shot, taken? }`、
+ * `declaration` は `{ folder, value, dirName? }`、`redeclaration` は `{ value }`。
  *
  * **欄の検査は本物を通す** — `declaration` / `redeclaration` は `dirName` を、
  * `imageName` は `taken`（置き場に既に在る名前）を渡せば、だめな値でその検査が
@@ -423,7 +437,9 @@ export const askForm = (
   args: unknown = null,
 ): HTMLFormElement => form(mbt.mmmAskForm(kind, args));
 
-// ---- 形を確かめながら整える ----
+// ============================================================================
+// 形を確かめながら整える
+// ============================================================================
 
 const bad = (what: string): never => {
   throw new Error(`core の JSON: ${what}`);

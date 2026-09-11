@@ -9,6 +9,8 @@ import {
 }
 
 // Values
+pub fn folder_caption(String?, String?) -> String
+
 pub fn folder_problem(String, String?) -> String?
 
 pub fn idb_store() -> Store
@@ -51,7 +53,7 @@ pub(all) struct Drop {
   failed : (String) -> Unit
 }
 
-pub(all) struct ImageDeps {
+pub(all) struct ImageHost {
   failed : (String) -> Unit
   refresh : () -> Unit
   declared : () -> String?
@@ -61,7 +63,7 @@ pub(all) struct ImageDeps {
 pub struct Images {
   doc : @dom.Document
   disk : Disk
-  deps : ImageDeps
+  host : ImageHost
   urls : Map[String, String?]
   mut cached : Binding??
   mut live : Bool
@@ -72,7 +74,7 @@ pub async fn Images::connect(Self) -> Unit
 pub async fn Images::connected(Self) -> Bool
 pub fn Images::folder_name(Self) -> String?
 pub fn Images::image_url(Self, String) -> String?
-pub fn Images::new(@dom.Document, Disk, ImageDeps) -> Self
+pub fn Images::new(@dom.Document, Disk, ImageHost) -> Self
 pub fn Images::readable(Self) -> Bool
 pub async fn Images::save_to_disk(Self, @core.Any) -> String?
 

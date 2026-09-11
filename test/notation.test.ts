@@ -9,8 +9,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import * as mbt from "../_build/js/release/build/mmm/app/js/js.js";
-import { notationBack } from "../src/app.ts";
+import { notationBack, serialize } from "../src/app.ts";
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
 const names = fs.readdirSync(dir).filter((f) => f.endsWith(".md"));
@@ -29,7 +28,7 @@ for (const name of names) {
   // **書きは別の道。** 木から綴る正規形は入力と違いうる（見出しの末尾空白や
   // タブが正規化される）ので、冪等であることだけを言う。
   test(`${name}: 木から綴った正規形は冪等`, () => {
-    const once = mbt.mmmSerialize(md);
-    assert.equal(mbt.mmmSerialize(once), once);
+    const once = serialize(md);
+    assert.equal(serialize(once), once);
   });
 }

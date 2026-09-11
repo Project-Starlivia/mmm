@@ -66,7 +66,7 @@ fn init_shortcuts(doc : @dom.Document, deps : Shortcuts) -> Unit {
         @web.target_in(e, "#md-pane") is Some(_) {
         @web.prevent(e)
         @web.stop(e)
-        focus_bar(doc)
+        @bar.focus_bar(doc)
         return
       }
       guard k.ctrlKey || k.metaKey else { return }

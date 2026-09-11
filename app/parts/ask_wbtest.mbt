@@ -87,3 +87,26 @@ test "宣言の 2 箱は表が持つ — 頭の image-folder: は字で、打て
     assert_eq(values(), ["./pics/"])
   })
 }
+
+///|
+/// 名で引いたものは、主語で呼んだものと同じ 1 つ
+test "named: 名は主語の表の写しで、渡したものがそのまま届く" {
+  let field : Field = { value: "./pics/", check: None, }
+  let ask = (kind : String) => {
+    named(
+      kind,
+      text="pics",
+      parts=[Text("![]("), Blank(field)],
+      shot="data:,",
+      field~,
+    )
+  }
+  assert_eq(ask("discard").title, unsaved_changes().title)
+  assert_eq(ask("place").title, image_place().title)
+  assert_eq(ask("connect").note, Some("Images here point to pics."))
+  assert_eq(ask("rename").parts.length(), 1)
+  assert_eq(ask("imageName").preview, Some("data:,"))
+  assert_eq(ask("imageName").parts.length(), 2)
+  assert_eq(ask("declaration").title, "Where is pics, seen from the .md?")
+  assert_eq(ask("redeclaration").ok, "Update")
+}

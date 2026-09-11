@@ -43,6 +43,13 @@ pub(all) struct Editor {
 }
 
 ///|
+/// 束ねる場所。地図・画像・書き出し・名乗りは組み上がった自分を呼ぶ（地図は画像の
+/// URL を、画像は地図の描き直しを、名乗りは改名を）。閉包は組む時点で固定され、自分は
+/// まだ無い — **後から入る自分を 1 つの入れ物で受け、閉包はそれを通して呼ぶ**（`App::new`
+/// の `late`）。入れ物を無くすには mindmap の Host を後付けにする必要がある: apply（映した
+/// 後の begin_edit）・paste・draw・connect_assets は App の状態（世代・保存名・窓）を要り、
+/// images.refresh は地図の render を要る — 地図 ↔ 画像 ↔ App の輪で、どれかを mut Option
+/// にすると使うたびに unwrap が要る。読む場所を 1 つに絞るのがいちばん少ない
 pub struct App {
   doc : @dom.Document
   ed : Editor
@@ -90,8 +97,7 @@ pub fn App::new(
 ) -> App {
   let md_pane = el(doc, "md-pane")
   let map_pane = el(doc, "map-pane")
-  // 地図・画像・書き出しは互いを指す（地図は画像の URL を、画像は地図の描き直しを）。
-  // 組み上がってから動くものなので、後から入る自分を通して呼ぶ
+  // 組み上がってから動くものは、後から入る自分を通して呼ぶ（App の doc comment）
   let late : Ref[App?] = { val: None, }
   let app = () => late.val.unwrap()
   let images = @disk.Images::new(doc, disk, {
@@ -144,7 +150,7 @@ pub fn App::new(
       tokens_block: ed.tokens_block,
       epoch: ed.epoch,
       failed: msg => @parts.failed(doc, msg),
-      leave: () => focus_bar(doc),
+      leave: () => @bar.focus_bar(doc),
     },
   )
   let theme = @bar.Theme::new(el(doc, "logo"), ed.set_theme)
@@ -375,7 +381,7 @@ fn App::apply_doc(self : App, opened : @disk.Doc) -> Unit {
 /// ブラウザはクリックの直後にしかピッカーを開けないので、**箱のボタンが
 /// その 1 回**になる。自動で繋ぎに行くことはできない
 async fn App::offer_connect(self : App) -> Unit {
-  guard self.saved_name is Some(_) && has_images(self.text()) else { return }
+  guard self.saved_name is Some(_) && self.survey().has_images() else { return }
   // 許可を確かめるあいだに別の文書へ移っていたら、もうこの文書の話ではない
   let gen = self.gen
   if self.images.connected() || gen != self.gen {
@@ -495,23 +501,15 @@ async fn App::refresh_recent(self : App) -> Unit {
 // ---------- リンク ----------
 
 ///|
-/// 本文へのリンクの綴り。作るのも測るのもこの 1 か所
+/// 本文へのリンク。綴りは link.mbt で、ここはページの住所を渡すだけ
 async fn App::link(self : App) -> String {
-  @web.address(self.doc) + to_hash(self.text())
+  link(@web.address(self.doc), self.text())
 }
 
 ///|
-/// リンクにまつわる**押す前の但し書き**。無ければ空。
-/// 長さは gzip してからでないと分からないので、開くたびに本当に測る（1ms 弱）
-async fn App::link_note(self : App) -> Array[String] {
-  let notes = []
-  if has_images(self.text()) {
-    notes.push("Images won't travel")
-  }
-  if self.link().length() > link_warn_length {
-    notes.push("Long link — may be cut")
-  }
-  notes
+/// リンクにまつわる**押す前の但し書き**（link.mbt）。長さは作ってから測る
+async fn App::link_caveat(self : App) -> Array[String] {
+  link_caveat(self.survey().has_images(), self.link().length())
 }
 
 ///|
@@ -664,19 +662,6 @@ fn App::paste(self : App) -> Unit {
   })
 }
 
-///|
-/// 画像フォルダの状態。**言葉は宣言と許可の 2 つだけ**（disk/images.mbt の冒頭が
-/// 名付けたもの）。許可が無いときは宣言のパスを出す — どこを指していて届いて
-/// いないのかが見えないと、直しようがない
-fn App::folder_caption(self : App) -> String {
-  match (self.images.folder_name(), self.declared_folder()) {
-    (None, None) => "no folder"
-    (None, Some(declared)) => declared + ", no access"
-    (Some(name), Some(_)) => name
-    (Some(name), None) => name + ", not declared"
-  }
-}
-
 // ---------- 配線 ----------
 
 ///|
@@ -687,12 +672,20 @@ fn App::set_grab(self : App, on : Bool) -> Unit {
 }
 
 ///|
-/// 帯・ペイン・キー・ドロップ・持ち主。組み上がった後に 1 度だけ
+/// 組み上がった後に 1 度だけ。持ち主・帯・離脱・投下・キー
 fn App::wire(self : App) -> Unit {
-  let doc = self.doc
-  // 選択は持っている側（フォーカスが最後に入ったペイン）が決める。md → map は、その
-  // 瞬間のカーソルのノードを位置にして引き継ぐ。map → md は捨てる（md のカーソルは
-  // 動かさない）。窓・メニュー・帯へ抜けても変わらない — 2 つのペインの focusin だけを見る
+  self.wire_holder()
+  self.wire_bar()
+  self.wire_unload()
+  self.wire_drop()
+  self.wire_keys()
+}
+
+///|
+/// 選択は持っている側（フォーカスが最後に入ったペイン）が決める。md → map は、その
+/// 瞬間のカーソルのノードを位置にして引き継ぐ。map → md は捨てる（md のカーソルは
+/// 動かさない）。窓・メニュー・帯へ抜けても変わらない — 2 つのペインの focusin だけを見る
+fn App::wire_holder(self : App) -> Unit {
   @web.listen(self.md_pane, "focusin", _ => {
     if (self.ed.holder)() != Md {
       (self.ed.hold)(Md, None)
@@ -703,8 +696,12 @@ fn App::wire(self : App) -> Unit {
       (self.ed.hold)(Map, self.anchors_for(self.choice()))
     }
   })
+}
 
-  // 帯のメニュー。並びは app の files.mbt / more.mbt の表。ここは状態を写して、押されたら走らせる
+///|
+/// 帯のメニュー。並びは bar の files.mbt / more.mbt の表。ここは状態を写して、押されたら走らせる
+fn App::wire_bar(self : App) -> Unit {
+  let doc = self.doc
   @parts.open_on_click(el(doc, "files"), () => {
     @bar.files_menu(
       {
@@ -714,7 +711,10 @@ fn App::wire(self : App) -> Unit {
         can_save: @web.can_save_as(),
         can_rename: @web.can_rename(),
         can_choose_folder: @web.can_choose_folder(),
-        folder: self.folder_caption(),
+        folder: @disk.folder_caption(
+          self.images.folder_name(),
+          self.declared_folder(),
+        ),
       },
       {
         new_file: () => @web.spawn(async fn() { self.new_file() }),
@@ -738,13 +738,14 @@ fn App::wire(self : App) -> Unit {
       },
     )
   })
+  // 掴みやすさは持ち物から。⋯ の行がその場で切り替える
   self.map.set_grab(self.grab)
   @parts.open_on_click(el(doc, "more"), () => {
     @bar.more_menu(
       {
         light: self.theme.is_light(),
         grab: self.grab,
-        link_caveat: k => @web.spawn(async fn() { k(self.link_note()) }),
+        link_caveat: k => @web.spawn(async fn() { k(self.link_caveat()) }),
       },
       {
         undo: self.ed.undo,
@@ -757,14 +758,22 @@ fn App::wire(self : App) -> Unit {
       },
     )
   })
+}
 
-  @web.on_window(doc, "beforeunload", e => {
+///|
+/// 未保存のまま閉じようとしたら止める
+fn App::wire_unload(self : App) -> Unit {
+  @web.on_window(self.doc, "beforeunload", e => {
     if self.text() != self.saved_text {
       @web.warn_unload(e)
     }
   })
+}
 
-  // 落とされたファイル（disk/drop.mbt）
+///|
+/// 落とされたファイル（disk/drop.mbt）
+fn App::wire_drop(self : App) -> Unit {
+  let doc = self.doc
   @disk.init_drop(doc, {
     open_markdown: async fn(file) {
       guard self.confirm_discard() else { return }
@@ -776,8 +785,12 @@ fn App::wire(self : App) -> Unit {
     },
     failed: msg => @parts.failed(doc, msg),
   })
+}
 
-  // ペインと全体のキー（app）
+///|
+/// ペインと全体のキー（panes.mbt / shortcuts.mbt）
+fn App::wire_keys(self : App) -> Unit {
+  let doc = self.doc
   let panes = Panes::new(
     self.md_pane,
     self.map_pane,

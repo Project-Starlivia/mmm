@@ -77,7 +77,7 @@ export const anchors = StateField.define<core.Anchors | null>({
 });
 
 /** md のカーソル。head は主カーソルの頭 */
-export const caretOf = (s: EditorState): core.Caret => ({
+const caretOf = (s: EditorState): core.Caret => ({
   ranges: s.selection.ranges.map((r) => ({ from: r.from, to: r.to })),
   head: s.selection.main.head,
 });

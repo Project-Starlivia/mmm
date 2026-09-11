@@ -89,28 +89,22 @@ async fn from_hash(hash : String) -> String? {
 }
 
 ///|
-/// 画像を貼った行があるか。`![...](...)` — 画像は旅をしないので、
-/// Copy link の行に**押す前の但し書き**として出すのに使う
-fn has_images(text : String) -> Bool {
-  let mut from = 0
-  while index_of(text, "![", from) is Some(bang) {
-    // `]` まで（`]` を含まない）、その直後が `(`、その先に `)`
-    guard index_of(text, "]", bang + 2) is Some(close) else { return false }
-    if close + 1 < text.length() && text[close + 1] == '(' {
-      if index_of(text, ")", close + 2) is Some(_) {
-        return true
-      }
-    }
-    from = bang + 2
-  }
-  false
+/// 本文へのリンクの綴り。`address` はいまのページ（`@web.address`）。作るのも測るのもこれ 1 つ
+async fn link(address : String, text : String) -> String {
+  address + to_hash(text)
 }
 
 ///|
-/// `from` から後ろで最初に見つかる位置
-fn index_of(text : String, needle : String, from : Int) -> Int? {
-  guard from <= text.length() else { return None }
-  String::unsafe_substring(text, start=from, end=text.length())
-  .find(needle)
-  .map(i => i + from)
+/// リンクにまつわる**押す前の但し書き**。無ければ空。`images` は木に画像が居るか
+/// （read の `has_images`）、`length` は作ったリンクの長さ — gzip してからでないと
+/// 分からないので、開くたびに本当に測る（1ms 弱）
+fn link_caveat(images : Bool, length : Int) -> Array[String] {
+  let out = []
+  if images {
+    out.push("Images won't travel")
+  }
+  if length > link_warn_length {
+    out.push("Long link — may be cut")
+  }
+  out
 }

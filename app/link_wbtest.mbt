@@ -22,10 +22,21 @@ async test "リンクでない hash は None。壊れた md= も None（投げ�
 }
 
 ///|
-test "has_images: 画像を貼った行があれば真。リンクは画像ではない" {
-  assert_true(has_images("# a\n\n![](./images/a.webp)\n"))
-  assert_false(has_images("# a\n\n本文だけ\n"))
-  assert_false(has_images("[a](./b.md)"))
-  assert_false(has_images("![alt] (x)"))
-  assert_true(has_images("text ![alt](x.png) more"))
+test "link_caveat: 画像が居れば言い、長ければ言う。どちらも無ければ空" {
+  assert_eq(link_caveat(false, 0), [])
+  assert_eq(link_caveat(true, link_warn_length), ["Images won't travel"])
+  assert_eq(link_caveat(false, link_warn_length + 1), [
+    "Long link — may be cut",
+  ])
+  assert_eq(link_caveat(true, link_warn_length + 1), [
+    "Images won't travel", "Long link — may be cut",
+  ])
+}
+
+///|
+async test "link: ページの住所の後ろに #md= が付く" {
+  let address = "https://mmm.example/"
+  let l = link(address, "# a\n")
+  assert_true(l.has_prefix(address + "#md="))
+  assert_eq(from_hash(l[address.length():].to_owned()), Some("# a\n"))
 }
