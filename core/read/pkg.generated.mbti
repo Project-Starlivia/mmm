@@ -81,6 +81,7 @@ pub fn Survey::blocks(Self, Int) -> Array[Int]
 pub fn Survey::copy(Self, Array[Int]) -> String
 pub fn Survey::empty(Self) -> Bool
 pub fn Survey::find(Self, String) -> Int?
+pub fn Survey::has_images(Self) -> Bool
 pub fn Survey::is_node(Self, Int) -> Bool
 pub fn Survey::name(Self) -> String
 

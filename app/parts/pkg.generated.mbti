@@ -44,6 +44,8 @@ pub fn is_icon(String) -> Bool
 
 pub fn label(@dom.Document, String, String, Bool) -> Array[@dom.Node]
 
+pub fn named(String, text~ : String, parts~ : Array[Part], shot~ : String, field~ : Field) -> Ask
+
 pub fn names() -> Array[String]
 
 pub let no_file_access : String

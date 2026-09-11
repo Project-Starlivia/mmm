@@ -73,3 +73,17 @@ pub fn Survey::blocks(self : Survey, id : Int) -> Array[Int] {
   each_node(self.doc, n => if n.id == id { out = meant(n.body).map(b => b.id) })
   out
 }
+
+///|
+/// 画像を貼った中身があるか。**木に聞く** — 原文を `![` で走査すると、フェンスの中に
+/// 書かれた綴り（Code の塊）まで数える（#245）。画像は旅をしないので、リンクの
+/// 但し書きと画像フォルダの繋ぎ直しがこれを見る
+pub fn Survey::has_images(self : Survey) -> Bool {
+  let mut found = false
+  each_node(self.doc, n => {
+    if n.body.any(b => b.content is Some(Image(..))) {
+      found = true
+    }
+  })
+  found
+}

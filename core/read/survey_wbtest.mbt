@@ -30,3 +30,16 @@ test "find は Implicit を名乗らせない" {
   assert_eq(s.find(""), None)
   assert_eq(survey("# r\n\n## \n").find(""), Some(3))
 }
+
+///|
+/// 画像はノードの中身に居るときだけ。フェンスの中の綴りは Code で、画像ではない（#245）。
+/// 字と混ざった `text ![a](b)` は Raw で、これも画像ではない
+test "has_images は木に聞く — フェンスの中の ![]() は数えない" {
+  assert_true(survey("# r\n\n![](./images/a.webp)\n").has_images())
+  assert_true(survey("# r\n\n## a\n\n![alt](x.png)\n").has_images())
+  assert_false(survey("# r\n\n本文だけ\n").has_images())
+  assert_false(survey("# r\n\n[a](./b.md)\n").has_images())
+  assert_false(survey("# r\n\n```md\n![](a.png)\n```\n").has_images())
+  assert_false(survey("# r\n\ntext ![alt](x.png) more\n").has_images())
+  assert_false(survey("").has_images())
+}

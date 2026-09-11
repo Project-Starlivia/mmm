@@ -121,31 +121,44 @@ struct Stand {
 }
 
 ///|
-/// index.html と同じ id の器を立てる
+/// index.html と同じ id の器（`(tag, id)` の並び）を `into` に立てる
+fn mount(
+  doc : @dom.Document,
+  into : @dom.Element,
+  ids : Array[(String, String)],
+) -> Unit {
+  for pair in ids {
+    let e = doc.createElement(pair.0)
+    e.setAttribute("id", pair.1)
+    into.append(e.as_node())
+  }
+}
+
+///|
+/// index.html と同じ器を立て、App を組んで動かす。非同期の試験は閉じる閉包を
+/// 通れないので、これを手で持って `defer s.win.close()`。それ以外は `with_stand`
 fn stand() -> Stand {
   let win = @test_utils.create_happy_window()
   let doc = win.document()
   let body = doc.body().unwrap()
   @web.set_style(doc.documentElement(), "--accent", "#5932ff")
-  let mk = (tag : String, id : String, into : @dom.Element) => {
-    let e = doc.createElement(tag)
-    e.setAttribute("id", id)
-    into.append(e.as_node())
-    e
-  }
   let bar = doc.createElement("header")
   body.append(bar.as_node())
-  mk("svg", "logo", bar) |> ignore
-  mk("span", "filename", bar) |> ignore
-  mk("span", "dirty", bar) |> ignore
-  mk("button", "files", bar) |> ignore
-  mk("button", "export", bar) |> ignore
-  mk("button", "export-way", bar) |> ignore
-  mk("button", "more", bar) |> ignore
-  let panes = mk("main", "panes", body.as_element())
-  mk("section", "md-pane", panes) |> ignore
-  mk("div", "splitter", panes) |> ignore
-  mk("section", "map-pane", panes) |> ignore
+  mount(doc, bar, [
+    ("svg", "logo"),
+    ("span", "filename"),
+    ("span", "dirty"),
+    ("button", "files"),
+    ("button", "export"),
+    ("button", "export-way"),
+    ("button", "more"),
+  ])
+  mount(doc, body.as_element(), [("main", "panes")])
+  mount(doc, doc.getElementById("panes").unwrap(), [
+    ("section", "md-pane"),
+    ("div", "splitter"),
+    ("section", "map-pane"),
+  ])
   let fake : Fake = {
     md: "",
     cached: None,
@@ -165,6 +178,21 @@ fn stand() -> Stand {
 }
 
 ///|
+/// 立てて渡し、済んだら閉じる（parts の `with_doc` と同じ形）
+fn with_stand(f : (Stand) -> Unit raise) -> Unit raise {
+  let s = stand()
+  defer s.win.close()
+  f(s)
+}
+
+///|
+/// 出来事を起こす。`kind` は窓の構築子の名（`FocusEvent` など）、`name` は出来事の名
+fn fire(s : Stand, target : @dom.Element, kind : String, name : String) -> Unit {
+  let ev = @core.new(s.win.as_any()._get(kind), [@core.any(name)])
+  target.as_event_target().dispatchEvent(ev.cast()) |> ignore
+}
+
+///|
 fn Stand::text_of(self : Stand, id : String) -> String {
   self.doc.getElementById(id).unwrap().textContent()
 }
@@ -176,111 +204,111 @@ fn Stand::nodes(self : Stand) -> Int {
 
 ///|
 test "立ち上がりは空。名乗りは mmm / empty.md、言い出しが出て、書き出しは沈む。焦点は md へ" {
-  let s = stand()
-  defer s.win.close()
-  assert_eq(s.doc.title(), "mmm")
-  assert_eq(s.text_of("filename"), "empty.md")
-  assert_true(s.fake.hint)
-  assert_eq(s.nodes(), 0)
-  assert_eq(
-    s.doc.getElementById("dirty").unwrap().getAttribute("hidden"),
-    Some(""),
-  )
-  assert_eq(
-    s.doc.getElementById("export").unwrap().getAttribute("title"),
-    Some("Nothing to export yet"),
-  )
-  // Node には改名の口が無いので、名乗りはその理由で沈む
-  assert_eq(
-    s.doc.getElementById("filename").unwrap().getAttribute("title"),
-    Some(@bar.no_rename_here),
-  )
-  assert_eq(s.fake.log[1:], ["set_text", "focus"])
+  with_stand(s => {
+    assert_eq(s.doc.title(), "mmm")
+    assert_eq(s.text_of("filename"), "empty.md")
+    assert_true(s.fake.hint)
+    assert_eq(s.nodes(), 0)
+    assert_eq(
+      s.doc.getElementById("dirty").unwrap().getAttribute("hidden"),
+      Some(""),
+    )
+    assert_eq(
+      s.doc.getElementById("export").unwrap().getAttribute("title"),
+      Some("Nothing to export yet"),
+    )
+    // Node には改名の口が無いので、名乗りはその理由で沈む
+    assert_eq(
+      s.doc.getElementById("filename").unwrap().getAttribute("title"),
+      Some(@bar.no_rename_here),
+    )
+    assert_eq(s.fake.log[1:], ["set_text", "focus"])
+  })
 }
 
 ///|
 test "打てば木が生まれ、地図が描かれ、名乗りが変わり、未保存の印が立ち、書き出しが開く" {
-  let s = stand()
-  defer s.win.close()
-  s.fake.change("# r\n\n## a\n")
-  assert_eq(s.nodes(), 2)
-  assert_eq(s.doc.title(), "r.md - mmm")
-  assert_eq(s.text_of("filename"), "r.md")
-  assert_false(s.fake.hint)
-  assert_eq(s.doc.getElementById("dirty").unwrap().getAttribute("hidden"), None)
-  assert_eq(
-    s.doc.getElementById("export").unwrap().getAttribute("title"),
-    Some("Export the whole Mindmap — Download SVG"),
-  )
-  // 木が変わらないサイクルは塗り直しだけ（描き直さない）
-  let before = s.doc.querySelectorAll(".map-svg .node")[0]
-  s.app.cycle(Some(s.fake.survey()), false)
-  assert_true(@web.same(before, s.doc.querySelectorAll(".map-svg .node")[0]))
+  with_stand(s => {
+    s.fake.change("# r\n\n## a\n")
+    assert_eq(s.nodes(), 2)
+    assert_eq(s.doc.title(), "r.md - mmm")
+    assert_eq(s.text_of("filename"), "r.md")
+    assert_false(s.fake.hint)
+    assert_eq(
+      s.doc.getElementById("dirty").unwrap().getAttribute("hidden"),
+      None,
+    )
+    assert_eq(
+      s.doc.getElementById("export").unwrap().getAttribute("title"),
+      Some("Export the whole Mindmap — Download SVG"),
+    )
+    // 木が変わらないサイクルは塗り直しだけ（描き直さない）
+    let before = s.doc.querySelectorAll(".map-svg .node")[0]
+    s.app.cycle(Some(s.fake.survey()), false)
+    assert_true(@web.same(before, s.doc.querySelectorAll(".map-svg .node")[0]))
+  })
 }
 
 ///|
 test "apply: 操作を md に映し、focus を effect で乗せ、別のノードなら寄せる。できない操作はしらせ" {
-  let s = stand()
-  defer s.win.close()
-  s.fake.change("# r\n\n## a\n")
-  let a = s.fake.survey().find("a").unwrap()
-  assert_eq(s.app.apply(Rename(id=a, label="b"), false), Some(a))
-  assert_eq(s.fake.md, "# r\n\n## b\n")
-  assert_eq(s.fake.log[s.fake.log.length() - 2:], [
-    "apply 1 focus=" + a.to_string(),
-    "reveal 5",
-  ])
-  // 同じ名前への Rename は編集が無くても focus が在り、しらせは出ない
-  assert_eq(s.app.apply(Rename(id=a, label="b"), false), Some(a))
-  // 無い id はできない
-  assert_eq(s.app.apply(Rename(id=99, label="x"), false), None)
-  assert_eq(s.doc.querySelectorAll(".notice").length(), 1)
+  with_stand(s => {
+    s.fake.change("# r\n\n## a\n")
+    let a = s.fake.survey().find("a").unwrap()
+    assert_eq(s.app.apply(Rename(id=a, label="b"), false), Some(a))
+    assert_eq(s.fake.md, "# r\n\n## b\n")
+    assert_eq(s.fake.log[s.fake.log.length() - 2:], [
+      "apply 1 focus=" + a.to_string(),
+      "reveal 5",
+    ])
+    // 同じ名前への Rename は編集が無くても focus が在り、しらせは出ない
+    assert_eq(s.app.apply(Rename(id=a, label="b"), false), Some(a))
+    // 無い id はできない
+    assert_eq(s.app.apply(Rename(id=99, label="x"), false), None)
+    assert_eq(s.doc.querySelectorAll(".notice").length(), 1)
+  })
 }
 
 ///|
 test "持ち主: 地図に焦点が入れば、そのときの選択を位置にして引き継ぐ。選び直しは位置で CodeMirror へ" {
-  let s = stand()
-  defer s.win.close()
-  s.fake.change("# r\n\n## a\n")
-  let a = s.fake.survey().find("a").unwrap()
-  s.fake.selection = { ids: [a], anchor: Some(a), }
-  let map_pane = s.doc.getElementById("map-pane").unwrap()
-  let ev = @core.new(s.win.as_any()._get("FocusEvent"), [@core.any("focusin")])
-  map_pane.as_event_target().dispatchEvent(ev.cast()) |> ignore
-  assert_eq(
-    s.fake.log[s.fake.log.length() - 1],
-    "hold map [\"NodeAt\",{\"at\":[8],\"anchor\":8}]",
-  )
-  // 地図で選び直した（host 経由）。位置に写り、寄せる
-  (s.app.map.host.set_selection)({ ids: [a], anchor: Some(a), }, true)
-  assert_eq(s.fake.log[s.fake.log.length() - 2:], [
-    "select [\"NodeAt\",{\"at\":[8],\"anchor\":8}]", "reveal 5",
-  ])
+  with_stand(s => {
+    s.fake.change("# r\n\n## a\n")
+    let a = s.fake.survey().find("a").unwrap()
+    s.fake.selection = { ids: [a], anchor: Some(a), }
+    fire(s, s.doc.getElementById("map-pane").unwrap(), "FocusEvent", "focusin")
+    assert_eq(
+      s.fake.log[s.fake.log.length() - 1],
+      "hold map [\"NodeAt\",{\"at\":[8],\"anchor\":8}]",
+    )
+    // 地図で選び直した（地図は host の set_selection でここへ来る）。位置に写り、寄せる
+    s.app.choose(Nodes(sel={ ids: [a], anchor: Some(a), }), true)
+    assert_eq(s.fake.log[s.fake.log.length() - 2:], [
+      "select [\"NodeAt\",{\"at\":[8],\"anchor\":8}]", "reveal 5",
+    ])
+  })
 }
 
 ///|
-test "宣言: 頭に書き、引っ越しなら本文の画像も同じ 1 手で追従する。フォルダの一言は宣言と許可で言う" {
-  let s = stand()
-  defer s.win.close()
-  s.fake.change("# r\n\n![](pics/a.png)\n")
-  assert_eq(s.app.folder_caption(), "no folder")
-  s.app.set_declared("pics")
-  assert_true(s.fake.md.has_prefix("---\n"))
-  assert_eq(s.app.declared_folder(), Some("pics/"))
-  assert_eq(s.app.folder_caption(), "pics/, no access")
-  assert_eq(s.fake.log[s.fake.log.length() - 1], "apply 1")
-  s.app.set_declared("img")
-  assert_eq(s.app.declared_folder(), Some("img/"))
-  assert_true(s.fake.md.contains("![](img/a.png)"))
-  assert_eq(s.fake.log[s.fake.log.length() - 1], "apply 2")
+test "宣言: 頭に書き、引っ越しなら本文の画像も同じ 1 手で追従する" {
+  with_stand(s => {
+    s.fake.change("# r\n\n![](pics/a.png)\n")
+    s.app.set_declared("pics")
+    assert_true(s.fake.md.has_prefix("---\n"))
+    assert_eq(s.app.declared_folder(), Some("pics/"))
+    assert_eq(s.fake.log[s.fake.log.length() - 1], "apply 1")
+    s.app.set_declared("img")
+    assert_eq(s.app.declared_folder(), Some("img/"))
+    assert_true(s.fake.md.contains("![](img/a.png)"))
+    assert_eq(s.fake.log[s.fake.log.length() - 1], "apply 2")
+  })
 }
 
 ///|
+/// 非同期なので、窓は `with_stand` を通らず手で持つ（閉じる閉包は async を呼べない）
 async test "リンクの但し書き: 画像が居れば言う。新規は捨てるか聞き、断れば何も起きない" {
   let s = stand()
   defer s.win.close()
   s.fake.change("# r\n\n![](pics/a.png)\n")
-  assert_eq(s.app.link_note(), ["Images won't travel"])
+  assert_eq(s.app.link_caveat(), ["Images won't travel"])
   // 未保存のまま New → たずねが開く。Cancel を押せば文書はそのまま
   let asked = @js_async.Promise::from_async(async fn() { s.app.new_file() })
   let dlg = s.doc.querySelector("dialog.ask").unwrap()
@@ -291,17 +319,17 @@ async test "リンクの但し書き: 画像が居れば言う。新規は捨て
 }
 
 ///|
-test "帯: Files は状態を写す（保存していない・覚えているものが無い）。⋯ は掴みやすさを持ち物に" {
-  let s = stand()
-  defer s.win.close()
-  @web.click(s.doc.getElementById("files").unwrap())
-  let rows = s.doc
-    .querySelectorAll(".menu [role=menuitem]")
-    .map(r => r.textContent())
-  assert_true(rows.length() > 0)
-  assert_eq(
-    s.doc.querySelector(".menu .caption").unwrap().textContent(),
-    "not saved yet",
-  )
-  assert_eq(s.app.grab, false)
+test "帯: Files は状態を写す（保存していない・覚えているものが無い・フォルダも無い）。⋯ は掴みやすさを持ち物に" {
+  with_stand(s => {
+    @web.click(s.doc.getElementById("files").unwrap())
+    let rows = s.doc
+      .querySelectorAll(".menu [role=menuitem]")
+      .map(r => r.textContent())
+    assert_true(rows.length() > 0)
+    let captions = s.doc
+      .querySelectorAll(".menu .caption")
+      .map(c => c.textContent())
+    assert_eq(captions, ["not saved yet", "no folder"])
+    assert_eq(s.app.grab, false)
+  })
 }

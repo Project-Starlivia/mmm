@@ -2,12 +2,12 @@
 // 実際に出す口（ダウンロード・クリップボード）はブラウザのもので、ここでは通らない
 
 ///|
-fn deps(
+fn host(
   empty : Bool,
   svg? : @dom.Element? = None,
   failed? : Array[String] = [],
   blocked? : Array[String] = [],
-) -> ExportDeps {
+) -> ExportHost {
   {
     svg: fn() { svg },
     name: () => "Notes.MD",
@@ -28,7 +28,7 @@ test "way_of: 覚えていた出し方。知らなければ既定（SVG を落�
 ///|
 test "export_ways: 落とすと写すのあいだに線。空なら全部沈み、理由は 1 つの言葉。header に選ばれた出し方が渡る" {
   let chosen = []
-  let rows = export_ways(deps(false), Some(w => chosen.push(w.id)))
+  let rows = export_ways(host(false), Some(w => chosen.push(w.id)))
   assert_eq(rows.length(), 5)
   assert_true(rows[2] is Sep)
   guard rows[3] is Run(row, go) else { fail("行でない") }
@@ -36,7 +36,7 @@ test "export_ways: 落とすと写すのあいだに線。空なら全部沈み�
   assert_true(row.disabled is No)
   go()
   assert_eq(chosen, ["png-copy"])
-  guard export_ways(deps(true), None)[0] is Run(row, _) else {
+  guard export_ways(host(true), None)[0] is Run(row, _) else {
     fail("行でない")
   }
   assert_eq(row.disabled, Why("Nothing to export yet"))
@@ -46,14 +46,14 @@ test "export_ways: 落とすと写すのあいだに線。空なら全部沈み�
 /// 非同期の中なので、窓は `with_doc` を通らず手で持つ（閉じる閉包は async を呼べない）
 async test "export_once: 出すものが無ければ blocked、出し口がしくじれば failed。どちらも投げない" {
   let blocked = []
-  assert_false(export_once(deps(true, blocked~), ways[0]))
+  assert_false(export_once(host(true, blocked~), ways[0]))
   assert_eq(blocked, ["Nothing to export yet"])
   let w = @test_utils.create_happy_window()
   defer w.close()
   let svg = @web.el(w.document(), "svg", [("width", "0"), ("height", "0")])
   let failed = []
   // 大きさが読めない（0）ので raster が投げる → failed
-  assert_false(export_once(deps(false, svg=Some(svg), failed~), ways[1]))
+  assert_false(export_once(host(false, svg=Some(svg), failed~), ways[1]))
   assert_eq(failed, ["Couldn't export"])
 }
 
@@ -63,7 +63,7 @@ test "Export: ボタンはいまの出し方（字 + 行き先の絵）を言う
     let button = doc.createElement("button")
     let way_button = doc.createElement("button")
     let mut empty = true
-    let d : ExportDeps = {
+    let d : ExportHost = {
       svg: fn() { None },
       name: () => "n.md",
       failed: _ => (),

@@ -48,7 +48,7 @@ core/   MoonBit — module `mmm/core`。文書モデルと地図の判断。**DO
                 context(右クリックの行) / camera(視点。world ↔ 画面、寄せ、ピンチ) /
                 indicator(画面外の根を指す針) / gesture(指の台帳) / place(欄を箱に重ねる算術)
   read/         md を読んだもの（Survey = 木 + 地番 + 原文）と、木の判断。ts はこれを持ち手として
-                持ち、問い合わせで読む。survey(is_node / empty / find / blocks) / caret(md の
+                持ち、問い合わせで読む。survey(is_node / empty / find / blocks / has_images) / caret(md の
                 カーソル・地図の位置 → 選択。chosen が持ち主とそれらから導く。選択の規則はここだけ) /
                 copy(選んだ部分木の原文) / name(文書の名前。ファイル名の柵) / head(frontmatter の
                 画像フォルダの宣言を読む・書く、引っ越しの追従、綴りの正規化)
@@ -62,15 +62,18 @@ app/    MoonBit — module `mmm/app`。core に依存し、DOM を触る。試�
                 CodeMirror の読み書きは Editor の閉包で受ける。試験は md 1 本の写し
   panes.mbt     枠。2 つのペインの出し分けと分割線（居場所の算術は純粋で、試験は数だけ）
   shortcuts.mbt 全体のキー
-  link.mbt      本文を URL に載せる / 戻す（gzip → base64url。非同期は js_async の Promise）
+  link.mbt      本文を URL に載せる / 戻す（gzip → base64url。非同期は js_async の Promise）と、
+                リンクの押す前の但し書き（純粋。画像が居るかは read に聞く）
   prefs/        持ち物（theme / color / way / grab）。localStorage の綴りはここだけ
-  bar/          帯（index.html の `#bar`）。files(Files の並び) / more(⋯ の並び) / export(書き出し —
-                ボタンと出し方 4 通り・出し口) / theme(ロゴ・アクセントカラー・ライト/ダーク・favicon) /
+  bar/          帯（index.html の `#bar`）。bar(帯へ焦点を落とす — Escape の抜け先) / files(Files の並び) /
+                more(⋯ の並び) / export(書き出し — ボタンと出し方 4 通り・出し口) /
+                theme(ロゴ・アクセントカラー・ライト/ダーク・favicon) /
                 name(名乗り — ファイル名と改名の入口、未保存の印)。並びは純粋な表で、状態を受けて行を返す
   disk/         ディスク。disk(Disk — File System Access API の窓口。開く・保存・改名) /
                 recent(覚えている文書と画像フォルダ。札を IndexedDB に置く台帳。置き場は閉包で受け、試験は手元の表) /
                 images(画像の読み書き。宣言は md の頭、許可は札。宣言を決める / 直すのは settle で、
-                md に書くのは App の set_declared) / path(画像の置き場と名前の柵、置く箱の形。純粋で試験する) /
+                md に書くのは App の set_declared。フォルダの状態の一言 folder_caption もここ) /
+                path(画像の置き場と名前の柵、置く箱の形。純粋で試験する) /
                 drop(落ちたファイルの振り分け。.md は開く、画像はノードの上だけ受ける)。札は不透明な持ち手
   mindmap/      地図のペイン。mindmap(Mindmap そのもの — 器・寸法・視点の当て方・render / fit / center /
                 refresh。判断は core/map) / input(入ってくるもの — ホイール・ポインタ・掴んで落とす・クリック・
@@ -90,12 +93,14 @@ app/    MoonBit — module `mmm/app`。core に依存し、DOM を触る。試�
                 canvas(紙。2d の文脈と手・字の幅・ラスタ化) / clip(クリップボード・アドレス) / storage(localStorage) /
                 time(時計) / drag(ファイルのドラッグ) / async(約束の糊。spawn / after)。
                 **web と js 以外の package は `_get` / `_call` を書かない**（js は出口で、JS の値に組む側）
-  js/           browser への出口。mmmMain / mmmCycle と、EditorState の field が読む問い合わせ
-                （mmmSurvey / mmmChosen / mmmCarry …）、見本（lab）が置く部品。読みも選択もその位置も
-                不透明な持ち手で往復し、渡るのは数・字・真偽と編集列だけ
+  js/           browser への出口。面は 2 つ — exports(本番の面。mmmMain / mmmCycle と、EditorState の field が
+                読む問い合わせ mmmSurvey / mmmChosen / mmmCarry …。JS の値との糊もここ) /
+                lab(見本と試験と build の面。読みの段・位置の組み立て・見本の地図・器。見本にできないことは
+                ここが決める)。読みも選択もその位置も不透明な持ち手で往復し、渡るのは数・字・真偽と編集列だけ
 src/    TypeScript — **CodeMirror（md ペイン）だけ。** 文書の真実はその中の文字列
-  app.ts       core の出口と入口（app/js）。形を整える唯一の場所（main(editor) が CodeMirror の読み書きを
-               閉包で渡し、cycle がサイクルを回す。木は持ち手を渡して問い合わせる — spot / chosen …）。
+  app.ts       core の出口と入口（app/js）。形を整える唯一の場所で、面は出口と同じ 2 つ — 本番の面
+               （main(editor) が CodeMirror の読み書きを閉包で渡し、cycle がサイクルを回す。木は持ち手を
+               渡して問い合わせる — chosen / carry …）と、試験と見本の面（spot / find / 見本の地図 / 器）。
                木も箱も core から出ない
   state.ts     文書から導けるものの置き場(EditorState の field: tree = core の読みの持ち手、anchors = 地図の
                選択の位置、holder = 持ち主、choice = 選択。位置は CodeMirror が編集で写す。effect は
@@ -399,7 +404,7 @@ Easy grab は押しても閉じず、**並びがその場で引き直される**
 印なら幅は一定で、メニューの並びも頭出しも揃ったまま。
 
 - 画像は旅をしない — `![](...)` は相対パスなので相手の環境には無い
-  (`app/link.mbt` の `has_images`)
+  (木に聞く — `core/read` の `has_images`。フェンスの中の綴りは数えない)
 - 長さも拒否はしない。相手側の実際の上限は mmm には分からないので、
   8000 字を超えたときに「切られるかもしれない」とだけ言う
 

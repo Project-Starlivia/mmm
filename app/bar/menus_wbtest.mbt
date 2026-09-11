@@ -168,7 +168,7 @@ test "帯の並びの絵は全部 icons の表に在る" {
     marks_of(
       more_menu({ light: true, grab: true, link_caveat: _ => (), }, more),
     ) +
-    marks_of(export_ways(deps(false), None))
+    marks_of(export_ways(host(false), None))
   assert_true(all.length() > 0)
   for m in all {
     assert_true(@parts.is_icon(m), msg="知らない絵: " + m)

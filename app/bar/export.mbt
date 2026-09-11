@@ -27,7 +27,8 @@ let choose = "Choose how to export"
 let hold = 1500
 
 ///|
-pub(all) struct ExportDeps {
+/// 外に頼るもの（値と動詞）
+pub(all) struct ExportHost {
   /// 全体の SVG。空なら None。出し口はこの要素の文書を通る
   svg : async () -> @dom.Element?
   /// ダウンロード名の元になる、いまのファイル名
@@ -178,19 +179,19 @@ fn way_of(saved : String?) -> Way {
 /// そのやり方で 1 回出す。**出せたかを返す** — 済んだらヘッダーのボタンが
 /// チェックで答えるので、答えてよいかを呼ぶ側が知る必要がある。
 /// しくじりはここがしらせに出し、投げない（呼ぶ側に try を書かせない）
-async fn export_once(deps : ExportDeps, way : Way) -> Bool {
+async fn export_once(host : ExportHost, way : Way) -> Bool {
   (async fn() -> Bool {
-    guard (deps.svg)() is Some(svg) else {
+    guard (host.svg)() is Some(svg) else {
       // ボタンは沈めてあるので、ここへ来るのはキー（`Mod+E`）から。
       // **触って読める言葉と同じものを出す** — 同じ壁に 2 つの綴りを持たない
-      (deps.blocked)(nothing)
+      (host.blocked)(nothing)
       return false
     }
-    (way.out)(svg.ownerDocument().unwrap(), svg, @read.bare((deps.name)()))
+    (way.out)(svg.ownerDocument().unwrap(), svg, @read.bare((host.name)()))
     true
   })() catch {
     _ => {
-      (deps.failed)("Couldn't export")
+      (host.failed)("Couldn't export")
       false
     }
   }
@@ -204,7 +205,7 @@ async fn export_once(deps : ExportDeps, way : Way) -> Bool {
 /// 答える場所がボタンなので、答え方を知っているのもボタンを持つ側。
 /// 無ければここが走らせるだけ
 pub fn export_ways(
-  deps : ExportDeps,
+  host : ExportHost,
   header : ((Way) -> Unit)?,
 ) -> Array[@parts.Entry] {
   let entries = []
@@ -213,12 +214,12 @@ pub fn export_ways(
     if i == 2 {
       entries.push(@parts.Sep)
     }
-    let disabled = @parts.unless(!(deps.empty)(), why=nothing)
+    let disabled = @parts.unless(!(host.empty)(), why=nothing)
     entries.push(
       @parts.Run(@parts.row(way.label, mark=Some(way.mark), disabled~), () => {
         match header {
           Some(h) => h(way)
-          None => @web.spawn(async fn() { export_once(deps, way) |> ignore })
+          None => @web.spawn(async fn() { export_once(host, way) |> ignore })
         }
       }),
     )
@@ -233,7 +234,7 @@ pub fn export_ways(
 /// その場で出て、次からの既定になる — 押す前に何が起きるかが常に見えている
 pub struct Export {
   doc : @dom.Document
-  deps : ExportDeps
+  host : ExportHost
   button : @dom.Element
   way_button : @dom.Element
   mut way : Way
@@ -244,14 +245,14 @@ pub struct Export {
 ///|
 pub fn Export::new(
   doc : @dom.Document,
-  deps : ExportDeps,
+  host : ExportHost,
   button : @dom.Element,
   way_button : @dom.Element,
 ) -> Export {
   way_button.replaceChildren([@parts.icon(doc, "chevron-down").as_node()])
   let self : Export = {
     doc,
-    deps,
+    host,
     button,
     way_button,
     way: way_of(@prefs.load(doc, "way")),
@@ -265,7 +266,7 @@ pub fn Export::new(
   @web.listen(button, "pointerleave", _ => self.undo())
   @web.listen(button, "click", _ => self.fire(self.way))
   @parts.open_on_click(way_button, () => {
-    export_ways(deps, Some(w => self.pick(w)))
+    export_ways(host, Some(w => self.pick(w)))
   })
   self
 }
@@ -278,7 +279,7 @@ pub fn Export::new(
 /// 出せないなら選ぶ意味も無い
 pub fn Export::refresh(self : Export) -> Unit {
   self.put(self.way.mark)
-  let empty = (self.deps.empty)()
+  let empty = (self.host.empty)()
   @web.set_disabled(self.button, empty)
   self.button.setAttribute(
     "title",
@@ -316,7 +317,7 @@ fn Export::undo(self : Export) -> Unit {
 /// かもしれないので、必ず通す
 fn Export::fire(self : Export, chosen : Way) -> Unit {
   @parts.nod(
-    k => @web.spawn(async fn() { k(export_once(self.deps, chosen)) }),
+    k => @web.spawn(async fn() { k(export_once(self.host, chosen)) }),
     mark => self.put(mark),
     ok => {
       if ok {

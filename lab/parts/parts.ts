@@ -151,10 +151,10 @@ export const PARTS: Part[] = [
           { ...SAVED, savedName: null, canOpen: false, canSave: false, canRename: false, canChooseFolder: false },
           FILES_ACTS,
         ),
-      "more-dark": () => core.moreRows({ light: false, grab: false, linkNote: Promise.resolve([]) }, MORE_ACTS),
+      "more-dark": () => core.moreRows({ light: false, grab: false, linkCaveat: Promise.resolve([]) }, MORE_ACTS),
       "more-light-noted": () =>
         core.moreRows(
-          { light: true, grab: true, linkNote: Promise.resolve(["Images won't travel", "Long link — may be cut"]) },
+          { light: true, grab: true, linkCaveat: Promise.resolve(["Images won't travel", "Long link — may be cut"]) },
           MORE_ACTS,
         ),
       "export-ways": () => core.exportWays(false),
