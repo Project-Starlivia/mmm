@@ -45,6 +45,7 @@ let file_acts : FileActs = {
   open_recent: _ => (),
   save: nop,
   save_as: nop,
+  toggle_autosave: nop,
   rename: nop,
   choose_folder: nop,
 }
@@ -53,6 +54,7 @@ let file_acts : FileActs = {
 let saved : Files = {
   saved_name: Some("notes.md"),
   recent: ["ideas.md", "todo.md"],
+  autosave: false,
   can_open: true,
   can_save: true,
   can_rename: true,
@@ -65,9 +67,14 @@ test "files_menu: 見出しが状態を言い、続く行ができること。Re
   let mut opened = -1
   let rows = files_menu(saved, { ..file_acts, open_recent: i => opened = i, })
   assert_eq(rows.map(row_of), [
-    "# notes.md", "New", "Open", "Recent", "Save", "Save as", "Rename", "# pics",
-    "Choose folder",
+    "# notes.md", "New", "Open", "Recent", "Save", "Save as", "Autosave", "Rename",
+    "# pics", "Choose folder",
   ])
+  // **行は切り替えた先を名乗る。** 入っていれば手で書く側が次
+  assert_eq(
+    files_menu({ ..saved, autosave: true, }, file_acts).map(row_of)[6],
+    "Save by hand",
+  )
   guard rows[3] is Sub(_, items, None) else {
     fail("Recent が入れ子でない")
   }
@@ -85,8 +92,8 @@ test "files_menu: 保存していなければ見出しは not saved yet、Recent
   )
   assert_eq(rows[0] |> row_of, "# not saved yet")
   assert_eq(rows[3] |> row_of, "Recent (off: Nothing opened yet)")
-  assert_eq(rows[6] |> row_of, "Rename (off: " + nothing_to_rename + ")")
-  assert_eq(rows[7] |> row_of, "# no folder")
+  assert_eq(rows[7] |> row_of, "Rename (off: " + nothing_to_rename + ")")
+  assert_eq(rows[8] |> row_of, "# no folder")
 }
 
 ///|
@@ -107,8 +114,10 @@ test "files_menu: ファイルを扱えない環境では、改名もふくめ�
   assert_eq(rows[5] |> row_of, "Save as" + why)
   // **改名も同じ理由。** ファイルを持てないのだから、改名できないのは
   // 「この環境が改名を持たない」より前の話（docs/browsers.md の (b′)）
-  assert_eq(rows[6] |> row_of, "Rename" + why)
-  assert_eq(rows[8] |> row_of, "Choose folder" + why)
+  // **自動保存も同じ理由。** 置き場が無いのだから、いつ書くかより前の話
+  assert_eq(rows[6] |> row_of, "Autosave" + why)
+  assert_eq(rows[7] |> row_of, "Rename" + why)
+  assert_eq(rows[9] |> row_of, "Choose folder" + why)
 }
 
 ///|

@@ -1,8 +1,8 @@
 // 永続化の器。
 //
 // **持つのは見た目と手触りの好みだけ**（テーマ・アクセントカラー・書き出しのやり方・
-// 掴みやすさ）。文書の控えもファイルハンドルも持たない（ハンドルは IndexedDB の
-// app/disk/recent.mbt が扱う）。
+// 掴みやすさ・自動保存）。文書の控えもファイルハンドルも持たない（ハンドルは
+// IndexedDB の app/disk/recent.mbt が扱う）。
 //
 // 持ち物は名前で言う（`theme` / `color` / `way` / `grab`）。localStorage の綴り
 // （`mmm.*`）はここだけが知っていて、外は名前を渡す — 知らない名前は壊れている。
@@ -19,6 +19,8 @@ let owned : Array[(String, String)] = [
   ("grab", "mmm.grab"),
   // 最後に居た分割線の居場所（panes.mbt が持ち主。"both" / "md" / "map"）
   ("panes", "mmm.panes"),
+  // 自動保存（Files の Autosave）。"on" のときだけ手が止まると書く
+  ("autosave", "mmm.autosave"),
 ]
 
 ///|

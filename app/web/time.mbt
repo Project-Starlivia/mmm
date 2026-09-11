@@ -1,4 +1,4 @@
-// 時間 — 時計（Date）と、次の描画のフレーム。
+// 時間 — 時計（Date）と、次の描画のフレームと、手が止まるのを待つ間。
 // 綴りは持たない — 名前に焼く形は置く側（app/disk）が決める
 
 ///|
@@ -37,3 +37,35 @@ pub fn per_frame(doc : @dom.Document, f : () -> Unit) -> () -> Unit {
 /// 次の描画の直前に 1 回呼ぶ。窓は文書から辿る（happy-dom は global に持たない）
 extern "js" fn next_frame(doc : @dom.Document, f : () -> Unit) -> Unit =
   #| (doc, f) => doc.defaultView.requestAnimationFrame(() => f())
+
+///|
+/// **静まってから 1 回。** 返った閉包を何回呼んでも、最後の呼びから `ms` のあいだ
+/// 何も来なければ、そこで 1 回だけ `f` が走る。来るたびに待ち時間は引き直す。
+///
+/// `per_frame` との違いは**待つ相手**。あちらは次の描画（16ms 後に必ず来る）で、
+/// 束ねても遅れない。こちらは**人の手が止まるのを待つ** — 連打の最中に走らせたく
+/// ないもの（ディスクへの書き込み。#275）はフレームでは早すぎる。
+///
+/// **落とすのは前の回で、残すのは後の回**（`per_frame` と同じ）。
+pub fn after_quiet(doc : @dom.Document, ms : Int, f : () -> Unit) -> () -> Unit {
+  let timer : Ref[Int] = { val: 0, }
+  () => {
+    if timer.val != 0 {
+      clear_timer(doc, timer.val)
+    }
+    timer.val = set_timer(doc, ms, () => {
+      timer.val = 0
+      f()
+    })
+  }
+}
+
+///|
+/// `ms` 後に 1 回呼ぶ。返るのは取り消しに使う札
+extern "js" fn set_timer(doc : @dom.Document, ms : Int, f : () -> Unit) -> Int =
+  #| (doc, ms, f) => doc.defaultView.setTimeout(() => f(), ms)
+
+///|
+/// 待っている呼びを取り消す
+extern "js" fn clear_timer(doc : @dom.Document, timer : Int) -> Unit =
+  #| (doc, timer) => doc.defaultView.clearTimeout(timer)

@@ -339,3 +339,74 @@ test "帯: Files は状態を写す（保存していない・覚えているも
     assert_eq(s.app.grab, false)
   })
 }
+
+// ---- 自動保存（#275）----
+
+///|
+/// 札の代役。**happy-dom に File System Access は無い**ので、書いた字は箱へ入る。
+/// 本物と同じ形だけ持つ（名前・許可・読み・書き）
+extern "js" fn paper(
+  name : String,
+  text : String,
+  into : (String) -> Unit,
+) -> @web.FileHandle =
+  #| (name, text, into) => ({ name,
+  #|   requestPermission: async () => "granted",
+  #|   getFile: async () => ({ text: async () => text }),
+  #|   createWritable: async () => ({ write: (t) => into(t), close: () => {} }) })
+
+///|
+/// `ms` 経つまで返らない。**時計そのものを待つ** — 自動保存は手が止まるのを
+/// 時計で待つので、フレームでは代わらない
+async fn rest(doc : @dom.Document, ms : Int) -> Unit {
+  @web.promise_of(k => wait_ms(doc, ms, () => k(@core.any(0)))).wait() |> ignore
+}
+
+///|
+extern "js" fn wait_ms(doc : @dom.Document, ms : Int, f : () -> Unit) -> Unit =
+  #| (doc, ms, f) => doc.defaultView.setTimeout(() => f(), ms)
+
+///|
+/// **引き金は未保存の印と同じ 1 つの判断**（`update_dirty`）なので、印が立つときに
+/// だけ書きに行く。切っていれば、汚れても書かない
+async test "自動保存: 入れれば手が止まってから書き、切れば書かない" {
+  let s = stand()
+  defer s.win.close()
+  let written : Array[String] = []
+  s.app.open_known(paper("notes.md", "# r\n", t => written.push(t)))
+  assert_eq(s.fake.md, "# r\n")
+  // 既定は切れている（持ち物に何も無い）
+  assert_false(s.app.autosave)
+  s.fake.change("# r\n\n## a\n")
+  rest(s.doc, quiet * 2)
+  assert_eq(written, [])
+  // 入れた瞬間、いま汚れているぶんが書かれる
+  s.app.set_autosave(true)
+  rest(s.doc, quiet * 2)
+  assert_eq(written, ["# r\n\n## a\n"])
+  // 打ち続けているあいだは書かない。**止まってから 1 回**
+  s.fake.change("# r\n\n## a\n\n## b\n")
+  s.fake.change("# r\n\n## a\n\n## b\n\n## c\n")
+  assert_eq(written.length(), 1)
+  rest(s.doc, quiet * 2)
+  assert_eq(written[1:], ["# r\n\n## a\n\n## b\n\n## c\n"])
+  // 切れば書かない
+  s.app.set_autosave(false)
+  s.fake.change("# r\n\n## d\n")
+  rest(s.doc, quiet * 2)
+  assert_eq(written.length(), 2)
+}
+
+///|
+/// **ディスクに置き場が無ければ書けない。** まだ保存していない文書は名前を
+/// 聞かずには書けないので、入っていても何も起きない（聞くのは人が押したときだけ）
+async test "自動保存: 保存していない文書では、入っていても書きに行かない" {
+  let s = stand()
+  defer s.win.close()
+  s.app.set_autosave(true)
+  s.fake.change("# r\n")
+  rest(s.doc, quiet * 2)
+  // しらせも出ない（書こうとして失敗したのではなく、行かなかった）
+  assert_true(s.doc.querySelector(".notice") is None)
+  assert_true(s.app.saved_name is None)
+}

@@ -35,6 +35,8 @@ pub struct App {
   mut recent : Array[@web.FileHandle]
   mut drawing_open : Bool
   mut grab : Bool
+  mut autosave : Bool
+  write_soon : () -> Unit
 }
 pub fn App::boot(Self) -> Unit
 pub fn App::cycle(Self, @read.Survey?, Bool) -> Unit

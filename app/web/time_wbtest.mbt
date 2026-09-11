@@ -26,3 +26,36 @@ async test "per_frame: 同じフレームの中で何回頼んでも 1 回だけ
   @dom.wait_animation_frame()
   assert_eq(count.val, 2)
 }
+
+///|
+/// **手が止まるまで走らない。** 連打の最中にディスクへ書かないための束ね（#275）で、
+/// ここが崩れると 1 打鍵ごとに書きに行く
+async test "after_quiet: 手が止まってから 1 回だけ走る" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let doc = w.document()
+  let count = Ref::{ val: 0, }
+  let ask = after_quiet(doc, 2, () => count.val += 1)
+  // 50 打鍵ぶん頼む
+  for _ in 0..<50 {
+    ask()
+  }
+  // まだ 1 回も走っていない（手が止まっていない）
+  assert_eq(count.val, 0)
+  rest(doc, 30)
+  assert_eq(count.val, 1)
+  // 止まったあとまた打てば、また 1 回
+  ask()
+  rest(doc, 30)
+  assert_eq(count.val, 2)
+  // 頼まれなければ走らない
+  rest(doc, 30)
+  assert_eq(count.val, 2)
+}
+
+///|
+/// `ms` 経つまで返らない。時計そのものを待つので、`wait_animation_frame` では代わらない
+async fn rest(doc : @dom.Document, ms : Int) -> Unit {
+  promise_of(k => set_timer(doc, ms, () => k(@core.any(0))) |> ignore).wait()
+  |> ignore
+}

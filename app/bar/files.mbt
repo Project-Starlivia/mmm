@@ -39,6 +39,8 @@ pub(all) struct Files {
   saved_name : String?
   /// 覚えている文書の名前。いま開いているものは含まない
   recent : Array[String]
+  /// 手が止まると自分で書くか（#275）
+  autosave : Bool
   can_open : Bool
   can_save : Bool
   can_rename : Bool
@@ -54,6 +56,7 @@ pub(all) struct FileActs {
   open_recent : (Int) -> Unit
   save : () -> Unit
   save_as : () -> Unit
+  toggle_autosave : () -> Unit
   rename : () -> Unit
   choose_folder : () -> Unit
 }
@@ -103,6 +106,20 @@ pub fn files_menu(s : Files, a : FileActs) -> Array[@parts.Entry] {
         disabled=@parts.unless(s.can_save, why=access),
       ),
       a.save_as,
+    ),
+    // 手が止まったら自分で書く。**行は切り替えた先を名乗る**（more.mbt の 2 つと
+    // 同じ `Flip`）。ディスクに置き場が無ければ書けないので、Save と同じ条件で沈む
+    Flip(
+      @parts.row(
+        if s.autosave {
+          "Save by hand"
+        } else {
+          "Autosave"
+        },
+        mark=Some(if s.autosave { "save" } else { "refresh-cw" }),
+        disabled=@parts.unless(s.can_save, why=access),
+      ),
+      a.toggle_autosave,
     ),
     Run(
       @parts.row(

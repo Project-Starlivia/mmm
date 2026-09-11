@@ -76,7 +76,17 @@ pub struct App {
   mut drawing_open : Bool
   /// 掴みやすさ（⋯ の Easy grab）
   mut grab : Bool
+  /// 手が止まると自分で書くか（Files の Autosave。#275）
+  mut autosave : Bool
+  /// 「手が止まったら書く」の引き金。**束ねは 1 本**（頼むたびに作り直すと
+  /// 待ち時間が引き直されず、連打の最中に書きに行く）
+  write_soon : () -> Unit
 }
+
+///|
+/// 手が止まったと見なすまでの間（ms）。**打鍵の間合いより長く、待たされたと
+/// 感じるより短い。** 1 秒は VS Code の `files.autoSaveDelay` の既定と同じ
+let quiet : Int = 1000
 
 ///|
 /// index.html の要素。無ければ壊れている
@@ -185,6 +195,10 @@ pub fn App::new(
     recent: [],
     drawing_open: false,
     grab: @prefs.load(doc, "grab") == Some("on"),
+    autosave: @prefs.load(doc, "autosave") == Some("on"),
+    write_soon: @web.after_quiet(doc, quiet, () => {
+      @web.spawn(async fn() { app().save_file(false) })
+    }),
   }
   late.val = Some(self)
   self.wire()
@@ -353,7 +367,22 @@ fn App::write(self : App, op : @op.Op) -> Unit {
 /// 未保存の印。**判定はここ 1 つ**で、帯の `●` とタブの favicon の両方が
 /// 同じ答えを見る（別々に数えると、片方だけ古い状態のまま残る）
 fn App::update_dirty(self : App) -> Unit {
-  self.name.set_dirty(self.can_hold() && self.text() != self.saved_text)
+  let dirty = self.can_hold() && self.text() != self.saved_text
+  self.name.set_dirty(dirty)
+  // **自分で書くのは印が立つときだけ。** 印と同じ 1 つの判断に乗るので
+  // 「汚れていないのに書く」も「汚れたのに書かない」も起こらない。
+  // 置き場が要る — まだ保存していない文書は、名前を聞かずには書けない（#275）
+  if dirty && self.autosave && self.saved_name is Some(_) {
+    (self.write_soon)()
+  }
+}
+
+///|
+/// 自動保存を入れ替える。**入れた瞬間から効く** — いま汚れていればそのまま書きに行く
+fn App::set_autosave(self : App, on : Bool) -> Unit {
+  self.autosave = on
+  @prefs.store(self.doc, "autosave", if on { "on" } else { "off" })
+  self.update_dirty()
 }
 
 ///|
@@ -727,6 +756,7 @@ fn App::wire_bar(self : App) -> Unit {
       {
         saved_name: self.saved_name,
         recent: self.recent.map(f => f.name()),
+        autosave: self.autosave,
         can_open: @web.can_open(),
         can_save: @web.can_save_as(),
         can_rename: @web.can_rename(),
@@ -747,6 +777,7 @@ fn App::wire_bar(self : App) -> Unit {
         },
         save: () => @web.spawn(async fn() { self.save_file(false) }),
         save_as: () => @web.spawn(async fn() { self.save_file(true) }),
+        toggle_autosave: () => self.set_autosave(!self.autosave),
         rename: () => @web.spawn(async fn() { self.rename_file() }),
         choose_folder: () => {
           @web.spawn(async fn() {
