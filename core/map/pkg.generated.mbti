@@ -136,8 +136,8 @@ pub(all) struct Card {
 } derive(Eq, ToJson, @debug.Debug)
 
 pub(all) enum Drop {
-  Node(id~ : Int, pos~ : Int)
-  Side(root~ : Int, left~ : Bool)
+  Node(id~ : Int, slot~ : Slot)
+  Side(root~ : Int, side~ : @tree.Side)
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 
 pub(all) enum Entry {
@@ -281,6 +281,12 @@ pub(all) struct Size {
   w : Double
   h : Double
 } derive(Eq, ToJson, @debug.Debug)
+
+pub(all) enum Slot {
+  Into
+  Before
+  After
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 
 pub(all) struct Span {
   a : Pt

@@ -5,19 +5,27 @@
 // だから見た目を塗る仕事から切り離して、ここだけを単体で試せるようにしてある。
 
 ///|
-/// ノード相手の落とし先（内部の刻み）。pos は 0 = target の子 / 1 = 直前 / 2 = 直後
+/// ノード相手の落とし先の刻み。その子の末尾 / 直前 / 直後
+pub(all) enum Slot {
+  Into
+  Before
+  After
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+/// ノード相手の落とし先（内部の刻み）
 priv struct Target {
   id : Int
-  pos : Int
+  slot : Slot
 }
 
 ///|
 /// 落とし先。**2 つだけ**:
-/// - `Node` … pos 0 = 子の末尾 / 1 = 直前 / 2 = 直後
+/// - `Node` … その箱の `Slot`
 /// - `Side` … 根の脇。その側の末尾へ
 pub(all) enum Drop {
-  Node(id~ : Int, pos~ : Int)
-  Side(root~ : Int, left~ : Bool)
+  Node(id~ : Int, slot~ : Slot)
+  Side(root~ : Int, side~ : @tree.Side)
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -131,7 +139,7 @@ fn slot_among_kids(s : Scene, parent : Int) -> Target? {
     Some(
       (
         (s.at.y - c.y).abs(),
-        { id: b.node.id, pos: if s.at.y < c.y { 1 } else { 2 }, },
+        { id: b.node.id, slot: if s.at.y < c.y { Before } else { After }, },
       ),
     )
   }).0
@@ -156,7 +164,7 @@ fn find_open_end(s : Scene) -> Target? {
     guard (if up { up_ends } else { down_ends }).contains(b.node.id) else {
       return None
     }
-    Some((over, { id: b.node.id, pos: if up { 1 } else { 2 }, }))
+    Some((over, { id: b.node.id, slot: if up { Before } else { After }, }))
   }).0
 }
 
@@ -212,22 +220,21 @@ fn banded(s : Scene) -> Near {
     // 箱の中なら 0。外に出た分だけ距離が増える（兄弟軸のほうを重く見る）
     let dist = @cmp.maximum(0.0, du.abs() - hu) +
       @cmp.maximum(0.0, dv.abs() - hv) * 2.0
-    Some((dist, { id: b.node.id, pos: slot_of(b, dv, hv), }))
+    Some((dist, { id: b.node.id, slot: slot_of(b, dv, hv), }))
   })
   { target, dist, }
 }
 
 ///|
-/// 帯のどこで拾ったか。0 = その子 / 1 = 直前 / 2 = 直後。
-/// **根に兄弟は無い**ので、上に落ちたものはすべて子になる。
-fn slot_of(b : Box, dv : Double, hv : Double) -> Int {
-  guard b.parent is Some(_) else { return 0 }
+/// 帯のどこで拾ったか。**根に兄弟は無い**ので、上に落ちたものはすべて子になる。
+fn slot_of(b : Box, dv : Double, hv : Double) -> Slot {
+  guard b.parent is Some(_) else { return Into }
   if dv < -hv * 0.4 {
-    1
+    Before
   } else if dv > hv * 0.4 {
-    2
+    After
   } else {
-    0
+    Into
   }
 }
 
@@ -250,7 +257,7 @@ fn beyond(s : Scene) -> Zone {
     // 根は側の話が乗るので、子の列には割り込まない
     let target = (if is_root { None } else { slot_among_kids(s, b.node.id) }).unwrap_or({
         id: b.node.id,
-        pos: 0,
+        slot: Into,
       },
     )
     Some((edge + @cmp.maximum(0.0, dv.abs() - hv) * 2.0, (target, edge)))
@@ -272,29 +279,28 @@ fn reachable(s : Scene, id : Int) -> Box? {
 /// 相手を落とし先にする。**「子にする」は、木の根が相手なら**どちら側か**まで
 /// 決まって初めて意味を持つ**ので、ポインタが根の中心のどちら側にあるかで振り分ける。
 fn landed(s : Scene, t : Target) -> Drop? {
-  guard t.pos == 0 else { return Some(Node(id=t.id, pos=t.pos)) }
+  guard t.slot is Into else { return Some(Node(id=t.id, slot=t.slot)) }
   guard s.layout.boxes.get(t.id) is Some(b) else {
-    return Some(Side(root=t.id, left=false))
+    return Some(Side(root=t.id, side=Right))
   }
-  guard b.parent is None else { return Some(Node(id=t.id, pos=0)) }
-  // ポインタがその箱の中心より左か。**側を決めるのはここだけ**
-  Some(Side(root=t.id, left=s.at.x < b.rect.center().x))
+  guard b.parent is None else { return Some(Node(id=t.id, slot=Into)) }
+  // ポインタがその箱の中心のどちら側か。**側を決めるのはここだけ**
+  Some(
+    Side(
+      root=t.id,
+      side=side_of(if s.at.x < b.rect.center().x { -1 } else { 1 }),
+    ),
+  )
 }
 
 ///|
 /// 落とし先を Op に。側は根のものなので In(root, side) で言う
 pub fn drop_op(d : Drop, ids : Array[Int]) -> @op.Op {
-  match d {
-    Side(root~, left~) =>
-      MoveNode(
-        ids~,
-        at=In(node=root, side=Some(if left { Left } else { Right })),
-      )
-    Node(id~, pos~) =>
-      match pos {
-        0 => MoveNode(ids~, at=In(node=id, side=None))
-        1 => MoveNode(ids~, at=Before(node=id))
-        _ => MoveNode(ids~, at=After(node=id))
-      }
+  let at : @op.NodePlace = match d {
+    Side(root~, side~) => In(node=root, side=Some(side))
+    Node(id~, slot=Into) => In(node=id, side=None)
+    Node(id~, slot=Before) => Before(node=id)
+    Node(id~, slot=After) => After(node=id)
   }
+  MoveNode(ids~, at~)
 }
