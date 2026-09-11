@@ -30,6 +30,12 @@ pub(all) struct Edit {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+/// derive が作る `to_json` を method 形（`x.to_json()`）で呼ぶための宣言。
+/// **上流は「derive のメソッドが暗黙に昇格する挙動を将来やめる」と言っている**ので、
+/// 昇格に頼らず明示する — 無いと呼び出し側に非推奨の印が出る（#68）
+pub extend Edit with ToJson::{to_json}
+
+///|
 /// 編集列（前の座標・from 順・重ならない）を md に当てた後の全文。
 /// 続けて操作を映すとき、次の操作が読む md はこれ
 pub fn patched(md : String, edits : Array[Edit]) -> String {
