@@ -668,10 +668,12 @@ html, body {
      当たり判定は座標で見ているので、これを外しても掴めなくならない */
   & image { cursor: pointer; }
 
+  /* 字しか描かないカード（リンク・details）の当たり判定。下に敷いた rect が持ち、
+     上の文字は拾わない。文字が拾うと、字の上だけクリックが通って隙間で死ぬ
+     （SVG の text はインクに当たる） */
+  & rect.card-hit { fill: transparent; cursor: pointer; }
+
   /* ---- リンクのカード ---- */
-  /* 当たり判定は下に敷いた rect が持つ。文字が上から拾ってしまうと、
-     タイトルの上だけクリックが死ぬ（SVG の text はインクに当たる） */
-  & rect.link-hit { fill: transparent; cursor: pointer; }
   & text.link-row {
     font-size: 12px;
     fill: var(--ink);
@@ -724,6 +726,10 @@ html, body {
 
   /* ---- 境界にならなかった水平線（core の ThematicBreak） / details ---- */
   & line.break { stroke: var(--line); stroke-width: 1; }
+  /* 当たり判定は下の rect.card-hit が持つので、字は拾わない */
+  & text.details-mark,
+  & text.details-row,
+  & text.details-line { pointer-events: none; }
   & text.details-mark { font-size: 10px; fill: var(--ink-dim); dominant-baseline: central; }
   & text.details-row { font-size: 12px; fill: var(--ink-dim); dominant-baseline: central; }
   & text.details-line { font-size: 11px; fill: var(--ink); white-space: pre; dominant-baseline: central; }
