@@ -140,22 +140,18 @@ fn Stand::fire(
   name : String,
   x : Double,
   y : Double,
-  button? : Int = 0,
-  pointer? : Int = 1,
-  touch? : Bool = false,
   shift? : Bool = false,
-  ctrl? : Bool = false,
   key? : String = "",
   target? : @dom.Element? = None,
 ) -> Unit {
   fire(self.doc, target.unwrap_or(self.pane.as_element()), kind, name, [
     ("clientX", @core.any(x)),
     ("clientY", @core.any(y)),
-    ("button", @core.any(button)),
-    ("pointerId", @core.any(pointer)),
-    ("pointerType", @core.any(if touch { "touch" } else { "mouse" })),
+    ("button", @core.any(0)),
+    ("pointerId", @core.any(1)),
+    ("pointerType", @core.any("mouse")),
     ("shiftKey", @core.any(shift)),
-    ("ctrlKey", @core.any(ctrl)),
+    ("ctrlKey", @core.any(false)),
     ("key", @core.any(key)),
   ])
 }
@@ -183,8 +179,8 @@ fn Stand::mid(self : Stand, id : Int) -> (Double, Double) {
 }
 
 ///|
-fn Stand::press_key(self : Stand, key : String, shift? : Bool = false) -> Unit {
-  self.fire("KeyboardEvent", "keydown", 0, 0, key~, shift~)
+fn Stand::press_key(self : Stand, key : String) -> Unit {
+  self.fire("KeyboardEvent", "keydown", 0, 0, key~)
 }
 
 ///|

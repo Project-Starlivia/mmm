@@ -170,10 +170,20 @@ ai-docs/ 実測の控え — moonbit.md は MoonBit の癖、codemirror.md は C
 `derive` が作るメソッドを method 形で呼ぶときは `pub extend T with Trait::{method}` を
 宣言する(上流は暗黙の昇格をやめると言っている。#68)。
 
-**既定で切れている診断は追わない。** `moon check --warn-list "+a"` は 469 件を出すが、
-その大半は宣言の側で同じ事実を数え直したもの(`implicit_impl_as_method` 158 件は
-`derive` の行そのもので、壊れるのは呼び出し側だけ)。**壊れる場所は既定の印が名指す**
-ので、そこを 0 に保つのが安い (#86 / #68)。
+**既定で切れている診断は、向きの合うものだけ入れる**(#86)。`--warn-list "+a"` の
+458 件は入れない。理由は 1 つずつ違う。
+
+| 診断 | 件 | 入れない理由 |
+|---|---:|---|
+| `implicit_impl_as_method` | 158 | `derive` の行そのもの。壊れるのは呼び出し側で、そこは既定の印が名指し 0 で固定済み (#68) |
+| `unqualified_record` | 118 | 構造体リテラルに型の前置を要求する。`let x : T = { .. }` にも出るので、注釈を足す向き |
+| `unnecessary_annotation` | 91 | **上と逆向き** — 注釈を外せと言う。2 つを同時に 0 にはできない |
+| `missing_doc` | 87 | この repo は説明の要るものに書き、名前と型が言っていることには `///|` だけ置く。入れると 87 件の言い直しになる |
+| `missing_invariant` / `missing_reasoning` | 2 / 2 | for ループに `proof_invariant` 句を求める証明付きコードの lint。この製品の話ではない |
+
+入れたのは `unused_optional_argument`(E0031)だけ — 誰も渡さない任意引数は
+**試験されていない試験道具**で、#78 の余った `export` と同じ類。`check:core` が
+`--warn-list "+31" --deny-warn` で 0 に固定する。
 
 ```
 pnpm install

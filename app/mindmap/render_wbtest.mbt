@@ -16,14 +16,13 @@ fn node(
   children? : Array[@tree.Node] = [],
   fold? : @tree.Fold? = None,
   body? : Array[@tree.Block] = [],
-  mark? : @tree.Mark? = Some(@tree.atx),
 ) -> @tree.Node {
-  { id, label, fold, body, children, mark, }
+  { id, label, fold, body, children, mark: Some(@tree.atx), }
 }
 
 ///|
-fn root(n : @tree.Node, sides? : Array[@tree.Side] = []) -> @tree.Root {
-  { node: n, sides, rules: [], }
+fn root(n : @tree.Node) -> @tree.Root {
+  { node: n, sides: [], rules: [], }
 }
 
 ///|
@@ -37,7 +36,6 @@ fn scene(
   roots : Array[@tree.Root],
   image_url? : (String) -> String? = _ => None,
   image_hint? : String? = None,
-  epoch? : Int = 0,
 ) -> Scene {
   {
     layout: @map.layout(roots, size),
@@ -46,7 +44,7 @@ fn scene(
     image_hint,
     // 色分けは 1 行 1 塊の地の文
     tokens: (lines, _lang) => lines.map(l => [{ text: l, cls: "", }]),
-    epoch,
+    epoch: 0,
   }
 }
 
