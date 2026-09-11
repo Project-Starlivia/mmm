@@ -70,7 +70,7 @@ app/    MoonBit — module `mmm/app`。core に依存し、DOM を触る。試�
   disk/         ディスク。disk(Disk — File System Access API の窓口。開く・保存・改名) /
                 recent(覚えている文書と画像フォルダ。札を IndexedDB に置く台帳。置き場は閉包で受け、試験は手元の表) /
                 images(画像の読み書き。宣言は md の頭、許可は札。宣言を決める / 直すのは settle で、
-                md に書くのは App の set_declared。置く名前の柵と宣言の柵は純粋で試験する) /
+                md に書くのは App の set_declared) / path(画像の置き場と名前の柵、置く箱の形。純粋で試験する) /
                 drop(落ちたファイルの振り分け。.md は開く、画像はノードの上だけ受ける)。札は不透明な持ち手
   mindmap/      地図のペイン。mindmap(Mindmap そのもの — 器・寸法・視点の当て方・render / fit / center /
                 refresh。判断は core/map) / input(入ってくるもの — ホイール・ポインタ・掴んで落とす・クリック・
@@ -83,11 +83,11 @@ app/    MoonBit — module `mmm/app`。core に依存し、DOM を触る。試�
                 hint(空のときの言い出し) / tool(ペインの隅に浮く道具の器) / menu(メニューの器。行の形・入れ子・
                 キーで辿る・外を押せば閉じる) / ask(聞く器。<dialog>) / asks(聞くことの綴りの全部) /
                 draw(お絵描きの窓。紙は手の並びの写像) / color(アクセントカラーの読み。綴りの源は style.css)
-  web/          browser の API を 1 行ずつ包む。svg(要素を作る) / dom(style・矩形・捕捉・欄の値・出来事の的・
-                約束) / fs(File System Access・IndexedDB・Blob) / async(約束の糊。spawn / after / settled) / canvas(紙。2d の文脈と手) /
-                out(直列化・ラスタ化・ダウンロード・クリップボード・埋め込み) / drag(ファイルのドラッグ) /
-                clip(クリップボード・アドレス・字の幅)。**web と js 以外の package は `_get` / `_call` を
-                書かない**（js は出口で、JS の値に組む側）
+  web/          browser の API を 1 行ずつ包む。svg(要素を作る・写す) / dom(style・class・矩形・捕捉・欄の値・
+                出来事の的・窓) / fs(File System Access・IndexedDB) / blob(Blob と URL・焼き直し・ダウンロード) /
+                canvas(紙。2d の文脈と手・字の幅・ラスタ化) / clip(クリップボード・アドレス) / storage(localStorage) /
+                time(時計) / drag(ファイルのドラッグ) / async(約束の糊。spawn / after)。
+                **web と js 以外の package は `_get` / `_call` を書かない**（js は出口で、JS の値に組む側）
   js/           browser への出口。mmmMain / mmmCycle と、EditorState の field が読む問い合わせ
                 （mmmSurvey / mmmChosen / mmmCarry …）、見本（lab）が置く部品。読みも選択もその位置も
                 不透明な持ち手で往復し、渡るのは数・字・真偽と編集列だけ

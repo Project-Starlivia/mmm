@@ -169,7 +169,7 @@ pub struct Panes {
 
 ///|
 fn Panes::narrow(self : Panes) -> Bool {
-  self.narrow.as_any()._get("matches").cast()
+  @web.matches(self.narrow)
 }
 
 ///|

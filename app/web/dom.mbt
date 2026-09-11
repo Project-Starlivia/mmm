@@ -21,6 +21,12 @@ pub fn set_style(e : @dom.Element, name : String, value : String) -> Unit {
 }
 
 ///|
+/// 数の綴り。JS の `String(n)` そのもの — SVG の属性も CSS の値もこれで書く
+pub fn num(v : Double) -> String {
+  @core.any(v).to_string()
+}
+
+///|
 /// style の px の綴り
 pub fn px(v : Double) -> String {
   num(v) + "px"
@@ -31,6 +37,32 @@ pub fn px(v : Double) -> String {
 pub fn show(e : @dom.Element, display : String, on : Bool) -> Unit {
   set_style(e, "display", if on { display } else { "none" })
 }
+
+///|
+/// `show` で見せているか（`display` が空でも `none` でもない）
+pub fn is_shown(e : @dom.Element) -> Bool {
+  let d = @dom.css_style_from_val(e.as_any()._get("style")).get_property_value(
+    "display",
+  )
+  d != "" && d != "none"
+}
+
+///|
+/// class の付け外し。`classList.toggle(name, on)` — 同じ値なら DOM は変わらない
+pub fn toggle_class(e : @dom.Element, name : String, on : Bool) -> Unit {
+  e.as_any()._get("classList")._call("toggle", [@core.any(name), @core.any(on)])
+  |> ignore
+}
+
+///|
+pub fn has_class(e : @dom.Element, name : String) -> Bool {
+  e.as_any()._get("classList")._call("contains", [@core.any(name)]).cast()
+}
+
+///|
+/// 押したことにする（隠したピッカーを開く・ボタンのふるまいをキーから通す）
+pub extern "js" fn click(e : @dom.Element) -> Unit =
+  #| (e) => e.click()
 
 ///|
 /// 画面上の矩形
@@ -103,6 +135,12 @@ pub fn prevent(e : @core.Any) -> Unit {
 ///|
 pub fn stop(e : @core.Any) -> Unit {
   e._call("stopPropagation", []) |> ignore
+}
+
+///|
+/// 出来事の的、そのまま（要素とは限らない）。要素として受けたければ `target_in`
+pub fn event_target(e : @core.Any) -> @core.Any {
+  e._get("target")
 }
 
 ///|

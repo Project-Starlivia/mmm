@@ -10,24 +10,19 @@ pub(all) struct Doc {
 ///|
 /// いま開いているファイルと、覚えている札
 pub struct Disk {
-  handles : Recent
+  recent : Recent
   mut current : @web.FileHandle?
 }
 
 ///|
-pub fn Disk::new(handles : Recent) -> Disk {
-  { handles, current: None, }
+pub fn Disk::new(recent : Recent) -> Disk {
+  { recent, current: None, }
 }
 
 ///|
 /// ピッカーの受け付ける種類（Markdown）
 fn markdown_types() -> @core.Any {
-  let accept = @core.new_object()
-  accept._set("text/markdown", @core.any(@read.md_exts))
-  let kind = @core.new_object()
-  kind._set("description", @core.any("Markdown"))
-  kind._set("accept", accept)
-  @core.any([kind])
+  @web.file_types("Markdown", "text/markdown", @read.md_exts)
 }
 
 ///|
@@ -45,7 +40,7 @@ async fn read_doc(file : @web.FileHandle) -> Doc {
 /// このファイルをいまのものにして、覚えて、読む
 async fn Disk::use_(self : Disk, file : @web.FileHandle) -> Doc {
   self.current = Some(file)
-  self.handles.opened(file)
+  self.recent.opened(file)
   read_doc(file)
 }
 
@@ -106,7 +101,7 @@ pub async fn Disk::save_as(
   let file : @web.FileHandle = picked.cast()
   @web.write_text(file, text).wait()
   self.current = Some(file)
-  self.handles.opened(file)
+  self.recent.opened(file)
   Some({ name: file.name(), text, })
 }
 
@@ -116,24 +111,13 @@ pub async fn Disk::save_as(
 pub async fn Disk::rename(self : Disk, name : String) -> String? {
   guard @web.can_rename() && self.current is Some(file) else { return None }
   @web.move_to(file, name).wait()
-  self.handles.opened(file)
+  self.recent.opened(file)
   Some(file.name())
 }
 
 ///|
 /// 覚えている文書。**Files の `Recent` に並ぶのがこれ** — 最後に触れた順で、
 /// いま開いているものは外す
-pub async fn Disk::recent(self : Disk) -> Array[@web.FileHandle] {
-  let out = []
-  for row in self.handles.list() {
-    match self.current {
-      Some(now) =>
-        if (self.handles.store.same)(row.doc.as_any(), now.as_any()) {
-          continue
-        }
-      None => ()
-    }
-    out.push(row.doc)
-  }
-  out
+pub async fn Disk::remembered(self : Disk) -> Array[@web.FileHandle] {
+  self.recent.list_besides(self.current)
 }

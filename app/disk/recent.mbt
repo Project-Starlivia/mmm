@@ -71,9 +71,9 @@ pub fn Recent::new(store : Store) -> Recent {
 /// 覚えていたものが、いまも期待の形をしているか（型は名乗らせず確かめる）
 fn Recent::known_of(self : Recent, v : @core.Any) -> Known? {
   guard @core.is_object(v) else { return None }
-  let doc = v._get("doc")
+  let doc = @web.field(v, "doc")
   guard (self.store.is_file)(doc) else { return None }
-  let dir = v._get("directory")
+  let dir = @web.field(v, "directory")
   let directory = if @core.is_nullish(dir) {
     None
   } else if (self.store.is_dir)(dir) {
@@ -81,7 +81,7 @@ fn Recent::known_of(self : Recent, v : @core.Any) -> Known? {
   } else {
     return None
   }
-  let seen = v._get("seen")
+  let seen = @web.field(v, "seen")
   guard @core.typeof_(seen) == "number" else { return None }
   Some({ doc: doc.cast(), directory, seen: seen.cast(), })
 }
@@ -95,8 +95,8 @@ async fn Recent::carry_over(self : Recent) -> Array[Known] {
   let file = (self.store.read)(legacy_file)
   let old = (self.store.read)(legacy_assets)
   let dir = if @core.is_object(old) &&
-    (self.store.is_dir)(old._get("directory")) {
-    Some((old._get("directory").cast() : @web.DirHandle))
+    (self.store.is_dir)(@web.field(old, "directory")) {
+    Some((@web.field(old, "directory").cast() : @web.DirHandle))
   } else {
     None
   }
@@ -117,14 +117,15 @@ async fn Recent::carry_over(self : Recent) -> Array[Known] {
 /// 置き場に入れる形（素の object）。MoonBit の Option は JS の値ではない —
 /// 無い箱は null にして置く
 fn row_of(k : Known) -> @core.Any {
-  let o = @core.new_object()
-  o._set("doc", k.doc.as_any())
-  o._set("directory", @core.from_option(k.directory))
-  o._set("seen", @core.any(k.seen))
-  o
+  @web.record([
+    ("doc", k.doc.as_any()),
+    ("directory", @core.from_option(k.directory)),
+    ("seen", @core.any(k.seen)),
+  ])
 }
 
 ///|
+/// 知っている文書。**最後に触れた順** — Files の並びがそのままこれ
 async fn Recent::rows(self : Recent) -> Array[Known] {
   let v = (self.store.read)(docs_key)
   if @core.is_array(v) {
@@ -174,9 +175,23 @@ async fn Recent::save(self : Recent, rows : Array[Known]) -> Unit {
 }
 
 ///|
-/// 知っている文書。**最後に触れた順** — Files の並びがそのままこれ
-async fn Recent::list(self : Recent) -> Array[Known] {
-  self.rows()
+/// 知っている文書の札を、`file` を除いて（いま開いているものは Files に並べない）
+async fn Recent::list_besides(
+  self : Recent,
+  file : @web.FileHandle?,
+) -> Array[@web.FileHandle] {
+  let rows = self.rows()
+  let skip = match file {
+    Some(f) => self.find(rows, f)
+    None => -1
+  }
+  let out = []
+  for i, row in rows {
+    if i != skip {
+      out.push(row.doc)
+    }
+  }
+  out
 }
 
 ///|
@@ -257,15 +272,11 @@ pub fn idb_store() -> Store {
     out
   }
   {
-    read: async fn(key) {
-      run("readonly", s => s._call("get", [@core.any(key)]))
-    },
+    read: async fn(key) { run("readonly", @web.idb_get(key)) },
     write: async fn(key, value) {
-      run("readwrite", s => s._call("put", [value, @core.any(key)])) |> ignore
+      run("readwrite", @web.idb_put(key, value)) |> ignore
     },
-    remove: async fn(key) {
-      run("readwrite", s => s._call("delete", [@core.any(key)])) |> ignore
-    },
+    remove: async fn(key) { run("readwrite", @web.idb_delete(key)) |> ignore },
     same: async fn(a, b) { @web.same_entry(a, b).wait() catch { _ => false } },
     is_file: @web.is_file_handle,
     is_dir: @web.is_dir_handle,
