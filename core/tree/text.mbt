@@ -17,7 +17,7 @@ fn carve(md : String, from : Int, to : Int) -> String {
   }
   let indent = column(md, from)
   if indent == 0 {
-    return lf(String::unsafe_substring(md, start=from, end=z))
+    return lf(slice(md, from, z))
   }
   let out = StringBuilder()
   let mut i = from
@@ -38,6 +38,53 @@ fn carve(md : String, from : Int, to : Int) -> String {
     i = i + 1
   }
   lf(out.to_string())
+}
+
+///|
+/// 原文の切り出し。**1 バイトも変えない** — 記法構造の書き戻しと地番はこれを使う。
+fn slice(md : String, from : Int, to : Int) -> String {
+  String::unsafe_substring(md, start=from, end=to)
+}
+
+///|
+/// 空白の字か。改行も含む（行の中の空白だけなら `skip_space`）。
+fn space(c : UInt16) -> Bool {
+  c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+///|
+/// 行の中の空白（空白とタブ）を読み飛ばした位置。
+fn skip_space(md : String, from : Int, to : Int) -> Int {
+  let mut p = from
+  while p < to && (md[p] == ' ' || md[p] == '\t') {
+    p = p + 1
+  }
+  p
+}
+
+///|
+/// n 桁の空白。
+fn pad(n : Int) -> String {
+  String::make(n, ' ')
+}
+
+///|
+/// 2 行目以降を n 桁字下げする。空行はそのまま。
+fn indent(text : String, n : Int) -> String {
+  if n == 0 {
+    return text
+  }
+  let fill = pad(n)
+  let out = StringBuilder()
+  let mut head = false
+  for c in text {
+    if head && c != '\n' && c != '\r' {
+      out.write_string(fill)
+    }
+    out.write_char(c)
+    head = c == '\n'
+  }
+  out.to_string()
 }
 
 ///|
@@ -96,7 +143,7 @@ fn blank_start(md : String, at : Int) -> Int {
   while p > 0 && md[p - 1] == '\n' {
     let nl = if p >= 2 && md[p - 2] == '\r' { p - 2 } else { p - 1 }
     let head = line_start(md, nl)
-    guard skip_blank(md, head, nl) == nl else { break }
+    guard skip_space(md, head, nl) == nl else { break }
     p = head
   }
   p
@@ -111,15 +158,6 @@ pub fn bare_path(path : String) -> String {
     Some(v) => v.to_owned()
     None => path
   }
-}
-
-///|
-fn skip_blank(md : String, from : Int, to : Int) -> Int {
-  let mut p = from
-  while p < to && (md[p] == ' ' || md[p] == '	') {
-    p = p + 1
-  }
-  p
 }
 
 ///|

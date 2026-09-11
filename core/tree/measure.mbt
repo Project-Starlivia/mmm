@@ -40,7 +40,7 @@ fn head_end(
 ) -> Int {
   let mut z = span.to
   // 末尾の空白と改行は記法
-  while z > span.from && blank(md[z - 1]) {
+  while z > span.from && space(md[z - 1]) {
     z = z - 1
   }
   if style is Atx {
@@ -49,9 +49,9 @@ fn head_end(
     while h > span.from && md[h - 1] == '#' {
       h = h - 1
     }
-    if h < z && (h == span.from || blank(md[h - 1])) {
+    if h < z && (h == span.from || space(md[h - 1])) {
       z = h
-      while z > span.from && blank(md[z - 1]) {
+      while z > span.from && space(md[z - 1]) {
         z = z - 1
       }
     }
@@ -60,7 +60,7 @@ fn head_end(
     while z > span.from && md[z - 1] != '\n' {
       z = z - 1
     }
-    while z > span.from && blank(md[z - 1]) {
+    while z > span.from && space(md[z - 1]) {
       z = z - 1
     }
   }
@@ -76,12 +76,12 @@ fn head_start(
   span : @markdown.Span,
   style : @markdown.HeadingStyle,
 ) -> Int {
-  let mut p = skip_blank(md, span.from, span.to)
+  let mut p = skip_space(md, span.from, span.to)
   if style is Atx {
     while p < span.to && md[p] == '#' {
       p = p + 1
     }
-    p = skip_blank(md, p, span.to)
+    p = skip_space(md, p, span.to)
   }
   p
 }
@@ -90,7 +90,7 @@ fn head_start(
 /// 項目のラベルの頭。マーカーと空白を読み飛ばす。
 /// 1 行目が段落ならその span の頭と一致する。段落の無い項目のために持つ。
 fn item_start(md : String, span : @markdown.Span) -> Int {
-  skip_blank(md, marker_end(md, span), span.to)
+  skip_space(md, marker_end(md, span), span.to)
 }
 
 ///|
@@ -118,13 +118,13 @@ fn item_gaps(md : String, items : Array[@markdown.ListItem]) -> Array[Bool] {
 /// 項目のマーカーの字。**読んだ綴りをそのまま持つ** — 番号はライブラリが
 /// 列の先頭から振り直すので、飛んだ数字（`1.` の次が `5.`）は原文からしか取れない。
 fn item_marker(md : String, span : @markdown.Span) -> String {
-  carve(md, skip_blank(md, span.from, span.to), marker_end(md, span))
+  carve(md, skip_space(md, span.from, span.to), marker_end(md, span))
 }
 
 ///|
 /// 項目のマーカーの尻。`-` `*` `+` か、数字と `.` `)`。
 fn marker_end(md : String, span : @markdown.Span) -> Int {
-  let mut p = skip_blank(md, span.from, span.to)
+  let mut p = skip_space(md, span.from, span.to)
   while p < span.to && md[p] >= '0' && md[p] <= '9' {
     p = p + 1
   }

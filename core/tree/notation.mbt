@@ -37,19 +37,19 @@ priv enum Verdict {
   /// 列 0 の見出しは開いている項目を閉じ（`- a` の後の `### x` は新しい木）、
   /// 境界は部分木を深さ 1 まで引き出す。閉じた分と、飛び（Implicit）で埋める分は
   /// 別のことなので、両方を言う。
-  /// `label` はラベルの頭（マーカーの後ろ）。綴りが無ければ飛び（Implicit）だが、
+  /// `at_label` はラベルの頭（マーカーの後ろ）。綴りが無ければ飛び（Implicit）だが、
   /// 飛びは原文に行を持たないのでひと切れにならない。
   ///
-  /// `text` と `at` は**組み立てに要るぶんだけ**の持ち出し。字は本来 `md` に 1 か所
+  /// `label` と `at` は**組み立てに要るぶんだけ**の持ち出し。字は本来 `md` に 1 か所
   /// だが、ラベルの切り出しには測りの但し書き（`head_label` の定義行の穴）が在り、
   /// 地番は畳まれた行なら `<details>` の範囲まで伸びる。**どちらもひと切れの範囲
   /// には畳めない** — 行の字とラベルと地番が、それぞれ別の所で終わる
   Line(
     depth~ : Int,
     under~ : Int,
-    label~ : Int,
+    label~ : String,
+    at_label~ : Int,
     mark~ : Mark?,
-    text~ : String,
     fold~ : Fold?,
     at~ : @markdown.Span
   )
@@ -147,8 +147,8 @@ fn piece_sig(md : String, p : Piece) -> String {
   let at = "[\{p.at.from},\{p.at.to}]"
   match p.verdict {
     None => if blank_span(md, p.at) { "Blank\{at}" } else { "Rest\{at}" }
-    Some(Line(depth~, label~, mark~, ..)) =>
-      "Line\{at}(\{depth},\{label},\{mark_sig(mark)})"
+    Some(Line(depth~, at_label~, mark~, ..)) =>
+      "Line\{at}(\{depth},\{at_label},\{mark_sig(mark)})"
     Some(Border(..)) => "Border\{at}"
     Some(FoldOpen(open~, summary~)) => {
       let flag = if open { "open" } else { "-" }
@@ -186,7 +186,7 @@ fn mark_sig(m : Mark?) -> String {
 /// その範囲が空白だけか。隙間が空行なのか、覆えていない字なのかを分ける
 fn blank_span(md : String, at : @markdown.Span) -> Bool {
   for i in at.from..<at.to {
-    if !blank(md[i]) {
+    if !space(md[i]) {
       return false
     }
   }

@@ -36,11 +36,11 @@ pub fn patched(md : String, edits : Array[Edit]) -> String {
   let out = StringBuilder()
   let mut at = 0
   for e in edits {
-    out.write_string(String::unsafe_substring(md, start=at, end=e.from))
+    out.write_string(slice(md, at, e.from))
     out.write_string(e.insert)
     at = e.to
   }
-  out.write_string(String::unsafe_substring(md, start=at, end=md.length()))
+  out.write_string(slice(md, at, md.length()))
   out.to_string()
 }
 
@@ -200,7 +200,7 @@ fn merge_node(
 ) -> Unit {
   match r.old.get(x.id) {
     // 畳みは `<details>` が部分木を包むので、自分か子列が変わればそこから丸ごと
-    Some(old) if kind(old) == kind(x) &&
+    Some(old) if sign_of(old) == sign_of(x) &&
       aligned(ids(old.children), ids(x.children)) &&
       (
         !(old.fold is Some(_) || x.fold is Some(_)) ||
@@ -230,9 +230,11 @@ fn merge_node(
           merge_body(r, old.body, x.body, line_to, col)
         }
       }
+      // 元から子の無い容器に差す位置は前の木の自分の尻。そのとき地番の尻は
+      // 自分の尻そのもの（setext の 2 行目も含む）
       merge_children(
         r,
-        own_end(r, old),
+        spot(r, old.id).to,
         col,
         old.children,
         x.children,
@@ -574,18 +576,6 @@ fn merge_body(
 }
 
 ///|
-/// 前の木のノードの、自分の尻。元から子の無い容器に差すときだけ使い、そのとき
-/// 地番の尻は自分の尻そのもの（setext の 2 行目も含む）。
-fn own_end(r : Merge, old : Node) -> Int {
-  r.spans.get(old.id).unwrap().to
-}
-
-///|
-fn pad(n : Int) -> String {
-  String::make(n, ' ')
-}
-
-///|
 /// 編集列を整える。from 順（同じ from なら幅の狭い順 — 差し込みが置き換えより先、
 /// 同じなら出た順）に並べ、隣り合う編集は 1 つに繋ぎ、行の途中（改行の無い末尾）に
 /// 字を書く編集は改行から始める。繋いでから見るので、消した後に何が残るかで決まる。
@@ -622,7 +612,7 @@ fn settle(r : Merge) -> Array[Edit] {
 ///|
 /// その位置が行の途中か（行頭の字下げの後ろは行頭と同じ — 項目のマーカーの手前がそこ）。
 fn mid_line(md : String, at : Int) -> Bool {
-  skip_blank(md, line_start(md, at), at) < at
+  skip_space(md, line_start(md, at), at) < at
 }
 
 ///|
@@ -647,28 +637,9 @@ fn patch(r : Merge, id : Int, text : String) -> Edit {
 }
 
 ///|
-/// 2 行目以降を n 桁字下げする。空行はそのまま。
-fn indent(text : String, n : Int) -> String {
-  if n == 0 {
-    return text
-  }
-  let pad = pad(n)
-  let out = StringBuilder()
-  let mut head = false
-  for c in text {
-    if head && c != '\n' && c != '\r' {
-      out.write_string(pad)
-    }
-    out.write_char(c)
-    head = c == '\n'
-  }
-  out.to_string()
-}
-
-///|
-/// 行が同じか — ラベルと畳み。中身と子は見ない。
+/// 行が同じか — 種類・ラベル・畳み。綴りの書き方と、中身と子は見ない。
 fn same_line(a : Node, b : Node) -> Bool {
-  kind(a) == kind(b) && a.label == b.label && a.fold == b.fold
+  sign_of(a) == sign_of(b) && a.label == b.label && a.fold == b.fold
 }
 
 ///|
@@ -682,16 +653,6 @@ fn index(into : Map[Int, Node], x : Node) -> Unit {
   into[x.id] = x
   for k in x.children {
     index(into, k)
-  }
-}
-
-///|
-/// 種類。綴りの書き方は見ない
-fn kind(x : Node) -> Int {
-  match sign_of(x) {
-    Some(Heading) => 0
-    Some(Item) => 1
-    None => 2
   }
 }
 

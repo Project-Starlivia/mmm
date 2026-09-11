@@ -10,9 +10,9 @@
 // タグの入れ子は元々そろっていないので、そろっている前提を持たない）。
 
 ///|
-/// 積む前のひと切れ。**記法構造の `Piece` とは別物** — こちらは畳みを解いた
-/// 積む順の並びで、原文を隙間なく覆う約束は持たない（落ちた綴りは出てこない）。
-priv enum Slice {
+/// 畳みを解いて積む順に切った塊。記法構造の `Piece` と違い、原文を隙間なく覆う
+/// 約束は持たない（落ちた綴りは出てこない）。
+priv enum Cut {
   /// 畳みに関わらない、素の塊
   Plain(@markdown.Block)
   /// 畳まれたノードの見出し・項目の行。中身は普通に読む。
@@ -89,16 +89,6 @@ priv struct Spell {
 // ══════════════════════════════════════════════════════════════════
 
 ///|
-fn blank(c : UInt16) -> Bool {
-  c == ' ' || c == '\t' || c == '\n' || c == '\r'
-}
-
-///|
-fn slice(md : String, from : Int, to : Int) -> String {
-  String::unsafe_substring(md, start=from, end=to)
-}
-
-///|
 /// md の i に pat がそのまま在るか。
 fn has(md : String, i : Int, pat : String, to : Int) -> Bool {
   guard i >= 0 && i + pat.length() <= to else { return false }
@@ -139,7 +129,7 @@ fn after(md : String, i : Int, pat : String, to : Int) -> Int {
 fn elem_name(md : String, i : Int, name : String, to : Int) -> Bool {
   guard name_at(md, i, name, to) else { return false }
   let z = i + name.length()
-  z >= to || blank(md[z]) || md[z] == '>' || md[z] == '/'
+  z >= to || space(md[z]) || md[z] == '>' || md[z] == '/'
 }
 
 ///|
@@ -197,7 +187,7 @@ fn opaque_end(md : String, i : Int, to : Int) -> Int? {
 fn elem_end(md : String, i : Int, to : Int) -> Int {
   guard i < to else { return -1 }
   let c = md[i]
-  guard blank(c) || c == '>' || c == '/' else { return -1 }
+  guard space(c) || c == '>' || c == '/' else { return -1 }
   let mut k = i
   let mut quote : UInt16 = 32
   let mut eq = false
@@ -214,7 +204,7 @@ fn elem_end(md : String, i : Int, to : Int) -> Int {
     } else if eq && (c == '"' || c == '\'') {
       quote = c
       eq = false
-    } else if !blank(c) {
+    } else if !space(c) {
       eq = false
     }
     k = k + 1
@@ -263,7 +253,7 @@ fn spell_of(md : String, b : @markdown.Block) -> Spell {
   let mut writes = true
   let mut i = s.from
   while i < s.to {
-    if blank(md[i]) {
+    if space(md[i]) {
       i = i + 1
       continue
     }
@@ -330,7 +320,7 @@ fn capsule(
   tail : Int,
   from : Int,
   upto : Int,
-) -> Slice {
+) -> Cut {
   let open = spots[head].tag.mark is Open(open=true)
   let mut summary = None
   let mut inner = spots[head].tag.to
@@ -353,11 +343,11 @@ fn capsule(
 /// 始まらないので容器の字下げは見ない）。
 fn strip(md : String, from : Int, to : Int) -> String {
   let mut a = from
-  while a < to && blank(md[a]) {
+  while a < to && space(md[a]) {
     a = a + 1
   }
   let mut z = to
-  while z > a && blank(md[z - 1]) {
+  while z > a && space(md[z - 1]) {
     z = z - 1
   }
   // 木が抱える字は LF だけ（`carve` と同じ不変量）
@@ -539,7 +529,7 @@ fn sift(
   blocks : Array[@markdown.Block],
   defs : Array[@markdown.Span],
   nest : Int,
-) -> Array[Slice] {
+) -> Array[Cut] {
   let spells = blocks.map(b => spell_of(md, b))
   let spots = found(spells)
   let pairs = paired(spots)
@@ -583,7 +573,8 @@ priv struct Stand {
 fn standing(s : Sift) -> Stand {
   let n = s.blocks.length()
   let gone = Array::makei(n, i => s.spells[i].writes)
-  let mut folded = s.pairs.map(_ => false)
+  // 最初の周で決まる
+  let mut folded : Array[Bool] = []
   for _ in 0..<=s.pairs.length() {
     // 深さも同じ `gone` で測る。跨ぐ塊が変われば本番の木も変わるので、
     // 判定と同じ前提で測り直さないと食い違う
@@ -747,7 +738,7 @@ fn arrange(
   v : Stand,
   folds : Array[(Fold, @markdown.Span, @markdown.Span)?],
   raws : Array[Raw?],
-) -> Array[Slice] {
+) -> Array[Cut] {
   let out = []
   let mut i = 0
   while i < s.blocks.length() {
@@ -799,7 +790,7 @@ fn closing(s : Sift, v : Stand, block : Int) -> Bool {
 /// **同じ行を 2 度は出さない** — 原文のまま持つ領域は定義ごと抱えるし、mdAst は
 /// 定義行を段落や見出しの範囲に含めることがある（項目の中の定義は、項目を
 /// 読み解くときに置かれる）。どこまでの原文がもうひと切れの中に入ったかで見る。
-fn restore(s : Sift, pieces : Array[Slice]) -> Array[Slice] {
+fn restore(s : Sift, cuts : Array[Cut]) -> Array[Cut] {
   let out = []
   let mut d = 0
   let mut carried = 0
@@ -818,10 +809,10 @@ fn restore(s : Sift, pieces : Array[Slice]) -> Array[Slice] {
     }
   }
 
-  for p in pieces {
-    let at = piece_span(p)
+  for c in cuts {
+    let at = cut_span(c)
     flush(at.from)
-    out.push(p)
+    out.push(c)
     carried = at.to
   }
   flush(s.md.length() + 1)
@@ -829,10 +820,10 @@ fn restore(s : Sift, pieces : Array[Slice]) -> Array[Slice] {
 }
 
 ///|
-/// ひと切れが原文で占める範囲。畳みは**骨格の行**の範囲で数える
+/// 切った塊が原文で占める範囲。畳みは**骨格の行**の範囲で数える
 /// （`<details>` の開きは落ちた綴りで、その手前の定義行は開きの塊が引き受けた）。
-fn piece_span(p : Slice) -> @markdown.Span {
-  match p {
+fn cut_span(c : Cut) -> @markdown.Span {
+  match c {
     Plain(b) => block_span(b)
     Folded(b, ..) => block_span(b)
     Capsule(from~, to~, ..) => { from, to, }
