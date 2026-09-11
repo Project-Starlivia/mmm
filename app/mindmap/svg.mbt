@@ -41,6 +41,17 @@ fn inline(orig : @dom.Element, copy : @dom.Element) -> Unit {
         copy.setAttribute(p, v)
       }
     }
+    // **字の幅も焼く。** 焼くのは `font-family` の名前だけなので、その字を持たない
+    // 機械では箱と字が合わない（箱の大きさはこちらの実測で決めてある）。`textLength`
+    // を置けば相手はこの幅に収めるので、フォントを埋めずともはみ出さない（#126）。
+    // 代償は字の形 — 相手の字が太ければ潰れて入る
+    if orig.tagName() == "text" {
+      let w = @web.drawn_width(orig)
+      if w > 0 {
+        copy.setAttribute("textLength", @web.num(w))
+        copy.setAttribute("lengthAdjust", "spacingAndGlyphs")
+      }
+    }
     copy.removeAttribute("class")
   }
   let a = orig.children()
