@@ -5,7 +5,6 @@ import {
   "mmm/app/bar",
   "mmm/app/disk",
   "mmm/app",
-  "moonbitlang/core/cmp",
   "moonbitlang/core/set",
   "mizchi/js/core",
   "moonbitlang/async/js_async",
