@@ -19,8 +19,6 @@ let owned : Array[(String, String)] = [
   ("grab", "mmm.grab"),
   // 最後に居た分割線の居場所（panes.mbt が持ち主。"both" / "md" / "map"）
   ("panes", "mmm.panes"),
-  // 自動保存（Files の Autosave）。"on" のときだけ手が止まると書く
-  ("autosave", "mmm.autosave"),
 ]
 
 ///|

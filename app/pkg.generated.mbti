@@ -37,7 +37,6 @@ pub struct App {
   mut drafts : Array[@disk.Draft]
   mut drawing_open : Bool
   mut grab : Bool
-  mut autosave : Bool
   greeting : @parts.Menu
   write_soon : @web.Quiet
 }
