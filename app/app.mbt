@@ -727,6 +727,9 @@ async fn App::copy(self : App) -> Bool {
 /// ノード（anchor）へ足す。字は raw のまま `Graft` へ — 何を貼るか（見出し・項目は
 /// 形だけ運んで綴りは貼り先に従う、段落は行ごとに子、それ以外の中身はカード）は
 /// core が読んで決める。`#` も URL もここでは見ない。
+///
+/// **選んでいないときに断るのは絵だけ。** 字は文書そのものが受け皿になれるので
+/// 根へ入るが、絵は 1 つのノードに付く形しか持たない。
 /// 決めは docs/superpowers/specs/2026-09-06-paste-design.md
 fn App::paste(self : App) -> Unit {
   let anchor = (self.ed.selection)().anchor
