@@ -202,7 +202,7 @@ pub fn App::new(
     autosave: @prefs.load(doc, "autosave") == Some("on"),
     greeting: @parts.Menu::new(doc),
     write_soon: @web.after_quiet(doc, quiet, () => {
-      @web.spawn(async fn() { app().save_file(false) })
+      @web.spawn(async fn() { app().on_quiet() })
     }),
   }
   late.val = Some(self)
@@ -374,11 +374,32 @@ fn App::write(self : App, op : @op.Op) -> Unit {
 fn App::update_dirty(self : App) -> Unit {
   let dirty = self.can_hold() && self.text() != self.saved_text
   self.name.set_dirty(dirty)
-  // **自分で書くのは印が立つときだけ。** 印と同じ 1 つの判断に乗るので
+  // **控えは常に取る。** ブラウザの中なので置き場が要らず、まだ保存していない
+  // 文書がいちばんの客（#306）。取ったのと同じ字なら何もしない
+  let keep = self.text() != self.disk.drafts().kept()
+  // ディスクへ自分で書くのは印が立つときだけ。印と同じ 1 つの判断に乗るので
   // 「汚れていないのに書く」も「汚れたのに書かない」も起こらない。
   // 置き場が要る — まだ保存していない文書は、名前を聞かずには書けない（#275）
-  if dirty && self.autosave && self.saved_name is Some(_) {
+  let write = dirty && self.autosave && self.saved_name is Some(_)
+  if keep || write {
     (self.write_soon.call)()
+  }
+}
+
+///|
+/// 手が止まった。**控えを取り、入っていればディスクへも書く。**
+///
+/// 2 つは行き先が違う（ブラウザの中と、他人も見るディスクの .md）。
+/// 控えに置き場は要らないので、名前の無い文書もここで残る
+async fn App::on_quiet(self : App) -> Unit {
+  self.disk
+  .drafts()
+  .keep(@web.now(), self.doc_name(), self.text(), self.disk.current_file())
+  if self.autosave &&
+    self.can_hold() &&
+    self.saved_name is Some(_) &&
+    self.text() != self.saved_text {
+    self.save_file(false)
   }
 }
 
@@ -413,6 +434,9 @@ fn App::load_text(self : App, next : String, name : String?) -> Unit {
   // 人が何も押していないのにピッカーを開きに行く（`showSaveFilePicker` は
   // 押した直後にしか開けない）
   (self.write_soon.cancel)()
+  // **控えの流れもここで切れる。** 続きを同じ系列に足すと、別の文書の字が
+  // 1 つの流れに混ざる
+  self.disk.drafts().start()
   self.saved_name = name
   self.images.clear() // 画像のパスは（新しい）md からの相対
   (self.ed.set_text)(next) // → cycle
