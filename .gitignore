@@ -3,7 +3,6 @@ dist/
 _build/
 .mooncakes/
 .moonagent/
-target/
 .wrangler/
 .idea/
 .worktrees/

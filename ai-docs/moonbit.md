@@ -1,12 +1,10 @@
-実測完了（`moon test` 28/28 pass、`moon check` 0 errors）。doc-model リポジトリは無変更（`git status --porcelain` 出力なし、`core/_build` も未生成）。
-
----
-
 # MoonBit 意味論の実測結果
 
-環境: `moon 0.1.20260803 (c19f78e 2026-08-03)`、`preferred_target = "js"`
-使い捨てモジュール: `C:\Users\taker\AppData\Local\Temp\claude\D--1-atrium-mmm--claude-worktrees-dnd-ux-improvement-1ebfc6\954c84b6-8b11-46ca-bd0f-361864110df4\scratchpad\v2\probe-a\`
-（`moon.mod` + `lib/`（library）+ `user/`（library、`import { "probe-a/lib", }`））
+測ったときの版: `moon 0.1.20260803 (c19f78e 2026-08-03)`、`preferred_target = "js"`。
+
+**追試のしかた** — mmm の外に使い捨てのモジュールを 1 つ作る。`moon new probe-a` して
+`lib/`（library）と `user/`（library、`import { "probe-a/lib", }`）の 2 つを置けば、
+下の節はそのまま回せる。mmm の中で測らないのは、package の境が答えを変えるから。
 
 ---
 
