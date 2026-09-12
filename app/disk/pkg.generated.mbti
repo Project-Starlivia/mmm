@@ -36,6 +36,7 @@ pub struct Disk {
   drafts : Drafts
   mut current : @web.FileHandle?
 }
+pub async fn Disk::adopt(Self, @web.FileHandle) -> Bool
 pub fn Disk::close(Self) -> Unit
 pub fn Disk::current_file(Self) -> @web.FileHandle?
 pub fn Disk::drafts(Self) -> Drafts

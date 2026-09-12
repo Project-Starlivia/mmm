@@ -13,9 +13,12 @@
 // 別のもの。並べて見る道具は、写すのではなく**その検査を通す**。
 
 ///|
-/// 未保存の文書を捨てて先へ進むか
-pub fn unsaved_changes() -> Ask {
-  ask_of("Discard unsaved changes?", "Discard")
+/// この文書を離れて先へ進むか。
+///
+/// **「捨てる」とは言わない** — 控え（Drafts）が残すので、押しても字は消えない。
+/// 消えると思って手が止まるのも、消えないと知らずに押すのも、どちらも嘘の上の判断
+pub fn leave_document() -> Ask {
+  ask_of("Leave this document? Your changes stay in Drafts.", "Leave")
 }
 
 ///|
@@ -93,7 +96,7 @@ pub fn named(
   field~ : Field,
 ) -> Ask {
   match kind {
-    "discard" => unsaved_changes()
+    "leave" => leave_document()
     "place" => image_place()
     "connect" => folder_connection(text)
     "rename" => file_name(text)

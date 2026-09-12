@@ -46,6 +46,8 @@ pub fn is_icon(String) -> Bool
 
 pub fn label(@dom.Document, String, String, Bool) -> Array[@dom.Node]
 
+pub fn leave_document() -> Ask
+
 pub fn named(String, text~ : String, parts~ : Array[Part], shot~ : String, field~ : Field) -> Ask
 
 pub fn names() -> Array[String]
@@ -71,8 +73,6 @@ pub fn rows(@dom.Document, Array[Entry]) -> @dom.Element
 pub async fn show_drawing(@dom.Document) -> @core.Any?
 
 pub fn unless(Bool, why? : String) -> Disabled
-
-pub fn unsaved_changes() -> Ask
 
 // Errors
 

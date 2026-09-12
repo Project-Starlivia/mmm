@@ -664,3 +664,50 @@ test "覚えているものの行: 名前と、見分けに使えるもの" {
   assert_eq(recent_label(bare, now), "notes.md · just now")
   assert_eq(recent_label(linked, now), "notes.md · pics · 1 h ago")
 }
+
+///|
+/// **控えは Recent の上。** Recent は「また開きたいもの」、控えは「まだ失われうる
+/// もの」で、急ぐのは後者（#306）
+async test "立ち上がり: 控えと覚えているものを、2 つの塊で並べる" {
+  let s = stand(known=["ideas.md"])
+  defer s.win.close()
+  s.app.disk.drafts().keep(@web.now(), "sketch.md", "# sketch\n", None)
+  s.app.refresh_recent()
+  s.app.greet()
+  let box = shown_menu(s)
+  assert_eq(box.querySelectorAll(".caption").map(c => c.textContent()), [
+    "Drafts", "Recent",
+  ])
+  let rows = box.querySelectorAll("[role=menuitem]").map(r => r.textContent())
+  assert_eq(rows[0], "sketch.md · just now")
+  assert_eq(rows[1], "ideas.md · just now")
+}
+
+///|
+/// **控えから開けば、本文が戻り、印は立ったまま。** 控えはディスクに届いて
+/// いない字なので、開いた瞬間から「ディスクとは違う」と言えているのが正しい。
+/// 全部忘れる道は 1 つ（1 件ごとの × は置かない）
+async test "控え: 押せば戻る。印は立ったまま。全部忘れれば消える" {
+  let s = stand()
+  defer s.win.close()
+  s.fake.change("# kept\n")
+  rest(s.doc, quiet * 2)
+  // 新規へ移る。汚れているのでたずねが開く — Discard（`[1]`）を押す
+  let asked = @js_async.Promise::from_async(async fn() { s.app.new_file() })
+  @web.click(
+    s.doc.querySelector("dialog.ask").unwrap().querySelectorAll(".row button")[1],
+  )
+  asked.wait()
+  assert_eq(s.fake.md, "")
+  // 控えから戻す
+  s.app.refresh_recent()
+  assert_eq(s.app.drafts.length(), 1)
+  @js_async.Promise::from_async(async fn() { s.app.open_draft(0) }).wait()
+  assert_eq(s.fake.md, "# kept\n")
+  // ディスクに届いていない字なので、印は立ったまま
+  assert_eq(s.app.saved_text, "")
+  // 全部忘れる
+  @js_async.Promise::from_async(async fn() { s.app.forget_drafts() }).wait()
+  assert_eq(s.app.disk.drafts().list().length(), 0)
+  assert_eq(s.app.drafts.length(), 0)
+}
