@@ -118,6 +118,7 @@ fn memo_disk(known : Array[String]) -> @disk.Disk {
       read: fn(key) { table.get(key).unwrap_or(@core.null()) },
       write: fn(key, value) { table[key] = value },
       remove: fn(key) { table.remove(key) },
+      all: fn() { table.values().collect() },
       same: fn(_, _) { false },
       is_file: looks_like_file,
       is_dir: _ => false,

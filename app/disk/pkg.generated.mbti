@@ -79,6 +79,7 @@ pub fn Images::readable(Self) -> Bool
 pub async fn Images::save_to_disk(Self, @core.Any) -> String?
 
 pub(all) struct Known {
+  id : String
   doc : @web.FileHandle
   directory : @web.DirHandle?
   seen : Double
@@ -94,6 +95,7 @@ pub(all) struct Store {
   read : async (String) -> @core.Any
   write : async (String, @core.Any) -> Unit
   remove : async (String) -> Unit
+  all : async () -> Array[@core.Any]
   same : async (@core.Any, @core.Any) -> Bool
   is_file : (@core.Any) -> Bool
   is_dir : (@core.Any) -> Bool

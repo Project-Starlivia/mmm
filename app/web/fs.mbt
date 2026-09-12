@@ -260,3 +260,15 @@ pub extern "js" fn write_blob(
   blob : @core.Any,
 ) -> @js_async.Promise[Unit] =
   #| (f, blob) => f.createWritable().then(async (s) => { try { await s.write(blob); } finally { await s.close(); } })
+
+///|
+/// 棚の中身を全部（`getAll`）。**鍵は要らない** — 行は自分の id を持っている
+pub fn idb_all() -> (@core.Any) -> @core.Any {
+  s => s._call("getAll", [])
+}
+
+///|
+/// 二度と同じ値が出ない札。**置き場の鍵に使う** — ディスクの札（FileSystemHandle）は
+/// 中が覗けないので鍵にできず、行を指すにはこちらで振った id が要る
+pub extern "js" fn unique_id() -> String =
+  #| () => (globalThis.crypto?.randomUUID?.() ?? (Date.now().toString(36) + Math.random().toString(36).slice(2)))

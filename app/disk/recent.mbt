@@ -6,8 +6,13 @@
 // 持っているのは**番号札**で、使えるかどうかは毎回下まで確かめる — **覚えているのは
 // 高速化であって、真実ではない**。札が死んでいれば、指し直しの駅（images.mbt の `choose_folder`）へ落ちる。
 //
-// 覚えるのは**知っている文書の一覧**だけ（`docs`）。1 行が 1 つの .md で、
+// 覚えるのは**知っている文書の一覧**だけ。1 行が 1 つの .md で、
 // その文書の画像フォルダを一緒に持つ。
+//
+// **1 行が 1 つの鍵**（`docs/<id>`）。一覧を丸ごと 1 つの鍵に入れると、読みと書きが
+// 別の取引になり、タブが 2 つあると後の書きが相手の行ごと消す。行を分けておけば、
+// 触るのは自分の行だけで済む。id をこちらで振るのは、**札が鍵にできない**から
+// （中が覗けず、綴りも取れない）。
 //
 // **「いま開いているのはこれ」は覚えない。** 起動時に勝手に開き直さないので、
 // 持っていても使い道が無い — 開くのは常に人が選んだとき（Open か、この一覧）。
@@ -19,6 +24,8 @@
 /// `seen` は最後に触れた時刻。**あふれたら古いものから捨てる** — 番号札は
 /// 腐るので、際限なく貯めても当たらない札が増えるだけ
 pub(all) struct Known {
+  /// この行の鍵。`docs/<id>` で置く。**札は鍵にできない**ので、こちらで振る
+  id : String
   doc : @web.FileHandle
   /// その文書の画像フォルダ。まだ指してもらっていなければ None
   directory : @web.DirHandle?
@@ -30,11 +37,16 @@ pub(all) struct Known {
 let keep = 20
 
 ///|
-let docs_key = "docs"
+/// 行の鍵の頭。後ろに行の id が付く
+let row_prefix = "docs/"
 
 ///|
-/// 前の版の鍵。読み替えたら消す（`inherit`）。
-/// `file` は「いまのファイル」、`assets` は枠 1 つの画像フォルダだった
+/// 前の版の鍵。読み替えたら消す（`carry_over`）。
+/// `file` は「いまのファイル」、`assets` は枠 1 つの画像フォルダだった。
+/// `docs` は一覧を丸ごと 1 つの鍵に入れていたときの形
+let legacy_docs = "docs"
+
+///|
 let legacy_file = "file"
 
 ///|
@@ -48,6 +60,8 @@ pub(all) struct Store {
   read : async (String) -> @core.Any
   write : async (String, @core.Any) -> Unit
   remove : async (String) -> Unit
+  /// 棚の中身を全部。**行ごとに鍵を分けたので、一覧はこれで引く**
+  all : async () -> Array[@core.Any]
   /// 札どうしが同じ実体を指すか
   same : async (@core.Any, @core.Any) -> Bool
   is_file : (@core.Any) -> Bool
@@ -68,8 +82,17 @@ pub fn Recent::new(store : Store) -> Recent {
 }
 
 ///|
-/// 覚えていたものが、いまも期待の形をしているか（型は名乗らせず確かめる）
+/// 覚えていたものが、いまも期待の形をしているか（型は名乗らせず確かめる）。
+/// id を持たないものは前の版の行なので、読み替えの側（`carry_over`）が id を振る
 fn Recent::known_of(self : Recent, v : @core.Any) -> Known? {
+  let id = @web.field(v, "id")
+  guard @core.is_object(v) && @core.typeof_(id) == "string" else { return None }
+  self.row_at(v, id.cast())
+}
+
+///|
+/// 行の中身（id 以外）を確かめる
+fn Recent::row_at(self : Recent, v : @core.Any, id : String) -> Known? {
   guard @core.is_object(v) else { return None }
   let doc = @web.field(v, "doc")
   guard (self.store.is_file)(doc) else { return None }
@@ -83,34 +106,44 @@ fn Recent::known_of(self : Recent, v : @core.Any) -> Known? {
   }
   let seen = @web.field(v, "seen")
   guard @core.typeof_(seen) == "number" else { return None }
-  Some({ doc: doc.cast(), directory, seen: seen.cast(), })
+  Some({ id, doc: doc.cast(), directory, seen: seen.cast(), })
 }
 
 ///|
-/// 前の版が残したもの（`file` と `assets`）を 1 行に読み替える。
-/// **版が上がっただけで開き直しをさせない。** 読み替えたら古い鍵は捨てる
-async fn Recent::carry_over(self : Recent) -> Array[Known] {
-  guard !self.inherited else { return [] }
+/// 前の版が残したものを、行ごとの鍵へ読み替える。**版が上がっただけで
+/// 開き直しをさせない。** 読み替えたら古い鍵は捨てる。
+///
+/// 読み替える形は 2 つ。一覧を丸ごと入れていた `docs` と、その前の
+/// `file`（いまのファイル）+ `assets`（枠 1 つの画像フォルダ）
+async fn Recent::carry_over(self : Recent) -> Unit {
+  guard !self.inherited else { return }
   self.inherited = true
+  let bulk = (self.store.read)(legacy_docs)
+  if @core.is_array(bulk) {
+    for v in @core.array_from(bulk) {
+      guard self.row_at(v, @web.unique_id()) is Some(row) else { continue }
+      self.put(row)
+    }
+    (self.store.remove)(legacy_docs)
+  }
   let file = (self.store.read)(legacy_file)
-  let old = (self.store.read)(legacy_assets)
-  let dir = if @core.is_object(old) &&
-    (self.store.is_dir)(@web.field(old, "directory")) {
-    Some((@web.field(old, "directory").cast() : @web.DirHandle))
-  } else {
-    None
-  }
-  let rows : Array[Known] = if (self.store.is_file)(file) {
-    [{ doc: file.cast(), directory: dir, seen: @web.now(), }]
-  } else {
-    []
-  }
-  if rows.length() > 0 {
-    (self.store.write)(docs_key, @core.any(rows.map(row_of)))
+  if (self.store.is_file)(file) {
+    let old = (self.store.read)(legacy_assets)
+    let dir = if @core.is_object(old) &&
+      (self.store.is_dir)(@web.field(old, "directory")) {
+      Some((@web.field(old, "directory").cast() : @web.DirHandle))
+    } else {
+      None
+    }
+    self.put({
+      id: @web.unique_id(),
+      doc: file.cast(),
+      directory: dir,
+      seen: @web.now(),
+    })
   }
   (self.store.remove)(legacy_file)
   (self.store.remove)(legacy_assets)
-  rows
 }
 
 ///|
@@ -118,6 +151,7 @@ async fn Recent::carry_over(self : Recent) -> Array[Known] {
 /// 無い箱は null にして置く
 fn row_of(k : Known) -> @core.Any {
   @web.record([
+    ("id", @core.any(k.id)),
     ("doc", k.doc.as_any()),
     ("directory", @core.from_option(k.directory)),
     ("seen", @core.any(k.seen)),
@@ -125,14 +159,11 @@ fn row_of(k : Known) -> @core.Any {
 }
 
 ///|
-/// 知っている文書。**最後に触れた順** — Files の並びがそのままこれ
+/// 知っている文書。**最後に触れた順** — Files の並びがそのままこれ。
+/// 並べるのは読むとき（書くのは自分の行 1 つだけなので、並びを書き戻す口が無い）
 async fn Recent::rows(self : Recent) -> Array[Known] {
-  let v = (self.store.read)(docs_key)
-  if @core.is_array(v) {
-    @core.array_from(v).filter_map(x => self.known_of(x))
-  } else {
-    self.carry_over()
-  }
+  self.carry_over()
+  by_recent((self.store.all)().filter_map(x => self.known_of(x)))
 }
 
 ///|
@@ -167,11 +198,18 @@ fn by_recent(rows : Array[Known]) -> Array[Known] {
 }
 
 ///|
-async fn Recent::save(self : Recent, rows : Array[Known]) -> Unit {
-  (self.store.write)(
-    docs_key,
-    @core.any(by_recent(rows).iter().take(keep).map(row_of).collect()),
-  )
+/// 行を 1 つ置く。**触るのは自分の行だけ** — 隣の行は読みもしない
+async fn Recent::put(self : Recent, row : Known) -> Unit {
+  (self.store.write)(row_prefix + row.id, row_of(row))
+}
+
+///|
+/// あふれたぶんを捨てる。**捨てるのは超えた行だけ**（残る行は書き直さない）
+async fn Recent::trim(self : Recent) -> Unit {
+  let rows = self.rows()
+  for i in keep..<rows.length() {
+    (self.store.remove)(row_prefix + rows[i].id)
+  }
 }
 
 ///|
@@ -199,17 +237,36 @@ async fn Recent::list_besides(
 /// **画像フォルダは保つ** — 同じ文書に戻れば結び付きも戻る
 async fn Recent::opened(self : Recent, file : @web.FileHandle) -> Unit {
   let rows = self.rows()
-  let at = self.find(rows, file)
-  let was = rows.get(at)
-  if at >= 0 {
-    rows.remove(at) |> ignore
-  }
-  rows.insert(0, {
+  let was = rows.get(self.find(rows, file))
+  self.put({
+    id: match was {
+      Some(w) => w.id
+      None => @web.unique_id()
+    },
     doc: file,
     directory: was.bind(w => w.directory),
-    seen: @web.now(),
+    seen: next_seen(rows),
   })
-  self.save(rows)
+  self.trim()
+}
+
+///|
+/// 触れた印。**必ずいちばん新しい行より大きい** — 続けて開いた 2 つが同じ ms に
+/// 入ると、並びが置き場の返す順に委ねられて Recent が嘘をつく。
+/// 行ごとに鍵を分けたので、並びを支えるのは印そのものしか無い
+fn next_seen(rows : Array[Known]) -> Double {
+  let now = @web.now()
+  match rows.get(0) {
+    Some(top) if top.seen >= now => top.seen + 1.0
+    _ => now
+  }
+}
+
+///|
+/// その文書の行。無ければ None
+async fn Recent::row_for(self : Recent, file : @web.FileHandle) -> Known? {
+  let rows = self.rows()
+  rows.get(self.find(rows, file))
 }
 
 ///|
@@ -218,9 +275,7 @@ async fn Recent::folder_for(
   self : Recent,
   file : @web.FileHandle,
 ) -> @web.DirHandle? {
-  let rows = self.rows()
-  let at = self.find(rows, file)
-  rows.get(at).bind(r => r.directory)
+  self.row_for(file).bind(r => r.directory)
 }
 
 ///|
@@ -231,22 +286,24 @@ async fn Recent::remember_folder(
   directory : @web.DirHandle,
 ) -> Unit {
   let rows = self.rows()
-  let at = self.find(rows, file)
-  if at >= 0 {
-    rows.remove(at) |> ignore
-  }
-  rows.insert(0, { doc: file, directory: Some(directory), seen: @web.now(), })
-  self.save(rows)
+  let was = rows.get(self.find(rows, file))
+  self.put({
+    id: match was {
+      Some(w) => w.id
+      None => @web.unique_id()
+    },
+    doc: file,
+    directory: Some(directory),
+    seen: next_seen(rows),
+  })
+  self.trim()
 }
 
 ///|
 /// 画像フォルダだけ忘れる（触って失敗した・指し先が消えた）。行は残す
 async fn Recent::forget_folder(self : Recent, file : @web.FileHandle) -> Unit {
-  let rows = self.rows()
-  let at = self.find(rows, file)
-  guard rows.get(at) is Some(row) else { return }
-  rows[at] = { doc: row.doc, directory: None, seen: row.seen, }
-  self.save(rows)
+  guard self.row_for(file) is Some(row) else { return }
+  self.put({ id: row.id, doc: row.doc, directory: None, seen: row.seen, })
 }
 
 ///|
@@ -277,6 +334,14 @@ pub fn idb_store() -> Store {
       run("readwrite", @web.idb_put(key, value)) |> ignore
     },
     remove: async fn(key) { run("readwrite", @web.idb_delete(key)) |> ignore },
+    all: async fn() {
+      let v = run("readonly", @web.idb_all())
+      if @core.is_array(v) {
+        @core.array_from(v)
+      } else {
+        []
+      }
+    },
     same: async fn(a, b) { @web.same_entry(a, b).wait() catch { _ => false } },
     is_file: @web.is_file_handle,
     is_dir: @web.is_dir_handle,
