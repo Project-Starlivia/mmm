@@ -215,19 +215,33 @@ pub fn retarget(
 }
 
 ///|
-/// `scheme://` で始まるか（URL は md からの相対ではない）
-fn has_scheme(s : String) -> Bool {
-  guard s.find("://") is Some(i) && i > 0 else { return false }
-  for k in 0..<i {
-    let c = s[k]
-    guard (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') else { return false }
+/// **md からの相対ではない綴りか。** 頭の `/`（絶対パス）と、最初の `/` より前の `:`。
+///
+/// `:` 1 つで、`https:` のような scheme も `C:` のようなドライブ文字も同時に断てる。
+/// `://` だけを見ていたころは、`data:` / `mailto:` / `javascript:` / `tel:` と
+/// `C:/win/` / `D:pics` が全部通っていた（#322）。
+///
+/// 相対の綴りに `:` は現れない — 名前に使えない字だと `app/disk/path.mbt` が
+/// 決めているので、mmm が作れるフォルダの名前には入らない
+fn rooted(s : String) -> Bool {
+  if s.has_prefix("/") {
+    return true
   }
-  true
+  for k in 0..<s.length() {
+    let c = s[k]
+    if c == '/' {
+      return false
+    }
+    if c == ':' {
+      return true
+    }
+  }
+  false
 }
 
 ///|
-/// 宣言の綴りを揃える。空・絶対パス・URL は None（宣言として読めない）。
-/// `\` は `/` に、`.` は `./` に、末尾には `/` を揃える。
+/// 宣言の綴りを揃える。**空・絶対パス・URL・ドライブ文字・制御文字は None**
+/// （宣言として読めない）。`\` は `/` に、`.` は `./` に、末尾には `/` を揃える。
 ///
 /// **続いた `/` は 1 つに畳む。** `.//` と `./` は同じ場所なのに、畳まないと
 /// `.//x.webp` という綴りが本文に入る。それは裸にすると `/x.webp` = 絶対パスに
@@ -236,13 +250,19 @@ fn has_scheme(s : String) -> Bool {
 pub fn normalize_path(value : String) -> String? {
   let trimmed = value.trim(chars=" \t\r\n").to_owned()
   guard trimmed != "" else { return None }
+  // **中の制御文字は断る。** 頭（frontmatter）に書くと行が割れ、読み直すと
+  // 別の値になる（`./a` + 改行 + `b/` は `./a` として読み直される）
+  for k in 0..<trimmed.length() {
+    let c = trimmed[k]
+    guard c >= ' ' && c != '\u{7f}' else { return None }
+  }
   let mut path = trimmed.replace_all(old="\\", new="/")
   if path == "." {
     path = "./"
   }
-  // **畳むのは断ってから。** 先に畳むと `https://x/` が `https:/x/` になって
-  // scheme が外れ、URL が宣言として通ってしまう
-  guard !path.has_prefix("/") && !has_scheme(path) else { return None }
+  // 断ってから畳む。**捨てる値を書き換えてから捨てる理由が無い**
+  // （`:` は畳んでも残るので、順そのものはもう効かない）
+  guard !rooted(path) else { return None }
   while path.contains("//") {
     path = path.replace_all(old="//", new="/")
   }
@@ -262,7 +282,7 @@ pub fn normalize_path(value : String) -> String? {
 pub fn under(path : String, folder : String) -> String? {
   let prefix = @tree.bare_path(folder)
   let rest = @tree.bare_path(path)
-  guard !rest.has_prefix("/") && !has_scheme(rest) else { return None }
+  guard !rooted(rest) else { return None }
   guard rest.has_prefix(prefix) else { return None }
   let tail = String::unsafe_substring(
     rest,
