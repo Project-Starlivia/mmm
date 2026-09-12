@@ -1,5 +1,8 @@
-// 見た目の好み: アクセントカラーと、ライト / ダーク（既定は OS 設定、
-// 分からなければダーク）。どちらも保存して、次のセッションでもそのまま。
+// 見た目の好み: アクセントカラーと、ライト / ダーク。
+//
+// **持ち物に書くのは人が選んだときだけ**（枠の `mmm.panes` と同じ流儀）。
+// 書いていないあいだは OS と style.css が言うとおりにし、OS が変われば
+// そのまま従う。選んだ後は人の選択が勝つ。
 
 ///|
 pub struct Theme {
@@ -7,6 +10,9 @@ pub struct Theme {
   set_editor_theme : (Bool) -> Unit
   base : String
   color_input : @dom.Element
+  /// OS のライト / ダーク。人が選ぶまではこれに従うので、いまの答えだけでなく
+  /// 変わったときのしらせも要る（持ち続けないと鳴らなくなる）
+  os : @dom.MediaQueryList
   /// favicon は**色と未保存の印**の 2 つで決まる。片方だけ変わっても描き直す
   /// ので、両方をここが覚えておく（呼ぶ側に「前は何色だったか」を持たせない）
   mut favicon_color : String
@@ -47,6 +53,15 @@ fn Theme::apply_color(self : Theme, hex : String) -> Unit {
   @web.set_style(self.doc.documentElement(), "--accent", c)
   self.favicon_color = c
   self.apply_favicon()
+}
+
+///|
+/// 人が選んだ一手。当てて、そのまま覚える（枠の `Panes::go` と同じ形）。
+/// 覚えるまでは style.css の `--accent` が源のままなので、トークンの表を
+/// 書き替えれば既に開いた人にも届く
+fn Theme::go_color(self : Theme, hex : String) -> Unit {
+  guard @parts.hex_of(hex) is Some(c) else { return }
+  self.apply_color(c)
   @prefs.store(self.doc, "color", c)
 }
 
@@ -56,15 +71,40 @@ pub fn Theme::is_light(self : Theme) -> Bool {
 }
 
 ///|
+/// OS はライトか。答えられない環境ならダーク
+fn Theme::os_light(self : Theme) -> Bool {
+  @web.matches(self.os)
+}
+
+///|
+/// 人が選んだ明るさ。持ち物に在るのは選んだときだけなので、「無い」と
+/// 「選んでいない」は同じこと。localStorage の中身は何でもありうる（人が
+/// 書き替えられるし、昔の版が別の値を入れているかもしれない）ので、名乗らせずに
+/// 確かめる — 知らない綴りも選んでいないのと同じ
+fn Theme::chosen(self : Theme) -> Bool? {
+  match @prefs.load(self.doc, "theme") {
+    Some("light") => Some(true)
+    Some("dark") => Some(false)
+    _ => None
+  }
+}
+
+///|
 fn Theme::apply_theme(self : Theme, light : Bool) -> Unit {
   @web.toggle_class(self.doc.documentElement(), "light", light)
   (self.set_editor_theme)(!light)
+}
+
+///|
+/// 人が選んだ一手。当てて、そのまま覚える。以後 OS が変わっても従わない
+fn Theme::go_theme(self : Theme, light : Bool) -> Unit {
+  self.apply_theme(light)
   @prefs.store(self.doc, "theme", if light { "light" } else { "dark" })
 }
 
 ///|
 pub fn Theme::toggle(self : Theme) -> Unit {
-  self.apply_theme(!self.is_light())
+  self.go_theme(!self.is_light())
 }
 
 ///|
@@ -123,10 +163,11 @@ pub fn Theme::new(
     set_editor_theme,
     base,
     color_input: input,
+    os: @web.match_media(doc, "(prefers-color-scheme: light)"),
     favicon_color: base,
     favicon_dirty: false,
   }
-  @web.listen(input, "input", _ => t.apply_color(@web.value(input)))
+  @web.listen(input, "input", _ => t.go_color(@web.value(input)))
   @web.listen(logo, "click", _ => t.pick_color())
   // ロゴは <svg role="button">。SVG はフォーカスされても Enter / Space で
   // click を出さないので、ボタンだと名乗る以上ここで自分で出す
@@ -138,15 +179,19 @@ pub fn Theme::new(
     }
   })
   // ---- 復元 ----
-  // localStorage の中身は何でもありうる（人が書き替えられるし、昔の版が
-  // 別の値を入れているかもしれない）。名乗らせずに確かめる
-  let light = match @prefs.load(doc, "theme") {
-    Some("light") => true
-    Some("dark") => false
-    _ => @web.matches(@web.match_media(doc, "(prefers-color-scheme: light)"))
+  // **ここでは覚え直さない** — まだ誰も選んでいない。選んでいないあいだは
+  // OS が変わればそのまま従う（枠が幅の境目を見張るのと同じ）
+  t.apply_theme(t.chosen().unwrap_or(t.os_light()))
+  t.os.addChangeListener(_ => {
+    if t.chosen() is None {
+      t.apply_theme(t.os_light())
+    }
+  })
+  // 色を持っていないなら何も置かない。style.css の `--accent` がそのまま出るし、
+  // 素の favicon も同じ色で焼いてある
+  if @prefs.load(doc, "color") is Some(hex) {
+    t.apply_color(hex)
   }
-  t.apply_theme(light)
-  t.apply_color(@prefs.load(doc, "color").unwrap_or(base))
   t
 }
 

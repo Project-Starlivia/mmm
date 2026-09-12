@@ -97,6 +97,7 @@ pub struct Theme {
   set_editor_theme : (Bool) -> Unit
   base : String
   color_input : @dom.Element
+  os : @dom.MediaQueryList
   mut favicon_color : String
   mut favicon_dirty : Bool
 }
