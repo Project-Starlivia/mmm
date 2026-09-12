@@ -116,16 +116,23 @@ fn memo_disk(known : Array[String]) -> @disk.Disk {
     )
   }
   @disk.Disk::new(
-    @disk.Recent::new({
-      read: fn(key) { table.get(key).unwrap_or(@core.null()) },
-      write: fn(key, value) { table[key] = value },
-      remove: fn(key) { table.remove(key) },
-      all: fn() { table.values().collect() },
-      same: fn(_, _) { false },
-      is_file: looks_like_file,
-      is_dir: _ => false,
-    }),
+    @disk.Recent::new(memo_shelf(table)),
+    @disk.Drafts::new(memo_shelf(Map([]))),
   )
+}
+
+///|
+/// 手元の棚 1 つ。実物は IndexedDB の objectStore で、札も控えも同じ形で並ぶ
+fn memo_shelf(table : Map[String, @core.Any]) -> @disk.Store {
+  {
+    read: fn(key) { table.get(key).unwrap_or(@core.null()) },
+    write: fn(key, value) { table[key] = value },
+    remove: fn(key) { table.remove(key) },
+    all: fn() { table.values().collect() },
+    same: fn(_, _) { false },
+    is_file: looks_like_file,
+    is_dir: _ => false,
+  }
 }
 
 ///|
@@ -590,6 +597,46 @@ async test "自動保存: 文書を入れ替えたら、積んでいた書き込
   assert_eq(first, [])
   // 開いたばかりの文書も、頼まれていないのに書かれない
   assert_eq(next, [])
+}
+
+///|
+/// **控えに置き場は要らない。** まだ保存していない文書 — いちばん失いやすいもの —
+/// がいちばんの客（#306）。ディスクへの自動書き込み（Autosave）とは行き先が違う
+async test "控え: 保存していない文書でも、手が止まれば控えが残る" {
+  let s = stand()
+  defer s.win.close()
+  assert_false(s.app.autosave)
+  s.fake.change("# r\n\n## a\n")
+  rest(s.doc, quiet * 2)
+  let rows = s.app.disk.drafts().list()
+  assert_eq(rows.length(), 1)
+  assert_eq(rows[0].text, "# r\n\n## a\n")
+  // ディスクに実体が無いので札は持たない
+  assert_true(rows[0].doc is None)
+  // 同じ字のままなら、二度は書かない
+  rest(s.doc, quiet * 2)
+  assert_eq(s.app.disk.drafts().list().length(), 1)
+}
+
+///|
+/// **文書を入れ替えたら控えの流れも切れる。** 前の文書の字は残るが、
+/// 続きは別の系列になる（1 つの流れに 2 つの文書の字が混ざらない）
+async test "控え: 新規にすると、前の文書の控えは残り、次は別の流れになる" {
+  let s = stand()
+  defer s.win.close()
+  s.fake.change("# first\n")
+  rest(s.doc, quiet * 2)
+  // 汚れているので、新規はたずねを開く。Discard（`[1]`）を押す
+  let asked = @js_async.Promise::from_async(async fn() { s.app.new_file() })
+  @web.click(
+    s.doc.querySelector("dialog.ask").unwrap().querySelectorAll(".row button")[1],
+  )
+  asked.wait()
+  s.fake.change("# second\n")
+  rest(s.doc, quiet * 2)
+  let rows = s.app.disk.drafts().list()
+  assert_eq(rows.map(d => d.text), ["# second\n", "# first\n"])
+  assert_true(rows[0].flow != rows[1].flow)
 }
 
 ///|

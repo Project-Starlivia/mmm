@@ -250,7 +250,10 @@ pub fn mmm_main(editor : @core.Any) -> @core.Any {
     @app.App::new(
       @dom.document(),
       editor_of(editor),
-      @disk.Disk::new(@disk.Recent::new(@disk.idb_store())),
+      @disk.Disk::new(
+        @disk.Recent::new(@disk.idb_store(@disk.handles_shelf)),
+        @disk.Drafts::new(@disk.idb_store(@disk.drafts_shelf)),
+      ),
     ),
   )
 }
