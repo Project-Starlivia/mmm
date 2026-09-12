@@ -12,7 +12,7 @@ pub fn address(@dom.Document) -> String
 
 pub fn after(@core.Any, (@core.Any) -> Unit) -> Unit
 
-pub fn after_quiet(@dom.Document, Int, () -> Unit) -> () -> Unit
+pub fn after_quiet(@dom.Document, Int, () -> Unit) -> Quiet
 
 pub fn attr_in(@core.Any, String, String) -> String?
 
@@ -271,6 +271,11 @@ pub(all) struct Entry {
 pub type FileHandle
 pub fn FileHandle::as_any(Self) -> @core.Any
 pub fn FileHandle::name(Self) -> String
+
+pub struct Quiet {
+  call : () -> Unit
+  cancel : () -> Unit
+}
 
 // Type aliases
 

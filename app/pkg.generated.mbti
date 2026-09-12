@@ -38,7 +38,7 @@ pub struct App {
   mut grab : Bool
   mut autosave : Bool
   greeting : @parts.Menu
-  write_soon : () -> Unit
+  write_soon : @web.Quiet
 }
 pub fn App::boot(Self) -> Unit
 pub fn App::cycle(Self, @read.Survey?, Bool) -> Unit
