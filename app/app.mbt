@@ -80,7 +80,6 @@ pub struct App {
   /// 掴みやすさ（⋯ の Easy grab）
   mut grab : Bool
   /// 手が止まると自分で書くか（Files の Autosave。#275）
-  mut autosave : Bool
   /// 立ち上がりに真ん中へ出す、覚えているものの一覧（#277）。器は他のメニューと
   /// 同じもので、閉じ方（外を押す・Escape・窓を離れる）もそれが持っている
   greeting : @parts.Menu
@@ -203,10 +202,9 @@ pub fn App::new(
     drafts: [],
     drawing_open: false,
     grab: @prefs.load(doc, "grab") == Some("on"),
-    autosave: @prefs.load(doc, "autosave") == Some("on"),
     greeting: @parts.Menu::new(doc),
     write_soon: @web.after_quiet(doc, quiet, () => {
-      @web.spawn(async fn() { app().on_quiet() })
+      @web.spawn(async fn() { app().keep_draft() })
     }),
   }
   late.val = Some(self)
@@ -379,38 +377,13 @@ fn App::update_dirty(self : App) -> Unit {
   let dirty = self.can_hold() && self.text() != self.saved_text
   self.name.set_dirty(dirty)
   // **控えは常に取る。** ブラウザの中なので置き場が要らず、まだ保存していない
-  // 文書がいちばんの客（#306）。取ったのと同じ字なら何もしない
-  let keep = self.text() != self.disk.drafts().kept()
-  // ディスクへ自分で書くのは印が立つときだけ。印と同じ 1 つの判断に乗るので
-  // 「汚れていないのに書く」も「汚れたのに書かない」も起こらない。
-  // 置き場が要る — まだ保存していない文書は、名前を聞かずには書けない（#275）
-  let write = dirty && self.autosave && self.saved_name is Some(_)
-  if keep || write {
+  // 文書がいちばんの客（#306）。取ったのと同じ字なら何もしない。
+  //
+  // **ディスクへ勝手に書く道は持たない。** 書けば他のアプリや git から見える
+  // ものが変わるので、人の意思なく触らない（#306 の決め、2026-09-12）
+  if self.text() != self.disk.drafts().kept() {
     (self.write_soon.call)()
   }
-}
-
-///|
-/// 手が止まった。**控えを取り、入っていればディスクへも書く。**
-///
-/// 2 つは行き先が違う（ブラウザの中と、他人も見るディスクの .md）。
-/// 控えに置き場は要らないので、名前の無い文書もここで残る
-async fn App::on_quiet(self : App) -> Unit {
-  self.keep_draft()
-  if self.autosave &&
-    self.can_hold() &&
-    self.saved_name is Some(_) &&
-    self.text() != self.saved_text {
-    self.save_file(false)
-  }
-}
-
-///|
-/// 自動保存を入れ替える。**入れた瞬間から効く** — いま汚れていればそのまま書きに行く
-fn App::set_autosave(self : App, on : Bool) -> Unit {
-  self.autosave = on
-  @prefs.store(self.doc, "autosave", if on { "on" } else { "off" })
-  self.update_dirty()
 }
 
 ///|
@@ -928,7 +901,6 @@ fn App::wire_bar(self : App) -> Unit {
         saved_name: self.saved_name,
         recent: self.recent.map(row => recent_label(row, @web.now())),
         drafts: self.drafts.map(d => draft_label(d, @web.now())),
-        autosave: self.autosave,
         can_open: @web.can_open(),
         can_save: @web.can_save_as(),
         can_rename: @web.can_rename(),
@@ -951,7 +923,6 @@ fn App::wire_bar(self : App) -> Unit {
         forget_drafts: () => @web.spawn(async fn() { self.forget_drafts() }),
         save: () => @web.spawn(async fn() { self.save_file(false) }),
         save_as: () => @web.spawn(async fn() { self.save_file(true) }),
-        toggle_autosave: () => self.set_autosave(!self.autosave),
         rename: () => @web.spawn(async fn() { self.rename_file() }),
         choose_folder: () => {
           @web.spawn(async fn() {

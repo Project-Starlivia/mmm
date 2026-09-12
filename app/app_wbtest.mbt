@@ -390,48 +390,23 @@ extern "js" fn wait_ms(doc : @dom.Document, ms : Int, f : () -> Unit) -> Unit =
   #| (doc, ms, f) => doc.defaultView.setTimeout(() => f(), ms)
 
 ///|
-/// **引き金は未保存の印と同じ 1 つの判断**（`update_dirty`）なので、印が立つときに
-/// だけ書きに行く。切っていれば、汚れても書かない
-async test "自動保存: 入れれば手が止まってから書き、切れば書かない" {
+/// **ディスクへ勝手に書く道は持たない**（#306 で Autosave を捨てた）。
+/// 手が止まっても、書くのは控え（ブラウザの中）だけ。ディスクの .md は
+/// 他のアプリや git からも見えるものなので、人が押さないかぎり触らない
+async test "手が止まっても、ディスクへは自分で書かない" {
   let s = stand()
   defer s.win.close()
   let written : Array[String] = []
   s.app.open_known(paper("notes.md", "# r\n", t => written.push(t)))
   assert_eq(s.fake.md, "# r\n")
-  // 既定は切れている（持ち物に何も無い）
-  assert_false(s.app.autosave)
   s.fake.change("# r\n\n## a\n")
   rest(s.doc, quiet * 2)
+  // ディスクには 1 字も書かれていない
   assert_eq(written, [])
-  // 入れた瞬間、いま汚れているぶんが書かれる
-  s.app.set_autosave(true)
-  rest(s.doc, quiet * 2)
-  assert_eq(written, ["# r\n\n## a\n"])
-  // 打ち続けているあいだは書かない。**止まってから 1 回**
-  s.fake.change("# r\n\n## a\n\n## b\n")
-  s.fake.change("# r\n\n## a\n\n## b\n\n## c\n")
-  assert_eq(written.length(), 1)
-  rest(s.doc, quiet * 2)
-  assert_eq(written[1:], ["# r\n\n## a\n\n## b\n\n## c\n"])
-  // 切れば書かない
-  s.app.set_autosave(false)
-  s.fake.change("# r\n\n## d\n")
-  rest(s.doc, quiet * 2)
-  assert_eq(written.length(), 2)
-}
-
-///|
-/// **ディスクに置き場が無ければ書けない。** まだ保存していない文書は名前を
-/// 聞かずには書けないので、入っていても何も起きない（聞くのは人が押したときだけ）
-async test "自動保存: 保存していない文書では、入っていても書きに行かない" {
-  let s = stand()
-  defer s.win.close()
-  s.app.set_autosave(true)
-  s.fake.change("# r\n")
-  rest(s.doc, quiet * 2)
-  // しらせも出ない（書こうとして失敗したのではなく、行かなかった）
-  assert_true(s.doc.querySelector(".notice") is None)
-  assert_true(s.app.saved_name is None)
+  // 控えのほうには残っている
+  assert_eq(s.app.disk.drafts().list().map(d => d.text), ["# r\n\n## a\n"])
+  // 印も立ったまま（ディスクの字とは違う）
+  assert_true(s.doc.querySelector("#dirty[hidden]") is None)
 }
 
 // ---- 立ち上がりの挨拶（#277）----
@@ -581,7 +556,6 @@ async test "自動保存: 文書を入れ替えたら、積んでいた書き込
   let first : Array[String] = []
   let next : Array[String] = []
   s.app.open_known(paper("a.md", "# a\n", t => first.push(t)))
-  s.app.set_autosave(true)
   // 汚す → 手が止まって 1 秒後に書く約束が積まれる
   s.fake.change("# a\n\n## x\n")
   // 鳴る前に別の文書を開く。たずねの Discard（`[1]` は進む側）を押す
@@ -605,7 +579,6 @@ async test "自動保存: 文書を入れ替えたら、積んでいた書き込
 async test "控え: 保存していない文書でも、手が止まれば控えが残る" {
   let s = stand()
   defer s.win.close()
-  assert_false(s.app.autosave)
   s.fake.change("# r\n\n## a\n")
   rest(s.doc, quiet * 2)
   let rows = s.app.disk.drafts().list()

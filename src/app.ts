@@ -370,7 +370,6 @@ export interface Files {
   /** 覚えている文書の名前。いま開いているものは含まない */
   recent: string[];
   /** 手が止まると自分で書くか */
-  autosave: boolean;
   canOpen: boolean;
   canSave: boolean;
   canRename: boolean;

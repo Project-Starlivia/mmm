@@ -53,7 +53,6 @@ function context(label: string | null): HTMLDivElement {
 const SAVED: core.Files = {
   savedName: "notes.md",
   recent: ["ideas.md", "todo.md"],
-  autosave: false,
   canOpen: true,
   canSave: true,
   canRename: true,
@@ -147,7 +146,6 @@ export const PARTS: Part[] = [
       "context-folded": () => context("hidden"),
       "context-none": () => context(null),
       "files-saved": () => core.filesRows(SAVED, FILES_ACTS),
-      "files-autosaving": () => core.filesRows({ ...SAVED, autosave: true }, FILES_ACTS),
       "files-unsaved": () => core.filesRows({ ...SAVED, savedName: null, recent: [], folder: "no folder" }, FILES_ACTS),
       "files-no-access": () =>
         core.filesRows(
