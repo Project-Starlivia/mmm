@@ -9,7 +9,7 @@
 //
 //   failed  … こちらが果たせなかった。ほとんどはこちら
 //   blocked … 先へ進めない。**次の一手はそちらにある**（書き出すものが無い、
-//             貼る先のノードを選んでいない）
+//             絵を貼る先のノードを選んでいない）
 //
 // **その向きを言うのは印の形で、色は増やさない。** 危険色を 1 つ足せば
 // 「その色＝まずいこと」を覚えてもらう話になるし、形なら、テーマにも色覚にも
@@ -32,12 +32,16 @@ let sorry = "Sorry..."
 /// 言葉の全部。**綴りはここ 1 つ** — 呼ぶ側はこの中の 1 つを渡す（外れていれば
 /// 壊れている）ので、足すときはまずここに書く。並べて見る道具もこれを読む。
 /// 名前を付けて引かないのは、呼び出し元で文言そのものが読める方が早いから。
+///
+/// **表と呼ぶ側は両向きで釣り合う。** 知らない言葉は下の `abort` が止め、言い手の
+/// 消えた言葉は `test/notice.test.ts` が止める — 片側だけだと、表は「全部」を
+/// 名乗ったまま、出る場面の無い言葉を抱える（読む人はそれを探しに行く）
 pub let failed_words : Array[String] = [
   "Couldn't save", "Couldn't save the image", "Couldn't open the file", "Couldn't open the dropped file",
-  "Couldn't open the image folder", "Couldn't create a new file", "Couldn't rename the file",
-  "Couldn't export", "Couldn't copy", "Couldn't copy the link", "Couldn't paste",
-  "Couldn't read that as a link", "Couldn't add the drawing", "Couldn't open that card",
-  "Couldn't start editing — the node is folded", "Couldn't do that here", no_file_access,
+  "Couldn't open the image folder", "Couldn't rename the file", "Couldn't export",
+  "Couldn't copy", "Couldn't copy the link", "Couldn't paste", "Couldn't read that as a link",
+  "Couldn't add the drawing", "Couldn't open that card", "Couldn't start editing — the node is folded",
+  "Couldn't do that here", no_file_access,
 ]
 
 ///|
@@ -45,10 +49,16 @@ pub let failed_words : Array[String] = [
 pub let no_file_access = "This browser cannot open or save files"
 
 ///|
-/// 次の一手が相手にあるもの — 書き出すものが無い（Mod+E）、貼る先のノードを
-/// 選んでいない。どちらも「選べば通る」ことを相手へ向けて言う
+/// 次の一手が相手にあるもの — 書き出すものが無い（Mod+E）、絵を貼る先のノードを
+/// 選んでいない。どちらも「選べば通る」ことを相手へ向けて言う。
+///
+/// **貼るときに断るのは絵だけ。** `Mod+V` の字は、選んでいなければ根へ入る
+/// （文書そのものが受け皿になれる）。絵は 1 つのノードに付く形しか持たないので、
+/// どこへ付けるかを相手が決めるまで先が無い。
+/// クリップボードの URL をリンクにする `Shift+L` は、**宛先が 1 つに決まるときしか
+/// 出ない**（`core/map/keys.mbt`）ので、そもそも断る場面を持たない
 pub let blocked_words : Array[String] = [
-  "Nothing to export yet", "Select a node to paste an image into", "Select a node to paste a link into",
+  "Nothing to export yet", "Select a node to paste an image into",
 ]
 
 ///|
