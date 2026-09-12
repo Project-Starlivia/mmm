@@ -1365,8 +1365,12 @@ html, body {
 
 @media (max-width: 720px) {
   #bar { gap: 6px; padding: 6px 8px; }
-  /* 名前はタブが言っている。狭いところで二重に場所を取らない */
-  #filename, #dirty { display: none; }
+  /* 名前はタブが言っている。狭いところで二重に場所を取らない。
+     **印は退かない** — タブの題が言うのは名前だけで、未保存かどうかは言わない。
+     ここで隠せば、画面に未保存を言うものが 1 つも無くなる。印を点けるかを
+     決めるのは能力ひとつ（docs/browsers.md — 消す手段が無ければ点けない）で、
+     幅はその判断に加わらない。名前が退いたぶん、印はロゴの隣に出る */
+  #filename { display: none; }
 
   #md-pane, #map-pane { flex: 1; min-width: 0; }
 }
