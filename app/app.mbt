@@ -71,7 +71,7 @@ pub struct App {
   mut saved_name : String?
   /// 覚えている文書。Files の Recent に並ぶ。IndexedDB の向こうに在るので、
   /// 開く・保存するたびに引き直して手元に置く
-  mut recent : Array[@web.FileHandle]
+  mut recent : Array[@disk.Known]
   /// お絵描きの窓が開いているか。二重に開かせない
   mut drawing_open : Bool
   /// 掴みやすさ（⋯ の Easy grab）
@@ -577,10 +577,10 @@ fn App::greet(self : App) -> Unit {
   self.greeting.show_middle(() => {
     [
       Caption("Recent", Some("clock")),
-      ..self.recent.mapi((i, f) => {
-        @parts.Entry::Run(@parts.row(f.name()), () => {
+      ..self.recent.mapi((i, row) => {
+        @parts.Entry::Run(@parts.row(recent_label(row, @web.now())), () => {
           match self.recent.get(i) {
-            Some(file) => @web.spawn(async fn() { self.open_known(file) })
+            Some(r) => @web.spawn(async fn() { self.open_known(r.doc) })
             None => ()
           }
         })
@@ -592,6 +592,21 @@ fn App::greet(self : App) -> Unit {
 ///|
 async fn App::refresh_recent(self : App) -> Unit {
   self.recent = self.disk.remembered() catch { _ => [] }
+}
+
+///|
+/// 覚えているものの一覧に出す 1 行の字。**綴りはここ 1 つ** — Files の `Recent ▸` と
+/// 立ち上がりの真ん中が同じ口から引く（同じものが 2 通りに見えない）。
+///
+/// 名前だけでは足りない。`notes.md` を 2 つの場所で開いていれば同じ行が 2 つ並び、
+/// 押すまでどちらか分からない（#309）。**札はパスを持たない**ので、見分けに使えるのは
+/// 画像フォルダの名前と、最後に触れた時刻しかない
+fn recent_label(row : @disk.Known, now : Double) -> String {
+  let folder = match row.directory {
+    Some(d) => d.name() + " · "
+    None => ""
+  }
+  row.doc.name() + " · " + folder + @parts.age(now, row.seen)
 }
 
 // ---------- リンク ----------
@@ -802,7 +817,7 @@ fn App::wire_bar(self : App) -> Unit {
     @bar.files_menu(
       {
         saved_name: self.saved_name,
-        recent: self.recent.map(f => f.name()),
+        recent: self.recent.map(row => recent_label(row, @web.now())),
         autosave: self.autosave,
         can_open: @web.can_open(),
         can_save: @web.can_save_as(),
@@ -818,7 +833,7 @@ fn App::wire_bar(self : App) -> Unit {
         open: () => @web.spawn(async fn() { self.open_file() }),
         open_recent: i => {
           match self.recent.get(i) {
-            Some(file) => @web.spawn(async fn() { self.open_known(file) })
+            Some(row) => @web.spawn(async fn() { self.open_known(row.doc) })
             None => ()
           }
         },

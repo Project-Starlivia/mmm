@@ -108,7 +108,9 @@ fn memo_disk(known : Array[String]) -> @disk.Disk {
         @web.record([
           ("doc", paper(name, "", _ => ()).as_any()),
           ("directory", @core.null()),
-          ("seen", @core.any((known.length() - i).to_double())),
+          // i 分前に触れたことにする（先に渡したものが新しい）。
+          // 行の字は「名前 · 古さ」なので、時刻が並びと綴りの両方を決める
+          ("seen", @core.any(@web.now() - i.to_double() * 60_000.0)),
         ])
       }),
     )
@@ -457,8 +459,10 @@ async test "立ち上がり: 覚えているものを真ん中に並べ、外を
   rest(s.doc, 5)
   assert_true(s.app.greeting.is_open())
   let box = shown_menu(s)
+  // **名前だけでは足りない。** 同じ名前の .md が 2 つあると押すまで分からないので、
+  // 最後に触れた時刻を添える（#309）
   assert_eq(box.querySelectorAll("[role=menuitem]").map(r => r.textContent()), [
-    "ideas.md", "todo.md",
+    "ideas.md · just now", "todo.md · 1 min ago",
   ])
   assert_eq(box.querySelectorAll(".caption").map(c => c.textContent()), [
     "Recent",
@@ -586,4 +590,30 @@ async test "自動保存: 文書を入れ替えたら、積んでいた書き込
   assert_eq(first, [])
   // 開いたばかりの文書も、頼まれていないのに書かれない
   assert_eq(next, [])
+}
+
+///|
+/// 画像フォルダの代役。名前しか要らない
+extern "js" fn folder(name : String) -> @web.DirHandle =
+  #| (name) => ({ name })
+
+///|
+/// **同じ名前の .md が 2 つあっても見分けられる**（#309）。札はディスクのパスを
+/// 持たないので、出せるのは画像フォルダの名前と、最後に触れた時刻だけ
+test "覚えているものの行: 名前と、見分けに使えるもの" {
+  let now = 1_000_000_000.0
+  let bare : @disk.Known = {
+    id: "1",
+    doc: paper("notes.md", "", _ => ()),
+    directory: None,
+    seen: now,
+  }
+  let linked : @disk.Known = {
+    id: "2",
+    doc: paper("notes.md", "", _ => ()),
+    directory: Some(folder("pics")),
+    seen: now - 3_600_000.0,
+  }
+  assert_eq(recent_label(bare, now), "notes.md · just now")
+  assert_eq(recent_label(linked, now), "notes.md · pics · 1 h ago")
 }

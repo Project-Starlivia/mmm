@@ -33,7 +33,7 @@ pub struct App {
   mut gen : Int
   mut saved_text : String
   mut saved_name : String?
-  mut recent : Array[@web.FileHandle]
+  mut recent : Array[@disk.Known]
   mut drawing_open : Bool
   mut grab : Bool
   mut autosave : Bool

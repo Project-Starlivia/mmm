@@ -118,6 +118,6 @@ pub async fn Disk::rename(self : Disk, name : String) -> String? {
 ///|
 /// 覚えている文書。**Files の `Recent` に並ぶのがこれ** — 最後に触れた順で、
 /// いま開いているものは外す
-pub async fn Disk::remembered(self : Disk) -> Array[@web.FileHandle] {
+pub async fn Disk::remembered(self : Disk) -> Array[Known] {
   self.recent.list_besides(self.current)
 }
