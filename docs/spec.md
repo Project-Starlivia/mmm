@@ -228,6 +228,27 @@ pnpm run deploy:dry   # ビルドしてから、配らずに設定と中身だ�
 MoonBit は公式の GitHub Action が無いので、配布スクリプトで入れて
 `$HOME/.moon/bin` を PATH に通している。
 
+#### 身を守るヘッダ
+
+静的ファイルしか返さない配り先でも、**返し方はこちらの持ち物**。`public/_headers` に
+4 つ置く(CSP・`X-Content-Type-Options`・`Referrer-Policy`・`Permissions-Policy`)。
+理由は 1 つずつ `_headers` の中に書いてある — **要らないと決めたのか書き忘れたのかが
+読めない**状態を残さないため。
+
+締めた理由がいちばん強いのは `frame-ancestors 'none'`。mmm は**人のディスクのファイルを
+開いて書く道具**で、帯には Open / Save / Rename が並ぶ。どの site からでも `<iframe>` に
+入れてよい理由が無い。`X-Frame-Options` は**書かない** — 同じことを 2 か所が言うと、
+片方だけ直って食い違う。
+
+`style-src` にだけ `'unsafe-inline'` が要る。CodeMirror がテーマを `<style>` で挿し、
+こちらも `--accent` や欄の位置を style 属性で置く。nonce に逃げるにはサーバ側で
+`index.html` を組む必要があり、**サーバ側のコードは 1 行も持たない**という決めと食い違う。
+
+`wrangler dev` で組んだ dist を配って実機で確かめた(2026-09-12、Chromium)。
+スタイルシート 2 枚・同梱の字 6 つ・CodeMirror の `<style>`・`data:` の favicon・
+`blob:` と `data:` の絵・`blob:` の読み返し・canvas・言語の動的 import が全部通り、
+違反は 0 件。
+
 要る Secrets は 2 つ:
 
 | 名前 | 何か |

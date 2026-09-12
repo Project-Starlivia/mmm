@@ -4,6 +4,38 @@
 #
 # https://developers.cloudflare.com/workers/static-assets/headers/
 
+# 身を守る。**mmm は人のディスクのファイルを開いて書く道具**で、帯には
+# Open / Save / Rename が並ぶ。どの site からでも `<iframe>` に入れてよい理由が無い。
+#
+# 静的ファイルしか返さなくても、返し方はこちらの持ち物。**要らないと決めたのか
+# 書き忘れたのかが読めない**状態を残さないために、選んだ結果をここに書く
+# （wrangler.jsonc が既定どおりの項目まで明示しているのと同じ理由）。
+#
+#   default-src 'self'      既定は同じ出自だけ。以下はそこからの差分
+#   script-src 'self'       出荷 JS は 1 チャンク + 言語の動的 import で、どれも同じ出自。
+#                           インラインの <script> も on* 属性も 0 件、`eval` も 0 件なので
+#                           `'unsafe-inline'` も `'unsafe-eval'` も要らない
+#   style-src   'unsafe-inline' が要る。CodeMirror がテーマを <style> で挿し、
+#                           こちらも `--accent` や欄の位置を style 属性で置く。
+#                           nonce に逃げるにはサーバ側で index.html を組む必要があり、
+#                           **サーバ側のコードは 1 行も持たない**という決めと食い違う
+#   img-src     blob: は手元の画像（objectURL）、data: はロゴと favicon と書き出しの
+#                           下絵。https: は md が外の絵を指したとき（人が書いた md は
+#                           mmm のものではない）
+#   font-src 'self'         JetBrains Mono は同梱（src/fonts）
+#   connect-src blob: data: は書き出しが自分の作った URL を読み返す道（svg.mbt）。
+#                           https: は上と同じ理由
+#   object-src 'none'       プラグインは使わない
+#   base-uri 'none'         <base> は無い。差し込まれれば相対パスが全部ずれる
+#   form-action 'self'      たずねの <form method="dialog"> は移動しないが、明示しておく
+#   frame-ancestors 'none'  埋め込ませない。**X-Frame-Options は書かない** —
+#                           同じことを 2 か所が言うと、片方だけ直って食い違う
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https:; font-src 'self'; connect-src 'self' blob: data: https:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), midi=(), display-capture=(), local-fonts=()
+
 # vite が名前に中身のハッシュを入れるのは `assets/` の下だけ。**中身が変われば
 # 名前が変わる**ので、同じ名前のものは永遠に同じ中身。確かめに行く理由が無い。
 # immutable が無いと、ブラウザは再読み込みのたびに 304 の往復をする
