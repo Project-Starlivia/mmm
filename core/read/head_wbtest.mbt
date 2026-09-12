@@ -355,3 +355,45 @@ test "follow_declaration: 引っ越していなければ空" {
   let outside = declared("./p/", "./other/y.webp")
   assert_eq(follow_declaration(outside, retyped(outside, "./img/")).length(), 0)
 }
+
+///|
+/// **`://` を見ていたころは、URL とドライブ文字が素通りしていた**（#322）。
+/// 宣言は md からの相対でしかありえないので、`:` が在れば相対ではない
+test "normalize_path: scheme もドライブ文字も断る" {
+  // 断る側 — `://` を持たない URL
+  assert_eq(normalize_path("data:text/plain,x"), None)
+  assert_eq(normalize_path("mailto:a@b"), None)
+  assert_eq(normalize_path("javascript:alert(1)"), None)
+  assert_eq(normalize_path("tel:123"), None)
+  // 断る側 — ドライブ文字
+  assert_eq(normalize_path("C:/win/"), None)
+  assert_eq(normalize_path("C:\\win\\"), None)
+  assert_eq(normalize_path("D:pics"), None)
+  // 断る側 — 前から在る 2 つ
+  assert_eq(normalize_path("https://e.com/"), None)
+  assert_eq(normalize_path("/abs/"), None)
+  // 通る側 — `:` を持たない相対の綴り
+  assert_eq(normalize_path("./pics/"), Some("./pics/"))
+  assert_eq(normalize_path("pics/a b/"), Some("pics/a b/"))
+  assert_eq(normalize_path("../up/"), Some("../up/"))
+}
+
+///|
+/// **中の制御文字は断る。** 頭に書くと行が割れ、読み直すと別の値になる
+test "normalize_path: 中の制御文字は断る" {
+  assert_eq(normalize_path("./a\nb/"), None)
+  assert_eq(normalize_path("./a\rb/"), None)
+  assert_eq(normalize_path("./a\tb/"), None)
+  assert_eq(normalize_path("./a\u{00}b/"), None)
+  assert_eq(normalize_path("./a\u{7f}b/"), None)
+  // 端の空白は落とすだけ（前からの振る舞い）
+  assert_eq(normalize_path(" \t./a/\n "), Some("./a/"))
+}
+
+///|
+/// `under` も同じ柵を使う。**md からの相対でないものは、どのフォルダの下でもない**
+test "under: scheme もドライブ文字も下ではない" {
+  assert_eq(under("C:/img/a.webp", "./"), None)
+  assert_eq(under("data:image/png;base64,xx", "./"), None)
+  assert_eq(under("mailto:a@b", "./"), None)
+}
