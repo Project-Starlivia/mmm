@@ -169,11 +169,12 @@ TypeScript 4.1 で `--generateTrace` が入った。増分ビルドだと結果�
 --diagnostic-dir  --max-heap-size  --stack-trace-limit
 ```
 
-実行して確かめた — `node --cpu-prof --cpu-prof-dir=<dir> --test test/layout.test.ts`:
+実行して確かめた（2026-09-12）— `node --cpu-prof --cpu-prof-dir=<dir> --test test/app.test.ts`
+（試験は `_build` を読むので、先に `pnpm run core`）:
 
 ```
-CPU.20260905.212318.23988.0.001.cpuprofile   54,834 B
-nodes: 309   samples: 43   duration: 73,693 us
+CPU.20260912.185036.19264.0.001.cpuprofile   49,649 B
+nodes: 274   samples: 59   duration: 97,286 us
 ```
 
 `.cpuprofile` は Chrome DevTools の Performance パネルにドロップすれば読める。JSON なので自前で集計もできる。
@@ -215,7 +216,8 @@ Variant is never read, never constructed, or both.
 
 公式ブログに JS バックエンドと最適化の記事がある:
 [JS backend](https://www.moonbitlang.com/blog/js-support) / [Optimizing MoonBit](https://www.moonbitlang.com/pearls/optimize-moonbit-core) / [Profiling MoonBit-Generated Wasm using Chrome](https://www.moonbitlang.com/blog/profile-wasm-from-js)。
-`moon build --target js` の出力は `target/js/release/build/*.js`（吐かれたコードを直接読める）。
+`moon build --target js` の出力は `_build/js/release/build/<module>/<package>/…`（吐かれたコードを直接読める）。
+mmm は workspace なので、browser への出口は `_build/js/release/build/mmm/app/js/js.js`。
 
 
 ## 6. SVG・描画まわりの一次資料の所在
