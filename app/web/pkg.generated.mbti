@@ -98,6 +98,8 @@ pub fn html(@dom.Document, String, String) -> @dom.Element
 
 pub fn html_text(@dom.Document, String, String, String) -> @dom.Element
 
+pub fn idb_all() -> (@core.Any) -> @core.Any
+
 pub fn idb_close(@core.Any) -> Unit
 
 pub fn idb_delete(String) -> (@core.Any) -> @core.Any
@@ -243,6 +245,8 @@ pub fn text_blob(String, String) -> @core.Any
 pub fn text_width(@dom.Document, String, String) -> Double
 
 pub fn toggle_class(@dom.Element, String, Bool) -> Unit
+
+pub fn unique_id() -> String
 
 pub fn value(@dom.Element) -> String
 
