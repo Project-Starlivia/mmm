@@ -512,3 +512,48 @@ async test "捨てる確認: 汚れていなければ、たずねは開かず、
   again.wait()
   assert_eq(s.fake.md, "")
 }
+
+///|
+/// 書き込みに間のかかる札。**待っているあいだに人が打てる** — `paper` の
+/// 書き込みはその場で済むので、保存と打鍵の重なりはこちらでしか作れない
+extern "js" fn slow_paper(
+  doc : @dom.Document,
+  name : String,
+  text : String,
+  into : (String) -> Unit,
+  ms : Int,
+) -> @web.FileHandle =
+  #| (doc, name, text, into, ms) => ({ name,
+  #|   requestPermission: async () => "granted",
+  #|   getFile: async () => ({ text: async () => text }),
+  #|   createWritable: async () => ({
+  #|     write: (t) => new Promise((done) => {
+  #|       doc.defaultView.setTimeout(() => { into(t); done(); }, ms);
+  #|     }),
+  #|     close: () => {} }) })
+
+///|
+/// **書く字と、書いたと記す字は同じ 1 つ**（#298）。書き込みを待っているあいだに
+/// 打った字は、ディスクに無いのだから「保存済み」にしてはいけない
+async test "保存: 書いているあいだに打った字は、書かれないまま済んだことにならない" {
+  let s = stand()
+  defer s.win.close()
+  let written : Array[String] = []
+  let hold = 200
+  s.app.open_known(
+    slow_paper(s.doc, "notes.md", "# r\n", t => written.push(t), hold),
+  )
+  s.fake.change("# r\n\n## a\n")
+  // 手で保存 → 書き込みの待ちに入る（待たずに次へ進む）
+  @web.spawn(async fn() { s.app.save_file(false) })
+  rest(s.doc, hold / 4)
+  // まだ書けていない。この隙に 1 つ打つ
+  assert_eq(written, [])
+  s.fake.change("# r\n\n## a\n\n## b\n")
+  rest(s.doc, hold * 2)
+  // ディスクに載ったのは打つ前の字
+  assert_eq(written, ["# r\n\n## a\n"])
+  // 記した字もそれと同じ。印は立ったまま
+  assert_eq(s.app.saved_text, "# r\n\n## a\n")
+  assert_true(s.doc.querySelector("#dirty[hidden]") is None)
+}

@@ -519,11 +519,14 @@ async fn App::rename_file(self : App) -> Unit {
 /// ダイアログの初期値はいまの名前 — 保存済みならそのファイル名、まだなら本文から導いたもの
 async fn App::save_file(self : App, as_new : Bool) -> Unit {
   (async fn() -> Unit {
+    // **書く字は 1 つ。** 書き込みは待つので、そのあいだに人は打てる。
+    // 書き終えた後にもう一度読むと、書いていない字を「書いた」と記してしまう
+    let written = self.text()
     if as_new || self.saved_name is None {
       guard @web.can_save_as() else {
         @parts.failed(self.doc, @parts.no_file_access)
       }
-      guard self.disk.save_as(self.doc_name(), self.text()) is Some(saved) else { // キャンセル
+      guard self.disk.save_as(self.doc_name(), written) is Some(saved) else { // キャンセル
         return
       }
       self.saved_name = Some(saved.name) // ここで初めて名前が決まる
@@ -534,9 +537,11 @@ async fn App::save_file(self : App, as_new : Bool) -> Unit {
       @web.spawn(async fn() { self.refresh_recent() })
       @web.spawn(async fn() { self.offer_connect() })
     } else {
-      self.disk.save(self.text())
+      self.disk.save(written)
     }
-    self.saved_text = self.text()
+    self.saved_text = written
+    // 書いているあいだに打った字は汚れたまま残る。印が立ち直り、
+    // 自動保存が入っていれば手が止まった所でもう一度書きに行く
     self.update_dirty()
   })() catch {
     _ => @parts.failed(self.doc, "Couldn't save")
