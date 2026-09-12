@@ -43,7 +43,7 @@ pub fn Disk::new(Recent, Drafts) -> Self
 pub async fn Disk::open_dialog(Self) -> Doc?
 pub async fn Disk::open_handle(Self, @web.FileHandle) -> Doc
 pub async fn Disk::open_known(Self, @web.FileHandle) -> Doc?
-pub async fn Disk::remembered(Self) -> Array[@web.FileHandle]
+pub async fn Disk::remembered(Self) -> Array[Known]
 pub async fn Disk::rename(Self, String) -> String?
 pub async fn Disk::save(Self, String) -> Unit
 pub async fn Disk::save_as(Self, String, String) -> Doc?

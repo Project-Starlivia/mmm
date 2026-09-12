@@ -213,11 +213,13 @@ async fn Recent::trim(self : Recent) -> Unit {
 }
 
 ///|
-/// 知っている文書の札を、`file` を除いて（いま開いているものは Files に並べない）
+/// 知っている文書を、`file` を除いて（いま開いているものは Files に並べない）。
+/// **札だけでなく行ごと返す** — 同じ名前が 2 つ並んだとき、見分けに使えるのは
+/// 札が持っていない側（画像フォルダの名前と、最後に触れた時刻）だけ（#309）
 async fn Recent::list_besides(
   self : Recent,
   file : @web.FileHandle?,
-) -> Array[@web.FileHandle] {
+) -> Array[Known] {
   let rows = self.rows()
   let skip = match file {
     Some(f) => self.find(rows, f)
@@ -226,7 +228,7 @@ async fn Recent::list_besides(
   let out = []
   for i, row in rows {
     if i != skip {
-      out.push(row.doc)
+      out.push(row)
     }
   }
   out
