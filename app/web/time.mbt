@@ -47,17 +47,37 @@ extern "js" fn next_frame(doc : @dom.Document, f : () -> Unit) -> Unit =
 /// ないもの（ディスクへの書き込み。#275）はフレームでは早すぎる。
 ///
 /// **落とすのは前の回で、残すのは後の回**（`per_frame` と同じ）。
-pub fn after_quiet(doc : @dom.Document, ms : Int, f : () -> Unit) -> () -> Unit {
+pub fn after_quiet(doc : @dom.Document, ms : Int, f : () -> Unit) -> Quiet {
   let timer : Ref[Int] = { val: 0, }
-  () => {
+  fn stop() {
     if timer.val != 0 {
       clear_timer(doc, timer.val)
-    }
-    timer.val = set_timer(doc, ms, () => {
       timer.val = 0
-      f()
-    })
+    }
   }
+
+  {
+    call: () => {
+      stop()
+      timer.val = set_timer(doc, ms, () => {
+        timer.val = 0
+        f()
+      })
+    },
+    cancel: stop,
+  }
+}
+
+///|
+/// 静まるのを待つもの。`call` は待ちを積み（呼ぶたびに待ち時間は引き直す）、
+/// `cancel` は待っているものを捨てる。
+///
+/// **待っているあいだに、頼んだ当人が居なくなることがある** — 文書を入れ替えれば、
+/// 前の文書のために積んだ書き込みは行き先を失う（#299）。捨てる口が無いと、
+/// 積んだものは必ず走ってしまう。
+pub struct Quiet {
+  call : () -> Unit
+  cancel : () -> Unit
 }
 
 ///|

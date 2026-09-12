@@ -557,3 +557,32 @@ async test "保存: 書いているあいだに打った字は、書かれない
   assert_eq(s.app.saved_text, "# r\n\n## a\n")
   assert_true(s.doc.querySelector("#dirty[hidden]") is None)
 }
+
+///|
+/// **積んだ書き込みにも持ち主が居る**（#299）。文書を入れ替えたら、前の文書の
+/// ために積んだものは捨てる。捨てないと、**前の文書のために積んだ書き込みが、
+/// 入れ替わった後の文書に対して走る** — 名前を手放した後（新規）なら、人が
+/// 何も押していないのに保存ダイアログの道へ入る
+async test "自動保存: 文書を入れ替えたら、積んでいた書き込みは走らない" {
+  let s = stand()
+  defer s.win.close()
+  let first : Array[String] = []
+  let next : Array[String] = []
+  s.app.open_known(paper("a.md", "# a\n", t => first.push(t)))
+  s.app.set_autosave(true)
+  // 汚す → 手が止まって 1 秒後に書く約束が積まれる
+  s.fake.change("# a\n\n## x\n")
+  // 鳴る前に別の文書を開く。たずねの Discard（`[1]` は進む側）を押す
+  let asked = @js_async.Promise::from_async(async fn() {
+    s.app.open_known(paper("b.md", "# b\n", t => next.push(t)))
+  })
+  let dlg = s.doc.querySelector("dialog.ask").unwrap()
+  @web.click(dlg.querySelectorAll(".row button")[1])
+  asked.wait()
+  assert_eq(s.fake.md, "# b\n")
+  rest(s.doc, quiet * 2)
+  // 捨てた字は捨てたまま
+  assert_eq(first, [])
+  // 開いたばかりの文書も、頼まれていないのに書かれない
+  assert_eq(next, [])
+}

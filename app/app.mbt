@@ -82,8 +82,9 @@ pub struct App {
   /// 同じもので、閉じ方（外を押す・Escape・窓を離れる）もそれが持っている
   greeting : @parts.Menu
   /// 「手が止まったら書く」の引き金。**束ねは 1 本**（頼むたびに作り直すと
-  /// 待ち時間が引き直されず、連打の最中に書きに行く）
-  write_soon : () -> Unit
+  /// 待ち時間が引き直されず、連打の最中に書きに行く）。
+  /// 文書を入れ替えるときは捨てる — 前の文書のために積んだ書き込みは行き先が無い
+  write_soon : @web.Quiet
 }
 
 ///|
@@ -377,7 +378,7 @@ fn App::update_dirty(self : App) -> Unit {
   // 「汚れていないのに書く」も「汚れたのに書かない」も起こらない。
   // 置き場が要る — まだ保存していない文書は、名前を聞かずには書けない（#275）
   if dirty && self.autosave && self.saved_name is Some(_) {
-    (self.write_soon)()
+    (self.write_soon.call)()
   }
 }
 
@@ -408,6 +409,10 @@ fn App::show_name(self : App) -> Unit {
 /// 文書を丸ごと入れ替える。名乗りも、寄せも、ここから
 fn App::load_text(self : App, next : String, name : String?) -> Unit {
   self.gen += 1
+  // **積んだ書き込みは前の文書のもの。** 名前を手放した直後に鳴れば、
+  // 人が何も押していないのにピッカーを開きに行く（`showSaveFilePicker` は
+  // 押した直後にしか開けない）
+  (self.write_soon.cancel)()
   self.saved_name = name
   self.images.clear() // 画像のパスは（新しい）md からの相対
   (self.ed.set_text)(next) // → cycle
@@ -518,6 +523,10 @@ async fn App::rename_file(self : App) -> Unit {
 /// 保存。`as_new`（別名で保存）と、まだ名前の無い文書はダイアログを出す。
 /// ダイアログの初期値はいまの名前 — 保存済みならそのファイル名、まだなら本文から導いたもの
 async fn App::save_file(self : App, as_new : Bool) -> Unit {
+  // **待つあいだに文書は入れ替わりうる。** ピッカーも書き込みも待つので、
+  // 戻ってきたら自分の世代を確かめる — 前の文書のために書いた字を、
+  // 次の文書の控えにしない
+  let gen = self.gen
   (async fn() -> Unit {
     // **書く字は 1 つ。** 書き込みは待つので、そのあいだに人は打てる。
     // 書き終えた後にもう一度読むと、書いていない字を「書いた」と記してしまう
@@ -529,6 +538,7 @@ async fn App::save_file(self : App, as_new : Bool) -> Unit {
       guard self.disk.save_as(self.doc_name(), written) is Some(saved) else { // キャンセル
         return
       }
+      guard gen == self.gen else { return } // 待つあいだに入れ替わった
       self.saved_name = Some(saved.name) // ここで初めて名前が決まる
       self.show_name()
       // **写しは別の文書。** 握りは「この md から見たあのフォルダ」という対
@@ -538,6 +548,7 @@ async fn App::save_file(self : App, as_new : Bool) -> Unit {
       @web.spawn(async fn() { self.offer_connect() })
     } else {
       self.disk.save(written)
+      guard gen == self.gen else { return } // 待つあいだに入れ替わった
     }
     self.saved_text = written
     // 書いているあいだに打った字は汚れたまま残る。印が立ち直り、
