@@ -2,6 +2,9 @@
 
 2026-09-12、main `73fef59`。開いている issue 45 件・PR 2 本を全部回収して v1.0.0 を出すまでの段。
 
+**進み（2026-09-12 時点）: 45 件 → 32 件。** 段 0 と段 A は #318 を残して済み、段 C から 5 件済み。
+済んだものは行の頭に ✅ を付けてある。
+
 ## リリースの定義
 
 - `package.json` を `1.0.0` にし、`v1.0.0` のタグと GitHub Release を切る
@@ -20,21 +23,21 @@
 |---|---|---|
 | PR #297 | docs/picture-parity を main へ（#292 の定義。段 E の土台） | S |
 | PR #154 / #148 | feat/menu-flip の積み（#121 → #154 → #124 → #105 → #57/#58）は**ユーザーが回収する**。触らない | — |
-| #302 | merge 済みの枝 31 本を remote から消す。`deleteBranchOnMerge` を true に。`.worktrees/` の抜け殻 123 個を消す。改名前の枝 3 本（`style/popup` / `refactor/asks` / `feat/menu-flip`）はユーザーの手元 | S |
-| #324 | `ai-docs/` を今の地図へ（`_build/`、消えた試験、作業ログの 1 行、消えた一時ディレクトリ） | S |
-| #313 | `docs/design.md` の「ts」2 つを MoonBit の段へ。「id の順 = 文書順」の試験を `core/read` に足す | S |
+| ✅ #302 | merge 済みの枝 31 本を remote から消す。`deleteBranchOnMerge` を true に。`.worktrees/` の抜け殻 123 個を消す。改名前の枝 3 本（`style/popup` / `refactor/asks` / `feat/menu-flip`）はユーザーの手元 | S |
+| ✅ #324 | `ai-docs/` を今の地図へ（`_build/`、消えた試験、作業ログの 1 行、消えた一時ディレクトリ） | S |
+| ✅ #313 | `docs/design.md` の「ts」2 つを MoonBit の段へ。「id の順 = 文書順」の試験を `core/read` に足す | S |
 
 ### 段 A 保存が嘘をつかない（2 日）— `app/app.mbt` `app/disk/*` `app/web/fs.mbt`
 
 | # | 何をする | 大きさ |
 |---|---|---|
-| #298 | 書く字を 1 つの変数に取り、`saved_text` はそれで立てる。書き込み中に打った字は汚れのまま残す | S |
-| #299 | `write_soon` に取り消しの口を持たせ、`load_text` / 新規で捨てる。`save_file` も `gen` を見る | S |
-| #300 | Recent の read-modify-write を 1 つの取引に。`find` の await も取引の中へ | M |
-| #309 | Recent の行に `seen` の時刻と画像フォルダの名前を添える。同名は束ねない。**行の形は Drafts も使う** | S |
-| #306 | 控え（Drafts）。spec は [2026-09-12-drafts-design.md](../specs/2026-09-12-drafts-design.md)。5 段に割る | L |
-| #318 | 書く前に `lastModified` を見て、開いたときと違えば書かずに知らせる。**Autosave を捨てたので自動では起きない** — 残るのは手で押したときだけ | S |
-| #310 | 狭い画面でも未保存の印は残す（名前だけ落とす）。置き場はロゴの隣 | S |
+| ✅ #298 | 書く字を 1 つの変数に取り、`saved_text` はそれで立てる。書き込み中に打った字は汚れのまま残す | S |
+| ✅ #299 | `write_soon` に取り消しの口を持たせ、`load_text` / 新規で捨てる。`save_file` も `gen` を見る | S |
+| ✅ #300 | Recent の read-modify-write を 1 つの取引に。`find` の await も取引の中へ | M |
+| ✅ #309 | Recent の行に `seen` の時刻と画像フォルダの名前を添える。同名は束ねない。**行の形は Drafts も使う** | S |
+| ✅ #306 | 控え（Drafts）。spec は [2026-09-12-drafts-design.md](../specs/2026-09-12-drafts-design.md)。5 段に割る | L |
+| #318 | 書く前に `lastModified` を見る。**Autosave を捨てたので自動では起きない** — 残るのは手で押したときだけ。押した瞬間なので、聞ける | S |
+| ✅ #310 | 狭い画面でも未保存の印は残す（名前だけ落とす）。置き場はロゴの隣 | S |
 
 ### 段 B 読みと書きが落とさない（2 日）— `core/tree/*` `core/op/*` `core/map/drop.mbt`
 
@@ -53,15 +56,15 @@
 
 | # | 何をする | 大きさ |
 |---|---|---|
-| #305 | `public/_headers` に CSP（`default-src 'self'`、`img-src 'self' blob: data:`、`frame-ancestors 'none'`）・`X-Content-Type-Options`・`Referrer-Policy`・`Permissions-Policy`。判断を `docs/spec.md` の「配る」に残す | S |
+| ✅ #305 | `public/_headers` に CSP（`default-src 'self'`、`img-src 'self' blob: data:`、`frame-ancestors 'none'`）・`X-Content-Type-Options`・`Referrer-Policy`・`Permissions-Policy`。判断を `docs/spec.md` の「配る」に残す | S |
 | #304 | 共有リンクは**展開後のバイト数**で止める（上限 2 MB）。超えたら開かず「too large to open」のしらせ | S |
-| #322 | `normalize_path` がドライブ文字と `scheme:` を断る。値の改行も断る | S |
+| ✅ #322 | `normalize_path` がドライブ文字と `scheme:` を断る。値の改行も断る | S |
 | #321 | 画像を置く道の `catch` を 3 つに割り、握りが腐ったときだけ `forget`。`name_problem` に制御文字・予約名・末尾の点と空白を足す | M |
 | #308 | クリップボードの「断られた」を `None` で返し、Shift+L も Mod+V も `blocked`（「Allow clipboard access」）で言う | S |
-| #303 | しらせの表 → 呼ぶ側の向きも `notice.test.ts` が見る。呼び手の無い 2 語は消す | S |
+| ✅ #303 | しらせの表 → 呼ぶ側の向きも `notice.test.ts` が見る。呼び手の無い 2 語は消す | S |
 | #325 | `↗` を `external-link` の絵に。呼び手の無い絵は `circle-plus` だけになり、#48 で使う | S |
-| #301 | `index.html` を `lang="en"` に（lab は `ja` のまま）。md ペインと地図の `lang` は立てない | S |
-| #323 | テーマと色は**人が押したときだけ** `prefs` に書く。書いていないあいだは OS の変化を `addChangeListener` で追う | S |
+| ✅ #301 | `index.html` を `lang="en"` に（lab は `ja` のまま）。md ペインと地図の `lang` は立てない | S |
+| 🔶 #323 | テーマと色は**人が押したときだけ** `prefs` に書く。書いていないあいだは OS の変化を `addChangeListener` で追う | S |
 | #70 | `scripts/icon.ts` を戻し、`logo` から PNG 192 / 512 / maskable を吐く。`manifest.webmanifest` と `theme-color`。未保存の印はアプリでは出さない（`setAppBadge` は使わない） | M |
 | #71 | 同じ仕組みで `og:image` 1200×630（ロゴ + 名前）。`description` は README の 1 行、`og:url` は workers.dev | S |
 | #62 | `vite.config.ts` の `manualChunks` で core（`_build/…/js.js`）を別チャンクに。警告が消えることを確かめる | S |
@@ -109,7 +112,10 @@
 |---|---|---|
 | ①リリースの形 ✅ | **`v1.0.0` タグ + GitHub Release。配り先は workers.dev のまま** | 独自ドメイン（#71 の `og:url` が変わる） |
 | ②#70 アプリとして入れるか | 入れる。#71 の og:image と同じラスタ化で済む | 閉じる（タブで完結） |
-| ③#306 控えの形 ✅ | **Autosave（ディスクへの自動書き込み）は捨てる。控え（Drafts）は保存した後も版として残す**（2026-09-12） | Autosave を残す／控えは届いていない字だけ |
+| ③#306 控えの形 ✅ | **Autosave（ディスクへの自動書き込み）は捨てる。控え（Drafts）は保存した後も版として残す**（2026-09-12。段 1〜5 とも main） | Autosave を残す／控えは届いていない字だけ |
+| ⑬#318 他所で書き換わっていたら | **聞く**（`Mod+S` は人が押した瞬間なので、たずねを開ける） | 書かずに知らせる／何もしない |
+| ⑭#323 OS へ戻る道 | `⋯` の行を 3 状態（Light / Dark / Follow OS）にする | 2 状態のまま。戻すには localStorage を消す |
+| ⑮ たずねの言葉 | `Leave this document? Your changes stay in Drafts.` / `Leave`（採用済み） | 別の言い方 |
 | ④#311 `Flaw` の 2 類 | 分ける。`check` の約束は木の整合だけ | 約束の文だけ直す |
 | ⑤#316 setext の下線 | 長さを綴りとして保つ | 3 本に決め打ちのまま（issue は閉じる） |
 | ⑥#291 `Doc.body` | v1 は出さないと書いて閉じる。文書の箱は v1.1 | 根の上に文書の箱（L、記法 spec を触る） |
