@@ -53,10 +53,13 @@ pub(all) struct FileActs {
   toggle_autosave : () -> Unit
   rename : () -> Unit
   choose_folder : () -> Unit
+  open_draft : (Int) -> Unit
+  forget_drafts : () -> Unit
 }
 
 pub(all) struct Files {
   saved_name : String?
+  drafts : Array[String]
   recent : Array[String]
   autosave : Bool
   can_open : Bool

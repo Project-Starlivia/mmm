@@ -72,6 +72,9 @@ pub struct App {
   /// 覚えている文書。Files の Recent に並ぶ。IndexedDB の向こうに在るので、
   /// 開く・保存するたびに引き直して手元に置く
   mut recent : Array[@disk.Known]
+  /// 控え。Files の Drafts と立ち上がりの真ん中に並ぶ。Recent と同じく
+  /// IndexedDB の向こうに在るので、控えるたびに引き直して手元に置く
+  mut drafts : Array[@disk.Draft]
   /// お絵描きの窓が開いているか。二重に開かせない
   mut drawing_open : Bool
   /// 掴みやすさ（⋯ の Easy grab）
@@ -197,6 +200,7 @@ pub fn App::new(
     saved_text: "",
     saved_name: None,
     recent: [],
+    drafts: [],
     drawing_open: false,
     grab: @prefs.load(doc, "grab") == Some("on"),
     autosave: @prefs.load(doc, "autosave") == Some("on"),
@@ -392,9 +396,7 @@ fn App::update_dirty(self : App) -> Unit {
 /// 2 つは行き先が違う（ブラウザの中と、他人も見るディスクの .md）。
 /// 控えに置き場は要らないので、名前の無い文書もここで残る
 async fn App::on_quiet(self : App) -> Unit {
-  self.disk
-  .drafts()
-  .keep(@web.now(), self.doc_name(), self.text(), self.disk.current_file())
+  self.keep_draft()
   if self.autosave &&
     self.can_hold() &&
     self.saved_name is Some(_) &&
@@ -487,7 +489,10 @@ async fn App::confirm_discard(self : App) -> Bool {
   if self.text() == self.saved_text {
     return true
   }
-  @parts.asked(self.doc, @parts.unsaved_changes()) is Some(_)
+  // **聞く前に控える。** たずねが「Drafts に残る」と言う以上、聞く時点で
+  // 本当に残っていなければならない — 手が止まって 1 秒より早く押されうる
+  self.keep_draft()
+  @parts.asked(self.doc, @parts.leave_document()) is Some(_)
 }
 
 ///|
@@ -599,23 +604,100 @@ async fn App::new_file(self : App) -> Unit {
 /// 並びは Files の `Recent ▸` と同じ口から引く（同じものが 2 通りに見えない）
 fn App::greet(self : App) -> Unit {
   self.greeting.show_middle(() => {
-    [
-      Caption("Recent", Some("clock")),
-      ..self.recent.mapi((i, row) => {
-        @parts.Entry::Run(@parts.row(recent_label(row, @web.now())), () => {
-          match self.recent.get(i) {
-            Some(r) => @web.spawn(async fn() { self.open_known(r.doc) })
-            None => ()
-          }
-        })
-      }),
-    ]
+    let now = @web.now()
+    // **控えが先。** Recent は「また開きたいもの」、控えは「まだ失われうるもの」で、
+    // 急ぐのは後者
+    let drafts : Array[@parts.Entry] = if self.drafts.is_empty() {
+      []
+    } else {
+      [
+        Caption("Drafts", Some("history")),
+        ..self.drafts.mapi((i, d) => {
+          @parts.Entry::Run(@parts.row(draft_label(d, now)), () => {
+            @web.spawn(async fn() { self.open_draft(i) })
+          })
+        }),
+      ]
+    }
+    let recent : Array[@parts.Entry] = if self.recent.is_empty() {
+      []
+    } else {
+      [
+        Caption("Recent", Some("clock")),
+        ..self.recent.mapi((i, row) => {
+          @parts.Entry::Run(@parts.row(recent_label(row, now)), () => {
+            match self.recent.get(i) {
+              Some(r) => @web.spawn(async fn() { self.open_known(r.doc) })
+              None => ()
+            }
+          })
+        }),
+      ]
+    }
+    [..drafts, ..recent]
   })
+}
+
+///|
+/// いまの字を控える。**置き場は要らない** — 名前の無い文書もここで残る
+async fn App::keep_draft(self : App) -> Unit {
+  self.disk
+  .drafts()
+  .keep(@web.now(), self.doc_name(), self.text(), self.disk.current_file())
+  self.drafts = self.disk.drafts().list() catch { _ => [] }
+}
+
+///|
+/// 控えから開く。**札も本文も戻し、印を立てたまま開く** — 控えはディスクに
+/// 届いていない字なので、開いた瞬間から「ディスクとは違う」と言えているのが正しい。
+/// 人が `Mod+S` を押した所で印が落ちる。
+///
+/// ディスクは読み直さない。控えのほうが新しいので、読めば戻した字を上書きする
+async fn App::open_draft(self : App, at : Int) -> Unit {
+  guard self.drafts.get(at) is Some(d) else { return }
+  (async fn() -> Unit {
+    guard self.confirm_discard() else { return }
+    let name = match d.doc {
+      // 許可はここで取り直す（押されたことがその資格。Recent と同じ作法）
+      Some(file) =>
+        if self.disk.adopt(file) {
+          Some(file.name())
+        } else {
+          return
+        }
+      None => {
+        self.disk.close()
+        None
+      }
+    }
+    // **ディスクに何が在るかは分からない。** 印を立てたまま出す
+    self.saved_text = ""
+    self.load_text(d.text, name)
+    (self.ed.focus)()
+  })() catch {
+    _ => @parts.failed(self.doc, "Couldn't open the file")
+  }
+}
+
+///|
+/// 控えを全部忘れる。**1 件ごとに消す道は持たない** — Recent の行が持たないので、
+/// 同じ器の中に 2 通りの行ができる
+async fn App::forget_drafts(self : App) -> Unit {
+  self.disk.drafts().forget_all()
+  self.drafts = []
 }
 
 ///|
 async fn App::refresh_recent(self : App) -> Unit {
   self.recent = self.disk.remembered() catch { _ => [] }
+  self.drafts = self.disk.drafts().list() catch { _ => [] }
+}
+
+///|
+/// 控えの一覧に出す 1 行の字。**Recent と同じ形** — 名前と、見分けに使えるもの。
+/// 同じ文書の版が 2 つ並ぶことがあるので、分けるのは時刻（#306）
+fn draft_label(d : @disk.Draft, now : Double) -> String {
+  d.name + " · " + @parts.age(now, d.at)
 }
 
 ///|
@@ -842,6 +924,7 @@ fn App::wire_bar(self : App) -> Unit {
       {
         saved_name: self.saved_name,
         recent: self.recent.map(row => recent_label(row, @web.now())),
+        drafts: self.drafts.map(d => draft_label(d, @web.now())),
         autosave: self.autosave,
         can_open: @web.can_open(),
         can_save: @web.can_save_as(),
@@ -861,6 +944,8 @@ fn App::wire_bar(self : App) -> Unit {
             None => ()
           }
         },
+        open_draft: i => @web.spawn(async fn() { self.open_draft(i) }),
+        forget_drafts: () => @web.spawn(async fn() { self.forget_drafts() }),
         save: () => @web.spawn(async fn() { self.save_file(false) }),
         save_as: () => @web.spawn(async fn() { self.save_file(true) }),
         toggle_autosave: () => self.set_autosave(!self.autosave),
@@ -978,7 +1063,9 @@ pub fn App::boot(self : App) -> Unit {
   // IndexedDB の向こうなので、届くまでに一拍ある）
   @web.spawn(async fn() {
     self.refresh_recent()
-    if self.gen == boot_gen && self.text() == "" && self.recent.length() > 0 {
+    if self.gen == boot_gen &&
+      self.text() == "" &&
+      (self.recent.length() > 0 || self.drafts.length() > 0) {
       self.greet()
     }
   })

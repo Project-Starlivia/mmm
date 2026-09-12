@@ -46,7 +46,7 @@ test "ask_form: 題・補足・絵・字と欄の並び・ボタン。check が�
     @web.click(no)
     assert_eq(cancelled.val, 1)
     // はい / いいえ には欄も bad も無い
-    let (yes, _) = ask_form(d, unsaved_changes(), () => ())
+    let (yes, _) = ask_form(d, leave_document(), () => ())
     assert_true(yes.querySelector("input") is None)
     assert_true(yes.querySelector(".bad") is None)
     assert_eq(yes.querySelectorAll("button")[0].textContent(), "Cancel")
@@ -101,7 +101,7 @@ test "named: 名は主語の表の写しで、渡したものがそのまま届�
       field~,
     )
   }
-  assert_eq(ask("discard").title, unsaved_changes().title)
+  assert_eq(ask("leave").title, leave_document().title)
   assert_eq(ask("place").title, image_place().title)
   assert_eq(ask("connect").note, Some("Images here point to pics."))
   assert_eq(ask("rename").parts.length(), 1)

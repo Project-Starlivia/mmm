@@ -34,6 +34,7 @@ pub struct App {
   mut saved_text : String
   mut saved_name : String?
   mut recent : Array[@disk.Known]
+  mut drafts : Array[@disk.Draft]
   mut drawing_open : Bool
   mut grab : Bool
   mut autosave : Bool

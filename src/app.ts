@@ -432,7 +432,7 @@ export const drawForm = (): HTMLFormElement => form(mbt.mmmDrawForm());
  * 本物の理由を返す。言葉をここへ写さない
  */
 export const askForm = (
-  kind: "discard" | "place" | "connect" | "rename" | "imageName" | "declaration" | "redeclaration",
+  kind: "leave" | "place" | "connect" | "rename" | "imageName" | "declaration" | "redeclaration",
   args: unknown = null,
 ): HTMLFormElement => form(mbt.mmmAskForm(kind, args));
 

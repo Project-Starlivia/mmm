@@ -71,6 +71,19 @@ pub async fn Disk::open_known(self : Disk, file : @web.FileHandle) -> Doc? {
 }
 
 ///|
+/// 札を引き受けて、**中身は読まない**。控えから戻すときの道 — ディスクの字より
+/// 控えのほうが新しいので、読めば戻した字を上書きしてしまう。
+/// 許可はここでも取り直す（押されたことがその資格）
+pub async fn Disk::adopt(self : Disk, file : @web.FileHandle) -> Bool {
+  guard @web.request_permission(file.as_any(), "readwrite").wait() == "granted" else {
+    return false
+  }
+  self.current = Some(file)
+  self.recent.opened(file)
+  true
+}
+
+///|
 /// いまのファイルを手放す（New file）。**覚えている一覧はそのまま**
 pub fn Disk::close(self : Disk) -> Unit {
   self.current = None
