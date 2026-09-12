@@ -8,15 +8,25 @@ pub(all) struct Doc {
 }
 
 ///|
-/// いま開いているファイルと、覚えている札
+/// いま開いているファイルと、覚えている札と、控え。
+///
+/// 控え（`drafts`）はディスクではなくブラウザの中に置くが、**覚えているものと
+/// 同じ置き場（IndexedDB）に同じ流儀で並ぶ**ので、口も 1 つにまとめる
 pub struct Disk {
   recent : Recent
+  drafts : Drafts
   mut current : @web.FileHandle?
 }
 
 ///|
-pub fn Disk::new(recent : Recent) -> Disk {
-  { recent, current: None, }
+pub fn Disk::new(recent : Recent, drafts : Drafts) -> Disk {
+  { recent, drafts, current: None, }
+}
+
+///|
+/// 控えの台帳
+pub fn Disk::drafts(self : Disk) -> Drafts {
+  self.drafts
 }
 
 ///|
@@ -45,7 +55,7 @@ async fn Disk::use_(self : Disk, file : @web.FileHandle) -> Doc {
 }
 
 ///|
-fn Disk::current_file(self : Disk) -> @web.FileHandle? {
+pub fn Disk::current_file(self : Disk) -> @web.FileHandle? {
   self.current
 }
 
@@ -118,6 +128,6 @@ pub async fn Disk::rename(self : Disk, name : String) -> String? {
 ///|
 /// 覚えている文書。**Files の `Recent` に並ぶのがこれ** — 最後に触れた順で、
 /// いま開いているものは外す
-pub async fn Disk::remembered(self : Disk) -> Array[@web.FileHandle] {
+pub async fn Disk::remembered(self : Disk) -> Array[Known] {
   self.recent.list_besides(self.current)
 }

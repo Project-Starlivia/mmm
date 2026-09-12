@@ -10,6 +10,8 @@ import {
 // Values
 pub fn accent(@dom.Document) -> String?
 
+pub fn age(Double, Double) -> String
+
 pub fn ask_form(@dom.Document, Ask, () -> Unit) -> (@dom.Element, () -> Array[String])
 
 pub async fn asked(@dom.Document, Ask) -> Array[String]?

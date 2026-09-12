@@ -9,11 +9,15 @@ import {
 }
 
 // Values
+pub let drafts_shelf : String
+
 pub fn folder_caption(String?, String?) -> String
 
 pub fn folder_problem(String, String?) -> String?
 
-pub fn idb_store() -> Store
+pub let handles_shelf : String
+
+pub fn idb_store(String) -> Store
 
 pub fn image_name_problem(String, @set.Set[String]) -> String?
 
@@ -29,14 +33,17 @@ pub(all) struct Binding {
 
 pub struct Disk {
   recent : Recent
+  drafts : Drafts
   mut current : @web.FileHandle?
 }
 pub fn Disk::close(Self) -> Unit
-pub fn Disk::new(Recent) -> Self
+pub fn Disk::current_file(Self) -> @web.FileHandle?
+pub fn Disk::drafts(Self) -> Drafts
+pub fn Disk::new(Recent, Drafts) -> Self
 pub async fn Disk::open_dialog(Self) -> Doc?
 pub async fn Disk::open_handle(Self, @web.FileHandle) -> Doc
 pub async fn Disk::open_known(Self, @web.FileHandle) -> Doc?
-pub async fn Disk::remembered(Self) -> Array[@web.FileHandle]
+pub async fn Disk::remembered(Self) -> Array[Known]
 pub async fn Disk::rename(Self, String) -> String?
 pub async fn Disk::save(Self, String) -> Unit
 pub async fn Disk::save_as(Self, String, String) -> Doc?
@@ -45,6 +52,29 @@ pub(all) struct Doc {
   name : String
   text : String
 }
+
+pub(all) struct Draft {
+  flow : String
+  seq : Int
+  name : String
+  at : Double
+  text : String
+  doc : @web.FileHandle?
+}
+
+pub struct Drafts {
+  store : Store
+  mut flow : String
+  mut seq : Int
+  mut born : Double
+  mut kept : String
+}
+pub async fn Drafts::forget_all(Self) -> Unit
+pub async fn Drafts::keep(Self, Double, String, String, @web.FileHandle?) -> Unit
+pub fn Drafts::kept(Self) -> String
+pub async fn Drafts::list(Self) -> Array[Draft]
+pub fn Drafts::new(Store) -> Self
+pub fn Drafts::start(Self) -> Unit
 
 pub(all) struct Drop {
   open_markdown : async (@web.FileHandle) -> Unit
