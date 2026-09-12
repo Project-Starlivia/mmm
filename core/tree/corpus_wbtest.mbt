@@ -244,3 +244,48 @@ test "見本 — 破れ" {
     ),
   )
 }
+
+///|
+/// 文書順の id を並べる。**読みと同じ振り方** — 文書の中身 → 根ごとに
+/// ノード → その中身 → 子（`build.mbt` の `number`）。
+fn ids_in_reading_order(doc : Doc) -> Array[Int] {
+  let ids = []
+  for b in doc.body {
+    ids.push(b.id)
+  }
+  fn node(x : Node) -> Unit {
+    ids.push(x.id)
+    for b in x.body {
+      ids.push(b.id)
+    }
+    for k in x.children {
+      node(k)
+    }
+  }
+
+  for r in doc.roots {
+    node(r.node)
+  }
+  ids
+}
+
+///|
+/// **id の順 = 文書順**、そして**中身は子より前に書かれる**（`docs/design.md`）。
+/// 読みは文書の頭から順に番号を振るので、文書順に歩けば id は必ず増える。
+/// 歩き方が「ノード → その中身 → 子」なので、この 1 本が 2 つの法則を同時に言う。
+///
+/// 頼る側: `core/map/select.mbt` の並べ替えと `Layout.order`（id の大小で文書順）、
+/// `core/read/caret.mbt` の `owns`（自身の文は地番の頭から最初の子の頭まで）。
+test "見本 — id の順 = 文書順" {
+  let bad : Array[String] = []
+  for md in read_corpus {
+    let ids = ids_in_reading_order(parse(md))
+    for i in 1..<ids.length() {
+      if ids[i] <= ids[i - 1] {
+        bad.push("\{md.escape()}  \{ids.to_json().stringify()}")
+        break
+      }
+    }
+  }
+  json_inspect(bad, content=[])
+}
