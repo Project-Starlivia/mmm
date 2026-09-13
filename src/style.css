@@ -101,12 +101,15 @@
   --line-mix: 12%;
   --node-border-mix: 21%;
   --node-border-strong-mix: 39%;
-  --edge-mix: 31%;
+  /* 枝は親子の関係そのものを言う線なので、**部品の輪郭と同じ 3:1** に届かせる
+     （WCAG 1.4.11）。箱の枠は字と面でも箱と分かるので、ここまで上げない */
+  --edge-mix: 44%;
   --dot-mix: 10%;
-  /* フォーカス枠の濃さ。--accent-soft より濃いのは、地が --bg へ沈んだ分
-     そのままだと枠が薄まって見えるため。**色は --accent から導く** — 数字で
-     持っていた頃は、色を変えても輪だけが既定の紫のまま残っていた */
-  --ring-mix: 32%;
+  /* 強調の**線**（焦点の輪・選択の枠・落とし先）が、アクセントを字の側へ
+     どれだけ寄せるか。暗い地では既定の紫のままだと 2.4:1 で、状態を言う線の
+     3:1 に届かない。**色は --accent から導く** — 数字で持っていた頃は、色を
+     変えても輪だけが既定の紫のまま残っていた */
+  --accent-line-mix: 20%;
   /* 面を accent で薄く塗るときの濃さ。**この 1 行だけ**が決める — 下が
      透ける面（`--accent-soft`）も、ノードの箱のように地の上へ不透明に塗る面も
      同じ濃さになる。同じ選択を 2 つのペインで見せているのに、濃さが違う
@@ -128,7 +131,7 @@
   --tok-keyword: #c792ea;
   --tok-string: #98c379;
   --tok-number: #d19a66;
-  --tok-comment: #6b7280;
+  --tok-comment: #888e9a;
   --tok-name: #61afef;
   --tok-type: #e5c07b;
 }
@@ -142,21 +145,66 @@
   --lift: #fff;
   --panel-mix: 100%;
   --node-bg-mix: 100%;
-  --ink-dim-mix: 61%;
+  --ink-dim-mix: 64%;
   --line-mix: 7%;
   --node-border-mix: 15%;
   --node-border-strong-mix: 38%;
-  --edge-mix: 26%;
+  --edge-mix: 51%;
   --dot-mix: 9%;
-  --ring-mix: 12%;
+  /* 明るい地では、既定の紫そのままで 5.7:1 ある */
+  --accent-line-mix: 0%;
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   --veil: rgba(0, 0, 0, 0.25);
+  /* one-light の配色を**字の側へ寄せて 4.5:1 に届かせた**もの（色相は保つ）。
+     白地に置くと、文字列・数・名前・コメントが本文の基準に届いていなかった */
   --tok-keyword: #a626a4;
-  --tok-string: #50a14f;
-  --tok-number: #b76b01;
-  --tok-comment: #9aa4b1;
-  --tok-name: #4078f2;
-  --tok-type: #986801;
+  --tok-string: #427c44;
+  --tok-number: #9f5f07;
+  --tok-comment: #69707a;
+  --tok-name: #3b6ad2;
+  --tok-type: #936503;
+}
+
+/* **OS でコントラストを上げている人へ。** 灰は混ぜ具合で導いているので、濃さを
+   差し替えるだけで薄い字・線・枠・枝・強調の線が一度に上がる — テーマを増やさず、
+   いまのテーマの上に重ねる（Figma の Enhanced contrast と同じ型）。
+   薄い字は 7:1、線と枠は 3:1、枝と強調の線は 4.5:1 に届かせる。
+   `.light` を後に置く — 同じ強さなので、後から来たほうが勝つ */
+@media (prefers-contrast: more) {
+  :root {
+    --ink-dim-mix: 73%;
+    --line-mix: 44%;
+    --node-border-mix: 44%;
+    --node-border-strong-mix: 59%;
+    --edge-mix: 59%;
+    --accent-line-mix: 42%;
+  }
+  .light {
+    --ink-dim-mix: 77%;
+    --line-mix: 51%;
+    --node-border-mix: 51%;
+    --node-border-strong-mix: 64%;
+    --edge-mix: 64%;
+    --accent-line-mix: 0%;
+  }
+}
+
+/* **OS が色を決めるとき**（Windows のハイコントラスト）。こちらの色は OS の
+   パレットに置き換わり、影は消える — 焦点の輪は影で描いているので、そのままでは
+   輪ごと無くなる。輪を枠線で描き直し、選択の線は OS の強調色に揃える */
+@media (forced-colors: active) {
+  #md-pane:focus-within .cm-editor,
+  .map-pane:focus-within {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .node.selected rect.box,
+  .node.drop-parent rect.box,
+  .card-pick rect.frame,
+  .caret-ring,
+  .drop-line {
+    stroke: Highlight;
+  }
 }
 
 /* 灰の導き方。**源（地・字・浮く向き）と濃さは上の 2 つが持ち、式はここ 1 つ。**
@@ -171,7 +219,9 @@
   --node-border-strong: color-mix(in srgb, var(--bg), var(--ink) var(--node-border-strong-mix));
   --edge: color-mix(in srgb, var(--bg), var(--ink) var(--edge-mix));
   --dot: color-mix(in srgb, var(--bg), var(--ink) var(--dot-mix));
-  --ring: color-mix(in srgb, var(--accent) var(--ring-mix), transparent);
+  --accent-line: color-mix(in srgb, var(--accent), var(--ink) var(--accent-line-mix));
+  /* 焦点の輪は強調の線そのもの。薄めて持つと地に対して 1.2:1 まで沈んでいた（#132） */
+  --ring: var(--accent-line);
   --accent-soft: color-mix(in srgb, var(--accent) var(--accent-mix), transparent);
 }
 
@@ -717,11 +767,11 @@ html, body {
 
   /* ---- ドラッグ（付けるのは app/mindmap/input.mbt と marks.mbt）---- */
   &.dragging { opacity: 0.4; }
-  &.drop-parent rect.box { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; }
+  &.drop-parent rect.box { stroke: var(--accent-line); stroke-width: 2; stroke-dasharray: 5 4; }
 
   /* ---- 選択（付けるのは app/mindmap/render.mbt の paint）---- */
   &.selected rect.box {
-    stroke: var(--accent);
+    stroke: var(--accent-line);
     stroke-width: 2;
     /* md 側の薄塗りと同じ濃さ。ただし箱は下が透けては困る（地のドットが出る）ので、
        transparent ではなく node-bg に混ぜる */
@@ -829,7 +879,7 @@ html, body {
 .card-pick {
   & rect.frame {
     fill: none;
-    stroke: var(--accent);
+    stroke: var(--accent-line);
     stroke-width: 2;
     rx: 6px;
     /* 枠は素通りさせる。もう一度押して外せなくなるため */
@@ -855,7 +905,7 @@ html, body {
 /* ========== 選択の持ち主 ==========
    矩形選択の面、md が持つ間の選択を示す内側の輪、ドラッグの落とし先の線。
    輪も枠（`selected`）も同じ 1 つの選択で、形が言うのは持ち主だけ — md が
-   持つなら輪、地図が持つなら枠。輪の濃さはここだけが持つ — `--accent-soft` は
+   持つなら輪、地図が持つなら枠。**線は `--accent-line`** — `--accent-soft` は
    面を塗るための薄さで、2px の線に当てると消える。 */
 .rubber {
   position: absolute;
@@ -867,7 +917,7 @@ html, body {
 
 .caret-ring {
   fill: none;
-  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke: var(--accent-line);
   stroke-width: 2;
   rx: 5px;
   /* 印は乗っているだけ。掴めると、下のノードを選べなくなる */
@@ -877,7 +927,7 @@ html, body {
 /* 兄弟へ挿入する予告（付けるのは app/mindmap/marks.mbt）。visibility で消す —
    display だと SVG の attribute と CSS の入り乱れが増える */
 .drop-line {
-  stroke: var(--accent);
+  stroke: var(--accent-line);
   stroke-width: 3;
   stroke-linecap: round;
   pointer-events: none;

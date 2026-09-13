@@ -11,7 +11,7 @@ type Theme = "light" | "dark";
 /** 源。3 色 */
 const COLORS = ["bg", "ink", "accent"] as const;
 /** 濃さ。地と字（浮くものは地と `--lift`）の混ぜ具合 */
-const MIXES = ["panel", "node-bg", "ink-dim", "line", "node-border", "node-border-strong", "edge", "dot", "ring"] as const;
+const MIXES = ["panel", "node-bg", "ink-dim", "line", "node-border", "node-border-strong", "edge", "dot", "accent-line"] as const;
 
 type Values = { color: Record<(typeof COLORS)[number], string>; mix: Record<(typeof MIXES)[number], number> };
 
@@ -22,7 +22,7 @@ function current(theme: Theme): Values {
   document.body.append(el);
   const cs = getComputedStyle(el);
   const read = (name: string): string => cs.getPropertyValue(name).trim();
-  const v: Values = { color: { bg: "", ink: "", accent: "" }, mix: { panel: 0, "node-bg": 0, "ink-dim": 0, line: 0, "node-border": 0, "node-border-strong": 0, edge: 0, dot: 0, ring: 0 } };
+  const v: Values = { color: { bg: "", ink: "", accent: "" }, mix: { panel: 0, "node-bg": 0, "ink-dim": 0, line: 0, "node-border": 0, "node-border-strong": 0, edge: 0, dot: 0, "accent-line": 0 } };
   for (const c of COLORS) v.color[c] = read(`--${c}`);
   for (const m of MIXES) v.mix[m] = parseFloat(read(`--${m}-mix`));
   el.remove();
