@@ -116,7 +116,11 @@ test "words: failed は Couldn't か環境の理由、blocked は次の一手。
     assert_false(blocked_words.contains(w))
   }
   for w in blocked_words {
-    assert_true(w.has_prefix("Select ") || w.has_prefix("Nothing "))
+    assert_true(
+      w.has_prefix("Select ") ||
+      w.has_prefix("Nothing ") ||
+      w.has_prefix("Allow "),
+    )
   }
   let all = failed_words + blocked_words
   assert_eq(Set::from_array(all).length(), all.length())

@@ -16,7 +16,7 @@ const TABLE = "app/parts/notice.mbt";
 
 // 言葉の形で向きが決まる（docs/spec.md「しらせ」）。`Couldn't …` は failed、
 // 「次の一手はそちら」は blocked
-const shape = { failed: /"(Couldn't [^"]*)"/g, blocked: /"((?:Select a node|Nothing to export)[^"]*)"/g };
+const shape = { failed: /"(Couldn't [^"]*)"/g, blocked: /"((?:Select a node|Nothing to export|Allow clipboard)[^"]*)"/g };
 
 function* sources(dir: string): Generator<string> {
   for (const name of fs.readdirSync(dir)) {

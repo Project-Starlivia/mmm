@@ -4,9 +4,14 @@
 ///|
 /// クリップボードの URL をリンクカードにして足し、題（`[]` の中）を打つ。
 /// URL として読めなければ `failed`（Mod+V は raw を core に読ませるが、ここは
-/// core の `is_url` で「URL か否か」だけを見て、違えば言う）
+/// core の `is_url` で「URL か否か」だけを見て、違えば言う）。クリップボードに
+/// 断られたら `blocked` — 中身のせいではなく、許せば通る
 fn Mindmap::add_link(self : Mindmap, id : Int) -> Unit {
-  (self.host.read_clipboard)(raw => {
+  (self.host.read_clipboard)(clip => {
+    guard clip is Some(raw) else {
+      (self.host.blocked)("Allow clipboard access")
+      return
+    }
     let url = raw.trim(chars=" \t\r\n").to_owned()
     guard @map.is_url(url) else {
       (self.host.failed)("Couldn't read that as a link")

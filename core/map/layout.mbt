@@ -68,6 +68,16 @@ fn parent_of(l : Layout, id : Int) -> Int? {
 }
 
 ///|
+/// その箱が居る木の根の箱。箱が無ければ None
+fn root_of(l : Layout, id : Int) -> Box? {
+  guard l.boxes.get(id) is Some(b) else { return None }
+  match b.parent {
+    Some(p) => root_of(l, p.id)
+    None => Some(b)
+  }
+}
+
+///|
 /// その親の、見えている子を文書順に（None なら根たち）
 fn kids_in(l : Layout, parent : Int?) -> Array[Int] {
   l.order.filter(id => parent_of(l, id) == parent)

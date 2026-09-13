@@ -182,15 +182,14 @@ fn lab_host(h : @core.Any) -> @mindmap.Host {
     copy: k => k(true),
     draw: _ => (),
     read_clipboard: k => {
-      @js_async.Promise::from_async(async fn() {
-        k(@web.read_clipboard(doc).wait())
-      })
+      @js_async.Promise::from_async(async fn() { k(@web.read_clipboard(doc)) })
       |> ignore
     },
     tokens,
     tokens_block: text => call("tokensBlock", [@core.any(text)]).cast(),
     epoch: () => call("epoch", []).cast(),
     failed: msg => @parts.failed(doc, msg),
+    blocked: msg => @parts.blocked(doc, msg),
     leave: () => @bar.focus_bar(doc),
   }
 }

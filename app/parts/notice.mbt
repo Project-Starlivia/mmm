@@ -50,15 +50,19 @@ pub let no_file_access = "This browser cannot open or save files"
 
 ///|
 /// 次の一手が相手にあるもの — 書き出すものが無い（Mod+E）、絵を貼る先のノードを
-/// 選んでいない。どちらも「選べば通る」ことを相手へ向けて言う。
+/// 選んでいない、ブラウザがクリップボードを読ませない（Mod+V と Shift+L）。
+/// どれも「そうすれば通る」ことを相手へ向けて言う。
 ///
-/// **貼るときに断るのは絵だけ。** `Mod+V` の字は、選んでいなければ根へ入る
+/// **貼るときに選択を求めるのは絵だけ。** `Mod+V` の字は、選んでいなければ根へ入る
 /// （文書そのものが受け皿になれる）。絵は 1 つのノードに付く形しか持たないので、
 /// どこへ付けるかを相手が決めるまで先が無い。
 /// クリップボードの URL をリンクにする `Shift+L` は、**宛先が 1 つに決まるときしか
-/// 出ない**（`core/map/keys.mbt`）ので、そもそも断る場面を持たない
+/// 出ない**（`core/map/keys.mbt`）ので、選択を求める場面を持たない。
+///
+/// **クリップボードに断られたのは、空とは違う。** 空は「何も無い」なので黙るが、
+/// 断られたのは許せば通る — 中身のせいにも、こちらのしくじりにもしない
 pub let blocked_words : Array[String] = [
-  "Nothing to export yet", "Select a node to paste an image into",
+  "Nothing to export yet", "Select a node to paste an image into", "Allow clipboard access",
 ]
 
 ///|
@@ -101,7 +105,9 @@ pub fn notice(
 }
 
 ///|
-/// body に 1 個。続けて呼べば中身が差し替わり、時計は打ち直す
+/// body に 1 個。続けて呼べば中身が差し替わり、時計は打ち直す。
+/// 器は**その文書のもの**だけを使い回す — 別の文書（試験の窓）に置いたものへ
+/// 差し替えても、目の前の文書には何も出ない
 fn show(
   doc : @dom.Document,
   mark : String,
@@ -110,11 +116,14 @@ fn show(
 ) -> Unit {
   let next = notice(doc, mark, msg, apologize)
   let box = match shown.box {
-    Some(b) => {
+    Some(b) if b
+      .ownerDocument()
+      .map(o => @core.equal(o.as_any(), doc.as_any()))
+      .unwrap_or(false) => {
       b.replaceChildren(next.childNodes())
       b
     }
-    None => {
+    _ => {
       match doc.body() {
         Some(body) => body.append(next.as_node())
         None => ()
