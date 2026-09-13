@@ -247,9 +247,10 @@ fn beyond(s : Scene) -> Zone {
   let (found, _) = s.best(s.layout.order, b => {
     let (du, dv, hu, hv) = offset(s.at, b)
     // 根は両方向に伸びる木の付け根なので、成長軸の判定を絶対値で見る
-    //（`offset` の du は dir で片側だけ正にしてあるので、根では素のままだと右側しか拾えない）
+    //（`offset` の du は dir で片側だけ正にしてあるので、根では素のままだと右側しか拾えない）。
+    // 右だけの根（項目）は、ほかの箱と同じく右へだけ伸びる
     let is_root = b.parent is None
-    let grow = if is_root { du.abs() } else { du }
+    let grow = if is_root && @tree.two_sided(b.node) { du.abs() } else { du }
     guard grow > hu && grow <= hu + reach && dv.abs() <= hv + slack else {
       return None
     }
@@ -284,13 +285,10 @@ fn landed(s : Scene, t : Target) -> Drop? {
     return Some(Side(root=t.id, side=Right))
   }
   guard b.parent is None else { return Some(Node(id=t.id, slot=Into)) }
-  // ポインタがその箱の中心のどちら側か。**側を決めるのはここだけ**
-  Some(
-    Side(
-      root=t.id,
-      side=side_of(if s.at.x < b.rect.center().x { -1 } else { 1 }),
-    ),
-  )
+  // ポインタがその箱の中心のどちら側か。**側を決めるのはここだけ**。
+  // 右だけの根（項目）は、どこを指しても右
+  let left = @tree.two_sided(b.node) && s.at.x < b.rect.center().x
+  Some(Side(root=t.id, side=side_of(if left { -1 } else { 1 })))
 }
 
 ///|

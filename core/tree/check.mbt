@@ -194,11 +194,16 @@ fn side_count(r : Root) -> Flaw? {
 }
 
 ///|
-/// 項目の根の子に Left。項目の中の `---` は中身なので側を書けない。
+/// 左右の両方へ子を置ける根か。**項目の根は右だけ** — 側の変わり目は `---` で書くが、
+/// 項目の中の `---` は中身なので側を書けない。落とし先（core/map）も同じ規則をここで見る。
+pub fn two_sided(root : Node) -> Bool {
+  !(sign_of(root) is Some(Item))
+}
+
+///|
+/// 右だけの根（`two_sided`）の子に Left。
 fn list_side(r : Root) -> Flaw? {
-  guard sign_of(r.node) is Some(Item) && r.sides.contains(Left) else {
-    return None
-  }
+  guard !two_sided(r.node) && r.sides.contains(Left) else { return None }
   Some(ListSide(r.node.id))
 }
 
