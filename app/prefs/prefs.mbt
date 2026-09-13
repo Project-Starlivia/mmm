@@ -42,6 +42,13 @@ pub fn load(doc : @dom.Document, name : String) -> String? {
 }
 
 ///|
+/// 持ち物を忘れる。**覚えが無いことに意味がある**ものに使う — テーマは、
+/// 覚えが無ければ OS に従う
+pub fn forget(doc : @dom.Document, name : String) -> Unit {
+  @web.storage_remove(doc, key_of(name))
+}
+
+///|
 /// 役目を終えた `mmm.*` を捨てる。消えたキーの名前を並べる移行リストは
 /// 増え続けて誰も消せなくなるので、持ち物のほうを宣言して残りを掃く。
 pub fn sweep(doc : @dom.Document) -> Unit {

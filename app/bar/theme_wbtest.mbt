@@ -93,8 +93,38 @@ test "Theme: 人が選んだら覚える。以後 OS が変わっても人の選
     // OS はダークのまま。もう一度鳴っても、選んだライトは動かない
     set_os(t, false)
     assert_true(t.is_light())
+    // OS と同じ側（ダーク）へ戻すと、覚えは消える（下の試験）
     t.toggle()
-    assert_eq(@prefs.load(d, "theme"), Some("dark"))
+    assert_eq(@prefs.load(d, "theme"), None)
+  })
+}
+
+///|
+/// **OS と同じ側を選んだら、覚えを消す**（#323）。時刻で明暗が変わる OS の人が、
+/// 一度選んだ後でも OS の切り替えに戻れる。判定は押した瞬間だけ — 後から OS が
+/// 変わっても、覚えは勝手に消えない
+test "Theme: OS と同じ側を選べば覚えを消し、また OS に従う" {
+  with_doc(d => {
+    let (t, _) = stage(d)
+    set_os(t, false)
+    // OS と逆（ライト）を選ぶ → 覚える
+    t.toggle()
+    assert_eq(@prefs.load(d, "theme"), Some("light"))
+    // 朝になって OS もライトに。覚えは勝手に消えない
+    set_os(t, true)
+    assert_eq(@prefs.load(d, "theme"), Some("light"))
+    // 夜になって OS がダーク。人の選択（ライト）が勝つ
+    set_os(t, false)
+    assert_true(t.is_light())
+    // OS と同じ側（ダーク）を選ぶ → 覚えを消す
+    t.toggle()
+    assert_false(t.is_light())
+    assert_eq(@prefs.load(d, "theme"), None)
+    // 以後はまた OS に従う
+    set_os(t, true)
+    assert_true(t.is_light())
+    set_os(t, false)
+    assert_false(t.is_light())
   })
 }
 

@@ -6,6 +6,8 @@ import {
 }
 
 // Values
+pub fn forget(@dom.Document, String) -> Unit
+
 pub fn load(@dom.Document, String) -> String?
 
 pub fn store(@dom.Document, String, String) -> Unit
