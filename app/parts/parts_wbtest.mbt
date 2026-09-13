@@ -187,6 +187,8 @@ test "rows: 行の形 — 見出し・区切り・絵の空欄・キー・入れ
     assert_eq(el.querySelectorAll("hr").length(), 1)
     let cap = el.querySelector(".caption").unwrap()
     assert_eq(cap.textContent(), "notes.md")
+    // `role="menu"` の中に置ける形で、行のふりはしない
+    assert_eq(attr(cap, "role"), "presentation")
     assert_eq(cap.querySelectorAll(".icon").length(), 1)
     let items = el.querySelectorAll(".item")
     assert_eq(items[0].querySelector(".key").unwrap().textContent(), "Mod+N")
@@ -258,6 +260,21 @@ test "Menu: 入れ子は行の隣に開き、子から選べば親ごと閉じ�
     assert_eq(attr(recent, "aria-expanded"), "true")
     let sub = m.sub.unwrap()
     assert_true(sub.is_open())
+    // 開いた行は、開いた器を id で指す。器の id は重ならない
+    assert_true(
+      @web.same(
+        d.getElementById(attr(recent, "aria-controls")).unwrap(),
+        sub.el,
+      ),
+    )
+    assert_true(attr(m.el, "id") != attr(sub.el, "id"))
+    // 子だけが閉じても（親の中の行でない所を押す）、行は閉じたと言う
+    fire(d, m.el.querySelector(".caption").unwrap(), "Event", "pointerdown")
+    assert_false(sub.is_open())
+    assert_true(m.is_open())
+    assert_eq(attr(recent, "aria-expanded"), "false")
+    @web.click(recent)
+    assert_eq(attr(recent, "aria-expanded"), "true")
     assert_eq(sub.el.querySelectorAll(".item").length(), 2)
     @web.click(sub.el.querySelectorAll(".item")[1])
     assert_eq(pressed, ["b"])
@@ -266,6 +283,56 @@ test "Menu: 入れ子は行の隣に開き、子から選べば親ごと閉じ�
     m.show(0, 0, () => sample(pressed))
     m.close_sub()
     assert_eq(attr(m.el.querySelectorAll(".item")[2], "aria-expanded"), "false")
+  })
+}
+
+///|
+test "open_on_click: ボタンは menu を開くと名乗り、開いているあいだだけ aria-expanded が true。どの閉じ方でも false に戻る" {
+  with_doc(d => {
+    let pressed : Array[String] = []
+    let button = d.createElement("button")
+    let body = d.querySelector("body").unwrap()
+    body.append(button.as_node())
+    open_on_click(button, () => sample(pressed))
+    assert_eq(attr(button, "aria-haspopup"), "menu")
+    assert_eq(attr(button, "aria-expanded"), "false")
+    let menu = d.getElementById(attr(button, "aria-controls")).unwrap()
+    assert_eq(attr(menu, "role"), "menu")
+    let expanded = () => attr(button, "aria-expanded")
+    let open = () => {
+      @web.click(button)
+      assert_eq(expanded(), "true")
+    }
+    // 選ぶ
+    open()
+    @web.click(menu.querySelectorAll(".item")[0])
+    assert_eq(pressed, ["new"])
+    assert_eq(expanded(), "false")
+    // Escape
+    open()
+    fire(d, d.documentElement(), "KeyboardEvent", "keydown", key="Escape")
+    assert_eq(expanded(), "false")
+    // 外を押す
+    open()
+    fire(d, body, "Event", "pointerdown")
+    assert_eq(expanded(), "false")
+    // 窓を離れる
+    open()
+    let win = d.as_any()._get("defaultView")
+    win._call("dispatchEvent", [
+      @core.new(win._get("Event"), [@core.any("blur")]),
+    ])
+    |> ignore
+    assert_eq(expanded(), "false")
+    // Tab で抜ける
+    open()
+    fire(d, menu, "KeyboardEvent", "keydown", key="Tab")
+    assert_eq(expanded(), "false")
+    // 押し直す
+    open()
+    fire(d, button, "Event", "pointerdown")
+    @web.click(button)
+    assert_eq(expanded(), "false")
   })
 }
 

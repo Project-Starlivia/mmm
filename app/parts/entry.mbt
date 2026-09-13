@@ -156,6 +156,9 @@ fn fill(
       }
       Caption(text, mark) => {
         let cap = @web.html(doc, "div", "caption")
+        // `role="menu"` の子に置ける形にする。行のふりはさせず、続く行を
+        // 包みもしない（並びは平らなまま）。字は読み上げの木に残る
+        cap.setAttribute("role", "presentation")
         match mark {
           Some(m) => cap.append(icon(doc, m).as_node())
           None => ()

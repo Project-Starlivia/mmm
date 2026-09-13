@@ -127,7 +127,7 @@ pub struct Menu {
   el : @dom.Element
   mut sub : Menu?
   mut parent : Menu?
-  mut opener_row : @dom.Element?
+  mut opened_by : @dom.Element?
   mut opener : @dom.Element?
   mut openers : Array[(@dom.Element, () -> Unit)]
   mut items : () -> Array[Entry]
