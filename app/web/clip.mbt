@@ -2,11 +2,20 @@
 // 試験の DOM（happy-dom）でも同じ道を通る
 
 ///|
-/// クリップボードの字。読めなければ ""
-pub extern "js" fn read_clipboard(
-  doc : @dom.Document,
-) -> @js_async.Promise[String] =
-  #| async (doc) => { try { return await doc.defaultView.navigator.clipboard.readText(); } catch { return ""; } }
+/// クリップボードの字。**断られれば None** — 空（`Some("")`）とは分ける。
+/// 空は「何も無い」、断られたのは「許せば通る」で、次の一手の向きが違う
+pub async fn read_clipboard(doc : @dom.Document) -> String? {
+  try clipboard_text(doc).wait() catch {
+    _ => None
+  } noraise {
+    text => Some(text)
+  }
+}
+
+///|
+/// 断られれば拒む
+extern "js" fn clipboard_text(doc : @dom.Document) -> @js_async.Promise[String] =
+  #| (doc) => doc.defaultView.navigator.clipboard.readText()
 
 ///|
 /// クリップボードへ字を置く。断られれば拒む
@@ -27,19 +36,26 @@ pub extern "js" fn clipboard_write(
   #|   const w = doc.defaultView; return w.navigator.clipboard.write([new w.ClipboardItem(item)]); }
 
 ///|
-/// クリップボードの絵（最初の image/*）。無い / 読めない / 断られたら null
-pub extern "js" fn clipboard_image(
-  doc : @dom.Document,
-) -> @js_async.Promise[@core.Any] =
+/// クリップボードの絵（最初の image/*）。**断られれば None** — 絵が無い
+/// （`Some(None)`。読む道を持たないブラウザもこちら）とは分ける
+pub async fn clipboard_image(doc : @dom.Document) -> @core.Any?? {
+  try first_image(doc).wait() catch {
+    _ => None
+  } noraise {
+    img => Some(@core.identity_option(img))
+  }
+}
+
+///|
+/// 最初の image/*。無ければ null、断られれば拒む
+extern "js" fn first_image(doc : @dom.Document) -> @js_async.Promise[@core.Any] =
   #| async (doc) => {
-  #|   try {
-  #|     const clip = doc.defaultView.navigator.clipboard;
-  #|     if (!("read" in clip)) return null;
-  #|     for (const item of await clip.read()) {
-  #|       const t = item.types.find((x) => x.startsWith("image/"));
-  #|       if (t) return await item.getType(t);
-  #|     }
-  #|   } catch {}
+  #|   const clip = doc.defaultView.navigator.clipboard;
+  #|   if (!("read" in clip)) return null;
+  #|   for (const item of await clip.read()) {
+  #|     const t = item.types.find((x) => x.startsWith("image/"));
+  #|     if (t) return await item.getType(t);
+  #|   }
   #|   return null;
   #| }
 

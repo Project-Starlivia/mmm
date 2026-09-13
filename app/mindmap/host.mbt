@@ -35,16 +35,18 @@ pub(all) struct Host {
   copy : ((Bool) -> Unit) -> Unit
   /// そのノードへ描いて貼る（Shift+D）
   draw : (Int) -> Unit
-  /// クリップボードの字を続きに渡す（読めなければ ""）
-  read_clipboard : ((String) -> Unit) -> Unit
+  /// クリップボードの字を続きに渡す（断られれば None）
+  read_clipboard : ((String?) -> Unit) -> Unit
   /// コードの色分け。(行, 言語) → 行ごとの塊
   tokens : (Array[String], String) -> Array[Array[Token]]
   /// カードの欄の色分け。原文 → 行ごとの塊
   tokens_block : (String) -> Array[Array[Token]]
   /// 言語の読み込みの世代。変われば描き直す
   epoch : () -> Int
-  /// しらせ（app/parts/notice.mbt の言葉）
+  /// しらせ（app/parts/notice.mbt の言葉）。こちらが果たせなかった
   failed : (String) -> Unit
+  /// しらせ。次の一手がそちらにある
+  blocked : (String) -> Unit
   /// ペインから帯へ抜ける（Escape）。Tab は子を足すのに使うので、キーボードだけで
   /// 帯やブラウザへ戻る道はこれ 1 つ
   leave : () -> Unit

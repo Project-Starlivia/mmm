@@ -781,3 +781,28 @@ async test "保存: ディスクが他所で書き換わっていれば、上書
   assert_true(s.doc.querySelector("dialog.ask") is None)
   assert_eq(written.length(), 4)
 }
+
+// ---- 貼る（#308）----
+
+///|
+/// ブラウザがクリップボードを読ませない（人が断った・組織の方針で切ってある）
+extern "js" fn deny_clipboard(doc : @dom.Document) -> @js_async.Promise[Unit] =
+  #| async (doc) => { (await doc.defaultView.navigator.permissions.query({ name: "clipboard-read" })).state = "denied"; }
+
+///|
+/// **断られたのは空とは違う。** 空なら黙るが、読ませてもらえなかったのは許せば
+/// 通るので、次の一手を相手へ向けて言う。文書には何も入らない
+async test "貼る: クリップボードに断られたら、許すよう言い、何も入れない" {
+  let s = stand()
+  defer s.win.close()
+  s.fake.change("# r\n")
+  @web.write_clipboard(s.doc, "## a").wait()
+  deny_clipboard(s.doc).wait()
+  s.app.paste()
+  rest(s.doc, 5)
+  assert_eq(s.fake.md, "# r\n")
+  assert_eq(
+    s.doc.querySelectorAll(".notice.on .msg").map(m => m.textContent()),
+    ["Allow clipboard access"],
+  )
+}

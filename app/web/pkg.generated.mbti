@@ -34,7 +34,7 @@ pub fn click(@dom.Element) -> Unit
 
 pub fn client_rect(@dom.Element) -> @dom.DOMRect
 
-pub fn clipboard_image(@dom.Document) -> @js_async.Promise[@core.Any]
+pub async fn clipboard_image(@dom.Document) -> @core.Any??
 
 pub fn clipboard_write(@dom.Document, FixedArray[String], FixedArray[@core.Any]) -> @js_async.Promise[Unit]
 
@@ -180,7 +180,7 @@ pub fn query_permission(@core.Any, String) -> @js_async.Promise[String]
 
 pub fn rasterize(@dom.Document, String, String, Int, Int) -> @js_async.Promise[@core.Any]
 
-pub fn read_clipboard(@dom.Document) -> @js_async.Promise[String]
+pub async fn read_clipboard(@dom.Document) -> String?
 
 pub fn read_text(FileHandle) -> @js_async.Promise[String]
 
