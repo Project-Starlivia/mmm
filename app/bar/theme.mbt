@@ -96,10 +96,19 @@ fn Theme::apply_theme(self : Theme, light : Bool) -> Unit {
 }
 
 ///|
-/// 人が選んだ一手。当てて、そのまま覚える。以後 OS が変わっても従わない
+/// 人が選んだ一手。当てて、覚える。以後 OS が変わっても従わない。
+///
+/// **ただし OS と同じ側を選んだら、覚えを消す**（#323）。覚えが無ければまた OS に
+/// 従うので、時刻で明暗が変わる OS の人も、一度選んだ後で戻れる — 3 つ目の行
+/// （System）を足さずに済む。判定は押した瞬間だけ。後から OS が変わっても
+/// 覚えは消さない（消すと、人の選択が知らないうちに外れる）
 fn Theme::go_theme(self : Theme, light : Bool) -> Unit {
   self.apply_theme(light)
-  @prefs.store(self.doc, "theme", if light { "light" } else { "dark" })
+  if light == self.os_light() {
+    @prefs.forget(self.doc, "theme")
+  } else {
+    @prefs.store(self.doc, "theme", if light { "light" } else { "dark" })
+  }
 }
 
 ///|
