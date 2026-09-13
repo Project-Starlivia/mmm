@@ -56,11 +56,12 @@ pub(all) struct Host {
   paste : () -> Unit
   copy : ((Bool) -> Unit) -> Unit
   draw : (Int) -> Unit
-  read_clipboard : ((String) -> Unit) -> Unit
+  read_clipboard : ((String?) -> Unit) -> Unit
   tokens : (Array[String], String) -> Array[Array[Token]]
   tokens_block : (String) -> Array[Array[Token]]
   epoch : () -> Int
   failed : (String) -> Unit
+  blocked : (String) -> Unit
   leave : () -> Unit
 }
 

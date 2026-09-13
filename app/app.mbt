@@ -160,12 +160,13 @@ pub fn App::new(
       copy: k => @web.spawn(async fn() { k(app().copy()) }),
       draw: id => app().draw(id),
       read_clipboard: k => {
-        @web.spawn(async fn() { k(@web.read_clipboard(doc).wait()) })
+        @web.spawn(async fn() { k(@web.read_clipboard(doc)) })
       },
       tokens: ed.tokens,
       tokens_block: ed.tokens_block,
       epoch: ed.epoch,
       failed: msg => @parts.failed(doc, msg),
+      blocked: msg => @parts.blocked(doc, msg),
       leave: () => @bar.focus_bar(doc),
     },
   )
@@ -842,24 +843,34 @@ async fn App::copy(self : App) -> Bool {
 ///
 /// **選んでいないときに断るのは絵だけ。** 字は文書そのものが受け皿になれるので
 /// 根へ入るが、絵は 1 つのノードに付く形しか持たない。
+///
+/// **クリップボードに断られたら、許すよう言う。** 空（何も無い）は黙るが、断られた
+/// のは許せば通る。絵で断られたら字の道へは落ちない — 読む許しは字と絵で 1 つなので、
+/// 字を読みに行っても同じ所で断られる（もう一度たずねるブラウザもある）
 /// 決めは docs/superpowers/specs/2026-09-06-paste-design.md
 fn App::paste(self : App) -> Unit {
   let anchor = (self.ed.selection)().anchor
   let gen = self.gen
   @web.spawn(async fn() {
     (async fn() -> Unit {
-      // クリップボードに画像があれば、テキストより優先する。読めない / 断られたら字の道へ
-      let img = @web.clipboard_image(self.doc).wait()
+      // クリップボードに画像があれば、テキストより優先する
+      let img = @web.clipboard_image(self.doc)
       guard gen == self.gen else { return }
-      if !@core.is_nullish(img) {
+      guard img is Some(found) else {
+        @parts.blocked(self.doc, "Allow clipboard access")
+      }
+      if found is Some(blob) {
         guard anchor is Some(id) else {
           @parts.blocked(self.doc, "Select a node to paste an image into")
         }
-        self.attach_image(id, img)
+        self.attach_image(id, blob)
         return
       }
-      let clip = @web.read_clipboard(self.doc).wait()
+      let clip = @web.read_clipboard(self.doc)
       guard gen == self.gen else { return }
+      guard clip is Some(clip) else {
+        @parts.blocked(self.doc, "Allow clipboard access")
+      }
       // 空はしくじりではなく「何も無い」なので黙る
       guard clip.trim(chars=" \t\r\n") != "" else { return }
       self.apply(

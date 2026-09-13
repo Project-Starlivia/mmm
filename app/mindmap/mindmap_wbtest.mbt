@@ -48,9 +48,11 @@ struct Stub {
   applied : Array[@op.Op]
   reveals : Array[Bool]
   failed : Array[String]
+  blocked : Array[String]
   mut pasted : Int
   mut drawn : Int?
-  mut clipboard : String
+  /// None は断られた
+  mut clipboard : String?
   /// 帯へ抜けた回数
   mut left : Int
 }
@@ -65,9 +67,10 @@ fn Stub::new(md : String) -> Stub {
     applied: [],
     reveals: [],
     failed: [],
+    blocked: [],
     pasted: 0,
     drawn: None,
-    clipboard: "",
+    clipboard: Some(""),
     left: 0,
   }
 }
@@ -109,6 +112,7 @@ fn Stub::host(self : Stub) -> Host {
     },
     epoch: () => 0,
     failed: msg => self.failed.push(msg),
+    blocked: msg => self.blocked.push(msg),
     leave: () => self.left = self.left + 1,
   }
 }
@@ -413,17 +417,22 @@ test "カードは選ぶと枠が出て、開けば欄、閉じるときに変�
 }
 
 ///|
-test "act: 選び直しは reveal で寄せ、Copy は写せたときだけ cut、AddLink は URL でなければ断る" {
+test "act: 選び直しは reveal で寄せ、Copy は写せたときだけ cut、AddLink は URL でなければ断り、読めなければ許しを求める" {
   with_doc(d => {
     let s = stand(d)
     s.map.act(Select(sel=@map.Selection::only(4), reveal=true))
     assert_eq(s.stub.selection.ids, [4])
     s.map.act(Copy(cut=Some(Op(op=Delete(ids=[4]), edit=false))))
     assert_true(s.stub.applied.last() is Some(Delete(ids=[4])))
-    s.stub.clipboard = "not a url"
+    s.stub.clipboard = Some("not a url")
     s.map.act(AddLink(id=3))
     assert_eq(s.stub.failed, ["Couldn't read that as a link"])
-    s.stub.clipboard = " https://example.com/x \n"
+    // 断られたのは中身のせいではない。次の一手は相手にある
+    s.stub.clipboard = None
+    s.map.act(AddLink(id=3))
+    assert_eq(s.stub.failed, ["Couldn't read that as a link"])
+    assert_eq(s.stub.blocked, ["Allow clipboard access"])
+    s.stub.clipboard = Some(" https://example.com/x \n")
     s.map.act(AddLink(id=3))
     assert_true(
       s.stub.applied.last()
