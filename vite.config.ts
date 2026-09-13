@@ -43,6 +43,19 @@ export default defineConfig({
      * `unicode-range` が要る人にだけ取らせる。
      */
     assetsInlineLimit: (file) => (file.endsWith(".woff2") ? false : undefined),
+    rollupOptions: {
+      output: {
+        /**
+         * **MoonBit の core は別のチャンクに出す**（#62）。core と CodeMirror とアプリは
+         * 変わる拍が違う — core は毎回、CodeMirror は依存を上げたときだけ変わる。
+         * 1 本に混ぜると、core の 1 行の直しで CodeMirror ぶんまで取り直させる。
+         *
+         * 割るのは core だけ。CodeMirror を名前で 1 本に寄せると、遅延で読む言語モード
+         * （`@codemirror/language-data` が引く 110 本）まで入口へ引き込んでしまう
+         */
+        manualChunks: (id) => (id.replace(/\\/g, "/").includes("/_build/js/") ? "core" : undefined),
+      },
+    },
   },
   server: {
     port: 13131,
