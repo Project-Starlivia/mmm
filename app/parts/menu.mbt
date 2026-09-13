@@ -27,8 +27,9 @@ pub struct Menu {
   mut sub : Menu?
   /// 自分が誰の子か。子から選んだとき、親ごと閉じるために辿る
   mut parent : Menu?
-  /// 子を開いた行。閉じたとき、そこへ焦点を戻す（← キー）
-  mut opener_row : @dom.Element?
+  /// 自分を開く行・ボタン（開き口）。開いているあいだだけ `aria-expanded` が
+  /// true で、`aria-controls` が自分の id を指す。子なら閉じたときに焦点を戻す先（← キー）
+  mut opened_by : @dom.Element?
   /// 開いたときに焦点があった要素。トップレベルだけが持つ — 閉じたら戻る先
   mut opener : @dom.Element?
   /// 入れ子を持つ行の「開く」動作（`fill` が返す）。ArrowRight が引く
@@ -47,6 +48,8 @@ pub fn Menu::new(doc : @dom.Document) -> Menu {
   @web.show(el, "block", false)
   el.setAttribute("role", "menu")
   el.setAttribute("tabindex", "-1")
+  // id は開き口が指すためだけに持つ。器は幾つでも作れるので、名は数で分ける
+  el.setId(fresh_id(doc, "menu"))
   match doc.body() {
     Some(body) => body.append(el.as_node())
     None => ()
@@ -56,7 +59,7 @@ pub fn Menu::new(doc : @dom.Document) -> Menu {
     el,
     sub: None,
     parent: None,
-    opener_row: None,
+    opened_by: None,
     opener: None,
     openers: [],
     items: () => [],
@@ -84,6 +87,24 @@ pub fn Menu::new(doc : @dom.Document) -> Menu {
   @web.on_window(doc, "resize", _ => if m.is_open() { m.respell() })
   @web.listen(el, "keydown", e => m.on_keydown(e))
   m
+}
+
+///|
+/// 文書の中でまだ誰も使っていない id
+fn fresh_id(doc : @dom.Document, name : String) -> String {
+  let mut i = 0
+  while doc.getElementById("\{name}-\{i}") is Some(_) {
+    i += 1
+  }
+  "\{name}-\{i}"
+}
+
+///|
+/// 開き口を覚える。開き口は**開く器を id で指す**（`aria-controls`）。
+/// 開いているかは `draw` と `hide` が `aria-expanded` で言う
+fn Menu::open_from(self : Menu, handle : @dom.Element) -> Unit {
+  self.opened_by = Some(handle)
+  handle.setAttribute("aria-controls", self.el.id())
 }
 
 ///|
@@ -181,20 +202,14 @@ fn Menu::on_keydown(self : Menu, e : @core.Any) -> Unit {
       }
     }
     "ArrowLeft" =>
-      // 自分が子のときだけ意味を持つ。**親の `close_sub` を経由する** —
-      // 直に `hide` すると、開いた行の `aria-expanded` を戻す係が
-      // 素通りされる（そこは親しか持っていない）
-      match self.parent {
-        Some(p) => {
-          @web.prevent(e)
-          let row = self.opener_row
-          p.close_sub()
-          match row {
-            Some(r) => @web.focus(r)
-            None => ()
-          }
+      // 自分が子のときだけ意味を持つ。閉じて、開いた行へ焦点を戻す
+      if self.parent is Some(_) {
+        @web.prevent(e)
+        self.hide(false)
+        match self.opened_by {
+          Some(r) => @web.focus(r)
+          None => ()
         }
-        None => ()
       }
     "Enter" | " " => {
       @web.prevent(e)
@@ -238,6 +253,11 @@ pub fn Menu::show_middle(self : Menu, items : () -> Array[Entry]) -> Unit {
 /// いまの並びを組んで置く。画面外へはみ出すときは内側へ寄せる
 fn Menu::draw(self : Menu) -> Unit {
   self.close_sub()
+  // 開き口は開いたと言う。閉じたと言うのは `hide` — どの道で閉じてもそこを通る
+  match self.opened_by {
+    Some(o) => o.setAttribute("aria-expanded", "true")
+    None => ()
+  }
   self.openers = fill(self.el, (self.items)(), {
     open_sub: (row, items) => self.open_sub(row, items),
     close_sub: () => self.close_sub(),
@@ -284,6 +304,10 @@ fn Menu::respell(self : Menu) -> Unit {
 pub fn Menu::hide(self : Menu, restore_focus : Bool) -> Unit {
   self.close_sub()
   @web.show(self.el, "block", false)
+  match self.opened_by {
+    Some(o) => o.setAttribute("aria-expanded", "false")
+    None => ()
+  }
   if restore_focus {
     match self.opener {
       Some(o) => @web.focus(o)
@@ -330,8 +354,7 @@ fn Menu::open_sub(
       s
     }
   }
-  row.setAttribute("aria-expanded", "true")
-  sub.opener_row = Some(row)
+  sub.open_from(row)
   let r = @web.client_rect(row)
   sub.show(r.right - overlap, r.top - overlap, () => items)
   // 右に入らないときは**親の左へ回す**。`show` の寄せは画面の中へ入れる
@@ -354,13 +377,7 @@ fn Menu::close(self : Menu, restore_focus : Bool) -> Unit {
 ///|
 fn Menu::close_sub(self : Menu) -> Unit {
   match self.sub {
-    Some(s) => {
-      match s.opener_row {
-        Some(r) => r.setAttribute("aria-expanded", "false")
-        None => ()
-      }
-      s.hide(false)
-    }
+    Some(s) => s.hide(false)
     None => ()
   }
 }
@@ -377,9 +394,14 @@ fn Menu::close_sub(self : Menu) -> Unit {
 /// 言うことになる（右クリックで開くメニューが誰も光らせないのと同じ）。
 /// 焦点はメニューが持ったままなので、矢印を押せばそこから先頭に着く。
 /// キーで押した click は `detail` が 0（マウスは押した回数が入る）
+///
+/// ボタンは**入れ子の行と同じく、menu を開くと名乗る**（`aria-haspopup`）
 pub fn open_on_click(button : @dom.Element, items : () -> Array[Entry]) -> Unit {
   guard button.ownerDocument() is Some(doc) else { return }
   let menu = Menu::new(doc)
+  button.setAttribute("aria-haspopup", "menu")
+  button.setAttribute("aria-expanded", "false")
+  menu.open_from(button)
   let was_open : Ref[Bool] = { val: false, }
   @web.listen(button, "pointerdown", _ => was_open.val = menu.is_open())
   @web.listen(button, "click", e => {
