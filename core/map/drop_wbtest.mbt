@@ -81,6 +81,50 @@ test "根の左外側（子が居ない側） → 側・左" {
 }
 
 ///|
+/// - r(1) → - a(2)。項目の根は右だけ（`@tree.two_sided`）
+fn item_l() -> Layout {
+  layout(
+    [
+      root(
+        node(
+          1,
+          "r",
+          children=[node(2, "a", mark=Some(@tree.bullet))],
+          mark=Some(@tree.bullet),
+        ),
+        sides=[Right],
+      ),
+    ],
+    size,
+  )
+}
+
+///|
+test "項目の根の箱の中（中心より左） → 側・右" {
+  let l = item_l()
+  let r = box(l, 1).rect
+  assert_eq(
+    drop_at(l, { x: r.x + 5.0, y: r.center().y, }),
+    Some(Side(root=1, side=Right)),
+  )
+}
+
+///|
+test "項目の根の周りのどこにも、左の側は出ない" {
+  let l = item_l()
+  let c = box(l, 1).rect.center()
+  for dx = -200.0; dx <= 200.0; dx = dx + 25.0 {
+    for dy = -100.0; dy <= 100.0; dy = dy + 25.0 {
+      let at : Pt = { x: c.x + dx, y: c.y + dy, }
+      assert_true(
+        drop_at(l, at) != Some(Side(root=1, side=Left)),
+        msg="(\{at.x}, \{at.y}) で左の側が出た",
+      )
+    }
+  }
+}
+
+///|
 test "遠い空所 → None" {
   assert_eq(drop_at(drop_l(), { x: 5000, y: 5000, }), None)
 }

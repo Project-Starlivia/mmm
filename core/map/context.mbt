@@ -164,22 +164,26 @@ fn turning(m : Menu) -> Array[Entry] {
       key="Shift+F",
       mark=if m.folded() { "chevrons-up-down" } else { "chevrons-down-up" },
     ),
-    match m.sel.anchor {
-      Some(a) if parent_of(m.l, a) is Some(_) =>
-        item(
-          "Flip side",
-          Some(Op(op=FlipSide(id=a), edit=false)),
-          mark="flip-horizontal",
-        )
-      _ =>
-        item(
-          "Flip side",
-          None,
-          mark="flip-horizontal",
-          why="The root has no side",
-        )
-    },
+    m.flip(),
   ]
+}
+
+///|
+/// 側を裏返す行。根は側を持たない。右だけの根（`@tree.two_sided`）の下は、
+/// 裏返すと左へ行くので沈む — 落とし先（drop.mbt）と同じ規則を同じ所から引く
+fn Menu::flip(self : Menu) -> Entry {
+  let row = (intent : Intent?, why : String?) => {
+    item("Flip side", intent, mark="flip-horizontal", why?)
+  }
+  guard self.sel.anchor is Some(a) &&
+    root_of(self.l, a) is Some(r) &&
+    r.node.id != a else {
+    return row(None, Some("The root has no side"))
+  }
+  guard @tree.two_sided(r.node) else {
+    return row(None, Some("A list has no left side"))
+  }
+  row(Some(Op(op=FlipSide(id=a), edit=false)), None)
 }
 
 ///|
