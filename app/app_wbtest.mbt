@@ -684,3 +684,100 @@ async test "控え: 押せば戻る。印は立ったまま。全部忘れれば
   assert_eq(s.app.disk.drafts().list().length(), 0)
   assert_eq(s.app.drafts.length(), 0)
 }
+
+///|
+/// **Save を選べば、書いてから進む**（IDE の 3 択）。Cancel なら何も書かず、
+/// 文書もそのまま。Don't Save は前からの試験が `[1]` で押している
+async test "離れる前のたずね: Save なら書いてから進み、Cancel なら何もしない" {
+  let s = stand()
+  defer s.win.close()
+  let written : Array[String] = []
+  s.app.open_known(paper("notes.md", "# r\n", t => written.push(t)))
+  s.fake.change("# r\n\n## a\n")
+  // Cancel（`[0]`）
+  let first = @js_async.Promise::from_async(async fn() { s.app.new_file() })
+  rest(s.doc, 5)
+  @web.click(
+    s.doc.querySelector("dialog.ask").unwrap().querySelectorAll(".row button")[0],
+  )
+  first.wait()
+  assert_eq(written, [])
+  assert_eq(s.fake.md, "# r\n\n## a\n")
+  // Save（`[2]`）— 書けたので新規へ進む
+  let second = @js_async.Promise::from_async(async fn() { s.app.new_file() })
+  rest(s.doc, 5)
+  @web.click(
+    s.doc.querySelector("dialog.ask").unwrap().querySelectorAll(".row button")[2],
+  )
+  second.wait()
+  assert_eq(written, ["# r\n\n## a\n"])
+  assert_eq(s.fake.md, "")
+}
+
+///|
+/// ディスク側の時刻を持つ札。自分の書き込みでも時刻が進む（本物と同じ）
+extern "js" fn stamped_paper(
+  name : String,
+  text : String,
+  into : (String) -> Unit,
+) -> @web.FileHandle =
+  #| (name, text, into) => ({ name, lm: 1,
+  #|   requestPermission: async () => "granted",
+  #|   async getFile() { return { text: async () => text, lastModified: this.lm }; },
+  #|   async createWritable() { const h = this; return { write: (t) => { into(t); h.lm += 1; }, close: () => {} }; } })
+
+///|
+/// 他所で書き換える（エディタ・git・同期フォルダの代わり）
+extern "js" fn touch_elsewhere(h : @web.FileHandle) -> Unit =
+  #| (h) => { h.lm += 100; }
+
+///|
+/// **他所で書き換わっていたら、保存の瞬間に聞く**（#318）。断れば書かない。
+/// 自分の書き込みは他所の変更と取り違えない（書いた後に時刻を控え直す）
+async test "保存: ディスクが他所で書き換わっていれば、上書きするか聞く" {
+  let s = stand()
+  defer s.win.close()
+  let written : Array[String] = []
+  let file = stamped_paper("notes.md", "# r\n", t => written.push(t))
+  s.app.open_known(file)
+  // 自分の保存は聞かない（続けて 2 回でも）
+  s.fake.change("# r\n\n## a\n")
+  s.app.save_file(false)
+  s.fake.change("# r\n\n## b\n")
+  s.app.save_file(false)
+  assert_eq(written, ["# r\n\n## a\n", "# r\n\n## b\n"])
+  assert_true(s.doc.querySelector("dialog.ask") is None)
+  // 他所で書き換わる → 聞く。Cancel（`[0]`）なら書かない
+  touch_elsewhere(file)
+  s.fake.change("# r\n\n## c\n")
+  let refused = @js_async.Promise::from_async(async fn() {
+    s.app.save_file(false)
+  })
+  rest(s.doc, 5)
+  guard s.doc.querySelector("dialog.ask") is Some(dlg) else {
+    fail("他所で書き換わっていたのに、たずねが開かない")
+  }
+  assert_eq(
+    dlg.querySelector(".title").unwrap().textContent(),
+    "notes.md has changed on disk.",
+  )
+  @web.click(dlg.querySelectorAll(".row button")[0])
+  refused.wait()
+  assert_eq(written.length(), 2)
+  // 断ったので時刻は控え直していない。もう一度押せばまた聞く — Overwrite（`[1]`）で書く
+  let accepted = @js_async.Promise::from_async(async fn() {
+    s.app.save_file(false)
+  })
+  rest(s.doc, 5)
+  guard s.doc.querySelector("dialog.ask") is Some(again) else {
+    fail("断った後にもう一度押しても、たずねが開かない")
+  }
+  @web.click(again.querySelectorAll(".row button")[1])
+  accepted.wait()
+  assert_eq(written[2], "# r\n\n## c\n")
+  // 上書きした後は自分の書き込み。次の保存では聞かない
+  s.fake.change("# r\n\n## d\n")
+  s.app.save_file(false)
+  assert_true(s.doc.querySelector("dialog.ask") is None)
+  assert_eq(written.length(), 4)
+}

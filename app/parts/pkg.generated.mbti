@@ -22,6 +22,8 @@ pub let blocked_words : Array[String]
 
 pub fn declaration(String, Field) -> Ask
 
+pub fn disk_changed(String) -> Ask
+
 pub fn draw_form(@dom.Document, () -> Unit, (Board) -> Unit, paint? : ((@dom.Element) -> Paint)?) -> (@dom.Element, Board)
 
 pub fn failed(@dom.Document, String) -> Unit
@@ -46,8 +48,6 @@ pub fn is_icon(String) -> Bool
 
 pub fn label(@dom.Document, String, String, Bool) -> Array[@dom.Node]
 
-pub fn leave_document() -> Ask
-
 pub fn named(String, text~ : String, parts~ : Array[Part], shot~ : String, field~ : Field) -> Ask
 
 pub fn names() -> Array[String]
@@ -66,9 +66,13 @@ pub fn pane_tool(@dom.Document, String) -> @dom.Element
 
 pub fn redeclaration(Field) -> Ask
 
+pub async fn reply(@dom.Document, Ask) -> Reply
+
 pub fn row(String, key? : String?, mark? : String?, caveat? : (((Array[String]) -> Unit) -> Unit)?, disabled? : Disabled) -> Row
 
 pub fn rows(@dom.Document, Array[Entry]) -> @dom.Element
+
+pub fn save_changes(String) -> Ask
 
 pub async fn show_drawing(@dom.Document) -> @core.Any?
 
@@ -81,6 +85,7 @@ pub(all) struct Ask {
   title : String
   note : String?
   ok : String
+  alt : String?
   cancel : String?
   parts : Array[Part]
   preview : String?
@@ -156,6 +161,12 @@ pub struct Pen {
 pub(all) struct Pt {
   x : Double
   y : Double
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Reply {
+  Go(Array[String])
+  Alt
+  No
 } derive(Eq, @debug.Debug)
 
 pub(all) struct Row {

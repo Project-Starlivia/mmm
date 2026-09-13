@@ -36,7 +36,7 @@
 | ✅ #300 | Recent の read-modify-write を 1 つの取引に。`find` の await も取引の中へ | M |
 | ✅ #309 | Recent の行に `seen` の時刻と画像フォルダの名前を添える。同名は束ねない。**行の形は Drafts も使う** | S |
 | ✅ #306 | 控え（Drafts）。spec は [2026-09-12-drafts-design.md](../specs/2026-09-12-drafts-design.md)。5 段に割る | L |
-| #318 | 書く前に `lastModified` を見る。**Autosave を捨てたので自動では起きない** — 残るのは手で押したときだけ。押した瞬間なので、聞ける | S |
+| ✅ #318 | 書く前に `lastModified` を見る。**Autosave を捨てたので自動では起きない** — 残るのは手で押したときだけ。押した瞬間なので、聞ける | S |
 | ✅ #310 | 狭い画面でも未保存の印は残す（名前だけ落とす）。置き場はロゴの隣 | S |
 
 ### 段 B 読みと書きが落とさない（2 日）— `core/tree/*` `core/op/*` `core/map/drop.mbt`
@@ -113,9 +113,9 @@
 | ①リリースの形 ✅ | **`v1.0.0` タグ + GitHub Release。配り先は workers.dev のまま** | 独自ドメイン（#71 の `og:url` が変わる） |
 | ②#70 アプリとして入れるか | 入れる。#71 の og:image と同じラスタ化で済む | 閉じる（タブで完結） |
 | ③#306 控えの形 ✅ | **Autosave（ディスクへの自動書き込み）は捨てる。控え（Drafts）は保存した後も版として残す**（2026-09-12。段 1〜5 とも main） | Autosave を残す／控えは届いていない字だけ |
-| ⑬#318 他所で書き換わっていたら | **聞く**（`Mod+S` は人が押した瞬間なので、たずねを開ける） | 書かずに知らせる／何もしない |
+| ⑬#318 他所で書き換わっていたら ✅ | **聞く**（`notes.md has changed on disk.` / Overwrite。2026-09-13） | 書かずに知らせる／何もしない |
 | ⑭#323 OS へ戻る道 | `⋯` の行を 3 状態（Light / Dark / Follow OS）にする | 2 状態のまま。戻すには localStorage を消す |
-| ⑮ たずねの言葉 | `Leave this document? Your changes stay in Drafts.` / `Leave`（採用済み） | 別の言い方 |
+| ⑮ たずねの言葉 ✅ | **IDE と同じ 3 択**（`Do you want to save the changes you made to notes.md?` / Save・Don't Save・Cancel。読む相手はエンジニア。2026-09-13） | 短い IDE 型の 2 択／Leave |
 | ④#311 `Flaw` の 2 類 | 分ける。`check` の約束は木の整合だけ | 約束の文だけ直す |
 | ⑤#316 setext の下線 | 長さを綴りとして保つ | 3 本に決め打ちのまま（issue は閉じる） |
 | ⑥#291 `Doc.body` | v1 は出さないと書いて閉じる。文書の箱は v1.1 | 根の上に文書の箱（L、記法 spec を触る） |

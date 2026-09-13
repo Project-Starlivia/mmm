@@ -16,11 +16,15 @@ pub struct Disk {
   recent : Recent
   drafts : Drafts
   mut current : @web.FileHandle?
+  /// いまのファイルを最後に読んだ / 書いたときの、ディスク側の時刻。
+  /// **書く直前に 1 度だけ比べる**（#318）。見張りではないので「外部変更は追わない」は
+  /// そのまま — 追わないが、他所の変更を黙って塗り潰しもしない
+  mut stamp : Double?
 }
 
 ///|
 pub fn Disk::new(recent : Recent, drafts : Drafts) -> Disk {
-  { recent, drafts, current: None, }
+  { recent, drafts, current: None, stamp: None, }
 }
 
 ///|
@@ -51,7 +55,32 @@ async fn read_doc(file : @web.FileHandle) -> Doc {
 async fn Disk::use_(self : Disk, file : @web.FileHandle) -> Doc {
   self.current = Some(file)
   self.recent.opened(file)
+  self.stamp = stamp_of(file)
   read_doc(file)
+}
+
+///|
+/// ディスク側の時刻。持たない実装なら None（比べようが無いので、聞かない側に倒す）
+async fn stamp_of(file : @web.FileHandle) -> Double? {
+  let v = @web.last_modified(file).wait() catch { _ => return None }
+  if @core.typeof_(v) == "number" {
+    Some(v.cast())
+  } else {
+    None
+  }
+}
+
+///|
+/// 最後に読んだ / 書いたときから、**他所で書き換わったか**。
+/// 比べる材料が無ければ false — 分からないことを理由に人を止めない
+pub async fn Disk::changed_elsewhere(self : Disk) -> Bool {
+  guard self.current is Some(file) && self.stamp is Some(before) else {
+    return false
+  }
+  match stamp_of(file) {
+    Some(now) => now != before
+    None => false
+  }
 }
 
 ///|
@@ -80,6 +109,9 @@ pub async fn Disk::adopt(self : Disk, file : @web.FileHandle) -> Bool {
   }
   self.current = Some(file)
   self.recent.opened(file)
+  // 戻すと決めたのは人。**いまのディスクの字を知ったうえで**控えを選んだので、
+  // ここから先の上書きは聞かない
+  self.stamp = stamp_of(file)
   true
 }
 
@@ -87,6 +119,7 @@ pub async fn Disk::adopt(self : Disk, file : @web.FileHandle) -> Bool {
 /// いまのファイルを手放す（New file）。**覚えている一覧はそのまま**
 pub fn Disk::close(self : Disk) -> Unit {
   self.current = None
+  self.stamp = None
 }
 
 ///|
@@ -109,6 +142,9 @@ pub async fn Disk::open_handle(self : Disk, file : @web.FileHandle) -> Doc {
 pub async fn Disk::save(self : Disk, text : String) -> Unit {
   guard self.current is Some(file) else { fail("no-file") }
   @web.write_text(file, text).wait()
+  // 自分の書き込みも時刻を進める。**書いた後に読み直して控える** —
+  // 控えなければ、次の保存で自分の書き込みを「他所の変更」と取り違える
+  self.stamp = stamp_of(file)
 }
 
 ///|
@@ -125,6 +161,7 @@ pub async fn Disk::save_as(
   @web.write_text(file, text).wait()
   self.current = Some(file)
   self.recent.opened(file)
+  self.stamp = stamp_of(file)
   Some({ name: file.name(), text, })
 }
 

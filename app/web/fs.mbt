@@ -272,3 +272,11 @@ pub fn idb_all() -> (@core.Any) -> @core.Any {
 /// 中が覗けないので鍵にできず、行を指すにはこちらで振った id が要る
 pub extern "js" fn unique_id() -> String =
   #| () => (globalThis.crypto?.randomUUID?.() ?? (Date.now().toString(36) + Math.random().toString(36).slice(2)))
+
+///|
+/// ファイルが最後に書き換わった時刻（ms）。**分からなければ null** —
+/// 持たない実装（試験の代役・一部の置き場）では、比べられないことを呼ぶ側が知る
+pub extern "js" fn last_modified(
+  h : FileHandle,
+) -> @js_async.Promise[@core.Any] =
+  #| (h) => h.getFile().then((f) => (typeof f.lastModified === "number" ? f.lastModified : null))

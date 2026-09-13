@@ -13,12 +13,31 @@
 // 別のもの。並べて見る道具は、写すのではなく**その検査を通す**。
 
 ///|
-/// この文書を離れて先へ進むか。
+/// いまの文書を離れる前に、保存するか。**IDE の聞き方に揃える** — 読む相手は
+/// エンジニアなので、VS Code が閉じるときに聞くのと同じ 3 択にする。
 ///
-/// **「捨てる」とは言わない** — 控え（Drafts）が残すので、押しても字は消えない。
-/// 消えると思って手が止まるのも、消えないと知らずに押すのも、どちらも嘘の上の判断
-pub fn leave_document() -> Ask {
-  ask_of("Leave this document? Your changes stay in Drafts.", "Leave")
+/// `Don't Save` を押しても字は消えない — 控え（Drafts）が残す。だから補足でそれを
+/// 言い、「失われる」とは書かない（消えると思って手が止まるのも、消えないと知らずに
+/// 押すのも、どちらも嘘の上の判断）
+pub fn save_changes(name : String) -> Ask {
+  ask_of(
+    "Do you want to save the changes you made to " + name + "?",
+    "Save",
+    alt=Some("Don't Save"),
+    note=Some("Unsaved changes are kept in Drafts."),
+  )
+}
+
+///|
+/// 保存しようとしたら、ディスクのほうが他所で書き換わっていた（#318）。
+/// **押した瞬間に聞く** — 保存は人の一手なので、そこで止めて確かめられる。
+/// 断れば何も書かない（字は手元と控えに残る）
+pub fn disk_changed(name : String) -> Ask {
+  ask_of(
+    name + " has changed on disk.",
+    "Overwrite",
+    note=Some("Overwrite it with your changes?"),
+  )
 }
 
 ///|
@@ -96,7 +115,8 @@ pub fn named(
   field~ : Field,
 ) -> Ask {
   match kind {
-    "leave" => leave_document()
+    "save" => save_changes(text)
+    "changed" => disk_changed(text)
     "place" => image_place()
     "connect" => folder_connection(text)
     "rename" => file_name(text)
