@@ -115,7 +115,8 @@ export const PARTS: Part[] = [
     name: "ask",
     height: 300,
     states: {
-      leave: () => asked("leave"),
+      save: () => asked("save", "notes.md"),
+      changed: () => asked("changed", "notes.md"),
       place: () => asked("place"),
       connect: () => asked("connect", "./pics/"),
       rename: () => asked("rename", "notes.md"),

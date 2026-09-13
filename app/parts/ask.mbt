@@ -33,8 +33,11 @@ pub(all) struct Ask {
   title : String
   /// 補足。**要るときだけ** — 題で足りるなら書かない
   note : String?
-  /// 進む側のボタンの名前（`OK` / `Discard` など）
+  /// 進む側のボタンの名前（`OK` / `Save` など）
   ok : String
+  /// 進むと断るのほかの、**もう 1 つの道**（`Don't Save`）。断りと進むのあいだに
+  /// 置き、色は持たない — どちらでもない一手なので、目を引く理由が無い
+  alt : String?
   /// 断る側の名前。無ければ `Cancel`（`Keep as is` のように意味を持つことがある）
   cancel : String?
   /// 字と欄の並び。空なら はい/いいえ
@@ -47,12 +50,13 @@ pub(all) struct Ask {
 fn ask_of(
   title : String,
   ok : String,
+  alt? : String? = None,
   note? : String? = None,
   cancel? : String? = None,
   parts? : Array[Part] = [],
   preview? : String? = None,
 ) -> Ask {
-  { title, note, ok, cancel, parts, preview, }
+  { title, note, ok, alt, cancel, parts, preview, }
 }
 
 ///|
@@ -65,13 +69,24 @@ fn footer(
   ok : String,
   cancel : String,
   on_cancel : () -> Unit,
+  alt? : String? = None,
 ) -> (@dom.Element, @dom.Element) {
   let row = @web.html(doc, "div", "row")
   let no = @web.html_text(doc, "button", "", cancel)
   no.setAttribute("type", "button")
   @web.listen(no, "click", _ => on_cancel())
-  let go = @web.html_text(doc, "button", "go", ok)
   row.append(no.as_node())
+  // もう 1 つの道は**送信**（value が returnValue になる）。断りのように
+  // 呼ぶ側へ任せると、器の外で 3 つ目の答えを組み立てることになる
+  match alt {
+    Some(label) => {
+      let other = @web.html_text(doc, "button", "", label)
+      other.setAttribute("value", "alt")
+      row.append(other.as_node())
+    }
+    None => ()
+  }
+  let go = @web.html_text(doc, "button", "go", ok)
   row.append(go.as_node())
   (row, go)
 }
@@ -141,7 +156,13 @@ pub fn ask_form(
     form.append(bad.as_node())
   }
   // 進む側は送信そのもの — 押したボタンの value（`"ok"`）が returnValue になる
-  let (row, go) = footer(doc, a.ok, a.cancel.unwrap_or("Cancel"), cancel)
+  let (row, go) = footer(
+    doc,
+    a.ok,
+    a.cancel.unwrap_or("Cancel"),
+    cancel,
+    alt=a.alt,
+  )
   go.setAttribute("value", "ok")
   form.append(row.as_node())
   // 打つそばから見直す。**進めない理由がある間は、進む道そのものを閉じる** —
@@ -177,9 +198,9 @@ pub fn ask_form(
 /// 器を組んで開き、**欄の値を並び順で**続きに渡す。断られたら None。
 /// 開くたびに作る — 聞くのは操作のたびに 1 回きりで、使い回す得が無い。
 ///
-/// 続きに渡るのは `<dialog>` の `returnValue` 由来: 進んだときだけ `"ok"`。
-/// Escape・背景・Cancel はすべて空文字（＝ 断り）に落ちる
-fn ask(doc : @dom.Document, a : Ask, k : (Array[String]?) -> Unit) -> Unit {
+/// 続きに渡るのは `<dialog>` の `returnValue` 由来: 進んだら `"ok"`、もう 1 つの道なら
+/// `"alt"`。Escape・背景・Cancel はすべて空文字（＝ 断り）に落ちる
+fn ask(doc : @dom.Document, a : Ask, k : (Reply) -> Unit) -> Unit {
   let dlg = @web.html(doc, "dialog", "ask")
   let (form, values) = ask_form(doc, a, () => @web.close_dialog(dlg))
   dlg.append(form.as_node())
@@ -188,10 +209,16 @@ fn ask(doc : @dom.Document, a : Ask, k : (Array[String]?) -> Unit) -> Unit {
     None => ()
   }
   @web.listen(dlg, "close", _ => {
-    let ok = @web.return_value(dlg) == "ok"
+    let way = @web.return_value(dlg)
     let out = values()
     dlg.remove()
-    k(if ok { Some(out) } else { None })
+    k(
+      match way {
+        "ok" => Go(out)
+        "alt" => Alt
+        _ => No
+      },
+    )
   })
   @web.show_modal(dlg)
   // 最初の欄を選んだ状態で開く（打ち直しがすぐ始められる）
@@ -202,12 +229,28 @@ fn ask(doc : @dom.Document, a : Ask, k : (Array[String]?) -> Unit) -> Unit {
 }
 
 ///|
-/// たずねて待つ（async の中から）。断られたら None
+/// たずねの答え。**道は 3 つ** — 進む・もう 1 つの道・断り
+pub(all) enum Reply {
+  /// 進んだ。欄の値を並び順で
+  Go(Array[String])
+  /// もう 1 つの道（`Ask.alt`）
+  Alt
+  /// 断った（Cancel・Escape・背景）
+  No
+} derive(Eq, Debug)
+
+///|
+/// たずねて待つ（async の中から）。3 つの道のどれを選んだかで返る
+pub async fn reply(doc : @dom.Document, a : Ask) -> Reply {
+  @web.promise_of(k => ask(doc, a, r => k(@core.any(r)))).wait().cast()
+}
+
+///|
+/// たずねて待つ（async の中から）。**進んだときだけ**欄の値を返し、ほかは None。
+/// もう 1 つの道を持たないたずねは、ほとんどこれで足りる
 pub async fn asked(doc : @dom.Document, a : Ask) -> Array[String]? {
-  let v = @web.promise_of(k => ask(doc, a, out => k(@core.from_option(out)))).wait()
-  if @core.is_null(v) {
-    None
-  } else {
-    Some(v.cast())
+  match reply(doc, a) {
+    Go(values) => Some(values)
+    Alt | No => None
   }
 }

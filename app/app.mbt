@@ -465,7 +465,16 @@ async fn App::confirm_discard(self : App) -> Bool {
   // **聞く前に控える。** たずねが「Drafts に残る」と言う以上、聞く時点で
   // 本当に残っていなければならない — 手が止まって 1 秒より早く押されうる
   self.keep_draft()
-  @parts.asked(self.doc, @parts.leave_document()) is Some(_)
+  match @parts.reply(self.doc, @parts.save_changes(self.doc_name())) {
+    Go(_) => {
+      // 保存してから進む。**ピッカーを閉じた・書けなかった・上書きを断った**なら
+      // 進まない — 保存を選んだ人の字を、書けていないまま入れ替えない
+      self.save_file(false)
+      self.text() == self.saved_text
+    }
+    Alt => true
+    No => false
+  }
 }
 
 ///|
@@ -549,6 +558,15 @@ async fn App::save_file(self : App, as_new : Bool) -> Unit {
       @web.spawn(async fn() { self.refresh_recent() })
       @web.spawn(async fn() { self.offer_connect() })
     } else {
+      // **書く直前に 1 度だけ確かめる**（#318）。他所（エディタ・git・同期フォルダ）で
+      // 書き換わっていれば聞く — 保存は人の一手なので、そこで止められる。
+      // 見張りではないので「外部変更は追わない」とは食い違わない
+      if self.disk.changed_elsewhere() {
+        guard @parts.asked(self.doc, @parts.disk_changed(self.doc_name()))
+          is Some(_) else {
+          return
+        }
+      }
       self.disk.save(written)
       guard gen == self.gen else { return } // 待つあいだに入れ替わった
     }

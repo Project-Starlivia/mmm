@@ -46,7 +46,7 @@ test "ask_form: 題・補足・絵・字と欄の並び・ボタン。check が�
     @web.click(no)
     assert_eq(cancelled.val, 1)
     // はい / いいえ には欄も bad も無い
-    let (yes, _) = ask_form(d, leave_document(), () => ())
+    let (yes, _) = ask_form(d, disk_changed("notes.md"), () => ())
     assert_true(yes.querySelector("input") is None)
     assert_true(yes.querySelector(".bad") is None)
     assert_eq(yes.querySelectorAll("button")[0].textContent(), "Cancel")
@@ -101,7 +101,8 @@ test "named: 名は主語の表の写しで、渡したものがそのまま届�
       field~,
     )
   }
-  assert_eq(ask("leave").title, leave_document().title)
+  assert_eq(ask("save").title, save_changes("pics").title)
+  assert_eq(ask("changed").title, disk_changed("pics").title)
   assert_eq(ask("place").title, image_place().title)
   assert_eq(ask("connect").note, Some("Images here point to pics."))
   assert_eq(ask("rename").parts.length(), 1)
@@ -109,4 +110,38 @@ test "named: 名は主語の表の写しで、渡したものがそのまま届�
   assert_eq(ask("imageName").parts.length(), 2)
   assert_eq(ask("declaration").title, "Where is pics, seen from the .md?")
   assert_eq(ask("redeclaration").ok, "Update")
+}
+
+///|
+/// **IDE と同じ 3 択。** 並びは 断り → もう 1 つ → 進む で、色を持つのは進む側だけ。
+/// もう 1 つの道は送信で、value が `"alt"`（器の外で 3 つ目の答えを組み立てない）
+test "save_changes: 3 つのボタンが 断り・もう 1 つ・進む の順に並ぶ" {
+  with_doc(d => {
+    let (form, _) = ask_form(d, save_changes("notes.md"), () => ())
+    assert_eq(
+      form.querySelector(".title").unwrap().textContent(),
+      "Do you want to save the changes you made to notes.md?",
+    )
+    assert_eq(
+      form.querySelector(".note").unwrap().textContent(),
+      "Unsaved changes are kept in Drafts.",
+    )
+    let buttons = form.querySelectorAll(".row button")
+    assert_eq(buttons.map(b => b.textContent()), [
+      "Cancel", "Don't Save", "Save",
+    ])
+    assert_eq(buttons[0].getAttribute("type"), Some("button"))
+    assert_eq(buttons[1].getAttribute("value"), Some("alt"))
+    assert_eq(buttons[2].getAttribute("value"), Some("ok"))
+    assert_eq(buttons[2].getAttribute("class"), Some("go"))
+    // もう 1 つの道を持たないたずねは、ボタン 2 つのまま
+    let (two, _) = ask_form(d, disk_changed("notes.md"), () => ())
+    assert_eq(two.querySelectorAll(".row button").map(b => b.textContent()), [
+      "Cancel", "Overwrite",
+    ])
+    assert_eq(
+      two.querySelector(".title").unwrap().textContent(),
+      "notes.md has changed on disk.",
+    )
+  })
 }

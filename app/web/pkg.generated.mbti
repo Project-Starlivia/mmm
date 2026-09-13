@@ -128,6 +128,8 @@ pub fn is_touch(@core.Any) -> Bool
 
 pub fn keyboard(@core.Any) -> @dom.KeyboardEvent
 
+pub fn last_modified(FileHandle) -> @js_async.Promise[@core.Any]
+
 pub fn left_window(@core.Any) -> Bool
 
 pub fn listen(@dom.Element, String, (@core.Any) -> Unit, capture? : Bool) -> Unit
