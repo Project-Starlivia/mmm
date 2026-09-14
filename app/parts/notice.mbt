@@ -40,8 +40,9 @@ pub let failed_words : Array[String] = [
   "Couldn't save", "Couldn't save the image", "Couldn't open the file", "Couldn't open the dropped file",
   "Couldn't open the image folder", "Couldn't rename the file", "Couldn't export",
   "Couldn't copy", "Couldn't copy the link", "Couldn't paste", "Couldn't read that as a link",
-  "Couldn't add the drawing", "Couldn't open that card", "Couldn't start editing — the node is folded",
-  "Couldn't do that here", no_file_access,
+  "Couldn't open all of it — the link is too large", "Couldn't add the drawing",
+  "Couldn't open that card", "Couldn't start editing — the node is folded", "Couldn't do that here",
+  no_file_access,
 ]
 
 ///|

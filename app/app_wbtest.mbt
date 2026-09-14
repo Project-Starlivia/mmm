@@ -159,9 +159,11 @@ fn mount(
 
 ///|
 /// index.html と同じ器を立て、App を組んで動かす。非同期の試験は閉じる閉包を
-/// 通れないので、これを手で持って `defer s.win.close()`。それ以外は `with_stand`
-fn stand(known? : Array[String] = []) -> Stand {
+/// 通れないので、これを手で持って `defer s.win.close()`。それ以外は `with_stand`。
+/// `hash` を渡せば、そのフラグメントの付いたページとして立ち上がる（共有リンク）
+fn stand(known? : Array[String] = [], hash? : String = "") -> Stand {
   let win = @test_utils.create_happy_window()
+  visit(win, "https://mmm.example/" + hash)
   let doc = win.document()
   let body = doc.body().unwrap()
   @web.set_style(doc.documentElement(), "--accent", "#5932ff")
@@ -199,6 +201,11 @@ fn stand(known? : Array[String] = []) -> Stand {
   app.boot()
   { win, doc, fake, app, }
 }
+
+///|
+/// 窓の住所を差し替える（happy-dom の既定は about:blank で、ハッシュを消す道が通らない）
+extern "js" fn visit(win : @dom.Window, url : String) -> Unit =
+  #| (win, url) => win.happyDOM.setURL(url)
 
 ///|
 /// 立てて渡し、済んだら閉じる（parts の `with_doc` と同じ形）
