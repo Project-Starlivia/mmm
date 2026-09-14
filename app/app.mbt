@@ -79,7 +79,6 @@ pub struct App {
   mut drawing_open : Bool
   /// 掴みやすさ（⋯ の Easy grab）
   mut grab : Bool
-  /// 手が止まると自分で書くか（Files の Autosave。#275）
   /// 立ち上がりに真ん中へ出す、覚えているものの一覧（#277）。器は他のメニューと
   /// 同じもので、閉じ方（外を押す・Escape・窓を離れる）もそれが持っている
   greeting : @parts.Menu
