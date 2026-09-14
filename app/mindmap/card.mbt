@@ -135,15 +135,14 @@ fn link(
   )
   let tip = @web.el(doc, "title", [])
   tip.setTextContent(url)
-  let open = @web.el(doc, "text", [
-    ("class", "link-open"),
-    // 枠の内側に収める。外へ出すと、選択の枠が本体より小さく見える
-    ("x", @web.num(x + w)),
-    ("y", @web.num(y + h / 2.0)),
-    ("text-anchor", "end"),
-    ("data-url", url),
-  ])
-  open.setTextContent("↗")
+  // 開く印は表の絵。大きさは core の数で置くので、帯やメニューの `.icon` の
+  // 大きさ（CSS。属性より勝つ）を継がないよう class は差し替える
+  let open = @parts.icon(doc, "external-link")
+  open.setAttribute("class", "link-open")
+  open.setAttribute("data-url", url)
+  let s = @map.link_mark
+  // 枠の内側に収める。外へ出すと、選択の枠が本体より小さく見える
+  cover(open, { x: x + w - s, y: y + (h - s) / 2.0, w: s, h: s, })
   [hit, text, tip, open]
 }
 

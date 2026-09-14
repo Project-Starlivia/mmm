@@ -77,6 +77,8 @@ pub fn label_place(Box, Camera, Double) -> Placement
 
 pub fn layout(Array[@tree.Root], (@tree.Node, Array[Card], Int) -> Size) -> Layout
 
+pub let link_mark : Double
+
 pub let mono_font : Font
 
 pub fn nearest(Array[Rect], Camera, Pane) -> Rect?
