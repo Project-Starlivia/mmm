@@ -16,8 +16,12 @@ let prefix = "md="
 let link_warn_length = 8000
 
 ///|
-/// バイト列を stream（Compression / DecompressionStream）に通して集める。
-/// 壊れた入力は reject（DecompressionStream が投げる）
+/// 開く側が展開するバイト数の上限。越えるリンクはここで読むのをやめ、最後の改行まで
+/// 戻して開く — 開く側は自分の上限を知っているので、決めてよい（#304）
+let link_read_bytes : Int = 2 * 1024 * 1024
+
+///|
+/// バイト列を stream（CompressionStream）に通して集める
 extern "js" fn pipe(
   bytes : @arraybuffer.Uint8Array,
   stream : @core.Any,
@@ -26,6 +30,51 @@ extern "js" fn pipe(
   #|   new Response(new Blob([bytes]).stream().pipeThrough(stream))
   #|     .arrayBuffer()
   #|     .then((b) => new Uint8Array(b))
+
+///|
+/// gzip を戻し、**`limit` バイトを読んだところで止める**（残りは展開しない）。
+/// 入力は 1KB ずつ流す — 1 切れの展開はまとめて出てくるので、切れが大きいと
+/// 止まる前に膨らむ。壊れた入力は reject（DecompressionStream が投げる）
+extern "js" fn gunzip(
+  bytes : @arraybuffer.Uint8Array,
+  limit : Int,
+) -> @js_async.Promise[@arraybuffer.Uint8Array] =
+  #| async (bytes, limit) => {
+  #|   let at = 0;
+  #|   const source = new ReadableStream({
+  #|     pull(c) {
+  #|       if (at >= bytes.length) return c.close();
+  #|       c.enqueue(bytes.subarray(at, at + 1024));
+  #|       at += 1024;
+  #|     },
+  #|   }, { highWaterMark: 0 });
+  #|   const reader = source.pipeThrough(new DecompressionStream("gzip")).getReader();
+  #|   const parts = [];
+  #|   let size = 0;
+  #|   while (size < limit) {
+  #|     const { done, value } = await reader.read();
+  #|     if (done) break;
+  #|     parts.push(value);
+  #|     size += value.length;
+  #|   }
+  #|   reader.cancel().catch(() => {});
+  #|   const out = new Uint8Array(Math.min(size, limit));
+  #|   let off = 0;
+  #|   for (const p of parts) {
+  #|     const n = Math.min(p.length, out.length - off);
+  #|     out.set(p.subarray(0, n), off);
+  #|     off += n;
+  #|   }
+  #|   return out;
+  #| }
+
+///|
+/// 頭の `end` バイト（写さない）
+extern "js" fn head(
+  bytes : @arraybuffer.Uint8Array,
+  end : Int,
+) -> @arraybuffer.Uint8Array =
+  #| (bytes, end) => bytes.subarray(0, end)
 
 ///|
 /// バイト列 → 1 バイト 1 文字の字（btoa の入力）
@@ -73,8 +122,29 @@ async fn to_hash(text : String) -> String {
 }
 
 ///|
-/// `location.hash` から本文を取り出す。リンクでなければ・壊れていれば None
-async fn from_hash(hash : String) -> String? {
+/// リンクから取り出した本文。`cut` は上限で切ったか
+priv struct Shared {
+  text : String
+  cut : Bool
+}
+
+///|
+/// 上限で切るところ。最後の改行の直後 — 行を半分に割らない。改行が 1 つも
+/// 無ければ上限ちょうどから、字の途中（UTF-8 の続きのバイト）を避けて戻る
+fn cut_at(bytes : @arraybuffer.Uint8Array, limit : Int) -> Int {
+  let newline = bytes.lastIndexOf('\n'.to_int(), from_index=limit - 1)
+  guard newline < 0 else { return newline + 1 }
+  let mut end = limit
+  while end > 0 && (bytes.get_at(end) & 0xC0) == 0x80 {
+    end -= 1
+  }
+  end
+}
+
+///|
+/// `location.hash` から本文を取り出す。リンクでなければ・壊れていれば None。
+/// 上限を 1 バイト越えて読む — 越えたかどうかは、読めた長さで分かる
+async fn from_hash(hash : String) -> Shared? {
   guard hash.has_prefix("#" + prefix) else { return None }
   let value = String::unsafe_substring(
     hash,
@@ -82,10 +152,17 @@ async fn from_hash(hash : String) -> String? {
     end=hash.length(),
   )
   guard from_base64url(value) is Some(bytes) else { return None }
-  let plain = pipe(bytes, @streams.DecompressionStream::new("gzip").as_any()).wait() catch {
+  let plain = gunzip(bytes, link_read_bytes + 1).wait() catch {
     _ => return None
   }
-  Some(@encoding.TextDecoder::new().decode(plain))
+  let decoder = @encoding.TextDecoder::new()
+  guard plain.length() > link_read_bytes else {
+    return Some({ text: decoder.decode(plain), cut: false, })
+  }
+  Some({
+    text: decoder.decode(head(plain, cut_at(plain, link_read_bytes))),
+    cut: true,
+  })
 }
 
 ///|

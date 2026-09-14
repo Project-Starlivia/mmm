@@ -1058,7 +1058,13 @@ pub fn App::boot(self : App) -> Unit {
     // ファイルハンドル 1 つで、リンクは入口でしかない
     @web.drop_hash(self.doc)
     if self.gen == boot_gen && self.text() == "" {
-      self.load_text(shared, None)
+      self.load_text(shared.text, None)
+      if shared.cut {
+        @parts.failed(
+          self.doc,
+          "Couldn't open all of it — the link is too large",
+        )
+      }
     }
   })
   // 覚えているものを真ん中に並べる。**空の文書のときだけ** — リンクで開いた
