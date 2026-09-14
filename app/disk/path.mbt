@@ -117,6 +117,8 @@ fn folder_from_doc(segments : Array[String]) -> String {
 // **決めるのも咎めるのも 1 か所**。`name_problem` はたずね箱が打鍵のたびに
 // 呼び、`name_parts` は通った値だけを受け取る — だめな値がここから先へ
 // 進むことは無いので、書き込む側で二度確かめない。
+//
+// 置き場の OS は選べない。**どこかの OS で置けない名前は、全部ここで止める**。
 
 ///|
 /// 名前をフォルダの断片に割る（末尾が置くファイル）。`.webp` は落とす
@@ -131,6 +133,18 @@ fn name_parts(typed : String) -> Array[String] {
 }
 
 ///|
+/// Windows が置かせない名前。拡張子の前で比べるので `con.webp` も同じ
+let reserved_names : Array[String] = {
+  let names = ["con", "prn", "aux", "nul"]
+  for head in ["com", "lpt"] {
+    for n in "0123456789¹²³" {
+      names.push(head + n.to_string())
+    }
+  }
+  names
+}
+
+///|
 /// その名前では置けない理由。置けるなら None
 fn name_problem(typed : String) -> String? {
   let parts = name_parts(typed)
@@ -141,6 +155,9 @@ fn name_problem(typed : String) -> String? {
   let joined = parts.join("")
   for i in 0..<joined.length() {
     let c = joined[i]
+    if c.to_int() < 0x20 || c.to_int() == 0x7f {
+      return Some("A file name cannot contain control characters")
+    }
     if c == '\\' ||
       c == ':' ||
       c == '*' ||
@@ -152,25 +169,49 @@ fn name_problem(typed : String) -> String? {
       return Some("A file name cannot contain \{c.to_char().unwrap()}")
     }
   }
+  for p in parts {
+    if p.has_prefix(" ") || p.has_suffix(" ") {
+      return Some("A name cannot start or end with a space")
+    }
+    if p.has_suffix(".") {
+      return Some("A name cannot end with .")
+    }
+    // 拡張子の前の空白も Windows は落として比べる（`con .png`）
+    let stem = match p.find(".") {
+      Some(dot) => String::unsafe_substring(p, start=0, end=dot)
+      None => p
+    }
+    let base = stem.trim_end(chars=" ").to_owned()
+    if reserved_names.contains(base.to_lower()) {
+      return Some("\{base} is reserved on Windows")
+    }
+  }
   None
 }
 
 ///|
 /// その名前では**置けない**理由。名前そのものの検査（`name_problem`）に、
 /// **置き場に同じ名前が居るか**を足したもの。置けるなら None。
-/// `here` はそのフォルダに既に在る名前（小文字、`.webp` 込み）。
+/// `here` はそのフォルダに既に在る名前（小文字、`.webp` 込み。フォルダは末尾に `/`）。
 ///
-/// 1 つの関数にしてあるのは、貼る側と並べて見る道具が**同じ検査を通す**ため —
-/// 言葉を写すと、条件を足したときに片方だけ古くなる
+/// ファイルは黙って上書きされ、フォルダとぶつかれば掘れも書けもしない — どちらも
+/// 押す前に止める。1 つの関数にしてあるのは、貼る側と並べて見る道具が
+/// **同じ検査を通す**ため — 言葉を写すと、条件を足したときに片方だけ古くなる
 pub fn image_name_problem(typed : String, here : Set[String]) -> String? {
   match name_problem(typed) {
     Some(why) => Some(why)
     None => {
       let parts = name_parts(typed)
-      guard parts.last() is Some(last) else { return None }
-      let head = parts.iter().take(parts.length() - 1).collect()
-      head.push(last + ".webp")
-      if here.contains(head.join("/").to_lower()) {
+      let last = parts.length() - 1
+      parts[last] = parts[last] + ".webp"
+      let mut path = ""
+      for i, p in parts {
+        path = if i == 0 { p.to_lower() } else { path + "/" + p.to_lower() }
+        if i < last && here.contains(path) {
+          return Some("\{p} is a file, not a folder")
+        }
+      }
+      if here.contains(path) || here.contains(path + "/") {
         Some("That name is taken")
       } else {
         None

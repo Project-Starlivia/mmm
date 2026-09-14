@@ -37,11 +37,11 @@ let sorry = "Sorry..."
 /// 消えた言葉は `test/notice.test.ts` が止める — 片側だけだと、表は「全部」を
 /// 名乗ったまま、出る場面の無い言葉を抱える（読む人はそれを探しに行く）
 pub let failed_words : Array[String] = [
-  "Couldn't save", "Couldn't save the image", "Couldn't open the file", "Couldn't open the dropped file",
-  "Couldn't open the image folder", "Couldn't rename the file", "Couldn't export",
-  "Couldn't copy", "Couldn't copy the link", "Couldn't paste", "Couldn't read that as a link",
-  "Couldn't add the drawing", "Couldn't open that card", "Couldn't start editing — the node is folded",
-  "Couldn't do that here", no_file_access,
+  "Couldn't save", "Couldn't save the image", "Couldn't convert the image", "Couldn't open the file",
+  "Couldn't open the dropped file", "Couldn't open the image folder", "Couldn't rename the file",
+  "Couldn't export", "Couldn't copy", "Couldn't copy the link", "Couldn't paste",
+  "Couldn't read that as a link", "Couldn't add the drawing", "Couldn't open that card",
+  "Couldn't start editing — the node is folded", "Couldn't do that here", no_file_access,
 ]
 
 ///|
