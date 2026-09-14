@@ -784,7 +784,7 @@ html, body {
   }
   & text.label {
     /* font-size は core/map/metric.mbt が決め、app/mindmap の render.mbt / card.mbt が
-       属性で入れる（数字を 2 箇所に置かない）。↗ だけは測らない字なのでここ */
+       属性で入れる（数字を 2 箇所に置かない） */
     fill: var(--ink);
     white-space: pre;
 
@@ -807,12 +807,13 @@ html, body {
     fill: var(--ink);
     pointer-events: none;
   }
-  & text.link-open {
-    font-size: 13px;
-    fill: var(--ink-dim);
+  & svg.link-open {
+    color: var(--ink-dim);
     cursor: pointer;
+    /* 線だけの絵は線にしか当たらない。塗らない面にも当て、印を丸ごと押せるようにする */
+    pointer-events: all;
 
-    &:hover { fill: var(--accent); }
+    &:hover { color: var(--accent); }
   }
 
   /* ---- 画像のカード ---- */

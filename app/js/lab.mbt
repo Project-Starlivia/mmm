@@ -241,7 +241,7 @@ pub fn mmm_map_edit_card(map : @core.Any, id : Int) -> Unit {
   map_of(map).edit_card(id)
 }
 
-// ---- 器（lab/parts/parts.ts、test/notice.test.ts） ----
+// ---- 器（lab/parts/parts.ts、test/notice.test.ts、test/icons.test.ts） ----
 
 ///|
 /// その名前の絵（Lucide の綴り）

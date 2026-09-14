@@ -3,7 +3,7 @@
 // 何をするかは act.mbt、印は marks.mbt
 
 ///|
-/// 押しても地図の手が始まらないもの。自分で出来事を受ける — リンクの ↗、
+/// 押しても地図の手が始まらないもの。自分で出来事を受ける — リンクの開く印、
 /// 読めていない画像の「繋ぐ」、隅の道具、開いている欄
 let interactive = ".link-open, .image-connect, .pane-tool, .label-editor, .card-editor"
 
@@ -48,7 +48,7 @@ fn Mindmap::rest_cursor(self : Mindmap) -> Unit {
 /// 背景の左ドラッグは矩形選択、パンは中クリック / Space+ドラッグ / 指の 1 本。
 /// **指は 1 本でも 2 本でも台帳に載せる** — 載らなかった指の pointermove が
 /// 「1 本ぶん」の流れへ落ちると、別の指の始点との差で地図が跳ぶ。capture で
-/// 取るのは、リンクの ↗ が pointerdown を止めるため
+/// 取るのは、リンクの開く印が pointerdown を止めるため
 fn Mindmap::bind_pointer(self : Mindmap) -> Unit {
   let pane = self.pane.as_element()
   @web.listen(
@@ -376,7 +376,7 @@ fn id_in(e : @core.Any, attr : String) -> Int? {
 }
 
 ///|
-/// リンクの ↗ と、読めていない画像の「繋ぐ」の字、カードと ×、ダブルクリックの編集
+/// リンクの開く印と、読めていない画像の「繋ぐ」の字、カードと ×、ダブルクリックの編集
 fn Mindmap::bind_click(self : Mindmap) -> Unit {
   let pane = self.pane.as_element()
   @web.listen(pane, "click", e => {

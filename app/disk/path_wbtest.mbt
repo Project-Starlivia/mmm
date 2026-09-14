@@ -47,6 +47,40 @@ test "name_problem: 空・. と ..・使えない字を咎め、通る名前は 
 }
 
 ///|
+test "name_problem: どこかの OS で置けない名前 — 制御文字・Windows の予約名・頭と末尾の空白・末尾の点" {
+  for typed in ["a\tb", "a\nb", "a\rb", "a\u{00}b", "a\u{1f}b", "a\u{7f}b"] {
+    assert_eq(
+      name_problem(typed),
+      Some("A file name cannot contain control characters"),
+    )
+  }
+  assert_eq(name_problem("con"), Some("con is reserved on Windows"))
+  assert_eq(name_problem("CON.webp"), Some("CON is reserved on Windows"))
+  assert_eq(name_problem("nul/shot"), Some("nul is reserved on Windows"))
+  assert_eq(name_problem("pics/Com1.x"), Some("Com1 is reserved on Windows"))
+  assert_eq(name_problem("lpt9"), Some("lpt9 is reserved on Windows"))
+  assert_eq(name_problem("con .png"), Some("con is reserved on Windows"))
+  assert_eq(name_problem("foo."), Some("A name cannot end with ."))
+  assert_eq(name_problem("..."), Some("A name cannot end with ."))
+  assert_eq(
+    name_problem("a /b"),
+    Some("A name cannot start or end with a space"),
+  )
+  assert_eq(
+    name_problem("a/ b"),
+    Some("A name cannot start or end with a space"),
+  )
+  // 予約名に似ているだけ・他の OS の字は通す
+  for
+    typed in [
+      "con1", "com10", "icon", "nul_", "café", "日本語", "🙂", "a;b", "a b",
+      " shot ",
+    ] {
+    assert_eq(name_problem(typed), None)
+  }
+}
+
+///|
 test "md_path: md に書くのは ./ 付き。上へ出る道はそのまま" {
   assert_eq(md_path("x.webp"), "./x.webp")
   assert_eq(md_path("./x.webp"), "./x.webp")
@@ -106,6 +140,14 @@ test "image_name_problem: 名前の柵に、置き場に同じ名前が居るか
   assert_eq(image_name_problem("Shot.WEBP", here), Some("That name is taken"))
   assert_eq(image_name_problem("pics/a", here), Some("That name is taken"))
   assert_eq(image_name_problem("a", here), None)
+  assert_eq(image_name_problem("pics/b", here), None)
+  // フォルダとぶつかる — 置く先にフォルダが居る、掘る途中にファイルが居る
+  let here : Set[String] = Set::from_array(["pics/", "pics/a.webp/", "notes"])
+  assert_eq(image_name_problem("pics/a", here), Some("That name is taken"))
+  assert_eq(
+    image_name_problem("Notes/a", here),
+    Some("Notes is a file, not a folder"),
+  )
   assert_eq(image_name_problem("pics/b", here), None)
   // 名前そのものの柵が先
   assert_eq(image_name_problem("", here), Some("Give it a name"))

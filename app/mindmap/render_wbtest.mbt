@@ -256,6 +256,8 @@ test "カードは仕切り線に続けて種類ごとの形で並び、data-car
     assert_eq(hits.length(), 2)
     assert_eq(hits.map(h => attr(h, "data-card")), ["5", "9"])
     assert_eq(attr(one(g, ".link-open"), "data-url"), "https://x.example/p")
+    // 開く印は字ではなく表の絵（#325）
+    assert_eq(one(g, ".link-open").tagName().to_lower(), "svg")
     assert_eq(one(g, ".link-row").textContent(), "t")
     assert_eq(attr(one(g, ".code-bg"), "data-card"), "6")
     assert_eq(one(g, ".code-bg title").textContent(), "js")

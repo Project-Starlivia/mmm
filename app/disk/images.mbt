@@ -394,11 +394,11 @@ pub async fn Images::choose_folder(self : Images) -> Unit {
 }
 
 ///|
-/// フォルダの中に**既に在る**綴り（小文字・フォルダからの相対）。
+/// フォルダの中に**既に在る**綴り（小文字・フォルダからの相対。フォルダは末尾に `/`）。
 ///
-/// 名前がぶつかると `createWritable` は黙って上書きする。押す前に言えるよう、
-/// 箱を開く時点で 1 度だけ数える。数えられなくても、上書きの警告が出ない
-/// だけで先へは進める
+/// 名前がぶつかると `createWritable` は黙って上書きし、フォルダとぶつかれば
+/// 掘れない。押す前に言えるよう、箱を開く時点で 1 度だけ数える。数えられなくても、
+/// 警告が出ないだけで先へは進める
 async fn taken(dir : @web.DirHandle) -> Set[String] {
   let out : Set[String] = Set([])
   async fn walk(d : @web.DirHandle, prefix : String) -> Unit {
@@ -406,7 +406,10 @@ async fn taken(dir : @web.DirHandle) -> Set[String] {
       let path = prefix + e.name
       match e.directory {
         None => out.add(path.to_lower())
-        Some(sub) => walk(sub, path + "/")
+        Some(sub) => {
+          out.add((path + "/").to_lower())
+          walk(sub, path + "/")
+        }
       }
     }
   }
@@ -430,6 +433,46 @@ async fn as_webp(blob : @core.Any) -> @core.Any {
     fail("webp conversion failed")
   }
   out
+}
+
+///|
+/// 絵を焼いてフォルダに置き、md に書く相対パスを返す。失敗は None。
+/// `parts` は柵を通った名前の断片（末尾は `.webp` 込み）
+async fn Images::put(
+  self : Images,
+  directory : @web.DirHandle,
+  parts : Array[String],
+  blob : @core.Any,
+) -> String? {
+  // 焼き直しは握りと関わらない。フォルダは無事なので、結び付きは捨てない
+  let webp = as_webp(blob) catch {
+    _ => {
+      (self.host.failed)("Couldn't convert the image")
+      return None
+    }
+  }
+  (async fn() {
+    let file = nested_file(directory, parts, true)
+    @web.write_blob(file, webp).wait()
+  })() catch {
+    _ => {
+      // 名前は柵（`image_name_problem`）が形も置き場の中身も見てから通している。
+      // それでも掘る・書くで転ぶのは**握りが腐った**とき — 抜かれた USB・
+      // 消されたフォルダ。掴んだまま持っていると、次も同じところで転ぶ
+      (self.host.failed)("Couldn't save the image")
+      self.forget()
+      return None
+    }
+  }
+  let rel = self.declared_path() + parts.join("/")
+  // 鍵はカード側が問い合わせてくる形（裸）に合わせる。md へ書くのは md_path の形（`./x`）
+  let key = @tree.bare_path(rel)
+  match self.urls.get(key) {
+    Some(Some(old)) => @web.revoke_url(old)
+    _ => ()
+  }
+  self.urls[key] = Some(@web.object_url(webp))
+  Some(md_path(rel))
 }
 
 ///|
@@ -462,27 +505,5 @@ pub async fn Images::save_to_disk(self : Images, blob : @core.Any) -> String? {
   let parts = name_parts(typed)
   guard parts.last() is Some(last) else { return None }
   parts[parts.length() - 1] = last + ".webp"
-  let written = (async fn() -> String {
-    let webp = as_webp(blob)
-    let file = nested_file(binding.directory, parts, true)
-    @web.write_blob(file, webp).wait()
-    let rel = self.declared_path() + parts.join("/")
-    // 鍵はカード側が問い合わせてくる形（裸）に合わせる。md へ書くのは md_path の形（`./x`）
-    let key = @tree.bare_path(rel)
-    match self.urls.get(key) {
-      Some(Some(old)) => @web.revoke_url(old)
-      _ => ()
-    }
-    self.urls[key] = Some(@web.object_url(webp))
-    md_path(rel)
-  })() catch {
-    _ => {
-      // **触って失敗した握りは腐っている。** 抜かれた USB・消されたフォルダ
-      // を掴んだまま持っていると、次も同じところで転ぶ
-      (self.host.failed)("Couldn't save the image")
-      self.forget()
-      return None
-    }
-  }
-  Some(written)
+  self.put(binding.directory, parts, blob)
 }
