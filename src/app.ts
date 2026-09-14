@@ -369,7 +369,6 @@ export interface Files {
   savedName: string | null;
   /** 覚えている文書の名前。いま開いているものは含まない */
   recent: string[];
-  /** 手が止まると自分で書くか */
   canOpen: boolean;
   canSave: boolean;
   canRename: boolean;
@@ -384,7 +383,6 @@ export interface FileActs {
   openRecent(index: number): void;
   save(): void;
   saveAs(): void;
-  toggleAutosave(): void;
   rename(): void;
   chooseFolder(): void;
 }

@@ -65,7 +65,6 @@ const FILES_ACTS: core.FileActs = {
   openRecent: nothing,
   save: nothing,
   saveAs: nothing,
-  toggleAutosave: nothing,
   rename: nothing,
   chooseFolder: nothing,
 };
