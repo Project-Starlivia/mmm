@@ -208,7 +208,7 @@ test "見本 — 記法構造の指紋" {
       #|"- [ ] a\n  - [x] b\n"
       #|  → Line[0,8](1,2,-,2,tight) Blank[8,10] Line[10,18](2,12,-,2,tight)
       #|"- a\n\n  ***\n\n  - b\n"
-      #|  → Line[0,4](1,2,-,2,tight) Blank[4,7] Card[7,11]"ThematicBreak" Blank[11,14] Line[14,18](2,16,-,2,tight)
+      #|  → Line[0,4](1,2,-,2,tight) Blank[4,7] Border[7,11] Blank[11,14] Line[14,18](2,16,-,2,tight)
       #|"- aaa\n  bbb\n  ccc\n"
       #|  → Line[0,18](1,2,-,2,tight)
       #|"---\nk: v\n---\n\n# a\n"
@@ -220,7 +220,7 @@ test "見本 — 記法構造の指紋" {
       #|"# a\r\n\r\n```\r\nx\r\n```\r\n"
       #|  → Line[0,5](1,2,#0) Blank[5,7] Card[7,20]["Code",{"info":"","text":"x\n"}]
       #|"# r\n\n## a\n\n---\n\n- b\n"
-      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Line[16,20](2,18,-,2,tight)
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Line[16,20](3,18,-,2,tight)
       #|":::a\n:::b\nx\n:::\n:::\n"
       #|  → Card[0,20]
       #|"# a\n\nbody\n\n---\n\n## b\n"
@@ -254,11 +254,11 @@ test "見本 — 記法構造の指紋" {
       #|"# a\n\n```js\nlet x = 1\n```\n"
       #|  → Line[0,4](1,2,#0) Blank[4,5] Card[5,25]["Code",{"info":"js","text":"let x = 1\n"}]
       #|"# r\n\n## a\n\n---\n\n- b\n\n- c\n"
-      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Line[16,20](2,18,-,2,loose) Blank[20,21] Line[21,25](2,23,-,2,loose)
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Line[16,20](3,18,-,2,loose) Blank[20,21] Line[21,25](3,23,-,2,loose)
       #|"# r\n\n## a\n\n---\n\n---\n\n## b\n"
       #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Card[11,15]"ThematicBreak" Blank[15,16] Border[16,20] Blank[20,21] Line[21,26](2,24,#0)
       #|"# r\n\n## h\n\n---\n\n- a\n  - b\n"
-      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Line[16,20](2,18,-,2,tight) Blank[20,22] Line[22,26](3,24,-,2,tight)
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Line[16,20](3,18,-,2,tight) Blank[20,22] Line[22,26](4,24,-,2,tight)
       #|"- a\n\n  - b\n\n  text\n\n  - c\n"
       #|  → Line[0,4](1,2,-,2,tight) Blank[4,7] Line[7,11](2,9,-,2,tight) Blank[11,14] Card[14,19] Blank[19,22] Line[22,26](2,24,-,2,tight)
       #|"# a\n\n[text](https://e.com)\n"
@@ -296,7 +296,7 @@ test "見本 — 記法構造の指紋" {
       #|"- a\n\n  <details>\n\n  ## h\n\n  </details>\n"
       #|  → Line[0,4](1,2,-,2,tight) Blank[4,7] Fold[7,17](-) Blank[17,20] Line[20,25](3,23,#0) Blank[25,28] Shut[28,39]
       #|"# r\n\n## h\n\n### x\n\n---\n\n- a\n  - b\n\n### t\n"
-      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Line[11,17](3,15,#0) Blank[17,18] Border[18,22] Blank[22,23] Line[23,27](2,25,-,2,tight) Blank[27,29] Line[29,33](3,31,-,2,tight) Blank[33,34] Line[34,40](3,38,#0)
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Line[11,17](3,15,#0) Blank[17,18] Border[18,22] Blank[22,23] Line[23,27](4,25,-,2,tight) Blank[27,29] Line[29,33](5,31,-,2,tight) Blank[33,34] Line[34,40](3,38,#0)
       #|"# r\n\n<details>\n\n## h\n\n## h2\n\n</details>\n"
       #|  → Line[0,4](1,2,#0) Blank[4,5] Card[5,40]["Details",{"open":false,"body":"## h\n\n## h2"}]
       #|"# r\n\n<details>\n\n[q]: /r\n\n## a\n\n</details>\n"
@@ -304,7 +304,7 @@ test "見本 — 記法構造の指紋" {
       #|"# r\n\n<details>\n\nbodya\n\n# head\n\n</details>\n"
       #|  → Line[0,4](1,2,#0) Blank[4,5] Card[5,42]["Details",{"open":false,"body":"bodya\n\n# head"}]
       #|"# root\n\n---\n\n## h1\n\n---\n\n* i1\n\n---\n\n## h2\n"
-      #|  → Line[0,7](1,2,#0) Blank[7,8] Border[8,12] Blank[12,13] Line[13,19](2,16,#0) Blank[19,20] Border[20,24] Blank[24,25] Line[25,30](2,27,*,2,tight) Blank[30,31] Border[31,35] Blank[35,36] Line[36,42](2,39,#0)
+      #|  → Line[0,7](1,2,#0) Blank[7,8] Border[8,12] Blank[12,13] Line[13,19](2,16,#0) Blank[19,20] Border[20,24] Blank[24,25] Line[25,30](3,27,*,2,tight) Blank[30,31] Border[31,35] Blank[35,36] Line[36,42](2,39,#0)
       #|"# r\n\n## h\n\n<svg><details>a</details></svg>\n"
       #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Card[11,43]["Svg","<svg><details>a</details></svg>\n"]
       #|"# r\n\n<details>\n\n## a\n\n---\n\n</details>\n\n## b\n"
@@ -320,7 +320,7 @@ test "見本 — 記法構造の指紋" {
       #|"# r\n\n<details><summary>a</summary>\n\n## a\n\n</details>\n"
       #|  → Line[0,4](1,2,#0) Blank[4,5] Fold[5,35](-,"a") Blank[35,36] Line[36,41](2,39,#0) Blank[41,42] Shut[42,53]
       #|"# r\n\n## h\n\n---\n\n<details>\n\n- a\n  - b\n\n</details>\n\n- c\n"
-      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Fold[16,26](-) Blank[26,27] Line[27,31](2,29,-,2,tight) Blank[31,33] Line[33,37](3,35,-,2,tight) Blank[37,38] Shut[38,49] Blank[49,50] Line[50,54](2,52,-,2,tight)
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Fold[16,26](-) Blank[26,27] Line[27,31](3,29,-,2,tight) Blank[31,33] Line[33,37](4,35,-,2,tight) Blank[37,38] Shut[38,49] Blank[49,50] Line[50,54](3,52,-,2,tight)
       #|"# r\n\n<details>\t<summary>s</summary>\n\n## a\n\n</details>\n"
       #|  → Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"s") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Shut[43,54]
       #|"# r\n\n<details>\n<summary>x</summary>\n\n## h\n\n</details>\n"
@@ -364,7 +364,7 @@ test "見本 — 記法構造の指紋" {
       #|"- a\n\n  <details>\n  <summary>b</summary>\n\n  - b\n\n  </details>\n\n  - c\n"
       #|  → Line[0,4](1,2,-,2,tight) Blank[4,7] Fold[7,40](-,"b") Blank[40,43] Line[43,47](2,45,-,2,tight) Blank[47,50] Shut[50,61] Blank[61,64] Line[64,68](2,66,-,2,tight)
       #|"# r\n\n## a\n\n---\n\n<details>\n<summary>c</summary>\n\n- c\n\n</details>\n\n- e\n"
-      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Fold[16,47](-,"c") Blank[47,48] Line[48,52](2,50,-,2,tight) Blank[52,53] Shut[53,64] Blank[64,65] Line[65,69](2,67,-,2,tight)
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Fold[16,47](-,"c") Blank[47,48] Line[48,52](3,50,-,2,tight) Blank[52,53] Shut[53,64] Blank[64,65] Line[65,69](3,67,-,2,tight)
       #|"# root\n\n<details>\n<summary>head</summary>\n\n## head\n\n</details>\n\ntext\n"
       #|  → Line[0,7](1,2,#0) Blank[7,8] Card[8,63]["Details",{"open":false,"summary":"head","body":"## head"}] Blank[63,64] Card[64,69]
       #|"# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n---\n\n---\n\n## b\n"

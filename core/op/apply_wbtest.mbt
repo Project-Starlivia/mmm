@@ -1418,7 +1418,12 @@ test "apply の結果は check を通る（境界は md が決めるので除く
     }
   }
   // 全部 None に潰れる退化を落とすための下限チェック。
-  inspect(some, content="502")
+  inspect(
+    some,
+    content=(
+      #|516
+    ),
+  )
   json_inspect(bad, content=[])
 }
 

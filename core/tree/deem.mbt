@@ -259,7 +259,7 @@ fn take(
       // 水平線が続くなら、手前の 1 本は境界になれない（直後が骨格でない）ので
       // その場の中身に落ちる。保留は 1 本しか持てないので、上書きの前に吐き出す
       spill(d)
-      d.pend = Some({ at: span, owner: holder(d) })
+      d.pend = Some({ at: span, owner: holder(d), })
     }
     // 空行は綴りであってモデルには無い。serialize が正規形として置き直す
     BlankLines(..) => ()
@@ -443,7 +443,7 @@ fn put(
   if d.own == deep {
     d.own = depth
   }
-  let seat : Seat = { mark, line: Some(own_at.from) }
+  let seat : Seat = { mark, line: Some(own_at.from), }
   d.read.push(seat)
   d.seat(seat)
 }
@@ -453,7 +453,7 @@ fn put(
 /// 控えて真。**境界になるのは 3 つを全部満たすときだけ** — 持ち主がノード、直後が
 /// 骨格の行（いまここ）、その行が同じ木（深さ 2 以上）。満たさなければ持ち主の中身
 fn resolve(d : Deem, depth : Int) -> Bool {
-  guard d.pend is Some({ at, owner }) else { return false }
+  guard d.pend is Some({ at, owner, }) else { return false }
   guard owner is Some(_) && depth >= 2 else {
     spill(d)
     return false
@@ -486,7 +486,7 @@ fn[T] lower(stack : Array[T], depth : Int) -> Unit {
 /// 木の積みなら `deem` を渡して、一番浅い深さを控えさせる
 fn fill(stack : Array[Seat], depth : Int, deem : Deem?) -> Unit {
   while stack.length() < depth - 1 {
-    let gap : Seat = { mark: None, line: None }
+    let gap : Seat = { mark: None, line: None, }
     match deem {
       Some(d) => d.seat(gap)
       None => stack.push(gap)
@@ -527,7 +527,7 @@ fn[T] shut(stack : Array[T], fold_roots : Array[Int]) -> Unit {
 /// 境界になれなかった水平線を、その場の中身として落とす。
 /// **書かれた位置も持ち主もそのまま保たれる**（`Pend`）。
 fn spill(d : Deem) -> Unit {
-  guard d.pend is Some({ at, owner }) else { return }
+  guard d.pend is Some({ at, owner, }) else { return }
   d.pend = None
   keep(
     d,

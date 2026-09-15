@@ -402,21 +402,31 @@ test "境界のあとの入れ子項目に空の項目が生えない" {
             },
             {
               "id": 4,
-              "label": "a",
+              "label": "",
               "body": [],
               "children": [
                 {
                   "id": 5,
-                  "label": "b",
+                  "label": "a",
                   "body": [],
-                  "children": [],
+                  "children": [
+                    {
+                      "id": 6,
+                      "label": "b",
+                      "body": [],
+                      "children": [],
+                      "mark": [
+                        "Item",
+                        { "marker": "-", "offset": 2, "loose": false },
+                      ],
+                    },
+                  ],
                   "mark": [
                     "Item",
                     { "marker": "-", "offset": 2, "loose": false },
                   ],
                 },
               ],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
             },
           ],
           "mark": ["Heading", { "setext": false, "closing": 0 }],
@@ -457,29 +467,39 @@ test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
             },
             {
               "id": 5,
-              "label": "a",
-              "body": [],
-              "children": [
-                {
-                  "id": 6,
-                  "label": "b",
-                  "body": [],
-                  "children": [],
-                  "mark": [
-                    "Item",
-                    { "marker": "-", "offset": 2, "loose": false },
-                  ],
-                },
-              ],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-            },
-            {
-              "id": 7,
               "label": "",
               "body": [],
               "children": [
                 {
-                  "id": 8,
+                  "id": 6,
+                  "label": "",
+                  "body": [],
+                  "children": [
+                    {
+                      "id": 7,
+                      "label": "a",
+                      "body": [],
+                      "children": [
+                        {
+                          "id": 8,
+                          "label": "b",
+                          "body": [],
+                          "children": [],
+                          "mark": [
+                            "Item",
+                            { "marker": "-", "offset": 2, "loose": false },
+                          ],
+                        },
+                      ],
+                      "mark": [
+                        "Item",
+                        { "marker": "-", "offset": 2, "loose": false },
+                      ],
+                    },
+                  ],
+                },
+                {
+                  "id": 9,
                   "label": "t",
                   "body": [],
                   "children": [],
@@ -490,8 +510,8 @@ test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
           ],
           "mark": ["Heading", { "setext": false, "closing": 0 }],
         },
-        "sides": ["Right", "Left", "Left"],
-        "rules": ["", "---", ""],
+        "sides": ["Right", "Left"],
+        "rules": ["", "---"],
       },
     ],
   })
@@ -519,23 +539,36 @@ test "境界のあとの兄弟項目は同じ深さに並ぶ" {
             },
             {
               "id": 4,
-              "label": "b",
+              "label": "",
               "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": true }],
-            },
-            {
-              "id": 5,
-              "label": "c",
-              "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": true }],
+              "children": [
+                {
+                  "id": 5,
+                  "label": "b",
+                  "body": [],
+                  "children": [],
+                  "mark": [
+                    "Item",
+                    { "marker": "-", "offset": 2, "loose": true },
+                  ],
+                },
+                {
+                  "id": 6,
+                  "label": "c",
+                  "body": [],
+                  "children": [],
+                  "mark": [
+                    "Item",
+                    { "marker": "-", "offset": 2, "loose": true },
+                  ],
+                },
+              ],
             },
           ],
           "mark": ["Heading", { "setext": false, "closing": 0 }],
         },
-        "sides": ["Right", "Left", "Left"],
-        "rules": ["", "---", ""],
+        "sides": ["Right", "Left"],
+        "rules": ["", "---"],
       },
     ],
   })
@@ -552,12 +585,12 @@ test "項目の中の 2 つ目の列は前の列の兄弟" {
         "node": {
           "id": 2,
           "label": "a",
-          "body": [],
+          "body": [{ "id": 3, "source": "text" }],
           "children": [
             {
-              "id": 3,
+              "id": 4,
               "label": "b",
-              "body": [{ "id": 4, "source": "text" }],
+              "body": [],
               "children": [],
               "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
             },
@@ -743,7 +776,7 @@ test "項目の中は文書 — 中の水平線は飾り" {
     skeleton("- # x\n\n  ---\n\n  # y\n"),
     content=(
       #|-
-      #|  # x +1
+      #|  # x
       #|  # y
     ),
   )

@@ -148,7 +148,7 @@ test "見本 — 読んで書き戻した字" {
       #|"- \n  - \n    - \n      - \n"
       #|  → "- -\n    - -\n"
       #|"- a\n\n  - b\n\n  text\n\n  - c\n"
-      #|  → "- a\n  - b\n\n    text\n  - c\n"
+      #|  → "- a\n\n  text\n\n  - b\n  - c\n"
       #|"# r\r\n\r\n<details class=\"x\">\r\n\r\n## h\r\n\r\n</details>\r\n"
       #|  → "# r\n\n<details class=\"x\">\n\n## h\n\n</details>\n"
       #|"# r\n\n<details><summary>a</summary>\n\n## a\n\n</details>\n"
@@ -238,8 +238,6 @@ test "見本 — 破れ" {
   inspect(
     out.to_string(),
     content=(
-      #|"# r\n\n---\n\n# s\n"  [["BorderBreak",3]]
-      #|"body\n\n---\n\n# a\n"  [["BorderBreak",3]]
       #|
     ),
   )

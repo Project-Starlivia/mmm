@@ -131,10 +131,20 @@ test "項目は Implicit を挟まず深さ 2 へ" {
             },
             {
               "id": 4,
-              "label": "b",
+              "label": "",
               "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+              "children": [
+                {
+                  "id": 5,
+                  "label": "b",
+                  "body": [],
+                  "children": [],
+                  "mark": [
+                    "Item",
+                    { "marker": "-", "offset": 2, "loose": false },
+                  ],
+                },
+              ],
             },
           ],
           "mark": ["Heading", { "setext": false, "closing": 0 }],
@@ -169,13 +179,23 @@ test "見出しと項目が交互に並ぶ" {
               },
               {
                 "id": 4,
-                "label": "i1",
+                "label": "",
                 "body": [],
-                "children": [],
-                "mark": ["Item", { "marker": "*", "offset": 2, "loose": false }],
+                "children": [
+                  {
+                    "id": 5,
+                    "label": "i1",
+                    "body": [],
+                    "children": [],
+                    "mark": [
+                      "Item",
+                      { "marker": "*", "offset": 2, "loose": false },
+                    ],
+                  },
+                ],
               },
               {
-                "id": 5,
+                "id": 6,
                 "label": "h2",
                 "body": [],
                 "children": [],

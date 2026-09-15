@@ -496,7 +496,11 @@ fn covers(
 /// 水平線の直後の塊 `w` が、その水平線を境界にするか。**同じ木に座る骨格の行**
 /// （深さ 2 以上）のときだけ — 新しい木（深さ 1）の手前の水平線は飾り。
 /// 持ち主がノードであることは問わない — 領域は畳んだノードの後ろなので、持ち主は必ずノード
-fn borders(blocks : Array[@markdown.Block], depth : Array[Depth], w : Int) -> Bool {
+fn borders(
+  blocks : Array[@markdown.Block],
+  depth : Array[Depth],
+  w : Int,
+) -> Bool {
   w < blocks.length() && depth[w].own >= 2 && depth[w].own < deep
 }
 

@@ -53,14 +53,18 @@ let border_cases : Array[(String, String)] = [
   ("# r\n\n## a\n\n---\n\n## b\n", "r → [a, 左:b]"),
   ("# r\n\n---\n\n## a\n", "r → [左:a]"),
   ("# r\n\n## a\n\n---\n\n### x\n", "r → [a, 左:() → [x]]"),
-  ("# r\n\n## a\n\n### x\n\n---\n\n### y\n", "r → [a → [x], 左:() → [y]]"),
+  (
+    "# r\n\n## a\n\n### x\n\n---\n\n### y\n", "r → [a → [x], 左:() → [y]]",
+  ),
   ("# r\n\n## a\n\n---\n\n- b\n- c\n", "r → [a, 左:() → [b, c]]"),
   ("# r\n\n## a\n\n---\n\n---\n\n## b\n", "r → [a{---}, 左:b]"),
   ("# r\n\n---\n\n# s\n", "r{---} ; s"),
   ("# H\n\n- r\n\n---\n\n- c\n", "H → [r, 左:c]"),
   ("# r\n\n---\n\n## b\n\ntext\n", "r → [左:b{text}]"),
   ("# r\n\n## a\n\n---\n\n- b\n\ntext\n", "r → [a{text}, 左:() → [b]]"),
-  ("## 野菜\n\n---\n\n- 肉\n\nメモ\n", "() → [野菜{メモ}, 左:() → [肉]]"),
+  (
+    "## 野菜\n\n---\n\n- 肉\n\nメモ\n", "() → [野菜{メモ}, 左:() → [肉]]",
+  ),
   // ---- 文書の body ----
   ("---\n\n## a\n", "文書{---} () → [a]"),
   ("---\n\n- a\n", "文書{---} a"),
@@ -78,7 +82,8 @@ let border_cases : Array[(String, String)] = [
     "- r\n  - b\n\n    ---\n\n    - x\n\n    text\n\n    - y\n", "r → [b{text}, 左:() → [x, y]]",
   ),
   (
-    "- 買い物\n  - 野菜\n\n    ---\n\n    - 肉\n\n    メモ\n\n    - 魚\n", "買い物 → [野菜{メモ}, 左:() → [肉, 魚]]",
+    "- 買い物\n  - 野菜\n\n    ---\n\n    - 肉\n\n    メモ\n\n    - 魚\n",
+    "買い物 → [野菜{メモ}, 左:() → [肉, 魚]]",
   ),
   ("- r\n\n  ---\n", "r{---}"),
   ("- r\n\n  ---\n\n  memo\n", "r{---, memo}"),
@@ -113,6 +118,8 @@ test "境界 — 設計書の例" {
     }
   }
   if !bad.is_empty() {
-    fail("\{bad.length()} / \{border_cases.length()} が違う\n" + bad.join("\n"))
+    fail(
+      "\{bad.length()} / \{border_cases.length()} が違う\n" + bad.join("\n"),
+    )
   }
 }
