@@ -96,6 +96,12 @@ pub struct App {
 let quiet : Int = 1000
 
 ///|
+/// 打ち続けても、未保存の字を書くまで待つのはここまで（ms）。**手が止まるのを待つだけだと、
+/// 打ち続けるあいだは一度も書かれない** — その最中に落ちれば全部を失う。draw.io は 30 秒
+/// （docs/unsaved.md）
+let max_wait : Int = 10000
+
+///|
 /// index.html の要素。無ければ壊れている
 fn el(doc : @dom.Document, id : String) -> @dom.Element {
   guard doc.getElementById(id) is Some(e) else {
@@ -205,9 +211,12 @@ pub fn App::new(
     drawing_open: false,
     grab: @prefs.load(doc, "grab") == Some("on"),
     greeting: @parts.Menu::new(doc),
-    write_soon: @web.after_quiet(doc, quiet, () => {
-      @web.spawn(async fn() { app().keep_unsaved() })
-    }),
+    write_soon: @web.after_quiet(
+      doc,
+      quiet,
+      () => @web.spawn(async fn() { app().keep_unsaved() }),
+      max_wait=Some(max_wait),
+    ),
   }
   late.val = Some(self)
   self.wire()
@@ -914,7 +923,7 @@ fn App::set_grab(self : App, on : Bool) -> Unit {
 fn App::wire(self : App) -> Unit {
   self.wire_holder()
   self.wire_bar()
-  self.wire_unload()
+  self.wire_leave()
   self.wire_drop()
   self.wire_keys()
 }
@@ -1002,12 +1011,21 @@ fn App::wire_bar(self : App) -> Unit {
 }
 
 ///|
-/// 未保存のまま閉じようとしたら止める
-fn App::wire_unload(self : App) -> Unit {
+/// ページを離れるとき。**未保存のまま閉じようとしたら止め**、タブが隠れる・ページを離れる
+/// ときは**待っている未保存の字を待たずに書く** — モバイルでタブを閉じると `beforeunload`
+/// は鳴らず、手が止まる 1 秒を待つあいだに消える。隠れてからの書き込みは終わる保証が無いので、
+/// 普段から書いておき、ここは最後のひと押し（docs/unsaved.md）
+fn App::wire_leave(self : App) -> Unit {
   @web.on_window(self.doc, "beforeunload", e => {
     // 解消する手段が無いなら止めない（`can_hold`）
     if self.can_hold() && self.text() != self.disk_text {
       @web.warn_unload(e)
+    }
+  })
+  @web.on_window(self.doc, "pagehide", _ => (self.write_soon.flush)())
+  @web.on_document(self.doc, "visibilitychange", _ => {
+    if @web.page_hidden(self.doc) {
+      (self.write_soon.flush)()
     }
   })
 }
