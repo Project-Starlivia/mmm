@@ -64,14 +64,16 @@ let saved : Files = {
 }
 
 ///|
-test "files_menu: 見出しが状態を言い、続く行ができること。Open Recent は入れ子で、押せば番号" {
+/// **入れ替える行が先。** New / Open はいまの文書に効くのではないので、見出しの上に
+/// 置く。見出しの下は、その見出しが名指すものにできること
+test "files_menu: 入れ替える行が先、見出しの下にそれにできること。Open Recent は入れ子で、押せば番号" {
   let mut opened = -1
   let rows = files_menu(saved, { ..file_acts, open_recent: i => opened = i, })
   assert_eq(rows.map(row_of), [
-    "# notes.md", "New", "Open", "Open Recent", "Open Autosave", "Save", "Save as",
+    "New", "Open", "Open Recent", "Open Autosave", "# notes.md", "Save", "Save as",
     "Rename", "# pics", "Choose folder",
   ])
-  guard rows[3] is Sub(_, items, None) else {
+  guard rows[2] is Sub(_, items, None) else {
     fail("Open Recent が入れ子でない")
   }
   assert_eq(items.map(row_of), ["ideas.md · just now", "todo.md · 1 min ago"])
@@ -90,7 +92,7 @@ test "files_menu: Open Autosave は入れ子で、末尾に全部忘れる行" {
     open_autosave: i => opened = i,
     forget_autosaves: () => forgot = true,
   })
-  guard rows[4] is Sub(_, items, None) else {
+  guard rows[3] is Sub(_, items, None) else {
     fail("Open Autosave が入れ子でない")
   }
   assert_eq(items.map(row_of), [
@@ -104,7 +106,7 @@ test "files_menu: Open Autosave は入れ子で、末尾に全部忘れる行" {
   assert_true(forgot)
   // 自動保存が無ければ沈む
   assert_eq(
-    files_menu({ ..saved, autosaves: [], }, file_acts).map(row_of)[4],
+    files_menu({ ..saved, autosaves: [], }, file_acts).map(row_of)[3],
     "Open Autosave (off: Nothing autosaved yet)",
   )
 }
@@ -115,8 +117,8 @@ test "files_menu: 保存していなければ見出しは not saved yet、Open R
     { ..saved, saved_name: None, recent: [], folder: "no folder", },
     file_acts,
   )
-  assert_eq(rows[0] |> row_of, "# not saved yet")
-  assert_eq(rows[3] |> row_of, "Open Recent (off: Nothing opened yet)")
+  assert_eq(rows[4] |> row_of, "# not saved yet")
+  assert_eq(rows[2] |> row_of, "Open Recent (off: Nothing opened yet)")
   assert_eq(rows[7] |> row_of, "Rename (off: " + nothing_to_rename + ")")
   assert_eq(rows[8] |> row_of, "# no folder")
 }
@@ -134,7 +136,7 @@ test "files_menu: ファイルを扱えない環境では、改名もふくめ�
     file_acts,
   )
   let why = " (off: " + @parts.no_file_access + ")"
-  assert_eq(rows[2] |> row_of, "Open" + why)
+  assert_eq(rows[1] |> row_of, "Open" + why)
   assert_eq(rows[5] |> row_of, "Save" + why)
   assert_eq(rows[6] |> row_of, "Save as" + why)
   // **改名も同じ理由。** ファイルを持てないのだから、改名できないのは

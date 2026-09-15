@@ -1,7 +1,8 @@
 // 帯の Files。文書に何かする道はここにまとめる。**画像フォルダもここ** —
 // 「この .md の画像がどこに居るか」は文書ぜんぶの設定で、新規 / 開く / 保存と
-// 同じ高さのもの。塊は 2 つ（.md と、その画像フォルダ）で、見出しが状態を
-// 言い、続く行がそれに対してできること。**絵が付くのは、押せるものだけ。**
+// 同じ高さのもの。**先頭は文書を入れ替える行**（New / Open …）で、いまの文書に
+// 効くのではないので見出しを持たない。続く塊は 2 つ（.md と、その画像フォルダ）で、
+// 見出しが状態を言い、続く行がそれに対してできること。**絵が付くのは、押せるものだけ。**
 //
 // 並びは純粋な表。いまの状態（`Files`）を受けて行を返し、押されたら `FileActs` を
 // 呼ぶだけ — 文書もファイルも知らない。並べて見る道具は好きな状態を渡す。
@@ -67,7 +68,6 @@ pub(all) struct FileActs {
 pub fn files_menu(s : Files, a : FileActs) -> Array[@parts.Entry] {
   let access = @parts.no_file_access
   [
-    Caption(s.saved_name.unwrap_or("not saved yet"), None),
     Run(
       @parts.row("New", key=Some("Mod+Alt+N"), mark=Some("file-plus")),
       a.new_file,
@@ -116,6 +116,8 @@ pub fn files_menu(s : Files, a : FileActs) -> Array[@parts.Entry] {
       ],
       None,
     ),
+    // ここからが**いまの文書**に効く行。見出しがその名前を言う
+    Caption(s.saved_name.unwrap_or("not saved yet"), None),
     Run(
       @parts.row(
         "Save",
