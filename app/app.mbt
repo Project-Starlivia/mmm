@@ -77,6 +77,10 @@ pub struct App {
   /// 未保存の文書。Files の Open Unsaved に並ぶ（いま開いている文書は含まない）。
   /// Recent と同じく IndexedDB の向こうに在るので、書くたびに引き直して手元に置く
   mut unsaved : Array[@disk.UnsavedDoc]
+  /// 置き場を消さないよう、もう頼んだか（最初に未保存の字を書く前に 1 度だけ）
+  mut persistence_asked : Bool
+  /// 未保存の字を書けなかったと、もう言ったか（1 セッションに 1 度だけ）
+  mut keep_failed : Bool
   /// お絵描きの窓が開いているか。二重に開かせない
   mut drawing_open : Bool
   /// 掴みやすさ（⋯ の Easy grab）
@@ -208,6 +212,8 @@ pub fn App::new(
     saved_name: None,
     recent: [],
     unsaved: [],
+    persistence_asked: false,
+    keep_failed: false,
     drawing_open: false,
     grab: @prefs.load(doc, "grab") == Some("on"),
     greeting: @parts.Menu::new(doc),
@@ -657,9 +663,21 @@ fn App::greet(self : App) -> Unit {
 async fn App::keep_unsaved(self : App) -> Unit {
   // 待つあいだにディスクと同じ字へ戻っていれば、書くものは無い
   guard self.text() != self.disk_text else { return }
-  self.disk
-  .unsaved()
-  .keep(@web.now(), self.doc_name(), self.text(), self.disk.current_file())
+  // **ブラウザの中の置き場は消えうる**（Safari は 7 日触らないと消す）。最初に書く前に
+  // 1 度だけ、消さないよう頼む。答えは待たない（docs/unsaved.md）
+  if !self.persistence_asked {
+    self.persistence_asked = true
+    @web.request_persistence(self.doc)
+  }
+  let kept = self.disk
+    .unsaved()
+    .keep(@web.now(), self.doc_name(), self.text(), self.disk.current_file())
+  // **書けなければ黙らない。ただし 1 度だけ** — 置き場が壊れているあいだ（private mode・
+  // 容量あふれ）は書くたびに失敗するので、そのたびに鳴らすと打つ手を止める
+  if !kept && !self.keep_failed {
+    self.keep_failed = true
+    @parts.failed(self.doc, "Couldn't keep unsaved changes")
+  }
   self.unsaved = self.disk.unsaved().others() catch { _ => [] }
 }
 

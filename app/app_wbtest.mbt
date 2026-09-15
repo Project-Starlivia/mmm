@@ -100,8 +100,13 @@ fn Fake::editor(self : Fake) -> Editor {
 /// 手元の置き場（ディスクの代わり）。既定は何も覚えていない。`known` を渡せば
 /// その名前の文書を覚えている台帳として立つ（立ち上がりの一覧。#277）。
 /// 並びは最後に触れた順なので、先に渡したものが新しい。
-/// `unsaved` を渡せば、その名前の未保存の文書を 1 件ずつ持って立つ（本文は `# 名前`）
-fn memo_disk(known : Array[String], unsaved : Array[String]) -> @disk.Disk {
+/// `unsaved` を渡せば、その名前の未保存の文書を 1 件ずつ持って立つ（本文は `# 名前`）。
+/// `broken` なら未保存の字の棚に書けない
+fn memo_disk(
+  known : Array[String],
+  unsaved : Array[String],
+  broken : Bool,
+) -> @disk.Disk {
   let table : Map[String, @core.Any] = Map([])
   if known.length() > 0 {
     table["docs"] = @core.any(
@@ -129,16 +134,24 @@ fn memo_disk(known : Array[String], unsaved : Array[String]) -> @disk.Disk {
   }
   @disk.Disk::new(
     @disk.Recent::new(memo_shelf(table)),
-    @disk.Unsaved::new(memo_shelf(docs)),
+    @disk.Unsaved::new(memo_shelf(docs, broken~)),
   )
 }
 
 ///|
-/// 手元の棚 1 つ。実物は IndexedDB の objectStore で、札も自動保存も同じ形で並ぶ
-fn memo_shelf(table : Map[String, @core.Any]) -> @disk.Store {
+/// 手元の棚 1 つ。実物は IndexedDB の objectStore で、札も未保存の字も同じ形で並ぶ。
+/// `broken` なら書けない
+fn memo_shelf(
+  table : Map[String, @core.Any],
+  broken? : Bool = false,
+) -> @disk.Store {
   {
     read: fn(key) { table.get(key).unwrap_or(@core.null()) },
-    write: fn(key, value) { table[key] = value },
+    write: fn(key, value) {
+      guard !broken else { return false }
+      table[key] = value
+      true
+    },
     remove: fn(key) { table.remove(key) },
     all: fn() { table.values().collect() },
     same: fn(_, _) { false },
@@ -176,6 +189,7 @@ fn mount(
 fn stand(
   known? : Array[String] = [],
   unsaved? : Array[String] = [],
+  broken? : Bool = false,
   hash? : String = "",
 ) -> Stand {
   let win = @test_utils.create_happy_window()
@@ -210,7 +224,7 @@ fn stand(
     log: [],
     hint: false,
   }
-  let app = App::new(doc, fake.editor(), memo_disk(known, unsaved), measure=(
+  let app = App::new(doc, fake.editor(), memo_disk(known, unsaved, broken), measure=(
     _,
     text,
   ) => text.char_length().to_double() * 7.0)
@@ -692,6 +706,32 @@ async test "未保存の字: Save を選んで進めば、前の文書の件は�
   rest(s.doc, 5)
   assert_eq(s.fake.md, "")
   assert_eq(s.app.disk.unsaved().list().length(), 0)
+}
+
+///|
+/// **書けなければ黙らない。ただし 1 度だけ。** 置き場が壊れているあいだ（private mode・
+/// 容量あふれ）は書くたびに失敗するので、そのたびに鳴らすと打つ手を止める（docs/unsaved.md）
+async test "未保存の字: 書けなければ 1 度だけ言う" {
+  let s = stand(broken=true)
+  defer s.win.close()
+  s.fake.change("# a\n")
+  rest(s.doc, quiet * 2)
+  let said = () => {
+    s.doc.querySelectorAll(".notice.on .msg").map(m => m.textContent())
+  }
+  assert_eq(said(), ["Couldn't keep unsaved changes"])
+  // もう一度書けなくても言い直さない。しらせの器は窓をまたいで 1 つを使い回すので、
+  // 待つあいだにほかの窓のしらせが挟まると、言い直せば器がもう 1 つ生える — 数で見る
+  s.fake.change("# a\n\n## b\n")
+  rest(s.doc, quiet * 2)
+  assert_true(s.app.keep_failed)
+  assert_eq(
+    s.doc
+    .querySelectorAll(".notice .msg")
+    .filter(m => m.textContent() == "Couldn't keep unsaved changes")
+    .length(),
+    1,
+  )
 }
 
 ///|

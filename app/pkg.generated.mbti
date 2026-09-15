@@ -35,6 +35,8 @@ pub struct App {
   mut saved_name : String?
   mut recent : Array[@disk.Known]
   mut unsaved : Array[@disk.UnsavedDoc]
+  mut persistence_asked : Bool
+  mut keep_failed : Bool
   mut drawing_open : Bool
   mut grab : Bool
   greeting : @parts.Menu
