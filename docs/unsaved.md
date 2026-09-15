@@ -67,7 +67,7 @@ Don't Save で捨てるのは VS Code・Word（既定）と同じ。人が「捨
 | 指すもの | 日本語（docs・コメント） | コード | 画面 |
 |---|---|---|---|
 | 機能 | 未保存の字 | — | Unsaved |
-| 1 件 | 未保存の字（1 件） | `UnsavedText` | 一覧の 1 行 `notes.md · 2 min ago` |
+| 1 件 | 未保存の文書（1 件） | `UnsavedDoc`（字だけでなく名前・時刻・札を持つので Text ではなく Doc。`disk.mbt` の `Doc` に id・時刻・札を足した形。Word の Recover Unsaved Documents と同じ言い方） | 一覧の 1 行 `notes.md · 2 min ago` |
 | 台帳 | 未保存の字の台帳 | `Unsaved`（`Recent` と同じく、台帳を中身で呼ぶ） | — |
 | ファイル | — | `app/disk/unsaved.mbt` | — |
 | 1 件の鍵 | id | `id`（`Recent` の `Known.id` と同じ語） | — |
