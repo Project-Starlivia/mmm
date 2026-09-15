@@ -406,13 +406,14 @@ fn put(
   // 畳まれた行なら `<details>` の範囲まで伸びるが、記法構造ではその外側は
   // 別のひと切れなので、行は行の字だけを持つ
   let own_at = line.unwrap_or(at)
-  let flip = resolve(d, depth)
   // **字下げが戻った見出しは、段より深い項目を閉じる**（列 0 なら全部）
   if mark is Some(Heading(..)) {
     close(d.read, d.base)
     close(d.tree, d.base)
   }
   lower(d.read, depth)
+  // 閉じた後に読みの根が残っていれば、この行は水平線と同じ木に入る
+  let flip = resolve(d, joins=!d.read.is_empty())
   fill(d.read, depth, None)
   // **境界は根より深い行を閉じる。** 深さは変えないので、足りない段は Implicit が埋める
   if flip {
@@ -449,12 +450,13 @@ fn put(
 }
 
 ///|
-/// 保留中の水平線の行き先を、これから置く深さ `depth` の行で決める。境界なら綴りを
-/// 控えて真。**境界になるのは 3 つを全部満たすときだけ** — 持ち主がノード、直後が
-/// 骨格の行（いまここ）、その行が同じ木（深さ 2 以上）。満たさなければ持ち主の中身
-fn resolve(d : Deem, depth : Int) -> Bool {
+/// 保留中の水平線の行き先を、これから置く行で決める。境界なら綴りを控えて真。
+/// **境界になるのは 3 つを全部満たすときだけ** — 持ち主がノード、直後が骨格の行
+/// （いまここ）、その行が同じ木（`joins` — 読みの根が閉じずに残る。深さ 1 の行も、
+/// 列 0 の見出しが項目を全部閉じた後の行も新しい木）。満たさなければ持ち主の中身
+fn resolve(d : Deem, joins~ : Bool) -> Bool {
   guard d.pend is Some({ at, owner, }) else { return false }
-  guard owner is Some(_) && depth >= 2 else {
+  guard owner is Some(_) && joins else {
     spill(d)
     return false
   }
