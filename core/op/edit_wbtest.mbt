@@ -367,5 +367,10 @@ test "合流 — 境界のすぐ手前の足し・消し・名付けは全文へ
       r.edits[0].to == md.length()
     "whole=\{whole} \{@tree.patched(md, r.edits).escape()}"
   })
-  json_inspect(out, content=(["whole=false \"# r\\n\\n## a\\n\\n- i\\n\\ntext\\n\\n## n\\n\\n---\\n\\n## b\\n\"","whole=false \"# r\\n\\n\\n\\n## a\\n\\n## n\\n\\n---\\n\\n## b\\n\"","whole=false \"# r\\n\\n---\\n\\n## b\\n\\n## c\\n\"","whole=false \"- r\\n  - b\\n\\n  - n\\n\\n  ---\\n\\n  - c\\n\"","whole=false \"- r\\n\\n  ---\\n\\n  - c\\n\"","whole=false \"# x\\n\\n## 野菜\\n\\n---\\n\\n- 肉\\n\\nメモ\\n\""]))
+  json_inspect(out, content=[
+    "whole=false \"# r\\n\\n## a\\n\\n- i\\n\\ntext\\n\\n## n\\n\\n---\\n\\n## b\\n\"",
+    "whole=false \"# r\\n\\n\\n\\n## a\\n\\n## n\\n\\n---\\n\\n## b\\n\"", "whole=false \"# r\\n\\n---\\n\\n## b\\n\\n## c\\n\"",
+    "whole=false \"- r\\n  - b\\n\\n  - n\\n\\n  ---\\n\\n  - c\\n\"", "whole=false \"- r\\n\\n  ---\\n\\n  - c\\n\"",
+    "whole=false \"# x\\n\\n## 野菜\\n\\n---\\n\\n- 肉\\n\\nメモ\\n\"",
+  ])
 }
