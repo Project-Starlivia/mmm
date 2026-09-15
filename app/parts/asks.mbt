@@ -16,15 +16,13 @@
 /// いまの文書を離れる前に、保存するか。**IDE の聞き方に揃える** — 読む相手は
 /// エンジニアなので、VS Code が閉じるときに聞くのと同じ 3 択にする。
 ///
-/// `Don't Save` を押しても字は消えない — 自動保存（Autosave）が残す。だから補足でそれを
-/// 言い、「失われる」とは書かない（消えると思って手が止まるのも、消えないと知らずに
-/// 押すのも、どちらも嘘の上の判断）
+/// `Don't Save` は字を捨てる。**ブラウザの中の未保存の字も一緒に捨てる**（VS Code・Word と
+/// 同じ。docs/unsaved.md）ので、「残る」とは言わない — 補足は持たない
 pub fn save_changes(name : String) -> Ask {
   ask_of(
     "Do you want to save the changes you made to " + name + "?",
     "Save",
     alt=Some("Don't Save"),
-    note=Some("Unsaved changes are autosaved."),
   )
 }
 
