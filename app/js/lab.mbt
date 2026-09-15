@@ -286,7 +286,7 @@ fn files_of(v : @core.Any) -> @bar.Files {
   {
     saved_name: str_opt(v._get("savedName")),
     recent: strings_of(v._get("recent")),
-    drafts: strings_of(v._get("drafts")),
+    autosaves: strings_of(v._get("autosaves")),
     can_open: v._get("canOpen").cast(),
     can_save: v._get("canSave").cast(),
     can_rename: v._get("canRename").cast(),
@@ -308,8 +308,8 @@ fn file_acts_of(v : @core.Any) -> @bar.FileActs {
     save_as: () => call("saveAs", []),
     rename: () => call("rename", []),
     choose_folder: () => call("chooseFolder", []),
-    open_draft: i => call("openDraft", [@core.any(i)]),
-    forget_drafts: () => call("forgetDrafts", []),
+    open_autosave: i => call("openAutosave", [@core.any(i)]),
+    forget_autosaves: () => call("forgetAutosaves", []),
   }
 }
 

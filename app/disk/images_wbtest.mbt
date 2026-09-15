@@ -39,7 +39,7 @@ fn holding(
   let store = shelf(Map([]))
   let images = Images::new(
     w.document(),
-    Disk::new(Recent::new(store), Drafts::new(store)),
+    Disk::new(Recent::new(store), Autosaves::new(store)),
     {
       failed: msg => said.push(msg),
       refresh: () => (),

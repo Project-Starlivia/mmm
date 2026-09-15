@@ -8,13 +8,13 @@ pub(all) struct Doc {
 }
 
 ///|
-/// いま開いているファイルと、覚えている札と、控え。
+/// いま開いているファイルと、覚えている札と、自動保存。
 ///
-/// 控え（`drafts`）はディスクではなくブラウザの中に置くが、**覚えているものと
+/// 自動保存（`autosaves`）はディスクではなくブラウザの中に置くが、**覚えているものと
 /// 同じ置き場（IndexedDB）に同じ流儀で並ぶ**ので、口も 1 つにまとめる
 pub struct Disk {
   recent : Recent
-  drafts : Drafts
+  autosaves : Autosaves
   mut current : @web.FileHandle?
   /// いまのファイルを最後に読んだ / 書いたときの、ディスク側の時刻。
   /// **書く直前に 1 度だけ比べる**（#318）。見張りではないので「外部変更は追わない」は
@@ -23,14 +23,14 @@ pub struct Disk {
 }
 
 ///|
-pub fn Disk::new(recent : Recent, drafts : Drafts) -> Disk {
-  { recent, drafts, current: None, stamp: None, }
+pub fn Disk::new(recent : Recent, autosaves : Autosaves) -> Disk {
+  { recent, autosaves, current: None, stamp: None, }
 }
 
 ///|
-/// 控えの台帳
-pub fn Disk::drafts(self : Disk) -> Drafts {
-  self.drafts
+/// 自動保存の台帳
+pub fn Disk::autosaves(self : Disk) -> Autosaves {
+  self.autosaves
 }
 
 ///|
@@ -100,8 +100,8 @@ pub async fn Disk::open_known(self : Disk, file : @web.FileHandle) -> Doc? {
 }
 
 ///|
-/// 札を引き受けて、**中身は読まない**。控えから戻すときの道 — ディスクの字より
-/// 控えのほうが新しいので、読めば戻した字を上書きしてしまう。
+/// 札を引き受けて、**中身は読まない**。自動保存から戻すときの道 — ディスクの字より
+/// 自動保存のほうが新しいので、読めば戻した字を上書きしてしまう。
 /// 許可はここでも取り直す（押されたことがその資格）
 pub async fn Disk::adopt(self : Disk, file : @web.FileHandle) -> Bool {
   guard @web.request_permission(file.as_any(), "readwrite").wait() == "granted" else {
@@ -109,7 +109,7 @@ pub async fn Disk::adopt(self : Disk, file : @web.FileHandle) -> Bool {
   }
   self.current = Some(file)
   self.recent.opened(file)
-  // 戻すと決めたのは人。**いまのディスクの字を知ったうえで**控えを選んだので、
+  // 戻すと決めたのは人。**いまのディスクの字を知ったうえで**自動保存を選んだので、
   // ここから先の上書きは聞かない
   self.stamp = stamp_of(file)
   true
@@ -176,7 +176,7 @@ pub async fn Disk::rename(self : Disk, name : String) -> String? {
 }
 
 ///|
-/// 覚えている文書。**Files の `Recent` に並ぶのがこれ** — 最後に触れた順で、
+/// 覚えている文書。**Files の `Open Recent` に並ぶのがこれ** — 最後に触れた順で、
 /// いま開いているものは外す
 pub async fn Disk::remembered(self : Disk) -> Array[Known] {
   self.recent.list_besides(self.current)

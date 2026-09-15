@@ -16,7 +16,7 @@
 /// いまの文書を離れる前に、保存するか。**IDE の聞き方に揃える** — 読む相手は
 /// エンジニアなので、VS Code が閉じるときに聞くのと同じ 3 択にする。
 ///
-/// `Don't Save` を押しても字は消えない — 控え（Drafts）が残す。だから補足でそれを
+/// `Don't Save` を押しても字は消えない — 自動保存（Autosave）が残す。だから補足でそれを
 /// 言い、「失われる」とは書かない（消えると思って手が止まるのも、消えないと知らずに
 /// 押すのも、どちらも嘘の上の判断）
 pub fn save_changes(name : String) -> Ask {
@@ -24,14 +24,14 @@ pub fn save_changes(name : String) -> Ask {
     "Do you want to save the changes you made to " + name + "?",
     "Save",
     alt=Some("Don't Save"),
-    note=Some("Unsaved changes are kept in Drafts."),
+    note=Some("Unsaved changes are autosaved."),
   )
 }
 
 ///|
 /// 保存しようとしたら、ディスクのほうが他所で書き換わっていた（#318）。
 /// **押した瞬間に聞く** — 保存は人の一手なので、そこで止めて確かめられる。
-/// 断れば何も書かない（字は手元と控えに残る）
+/// 断れば何も書かない（字は手元と自動保存に残る）
 pub fn disk_changed(name : String) -> Ask {
   ask_of(
     name + " has changed on disk.",

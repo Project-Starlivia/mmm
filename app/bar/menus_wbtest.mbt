@@ -47,15 +47,15 @@ let file_acts : FileActs = {
   save_as: nop,
   rename: nop,
   choose_folder: nop,
-  open_draft: _ => (),
-  forget_drafts: nop,
+  open_autosave: _ => (),
+  forget_autosaves: nop,
 }
 
 ///|
 let saved : Files = {
   saved_name: Some("notes.md"),
   recent: ["ideas.md · just now", "todo.md · 1 min ago"],
-  drafts: ["draft.md · 2 min ago"],
+  autosaves: ["autosave.md · 2 min ago"],
   can_open: true,
   can_save: true,
   can_rename: true,
@@ -64,15 +64,15 @@ let saved : Files = {
 }
 
 ///|
-test "files_menu: 見出しが状態を言い、続く行ができること。Recent は入れ子で、押せば番号" {
+test "files_menu: 見出しが状態を言い、続く行ができること。Open Recent は入れ子で、押せば番号" {
   let mut opened = -1
   let rows = files_menu(saved, { ..file_acts, open_recent: i => opened = i, })
   assert_eq(rows.map(row_of), [
-    "# notes.md", "New", "Open", "Recent", "Drafts", "Save", "Save as", "Rename",
-    "# pics", "Choose folder",
+    "# notes.md", "New", "Open", "Open Recent", "Open Autosave", "Save", "Save as",
+    "Rename", "# pics", "Choose folder",
   ])
   guard rows[3] is Sub(_, items, None) else {
-    fail("Recent が入れ子でない")
+    fail("Open Recent が入れ子でない")
   }
   assert_eq(items.map(row_of), ["ideas.md · just now", "todo.md · 1 min ago"])
   guard items[1] is Run(_, go) else { fail("行でない") }
@@ -81,20 +81,20 @@ test "files_menu: 見出しが状態を言い、続く行ができること。Re
 }
 
 ///|
-/// 控えは Recent と同じ入れ子。**末尾に全部忘れる行が 1 つ**（1 件ごとの × は無い）
-test "files_menu: Drafts は入れ子で、末尾に全部忘れる行" {
+/// 自動保存は Open Recent と同じ入れ子。**末尾に全部忘れる行が 1 つ**（1 件ごとの × は無い）
+test "files_menu: Open Autosave は入れ子で、末尾に全部忘れる行" {
   let mut opened = -1
   let mut forgot = false
   let rows = files_menu(saved, {
     ..file_acts,
-    open_draft: i => opened = i,
-    forget_drafts: () => forgot = true,
+    open_autosave: i => opened = i,
+    forget_autosaves: () => forgot = true,
   })
   guard rows[4] is Sub(_, items, None) else {
-    fail("Drafts が入れ子でない")
+    fail("Open Autosave が入れ子でない")
   }
   assert_eq(items.map(row_of), [
-    "draft.md · 2 min ago", "---", "Forget all drafts",
+    "autosave.md · 2 min ago", "---", "Forget all autosaves",
   ])
   guard items[0] is Run(_, go) else { fail("行でない") }
   go()
@@ -102,21 +102,21 @@ test "files_menu: Drafts は入れ子で、末尾に全部忘れる行" {
   guard items[2] is Run(_, wipe) else { fail("行でない") }
   wipe()
   assert_true(forgot)
-  // 控えが無ければ沈む
+  // 自動保存が無ければ沈む
   assert_eq(
-    files_menu({ ..saved, drafts: [], }, file_acts).map(row_of)[4],
-    "Drafts (off: Nothing kept yet)",
+    files_menu({ ..saved, autosaves: [], }, file_acts).map(row_of)[4],
+    "Open Autosave (off: Nothing autosaved yet)",
   )
 }
 
 ///|
-test "files_menu: 保存していなければ見出しは not saved yet、Recent が無ければ沈み、Rename は理由を言う" {
+test "files_menu: 保存していなければ見出しは not saved yet、Open Recent が無ければ沈み、Rename は理由を言う" {
   let rows = files_menu(
     { ..saved, saved_name: None, recent: [], folder: "no folder", },
     file_acts,
   )
   assert_eq(rows[0] |> row_of, "# not saved yet")
-  assert_eq(rows[3] |> row_of, "Recent (off: Nothing opened yet)")
+  assert_eq(rows[3] |> row_of, "Open Recent (off: Nothing opened yet)")
   assert_eq(rows[7] |> row_of, "Rename (off: " + nothing_to_rename + ")")
   assert_eq(rows[8] |> row_of, "# no folder")
 }

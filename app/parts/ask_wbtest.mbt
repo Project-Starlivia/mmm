@@ -124,7 +124,7 @@ test "save_changes: 3 つのボタンが 断り・もう 1 つ・進む の順�
     )
     assert_eq(
       form.querySelector(".note").unwrap().textContent(),
-      "Unsaved changes are kept in Drafts.",
+      "Unsaved changes are autosaved.",
     )
     let buttons = form.querySelectorAll(".row button")
     assert_eq(buttons.map(b => b.textContent()), [

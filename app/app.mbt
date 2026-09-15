@@ -72,9 +72,9 @@ pub struct App {
   /// 覚えている文書。Files の Recent に並ぶ。IndexedDB の向こうに在るので、
   /// 開く・保存するたびに引き直して手元に置く
   mut recent : Array[@disk.Known]
-  /// 控え。Files の Drafts に並ぶ。Recent と同じく
-  /// IndexedDB の向こうに在るので、控えるたびに引き直して手元に置く
-  mut drafts : Array[@disk.Draft]
+  /// 自動保存。Files の Open Autosave に並ぶ。Recent と同じく
+  /// IndexedDB の向こうに在るので、自動保存するたびに引き直して手元に置く
+  mut autosaves : Array[@disk.Autosave]
   /// お絵描きの窓が開いているか。二重に開かせない
   mut drawing_open : Bool
   /// 掴みやすさ（⋯ の Easy grab）
@@ -199,12 +199,12 @@ pub fn App::new(
     saved_text: "",
     saved_name: None,
     recent: [],
-    drafts: [],
+    autosaves: [],
     drawing_open: false,
     grab: @prefs.load(doc, "grab") == Some("on"),
     greeting: @parts.Menu::new(doc),
     write_soon: @web.after_quiet(doc, quiet, () => {
-      @web.spawn(async fn() { app().keep_draft() })
+      @web.spawn(async fn() { app().autosave() })
     }),
   }
   late.val = Some(self)
@@ -376,12 +376,12 @@ fn App::write(self : App, op : @op.Op) -> Unit {
 fn App::update_dirty(self : App) -> Unit {
   let dirty = self.can_hold() && self.text() != self.saved_text
   self.name.set_dirty(dirty)
-  // **控えは常に取る。** ブラウザの中なので置き場が要らず、まだ保存していない
+  // **自動保存は常に取る。** ブラウザの中なので置き場が要らず、まだ保存していない
   // 文書がいちばんの客（#306）。取ったのと同じ字なら何もしない。
   //
   // **ディスクへ勝手に書く道は持たない。** 書けば他のアプリや git から見える
   // ものが変わるので、人の意思なく触らない（#306 の決め、2026-09-12）
-  if self.text() != self.disk.drafts().kept() {
+  if self.text() != self.disk.autosaves().kept() {
     (self.write_soon.call)()
   }
 }
@@ -409,9 +409,9 @@ fn App::load_text(self : App, next : String, name : String?) -> Unit {
   // 人が何も押していないのにピッカーを開きに行く（`showSaveFilePicker` は
   // 押した直後にしか開けない）
   (self.write_soon.cancel)()
-  // **控えの流れもここで切れる。** 続きを同じ系列に足すと、別の文書の字が
+  // **自動保存の流れもここで切れる。** 続きを同じ系列に足すと、別の文書の字が
   // 1 つの流れに混ざる
-  self.disk.drafts().start()
+  self.disk.autosaves().start()
   self.saved_name = name
   self.images.clear() // 画像のパスは（新しい）md からの相対
   (self.ed.set_text)(next) // → cycle
@@ -462,9 +462,9 @@ async fn App::confirm_discard(self : App) -> Bool {
   if self.text() == self.saved_text {
     return true
   }
-  // **聞く前に控える。** たずねが「Drafts に残る」と言う以上、聞く時点で
+  // **聞く前に自動保存する。** たずねが「自動保存される」と言う以上、聞く時点で
   // 本当に残っていなければならない — 手が止まって 1 秒より早く押されうる
-  self.keep_draft()
+  self.autosave()
   match @parts.reply(self.doc, @parts.save_changes(self.doc_name())) {
     Go(_) => {
       // 保存してから進む。**ピッカーを閉じた・書けなかった・上書きを断った**なら
@@ -536,7 +536,7 @@ async fn App::rename_file(self : App) -> Unit {
 async fn App::save_file(self : App, as_new : Bool) -> Unit {
   // **待つあいだに文書は入れ替わりうる。** ピッカーも書き込みも待つので、
   // 戻ってきたら自分の世代を確かめる — 前の文書のために書いた字を、
-  // 次の文書の控えにしない
+  // 次の文書の自動保存にしない
   let gen = self.gen
   (async fn() -> Unit {
     // **書く字は 1 つ。** 書き込みは待つので、そのあいだに人は打てる。
@@ -592,9 +592,9 @@ async fn App::new_file(self : App) -> Unit {
 ///|
 /// 覚えているものを真ん中に並べる。**開くのは人** — 一覧を出すだけで、
 /// 触れば許可を取り直して開き、ほかを触れば消える（#277）。
-/// 並びは Files の `Recent ▸` と同じ口から引く（同じものが 2 通りに見えない）。
-/// **控えは並べない** — ここは「また開きたいもの」を選ぶ場所で、控えの入口は
-/// Files の `Drafts ▸`（#359）
+/// 並びは Files の `Open Recent ▸` と同じ口から引く（同じものが 2 通りに見えない）。
+/// **自動保存は並べない** — ここは「また開きたいもの」を選ぶ場所で、自動保存の入口は
+/// Files の `Open Autosave ▸`（#359）
 fn App::greet(self : App) -> Unit {
   self.greeting.show_middle(() => {
     let now = @web.now()
@@ -613,22 +613,22 @@ fn App::greet(self : App) -> Unit {
 }
 
 ///|
-/// いまの字を控える。**置き場は要らない** — 名前の無い文書もここで残る
-async fn App::keep_draft(self : App) -> Unit {
+/// いまの字を自動保存する。**置き場は要らない** — 名前の無い文書もここで残る
+async fn App::autosave(self : App) -> Unit {
   self.disk
-  .drafts()
+  .autosaves()
   .keep(@web.now(), self.doc_name(), self.text(), self.disk.current_file())
-  self.drafts = self.disk.drafts().list() catch { _ => [] }
+  self.autosaves = self.disk.autosaves().list() catch { _ => [] }
 }
 
 ///|
-/// 控えから開く。**札も本文も戻し、印を立てたまま開く** — 控えはディスクに
+/// 自動保存から開く。**札も本文も戻し、印を立てたまま開く** — 自動保存はディスクに
 /// 届いていない字なので、開いた瞬間から「ディスクとは違う」と言えているのが正しい。
 /// 人が `Mod+S` を押した所で印が落ちる。
 ///
-/// ディスクは読み直さない。控えのほうが新しいので、読めば戻した字を上書きする
-async fn App::open_draft(self : App, at : Int) -> Unit {
-  guard self.drafts.get(at) is Some(d) else { return }
+/// ディスクは読み直さない。自動保存のほうが新しいので、読めば戻した字を上書きする
+async fn App::open_autosave(self : App, at : Int) -> Unit {
+  guard self.autosaves.get(at) is Some(d) else { return }
   (async fn() -> Unit {
     guard self.confirm_discard() else { return }
     let name = match d.doc {
@@ -654,28 +654,28 @@ async fn App::open_draft(self : App, at : Int) -> Unit {
 }
 
 ///|
-/// 控えを全部忘れる。**1 件ごとに消す道は持たない** — Recent の行が持たないので、
+/// 自動保存を全部忘れる。**1 件ごとに消す道は持たない** — Recent の行が持たないので、
 /// 同じ器の中に 2 通りの行ができる
-async fn App::forget_drafts(self : App) -> Unit {
-  self.disk.drafts().forget_all()
-  self.drafts = []
+async fn App::forget_autosaves(self : App) -> Unit {
+  self.disk.autosaves().forget_all()
+  self.autosaves = []
 }
 
 ///|
 async fn App::refresh_recent(self : App) -> Unit {
   self.recent = self.disk.remembered() catch { _ => [] }
-  self.drafts = self.disk.drafts().list() catch { _ => [] }
+  self.autosaves = self.disk.autosaves().list() catch { _ => [] }
 }
 
 ///|
-/// 控えの一覧に出す 1 行の字。**Recent と同じ形** — 名前と、見分けに使えるもの。
+/// 自動保存の一覧に出す 1 行の字。**Recent と同じ形** — 名前と、見分けに使えるもの。
 /// 同じ文書の版が 2 つ並ぶことがあるので、分けるのは時刻（#306）
-fn draft_label(d : @disk.Draft, now : Double) -> String {
+fn autosave_label(d : @disk.Autosave, now : Double) -> String {
   d.name + " · " + @parts.age(now, d.at)
 }
 
 ///|
-/// 覚えているものの一覧に出す 1 行の字。**綴りはここ 1 つ** — Files の `Recent ▸` と
+/// 覚えているものの一覧に出す 1 行の字。**綴りはここ 1 つ** — Files の `Open Recent ▸` と
 /// 立ち上がりの真ん中が同じ口から引く（同じものが 2 通りに見えない）。
 ///
 /// 名前だけでは足りない。`notes.md` を 2 つの場所で開いていれば同じ行が 2 つ並び、
@@ -911,7 +911,7 @@ fn App::wire_bar(self : App) -> Unit {
       {
         saved_name: self.saved_name,
         recent: self.recent.map(row => recent_label(row, @web.now())),
-        drafts: self.drafts.map(d => draft_label(d, @web.now())),
+        autosaves: self.autosaves.map(d => autosave_label(d, @web.now())),
         can_open: @web.can_open(),
         can_save: @web.can_save_as(),
         can_rename: @web.can_rename(),
@@ -930,8 +930,10 @@ fn App::wire_bar(self : App) -> Unit {
             None => ()
           }
         },
-        open_draft: i => @web.spawn(async fn() { self.open_draft(i) }),
-        forget_drafts: () => @web.spawn(async fn() { self.forget_drafts() }),
+        open_autosave: i => @web.spawn(async fn() { self.open_autosave(i) }),
+        forget_autosaves: () => {
+          @web.spawn(async fn() { self.forget_autosaves() })
+        },
         save: () => @web.spawn(async fn() { self.save_file(false) }),
         save_as: () => @web.spawn(async fn() { self.save_file(true) }),
         rename: () => @web.spawn(async fn() { self.rename_file() }),
@@ -1026,7 +1028,7 @@ fn App::wire_keys(self : App) -> Unit {
 
 ///|
 /// 動かす。**サイクルの出口（cycle）が繋がってから** — 最初の set_text がもう回す。
-/// 本文の控えは持たない。IndexedDB に置くのはハンドルだけで、
+/// IndexedDB にはハンドルと自動保存を置くが、
 /// **起動時に勝手に開き直すことはしない** — 立ち上げたら常に空から始まり、
 /// 覚えているものは真ん中に**並べて見せるだけ**（開くのは人。#277）
 pub fn App::boot(self : App) -> Unit {
