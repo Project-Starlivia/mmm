@@ -838,12 +838,13 @@ test "FlipSide の深い項目を出して戻すと元の木" {
 }
 
 ///|
+/// 行の無い根の最初の子が左になるので、根は綴られる（`Ownerless` — 手前の `---` の持ち主が要る）
 test "FlipSide の深いノード: 根の Implicit が丸ごと抜ければ、引き出したものを子に置き直す" {
   let d = doc([root(gap(2, [gap(3, [h(4, "x")])]), sides=[Right])])
   assert_eq(
     apply(d, FlipSide(id=4)),
     Some({
-      doc: doc([root(gap(2, [gap(5, [h(4, "x")])]), sides=[Left])]),
+      doc: doc([root(h(2, "", children=[gap(5, [h(4, "x")])]), sides=[Left])]),
       focus: Some(4),
     }),
   )

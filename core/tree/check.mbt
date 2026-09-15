@@ -17,11 +17,14 @@ pub(all) enum Flaw {
   BarrenImplicit(Int)
   /// 側の本数が根の子と合わない
   SideCount(root~ : Int, sides~ : Int, children~ : Int)
+  /// 行の無い根（Implicit）の最初の子が左。手前の `---` は文書の段に書かれ、持ち主が
+  /// 文書なので境界にならない（`--- / ## a`）。根を綴れば書ける
+  Ownerless(Int)
   /// ノードの中身の尻の水平線に、同じ木の骨格の行が続く。境界（側の変わり目）に
   /// 読まれて中身に残らない
   BorderBreak(Int)
-  /// 見出し（綴られた・綴られない）に境界なしで続く項目・Implicit。その見出しに
-  /// 飲み込まれる — 項目は子に読まれ、飛びはその見出しの深さから測られる
+  /// 見出し（綴られた・綴られない）に続く項目、境界なしで続く Implicit。その見出しに
+  /// 飲み込まれる — 項目は子に読まれ（境界が在っても深さは入れ物から測る）、飛びはその見出しの深さから測られる
   Swallowed(Int)
   /// Implicit の直下の項目。項目は書かれた入れ物から深さを測るので、行の無い
   /// Implicit を挟めない（境界の直後で、手前の兄弟の尻に書ける所は除く）
@@ -46,9 +49,16 @@ pub let deepest : Int = 6
 ///|
 /// 文書ぜんぶを見る。破れが無ければ空。
 pub fn check(doc : Doc) -> Array[Flaw] {
-  let c : Check = { flaws: [], seen: Set([]), border: None, }
+  let c : Check = {
+    flaws: [],
+    seen: Set([]),
+    border: None,
+    containers: Map([]),
+  }
   for r in doc.roots {
     note(c, side_count(r))
+    note(c, ownerless(r))
+    containers(c.containers, r)
   }
   // 文書の中身の水平線は境界にならない（持ち主がノードでない）ので持ち回らない
   each_block(c, doc.body)
@@ -57,13 +67,72 @@ pub fn check(doc : Doc) -> Array[Flaw] {
 }
 
 ///|
-/// 検めの途中。**状態は 2 つだけ** — id は文書ぜんぶで 1 つの列なので覚え、
-/// 中身の尻の水平線は次の骨格まで文書順に持ち回る。
+/// 検めの途中。id は文書ぜんぶで 1 つの列なので覚え、中身の尻の水平線は次の骨格まで
+/// 文書順に持ち回る。境界の直後の Implicit をどこに書けるかは、書く側に先に聞いておく。
 priv struct Check {
   flaws : Array[Flaw]
   seen : Set[Int]
   /// 文書順で 1 つ前の骨格が、中身の尻に置いた水平線
   mut border : Int?
+  /// 境界の直後の Implicit の鎖ごとに、その下に書いた項目の入れ物になる行の深さ（`containers`）
+  containers : Map[Int, Int]
+}
+
+///|
+/// 境界の直後の Implicit の鎖ごとに、その下に書いた項目の**入れ物になる行の深さ**を控える。
+/// 項目は書かれた入れ物の 1 つ下に読まれるので、鎖の深さと一致すれば書ける。
+/// **書く側と同じ道を辿る** — 書く側（`laid`）が手前の兄弟の尻へ移せた（`tuck`）なら鎖の
+/// 深さそのもの。移せなければ境界の後ろ、根の段に書かれ、入れ物はそこで開いたままの
+/// 一番深い見出しの節（`sections` — 手前の兄弟たちが開いた節は、境界では閉じない）、
+/// 無ければ根（行の無い根なら文書 = 0）。
+/// 先頭の子を辿る Implicit の鎖は丸ごと同じ所に書かれるので、鎖ぜんぶに控える
+fn containers(out : Map[Int, Int], r : Root) -> Unit {
+  let kept : Set[Int] = Set([])
+  for l in laid(r).kids {
+    kept.add(l.node.id)
+  }
+  let turned = turns(r)
+  let root = if r.node.mark is None { 0 } else { 1 }
+  let open : Array[Int] = []
+  for i, k in r.node.children {
+    if k.mark is None && turned[i] is Some(_) {
+      let tucked = !kept.contains(k.id)
+      let container = open.last().unwrap_or(root)
+      let mut g : Node? = Some(k)
+      let mut depth = 2
+      while g is Some(n) {
+        out[n.id] = if tucked { depth } else { container }
+        g = match n.children {
+          [first, ..] if first.mark is None => Some(first)
+          _ => None
+        }
+        depth = depth + 1
+      }
+    }
+    sections(open, k, 2)
+  }
+}
+
+///|
+/// 根の段で開いている見出しの節（深さ、浅い順）を、深さ `depth` の部分木 `n` を書いた後へ
+/// 進める。見出しは同じか深い節を閉じて開き、項目は中の節ごと字下げの戻りで閉じ、
+/// 畳みは閉じの後ろで部分木ごと閉じる。水平線は節を閉じない
+fn sections(open : Array[Int], n : Node, depth : Int) -> Unit {
+  guard !(n.mark is Some(Item(..))) else { return }
+  if n.mark is Some(Heading(..)) {
+    while open.last() is Some(d) && d >= depth {
+      ignore(open.pop())
+    }
+    open.push(depth)
+  }
+  for k in n.children {
+    sections(open, k, depth + 1)
+  }
+  if n.fold is Some(_) {
+    while open.last() is Some(d) && d >= depth {
+      ignore(open.pop())
+    }
+  }
 }
 
 ///|
@@ -82,15 +151,13 @@ priv struct Site {
   bordered : Bool
   /// 文書順で 1 つ前の骨格が、中身の尻に置いた水平線
   border : Int?
-  /// 境界の直後に立った Implicit の先頭の鎖に居るなら、境界の手前の兄弟の
-  /// 部分木の尻の鎖で、書かれた行が居る深さ。その深さの行の中に書き足せる
-  lead : Set[Int]?
+  /// 境界の直後の Implicit の鎖なら、その下に書いた項目の入れ物になる行の深さ（`containers`）
+  container : Int?
 }
 
 ///|
 /// 同じ列の兄弟を順に見る。`sides` はこの列の側（根の子だけが持つ）、
-/// `kids` は i 番目の子の列の側（根なら `Root.sides`、深ければ無い）、
-/// `lead` は列の頭が境界の直後の Implicit の鎖を継ぐときの `Site.lead`。
+/// `kids` は i 番目の子の列の側（根なら `Root.sides`、深ければ無い）。
 fn walk(
   c : Check,
   xs : Array[Node],
@@ -98,11 +165,11 @@ fn walk(
   base : Int,
   sides : Array[Side],
   kids : (Int) -> Array[Side],
-  lead? : Set[Int]? = None,
+  mid? : Int? = None,
 ) -> Unit {
   for i, x in xs {
-    // 新しい木の手前の水平線は境界にならない
-    if depth == 1 {
+    // 新しい木の手前の水平線は境界にならない。親の中身が手前に挟まる子（`middle`）も
+    if depth == 1 || mid == Some(x.id) {
       c.border = None
     }
     // 手前に境界の `---` が書かれるか。**書く側（unbuild の `nodes`）と同じ見方** —
@@ -120,13 +187,7 @@ fn walk(
       },
       bordered,
       border: c.border,
-      lead: if bordered && i > 0 {
-        Some(tail(xs[i - 1], depth, Set([])))
-      } else if i == 0 {
-        lead
-      } else {
-        None
-      },
+      container: c.containers.get(x.id),
     }
     c.border = None
     note(c, border_break(s))
@@ -143,25 +204,20 @@ fn walk(
     // 行が無いので中身を書けない（`Unmarked`）— 綴られてから咎める
     let trail = if x.mark is Some(_) { trailing(x.body) } else { None }
     c.border = if trails(x) { None } else { trail }
-    let under = if x.mark is None { s.lead } else { None }
     // 項目の中は、その項目の深さを 0 とした文書。側は見出しの根も項目の根も持つ
     let inner = if sign_of(x) is Some(Item) { depth } else { base }
-    walk(c, x.children, depth + 1, inner, kids(i), _ => [], lead=under)
+    walk(
+      c,
+      x.children,
+      depth + 1,
+      inner,
+      kids(i),
+      _ => [],
+      mid=middle(x).map(h => h.id),
+    )
     if trails(x) {
       c.border = trail
     }
-  }
-}
-
-///|
-/// 部分木の尻の鎖（最後の子を辿る）で、書かれた行が居る深さ。`n` は深さ `depth`。
-fn tail(n : Node, depth : Int, out : Set[Int]) -> Set[Int] {
-  if n.mark is Some(_) {
-    out.add(depth)
-  }
-  match n.children.last() {
-    Some(k) => tail(k, depth + 1, out)
-    None => out
   }
 }
 
@@ -191,6 +247,36 @@ fn trails(x : Node) -> Bool {
   trailing(x.body) is Some(_) &&
   x.children is [_, ..] &&
   x.children.iter().all(k => k.mark is Some(Item(..)))
+}
+
+///|
+/// 中身を、項目の子の列と見出しの子の間に書くか。**項目の列の尻が水平線で終わり**（`ends`）、
+/// 続く見出しの子がそれを境界にしてしまうとき、中身を挟めば線は飾りのまま
+/// （`# a / - b / (b) --- / text / ## c`）。中身の尻が水平線なら挟んでも境界になるので挟まない。
+/// 返すのは中身の後ろに書く最初の見出しの子。**書く側（`strokes`）も同じ答えを引く**
+fn middle(x : Node) -> Node? {
+  guard x.body.last() is Some(b) && !(b.content is Some(ThematicBreak)) else {
+    return None
+  }
+  guard x.children.search_by(k => k.mark is Some(Heading(..))) is Some(split) &&
+    split > 0 &&
+    x.children[:split].iter().all(k => k.mark is Some(Item(..))) &&
+    ends(x.children[split - 1]) else {
+    return None
+  }
+  Some(x.children[split])
+}
+
+///|
+/// 部分木を書いたとき、最後の塊が水平線か（書く側の順 — 尻に続く線は子が項目だけなら子の後ろ）。
+/// 畳みは閉じが最後に来る
+fn ends(n : Node) -> Bool {
+  guard n.fold is None else { return false }
+  guard !trails(n) else { return true }
+  match n.children.last() {
+    Some(k) => ends(k)
+    None => trailing(n.body) is Some(_)
+  }
 }
 
 ///|
@@ -234,6 +320,14 @@ fn side_count(r : Root) -> Flaw? {
 }
 
 ///|
+/// 行の無い根の最初の子が左。境界の `---` はその子の手前の文書の段に書かれ、持ち主が
+/// 文書になるので境界にならない（docs/spec.md「水平線」の `--- / ## a`）。
+fn ownerless(r : Root) -> Flaw? {
+  guard r.node.mark is None && r.sides.get(0) is Some(Left) else { return None }
+  Some(Ownerless(r.node.id))
+}
+
+///|
 /// ノードの中身の尻の水平線に、同じ木の骨格の行が続く。次の骨格の行で境界
 /// （側の変わり目）に読まれて、中身に残らない。
 /// 側が変わる所には境界の `---` がもう 1 本書かれるので、中身の水平線は残る
@@ -244,16 +338,18 @@ fn border_break(s : Site) -> Flaw? {
 }
 
 ///|
-/// 見出し（綴られた・綴られない）に境界なしで続く項目・Implicit。その見出しに
+/// 見出し（綴られた・綴られない）に続く項目、境界なしで続く Implicit。その見出しに
 /// 飲み込まれる — 項目は子に読まれ、飛びはその見出しの深さから測られる。
-/// 側が変わる所には `---` が書かれるので飲み込まれない。
+/// **境界で逃げられるのは Implicit だけ** — `---` の後ろの見出しは `#` の数で深さが決まるが、
+/// 項目の深さは書かれた入れ物から測るので、`## a / --- / - b` の b は a の兄弟にならず、
+/// 境界の後ろの Implicit の下に読まれる（docs/spec.md「水平線」）。
 /// **畳まれた見出しも飲み込まない** — `</details>` がその部分木の終わりを言うので、
 /// 閉じの後ろに書かれたものは外（docs/core.md「畳み」）。
 fn swallowed(s : Site) -> Flaw? {
   guard s.prev is Some(prev) else { return None }
   guard !(sign_of(prev) is Some(Item)) &&
     prev.fold is None &&
-    !s.bordered &&
+    !(s.bordered && s.node.mark is None) &&
     !(sign_of(s.node) is Some(Heading)) else {
     return None
   }
@@ -303,13 +399,13 @@ fn unmarked(s : Site) -> Flaw? {
 ///|
 /// Implicit の先頭の子が項目。項目の深さは書かれた入れ物から測られ、Implicit に
 /// 行は無いので 1 つ浅く読まれる（2 つ目からは直前の兄弟が深さを留める）。
-/// **境界の直後なら書ける** — 境界の手前の兄弟の尻に、この Implicit と同じ深さの
-/// 書かれた行が居れば、その行の中に `---` と項目を書けば深さが保たれる。
+/// **境界の直後なら、書いた所の入れ物がこの Implicit と同じ深さのとき書ける**（`containers`）—
+/// 項目の深さはその行から測られて保たれる。
 fn gapped_item(s : Site) -> Flaw? {
   guard sign_of(s.node) is None else { return None }
   guard s.node.children is [first, ..] && sign_of(first) is Some(Item) else {
     return None
   }
-  guard !(s.lead is Some(t) && t.contains(s.depth)) else { return None }
+  guard s.container != Some(s.depth) else { return None }
   Some(GappedItem(first.id))
 }

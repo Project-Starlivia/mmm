@@ -14,18 +14,29 @@
 
 ///|
 /// 書く形の枠 1 つ。木のノードに、手前に書く境界の水平線を添えたもの。
-/// 子は `kids` が持つ — 境界の直後の Implicit は、手前の兄弟の尻へ移っている（`laid`）
+/// 子は `kids` が持つ — 境界の直後の Implicit の子は、手前の兄弟の尻へ移っている（`after`）
 priv struct Laid {
   node : Node
   /// この行の手前に書く境界の綴り。無ければ None
   rule : String?
   kids : Array[Laid]
+  /// 境界の後ろから移ってきた行（`tuck`）。**中身の尻より後ろ**に書く
+  after : Array[Laid]
 }
 
 ///|
 /// 境界を持たない部分木の書く形。
 fn Laid::of(n : Node) -> Laid {
-  { node: n, rule: None, kids: n.children.map(Laid::of), }
+  { node: n, rule: None, kids: n.children.map(Laid::of), after: [], }
+}
+
+///|
+/// この部分木の中で最後に書かれる部分木 — 移ってきた行が在ればその尻、無ければ子の尻。
+fn Laid::last(self : Laid) -> Laid? {
+  match self.after.last() {
+    Some(l) => Some(l)
+    None => self.kids.last()
+  }
 }
 
 ///|
@@ -75,31 +86,60 @@ fn laid(r : Root) -> Laid {
         }
     }
   }
-  { node: r.node, rule: None, kids: out, }
+  { node: r.node, rule: None, kids: out, after: [], }
 }
 
 ///|
 /// Implicit `gap` の子を、同じ深さの書かれた行 `host` の尻へ移し、移した先頭の行の
-/// 手前に境界 `rule` を添える。`gap` の先頭の子も Implicit なら、`host` の最後の子の
-/// 尻へさらに降りる。移せなければ None
+/// 手前に境界 `rule` を添える。**移した行は host の中身の尻より後ろ**（`after`）— 子の後ろに
+/// 書く尻の水平線（`ahead`）より前に置けば、その線が移した行の手前の境界になる。
+/// `gap` の先頭の子も Implicit なら、host の中で最後に書かれる行の尻へさらに降りる
+/// （降りるだけなら行の無い host も通る — 書き足すのは降りた先の書かれた行）。
+/// **項目は、host より深い見出しの節が開いていれば移せない**（`open_section`）— 項目の
+/// 深さは書かれた入れ物から測るので、その節に入ってしまう。移せなければ None
 fn tuck(host : Laid, gap : Node, rule : String) -> Laid? {
-  guard host.node.mark is Some(_) && gap.children is [first, .. rest] else {
-    return None
-  }
-  let after : Array[Laid] = rest.iter().map(Laid::of).collect()
+  guard gap.children is [first, .. rest] else { return None }
+  let more : Array[Laid] = rest.iter().map(Laid::of).collect()
   if first.mark is None {
-    guard host.kids.last() is Some(tail) &&
-      tuck(tail, first, rule) is Some(moved) else {
-      return None
-    }
     let kids = host.kids.copy()
-    kids[kids.length() - 1] = moved
-    return Some({ ..host, kids: [..kids, ..after], })
+    let after = host.after.copy()
+    match after.last() {
+      Some(tail) => {
+        guard tuck(tail, first, rule) is Some(moved) else { return None }
+        after[after.length() - 1] = moved
+      }
+      // 子の後ろに尻の水平線を書く host の子へは降りない — 移した行の後ろにその線が来る
+      None => {
+        guard ahead(host) == host.node.body.length() &&
+          kids.last() is Some(tail) &&
+          tuck(tail, first, rule) is Some(moved) else {
+          return None
+        }
+        kids[kids.length() - 1] = moved
+      }
+    }
+    return Some({ ..host, kids, after: [..after, ..more], })
+  }
+  guard host.node.mark is Some(_) &&
+    !(first.mark is Some(Item(..)) && open_section(host)) else {
+    return None
   }
   Some({
     ..host,
-    kids: [..host.kids, { ..Laid::of(first), rule: Some(rule), }, ..after],
+    after: [..host.after, { ..Laid::of(first), rule: Some(rule), }, ..more],
   })
+}
+
+///|
+/// host の部分木の尻で、host より深い見出しの節が開いたままか。host の段に書く行は、
+/// 深い項目を字下げの戻りで閉じるが、見出しの節は閉じない。畳みは閉じの後ろで閉じている
+fn open_section(host : Laid) -> Bool {
+  guard host.last() is Some(k) && k.node.fold is None else { return false }
+  match k.node.mark {
+    Some(Heading(..)) => true
+    Some(Item(..)) => false
+    None => open_section(k)
+  }
 }
 
 ///|
@@ -245,6 +285,7 @@ fn Part::node(self : Part, x : Laid) -> Unit {
     // 飛び（Implicit）は行を持たないので、隙間は最初の要素のもの
     None => {
       self.nodes(x.kids)
+      self.nodes(x.after)
       if head_element(x) is Some(first) {
         self.out[x.node.id] = self.out.get(first).unwrap_or(true)
       }
@@ -294,13 +335,14 @@ fn Part::bullets(self : Part, run : Array[Laid]) -> Unit {
 ///|
 /// 中身と子の列。`ahead` と同じ順。
 fn Part::body(self : Part, x : Laid) -> Unit {
-  let cut = ahead(x)
-  for b in x.node.body[:cut] {
-    self.content(b)
-  }
-  self.nodes(x.kids)
-  for b in x.node.body[cut:] {
-    self.content(b)
+  for s in strokes(x) {
+    match s {
+      Blocks(bs) =>
+        for b in bs {
+          self.content(b)
+        }
+      Kids(ks) => self.nodes(ks)
+    }
   }
 }
 
@@ -378,7 +420,10 @@ fn node(out : Array[@markdown.Block], x : Laid, depth : Int) -> Unit {
         out.push(heading(depth, x.node.label, setext, closing))
         body(out, x, depth + 1)
       })
-    None => nodes(out, x.kids, depth + 1)
+    None => {
+      nodes(out, x.kids, depth + 1)
+      nodes(out, x.after, depth + 1)
+    }
   }
 }
 
@@ -386,14 +431,46 @@ fn node(out : Array[@markdown.Block], x : Laid, depth : Int) -> Unit {
 /// 中身と子の列。**中身は子の手前**、ただし尻に続く水平線は子が項目だけなら子の後ろ
 /// （`trails`）。`depth` は子の深さ。
 fn body(out : Array[@markdown.Block], x : Laid, depth : Int) -> Unit {
-  let cut = ahead(x)
-  for b in x.node.body[:cut] {
-    content(out, b)
+  for s in strokes(x) {
+    match s {
+      Blocks(bs) =>
+        for b in bs {
+          content(out, b)
+        }
+      Kids(ks) => nodes(out, ks, depth)
+    }
   }
-  nodes(out, x.kids, depth)
-  for b in x.node.body[cut:] {
-    content(out, b)
+}
+
+///|
+/// 中身と子を書くひと続き。
+priv enum Stroke {
+  Blocks(ArrayView[Block])
+  Kids(Array[Laid])
+}
+
+///|
+/// 中身と子を書く順。**書く側（`body`）と隙間の計算（`Part::body`）が同じ順を引く。**
+/// 中身は子の手前。尻に続く水平線は子が項目だけなら子の後ろ（`ahead`）、項目の列の尻の線を
+/// 見出しの子が境界にしてしまうなら、中身ごと項目の列と見出しの子の間（`middle`）。
+/// 境界の後ろから移ってきた行は最後
+fn strokes(x : Laid) -> Array[Stroke] {
+  let body = x.node.body
+  let split = middle(x.node).bind(h => x.kids.search_by(l => l.node.id == h.id))
+  let out : Array[Stroke] = match split {
+    Some(s) =>
+      [
+        Kids(x.kids[:s].iter().collect()),
+        Blocks(body[:]),
+        Kids(x.kids[s:].iter().collect()),
+      ]
+    None => {
+      let cut = ahead(x)
+      [Blocks(body[:cut]), Kids(x.kids), Blocks(body[cut:])]
+    }
   }
+  out.push(Kids(x.after))
+  out
 }
 
 ///|
@@ -463,6 +540,7 @@ fn tight_of(run : Array[Laid]) -> Bool {
   .iter()
   .all(l => {
     l.node.body.is_empty() &&
+    l.after.is_empty() &&
     l.kids.iter().all(c => c.node.fold is None) &&
     !underlined(l) &&
     !(l.kids.get(0) is Some({ rule: Some(_), .. }))
