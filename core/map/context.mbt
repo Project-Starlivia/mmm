@@ -169,21 +169,23 @@ fn turning(m : Menu) -> Array[Entry] {
 }
 
 ///|
-/// 側を裏返す行。根は側を持たない。右だけの根（`@tree.two_sided`）の下は、
-/// 裏返すと左へ行くので沈む — 落とし先（drop.mbt）と同じ規則を同じ所から引く
+/// 側を裏返す行。根は側を持たない。見出しの根も項目の根も左右を持つ
 fn Menu::flip(self : Menu) -> Entry {
-  let row = (intent : Intent?, why : String?) => {
-    item("Flip side", intent, mark="flip-horizontal", why?)
-  }
   guard self.sel.anchor is Some(a) &&
     root_of(self.l, a) is Some(r) &&
     r.node.id != a else {
-    return row(None, Some("The root has no side"))
+    return item(
+      "Flip side",
+      None,
+      mark="flip-horizontal",
+      why="The root has no side",
+    )
   }
-  guard @tree.two_sided(r.node) else {
-    return row(None, Some("A list has no left side"))
-  }
-  row(Some(Op(op=FlipSide(id=a), edit=false)), None)
+  item(
+    "Flip side",
+    Some(Op(op=FlipSide(id=a), edit=false)),
+    mark="flip-horizontal",
+  )
 }
 
 ///|

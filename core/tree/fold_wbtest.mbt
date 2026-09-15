@@ -442,8 +442,8 @@ test "コメントの中の閉じは綴りではない" {
 
 ///|
 /// **深さは md の `#` の数ではなく、build が実際に積んだ深さで測る。**
-/// 境界の水平線は部分木を深さ 2 へ引き出すので、`### x` は `a` の子ではなく
-/// 兄弟になる。領域は 2 つの部分木に跨っていて、1 ノードを覆っていない。
+/// 境界の水平線は後ろの行を `a` の子にせず根の下へ置き直すので、`### x` は
+/// `a` の部分木の外になる。領域は 2 つの部分木に跨っていて、1 ノードを覆っていない。
 test "境界の水平線が領域の中にあれば中身" {
   inspect(
     notation_sig(
@@ -610,24 +610,37 @@ test "畳みの前の境界は空打ちでも境界のまま" {
               },
               {
                 "id": 4,
-                "label": "c",
-                "fold": { "open": false, "summary": "c" },
+                "label": "",
                 "body": [],
-                "children": [],
-                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-              },
-              {
-                "id": 5,
-                "label": "e",
-                "body": [],
-                "children": [],
-                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
+                "children": [
+                  {
+                    "id": 5,
+                    "label": "c",
+                    "fold": { "open": false, "summary": "c" },
+                    "body": [],
+                    "children": [],
+                    "mark": [
+                      "Item",
+                      { "marker": "-", "offset": 2, "loose": false },
+                    ],
+                  },
+                  {
+                    "id": 6,
+                    "label": "e",
+                    "body": [],
+                    "children": [],
+                    "mark": [
+                      "Item",
+                      { "marker": "-", "offset": 2, "loose": false },
+                    ],
+                  },
+                ],
               },
             ],
             "mark": ["Heading", { "setext": false, "closing": 0 }],
           },
-          "sides": ["Right", "Left", "Left"],
-          "rules": ["", "---", ""],
+          "sides": ["Right", "Left"],
+          "rules": ["", "---"],
         },
       ],
     },
@@ -781,13 +794,34 @@ test "入れ子項目を含む塊でも、持ち主の深さで測る" {
               },
               {
                 "id": 4,
-                "label": "a",
-                "fold": { "open": false },
+                "label": "",
                 "body": [],
                 "children": [
                   {
                     "id": 5,
-                    "label": "b",
+                    "label": "a",
+                    "fold": { "open": false },
+                    "body": [],
+                    "children": [
+                      {
+                        "id": 6,
+                        "label": "b",
+                        "body": [],
+                        "children": [],
+                        "mark": [
+                          "Item",
+                          { "marker": "-", "offset": 2, "loose": false },
+                        ],
+                      },
+                    ],
+                    "mark": [
+                      "Item",
+                      { "marker": "-", "offset": 2, "loose": false },
+                    ],
+                  },
+                  {
+                    "id": 7,
+                    "label": "c",
                     "body": [],
                     "children": [],
                     "mark": [
@@ -796,20 +830,12 @@ test "入れ子項目を含む塊でも、持ち主の深さで測る" {
                     ],
                   },
                 ],
-                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-              },
-              {
-                "id": 6,
-                "label": "c",
-                "body": [],
-                "children": [],
-                "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
               },
             ],
             "mark": ["Heading", { "setext": false, "closing": 0 }],
           },
-          "sides": ["Right", "Left", "Left"],
-          "rules": ["", "---", ""],
+          "sides": ["Right", "Left"],
+          "rules": ["", "---"],
         },
       ],
     },
@@ -820,7 +846,7 @@ test "入れ子項目を含む塊でも、持ち主の深さで測る" {
 /// **領域の中に書いた水平線は、領域の中の骨格にしか効かない。** 行き先が
 /// 領域の外なら、その水平線は部分木のものではない（畳みが立つと綴りは木から
 /// 消えるので、書き戻したとき領域の外へ出てしまう）。
-test "領域の中の境界が外の骨格を引き出せば中身" {
+test "領域の中の境界が外の骨格を置き直すなら中身" {
   inspect(
     notation_sig("# r\n\n<details>\n\n## a\n\n---\n\n</details>\n\n## b\n"),
     content=(

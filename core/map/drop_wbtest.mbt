@@ -81,7 +81,7 @@ test "根の左外側（子が居ない側） → 側・左" {
 }
 
 ///|
-/// - r(1) → - a(2)。項目の根は右だけ（`@tree.two_sided`）
+/// - r(1) → - a(2)。項目の根
 fn item_l() -> Layout {
   layout(
     [
@@ -100,28 +100,18 @@ fn item_l() -> Layout {
 }
 
 ///|
-test "項目の根の箱の中（中心より左） → 側・右" {
+/// 項目の根も見出しの根と同じく左右を持つ（書き方は項目の中の `---`）
+test "項目の根も、箱の中の左半分と左外側は側・左" {
   let l = item_l()
   let r = box(l, 1).rect
   assert_eq(
     drop_at(l, { x: r.x + 5.0, y: r.center().y, }),
-    Some(Side(root=1, side=Right)),
+    Some(Side(root=1, side=Left)),
   )
-}
-
-///|
-test "項目の根の周りのどこにも、左の側は出ない" {
-  let l = item_l()
-  let c = box(l, 1).rect.center()
-  for dx = -200.0; dx <= 200.0; dx = dx + 25.0 {
-    for dy = -100.0; dy <= 100.0; dy = dy + 25.0 {
-      let at : Pt = { x: c.x + dx, y: c.y + dy, }
-      assert_true(
-        drop_at(l, at) != Some(Side(root=1, side=Left)),
-        msg="(\{at.x}, \{at.y}) で左の側が出た",
-      )
-    }
-  }
+  assert_eq(
+    drop_at(l, { x: r.x - 10.0, y: r.center().y, }),
+    Some(Side(root=1, side=Left)),
+  )
 }
 
 ///|

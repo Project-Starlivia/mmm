@@ -105,7 +105,7 @@ test "Implicit も畳める。根は側を持たない" {
 }
 
 ///|
-/// - r(2) → - a(3) → - x(4)。項目の根は右だけ（`@tree.two_sided`）
+/// - r(2) → - a(3) → - x(4)。項目の根
 fn ctx_item_l() -> Layout {
   layout(
     [
@@ -131,12 +131,14 @@ fn ctx_item_l() -> Layout {
 }
 
 ///|
-test "項目の根の下では、子も孫も Flip side が沈む（左へは行けない）" {
+/// 項目の根も見出しの根と同じく左右を持つ
+test "項目の根の下でも、子も孫も Flip side が効く" {
   let l = ctx_item_l()
   for id in [3, 4] {
-    let flip = row(items(l, Selection::only(id)), "Flip side")
-    assert_eq(flip.intent, None)
-    assert_eq(flip.why, Some("A list has no left side"))
+    assert_eq(
+      row(items(l, Selection::only(id)), "Flip side").intent,
+      Some(Op(op=FlipSide(id~), edit=false)),
+    )
   }
   assert_eq(
     row(items(l, Selection::only(2)), "Flip side").why,

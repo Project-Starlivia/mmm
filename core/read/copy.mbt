@@ -1,18 +1,24 @@
-// 写す（Mod+C / Mod+X）。選んだ部分木の原文を地番で切り出す。貼る側（core の
+// 写す（Mod+C / Mod+X）。選んだ部分木の原文を切り出す。貼る側（core の
 // Graft）が断片を形として読み直すので、深さも綴りも付け直さない。
 
 ///|
-/// 選んだノードの原文を文書順に空行で継ぐ。地番の範囲は部分木を丸ごと覆う
+/// 選んだノードの原文を文書順に空行で継ぐ。部分木の原文（`cover`）を丸ごと写す
 /// （子の中身まで）ので、選んだ祖先の中の子孫には降りない（core の Delete /
-/// MoveNode と同じ決め）。末尾は改行 1 つ。何も選んでいなければ空
+/// MoveNode と同じ決め）。部分木の外の行を跨いで割れた範囲も空行で継ぐ。
+/// 末尾は改行 1 つ。何も選んでいなければ空
 pub fn Survey::copy(self : Survey, ids : Array[Int]) -> String {
   let chosen : Set[Int] = Set::from_array(ids)
   let parts : Array[String] = []
   fn walk(n : @tree.Node) -> Unit {
-    if chosen.contains(n.id) && self.spots.get(n.id) is Some(sp) {
-      parts.push(
-        trim_eol(String::unsafe_substring(self.md, start=sp.from, end=sp.to)),
-      )
+    if chosen.contains(n.id) && self.spots.get(n.id) is Some(_) {
+      for r in self.cover(n.id) {
+        let text = trim_eol(
+          trim_bol(String::unsafe_substring(self.md, start=r.from, end=r.to)),
+        )
+        if text != "" {
+          parts.push(text)
+        }
+      }
       return
     }
     for k in n.children {
@@ -38,4 +44,24 @@ fn trim_eol(s : String) -> String {
     end -= 1
   }
   String::unsafe_substring(s, start=0, end~)
+}
+
+///|
+/// 頭の空行を落とす。字下げは容器の桁なので残す（貼る側が断片の左余白を落とす）
+fn trim_bol(s : String) -> String {
+  let mut start = 0
+  let mut line = 0
+  while start < s.length() &&
+        (
+          s[start] == ' ' ||
+          s[start] == '\t' ||
+          s[start] == '\r' ||
+          s[start] == '\n'
+        ) {
+    if s[start] == '\n' {
+      line = start + 1
+    }
+    start += 1
+  }
+  String::unsafe_substring(s, start=line, end=s.length())
 }

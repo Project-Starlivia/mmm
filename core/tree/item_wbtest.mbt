@@ -1,7 +1,7 @@
 // 項目（`- a`）が骨格として積まれることを固定する。
 //
-// 深さは**その列が座る枠の 1 つ下**。見出しは入れ子をリセットするので、同じ
-// 字下げでも直前の見出し次第で深さが変わる。境界が引き出した先も同じ。
+// 深さは**書かれた入れ物の 1 つ下**。見出しは入れ子をリセットするので、同じ
+// 字下げでも直前の見出し次第で深さが変わる。境界は深さを変えない。
 // 項目の中は文書（見出しは項目の子）と順序法則（兄弟は項目が先）もここ。
 
 ///|
@@ -380,10 +380,9 @@ test "定義行に見える 1 行目でもラベルは全部残る" {
 }
 
 ///|
-/// **項目の深さは、その列が座る枠の 1 つ下。** 入れ子の段数から数え直すと、
-/// 境界が親の項目を深さ 2 へ引き出したときに元の位置から数えてしまい、
-/// 間に綴られていない項目が生える（項目は相対記法なので飛びは存在しない）。
-test "境界のあとの入れ子項目に空の項目が生えない" {
+/// **項目の深さは、書かれた入れ物の 1 つ下で、境界は深さを変えない。** `## h` の節の
+/// 項目は深さ 3 なので、境界の後ろでは Implicit の下に深さのまま並び、入れ子も続く。
+test "境界のあとの入れ子項目は深さを保つ" {
   json_inspect(parse("# r\n\n## h\n\n---\n\n- a\n  - b\n"), content={
     "body": [],
     "roots": [
@@ -402,21 +401,31 @@ test "境界のあとの入れ子項目に空の項目が生えない" {
             },
             {
               "id": 4,
-              "label": "a",
+              "label": "",
               "body": [],
               "children": [
                 {
                   "id": 5,
-                  "label": "b",
+                  "label": "a",
                   "body": [],
-                  "children": [],
+                  "children": [
+                    {
+                      "id": 6,
+                      "label": "b",
+                      "body": [],
+                      "children": [],
+                      "mark": [
+                        "Item",
+                        { "marker": "-", "offset": 2, "loose": false },
+                      ],
+                    },
+                  ],
                   "mark": [
                     "Item",
                     { "marker": "-", "offset": 2, "loose": false },
                   ],
                 },
               ],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
             },
           ],
           "mark": ["Heading", { "setext": false, "closing": 0 }],
@@ -457,29 +466,39 @@ test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
             },
             {
               "id": 5,
-              "label": "a",
-              "body": [],
-              "children": [
-                {
-                  "id": 6,
-                  "label": "b",
-                  "body": [],
-                  "children": [],
-                  "mark": [
-                    "Item",
-                    { "marker": "-", "offset": 2, "loose": false },
-                  ],
-                },
-              ],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
-            },
-            {
-              "id": 7,
               "label": "",
               "body": [],
               "children": [
                 {
-                  "id": 8,
+                  "id": 6,
+                  "label": "",
+                  "body": [],
+                  "children": [
+                    {
+                      "id": 7,
+                      "label": "a",
+                      "body": [],
+                      "children": [
+                        {
+                          "id": 8,
+                          "label": "b",
+                          "body": [],
+                          "children": [],
+                          "mark": [
+                            "Item",
+                            { "marker": "-", "offset": 2, "loose": false },
+                          ],
+                        },
+                      ],
+                      "mark": [
+                        "Item",
+                        { "marker": "-", "offset": 2, "loose": false },
+                      ],
+                    },
+                  ],
+                },
+                {
+                  "id": 9,
                   "label": "t",
                   "body": [],
                   "children": [],
@@ -490,16 +509,16 @@ test "境界のあとの入れ子項目の後ろでも見出しは見出し" {
           ],
           "mark": ["Heading", { "setext": false, "closing": 0 }],
         },
-        "sides": ["Right", "Left", "Left"],
-        "rules": ["", "---", ""],
+        "sides": ["Right", "Left"],
+        "rules": ["", "---"],
       },
     ],
   })
 }
 
 ///|
-/// **同じ列の項目は兄弟。** 境界は最初の項目を深さ 2 へ引き出すので、残りも
-/// 引き出された先に並ぶ。見出し（`## b` `## c`）と同じ形になる。
+/// **同じ列の項目は兄弟。** 境界は深さを変えないので、列の項目は同じ深さのまま
+/// 同じ Implicit の下に並ぶ。見出し（`### b` `### c`）と同じ形になる。
 test "境界のあとの兄弟項目は同じ深さに並ぶ" {
   json_inspect(parse("# r\n\n## a\n\n---\n\n- b\n\n- c\n"), content={
     "body": [],
@@ -519,23 +538,36 @@ test "境界のあとの兄弟項目は同じ深さに並ぶ" {
             },
             {
               "id": 4,
-              "label": "b",
+              "label": "",
               "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": true }],
-            },
-            {
-              "id": 5,
-              "label": "c",
-              "body": [],
-              "children": [],
-              "mark": ["Item", { "marker": "-", "offset": 2, "loose": true }],
+              "children": [
+                {
+                  "id": 5,
+                  "label": "b",
+                  "body": [],
+                  "children": [],
+                  "mark": [
+                    "Item",
+                    { "marker": "-", "offset": 2, "loose": true },
+                  ],
+                },
+                {
+                  "id": 6,
+                  "label": "c",
+                  "body": [],
+                  "children": [],
+                  "mark": [
+                    "Item",
+                    { "marker": "-", "offset": 2, "loose": true },
+                  ],
+                },
+              ],
             },
           ],
           "mark": ["Heading", { "setext": false, "closing": 0 }],
         },
-        "sides": ["Right", "Left", "Left"],
-        "rules": ["", "---", ""],
+        "sides": ["Right", "Left"],
+        "rules": ["", "---"],
       },
     ],
   })
@@ -552,12 +584,12 @@ test "項目の中の 2 つ目の列は前の列の兄弟" {
         "node": {
           "id": 2,
           "label": "a",
-          "body": [],
+          "body": [{ "id": 3, "source": "text" }],
           "children": [
             {
-              "id": 3,
+              "id": 4,
               "label": "b",
-              "body": [{ "id": 4, "source": "text" }],
+              "body": [],
               "children": [],
               "mark": ["Item", { "marker": "-", "offset": 2, "loose": false }],
             },
@@ -731,20 +763,6 @@ test "項目の中は文書 — 積みは項目ごと" {
       #|    # a
       #|-
       #|  # b
-    ),
-  )
-}
-
-///|
-/// 側は根の子だけの性質なので、項目の中の `---` は常に飾り（直前のノードの
-/// 中身の尻）。境界にならないので、続く見出しは引き出されない。
-test "項目の中は文書 — 中の水平線は飾り" {
-  inspect(
-    skeleton("- # x\n\n  ---\n\n  # y\n"),
-    content=(
-      #|-
-      #|  # x +1
-      #|  # y
     ),
   )
 }

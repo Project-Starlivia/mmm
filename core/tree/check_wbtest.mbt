@@ -189,9 +189,9 @@ fn leaf(id : Int, label : String, body? : Array[Block] = []) -> Node {
 }
 
 ///|
-/// 骨格の直前の水平線は境界（側の変わり目）に読まれるので、中身としては書けない。
-/// 文書の中身の尻に根が続く・見出しの中身の尻に子が続く、の 2 つ。
-/// 最後のノードの尻と、項目の中は飾りのまま。
+/// ノードの中身の尻の水平線に同じ木の骨格の行が続けば、境界（側の変わり目）に
+/// 読まれるので中身としては書けない。見出しの尻に子が続く（4）・項目の尻に兄弟が
+/// 続く（8）。文書の中身の尻（2）と、最後のノードの尻（13）は飾りのまま。
 /// **側が変わる所は破れではない** — 境界の `---` がもう 1 本書かれるので、
 /// 読みは 1 本目を中身に落として 2 本目を境界にする（`a` の尻の 6 が残るのはこれ）。
 test "中身の尻の水平線に骨格が続けば見つける" {
@@ -229,12 +229,57 @@ test "中身の尻の水平線に骨格が続けば見つける" {
       },
     ],
   }
-  json_inspect(check(doc), content=[["BorderBreak", 2], ["BorderBreak", 4]])
+  json_inspect(check(doc), content=[["BorderBreak", 4], ["BorderBreak", 8]])
+}
+
+///|
+/// 子が項目だけなら、中身の尻の水平線は子の後ろに書かれる（項目の列を閉じた所）。
+/// 続くのは部分木の次の骨格 — 無ければ飾り、同じ木の行なら破れ（a の尻の 4 に b が続く）。
+test "子が項目だけなら、尻の水平線は部分木の次の骨格を見る" {
+  json_inspect(check(parse("# a\n\n- i\n\n---\n")), content=[])
+  json_inspect(check(parse("- r\n  - i\n\n  ---\n")), content=[])
+  let i : Node = {
+    id: 5,
+    label: "i",
+    fold: None,
+    body: [],
+    children: [],
+    mark: Some(bullet),
+  }
+  let doc : Doc = {
+    frontmatter: None,
+    body: [],
+    roots: [
+      {
+        node: {
+          id: 2,
+          label: "r",
+          fold: None,
+          body: [],
+          children: [
+            {
+              id: 3,
+              label: "a",
+              fold: None,
+              body: [tb(4)],
+              children: [i],
+              mark: Some(atx),
+            },
+            leaf(6, "b"),
+          ],
+          mark: Some(atx),
+        },
+        sides: [Right, Right],
+        rules: [],
+      },
+    ],
+  }
+  json_inspect(check(doc), content=[["BorderBreak", 4]])
 }
 
 ///|
 /// 見出し（Implicit も）の直後の項目はその見出しの子に読まれ、Implicit は飛びを
-/// その見出しから測られる。間に境界（側の変わり目）があれば別 — 深さ 2 へ引き出される。
+/// その見出しから測られる。間に境界（側の変わり目）があれば別 — 根の下へ置き直される。
 /// 項目の後ろなら何でも置ける（項目の枠は見出しの親になれず、落ちる）。
 test "見出しに境界なしで続く項目・Implicit を見つける" {
   let item = (id : Int, label : String) => {
@@ -287,47 +332,6 @@ test "見出しに境界なしで続く項目・Implicit を見つける" {
     ["Swallowed", 14],
     ["Swallowed", 20],
   ])
-}
-
-///|
-/// 項目の中の `---` は中身なので、項目の根の子は側を持てない。
-test "項目の根の子の Left を見つける" {
-  let doc : Doc = {
-    frontmatter: None,
-    body: [],
-    roots: [
-      {
-        node: {
-          id: 2,
-          label: "a",
-          fold: None,
-          body: [],
-          children: [
-            {
-              id: 3,
-              label: "b",
-              fold: None,
-              body: [],
-              children: [],
-              mark: Some(bullet),
-            },
-            {
-              id: 4,
-              label: "c",
-              fold: None,
-              body: [],
-              children: [],
-              mark: Some(bullet),
-            },
-          ],
-          mark: Some(bullet),
-        },
-        sides: [Right, Left],
-        rules: [],
-      },
-    ],
-  }
-  json_inspect(check(doc), content=[["ListSide", 2]])
 }
 
 ///|

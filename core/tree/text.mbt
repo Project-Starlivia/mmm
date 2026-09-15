@@ -206,6 +206,24 @@ fn blank_start(md : String, at : Int) -> Int {
 }
 
 ///|
+/// 行頭 `at` から後ろに続く空行の尻 — 次に字の在る行の頭。空行の数え方は `blank_start`。
+fn blank_end(md : String, at : Int) -> Int {
+  let mut p = at
+  while p < md.length() {
+    let next = line_end(md, p)
+    guard next > p && md[next - 1] == '\n' else { break }
+    let nl = if next >= p + 2 && md[next - 2] == '\r' {
+      next - 2
+    } else {
+      next - 1
+    }
+    guard skip_space(md, p, nl) == nl else { break }
+    p = next
+  }
+  p
+}
+
+///|
 /// 先頭の `./` を落とした形。`./x` と `x` は同じ場所を指すので、比べる前に
 /// 必ずこの形へ寄せる。カードが持つ path も、画像の鍵（app/disk/images.mbt）も、
 /// 宣言の下に在るかの判定（read/head.mbt）も、みなこの形

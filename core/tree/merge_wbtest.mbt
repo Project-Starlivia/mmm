@@ -232,7 +232,9 @@ test "入れ子の項目が消えれば字下げも道連れ" {
 }
 
 ///|
-test "側の在る根に子を足せば根が丸ごと" {
+/// **境界の `---` は行 1 本ぶんの要素。** 側の変わる子を足せば、断片の頭にその子の
+/// 境界を書く。根は書き直さない
+test "側の変わる子を足せば、境界の行と子だけ" {
   let md = "# r\n\n## a\n\n---\n\n## b\n"
   let (before, spans) = build(md)
   let roots = before.roots.copy()
@@ -244,11 +246,7 @@ test "側の在る根に子を足せば根が丸ごと" {
   }
   let after : Doc = { ..before, roots, }
   json_inspect(changes(md, before, spans, after), content=[
-    {
-      "from": 0,
-      "to": 21,
-      "insert": "# r\n\n## a\n\n---\n\n## b\n\n---\n\n## c\n",
-    },
+    { "from": 21, "to": 21, "insert": "\n---\n\n## c\n" },
   ])
 }
 
@@ -277,14 +275,28 @@ test "改行の無い末尾に差すときは改行してから" {
 }
 
 ///|
-test "側が変われば根が丸ごと" {
+/// 側が変わっても根は書き直さない。**要るようになった境界の行だけを足す**
+test "側が変われば、境界の行だけを足す" {
   let md = "# r\n\n## a\n\n## b\n"
   let (before, spans) = build(md)
   let roots = before.roots.copy()
   roots[0] = { node: roots[0].node, sides: [Right, Left], rules: ["", ""], }
   let after : Doc = { ..before, roots, }
   json_inspect(changes(md, before, spans, after), content=[
-    { "from": 0, "to": 16, "insert": "# r\n\n## a\n\n---\n\n## b\n" },
+    { "from": 10, "to": 10, "insert": "\n---\n" },
+  ])
+}
+
+///|
+/// 側が戻れば、**要らなくなった境界の行だけを消す**（手前の空行ごと。子の隙間は残る）
+test "側が戻れば、境界の行だけを消す" {
+  let md = "# r\n\n## a\n\n---\n\n## b\n"
+  let (before, spans) = build(md)
+  let roots = before.roots.copy()
+  roots[0] = { node: roots[0].node, sides: [Right, Right], rules: ["", ""], }
+  let after : Doc = { ..before, roots, }
+  json_inspect(changes(md, before, spans, after), content=[
+    { "from": 10, "to": 15, "insert": "" },
   ])
 }
 

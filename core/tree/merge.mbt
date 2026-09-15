@@ -107,6 +107,8 @@ priv struct Merge {
   spans : Map[Int, Spot]
   /// 前の木のノードを id で引く
   old : Map[Int, Node]
+  /// 前の木の根を、根のノードの id で引く。側と境界の綴りを比べるのに要る
+  roots : Map[Int, Root]
   /// ours — 要素の手前の隙間の頭（空行が無ければ行頭）。前の木の id で引く
   gap : Map[Int, Int]
   /// base — 前の木の階層が言う、手前の空行。前の木の id で引く
@@ -137,6 +139,7 @@ fn plan(
     md,
     spans,
     old: Map([]),
+    roots: Map::from_array(before.roots.map(x => (x.node.id, x))),
     gap: gaps(md, spans),
     base,
     theirs,
@@ -147,15 +150,8 @@ fn plan(
   }
   // 文書の散文。容器の自分の尻は散文の頭（frontmatter の尻）
   merge_body(r, before.body, after.body, spans.get(doc_id).unwrap().from, 0)
-  let olds = Map::from_array(before.roots.map(x => (x.node.id, x.sides)))
   let sides = Map::from_array(after.roots.map(x => (x.node.id, x.sides)))
   let rules = Map::from_array(after.roots.map(x => (x.node.id, x.rules)))
-  // 側が変われば根が丸ごとなので、突き合わせから外す
-  for x in after.roots {
-    if olds.get(x.node.id) is Some(was) && !sided(was, x.sides) {
-      r.old.remove(x.node.id)
-    }
-  }
   merge_children(
     r,
     spans.get(doc_id).unwrap().to,
@@ -167,19 +163,6 @@ fn plan(
     rules,
   )
   Some(settle(r))
-}
-
-///|
-/// 側が前後で同じか。**側は根のもの**で `---` は隙間に書かれるので、変われば
-/// 根ごと書き直す。子の増減で長さが変わるだけ（前後とも全部 Right）は同じと見る。
-fn sided(olds : Array[Side], news : Array[Side]) -> Bool {
-  olds == news || (plain(olds) && plain(news))
-}
-
-///|
-/// 側が 1 つも変わらない列（`---` が 1 本も書かれない）。
-fn plain(sides : Array[Side]) -> Bool {
-  sides.iter().all(s => s is Right)
 }
 
 ///|
@@ -224,16 +207,30 @@ fn merge_node(
         Some(_) => {
           let line_to = line_end(r.md, s.from)
           if !same_line(old, x) {
+            let inner = label_end(r.md, r.spans, old)
             r.out.push({
               from: s.from,
-              to: line_to,
+              to: inner,
               insert: indent(
                 fragment({ ..x, body: [], children: [], }, depth, [], []),
                 column(r.md, s.from),
-              ),
+              ) +
+              (if inner < line_to { pad(column(r.md, inner)) } else { "" }),
             })
           }
           merge_body(r, old.body, x.body, line_to, col)
+        }
+      }
+      // **根なら、境界の行も要素。** 側が変わった所の `---` の行だけを書き換え、
+      // 増える子には断片の頭に自分の境界を書かせる
+      let wants : Map[Int, String] = Map([])
+      if r.roots.get(x.id) is Some(was) {
+        let after = turns({ node: x, sides, rules, })
+        turned(r, col, old, x, turns(was), after)
+        for i, k in x.children {
+          if after[i] is Some(rule) {
+            wants[k.id] = rule
+          }
         }
       }
       // 元から子の無い容器に差す位置は前の木の自分の尻。そのとき地番の尻は
@@ -244,13 +241,84 @@ fn merge_node(
         col,
         old.children,
         x.children,
-        depth + 1,
+        // 項目の中は、その項目の深さを 0 とした文書（書く側の `list_item` と同じ）
+        if x.mark is Some(Item(..)) {
+          1
+        } else {
+          depth + 1
+        },
         Map([]),
         Map([]),
+        rule=id => wants.get(id),
       )
     }
     _ => replace(r, x, depth, sides, rules)
   }
+}
+
+///|
+/// ノードの行の尻（改行の次）。**名前の無い項目は、中身か子がマーカーの行に乗る**
+/// （`- # h`）ので、行はその手前まで。
+fn label_end(md : String, spans : Map[Int, Spot], x : Node) -> Int {
+  [..x.body.map(b => b.id), ..x.children.map(k => k.id)]
+  .iter()
+  .filter_map(id => spans.get(id).map(sp => sp.from))
+  .fold(init=line_end(md, spans.get(x.id).unwrap().from), (a, b) => {
+    if b < a {
+      b
+    } else {
+      a
+    }
+  })
+}
+
+///|
+/// 根の子の手前の境界の行を、前後の側の違いだけ書き換える（`turns` の表どうし）。
+/// **消すのは要らなくなった行だけ、足すのは残る子の手前に要るようになった行だけ** —
+/// 増える子は断片の頭に自分の境界を書く（`merge_children` の `rule`）。
+/// 子の差分より先に積む — 同じ位置に隙間の書き換えが来ても、境界が手前に並ぶように
+fn turned(
+  r : Merge,
+  col : Int,
+  old : Node,
+  x : Node,
+  before : Array[String?],
+  after : Array[String?],
+) -> Unit {
+  let had : Map[Int, Bool] = Map([])
+  for i, k in old.children {
+    had[k.id] = before[i] is Some(_)
+  }
+  let wants : Map[Int, Bool] = Map([])
+  for i, k in x.children {
+    wants[k.id] = after[i] is Some(_)
+  }
+  for i, k in old.children {
+    guard before[i] is Some(_) && wants.get(k.id) != Some(true) else {
+      continue
+    }
+    if border_line(r, k.id) is Some((from, to)) {
+      r.out.push({ from, to, insert: "", })
+    }
+  }
+  for i, k in x.children {
+    guard after[i] is Some(rule) && had.get(k.id) == Some(false) else {
+      continue
+    }
+    let at = r.gap.get(k.id).unwrap()
+    r.out.push({ from: at, to: at, insert: "\n" + pad(col) + rule + "\n", })
+  }
+}
+
+///|
+/// 前の木で子 `id` の手前に書かれた境界の行と、その手前の空行。境界の行は子の隙間の
+/// すぐ上の行。水平線でなければ None（消さない）
+fn border_line(r : Merge, id : Int) -> (Int, Int)? {
+  let end = r.gap.get(id).unwrap()
+  guard end > 0 else { return None }
+  let head = line_start(r.md, end - 1)
+  guard ruled(slice(r.md, head, end)) else { return None }
+  Some((blank_start(r.md, head), end))
 }
 
 ///|
@@ -338,12 +406,27 @@ fn dropped(r : Merge, q : Seq) -> Int? {
       )
     } else if head && head_born {
       (line_start(r.md, spot(r, first).from), last)
+    } else if head &&
+      r.gap.get(first) == Some(spot(r, doc_id).from) &&
+      stale_head(r, last) {
+      // 文書の頭の列が丸ごと消え、後ろに続く物（列の外）が頭になる。その物の隙間は
+      // 誰も書き換えないので、列の境目を引き継がせ、消す物の後ろの空行ごと消す
+      (line_start(r.md, spot(r, first).from), blank_end(r.md, last))
     } else {
       (r.gap.get(first).unwrap(), last)
     }
     r.out.push({ from, to, insert: "", })
   }
   inherited
+}
+
+///|
+/// 位置 `at` のすぐ後ろに書かれた物を、base がもう文書の頭と言うか。**中身が根の
+/// 後ろに書かれた文書**（`- a / ---`）では、正規形は中身を先に書くので base は頭と言うが、
+/// ours では前に物が居る。そのとき base と theirs は同じなので、`gapped` は隙間を書き換えない
+fn stale_head(r : Merge, at : Int) -> Bool {
+  let next = if column(r.md, at) == 0 { at } else { line_end(r.md, at) }
+  r.gap.iter().any(p => p.1 == next && r.base.get(p.0) == Some(false))
 }
 
 ///|
@@ -458,6 +541,7 @@ fn spot(r : Merge, id : Int) -> Spot {
 ///|
 /// 子列の差分。残った子には降りる。項目の列は ours の兄弟の流儀（詰まっているか）を
 /// 増える物にも写す — 正規形は流儀を知らないので、ここだけは ours が先。
+/// `rule` は増える子の手前に書く境界の綴り（根の子の列のときだけ在る）。
 fn merge_children(
   r : Merge,
   own : Int,
@@ -467,6 +551,7 @@ fn merge_children(
   depth : Int,
   sides : Map[Int, Array[Side]],
   rules : Map[Int, Array[String]],
+  rule? : (Int) -> String? = _ => None,
 ) -> Unit {
   let now = Map::from_array(news.map(x => (x.id, x)))
   let old_ids = ids(olds)
@@ -492,12 +577,16 @@ fn merge_children(
       )
     },
     make: id => {
-      fragment(
+      let text = fragment(
         now.get(id).unwrap(),
         depth,
         sides.get(id).unwrap_or([]),
         rules.get(id).unwrap_or([]),
       )
+      match rule(id) {
+        Some(line) => line + "\n\n" + text
+        None => text
+      }
     },
   })
 }
@@ -616,9 +705,10 @@ fn settle(r : Merge) -> Array[Edit] {
 }
 
 ///|
-/// その位置が行の途中か（行頭の字下げの後ろは行頭と同じ — 項目のマーカーの手前がそこ）。
+/// その位置が行の途中か — 直前が空白でない字。行頭の字下げの後ろ（項目のマーカーの
+/// 手前）も、マーカーの後ろ（`- # h` の見出しの頭）も、書いてよい行の頭。
 fn mid_line(md : String, at : Int) -> Bool {
-  skip_space(md, line_start(md, at), at) < at
+  at > line_start(md, at) && md[at - 1] != ' ' && md[at - 1] != '\t'
 }
 
 ///|

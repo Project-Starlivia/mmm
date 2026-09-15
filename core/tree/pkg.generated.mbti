@@ -50,8 +50,6 @@ pub fn sign_of(Node) -> Sign?
 
 pub fn spans_sig(String) -> String
 
-pub fn two_sided(Node) -> Bool
-
 pub fn unbuild(Doc) -> @markdown.Document
 
 // Errors
@@ -93,7 +91,6 @@ pub(all) enum Flaw {
   SideCount(root~ : Int, sides~ : Int, children~ : Int)
   BorderBreak(Int)
   Swallowed(Int)
-  ListSide(Int)
   GappedItem(Int)
   TooDeep(Int)
   DeepSetext(Int)

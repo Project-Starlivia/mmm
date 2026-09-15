@@ -57,19 +57,26 @@ priv struct Own {
 
 ///|
 fn owns(s : Survey) -> Array[Own] {
+  let starts = starts_of(s)
   let out = []
   each_node(s.doc, n => {
     guard s.spots.get(n.id) is Some(sp) else { return }
-    let to = match n.children.get(0).bind(k => s.spots.get(k.id)) {
-      Some(first) => first.from
-      None => sp.to
+    // **自身の文の尻は、次に始まるノードの頭。** ふつうは最初の子だが、境界で置き直された
+    // 行のこともある — 境界は中身の持ち主を変えないので、その行の下に自分の中身が続く
+    let mut to = sp.to
+    if n.children.get(0).bind(k => s.spots.get(k.id)) is Some(first) &&
+      first.from < to {
+      to = first.from
+    }
+    if after(starts, sp.from) is Some(next) && next < to {
+      to = next
     }
     if to > sp.from {
       out.push({ id: n.id, from: sp.from, to, })
     }
-    // **子の後ろに書かれた中身も自分の文。** 列 0 の塊は開いている項目を閉じるので、
-    // 見出しの中身が子より後ろに書かれていることがある（#204）。1 本の区間では
-    // 言えないので、そういう塊は 1 つずつ足す
+    // **子や置き直された行の後ろに書かれた中身も自分の文。** 列 0 の塊は開いている
+    // 項目を閉じるので、見出しの中身が子より後ろに書かれていることがある（#204）。
+    // 1 本の区間では言えないので、そういう塊は 1 つずつ足す
     for b in n.body {
       guard s.spots.get(b.id) is Some(at) else { continue }
       if at.from >= to && at.to > at.from {
@@ -79,6 +86,35 @@ fn owns(s : Survey) -> Array[Own] {
   })
   out.sort_by_key(o => o.from)
   out
+}
+
+///|
+/// 書かれたノードの頭、昇順。
+fn starts_of(s : Survey) -> Array[Int] {
+  let out = []
+  each_node(s.doc, n => {
+    if n.mark is Some(_) && s.spots.get(n.id) is Some(sp) {
+      out.push(sp.from)
+    }
+  })
+  out.sort()
+  out
+}
+
+///|
+/// 昇順の並びで、`p` より後ろの最初の値。
+fn after(xs : Array[Int], p : Int) -> Int? {
+  let mut lo = 0
+  let mut hi = xs.length()
+  while lo < hi {
+    let mid = (lo + hi) / 2
+    if xs[mid] <= p {
+      lo = mid + 1
+    } else {
+      hi = mid
+    }
+  }
+  xs.get(lo)
 }
 
 ///|
@@ -258,15 +294,129 @@ pub fn anchors_for(s : Survey, c : Choice) -> Anchors? {
 }
 
 ///|
-/// md 側で薄く塗る範囲。ノードは地番そのもの（子孫込み）、カードは中身の原文。無い地番は落とす。
-/// 「地図が持つ間だけ」は呼ぶ側（state.ts）が見る
+/// md 側で薄く塗る範囲。ノードは部分木の原文（`Survey::cover`）、カードは中身の原文。
+/// 無い地番は落とす。「地図が持つ間だけ」は呼ぶ側（state.ts）が見る
 pub fn ranges(s : Survey, c : Choice) -> Array[Range] {
-  let span = (id : Int) => {
-    s.spots.get(id).map(sp => ({ from: sp.from, to: sp.to, } : Range))
+  match c {
+    Card(id~) =>
+      match s.spots.get(id) {
+        Some(sp) => [{ from: sp.from, to: sp.to, }]
+        None => []
+      }
+    Nodes(sel~) => {
+      let out = []
+      for id in sel.ids {
+        out.push_iter(s.cover(id).iter())
+      }
+      out
+    }
   }
-  let ids = match c {
-    Card(id~) => [id]
-    Nodes(sel~) => sel.ids
+}
+
+///|
+/// ノードの部分木が原文に書かれた範囲、原文の順。ふつうは地番 1 本。
+///
+/// **部分木の外の行を跨げば、そこを抜いて割る。** 境界は中身の持ち主を変えないので、
+/// 持ち主の中身が、境界で置き直された行より下に書かれていることがある
+/// （`- 野菜` / `(野菜) ---` / `(野菜) - 肉` / `(野菜) メモ` の、野菜と メモ の間の肉。
+/// docs/spec.md「水平線」）。抜くのは跨いだ書かれた行の範囲と、その手前の境界の水平線。
+/// Implicit の地番は子の和なので、跨いだ持ち主の中身まで覆う — 抜く物には数えない
+fn Survey::cover(self : Survey, id : Int) -> Array[Range] {
+  guard self.spots.get(id) is Some(sp) else { return [] }
+  let inside : Set[Int] = Set([])
+  fn mark(n : @tree.Node) -> Unit {
+    inside.add(n.id)
+    for k in n.children {
+      mark(k)
+    }
   }
-  ids.map(span).filter(x => x is Some(_)).map(x => x.unwrap())
+
+  each_node(self.doc, n => if n.id == id { mark(n) })
+  let holes : Array[Range] = []
+  each_node(self.doc, n => {
+    guard n.mark is Some(_) &&
+      !inside.contains(n.id) &&
+      self.spots.get(n.id) is Some(o) &&
+      o.from > sp.from &&
+      o.from < sp.to else {
+      return
+    }
+    holes.push({ from: hole_start(self.md, o.from), to: o.to, })
+  })
+  holes.sort_by_key(h => h.from)
+  let out : Array[Range] = []
+  let mut at = sp.from
+  for h in holes {
+    if h.from > at {
+      out.push({ from: at, to: h.from, })
+    }
+    if h.to > at {
+      at = h.to
+    }
+  }
+  if sp.to > at {
+    out.push({ from: at, to: sp.to, })
+  }
+  out
+}
+
+///|
+/// 跨いだ行 `at` を抜くときの頭。行の頭から、手前の空行を越えて**境界の水平線が在れば
+/// その行の頭**まで — 置き直された行の手前の水平線は、その行の側の綴りで、持ち主の中身ではない
+fn hole_start(md : String, at : Int) -> Int {
+  let head = line_head(md, at)
+  let mut p = head
+  while p > 0 {
+    let prev = line_head(md, p - 1)
+    guard blank(md, prev, p) else {
+      return if ruled(md, prev, p) { prev } else { head }
+    }
+    p = prev
+  }
+  head
+}
+
+///|
+/// `at` を含む行の頭。
+fn line_head(md : String, at : Int) -> Int {
+  let mut p = if at < md.length() { at } else { md.length() }
+  while p > 0 && md[p - 1] != '\n' {
+    p = p - 1
+  }
+  p
+}
+
+///|
+/// `[from, to)` が空白だけか。
+fn blank(md : String, from : Int, to : Int) -> Bool {
+  for i in from..<(if to < md.length() { to } else { md.length() }) {
+    let c = md[i]
+    if c != ' ' && c != '\t' && c != '\r' && c != '\n' {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// `[from, to)` の行が水平線か。空白を除いて `-` `_` `*` のどれか 1 種が 3 つ以上だけ並ぶ
+fn ruled(md : String, from : Int, to : Int) -> Bool {
+  let mut mark : UInt16 = 0
+  let mut count = 0
+  for i in from..<(if to < md.length() { to } else { md.length() }) {
+    let c = md[i]
+    if c == ' ' || c == '\t' || c == '\r' || c == '\n' {
+      continue
+    }
+    if c != '-' && c != '_' && c != '*' {
+      return false
+    }
+    if count == 0 {
+      mark = c
+    } else if c != mark {
+      return false
+    }
+    count = count + 1
+  }
+  count >= 3
 }
