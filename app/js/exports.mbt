@@ -252,7 +252,7 @@ pub fn mmm_main(editor : @core.Any) -> @core.Any {
       editor_of(editor),
       @disk.Disk::new(
         @disk.Recent::new(@disk.idb_store(@disk.handles_shelf)),
-        @disk.Drafts::new(@disk.idb_store(@disk.drafts_shelf)),
+        @disk.Autosaves::new(@disk.idb_store(@disk.autosaves_shelf)),
       ),
     ),
   )
