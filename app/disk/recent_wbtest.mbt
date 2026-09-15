@@ -34,6 +34,7 @@ fn memo_store(m : Memo) -> Store {
     write: fn(key, value) {
       m.log.push("write " + key)
       m.table[key] = value
+      true
     },
     remove: fn(key) {
       m.log.push("remove " + key)

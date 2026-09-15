@@ -72,20 +72,28 @@ pub fn Unsaved::written(self : Unsaved) -> String? {
 }
 
 ///|
-/// いまの件に書く（上書き）
+/// いまの件に書く（上書き）。**書けたかを返す。** 書けなければ書いた字も覚えない —
+/// 覚えると同じ字は二度書かない照合に引っかかり、置き場が戻っても書き直さない
 pub async fn Unsaved::keep(
   self : Unsaved,
   now : Double,
   name : String,
   text : String,
   doc : @web.FileHandle?,
-) -> Unit {
-  self.written = Some(text)
-  (self.store.write)(
-    self.id,
-    unsaved_doc_of({ id: self.id, name, at: now, text, doc, }),
-  )
+) -> Bool {
+  let id = self.id
+  guard (self.store.write)(
+    id,
+    unsaved_doc_of({ id, name, at: now, text, doc, }),
+  ) else {
+    return false
+  }
+  // 待つあいだに文書が入れ替わっていれば、覚えるのは入れ替わった後の件の話ではない
+  if self.id == id {
+    self.written = Some(text)
+  }
   self.trim()
+  true
 }
 
 ///|

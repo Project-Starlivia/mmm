@@ -194,6 +194,8 @@ pub fn record(Array[(String, @core.Any)]) -> @core.Any
 
 pub fn request_permission(@core.Any, String) -> @js_async.Promise[String]
 
+pub fn request_persistence(@dom.Document) -> Unit
+
 pub fn resolve_path(DirHandle, FileHandle) -> @js_async.Promise[@core.Any]
 
 pub fn return_value(@dom.Element) -> String

@@ -58,7 +58,8 @@ let legacy_assets = "assets"
 /// 壊れても、開く・新規・保存という本体機能を道連れにしない
 pub(all) struct Store {
   read : async (String) -> @core.Any
-  write : async (String, @core.Any) -> Unit
+  /// 書く。**書けたかを返す** — 未保存の字は書けなかったことを言う（docs/unsaved.md）
+  write : async (String, @core.Any) -> Bool
   remove : async (String) -> Unit
   /// 棚の中身を全部。**行ごとに鍵を分けたので、一覧はこれで引く**
   all : async () -> Array[@core.Any]
@@ -200,7 +201,8 @@ fn by_recent(rows : Array[Known]) -> Array[Known] {
 ///|
 /// 行を 1 つ置く。**触るのは自分の行だけ** — 隣の行は読みもしない
 async fn Recent::put(self : Recent, row : Known) -> Unit {
-  (self.store.write)(row_prefix + row.id, row_of(row))
+  // 書けなくても言わない — 覚えているのは高速化であって、真実ではない（冒頭）
+  (self.store.write)(row_prefix + row.id, row_of(row)) |> ignore
 }
 
 ///|
@@ -345,8 +347,9 @@ pub fn idb_store(shelf : String) -> Store {
   }
   {
     read: async fn(key) { run("readonly", @web.idb_get(key)) },
+    // put が済めば鍵が返る。null は開けなかった・書けなかった（`run` が倒した）
     write: async fn(key, value) {
-      run("readwrite", @web.idb_put(key, value)) |> ignore
+      !@core.is_nullish(run("readwrite", @web.idb_put(key, value)))
     },
     remove: async fn(key) { run("readwrite", @web.idb_delete(key)) |> ignore },
     all: async fn() {
