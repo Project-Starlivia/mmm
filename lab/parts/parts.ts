@@ -71,9 +71,11 @@ const FILES_ACTS: core.FileActs = {
   openUnsaved: nothing,
   discardUnsaved: nothing,
 };
-const MORE_ACTS: core.MoreActs = {
+const EDIT_ACTS: core.EditActs = {
   undo: nothing,
   redo: nothing,
+};
+const MORE_ACTS: core.MoreActs = {
   pickColor: nothing,
   toggleTheme: nothing,
   toggleGrab: nothing,
@@ -155,6 +157,7 @@ export const PARTS: Part[] = [
           { ...SAVED, savedName: null, canOpen: false, canSave: false, canRename: false, canChooseFolder: false },
           FILES_ACTS,
         ),
+      edit: () => core.editRows(EDIT_ACTS),
       "more-dark": () => core.moreRows({ light: false, grab: false, linkCaveat: Promise.resolve([]) }, MORE_ACTS),
       "more-light-noted": () =>
         core.moreRows(

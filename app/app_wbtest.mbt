@@ -204,6 +204,7 @@ fn stand(
     ("span", "filename"),
     ("span", "dirty"),
     ("button", "files"),
+    ("button", "edit"),
     ("button", "export"),
     ("button", "export-way"),
     ("button", "more"),

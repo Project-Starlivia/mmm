@@ -1,4 +1,5 @@
-// 帯の `⋯`。低頻度だが消したくないものの受け皿。3 つの塊 — 戻す / 見た目と手触り / 外に開く。
+// 帯の `⋯`。低頻度だが消したくないものの受け皿。本文には触らない。
+// 3 つの塊 — 見た目と手触り / 共有 / 外に開く。
 //
 // 並びは純粋な表（files.mbt と同じ作り）。いまの状態を受けて行を返し、
 // 押されたら `MoreActs` を呼ぶだけ。外に開く先はここが知っていて、開くのは `visit`
@@ -18,8 +19,6 @@ pub(all) struct More {
 
 ///|
 pub(all) struct MoreActs {
-  undo : () -> Unit
-  redo : () -> Unit
   pick_color : () -> Unit
   toggle_theme : () -> Unit
   toggle_grab : () -> Unit
@@ -32,12 +31,6 @@ pub(all) struct MoreActs {
 ///|
 pub fn more_menu(s : More, a : MoreActs) -> Array[@parts.Entry] {
   [
-    Run(@parts.row("Undo", key=Some("Mod+Z"), mark=Some("undo-2")), a.undo),
-    Run(
-      @parts.row("Redo", key=Some("Mod+Shift+Z"), mark=Some("redo-2")),
-      a.redo,
-    ),
-    Sep,
     Run(@parts.row("Accent color", mark=Some("palette")), a.pick_color),
     // 絵は「押すと何になるか」（切り替えた先）を言う。字と同じ向き。
     // **閉じない**（`Flip`）— 変わったのは画面の見え方そのものなので、

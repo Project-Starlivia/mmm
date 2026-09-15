@@ -324,6 +324,17 @@ pub fn mmm_files_rows(state : @core.Any, acts : @core.Any) -> @dom.Element {
 }
 
 ///|
+/// Edit の行
+#export_name("mmmEditRows")
+pub fn mmm_edit_rows(acts : @core.Any) -> @dom.Element {
+  let call = (name : String) => acts._call(name, []) |> ignore
+  @parts.rows(
+    @dom.document(),
+    @bar.edit_menu({ undo: () => call("undo"), redo: () => call("redo"), }),
+  )
+}
+
+///|
 fn more_of(v : @core.Any) -> @bar.More {
   {
     light: v._get("light").cast(),
@@ -338,8 +349,6 @@ fn more_of(v : @core.Any) -> @bar.More {
 fn more_acts_of(v : @core.Any) -> @bar.MoreActs {
   let call = (name : String, args : Array[@core.Any]) => v._call(name, args)
   {
-    undo: () => call("undo", []) |> ignore,
-    redo: () => call("redo", []) |> ignore,
     pick_color: () => call("pickColor", []) |> ignore,
     toggle_theme: () => call("toggleTheme", []) |> ignore,
     toggle_grab: () => call("toggleGrab", []) |> ignore,
