@@ -270,7 +270,14 @@ fn take(
         d,
         block_span(block),
         content=content_of(d.md, block),
-        source=Some(verbatim(d.md, block)),
+        // 段落は、書き戻して読み直しても段落のままの字で持つ（`paragraphed`）
+        source=Some(
+          if block is Paragraph(..) {
+            paragraphed(verbatim(d.md, block))
+          } else {
+            verbatim(d.md, block)
+          },
+        ),
       )
     }
   }
@@ -349,7 +356,7 @@ fn face_of(md : String, it : @markdown.ListItem) -> Face {
       // 段落をその後ろから始める。**チェックは綴り**（mmm は GFM のタスクリストを
       // 解釈しない）なので、頭が手前ならマーカーの後ろから測る
       let head = if at < span.from { at } else { span.from }
-      label = carve(md, head, span.to)
+      label = lines_of(carve(md, head, span.to))
       at = head
       from = span.to
     } else {
@@ -359,7 +366,7 @@ fn face_of(md : String, it : @markdown.ListItem) -> Face {
   // 塊が 1 つも残らない項目は、マーカーの後ろの字がそのままラベル。
   // ライブラリが食べて塊を残さない綴り（`- [ ]`）のため
   if it.children.is_empty() {
-    label = carve(md, at, it.span.to)
+    label = lines_of(carve(md, at, it.span.to))
   }
   { label, at, from, rest, }
 }

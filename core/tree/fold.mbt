@@ -332,16 +332,16 @@ fn capsule(
     text=carve(md, from, upto),
     open~,
     summary~,
-    body=strip(md, inner, spots[tail].tag.from),
+    body=strip(md, inner, spots[tail].tag.from, column(md, from)),
     from~,
     to=upto,
   )
 }
 
 ///|
-/// 原文の切り出し。前後の改行と空白を落とすだけ（`carve` と違い、行頭から
-/// 始まらないので容器の字下げは見ない）。
-fn strip(md : String, from : Int, to : Int) -> String {
+/// 原文の切り出し。前後の改行と空白を落とし、2 行目以降から容器の字下げ `indent` を剥がす
+/// （領域の原文 `carve` と同じ剥がし方 — 剥がさなければ、容器の外へ書き戻したとき中身の字が変わる）。
+fn strip(md : String, from : Int, to : Int, indent : Int) -> String {
   let mut a = from
   while a < to && space(md[a]) {
     a = a + 1
@@ -351,7 +351,7 @@ fn strip(md : String, from : Int, to : Int) -> String {
     z = z - 1
   }
   // 木が抱える字は LF だけ（`carve` と同じ不変量）
-  lf(slice(md, a, z))
+  lf(unindent(slice(md, a, z), indent))
 }
 
 ///|

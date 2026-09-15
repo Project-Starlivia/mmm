@@ -315,6 +315,7 @@ fn strokes(x : Laid) -> Array[Stroke] {
         Blocks(body[:]),
         Kids(x.kids[s:].iter().collect()),
       ]
+    None if lead_paragraph(x) => [Kids(x.kids), Blocks(body[:])]
     None => {
       let cut = front(x)
       [Blocks(body[:cut]), Kids(x.kids), Blocks(body[cut:])]
@@ -322,6 +323,19 @@ fn strokes(x : Laid) -> Array[Stroke] {
   }
   out.push(Kids(x.after))
   out
+}
+
+///|
+/// 名前の無い項目の中身が段落で始まり、子が項目だけか。**マーカーの行に段落を書くと名前に
+/// 読まれる**（`- - a / (a の段) b` の b）ので、子の列を先に書き、中身はその後ろ（項目の段に戻った塊は
+/// 項目のもの）
+fn lead_paragraph(x : Laid) -> Bool {
+  x.node.mark is Some(Item(..)) &&
+  x.node.label == "" &&
+  x.kids is [_, ..] &&
+  x.kids.iter().all(k => k.node.mark is Some(Item(..))) &&
+  x.node.body.get(0) is Some({ content: None, source: Some(s), .. }) &&
+  read(s).children is [Paragraph(..), ..]
 }
 
 ///|
@@ -394,7 +408,8 @@ fn underlined(l : Laid) -> Bool {
 fn list_item(l : Laid, tight : Bool, kids : Array[@markdown.Block]) -> String {
   let inner = StringBuilder()
   if l.node.label != "" {
-    inner.write_string(l.node.label)
+    // 名前は段落。続きの行が項目の段で別の塊に読まれるなら 4 桁下げる（`paragraphed`）
+    inner.write_string(paragraphed(l.node.label))
     inner.write_char('\n')
   }
   if !kids.is_empty() {
