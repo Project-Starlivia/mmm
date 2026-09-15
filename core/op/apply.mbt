@@ -765,8 +765,8 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
     }
   }
   // 断片の側は境界の水平線に戻す。側は根のものなので席へ差せば消えるが、
-  // 字として運べば書き戻したときに md が境界と読む
-  let sub = bordered(sub)
+  // 字として運べば書き戻したときに md が境界と読む（置き場は書く側と同じ表 `@tree.bordered`）
+  let sub = @tree.bordered(sub)
   let cut = pieces(md, spots, sub.body)
   // 行のノードは文書に無い番号から、断片の id はその先へ寄せる
   let first = fresh(doc)
@@ -886,46 +886,6 @@ fn grow(
     }
   }
   (out, prose)
-}
-
-///|
-/// 断片の側を、境界の水平線に戻す。側が変わる子の**手前の子の部分木の最後の行**
-/// （文書順で境界の直前に書かれていた行）の中身の尻に置く。読んだ字（`rules`）は
-/// そのまま運ぶ。行が綴りを持たない（Implicit）なら中身を持てないので置けない。
-fn bordered(sub : @tree.Doc) -> @tree.Doc {
-  let mut cur = sub
-  let mut next = fresh(sub)
-  for r in sub.roots {
-    let kids = r.node.children
-    for i in 1..<kids.length() {
-      guard i < r.sides.length() && r.sides[i] != r.sides[i - 1] else {
-        continue
-      }
-      let source = match r.rules.get(i) {
-        Some(line) if line != "" => Some(line)
-        _ => None
-      }
-      let rule : @tree.Block = {
-        id: next,
-        content: Some(ThematicBreak),
-        source,
-      }
-      next = next + 1
-      if body(cur, node=last_line(kids[i - 1]), bs => [..bs, rule]) is Some(d) {
-        cur = d
-      }
-    }
-  }
-  cur
-}
-
-///|
-/// 部分木の中で文書順が最後の骨格の行。
-fn last_line(n : @tree.Node) -> Int {
-  match n.children.last() {
-    Some(k) => last_line(k)
-    None => n.id
-  }
 }
 
 ///|

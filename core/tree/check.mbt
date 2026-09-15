@@ -62,7 +62,9 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   }
   // 文書の中身の水平線は境界にならない（持ち主がノードでない）ので持ち回らない
   each_block(c, doc.body)
-  walk(c, doc.roots.map(r => r.node), 1, 0, [], i => doc.roots[i].sides)
+  walk(c, doc.roots.map(r => r.node), 1, 0, [], i => {
+    turns(doc.roots[i]).map(t => t is Some(_))
+  })
   c.flaws
 }
 
@@ -156,15 +158,15 @@ priv struct Site {
 }
 
 ///|
-/// 同じ列の兄弟を順に見る。`sides` はこの列の側（根の子だけが持つ）、
-/// `kids` は i 番目の子の列の側（根なら `Root.sides`、深ければ無い）。
+/// 同じ列の兄弟を順に見る。`turned` はこの列の子ごとに手前へ境界が書かれるか（根の子だけが
+/// 持つ）、`kids` は i 番目の子の列のそれ（根なら境界の表 `turns`、深ければ無い）。
 fn walk(
   c : Check,
   xs : Array[Node],
   depth : Int,
   base : Int,
-  sides : Array[Side],
-  kids : (Int) -> Array[Side],
+  turned : Array[Bool],
+  kids : (Int) -> Array[Bool],
   mid? : Int? = None,
 ) -> Unit {
   for i, x in xs {
@@ -172,10 +174,8 @@ fn walk(
     if depth == 1 || mid == Some(x.id) {
       c.border = None
     }
-    // 手前に境界の `---` が書かれるか。**書く側（unbuild の `nodes`）と同じ見方** —
-    // 側は Right から始まるので、先頭の子が Left なら手前にも 1 本書かれる
-    let bordered = i < sides.length() &&
-      sides[i] != (if i > 0 { sides[i - 1] } else { Right })
+    // 手前に境界の `---` が書かれるか。**書く側と同じ表**（`turns`）
+    let bordered = turned.get(i) == Some(true)
     let s : Site = {
       node: x,
       depth,
