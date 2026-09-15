@@ -14,6 +14,8 @@ pub let atx : Mark
 
 pub fn bare_path(String) -> String
 
+pub fn bordered(Doc) -> Doc
+
 pub fn build(String) -> (Doc, Map[Int, Spot])
 
 pub let bullet : Mark

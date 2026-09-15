@@ -127,6 +127,56 @@ test "Graft — 貼り付けの見本" {
 }
 
 ///|
+/// #383 — 断片の側は、書く側と同じ表（`@tree.bordered`）で線に戻す。先頭の子が左でも運び、
+/// 手前の部分木の尻が畳みなら線を畳みの中に置かない（置ける行が無ければ側は落ちる）
+test "Graft — 断片の先頭の左も運び、畳みの中には線を置かない" {
+  let (first, _) = applied(
+    "# r\n",
+    Graft(at=NodePlace::In(node=2, side=None), md="# p\n\n---\n\n## q\n"),
+  )
+  inspect(
+    first,
+    content=(
+      #|# r
+      #|
+      #|## p
+      #|
+      #|---
+      #|
+      #|### q
+      #|
+    ),
+  )
+  let (folded, _) = applied(
+    "# r\n",
+    Graft(
+      at=NodePlace::In(node=2, side=None),
+      md="# p\n\n## a\n\n<details>\n<summary>b</summary>\n\n### b\n\n</details>\n\n---\n\n## c\n",
+    ),
+  )
+  inspect(
+    folded,
+    content=(
+      #|# r
+      #|
+      #|## p
+      #|
+      #|### a
+      #|
+      #|<details>
+      #|<summary>b</summary>
+      #|
+      #|#### b
+      #|
+      #|</details>
+      #|
+      #|### c
+      #|
+    ),
+  )
+}
+
+///|
 /// #118 — 貼った `---` は md と同じ意味。次に骨格が来れば境界（根の子なら側の
 /// 反転、深ければ深さを保って根の反対側へ置き直す）。形は md が決めるので focus は無い。
 /// 順は崩れない — 中身は直前に生えたノードのもの

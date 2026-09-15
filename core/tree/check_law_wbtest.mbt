@@ -124,3 +124,53 @@ test "法則 — check が通る木は、書いて読み直すと同じ形" {
     fail("check を通った木が \{passed} 本しか無い")
   }
 }
+
+///|
+/// 貼る断片は根でない席に差されるので、側は中身の水平線に戻して運ぶ（`bordered`）。
+/// **変わり目ぜんぶに線が置け、check がその線だけを `BorderBreak`（境界に読まれる線）と
+/// 言う木**で回す。置けない変わり目（子が項目だけの根の最初の子）は側が落ち、中身が挟まる所や
+/// 項目の宿が要る所の線は飾りに読まれる — そこは md の読みが形を決める（docs/spec.md「水平線」）
+test "法則 — 側を中身の水平線に戻しても、書けば同じ木に読まれる" {
+  let grow : Grow = { seed: 7L, id: doc_id + 1, }
+  let mut kept = 0
+  let bad : Array[String] = []
+  for _ in 0..<20000 {
+    let doc = grow.doc()
+    guard check(doc).is_empty() else { continue }
+    let mut turned = 0
+    for r in doc.roots {
+      for t in turns(r) {
+        if t is Some(_) {
+          turned = turned + 1
+        }
+      }
+    }
+    let top = top_id(doc)
+    let lined = bordered(doc)
+    let plain : Doc = {
+      ..lined,
+      roots: lined.roots.map(r => {
+        ..r,
+        sides: r.sides.map(_ => Right),
+        rules: r.rules.map(_ => ""),
+      }),
+    }
+    let flaws = check(plain)
+    guard turned > 0 &&
+      top_id(lined) - top == turned &&
+      flaws.length() == turned &&
+      flaws.iter().all(f => f is BorderBreak(id) && id > top) else {
+      continue
+    }
+    kept = kept + 1
+    let md = serialize(plain)
+    if shape(parse(md)) != shape(doc) && bad.length() < 5 {
+      bad.push(md)
+    }
+  }
+  json_inspect(bad, content=[])
+  // 全部 篩に落ちる退化を落とすための下限（線が境界に読まれる木は 2 割ほど）
+  guard kept > 300 else {
+    fail("線を置けた木が \{kept} 本しか無い")
+  }
+}
