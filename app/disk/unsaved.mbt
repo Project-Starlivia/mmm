@@ -24,6 +24,11 @@ pub(all) struct UnsavedDoc {
   /// その文書のファイル。開き直したとき Save の行き先が要る。
   /// まだ保存していない文書では None
   doc : @web.FileHandle?
+  /// 書いたとき、ディスクを最後に読んだ・書いた時刻（ファイルの lastModified）。
+  /// **開き直したら保存時の上書きの確かめをこの時刻からにする** — 開いた時刻からにすると、
+  /// その間にほかで保存された版を黙って上書きする（VS Code #15749 と同じ形）。
+  /// 持っていなければ確かめない
+  stamp : Double?
 }
 
 ///|
@@ -83,6 +88,7 @@ pub async fn Unsaved::keep(
   name : String,
   text : String,
   doc : @web.FileHandle?,
+  stamp? : Double? = None,
 ) -> Bool {
   // **柵より大きい 1 件は書かない。** 書いた直後に柵で捨てるのに「書けた」と言うと、
   // 人は残っていると思ったまま打ち続ける
@@ -91,7 +97,7 @@ pub async fn Unsaved::keep(
   self.writing = self.writing + 1
   let ok = (self.store.write)(
     id,
-    unsaved_doc_of({ id, name, at: now, text, doc, }),
+    unsaved_doc_of({ id, name, at: now, text, doc, stamp, }),
   )
   self.writing = self.writing - 1
   guard ok else { return false }
@@ -174,6 +180,7 @@ fn unsaved_doc_of(d : UnsavedDoc) -> @core.Any {
     ("at", @core.any(d.at)),
     ("text", @core.any(d.text)),
     ("doc", @core.from_option(d.doc)),
+    ("stamp", @core.from_option(d.stamp)),
   ])
 }
 
@@ -199,11 +206,18 @@ fn Unsaved::unsaved_doc_at(self : Unsaved, v : @core.Any) -> UnsavedDoc? {
   } else {
     None
   }
+  let on_disk = @web.field(v, "stamp")
+  let stamp : Double? = if @core.typeof_(on_disk) == "number" {
+    Some(on_disk.cast())
+  } else {
+    None
+  }
   Some({
     id: id.cast(),
     name: name.cast(),
     at: at.cast(),
     text: text.cast(),
     doc,
+    stamp,
   })
 }

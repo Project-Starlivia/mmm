@@ -184,6 +184,17 @@ async test "未保存の字: ほかの件だけを捨て、いまの件は残す
 }
 
 ///|
+/// **ディスクの基準の時刻も一緒に持つ。** 開き直したとき、保存時の上書きの確かめを
+/// この時刻からにする（開いた時刻からにすると、その間にほかで保存された版を見落とす）
+async test "未保存の字: ディスクの基準の時刻も一緒に持ち、渡さなければ持たない" {
+  let u = unsaved()
+  assert_true(u.keep(1.0, "a.md", "one", None, stamp=Some(5.0)))
+  assert_eq(u.list()[0].stamp, Some(5.0))
+  assert_true(u.keep(2.0, "a.md", "two", None))
+  assert_eq(u.list()[0].stamp, None)
+}
+
+///|
 /// その文書のファイルも覚える — 開き直したとき Save の行き先が要る
 async test "未保存の字: ファイルの札も一緒に持つ。まだ保存していなければ持たない" {
   let table : Map[String, @core.Any] = Map([])

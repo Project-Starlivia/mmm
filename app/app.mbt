@@ -679,7 +679,13 @@ async fn App::keep_unsaved(self : App) -> Unit {
   }
   let kept = self.disk
     .unsaved()
-    .keep(@web.now(), self.doc_name(), self.text(), self.disk.current_file())
+    .keep(
+      @web.now(),
+      self.doc_name(),
+      self.text(),
+      self.disk.current_file(),
+      stamp=self.disk.stamp(),
+    )
   // **書けなければ黙らない。ただし 1 度だけ** — 置き場が壊れているあいだ（private mode・
   // 容量あふれ）は書くたびに失敗するので、そのたびに鳴らすと打つ手を止める
   if !kept && !self.keep_failed {
@@ -705,7 +711,7 @@ async fn App::open_unsaved(self : App, at : Int) -> Unit {
     let (name, on_disk) = match d.doc {
       // 許可はここで取り直す（押されたことがその資格。Recent と同じ作法）
       Some(file) =>
-        match self.disk.adopt(file) {
+        match self.disk.adopt(file, d.stamp) {
           Some(text) => (Some(file.name()), text)
           None => return
         }

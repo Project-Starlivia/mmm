@@ -102,6 +102,7 @@ fn Fake::editor(self : Fake) -> Editor {
 /// 並びは最後に触れた順なので、先に渡したものが新しい。
 /// `unsaved` を渡せば、その名前の未保存の文書を 1 件ずつ持って立つ（本文は `# 名前`）。
 /// 組の 2 つ目がディスクの字で、在ればその札を持つ（無ければ保存していない文書）。
+/// 札の変更時刻は 1 で、件はそれを基準の時刻として持つ（`stamped_paper`）。
 /// `broken` なら未保存の字の棚に書けない。`gate` を渡せば、その棚への書き込みは
 /// それが解けるまで終わらない
 fn memo_disk(
@@ -136,7 +137,14 @@ fn memo_disk(
       (
         "doc",
         match on_disk {
-          Some(text) => paper(name, text, _ => ()).as_any()
+          Some(text) => stamped_paper(name, text, _ => ()).as_any()
+          None => @core.null()
+        },
+      ),
+      (
+        "stamp",
+        match on_disk {
+          Some(_) => @core.any(1.0)
           None => @core.null()
         },
       ),
@@ -797,6 +805,35 @@ async test "未保存の字: 札付きの件を開くとディスクと比べ、
   assert_eq(s.app.disk_text, "# older\n")
   rest(s.doc, quiet * 2)
   assert_eq(s.app.disk.unsaved().list().length(), 1)
+}
+
+///|
+/// **古い件を開いて保存しても、その後にほかで保存された版を黙って上書きしない。** 基準は
+/// 件を書いたときのディスクの時刻に戻す — 開いた時刻にすると、その間の変更を見落とす
+/// （VS Code #15749 と同じ形。docs/unsaved.md）
+async test "未保存の字: 古い件を開いて保存するとき、その後にほかで保存されていれば聞く" {
+  let s = stand(unsaved=[("notes.md", Some("# older\n"))])
+  defer s.win.close()
+  rest(s.doc, 5)
+  // 件を書いた後に、ほかのアプリで書き換わった
+  touch_elsewhere(s.app.unsaved[0].doc.unwrap())
+  @js_async.Promise::from_async(async fn() { s.app.open_unsaved(0) }).wait()
+  let saving = @js_async.Promise::from_async(async fn() {
+    s.app.save_file(false)
+  })
+  rest(s.doc, 5)
+  guard s.doc.querySelector("dialog.ask") is Some(dlg) else {
+    fail(
+      "件の後にほかで書き換わっていたのに、たずねが開かない",
+    )
+  }
+  assert_eq(
+    dlg.querySelector(".title").unwrap().textContent(),
+    "notes.md has changed on disk.",
+  )
+  // Cancel（`[0]`）で閉じる
+  @web.click(dlg.querySelectorAll(".row button")[0])
+  saving.wait()
 }
 
 ///|
