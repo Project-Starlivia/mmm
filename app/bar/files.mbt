@@ -38,8 +38,8 @@ fn rename_problem(can_hold : Bool, can_rename : Bool, saved : Bool) -> String? {
 pub(all) struct Files {
   /// ディスク上の名前。まだ無ければ None
   saved_name : String?
-  /// 自動保存の見出し。新しい流れが先（#306）
-  autosaves : Array[String]
+  /// 未保存の文書の見出し。新しいものが先。いま開いている文書は含まない（docs/unsaved.md）
+  unsaved : Array[String]
   /// 覚えている文書の名前。いま開いているものは含まない
   recent : Array[String]
   /// 手が止まると自分で書くか（#275）
@@ -60,8 +60,8 @@ pub(all) struct FileActs {
   save_as : () -> Unit
   rename : () -> Unit
   choose_folder : () -> Unit
-  open_autosave : (Int) -> Unit
-  forget_autosaves : () -> Unit
+  open_unsaved : (Int) -> Unit
+  discard_unsaved : () -> Unit
 }
 
 ///|
@@ -91,27 +91,24 @@ pub fn files_menu(s : Files, a : FileActs) -> Array[@parts.Entry] {
       s.recent.mapi((i, name) => Run(@parts.row(name), () => (a.open_recent)(i))),
       None,
     ),
-    // 自動保存。**まだディスクに届いていない字**で、Recent（また開きたいもの）とは
+    // 未保存の文書。**まだディスクに届いていない字**で、Recent（また開きたいもの）とは
     // 別の塊。押せば戻るが、戻した字はディスクに書かれていないので印が立つ
     Sub(
       @parts.row(
-        "Open Autosave",
+        "Open Unsaved",
         mark=Some("history"),
-        disabled=@parts.unless(
-          s.autosaves.length() > 0,
-          why="Nothing autosaved yet",
-        ),
+        disabled=@parts.unless(s.unsaved.length() > 0, why="Nothing unsaved"),
       ),
       [
-        ..s.autosaves.mapi((i, label) => {
-          @parts.Entry::Run(@parts.row(label), () => (a.open_autosave)(i))
+        ..s.unsaved.mapi((i, label) => {
+          @parts.Entry::Run(@parts.row(label), () => (a.open_unsaved)(i))
         }),
         Sep,
         // **1 件ごとの × は置かない** — Recent の行が持たないので、
         // 同じ器の中に 2 通りの行ができる
         Run(
-          @parts.row("Forget all autosaves", mark=Some("trash-2")),
-          a.forget_autosaves,
+          @parts.row("Discard all unsaved", mark=Some("trash-2")),
+          a.discard_unsaved,
         ),
       ],
       None,

@@ -317,12 +317,12 @@ let db_name = "mmm"
 pub let handles_shelf = "handles"
 
 ///|
-pub let autosaves_shelf = "autosaves"
+pub let unsaved_shelf = "unsaved"
 
 ///|
 /// 置き場の版。**棚を増やしたら上げる** — 上げないと、前から在るタブの DB に
-/// 新しい棚が生えない
-let db_version = 3
+/// 新しい棚が生えない。前の版の棚（`autosaves` など）の中身は移さない
+let db_version = 4
 
 ///|
 /// 実物の置き場（IndexedDB）。1 つの取引ごとに開いて閉じる。失敗は null に倒す
@@ -333,7 +333,7 @@ pub fn idb_store(shelf : String) -> Store {
   ) -> @core.Any {
     let db = @web.idb_open(db_name, db_version, d => {
       @web.idb_ensure_store(d, handles_shelf)
-      @web.idb_ensure_store(d, autosaves_shelf)
+      @web.idb_ensure_store(d, unsaved_shelf)
     }).wait() catch {
       _ => return @core.null()
     }

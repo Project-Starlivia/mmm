@@ -31,10 +31,10 @@ pub struct App {
   map_pane : @dom.Element
   name : @bar.Name
   mut gen : Int
-  mut saved_text : String
+  mut disk_text : String
   mut saved_name : String?
   mut recent : Array[@disk.Known]
-  mut autosaves : Array[@disk.Autosave]
+  mut unsaved : Array[@disk.UnsavedDoc]
   mut drawing_open : Bool
   mut grab : Bool
   greeting : @parts.Menu

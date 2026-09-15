@@ -369,6 +369,8 @@ export interface Files {
   savedName: string | null;
   /** 覚えている文書の名前。いま開いているものは含まない */
   recent: string[];
+  /** 未保存の文書の見出し。新しいものが先。いま開いているものは含まない */
+  unsaved: string[];
   canOpen: boolean;
   canSave: boolean;
   canRename: boolean;
@@ -385,6 +387,8 @@ export interface FileActs {
   saveAs(): void;
   rename(): void;
   chooseFolder(): void;
+  openUnsaved(index: number): void;
+  discardUnsaved(): void;
 }
 
 /** Files の行 */
