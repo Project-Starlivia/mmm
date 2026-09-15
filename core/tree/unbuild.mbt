@@ -194,7 +194,7 @@ fn laid(r : Root) -> Laid {
 ///|
 /// Implicit `gap` の子を、同じ深さの書かれた行 `host` の尻へ移し、移した先頭の行の
 /// 手前に境界 `rule` を添える。**移した行は host の中身の尻より後ろ**（`after`）— 子の後ろに
-/// 書く尻の水平線（`ahead`）より前に置けば、その線が移した行の手前の境界になる。
+/// 書く尻の水平線（`front`）より前に置けば、その線が移した行の手前の境界になる。
 /// `gap` の先頭の子も Implicit なら、host の中で最後に書かれる行の尻へさらに降りる
 /// （降りるだけなら行の無い host も通る — 書き足すのは降りた先の書かれた行）。
 /// **項目は、host より深い見出しの節が開いていれば移せない**（`open_section`）— 項目の
@@ -212,7 +212,7 @@ fn tuck(host : Laid, gap : Node, rule : String) -> Laid? {
       }
       // 子の後ろに尻の水平線を書く host の子へは降りない — 移した行の後ろにその線が来る
       None => {
-        guard ahead(host) == host.node.body.length() &&
+        guard front(host) == host.node.body.length() &&
           kids.last() is Some(tail) &&
           tuck(tail, first, rule) is Some(moved) else {
           return None
@@ -435,7 +435,7 @@ fn Part::bullets(self : Part, run : Array[Laid]) -> Unit {
 }
 
 ///|
-/// 中身と子の列。`ahead` と同じ順。
+/// 中身と子の列。`front` と同じ順。
 fn Part::body(self : Part, x : Laid) -> Unit {
   for s in strokes(x) {
     match s {
@@ -553,7 +553,7 @@ priv enum Stroke {
 
 ///|
 /// 中身と子を書く順。**書く側（`body`）と隙間の計算（`Part::body`）が同じ順を引く。**
-/// 中身は子の手前。尻に続く水平線は子が項目だけなら子の後ろ（`ahead`）、項目の列の尻の線を
+/// 中身は子の手前。尻に続く水平線は子が項目だけなら子の後ろ（`front`）、項目の列の尻の線を
 /// 見出しの子が境界にしてしまうなら、中身ごと項目の列と見出しの子の間（`middle`）。
 /// 境界の後ろから移ってきた行は最後
 fn strokes(x : Laid) -> Array[Stroke] {
@@ -567,7 +567,7 @@ fn strokes(x : Laid) -> Array[Stroke] {
         Kids(x.kids[s:].iter().collect()),
       ]
     None => {
-      let cut = ahead(x)
+      let cut = front(x)
       [Blocks(body[:cut]), Kids(x.kids), Blocks(body[cut:])]
     }
   }
@@ -578,7 +578,7 @@ fn strokes(x : Laid) -> Array[Stroke] {
 ///|
 /// 子の手前に書く中身の枚数。尻に続く水平線を後ろへ回すなら、1 本残らず回す —
 /// 手前に 1 本でも残れば、子の行が境界に読む。
-fn ahead(x : Laid) -> Int {
+fn front(x : Laid) -> Int {
   let bs = x.node.body
   let mut cut = bs.length()
   if trails(x.node) {

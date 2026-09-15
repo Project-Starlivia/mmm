@@ -80,8 +80,9 @@ fn cap(doc : @tree.Doc) -> @tree.Doc {
 /// check の破れのうち、Implicit で直るものを直して通し直す。子が尽きた Implicit
 /// （`BarrenImplicit`）は消す — 道具は途中で席が消えないように残しておくので、
 /// 掃除はここ。見出しの直後に来た Implicit（`Swallowed`）と、先頭の子が項目の
-/// Implicit（`GappedItem` の親）と、行の要るものを持った Implicit（`Unmarked`）と、
-/// 最初の子が左の行の無い根（`Ownerless`）は綴る。消すものは綴らないので、消す回は綴らない。
+/// Implicit（`GappedItem` の親）と、最初の子が左の行の無い根（`Ownerless`）は綴る。
+/// 消すものは綴らないので、消す回は綴らない。行の要るものを持った Implicit（`Unmarked`）は
+/// 来ない — 名前・畳み・中身を持たせる道具は、先に綴ってから当てる（`rename` / `fold` / `body`）。
 /// 一回ごとに Implicit は減るので止まる。残った破れは None。
 fn mend(doc : @tree.Doc) -> @tree.Doc? {
   let mut cur = doc
@@ -96,7 +97,7 @@ fn mend(doc : @tree.Doc) -> @tree.Doc? {
       match f {
         BarrenImplicit(id) => barren.push(id)
         Swallowed(id) => ids.push(id)
-        Unmarked(id) | Ownerless(id) => ids.push(id)
+        Ownerless(id) => ids.push(id)
         GappedItem(id) => ids.push(parent(cur, id).unwrap())
         _ => ()
       }
@@ -519,7 +520,7 @@ fn flip(doc : @tree.Doc, id : Int) -> Done? {
       sides[path[1]] = flipped(side_at(r, path[1]))
       Some(reside(doc, path[0], sides))
     }
-    depth => haul(doc, r, id, side=flipped(side_at(r, path[1])), depth~)
+    depth => haul(doc, path[0], id, side=flipped(side_at(r, path[1])), depth~)
   }
   done(turned, Some(id))
 }
@@ -542,9 +543,10 @@ fn reside(doc : @tree.Doc, at : Int, sides : Array[@tree.Side]) -> @tree.Doc {
 /// - そうでなければ境界が書かれるので、根の子の席から Implicit が深さを埋める
 ///
 /// 元の側に残った Implicit は子が尽きていれば門（`mend`）が消す
+/// `at` は根の添字。抜くのは深さ 3 以上なので、抜いた後も根の並びは変わらない
 fn haul(
   doc : @tree.Doc,
-  r : @tree.Root,
+  at : Int,
   id : Int,
   side~ : @tree.Side,
   depth~ : Int,
@@ -553,16 +555,15 @@ fn haul(
   guard take(doc, [id], taken) is Some(rest) else { return None }
   let x = taken[0]
   let next : Ref[Int] = { val: fresh(doc), }
-  for i, t in rest.roots {
-    guard t.node.id == r.node.id else { continue }
-    guard last_filled(t.node) is Some(j) && side_at(t, j) == side else { break }
+  let t = rest.roots[at]
+  if last_filled(t.node) is Some(j) && side_at(t, j) == side {
     let kids = t.node.children.copy()
     kids[j] = sink(kids[j], 2, x, depth, next)
     let roots = rest.roots.copy()
-    roots[i] = { ..t, node: { ..t.node, children: kids, }, }
+    roots[at] = { ..t, node: { ..t.node, children: kids, }, }
     return Some({ ..rest, roots, })
   }
-  append(rest, node=r.node.id, side~, [gaps(x, depth - 2, next)])
+  append(rest, node=t.node.id, side~, [gaps(x, depth - 2, next)])
 }
 
 ///|

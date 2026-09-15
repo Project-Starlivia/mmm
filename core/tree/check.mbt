@@ -52,7 +52,7 @@ pub fn check(doc : Doc) -> Array[Flaw] {
   let c : Check = {
     flaws: [],
     seen: Set([]),
-    border: None,
+    trail: None,
     containers: Map([]),
   }
   for r in doc.roots {
@@ -75,7 +75,7 @@ priv struct Check {
   flaws : Array[Flaw]
   seen : Set[Int]
   /// 文書順で 1 つ前の骨格が、中身の尻に置いた水平線
-  mut border : Int?
+  mut trail : Int?
   /// 境界の直後の Implicit の鎖ごとに、その下に書いた項目の入れ物になる行の深さ（`containers`）
   containers : Map[Int, Int]
 }
@@ -152,7 +152,7 @@ priv struct Site {
   /// 直前の兄弟との間で側が変わる。そこには境界（`---`）が書かれる
   bordered : Bool
   /// 文書順で 1 つ前の骨格が、中身の尻に置いた水平線
-  border : Int?
+  trail : Int?
   /// 境界の直後の Implicit の鎖なら、その下に書いた項目の入れ物になる行の深さ（`containers`）
   container : Int?
 }
@@ -172,7 +172,7 @@ fn walk(
   for i, x in xs {
     // 新しい木の手前の水平線は境界にならない。親の中身が手前に挟まる子（`middle`）も
     if depth == 1 || mid == Some(x.id) {
-      c.border = None
+      c.trail = None
     }
     // 手前に境界の `---` が書かれるか。**書く側と同じ表**（`turns`）
     let bordered = turned.get(i) == Some(true)
@@ -186,10 +186,10 @@ fn walk(
         None
       },
       bordered,
-      border: c.border,
+      trail: c.trail,
       container: c.containers.get(x.id),
     }
-    c.border = None
+    c.trail = None
     note(c, border_break(s))
     note(c, swallowed(s))
     dupe(c, x.id)
@@ -203,7 +203,7 @@ fn walk(
     // 部分木の後ろに書かれる（`trails`）ので、部分木の次の骨格へ持ち回る。Implicit は
     // 行が無いので中身を書けない（`Unmarked`）— 綴られてから咎める
     let trail = if x.mark is Some(_) { trailing(x.body) } else { None }
-    c.border = if trails(x) { None } else { trail }
+    c.trail = if trails(x) { None } else { trail }
     // 項目の中は、その項目の深さを 0 とした文書。側は見出しの根も項目の根も持つ
     let inner = if sign_of(x) is Some(Item) { depth } else { base }
     walk(
@@ -216,7 +216,7 @@ fn walk(
       mid=middle(x).map(h => h.id),
     )
     if trails(x) {
-      c.border = trail
+      c.trail = trail
     }
   }
 }
@@ -334,7 +334,7 @@ fn ownerless(r : Root) -> Flaw? {
 /// （読みは 1 本目を中身に落とし、2 本目を境界にする）。
 fn border_break(s : Site) -> Flaw? {
   guard !s.bordered else { return None }
-  s.border.map(b => BorderBreak(b))
+  s.trail.map(b => BorderBreak(b))
 }
 
 ///|

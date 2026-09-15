@@ -486,7 +486,7 @@ Done = { doc, focus: Int? }       // 操作後の木と、そこで選ぶべき 
   言うとおりに読まれる
 - **apply は check を通る木しか返さない。** md に書けない並び（上の一覧）は、
   操作ごとに規則を写さず、組んだ結果を check に通す。破れのうち Implicit を綴れば
-  直るもの（`Swallowed` の Implicit・`GappedItem` の親・`Unmarked`・`Ownerless` の根）は `mend` が綴って通し直し、
+  直るもの（`Swallowed` の Implicit・`GappedItem` の親・`Ownerless` の根）は `mend` が綴って通し直し、
   残れば `None` で断る。規則は check の 1 つ。**`BorderBreak` だけは通す** —
   中身の尻の水平線に骨格が続く形は、書けば md が境界と読む（根の子なら側の反転、
   深ければ深さを保って反対側へ引き出す）。**形は読み直しが決め**、そのとき `edit` は

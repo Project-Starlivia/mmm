@@ -126,7 +126,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
           to: p.at.to,
           border: None,
         }
-        // **持ち主は裁定が言う**（`holder`）。積んである頂上とは限らない —
+        // **持ち主は裁定が言う**（`owner`）。積んである頂上とは限らない —
         // 字下げの戻った塊は開いている項目を閉じ、境界は行を閉じても持ち主を変えない。
         // 枠は降ろさない — 降ろすのは骨格の行の仕事（`under`）
         match owner.bind(from => l.lines.get(from)) {
