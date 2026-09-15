@@ -1,4 +1,4 @@
-// 帯の並び（Files / ⋯）。行の形と、沈む理由・切り替えた先の言葉を固定する
+// 帯の並び（Files / Edit / ⋯）。行の形と、沈む理由・切り替えた先の言葉を固定する
 
 ///|
 fn row_of(e : @parts.Entry) -> String {
@@ -154,11 +154,24 @@ test "rename_problem: 深い理由が浅い理由を隠す" {
 }
 
 ///|
+test "edit_menu: Undo / Redo。押せば履歴へ" {
+  let calls = []
+  let rows = edit_menu({
+    undo: () => calls.push("undo"),
+    redo: () => calls.push("redo"),
+  })
+  assert_eq(rows.map(row_of), ["Undo", "Redo"])
+  for row in rows {
+    guard row is Run(_, go) else { fail("行でない") }
+    go()
+  }
+  assert_eq(calls, ["undo", "redo"])
+}
+
+///|
 test "more_menu: 3 つの塊。テーマと掴みやすさの行は切り替えた先を言い、Copy link は閉じずに答える" {
   let mut copied = 0
   let acts : MoreActs = {
-    undo: nop,
-    redo: nop,
     pick_color: nop,
     toggle_theme: nop,
     toggle_grab: nop,
@@ -173,16 +186,16 @@ test "more_menu: 3 つの塊。テーマと掴みやすさの行は切り替え�
     acts,
   )
   assert_eq(dark.map(row_of), [
-    "Undo", "Redo", "---", "Accent color", "Light theme", "Easy grab", "---", "Copy link",
-    "---", "Shortcuts", "GitHub",
+    "Accent color", "Light theme", "Easy grab", "---", "Copy link", "---", "Shortcuts",
+    "GitHub",
   ])
   let light = more_menu(
     { light: true, grab: true, link_caveat: k => k(["Images won't travel"]), },
     acts,
   )
-  assert_eq(light[4] |> row_of, "Dark theme")
-  assert_eq(light[5] |> row_of, "Exact hit")
-  guard light[7] is Done(r, go) else { fail("Copy link が Done でない") }
+  assert_eq(light[1] |> row_of, "Dark theme")
+  assert_eq(light[2] |> row_of, "Exact hit")
+  guard light[4] is Done(r, go) else { fail("Copy link が Done でない") }
   assert_eq(r.mark, Some("link"))
   let notes = []
   r.caveat.unwrap()(n => notes.push(n))
@@ -196,8 +209,6 @@ test "more_menu: 3 つの塊。テーマと掴みやすさの行は切り替え�
 /// 帯の表が言う絵の名は、どれも parts/icons.mbt の表に在る（綴りの食い違いは開いた瞬間に落ちる）
 test "帯の並びの絵は全部 icons の表に在る" {
   let more : MoreActs = {
-    undo: nop,
-    redo: nop,
     pick_color: nop,
     toggle_theme: nop,
     toggle_grab: nop,
@@ -205,6 +216,7 @@ test "帯の並びの絵は全部 icons の表に在る" {
     visit: _ => (),
   }
   let all = marks_of(files_menu(saved, file_acts)) +
+    marks_of(edit_menu({ undo: nop, redo: nop, })) +
     marks_of(
       more_menu({ light: false, grab: false, link_caveat: _ => (), }, more),
     ) +

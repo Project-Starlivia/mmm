@@ -8,6 +8,8 @@ import {
 }
 
 // Values
+pub fn edit_menu(EditActs) -> Array[@parts.Entry]
+
 pub fn export_ways(ExportHost, ((Way) -> Unit)?) -> Array[@parts.Entry]
 
 pub fn files_menu(Files, FileActs) -> Array[@parts.Entry]
@@ -23,6 +25,11 @@ pub let no_rename_here : String
 // Errors
 
 // Types and methods
+pub(all) struct EditActs {
+  undo : () -> Unit
+  redo : () -> Unit
+}
+
 pub struct Export {
   doc : @dom.Document
   host : ExportHost
@@ -74,8 +81,6 @@ pub(all) struct More {
 }
 
 pub(all) struct MoreActs {
-  undo : () -> Unit
-  redo : () -> Unit
   pick_color : () -> Unit
   toggle_theme : () -> Unit
   toggle_grab : () -> Unit

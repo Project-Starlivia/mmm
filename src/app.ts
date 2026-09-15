@@ -390,6 +390,14 @@ export interface FileActs {
 /** Files の行 */
 export const filesRows = (state: Files, acts: FileActs): HTMLDivElement => div(mbt.mmmFilesRows(state, acts));
 
+export interface EditActs {
+  undo(): void;
+  redo(): void;
+}
+
+/** Edit の行 */
+export const editRows = (acts: EditActs): HTMLDivElement => div(mbt.mmmEditRows(acts));
+
 interface More {
   light: boolean;
   /** 掴みやすさ（Easy grab）が入っているか */
@@ -399,8 +407,6 @@ interface More {
 }
 
 export interface MoreActs {
-  undo(): void;
-  redo(): void;
   pickColor(): void;
   toggleTheme(): void;
   toggleGrab(): void;

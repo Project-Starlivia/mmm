@@ -903,7 +903,7 @@ fn App::wire_holder(self : App) -> Unit {
 }
 
 ///|
-/// 帯のメニュー。並びは bar の files.mbt / more.mbt の表。ここは状態を写して、押されたら走らせる
+/// 帯のメニュー。並びは bar の files.mbt / edit.mbt / more.mbt の表。ここは状態を写して、押されたら走らせる
 fn App::wire_bar(self : App) -> Unit {
   let doc = self.doc
   @parts.open_on_click(el(doc, "files"), () => {
@@ -947,6 +947,9 @@ fn App::wire_bar(self : App) -> Unit {
       },
     )
   })
+  @parts.open_on_click(el(doc, "edit"), () => {
+    @bar.edit_menu({ undo: self.ed.undo, redo: self.ed.redo, })
+  })
   // 掴みやすさは持ち物から。⋯ の行がその場で切り替える
   self.map.set_grab(self.grab)
   @parts.open_on_click(el(doc, "more"), () => {
@@ -957,8 +960,6 @@ fn App::wire_bar(self : App) -> Unit {
         link_caveat: k => @web.spawn(async fn() { k(self.link_caveat()) }),
       },
       {
-        undo: self.ed.undo,
-        redo: self.ed.redo,
         pick_color: () => self.theme.pick_color(),
         toggle_theme: () => self.theme.toggle(),
         toggle_grab: () => self.set_grab(!self.grab),

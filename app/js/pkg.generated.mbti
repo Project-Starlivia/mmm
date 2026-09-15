@@ -38,6 +38,8 @@ pub fn mmm_cycle(@core.Any, @core.Any, Bool) -> Unit
 
 pub fn mmm_draw_form() -> @dom.Element
 
+pub fn mmm_edit_rows(@core.Any) -> @dom.Element
+
 pub fn mmm_empty(@core.Any) -> Bool
 
 pub fn mmm_export_ways(Bool) -> @dom.Element

@@ -1,4 +1,4 @@
-// 帯そのもの（index.html の `#bar`）。並びは files / more / export、名乗りは name、
+// 帯そのもの（index.html の `#bar`）。並びは files / edit / more / export、名乗りは name、
 // ロゴと色は theme。ここに居るのは、帯へ焦点を落とすことだけ
 
 ///|
