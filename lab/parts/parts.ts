@@ -53,6 +53,7 @@ function context(label: string | null): HTMLDivElement {
 const SAVED: core.Files = {
   savedName: "notes.md",
   recent: ["ideas.md", "todo.md"],
+  unsaved: ["sketch.md"],
   canOpen: true,
   canSave: true,
   canRename: true,
@@ -67,6 +68,8 @@ const FILES_ACTS: core.FileActs = {
   saveAs: nothing,
   rename: nothing,
   chooseFolder: nothing,
+  openUnsaved: nothing,
+  discardUnsaved: nothing,
 };
 const EDIT_ACTS: core.EditActs = {
   undo: nothing,
@@ -155,7 +158,7 @@ export const PARTS: Part[] = [
           FILES_ACTS,
         ),
       edit: () => core.editRows(EDIT_ACTS),
-      "more-dark":() => core.moreRows({ light: false, grab: false, linkCaveat: Promise.resolve([]) }, MORE_ACTS),
+      "more-dark": () => core.moreRows({ light: false, grab: false, linkCaveat: Promise.resolve([]) }, MORE_ACTS),
       "more-light-noted": () =>
         core.moreRows(
           { light: true, grab: true, linkCaveat: Promise.resolve(["Images won't travel", "Long link — may be cut"]) },

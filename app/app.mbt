@@ -65,16 +65,22 @@ pub struct App {
   /// set_text のたびに進む世代。**文書を跨いだ非同期は、必ずこれを見てから物を言う** —
   /// 待っているあいだに New / Open で別の文書へ移っていることがある
   mut gen : Int
-  mut saved_text : String
+  /// ディスクの字。開いて読んだ字か、最後に書いた字で、保存していない文書では空。
+  /// 未保存の印も、未保存の字を取るか捨てるかも、これと本文を比べて決める
+  mut disk_text : String
   /// 保存済みのファイル名。まだ保存していない文書では None で、名前は本文の
   /// 見出しから導く（read の name）。「無題」という状態は持たない
   mut saved_name : String?
   /// 覚えている文書。Files の Recent に並ぶ。IndexedDB の向こうに在るので、
   /// 開く・保存するたびに引き直して手元に置く
   mut recent : Array[@disk.Known]
-  /// 自動保存。Files の Open Autosave に並ぶ。Recent と同じく
-  /// IndexedDB の向こうに在るので、自動保存するたびに引き直して手元に置く
-  mut autosaves : Array[@disk.Autosave]
+  /// 未保存の文書。Files の Open Unsaved に並ぶ（いま開いている文書は含まない）。
+  /// Recent と同じく IndexedDB の向こうに在るので、書くたびに引き直して手元に置く
+  mut unsaved : Array[@disk.UnsavedDoc]
+  /// 置き場を消さないよう、もう頼んだか（最初に未保存の字を書く前に 1 度だけ）
+  mut persistence_asked : Bool
+  /// 未保存の字を書けなかったと、もう言ったか（1 セッションに 1 度だけ）
+  mut keep_failed : Bool
   /// お絵描きの窓が開いているか。二重に開かせない
   mut drawing_open : Bool
   /// 掴みやすさ（⋯ の Easy grab）
@@ -92,6 +98,12 @@ pub struct App {
 /// 手が止まったと見なすまでの間（ms）。**打鍵の間合いより長く、待たされたと
 /// 感じるより短い。** 1 秒は VS Code の `files.autoSaveDelay` の既定と同じ
 let quiet : Int = 1000
+
+///|
+/// 打ち続けても、未保存の字を書くまで待つのはここまで（ms）。**手が止まるのを待つだけだと、
+/// 打ち続けるあいだは一度も書かれない** — その最中に落ちれば全部を失う。draw.io は 30 秒
+/// （docs/unsaved.md）
+let max_wait : Int = 10000
 
 ///|
 /// index.html の要素。無ければ壊れている
@@ -196,16 +208,21 @@ pub fn App::new(
       @web.spawn(async fn() { app().rename_file() })
     }),
     gen: 0,
-    saved_text: "",
+    disk_text: "",
     saved_name: None,
     recent: [],
-    autosaves: [],
+    unsaved: [],
+    persistence_asked: false,
+    keep_failed: false,
     drawing_open: false,
     grab: @prefs.load(doc, "grab") == Some("on"),
     greeting: @parts.Menu::new(doc),
-    write_soon: @web.after_quiet(doc, quiet, () => {
-      @web.spawn(async fn() { app().autosave() })
-    }),
+    write_soon: @web.after_quiet(
+      doc,
+      quiet,
+      () => @web.spawn(async fn() { app().keep_unsaved() }),
+      max_wait=Some(max_wait),
+    ),
   }
   late.val = Some(self)
   self.wire()
@@ -374,14 +391,24 @@ fn App::write(self : App, op : @op.Op) -> Unit {
 /// 未保存の印。**判定はここ 1 つ**で、帯の `●` とタブの favicon の両方が
 /// 同じ答えを見る（別々に数えると、片方だけ古い状態のまま残る）
 fn App::update_dirty(self : App) -> Unit {
-  let dirty = self.can_hold() && self.text() != self.saved_text
+  let dirty = self.can_hold() && self.text() != self.disk_text
   self.name.set_dirty(dirty)
-  // **自動保存は常に取る。** ブラウザの中なので置き場が要らず、まだ保存していない
-  // 文書がいちばんの客（#306）。取ったのと同じ字なら何もしない。
+  // **未保存の字は、ディスクと違うあいだだけ持つ**（docs/unsaved.md）。ブラウザの中なので
+  // 置き場が要らず、まだ保存していない文書（比べる相手は空の字）がいちばんの客。
+  // ディスクと同じ字に戻れば役目を終えるので捨てる。書いたのと同じ字なら何もしない。
   //
   // **ディスクへ勝手に書く道は持たない。** 書けば他のアプリや git から見える
   // ものが変わるので、人の意思なく触らない（#306 の決め、2026-09-12）
-  if self.text() != self.disk.autosaves().kept() {
+  let unsaved = self.disk.unsaved()
+  if self.text() == self.disk_text {
+    (self.write_soon.cancel)()
+    if unsaved.written() is Some(_) {
+      @web.spawn(async fn() {
+        unsaved.discard()
+        self.refresh_recent()
+      })
+    }
+  } else if unsaved.written() != Some(self.text()) {
     (self.write_soon.call)()
   }
 }
@@ -402,16 +429,25 @@ fn App::show_name(self : App) -> Unit {
 }
 
 ///|
-/// 文書を丸ごと入れ替える。名乗りも、寄せも、ここから
-fn App::load_text(self : App, next : String, name : String?) -> Unit {
+/// 文書を丸ごと入れ替える。名乗りも、寄せも、ここから。
+/// `adopt` は開き直した未保存の文書で、その件を引き受ける
+fn App::load_text(
+  self : App,
+  next : String,
+  name : String?,
+  adopt? : @disk.UnsavedDoc? = None,
+) -> Unit {
   self.gen += 1
   // **積んだ書き込みは前の文書のもの。** 名前を手放した直後に鳴れば、
   // 人が何も押していないのにピッカーを開きに行く（`showSaveFilePicker` は
   // 押した直後にしか開けない）
   (self.write_soon.cancel)()
-  // **自動保存の流れもここで切れる。** 続きを同じ系列に足すと、別の文書の字が
-  // 1 つの流れに混ざる
-  self.disk.autosaves().start()
+  // **未保存の字の件もここで入れ替わる。** 続きを同じ件に書くと、別の文書の字が
+  // 混ざる。開き直した文書なら元の件を引き受ける（開き直すたびに同じ字の件を増やさない）
+  match adopt {
+    Some(d) => self.disk.unsaved().adopt(d)
+    None => self.disk.unsaved().start()
+  }
   self.saved_name = name
   self.images.clear() // 画像のパスは（新しい）md からの相対
   (self.ed.set_text)(next) // → cycle
@@ -427,7 +463,7 @@ fn App::load_text(self : App, next : String, name : String?) -> Unit {
 ///|
 /// 開いた文書を UI に載せる
 fn App::apply_doc(self : App, opened : @disk.Doc) -> Unit {
-  self.saved_text = opened.text
+  self.disk_text = opened.text
   self.load_text(opened.text, Some(opened.name))
   @web.spawn(async fn() { self.offer_connect() })
 }
@@ -459,20 +495,24 @@ async fn App::confirm_discard(self : App) -> Bool {
   // **`||` の右に async を置かない。** 短絡しないので、捨てるものが無くても
   // たずねが開く（#295。左辺が定数なら畳まれるので、書いている側からは
   // 短絡して見える）
-  if self.text() == self.saved_text {
+  if self.text() == self.disk_text {
     return true
   }
-  // **聞く前に自動保存する。** たずねが「自動保存される」と言う以上、聞く時点で
-  // 本当に残っていなければならない — 手が止まって 1 秒より早く押されうる
-  self.autosave()
+  // **聞く前に書く。** たずねを開いたまま落ちても、字が残るように —
+  // 手が止まって 1 秒より早く押されうる
+  self.keep_unsaved()
   match @parts.reply(self.doc, @parts.save_changes(self.doc_name())) {
     Go(_) => {
       // 保存してから進む。**ピッカーを閉じた・書けなかった・上書きを断った**なら
       // 進まない — 保存を選んだ人の字を、書けていないまま入れ替えない
       self.save_file(false)
-      self.text() == self.saved_text
+      self.text() == self.disk_text
     }
-    Alt => true
+    Alt => {
+      // **Don't Save は未保存の字も捨てる。** 人が捨てると選んだ（docs/unsaved.md）
+      self.disk.unsaved().discard()
+      true
+    }
     No => false
   }
 }
@@ -536,7 +576,7 @@ async fn App::rename_file(self : App) -> Unit {
 async fn App::save_file(self : App, as_new : Bool) -> Unit {
   // **待つあいだに文書は入れ替わりうる。** ピッカーも書き込みも待つので、
   // 戻ってきたら自分の世代を確かめる — 前の文書のために書いた字を、
-  // 次の文書の自動保存にしない
+  // 次の文書の未保存の字にしない
   let gen = self.gen
   (async fn() -> Unit {
     // **書く字は 1 つ。** 書き込みは待つので、そのあいだに人は打てる。
@@ -570,9 +610,15 @@ async fn App::save_file(self : App, as_new : Bool) -> Unit {
       self.disk.save(written)
       guard gen == self.gen else { return } // 待つあいだに入れ替わった
     }
-    self.saved_text = written
+    self.disk_text = written
+    // **ディスクに届いた字は、未保存の字として持たない。** ここで待って捨てる —
+    // 待たずに文書が入れ替わると（Save を選んで進む）、捨てる相手が次の文書の件になる
+    if self.text() == written {
+      (self.write_soon.cancel)()
+      self.disk.unsaved().discard()
+    }
     // 書いているあいだに打った字は汚れたまま残る。印が立ち直り、
-    // 自動保存が入っていれば手が止まった所でもう一度書きに行く
+    // 手が止まった所で未保存の字をもう一度書きに行く
     self.update_dirty()
   })() catch {
     _ => @parts.failed(self.doc, "Couldn't save")
@@ -584,7 +630,7 @@ async fn App::save_file(self : App, as_new : Bool) -> Unit {
 async fn App::new_file(self : App) -> Unit {
   guard self.confirm_discard() else { return }
   self.disk.close()
-  self.saved_text = ""
+  self.disk_text = ""
   self.load_text("", None)
   (self.ed.focus)()
 }
@@ -593,8 +639,8 @@ async fn App::new_file(self : App) -> Unit {
 /// 覚えているものを真ん中に並べる。**開くのは人** — 一覧を出すだけで、
 /// 触れば許可を取り直して開き、ほかを触れば消える（#277）。
 /// 並びは Files の `Open Recent ▸` と同じ口から引く（同じものが 2 通りに見えない）。
-/// **自動保存は並べない** — ここは「また開きたいもの」を選ぶ場所で、自動保存の入口は
-/// Files の `Open Autosave ▸`（#359）
+/// **未保存の文書は並べない** — ここは「また開きたいもの」を選ぶ場所で、その入口は
+/// Files の `Open Unsaved ▸`（#359）
 fn App::greet(self : App) -> Unit {
   self.greeting.show_middle(() => {
     let now = @web.now()
@@ -613,22 +659,37 @@ fn App::greet(self : App) -> Unit {
 }
 
 ///|
-/// いまの字を自動保存する。**置き場は要らない** — 名前の無い文書もここで残る
-async fn App::autosave(self : App) -> Unit {
-  self.disk
-  .autosaves()
-  .keep(@web.now(), self.doc_name(), self.text(), self.disk.current_file())
-  self.autosaves = self.disk.autosaves().list() catch { _ => [] }
+/// いまの字を未保存の字として書く。**置き場は要らない** — 名前の無い文書もここで残る
+async fn App::keep_unsaved(self : App) -> Unit {
+  // 待つあいだにディスクと同じ字へ戻っていれば、書くものは無い
+  guard self.text() != self.disk_text else { return }
+  // **ブラウザの中の置き場は消えうる**（Safari は 7 日触らないと消す）。最初に書く前に
+  // 1 度だけ、消さないよう頼む。答えは待たない（docs/unsaved.md）
+  if !self.persistence_asked {
+    self.persistence_asked = true
+    @web.request_persistence(self.doc)
+  }
+  let kept = self.disk
+    .unsaved()
+    .keep(@web.now(), self.doc_name(), self.text(), self.disk.current_file())
+  // **書けなければ黙らない。ただし 1 度だけ** — 置き場が壊れているあいだ（private mode・
+  // 容量あふれ）は書くたびに失敗するので、そのたびに鳴らすと打つ手を止める
+  if !kept && !self.keep_failed {
+    self.keep_failed = true
+    @parts.failed(self.doc, "Couldn't keep unsaved changes")
+  }
+  self.unsaved = self.disk.unsaved().others() catch { _ => [] }
 }
 
 ///|
-/// 自動保存から開く。**札も本文も戻し、印を立てたまま開く** — 自動保存はディスクに
-/// 届いていない字なので、開いた瞬間から「ディスクとは違う」と言えているのが正しい。
-/// 人が `Mod+S` を押した所で印が落ちる。
+/// 未保存の文書から開く。**札も本文も戻し、印を立てたまま開く** — ディスクに届いて
+/// いない字なので、開いた瞬間から「ディスクとは違う」と言えているのが正しい。
+/// 人が `Mod+S` を押した所で印が落ちる。元の件を引き受けるので、開き直すたびに
+/// 同じ字の件は増えない。
 ///
-/// ディスクは読み直さない。自動保存のほうが新しいので、読めば戻した字を上書きする
-async fn App::open_autosave(self : App, at : Int) -> Unit {
-  guard self.autosaves.get(at) is Some(d) else { return }
+/// ディスクは読み直さない。未保存の字のほうが新しいので、読めば戻した字を上書きする
+async fn App::open_unsaved(self : App, at : Int) -> Unit {
+  guard self.unsaved.get(at) is Some(d) else { return }
   (async fn() -> Unit {
     guard self.confirm_discard() else { return }
     let name = match d.doc {
@@ -645,8 +706,8 @@ async fn App::open_autosave(self : App, at : Int) -> Unit {
       }
     }
     // **ディスクに何が在るかは分からない。** 印を立てたまま出す
-    self.saved_text = ""
-    self.load_text(d.text, name)
+    self.disk_text = ""
+    self.load_text(d.text, name, adopt=Some(d))
     (self.ed.focus)()
   })() catch {
     _ => @parts.failed(self.doc, "Couldn't open the file")
@@ -654,23 +715,23 @@ async fn App::open_autosave(self : App, at : Int) -> Unit {
 }
 
 ///|
-/// 自動保存を全部忘れる。**1 件ごとに消す道は持たない** — Recent の行が持たないので、
+/// 未保存の字を全部捨てる。**1 件ごとに捨てる道は持たない** — Recent の行が持たないので、
 /// 同じ器の中に 2 通りの行ができる
-async fn App::forget_autosaves(self : App) -> Unit {
-  self.disk.autosaves().forget_all()
-  self.autosaves = []
+async fn App::discard_unsaved(self : App) -> Unit {
+  self.disk.unsaved().discard_all()
+  self.unsaved = []
 }
 
 ///|
 async fn App::refresh_recent(self : App) -> Unit {
   self.recent = self.disk.remembered() catch { _ => [] }
-  self.autosaves = self.disk.autosaves().list() catch { _ => [] }
+  self.unsaved = self.disk.unsaved().others() catch { _ => [] }
 }
 
 ///|
-/// 自動保存の一覧に出す 1 行の字。**Recent と同じ形** — 名前と、見分けに使えるもの。
-/// 同じ文書の版が 2 つ並ぶことがあるので、分けるのは時刻（#306）
-fn autosave_label(d : @disk.Autosave, now : Double) -> String {
+/// 未保存の文書の一覧に出す 1 行の字。**Recent と同じ形** — 名前と、見分けに使えるもの。
+/// 同じ名前の文書が 2 つ並ぶことがあるので、分けるのは時刻
+fn unsaved_label(d : @disk.UnsavedDoc, now : Double) -> String {
   d.name + " · " + @parts.age(now, d.at)
 }
 
@@ -880,7 +941,7 @@ fn App::set_grab(self : App, on : Bool) -> Unit {
 fn App::wire(self : App) -> Unit {
   self.wire_holder()
   self.wire_bar()
-  self.wire_unload()
+  self.wire_leave()
   self.wire_drop()
   self.wire_keys()
 }
@@ -911,7 +972,7 @@ fn App::wire_bar(self : App) -> Unit {
       {
         saved_name: self.saved_name,
         recent: self.recent.map(row => recent_label(row, @web.now())),
-        autosaves: self.autosaves.map(d => autosave_label(d, @web.now())),
+        unsaved: self.unsaved.map(d => unsaved_label(d, @web.now())),
         can_open: @web.can_open(),
         can_save: @web.can_save_as(),
         can_rename: @web.can_rename(),
@@ -930,10 +991,8 @@ fn App::wire_bar(self : App) -> Unit {
             None => ()
           }
         },
-        open_autosave: i => @web.spawn(async fn() { self.open_autosave(i) }),
-        forget_autosaves: () => {
-          @web.spawn(async fn() { self.forget_autosaves() })
-        },
+        open_unsaved: i => @web.spawn(async fn() { self.open_unsaved(i) }),
+        discard_unsaved: () => @web.spawn(async fn() { self.discard_unsaved() }),
         save: () => @web.spawn(async fn() { self.save_file(false) }),
         save_as: () => @web.spawn(async fn() { self.save_file(true) }),
         rename: () => @web.spawn(async fn() { self.rename_file() }),
@@ -971,12 +1030,21 @@ fn App::wire_bar(self : App) -> Unit {
 }
 
 ///|
-/// 未保存のまま閉じようとしたら止める
-fn App::wire_unload(self : App) -> Unit {
+/// ページを離れるとき。**未保存のまま閉じようとしたら止め**、タブが隠れる・ページを離れる
+/// ときは**待っている未保存の字を待たずに書く** — モバイルでタブを閉じると `beforeunload`
+/// は鳴らず、手が止まる 1 秒を待つあいだに消える。隠れてからの書き込みは終わる保証が無いので、
+/// 普段から書いておき、ここは最後のひと押し（docs/unsaved.md）
+fn App::wire_leave(self : App) -> Unit {
   @web.on_window(self.doc, "beforeunload", e => {
     // 解消する手段が無いなら止めない（`can_hold`）
-    if self.can_hold() && self.text() != self.saved_text {
+    if self.can_hold() && self.text() != self.disk_text {
       @web.warn_unload(e)
+    }
+  })
+  @web.on_window(self.doc, "pagehide", _ => (self.write_soon.flush)())
+  @web.on_document(self.doc, "visibilitychange", _ => {
+    if @web.page_hidden(self.doc) {
+      (self.write_soon.flush)()
     }
   })
 }

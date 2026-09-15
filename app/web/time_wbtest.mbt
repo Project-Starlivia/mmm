@@ -77,6 +77,62 @@ async test "after_quiet: 捨てれば、待っていたものは走らない" {
 }
 
 ///|
+/// **打ち続けても、上限の間が経てば走る。** 手が止まるのを待つだけだと、打ち続けるあいだは
+/// 何も書かれない — その最中に落ちれば全部を失う（docs/unsaved.md）
+async test "after_quiet: 打ち続けても、上限の間が経てば走る" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let doc = w.document()
+  let count = Ref::{ val: 0, }
+  let ask = after_quiet(doc, 30, () => count.val += 1, max_wait=Some(60))
+  // 静まる間（30ms）より短い間合いで打ち続ける
+  for _ in 0..<15 {
+    (ask.call)()
+    rest(doc, 10)
+  }
+  // 手は一度も止まっていないが、上限が来たので走っている
+  assert_true(count.val >= 1)
+  // 打つのをやめれば、待っているものは静まって尽きる（走り続けない）
+  rest(doc, 150)
+  let settled = count.val
+  rest(doc, 150)
+  assert_eq(count.val, settled)
+}
+
+///|
+/// **待っているものを、いま走らせる。** タブが隠れる・閉じるときは待てない
+async test "after_quiet: 急かせば待たずに 1 回走り、待っていなければ何もしない" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let doc = w.document()
+  let count = Ref::{ val: 0, }
+  let ask = after_quiet(doc, 30, () => count.val += 1, max_wait=Some(60))
+  (ask.call)()
+  (ask.flush)()
+  assert_eq(count.val, 1)
+  // 急かした後に、静まる間・上限の間が来ても二度は走らない
+  rest(doc, 100)
+  assert_eq(count.val, 1)
+  // 何も待っていなければ、急かしても走らない
+  (ask.flush)()
+  assert_eq(count.val, 1)
+}
+
+///|
+/// **捨てれば、上限の待ちも一緒に捨てる**
+async test "after_quiet: 捨てれば、上限の待ちも走らない" {
+  let w = @test_utils.create_happy_window()
+  defer w.close()
+  let doc = w.document()
+  let count = Ref::{ val: 0, }
+  let ask = after_quiet(doc, 30, () => count.val += 1, max_wait=Some(60))
+  (ask.call)()
+  (ask.cancel)()
+  rest(doc, 100)
+  assert_eq(count.val, 0)
+}
+
+///|
 /// `ms` 経つまで返らない。時計そのものを待つので、`wait_animation_frame` では代わらない
 async fn rest(doc : @dom.Document, ms : Int) -> Unit {
   promise_of(k => set_timer(doc, ms, () => k(@core.any(0))) |> ignore).wait()

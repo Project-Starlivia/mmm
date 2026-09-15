@@ -12,7 +12,7 @@ pub fn address(@dom.Document) -> String
 
 pub fn after(@core.Any, (@core.Any) -> Unit) -> Unit
 
-pub fn after_quiet(@dom.Document, Int, () -> Unit) -> Quiet
+pub fn after_quiet(@dom.Document, Int, () -> Unit, max_wait? : Int?) -> Quiet
 
 pub fn attr_in(@core.Any, String, String) -> String?
 
@@ -154,9 +154,13 @@ pub fn observe_resize(@dom.Element, () -> Unit) -> Unit
 
 pub fn offset_size(@dom.Element) -> (Double, Double)
 
+pub fn on_document(@dom.Document, String, (@core.Any) -> Unit) -> Unit
+
 pub fn on_window(@dom.Document, String, (@core.Any) -> Unit, capture? : Bool) -> Unit
 
 pub fn open_url(@dom.Document, String) -> Unit
+
+pub fn page_hidden(@dom.Document) -> Bool
 
 pub fn paper_2d(@dom.Element, Double) -> @core.Any
 
@@ -189,6 +193,8 @@ pub fn read_url(FileHandle, String) -> @js_async.Promise[String]
 pub fn record(Array[(String, @core.Any)]) -> @core.Any
 
 pub fn request_permission(@core.Any, String) -> @js_async.Promise[String]
+
+pub fn request_persistence(@dom.Document) -> Unit
 
 pub fn resolve_path(DirHandle, FileHandle) -> @js_async.Promise[@core.Any]
 
@@ -281,6 +287,7 @@ pub fn FileHandle::name(Self) -> String
 pub struct Quiet {
   call : () -> Unit
   cancel : () -> Unit
+  flush : () -> Unit
 }
 
 // Type aliases

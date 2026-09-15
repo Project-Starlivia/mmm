@@ -20,6 +20,13 @@ pub extern "js" fn storage_remove(doc : @dom.Document, key : String) -> Unit =
   #| (doc, key) => { try { doc.defaultView.localStorage.removeItem(key); } catch {} }
 
 ///|
+/// この origin の置き場（IndexedDB を含む）を、容量が逼迫しても消さないよう頼む
+/// （`navigator.storage.persist`）。**答えは待たない** — Chrome と Safari は黙って決め、
+/// Firefox は聞く。持たない環境・断られたときは何もしない（docs/unsaved.md）
+pub extern "js" fn request_persistence(doc : @dom.Document) -> Unit =
+  #| (doc) => { try { doc.defaultView.navigator.storage?.persist?.()?.catch?.(() => {}); } catch {} }
+
+///|
 /// 置いてある鍵の全部。読めなければ空
 pub extern "js" fn storage_keys(doc : @dom.Document) -> FixedArray[String] =
   #| (doc) => { try { const s = doc.defaultView.localStorage; return Array.from({ length: s.length }, (_, i) => s.key(i)); } catch { return []; } }

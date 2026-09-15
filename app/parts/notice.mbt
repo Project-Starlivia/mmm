@@ -42,7 +42,7 @@ pub let failed_words : Array[String] = [
   "Couldn't export", "Couldn't copy", "Couldn't copy the link", "Couldn't paste",
   "Couldn't read that as a link", "Couldn't open all of it — the link is too large",
   "Couldn't add the drawing", "Couldn't open that card", "Couldn't start editing — the node is folded",
-  "Couldn't do that here", no_file_access,
+  "Couldn't do that here", "Couldn't keep unsaved changes", no_file_access,
 ]
 
 ///|
