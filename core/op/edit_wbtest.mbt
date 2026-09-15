@@ -342,3 +342,35 @@ test "MoveNode — setext の見出しを深さ 3 へ動かせば ATX で綴り�
   assert_eq(r.focus, Some(4))
   assert_false(r.edits.any(e => e.from == 0 && e.to == md.length()))
 }
+
+///|
+/// #385 — 境界のすぐ手前で子を足す・消す、名前の無い根に名前を付ける、どれも合流は触った所
+/// だけを書き換える。境界の `---` は後ろの子の隙間なので、子の手前に差す物は線より前に入り、
+/// 手前の子を消しても線は残る
+test "合流 — 境界のすぐ手前の足し・消し・名付けは全文へ落ちない" {
+  let cases : Array[(String, Op)] = [
+    (
+      "# r\n\n## a\n\n- i\n\ntext\n\n---\n\n## b\n",
+      AddNode(at=After(node=3), label="n"),
+    ),
+    ("# r\n\n\n\n## a\n\n---\n\n## b\n", AddNode(at=After(node=3), label="n")),
+    ("# r\n\n## a\n\n---\n\n## b\n\n## c\n", Delete(ids=[3])),
+    ("- r\n  - b\n\n  ---\n\n  - c\n", AddNode(at=After(node=3), label="n")),
+    ("- r\n  - b\n\n  ---\n\n  - c\n", Delete(ids=[3])),
+    ("## 野菜\n\n---\n\n- 肉\n\nメモ\n", Rename(id=2, label="x")),
+  ]
+  let out = cases.map(c => {
+    let (md, op) = c
+    let r = edit(md, op)
+    let whole = r.edits.length() == 1 &&
+      r.edits[0].from == 0 &&
+      r.edits[0].to == md.length()
+    "whole=\{whole} \{@tree.patched(md, r.edits).escape()}"
+  })
+  json_inspect(out, content=[
+    "whole=false \"# r\\n\\n## a\\n\\n- i\\n\\ntext\\n\\n## n\\n\\n---\\n\\n## b\\n\"",
+    "whole=false \"# r\\n\\n\\n\\n## a\\n\\n## n\\n\\n---\\n\\n## b\\n\"", "whole=false \"# r\\n\\n---\\n\\n## b\\n\\n## c\\n\"",
+    "whole=false \"- r\\n  - b\\n\\n  - n\\n\\n  ---\\n\\n  - c\\n\"", "whole=false \"- r\\n\\n  ---\\n\\n  - c\\n\"",
+    "whole=false \"# x\\n\\n## 野菜\\n\\n---\\n\\n- 肉\\n\\nメモ\\n\"",
+  ])
+}

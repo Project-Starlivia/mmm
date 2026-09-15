@@ -166,14 +166,24 @@ fn plan(
 }
 
 ///|
-/// ours の隙間 — 地番を持つものごとに、手前に続く空行の頭。Implicit の範囲の頭は
-/// 最初の子の頭なので、Implicit の隙間はその子の隙間。
+/// ours の隙間 — 地番を持つものごとに、手前に続く空行の頭。**境界の直後の根の子は、
+/// 手前の境界の水平線ごと隙間**（`Spot.border`）— その線は子の側の綴りなので、子を消せば
+/// 一緒に消え、子の手前に差す物は線より前に入る。Implicit の範囲の頭は最初の子の頭なので、
+/// Implicit の隙間はその子の隙間（境界は Implicit が持つ）。
 fn gaps(md : String, spans : Map[Int, Spot]) -> Map[Int, Int] {
   let out : Map[Int, Int] = Map([])
   for id, s in spans {
-    out[id] = blank_start(md, line_start(md, s.from))
+    out[id] = blank_start(md, line_start(md, s.border.unwrap_or(s.from)))
   }
   out
+}
+
+///|
+/// 要素の頭の行 — 手前に境界の水平線が在ればその行、無ければ要素の行。隙間（`gaps`）は
+/// この行の手前の空行で、要素を消す・差すときの行の頭もこれ。
+fn lead(r : Merge, id : Int) -> Int {
+  let s = spot(r, id)
+  line_start(r.md, s.border.unwrap_or(s.from))
 }
 
 ///|
@@ -252,6 +262,26 @@ fn merge_node(
         rule=id => wants.get(id),
       )
     }
+    // **名前の無い行に名前が付いただけ**（Implicit を綴った見出し）なら、行を 1 本差して子へ降りる。
+    // 部分木ごと書くと、触っていない中身の位置が正規形へ動く
+    Some(old) if old.mark is None &&
+      sign_of(x) is Some(Heading) &&
+      x.fold is None &&
+      x.body.is_empty() &&
+      ids(old.children) == ids(x.children) => {
+      let s = spot(r, old.id)
+      let at = line_start(r.md, s.from)
+      r.out.push({
+        from: at,
+        to: at,
+        insert: pad(column(r.md, s.from)) +
+        fragment({ ..x, children: [], }, depth, [], [])
+        .trim_end(chars="\n")
+        .to_owned() +
+        "\n",
+      })
+      merge_node(r, { ..x, mark: None, label: "", }, depth, sides, rules)
+    }
     _ => replace(r, x, depth, sides, rules)
   }
 }
@@ -274,8 +304,9 @@ fn label_end(md : String, spans : Map[Int, Spot], x : Node) -> Int {
 
 ///|
 /// 根の子の手前の境界の行を、前後の側の違いだけ書き換える（`turns` の表どうし）。
-/// **消すのは要らなくなった行だけ、足すのは残る子の手前に要るようになった行だけ** —
-/// 増える子は断片の頭に自分の境界を書く（`merge_children` の `rule`）。
+/// **消すのは残る子で要らなくなった行だけ、足すのは残る子の手前に要るようになった行だけ** —
+/// 消える子の行は子の隙間ごと消え（`gaps`）、増える子は断片の頭に自分の境界を書く
+/// （`merge_children` の `rule`）。
 /// 子の差分より先に積む — 同じ位置に隙間の書き換えが来ても、境界が手前に並ぶように
 fn turned(
   r : Merge,
@@ -294,7 +325,7 @@ fn turned(
     wants[k.id] = after[i] is Some(_)
   }
   for i, k in old.children {
-    guard before[i] is Some(_) && wants.get(k.id) != Some(true) else {
+    guard before[i] is Some(_) && wants.get(k.id) == Some(false) else {
       continue
     }
     if border_line(r, k.id) is Some((from, to)) {
@@ -311,11 +342,13 @@ fn turned(
 }
 
 ///|
-/// 前の木で子 `id` の手前に書かれた境界の行と、その手前の空行。**行の頭は読みが控えた**
-/// （`Spot.border`）— 原文を読み直して水平線を探さない。境界が無ければ None（消さない）
+/// 前の木で子 `id` の手前に書かれた境界の行と、その手前の空行 — 子の隙間の頭から、
+/// 子の行の手前の空行まで。**行の頭は読みが控えた**（`Spot.border`）— 原文を読み直して
+/// 水平線を探さない。境界が無ければ None（消さない）
 fn border_line(r : Merge, id : Int) -> (Int, Int)? {
-  guard spot(r, id).border is Some(at) else { return None }
-  Some((blank_start(r.md, line_start(r.md, at)), r.gap.get(id).unwrap()))
+  let s = spot(r, id)
+  guard s.border is Some(_) else { return None }
+  Some((r.gap.get(id).unwrap(), blank_start(r.md, line_start(r.md, s.from))))
 }
 
 ///|
@@ -388,31 +421,40 @@ fn dropped(r : Merge, q : Seq) -> Int? {
     let first = q.olds[start]
     let last = spot(r, q.olds[i - 1]).to
     let head = !kept_before
-    let (from, to) = if head && i < q.olds.length() {
+    let (from, to, insert) = if head && i < q.olds.length() {
       let next = q.olds[i]
       inherited = Some(next)
-      // 後ろに残る物が後の列の頭で、しかも文書の頭なら境目ごと。そうでなければ境目は残す
-      let bare = q.news.get(0) == Some(next) && headless(r, next)
+      // 後ろに残る物が後の列の頭になるなら、境目の空行は theirs に合わせる — 文書の頭なら
+      // 境目ごと消し、頭の物が空行を要るのに境目に無ければ足す（境界の `---` を持つ子が
+      // 頭になれば、名前の行の直下の線は setext の下線に読まれる）。そうでなければ境目は残す
+      let now_head = q.news.get(0) == Some(next)
+      let had = r.base.get(first).unwrap_or(true)
+      let has = r.theirs.get(next).unwrap_or(had)
       (
-        if bare {
+        if now_head && headless(r, next) {
           r.gap.get(first).unwrap()
         } else {
-          line_start(r.md, spot(r, first).from)
+          lead(r, first)
         },
-        line_start(r.md, spot(r, next).from),
+        lead(r, next),
+        if now_head && has && !had {
+          "\n"
+        } else {
+          ""
+        },
       )
     } else if head && head_born {
-      (line_start(r.md, spot(r, first).from), last)
+      (lead(r, first), last, "")
     } else if head &&
       r.gap.get(first) == Some(spot(r, doc_id).from) &&
       stale_head(r, last) {
       // 文書の頭の列が丸ごと消え、後ろに続く物（列の外）が頭になる。その物の隙間は
       // 誰も書き換えないので、列の境目を引き継がせ、消す物の後ろの空行ごと消す
-      (line_start(r.md, spot(r, first).from), blank_end(r.md, last))
+      (lead(r, first), blank_end(r.md, last), "")
     } else {
-      (r.gap.get(first).unwrap(), last)
+      (r.gap.get(first).unwrap(), last, "")
     }
-    r.out.push({ from, to, insert: "", })
+    r.out.push({ from, to, insert, })
   }
   inherited
 }
@@ -446,7 +488,7 @@ fn filled(r : Merge, q : Seq, inherited : Int?) -> Unit {
         // 列の頭。境目の後ろに置き、隙間は次に残る物との間に。
         // 差す物が文書の頭なら（手前に何も残らない）、境目ごと置き換える
         None => {
-          let head = line_start(r.md, spot(r, id).from)
+          let head = lead(r, id)
           r.out.push({
             from: if headless(r, pend[0]) {
               r.gap.get(id).unwrap()
@@ -475,7 +517,7 @@ fn filled(r : Merge, q : Seq, inherited : Int?) -> Unit {
   let (pos, lead) = match (kept, q.olds.get(0)) {
     (Some(k), _) => (spot(r, k).to, true)
     // 列ごと消えて生まれ直す。境目は残してあるので頭の隙間は要らない
-    (None, Some(first)) => (line_start(r.md, spot(r, first).from), false)
+    (None, Some(first)) => (lead(r, first), false)
     // 元から空の列。境目は無いので theirs の隙間から
     (None, None) => (q.own, true)
   }
@@ -491,7 +533,7 @@ fn gapped(r : Merge, id : Int) -> Unit {
   guard had != has else { return }
   r.out.push({
     from: r.gap.get(id).unwrap(),
-    to: line_start(r.md, spot(r, id).from),
+    to: lead(r, id),
     insert: if has {
       "\n"
     } else {
@@ -597,11 +639,7 @@ fn loosened(r : Merge, news : Array[Node], olds : Array[Int]) -> Bool? {
   guard news.get(0).map(sign_of) is Some(Some(Item)) && olds.length() >= 2 else {
     return None
   }
-  Some(
-    olds[1:]
-    .iter()
-    .any(id => r.gap.get(id).unwrap() < line_start(r.md, spot(r, id).from)),
-  )
+  Some(olds[1:].iter().any(id => r.gap.get(id).unwrap() < lead(r, id)))
 }
 
 ///|
