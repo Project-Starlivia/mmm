@@ -247,24 +247,30 @@ fn open_section(host : Laid) -> Bool {
 ///|
 /// 木を mdAst にする。
 pub fn unbuild(doc : Doc) -> @markdown.Document {
-  let out = []
-  for b in doc.body {
-    content(out, b)
-  }
-  // **木は桁 0 の兄弟。** md で桁 0 に並ぶ項目は 1 本の列で、木が本ごとに
-  // 分かれるのは読みの都合。木ごとに書くと間に空行がライブラリから入り、
-  // 読んだ詰めが消える（#203）
-  nodes(out, doc.roots.map(laid), 1)
   {
     // serialize は frontmatter を自分で書く（本文との間に空行を置くため）。
     // ここで持つのは、指紋（ast_sig）が mdAst ぜんぶを見るため
     frontmatter: doc.frontmatter.map(raw => {
       ({ raw, entries: [], span: nowhere, } : @markdown.Frontmatter)
     }),
-    children: out,
+    children: penned(doc, dry=false).blocks,
     definitions: [],
     span: nowhere,
   }
+}
+
+///|
+/// 文書 1 つを書く歩き。**木は桁 0 の兄弟。** md で桁 0 に並ぶ項目は 1 本の列で、木が
+/// 本ごとに分かれるのは読みの都合。木ごとに書くと間に空行がライブラリから入り、
+/// 読んだ詰めが消える（#203）。文書の頭の答えは、frontmatter が在れば空行 1 つ
+/// （`serialize` が置く）
+fn penned(doc : Doc, dry~ : Bool) -> Pen {
+  let pen = Pen::new(next=doc.frontmatter is Some(_), dry~)
+  for b in doc.body {
+    pen.content(b)
+  }
+  pen.nodes(doc.roots.map(laid), 1)
+  pen
 }
 
 ///|
@@ -276,27 +282,27 @@ fn unbuild_node(
   sides : Array[Side],
   rules : Array[String],
 ) -> @markdown.Document {
-  let out = []
-  node(out, laid({ node: x, sides, rules, }), depth)
-  { frontmatter: None, children: out, definitions: [], span: nowhere, }
+  let pen = Pen::new(next=false, dry=false)
+  pen.node(laid({ node: x, sides, rules, }), depth)
+  { frontmatter: None, children: pen.blocks, definitions: [], span: nowhere, }
 }
 
 ///|
 /// 散文（骨格を持たない中身の列）を mdAst にする。
 fn unbuild_prose(body : Array[Block]) -> @markdown.Document {
-  let out = []
+  let pen = Pen::new(next=false, dry=false)
   for b in body {
-    content(out, b)
+    pen.content(b)
   }
-  { frontmatter: None, children: out, definitions: [], span: nowhere, }
+  { frontmatter: None, children: pen.blocks, definitions: [], span: nowhere, }
 }
 
 ///|
 /// 階層が言う隙間 — 正規形で、要素ごとに手前が空行で分かれるか。
 /// 合流の base と theirs はこれで、**正規形を書いて読み直す道は要らない**。
 ///
-/// **下の walk と同じ順に歩く。** 正規形の塊はライブラリが必ず空行で分けるので、
-/// 分かれないのは 3 か所だけ:
+/// **書く歩きそのもの（`penned`）を、字を組まずに走らせる。** 正規形の塊はライブラリが
+/// 必ず空行で分けるので、分かれないのは 3 か所だけ:
 ///
 /// - 文書の頭。frontmatter が在れば、その後ろは空行 1 つ（`serialize` が置く）
 /// - 詰めた列の 2 つ目からの兄弟（`loose` が偽）
@@ -306,45 +312,80 @@ fn unbuild_prose(body : Array[Block]) -> @markdown.Document {
 /// 書く字が無い中身（check の `Wordless`）が在れば None — 正規形に塊が出ず要素が
 /// 並ばないので、合流は全文へ落ちる。
 fn parted(doc : Doc) -> Map[Int, Bool]? {
-  let p : Part = {
-    out: Map([]),
-    next: doc.frontmatter is Some(_),
-    torn: false,
-  }
-  for b in doc.body {
-    p.content(b)
-  }
-  p.nodes(doc.roots.map(laid))
-  if p.torn {
+  let pen = penned(doc, dry=true)
+  if pen.gaps.torn {
     None
   } else {
-    Some(p.out)
+    Some(pen.gaps.out)
   }
 }
 
 ///|
-/// 隙間を数える途中。
-priv struct Part {
+/// 書く途中。**書く字（`blocks`）と、階層が言う隙間（`gaps`）を 1 本の歩きで出す** —
+/// 書き戻し（`unbuild`）と合流の base / theirs（`parted`）が同じ順を歩くので、書き方の
+/// 規則を二度書かない。項目の中は別の文書として書くので、字は子のペン（`sub`）が持ち、
+/// 隙間の答えは共有する。
+priv struct Pen {
+  /// 書いた塊。空打ちでは積まない
+  blocks : Array[@markdown.Block]
+  gaps : Gaps
+}
+
+///|
+/// 隙間の答え。項目の中を書く子のペンと共有する。
+priv struct Gaps {
+  /// 要素ごとに、手前が空行で分かれるか
   out : Map[Int, Bool]
-  /// 次に置く塊の答え — 手前が空行で分かれるか
+  /// 次に置く塊の答え
   mut next : Bool
-  /// 書く字が無い中身に当たった
+  /// 書く字が無い中身に当たった — 隙間を言えない
   mut torn : Bool
+  /// 字を組まず、隙間だけを数える空打ち
+  dry : Bool
+}
+
+///|
+fn Pen::new(next~ : Bool, dry~ : Bool) -> Pen {
+  { blocks: [], gaps: { out: Map([]), next, torn: false, dry, }, }
+}
+
+///|
+/// 項目の中を書く子のペン。字は別に積み、隙間の答えは親と共有する。
+fn Pen::sub(self : Pen) -> Pen {
+  { blocks: [], gaps: self.gaps, }
 }
 
 ///|
 /// 塊 1 つを置く。**ライブラリは塊を空行で分ける**ので、次の塊は必ず分かれる。
 /// 要素でない塊（境界の水平線・畳みの角）は id を持たないが、頭の席は使う。
-fn Part::place(self : Part, id : Int?) -> Unit {
+/// 空打ちでは字を組まない（`block` を呼ばない）
+fn Pen::put(self : Pen, id : Int?, block : () -> @markdown.Block) -> Unit {
   if id is Some(id) {
-    self.out[id] = self.next
+    self.gaps.out[id] = self.gaps.next
   }
-  self.next = true
+  self.gaps.next = true
+  if !self.gaps.dry {
+    self.blocks.push(block())
+  }
 }
 
 ///|
-/// 兄弟の列。`nodes` と同じ規則で列を割る（境界・畳まれた項目・マーカーの種類が変わる）。
-fn Part::nodes(self : Part, xs : Array[Laid]) -> Unit {
+/// 中身 1 枚。**書く字が無ければ塊が出ない**（check の `Wordless`）— そのときは隙間を
+/// 言えないので折れる。
+fn Pen::content(self : Pen, b : Block) -> Unit {
+  match content(b) {
+    Some(block) => self.put(Some(b.id), () => block)
+    None => self.gaps.torn = true
+  }
+}
+
+///|
+/// 兄弟の列を書く。境界を添えた行の手前には、その水平線を置く。
+///
+/// **続く項目は 1 つの列にまとめる**（兄弟は詰める）。列が割れるのは、境界の
+/// 水平線と、畳まれた項目（自分の `<details>` に包まれる）と、マーカーの種類が
+/// 変わるとき（md でもそこで別の列になる）。
+fn Pen::nodes(self : Pen, xs : Array[Laid], depth : Int) -> Unit {
   let run : Array[Laid] = []
   fn flush() {
     if !run.is_empty() {
@@ -354,9 +395,9 @@ fn Part::nodes(self : Part, xs : Array[Laid]) -> Unit {
   }
 
   for x in xs {
-    if x.rule is Some(_) {
+    if x.rule is Some(rule) {
       flush()
-      self.place(None)
+      self.put(None, () => html(rule))
     }
     match x.node.mark {
       Some(Item(marker~, ..)) if x.node.fold is None => {
@@ -367,7 +408,7 @@ fn Part::nodes(self : Part, xs : Array[Laid]) -> Unit {
       }
       _ => {
         flush()
-        self.node(x)
+        self.node(x, depth)
       }
     }
   }
@@ -375,87 +416,96 @@ fn Part::nodes(self : Part, xs : Array[Laid]) -> Unit {
 }
 
 ///|
-/// ノード 1 つと、その部分木。`node` と同じ順。
-fn Part::node(self : Part, x : Laid) -> Unit {
+/// ノード 1 つと、その部分木。飛び（Implicit）は行を持たないので、隙間は最初の要素のもの。
+fn Pen::node(self : Pen, x : Laid, depth : Int) -> Unit {
   match x.node.mark {
     Some(Item(..)) => self.wrap(x.node, () => self.bullets([x]))
-    Some(Heading(..)) =>
+    Some(Heading(setext~, closing~)) =>
       self.wrap(x.node, () => {
-        self.place(Some(x.node.id))
-        self.body(x)
+        self.put(Some(x.node.id), () => {
+          heading(depth, x.node.label, setext, closing)
+        })
+        self.body(x, depth + 1)
       })
-    // 飛び（Implicit）は行を持たないので、隙間は最初の要素のもの
     None => {
-      self.nodes(x.kids)
-      self.nodes(x.after)
+      self.nodes(x.kids, depth + 1)
+      self.nodes(x.after, depth + 1)
       if head_element(x) is Some(first) {
-        self.out[x.node.id] = self.out.get(first).unwrap_or(true)
+        self.gaps.out[x.node.id] = self.gaps.out.get(first).unwrap_or(true)
       }
     }
   }
 }
 
 ///|
-/// 畳みは `<details>` と `</details>` の塊で部分木を挟む。どちらも塊なので、
-/// 中の頭も次の兄弟も必ず空行で分かれる。
+/// 畳みは `<details>` と `</details>` の塊で部分木を挟む。開きの塊は「開き」か
+/// 「開き + 名前」、閉じは閉じだけ。どちらも塊なので、中の頭も次の兄弟も必ず空行で分かれる。
 ///
 /// **畳まれた行の隙間は、開きの手前のもの。** 地番が `<details>` から始まる
 /// （`put`）ので、合流が測る隙間もそこの手前。中で付いた答え（開きの塊で
 /// 分かれている）を、開き自身の答えで上書きする
-fn Part::wrap(self : Part, x : Node, inner : () -> Unit) -> Unit {
-  match x.fold {
-    None => inner()
-    Some(_) => {
-      let mine = self.next
-      self.place(None)
-      inner()
-      self.place(None)
-      self.out[x.id] = mine
+fn Pen::wrap(self : Pen, x : Node, inner : () -> Unit) -> Unit {
+  guard x.fold is Some({ open, summary, }) else { return inner() }
+  let mine = self.gaps.next
+  self.put(None, () => {
+    let head = StringBuilder()
+    head.write_string(spelling(Open(open~)))
+    if summary is Some(s) {
+      head.write_char('\n')
+      head.write_string(spelling(Name(s)))
     }
-  }
+    html(head.to_string())
+  })
+  inner()
+  self.put(None, () => html(spelling(Close)))
+  self.gaps.out[x.id] = mine
 }
 
 ///|
-/// 項目の列 1 つ。**塊は 1 つ**（`bullets` が生の塊で綴る）なので、兄弟の間の
-/// 空行はライブラリでなく読んだ詰め（`loose_of`）が決める。ラベルと中身の間は
-/// `tight_of`。
-fn Part::bullets(self : Part, run : Array[Laid]) -> Unit {
+/// 項目の列 1 つ。**列の字は mmm が組む** — マーカー・ラベルの桁・項目の間の
+/// 詰めを読める者がライブラリに居ないので、包み（`HtmlBlock`）の中だけ自分で
+/// 綴る。文書の中での並びと前後の空行はライブラリのまま。
+///
+/// **塊は 1 つ**なので、空行は 2 か所で mmm が決める。**項目と項目の間**は `loose_of`、
+/// **ラベルと中身の間**は `tight_of`。
+fn Pen::bullets(self : Pen, run : Array[Laid]) -> Unit {
   let tight = tight_of(run)
   let loose = loose_of(run)
-  let head = self.next
+  let head = self.gaps.next
+  let sb = StringBuilder()
   for i, l in run {
     let mine = if i == 0 { head } else { loose }
-    self.out[l.node.id] = mine
-    // **項目の中は、その項目の深さを 0 とした文書。** ラベルが無ければ中身は
-    // マーカーの行に乗るので、隙間は項目自身のもの
-    self.next = if l.node.label == "" { mine } else { !tight }
-    self.body(l)
+    self.gaps.out[l.node.id] = mine
+    // **項目の中は、その項目の深さを 0 とした文書。** 子の見出しは項目からの
+    // 深さぶんの `#` で書く（docs/spec.md「項目の中」）。項目の根の側の境界も
+    // 項目の段に書く。ラベルが無ければ中身はマーカーの行に乗るので、隙間は項目自身のもの
+    self.gaps.next = if l.node.label == "" { mine } else { !tight }
+    let inner = self.sub()
+    inner.body(l, 1)
+    if !self.gaps.dry {
+      if i > 0 && loose {
+        sb.write_char('\n')
+      }
+      sb.write_string(list_item(l, tight, inner.blocks))
+    }
   }
-  self.next = true
+  self.gaps.next = true
+  if !self.gaps.dry {
+    self.blocks.push(html(sb.to_string()))
+  }
 }
 
 ///|
-/// 中身と子の列。`front` と同じ順。
-fn Part::body(self : Part, x : Laid) -> Unit {
+/// 中身と子の列。順は `strokes`。`depth` は子の深さ。
+fn Pen::body(self : Pen, x : Laid, depth : Int) -> Unit {
   for s in strokes(x) {
     match s {
       Blocks(bs) =>
         for b in bs {
           self.content(b)
         }
-      Kids(ks) => self.nodes(ks)
+      Kids(ks) => self.nodes(ks, depth)
     }
-  }
-}
-
-///|
-/// 中身 1 枚。**書く字が無ければ塊が出ない** — `Details` も `source` も無い中身で、
-/// check の `Wordless`。そのときは隙間を言えないので折れる
-fn Part::content(self : Part, b : Block) -> Unit {
-  if b.source is Some(_) || !(b.content is (Some(Details(..)) | None)) {
-    self.place(Some(b.id))
-  } else {
-    self.torn = true
   }
 }
 
@@ -477,74 +527,6 @@ fn head_element(x : Laid) -> Int? {
 let nowhere : @markdown.Span = @markdown.Span::empty()
 
 ///|
-/// 兄弟の列を書く。境界を添えた行の手前には、その水平線を置く。
-///
-/// **続く項目は 1 つの列にまとめる**（兄弟は詰める）。列が割れるのは、境界の
-/// 水平線と、畳まれた項目（自分の `<details>` に包まれる）と、マーカーの種類が
-/// 変わるとき（md でもそこで別の列になる）。
-fn nodes(out : Array[@markdown.Block], xs : Array[Laid], depth : Int) -> Unit {
-  let run : Array[Laid] = []
-  fn flush() {
-    if !run.is_empty() {
-      out.push(bullets(run))
-      run.clear()
-    }
-  }
-
-  for x in xs {
-    if x.rule is Some(rule) {
-      flush()
-      out.push(html(rule))
-    }
-    match x.node.mark {
-      Some(Item(marker~, ..)) if x.node.fold is None => {
-        if splits(run, marker) {
-          flush()
-        }
-        run.push(x)
-      }
-      _ => {
-        flush()
-        node(out, x, depth)
-      }
-    }
-  }
-  flush()
-}
-
-///|
-/// ノード 1 つと、その部分木。
-fn node(out : Array[@markdown.Block], x : Laid, depth : Int) -> Unit {
-  match x.node.mark {
-    Some(Item(..)) => wrap(out, x.node.fold, () => out.push(bullets([x])))
-    Some(Heading(setext~, closing~)) =>
-      wrap(out, x.node.fold, () => {
-        out.push(heading(depth, x.node.label, setext, closing))
-        body(out, x, depth + 1)
-      })
-    None => {
-      nodes(out, x.kids, depth + 1)
-      nodes(out, x.after, depth + 1)
-    }
-  }
-}
-
-///|
-/// 中身と子の列。**中身は子の手前**、ただし尻に続く水平線は子が項目だけなら子の後ろ
-/// （`trails`）。`depth` は子の深さ。
-fn body(out : Array[@markdown.Block], x : Laid, depth : Int) -> Unit {
-  for s in strokes(x) {
-    match s {
-      Blocks(bs) =>
-        for b in bs {
-          content(out, b)
-        }
-      Kids(ks) => nodes(out, ks, depth)
-    }
-  }
-}
-
-///|
 /// 中身と子を書くひと続き。
 priv enum Stroke {
   Blocks(ArrayView[Block])
@@ -552,10 +534,9 @@ priv enum Stroke {
 }
 
 ///|
-/// 中身と子を書く順。**書く側（`body`）と隙間の計算（`Part::body`）が同じ順を引く。**
-/// 中身は子の手前。尻に続く水平線は子が項目だけなら子の後ろ（`front`）、項目の列の尻の線を
-/// 見出しの子が境界にしてしまうなら、中身ごと項目の列と見出しの子の間（`middle`）。
-/// 境界の後ろから移ってきた行は最後
+/// 中身と子を書く順。中身は子の手前。尻に続く水平線は子が項目だけなら子の後ろ（`front`）、
+/// 項目の列の尻の線を見出しの子が境界にしてしまうなら、中身ごと項目の列と見出しの子の間
+/// （`middle`）。境界の後ろから移ってきた行は最後
 fn strokes(x : Laid) -> Array[Stroke] {
   let body = x.node.body
   let split = middle(x.node).bind(h => x.kids.search_by(l => l.node.id == h.id))
@@ -587,48 +568,6 @@ fn front(x : Laid) -> Int {
     }
   }
   cut
-}
-
-///|
-/// 畳みで包む。開きの塊は「開き」か「開き + 名前」、閉じは閉じだけ。
-fn wrap(out : Array[@markdown.Block], fold : Fold?, inner : () -> Unit) -> Unit {
-  match fold {
-    None => inner()
-    Some({ open, summary, }) => {
-      let head = StringBuilder()
-      head.write_string(spelling(Open(open~)))
-      match summary {
-        Some(s) => {
-          head.write_char('\n')
-          head.write_string(spelling(Name(s)))
-        }
-        None => ()
-      }
-      out.push(html(head.to_string()))
-      inner()
-      out.push(html(spelling(Close)))
-    }
-  }
-}
-
-///|
-/// 項目の列 1 つ。**列の字は mmm が組む** — マーカー・ラベルの桁・項目の間の
-/// 詰めを読める者がライブラリに居ないので、包み（`HtmlBlock`）の中だけ自分で
-/// 綴る。文書の中での並びと前後の空行はライブラリのまま。
-///
-/// 空行は 2 か所に要る。**項目と項目の間**は `loose_of`、**ラベルと中身の間**は
-/// `tight_of` が言う。
-fn bullets(run : Array[Laid]) -> @markdown.Block {
-  let tight = tight_of(run)
-  let loose = loose_of(run)
-  let sb = StringBuilder()
-  for i, l in run {
-    if i > 0 && loose {
-      sb.write_char('\n')
-    }
-    sb.write_string(list_item(l, tight))
-  }
-  html(sb.to_string())
 }
 
 ///|
@@ -683,12 +622,8 @@ fn underlined(l : Laid) -> Bool {
 /// 項目 1 つ。1 行目はマーカーとラベル、続きは中身と入れ子の列 —
 /// **その字はライブラリに綴らせ**、ラベルの桁ぶん字下げしてぶら下げる。
 /// ラベルも中身も無ければマーカーだけの行。
-fn list_item(l : Laid, tight : Bool) -> String {
-  let kids = []
-  // **項目の中は、その項目の深さを 0 とした文書。** 子の見出しは項目からの
-  // 深さぶんの `#` で書く（docs/spec.md「項目の中」）。項目の根の側の境界も
-  // 項目の段に書く
-  body(kids, l, 1)
+/// `kids` は中身と入れ子の列を書き上げた塊（`Pen::bullets` が子のペンで書く）。
+fn list_item(l : Laid, tight : Bool, kids : Array[@markdown.Block]) -> String {
   let inner = StringBuilder()
   if l.node.label != "" {
     inner.write_string(l.node.label)
@@ -771,17 +706,18 @@ fn marker_of(l : Node) -> String {
 }
 
 ///|
-/// 中身 1 枚。**読んだ原文はそのまま返す。** mmm が作った中身（source が無い）だけ、
+/// 中身 1 枚の塊。**読んだ原文はそのまま返す。** mmm が作った中身（source が無い）だけ、
 /// 種類ごとに綴る — 絵の 3 つは mdAst の形で、原文で持つものは生の塊で。
-fn content(out : Array[@markdown.Block], b : Block) -> Unit {
+/// 書く字が無ければ None（check の `Wordless`）
+fn content(b : Block) -> @markdown.Block? {
   match b.source {
-    Some(source) => out.push(html(source))
+    Some(source) => Some(html(source))
     None =>
       match b.content {
         Some(Image(alt~, src~, title~)) =>
-          out.push(paragraph([Image(alt~, url=src, title~, span=nowhere)]))
+          Some(paragraph([Image(alt~, url=src, title~, span=nowhere)]))
         Some(Link(text~, href~, title~)) =>
-          out.push(
+          Some(
             paragraph([
               Link(
                 children=[verbatim_inline(text)],
@@ -792,7 +728,7 @@ fn content(out : Array[@markdown.Block], b : Block) -> Unit {
             ]),
           )
         Some(Code(info~, text~)) =>
-          out.push(
+          Some(
             FencedCode(
               fence_marker=Backtick,
               fence_length=3,
@@ -804,11 +740,11 @@ fn content(out : Array[@markdown.Block], b : Block) -> Unit {
               trailing_trivia=@markdown.Trivia::empty(),
             ),
           )
-        Some(Svg(s)) => out.push(html(s))
-        Some(ThematicBreak) => out.push(html("---"))
+        Some(Svg(s)) => Some(html(s))
+        Some(ThematicBreak) => Some(html("---"))
         // 畳みにならなかった領域も、読み解かなかった中身も、原文だけが書き戻せる
-        // （`source` が持つ）。どちらも無ければ書く字が無い（check の `Wordless`）
-        Some(Details(..)) | None => ()
+        // （`source` が持つ）。どちらも無ければ書く字が無い
+        Some(Details(..)) | None => None
       }
   }
 }
