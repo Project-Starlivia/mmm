@@ -31,7 +31,7 @@ fn spots(rows : Array[(Int, Int, Int?, Int)]) -> Map[Int, @tree.Spot] {
   let out : Map[Int, @tree.Spot] = Map([])
   for r in rows {
     let (id, from, label, to) = r
-    out[id] = { from, label, to, }
+    out[id] = { from, label, to, border: None, }
   }
   out
 }

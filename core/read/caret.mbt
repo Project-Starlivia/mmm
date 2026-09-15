@@ -316,11 +316,12 @@ pub fn ranges(s : Survey, c : Choice) -> Array[Range] {
 ///|
 /// ノードの部分木が原文に書かれた範囲、原文の順。ふつうは地番 1 本。
 ///
-/// **部分木の外の行を跨げば、そこを抜いて割る。** 境界は中身の持ち主を変えないので、
+/// **部分木の外の物を跨げば、そこを抜いて割る。** 境界は中身の持ち主を変えないので、
 /// 持ち主の中身が、境界で置き直された行より下に書かれていることがある
 /// （`- 野菜` / `(野菜) ---` / `(野菜) - 肉` / `(野菜) メモ` の、野菜と メモ の間の肉。
-/// docs/spec.md「水平線」）。抜くのは跨いだ書かれた行の範囲と、その手前の境界の水平線。
-/// Implicit の地番は子の和なので、跨いだ持ち主の中身まで覆う — 抜く物には数えない
+/// docs/spec.md「水平線」）。抜くのは跨いだ**外の書かれた行**（手前の境界の水平線から —
+/// 読みが控えた `Spot.border`）と、**外の持ち主の中身**（肉と魚を抱える Implicit の間の メモ）。
+/// Implicit は行を持たないので抜く物には数えない（地番は子の和）
 fn Survey::cover(self : Survey, id : Int) -> Array[Range] {
   guard self.spots.get(id) is Some(sp) else { return [] }
   let inside : Set[Int] = Set([])
@@ -332,16 +333,35 @@ fn Survey::cover(self : Survey, id : Int) -> Array[Range] {
   }
 
   each_node(self.doc, n => if n.id == id { mark(n) })
-  let holes : Array[Range] = []
-  each_node(self.doc, n => {
-    guard n.mark is Some(_) &&
-      !inside.contains(n.id) &&
-      self.spots.get(n.id) is Some(o) &&
-      o.from > sp.from &&
-      o.from < sp.to else {
-      return
+  // 置き直された行の手前の境界の頭を、その行の頭で引く（Implicit の地番も最初の行から始まる）
+  let borders : Map[Int, Int] = Map([])
+  for _, o in self.spots {
+    if o.border is Some(b) {
+      borders[o.from] = b
     }
-    holes.push({ from: hole_start(self.md, o.from), to: o.to, })
+  }
+  let holes : Array[Range] = []
+  fn cut(at : @tree.Spot, from : Int) -> Unit {
+    if at.from > sp.from && at.from < sp.to {
+      holes.push({ from: line_head(self.md, from), to: at.to, })
+    }
+  }
+
+  fn blocks(bs : Array[@tree.Block]) -> Unit {
+    for b in bs {
+      if self.spots.get(b.id) is Some(at) {
+        cut(at, at.from)
+      }
+    }
+  }
+
+  blocks(self.doc.body)
+  each_node(self.doc, n => {
+    guard !inside.contains(n.id) else { return }
+    blocks(n.body)
+    if n.mark is Some(_) && self.spots.get(n.id) is Some(at) {
+      cut(at, borders.get(at.from).unwrap_or(at.from))
+    }
   })
   holes.sort_by_key(h => h.from)
   let out : Array[Range] = []
@@ -361,22 +381,6 @@ fn Survey::cover(self : Survey, id : Int) -> Array[Range] {
 }
 
 ///|
-/// 跨いだ行 `at` を抜くときの頭。行の頭から、手前の空行を越えて**境界の水平線が在れば
-/// その行の頭**まで — 置き直された行の手前の水平線は、その行の側の綴りで、持ち主の中身ではない
-fn hole_start(md : String, at : Int) -> Int {
-  let head = line_head(md, at)
-  let mut p = head
-  while p > 0 {
-    let prev = line_head(md, p - 1)
-    guard blank(md, prev, p) else {
-      return if ruled(md, prev, p) { prev } else { head }
-    }
-    p = prev
-  }
-  head
-}
-
-///|
 /// `at` を含む行の頭。
 fn line_head(md : String, at : Int) -> Int {
   let mut p = if at < md.length() { at } else { md.length() }
@@ -384,39 +388,4 @@ fn line_head(md : String, at : Int) -> Int {
     p = p - 1
   }
   p
-}
-
-///|
-/// `[from, to)` が空白だけか。
-fn blank(md : String, from : Int, to : Int) -> Bool {
-  for i in from..<(if to < md.length() { to } else { md.length() }) {
-    let c = md[i]
-    if c != ' ' && c != '\t' && c != '\r' && c != '\n' {
-      return false
-    }
-  }
-  true
-}
-
-///|
-/// `[from, to)` の行が水平線か。空白を除いて `-` `_` `*` のどれか 1 種が 3 つ以上だけ並ぶ
-fn ruled(md : String, from : Int, to : Int) -> Bool {
-  let mut mark : UInt16 = 0
-  let mut count = 0
-  for i in from..<(if to < md.length() { to } else { md.length() }) {
-    let c = md[i]
-    if c == ' ' || c == '\t' || c == '\r' || c == '\n' {
-      continue
-    }
-    if c != '-' && c != '_' && c != '*' {
-      return false
-    }
-    if count == 0 {
-      mark = c
-    } else if c != mark {
-      return false
-    }
-    count = count + 1
-  }
-  count >= 3
 }

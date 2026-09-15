@@ -19,6 +19,8 @@ priv struct Frame {
   side : Side
   /// 自分の手前で側を変えた水平線の原文。変えていなければ空
   rule : String
+  /// その水平線の頭。変えていなければ None
+  border : Int?
   /// **骨格の行だけ**の原文の範囲。中身と子の尻は `to_node` が足す。
   /// 飛び（Implicit）は行を持たないので -1
   from : Int
@@ -49,6 +51,8 @@ priv struct Lay {
   mut side : Side
   /// 境界になった水平線の綴り。次に座る深さ 2 の枠が受け取る
   mut rule : String
+  /// その水平線の頭
+  mut border : Int?
   /// まだ閉じていない畳みの、畳んだノードの深さ
   fold_roots : Array[Int]
   /// 直前に畳みの開きを跨いだ。次に座る枠が畳みの根
@@ -56,15 +60,17 @@ priv struct Lay {
 }
 
 ///|
-/// これから座る枠の側と、その手前で側を変えた水平線の原文。
+/// これから座る枠の側と、その手前で側を変えた水平線の原文と頭。
 /// **側を持つのは深さ 2 の枠だけ**（根の子）。境界の綴りは、その次に座る深さ 2 の枠が受け取る
-fn Lay::born(self : Lay) -> (Side, String) {
-  guard self.stack.length() == 1 else { return (Right, "") }
-  guard self.rule != "" else { return (self.side, "") }
+fn Lay::born(self : Lay) -> (Side, String, Int?) {
+  guard self.stack.length() == 1 else { return (Right, "", None) }
+  guard self.rule != "" else { return (self.side, "", None) }
   let rule = self.rule
+  let border = self.border
   self.rule = ""
+  self.border = None
   self.side = flipped(self.side)
-  (self.side, rule)
+  (self.side, rule, border)
 }
 
 ///|
@@ -99,18 +105,27 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
     body_to: 0,
     side: Right,
     rule: "",
+    border: None,
     fold_roots: [],
     opening: false,
   }
   for p in n.pieces {
     match p.verdict {
       None => ()
-      Some(Border(rule~)) => l.rule = rule
+      Some(Border(rule~)) => {
+        l.rule = rule
+        l.border = Some(p.at.from)
+      }
       Some(FoldOpen(..)) => l.opening = true
       Some(FoldClose) => shut(l.stack, l.fold_roots)
       Some(Card(content~, source~, owner~)) => {
         let block : Block = { id: 0, content, source, }
-        let at : Spot = { from: p.at.from, label: None, to: p.at.to, }
+        let at : Spot = {
+          from: p.at.from,
+          label: None,
+          to: p.at.to,
+          border: None,
+        }
         // **持ち主は裁定が言う**（`holder`）。積んである頂上とは限らない —
         // 字下げの戻った塊は開いている項目を閉じ、境界は行を閉じても持ち主を変えない。
         // 枠は降ろさない — 降ろすのは骨格の行の仕事（`under`）
@@ -140,7 +155,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
         }
         // 足りない深さは飛び（Implicit）が埋める。行を持たないので範囲は無い
         while l.stack.length() < depth - 1 {
-          let (side, rule) = l.born()
+          let (side, rule, border) = l.born()
           l.seat({
             mark: None,
             label: "",
@@ -149,13 +164,14 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
             kids: [],
             side,
             rule,
+            border,
             from: no_line,
             to: no_line,
             at_label: no_line,
             body_at: [],
           })
         }
-        let (side, rule) = l.born()
+        let (side, rule, border) = l.born()
         let f : Frame = {
           mark,
           label,
@@ -164,6 +180,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
           kids: [],
           side,
           rule,
+          border,
           from: at.from,
           to: at.to,
           at_label,
@@ -188,6 +205,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
   spans[doc_id] = {
     from,
     label: None,
+    border: None,
     to: if l.body_to > from {
       l.body_to
     } else {
@@ -245,7 +263,9 @@ fn number_blocks(body : Array[Block], next : Ref[Int]) -> Unit {
 }
 
 ///|
-/// 枠の地番。骨格の行の頭から、**自分の最後の中身の尻まで**（子の中身も含む）。
+/// 枠の地番。骨格の行の頭から、**自分と子孫の中身の一番後ろの尻まで**。
+/// **尻は最後の子とは限らない** — 境界は中身の持ち主を変えないので、子の中身が後ろの子
+/// （置き直された行）より下に書かれていることがある（`## a / --- / - b / text` の text）。
 /// 行を持たない飛びは範囲ごと子の和。畳みの尻（`</details>`）は子より後ろに
 /// 在るので、大きいほうを採れば保たれる。
 fn frame_at(f : Frame, children : Array[Node], spans : Map[Int, Spot]) -> Spot {
@@ -256,13 +276,13 @@ fn frame_at(f : Frame, children : Array[Node], spans : Map[Int, Spot]) -> Spot {
       to = at.to
     }
   }
-  if !children.is_empty() {
+  for k in children {
+    let at = spans[k.id]
     if from == no_line {
-      from = spans[children[0].id].from
+      from = at.from
     }
-    let tail = spans[children[children.length() - 1].id].to
-    if tail > to {
-      to = tail
+    if at.to > to {
+      to = at.to
     }
   }
   {
@@ -273,5 +293,6 @@ fn frame_at(f : Frame, children : Array[Node], spans : Map[Int, Spot]) -> Spot {
       Some(f.at_label)
     },
     to,
+    border: f.border,
   }
 }
