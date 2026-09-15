@@ -92,14 +92,14 @@ priv struct Pend {
 }
 
 ///|
-/// 塊を 1 枚控える。持ち主はいまの読みの持ち主（`holder`）。
+/// 塊を 1 枚控える。持ち主はいまの読みの持ち主（`owner`）。
 fn card(
   d : Deem,
   at : @markdown.Span,
   content~ : Content?,
   source~ : String?,
 ) -> Unit {
-  keep(d, at, Card(content~, source~, owner=holder(d)))
+  keep(d, at, Card(content~, source~, owner=owner(d)))
 }
 
 ///|
@@ -118,7 +118,7 @@ fn open_height(stack : Array[Seat], base : Int) -> Int {
 /// 塊の持ち主の行。`---` が無かったものとしての読み（`read`）で決める —
 /// 段の中で開いている一番深い、**書かれた**行（見出しの節）。無ければ段の項目自身、
 /// 文書の段なら文書（None）。Implicit は書かれた行ではないので持ち主にならない
-fn holder(d : Deem) -> Int? {
+fn owner(d : Deem) -> Int? {
   let h = open_height(d.read, d.base)
   for i = h - 1; i >= d.base; i = i - 1 {
     if d.read[i].line is Some(line) {
@@ -259,7 +259,7 @@ fn take(
       // 水平線が続くなら、手前の 1 本は境界になれない（直後が骨格でない）ので
       // その場の中身に落ちる。保留は 1 本しか持てないので、上書きの前に吐き出す
       spill(d)
-      d.pend = Some({ at: span, owner: holder(d), })
+      d.pend = Some({ at: span, owner: owner(d), })
     }
     // 空行は綴りであってモデルには無い。serialize が正規形として置き直す
     BlankLines(..) => ()
@@ -414,7 +414,7 @@ fn put(
   lower(d.read, depth)
   // 閉じた後に読みの根が残っていれば、この行は水平線と同じ木に入る
   let flip = resolve(d, joins=!d.read.is_empty())
-  fill(d.read, depth, None)
+  fill(d.read, depth, s => d.read.push(s))
   // **境界は根より深い行を閉じる。** 深さは変えないので、足りない段は Implicit が埋める
   if flip {
     lower(d.tree, 2)
@@ -423,7 +423,7 @@ fn put(
   // **閉じた後に残った高さ**。深さだけでは組み直せない — 列 0 の見出しが
   // 開いている項目を閉じたか、境界が行を閉じたかは、ここでしか分からない
   let under = d.tree.length()
-  fill(d.tree, depth, Some(d))
+  fill(d.tree, depth, s => d.seat(s))
   // 畳まれた行の地番は `<details>` の範囲まで伸びる。**伸びるのは畳んだ行 1 本だけ** —
   // 項目は部分木ぜんぶが 1 枚の塊なので、下って積む子まで伸ばすと子の行が
   // 見失われる（隙間も畳みの手前のものになる）
@@ -484,15 +484,11 @@ fn[T] lower(stack : Array[T], depth : Int) -> Unit {
 }
 
 ///|
-/// 足りない深さを Implicit で埋める（飛びは綴りであって、無ではない）。
-/// 木の積みなら `deem` を渡して、一番浅い深さを控えさせる
-fn fill(stack : Array[Seat], depth : Int, deem : Deem?) -> Unit {
+/// 足りない深さを Implicit で埋める（飛びは綴りであって、無ではない）。積み方は `push` —
+/// 木の積みは `Deem::seat` で積み、一番浅い深さを控えさせる
+fn fill(stack : Array[Seat], depth : Int, push : (Seat) -> Unit) -> Unit {
   while stack.length() < depth - 1 {
-    let gap : Seat = { mark: None, line: None, }
-    match deem {
-      Some(d) => d.seat(gap)
-      None => stack.push(gap)
-    }
+    push({ mark: None, line: None, })
   }
 }
 
