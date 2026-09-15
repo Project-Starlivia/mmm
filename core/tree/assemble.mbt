@@ -129,14 +129,14 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
         }
       }
       Some(Line(depth~, under~, label~, at_label~, mark~, fold~, at~)) => {
-        // 新しい木は側を持たない。**保留の綴りはもう中身に落ちている**
-        // （裁定の側の `spill` が `Card` として出しているので、ここでは捨てるだけ）
-        if depth == 1 {
-          l.side = Right
-          l.rule = ""
-        }
         while l.stack.length() > under {
           ignore(l.stack.unsafe_pop())
+        }
+        // **積みが空になれば新しい木**で、側は右から始まる — 深さ 1 の行でも、根を
+        // Implicit が埋める深い行でも。新しい木の手前の水平線は境界にならない（`resolve`）
+        // ので、受け取る綴りは残っていない
+        if under == 0 {
+          l.side = Right
         }
         // 足りない深さは飛び（Implicit）が埋める。行を持たないので範囲は無い
         while l.stack.length() < depth - 1 {
