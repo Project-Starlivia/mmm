@@ -267,6 +267,24 @@ pub fn on_window(
 }
 
 ///|
+/// 文書の出来事を聞く（`visibilitychange` は窓ではなく文書に届く）
+pub fn on_document(
+  doc : @dom.Document,
+  name : String,
+  f : (@core.Any) -> Unit,
+) -> Unit {
+  let t : @event.EventTarget = doc.as_any().cast()
+  t.addEventListener(name, f)
+}
+
+///|
+/// ページが隠れているか（タブを移った・窓を畳んだ・閉じる途中）
+pub fn page_hidden(doc : @dom.Document) -> Bool {
+  let state : String = doc.as_any()._get("visibilityState").cast()
+  state == "hidden"
+}
+
+///|
 /// 押せる / 押せない（`disabled` は属性ではなく性質）
 pub fn set_disabled(e : @dom.Element, off : Bool) -> Unit {
   e.as_any()._set("disabled", @core.any(off))

@@ -695,6 +695,43 @@ async test "未保存の字: Save を選んで進めば、前の文書の件は�
 }
 
 ///|
+/// 窓か文書に、名前だけの出来事を送る
+fn dispatch(s : Stand, target : @core.Any, name : String) -> Unit {
+  let ev = @core.new(s.win.as_any()._get("Event"), [@core.any(name)])
+  target._call("dispatchEvent", [ev]) |> ignore
+}
+
+///|
+/// ページを隠れた状態にする（happy-dom は常に visible なので、読み口だけ差し替える）
+extern "js" fn hide_page(doc : @dom.Document) -> Unit =
+  #| (doc) => Object.defineProperty(doc, "visibilityState", { value: "hidden", configurable: true })
+
+///|
+/// **ページを離れるときは待たずに書く。** 手が止まる 1 秒を待つあいだに閉じられると、
+/// その字は残らない。モバイルでタブを閉じると `beforeunload` は鳴らない（docs/unsaved.md）
+async test "未保存の字: ページを離れる（pagehide）ときは、待たずに書く" {
+  let s = stand()
+  defer s.win.close()
+  s.fake.change("# r\n\n## a\n")
+  // 手が止まる間を待たずに離れる
+  dispatch(s, s.win.as_any(), "pagehide")
+  rest(s.doc, 5)
+  assert_eq(s.app.disk.unsaved().list().map(d => d.text), ["# r\n\n## a\n"])
+}
+
+///|
+/// **タブが隠れたときも待たずに書く。** 隠れたまま閉じられると pagehide も来ないことがある
+async test "未保存の字: タブが隠れたら、待たずに書く" {
+  let s = stand()
+  defer s.win.close()
+  s.fake.change("# r\n\n## a\n")
+  hide_page(s.doc)
+  dispatch(s, s.doc.as_any(), "visibilitychange")
+  rest(s.doc, 5)
+  assert_eq(s.app.disk.unsaved().list().map(d => d.text), ["# r\n\n## a\n"])
+}
+
+///|
 /// 画像フォルダの代役。名前しか要らない
 extern "js" fn folder(name : String) -> @web.DirHandle =
   #| (name) => ({ name })
