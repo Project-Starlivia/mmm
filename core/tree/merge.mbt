@@ -107,8 +107,14 @@ priv struct Merge {
   spans : Map[Int, Spot]
   /// 前の木のノードを id で引く
   old : Map[Int, Node]
-  /// 前の木の根を、根のノードの id で引く。側と境界の綴りを比べるのに要る
-  roots : Map[Int, Root]
+  /// 前の木の根を、根のノードの id で引く。根かどうかを見る
+  roots_before : Map[Int, Root]
+  /// 後の木の根を、根のノードの id で引く。断片に側と境界の綴りを書くのに要る
+  roots_after : Map[Int, Root]
+  /// 根の子ごとの、手前に書かれた境界の綴り（`turns`）を子の id で引く — 前の木
+  turns_before : Map[Int, String]
+  /// 同じ表の後の木
+  turns_after : Map[Int, String]
   /// ours — 要素の手前の隙間の頭（空行が無ければ行頭）。前の木の id で引く
   gap : Map[Int, Int]
   /// base — 前の木の階層が言う、手前の空行。前の木の id で引く
@@ -139,7 +145,10 @@ fn plan(
     md,
     spans,
     old: Map([]),
-    roots: Map::from_array(before.roots.map(x => (x.node.id, x))),
+    roots_before: Map::from_array(before.roots.map(x => (x.node.id, x))),
+    roots_after: Map::from_array(after.roots.map(x => (x.node.id, x))),
+    turns_before: turn_table(before.roots),
+    turns_after: turn_table(after.roots),
     gap: gaps(md, spans),
     base,
     theirs,
@@ -150,19 +159,32 @@ fn plan(
   }
   // 文書の散文。容器の自分の尻は散文の頭（frontmatter の尻）
   merge_body(r, before.body, after.body, spans.get(doc_id).unwrap().from, 0)
-  let sides = Map::from_array(after.roots.map(x => (x.node.id, x.sides)))
-  let rules = Map::from_array(after.roots.map(x => (x.node.id, x.rules)))
-  merge_children(
-    r,
-    spans.get(doc_id).unwrap().to,
-    0,
-    olds_n,
-    news_n,
-    1,
-    sides,
-    rules,
-  )
+  merge_children(r, spans.get(doc_id).unwrap().to, 0, olds_n, news_n, 1)
   Some(settle(r))
+}
+
+///|
+/// 根の子ごとの、手前に書く境界の綴り（`turns`）を子の id で引く表。**根にしか要らない
+/// 側と境界は、ここで 1 度だけ引いておく** — 合流の歩きに引数で持ち回らない
+fn turn_table(roots : Array[Root]) -> Map[Int, String] {
+  let out : Map[Int, String] = Map([])
+  for root in roots {
+    for i, t in turns(root) {
+      if t is Some(rule) {
+        out[root.node.children[i].id] = rule
+      }
+    }
+  }
+  out
+}
+
+///|
+/// 部分木の断片。根なら側と境界の綴りも書く。
+fn subtree(r : Merge, x : Node, depth : Int) -> String {
+  match r.roots_after.get(x.id) {
+    Some(root) => fragment(x, depth, root.sides, root.rules)
+    None => fragment(x, depth, [], [])
+  }
 }
 
 ///|
@@ -190,13 +212,7 @@ fn lead(r : Merge, id : Int) -> Int {
 /// 前の木の同じ id と比べる。種類・畳み・子の並びが変わっていれば部分木ごと書く。
 /// そうでなければ、行（ラベル）・中身・子の 3 つの列をそれぞれ差分にする —
 /// 行が同じなら行には触らない（そこに選択の目印が在る）。
-fn merge_node(
-  r : Merge,
-  x : Node,
-  depth : Int,
-  sides : Array[Side],
-  rules : Array[String],
-) -> Unit {
+fn merge_node(r : Merge, x : Node, depth : Int) -> Unit {
   match r.old.get(x.id) {
     // 畳みは `<details>` が部分木を包むので、自分か子列が変わればそこから丸ごと
     Some(old) if sign_of(old) == sign_of(x) &&
@@ -231,17 +247,10 @@ fn merge_node(
           merge_body(r, old.body, x.body, line_to, col)
         }
       }
-      // **根なら、境界の行も要素。** 側が変わった所の `---` の行だけを書き換え、
-      // 増える子には断片の頭に自分の境界を書かせる
-      let wants : Map[Int, String] = Map([])
-      if r.roots.get(x.id) is Some(was) {
-        let after = turns({ node: x, sides, rules, })
-        turned(r, col, old, x, turns(was), after)
-        for i, k in x.children {
-          if after[i] is Some(rule) {
-            wants[k.id] = rule
-          }
-        }
+      // **根なら、境界の行も要素。** 側が変わった所の `---` の行だけを書き換える
+      // （増える子は断片の頭に自分の境界を書く — `merge_children`）
+      if r.roots_before.contains(x.id) {
+        turned(r, col, old, x)
       }
       // 元から子の無い容器に差す位置は前の木の自分の尻。そのとき地番の尻は
       // 自分の尻そのもの（setext の 2 行目も含む）
@@ -257,9 +266,6 @@ fn merge_node(
         } else {
           depth + 1
         },
-        Map([]),
-        Map([]),
-        rule=id => wants.get(id),
       )
     }
     // **名前の無い行に名前が付いただけ**（Implicit を綴った見出し）なら、行を 1 本差して子へ降りる。
@@ -280,9 +286,9 @@ fn merge_node(
         .to_owned() +
         "\n",
       })
-      merge_node(r, { ..x, mark: None, label: "", }, depth, sides, rules)
+      merge_node(r, { ..x, mark: None, label: "", }, depth)
     }
-    _ => replace(r, x, depth, sides, rules)
+    _ => replace(r, x, depth)
   }
 }
 
@@ -303,37 +309,28 @@ fn label_end(md : String, spans : Map[Int, Spot], x : Node) -> Int {
 }
 
 ///|
-/// 根の子の手前の境界の行を、前後の側の違いだけ書き換える（`turns` の表どうし）。
+/// 根の子の手前の境界の行を、前後の側の違いだけ書き換える（`turns_before` と `turns_after`）。
 /// **消すのは残る子で要らなくなった行だけ、足すのは残る子の手前に要るようになった行だけ** —
 /// 消える子の行は子の隙間ごと消え（`gaps`）、増える子は断片の頭に自分の境界を書く
-/// （`merge_children` の `rule`）。
+/// （`merge_children`）。
 /// 子の差分より先に積む — 同じ位置に隙間の書き換えが来ても、境界が手前に並ぶように
-fn turned(
-  r : Merge,
-  col : Int,
-  old : Node,
-  x : Node,
-  before : Array[String?],
-  after : Array[String?],
-) -> Unit {
-  let had : Map[Int, Bool] = Map([])
-  for i, k in old.children {
-    had[k.id] = before[i] is Some(_)
-  }
-  let wants : Map[Int, Bool] = Map([])
-  for i, k in x.children {
-    wants[k.id] = after[i] is Some(_)
-  }
-  for i, k in old.children {
-    guard before[i] is Some(_) && wants.get(k.id) == Some(false) else {
+fn turned(r : Merge, col : Int, old : Node, x : Node) -> Unit {
+  let kept : Set[Int] = Set::from_array(ids(x.children))
+  for k in old.children {
+    guard kept.contains(k.id) &&
+      r.turns_before.contains(k.id) &&
+      !r.turns_after.contains(k.id) else {
       continue
     }
     if border_line(r, k.id) is Some((from, to)) {
       r.out.push({ from, to, insert: "", })
     }
   }
-  for i, k in x.children {
-    guard after[i] is Some(rule) && had.get(k.id) == Some(false) else {
+  let was : Set[Int] = Set::from_array(ids(old.children))
+  for k in x.children {
+    guard was.contains(k.id) &&
+      !r.turns_before.contains(k.id) &&
+      r.turns_after.get(k.id) is Some(rule) else {
       continue
     }
     let at = r.gap.get(k.id).unwrap()
@@ -580,7 +577,7 @@ fn spot(r : Merge, id : Int) -> Spot {
 ///|
 /// 子列の差分。残った子には降りる。項目の列は ours の兄弟の流儀（詰まっているか）を
 /// 増える物にも写す — 正規形は流儀を知らないので、ここだけは ours が先。
-/// `rule` は増える子の手前に書く境界の綴り（根の子の列のときだけ在る）。
+/// 増える根の子は、断片の頭に手前の境界の綴りを書く（`turns_after`）。
 fn merge_children(
   r : Merge,
   own : Int,
@@ -588,9 +585,6 @@ fn merge_children(
   olds : Array[Node],
   news : Array[Node],
   depth : Int,
-  sides : Map[Int, Array[Side]],
-  rules : Map[Int, Array[String]],
-  rule? : (Int) -> String? = _ => None,
 ) -> Unit {
   let now = Map::from_array(news.map(x => (x.id, x)))
   let old_ids = ids(olds)
@@ -606,23 +600,10 @@ fn merge_children(
         None => r.theirs.get(id).unwrap_or(true)
       }
     },
-    keep: id => {
-      merge_node(
-        r,
-        now.get(id).unwrap(),
-        depth,
-        sides.get(id).unwrap_or([]),
-        rules.get(id).unwrap_or([]),
-      )
-    },
+    keep: id => merge_node(r, now.get(id).unwrap(), depth),
     make: id => {
-      let text = fragment(
-        now.get(id).unwrap(),
-        depth,
-        sides.get(id).unwrap_or([]),
-        rules.get(id).unwrap_or([]),
-      )
-      match rule(id) {
+      let text = subtree(r, now.get(id).unwrap(), depth)
+      match r.turns_after.get(id) {
         Some(line) => line + "\n\n" + text
         None => text
       }
@@ -748,14 +729,8 @@ fn mid_line(md : String, at : Int) -> Bool {
 
 ///|
 /// 部分木ごと断片にして、地番に差す。
-fn replace(
-  r : Merge,
-  x : Node,
-  depth : Int,
-  sides : Array[Side],
-  rules : Array[String],
-) -> Unit {
-  r.out.push(patch(r, x.id, fragment(x, depth, sides, rules)))
+fn replace(r : Merge, x : Node, depth : Int) -> Unit {
+  r.out.push(patch(r, x.id, subtree(r, x, depth)))
 }
 
 ///|
