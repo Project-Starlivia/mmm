@@ -142,12 +142,9 @@ fn walk(
     // 行が無いので中身を書けない（`Unmarked`）— 綴られてから咎める
     c.border = if x.mark is Some(_) { trailing(x.body) } else { None }
     let under = if x.mark is None { s.lead } else { None }
-    if sign_of(x) is Some(Item) {
-      // 項目の中は、その項目の深さを 0 とした文書
-      walk(c, x.children, depth + 1, depth, [], _ => [], lead=under)
-    } else {
-      walk(c, x.children, depth + 1, base, kids(i), _ => [], lead=under)
-    }
+    // 項目の中は、その項目の深さを 0 とした文書。側は見出しの根も項目の根も持つ
+    let inner = if sign_of(x) is Some(Item) { depth } else { base }
+    walk(c, x.children, depth + 1, inner, kids(i), _ => [], lead=under)
   }
 }
 

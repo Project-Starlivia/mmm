@@ -120,7 +120,7 @@ fn mend(doc : @tree.Doc) -> @tree.Doc? {
     }
     if !fixed {
       // 中身の尻の水平線に骨格が続く形（`BorderBreak`）だけは通す — 書けば md が
-      // 境界と読む（深さ 2 なら側の反転、深ければ深さ 2 へ引き出して反対側）。
+      // 境界と読む（根の子なら側の反転、深ければ深さを保って根の反対側へ置き直す）。
       // 形は読み直しが決めるので、そのとき edit は focus を持たない
       return if flaws.iter().all(f => f is BorderBreak(_)) {
         Some(cur)
@@ -508,7 +508,7 @@ fn flipped(s : @tree.Side) -> @tree.Side {
 
 ///|
 /// 側を裏返す。根は sides を一括反転（鏡像）、根の子はその 1 つ、深いノードは
-/// 反対側の末尾へ引き出す（深さは保つので、間を Implicit が埋める）。
+/// 深さを保って反対側の末尾へ置き直す（`haul`）。
 fn flip(doc : @tree.Doc, id : Int) -> Done? {
   guard seat(doc, id) is Some(path) else { return None }
   let r = doc.roots[path[0]]
@@ -533,8 +533,14 @@ fn reside(doc : @tree.Doc, at : Int, sides : Array[@tree.Side]) -> @tree.Doc {
 }
 
 ///|
-/// 深いノードを反対側の末尾へ引き出す。**深さは保つ**ので、間を Implicit が埋める。
-/// 項目は相対記法で深さを持たず飛びを綴れないので、直に深さ 2 へ。
+/// 深いノードを反対側の末尾へ置き直す。**動くのは選んだノードだけで、深さは保つ**
+/// （読みの境界と同じ形。docs/spec.md「水平線」）。
+///
+/// - 行き先の側の最後の子が同じ側なら、間に境界は書かれない。その子の部分木の尻へ
+///   深さのまま入る — md に書けば読みが置く親（`sink`）。左へ出して右へ戻せば元の木
+/// - そうでなければ境界が書かれるので、根の子の席から Implicit が深さを埋める
+///
+/// 元の側に残った Implicit は子が尽きていれば門（`mend`）が消す
 fn haul(
   doc : @tree.Doc,
   r : @tree.Root,
@@ -544,22 +550,79 @@ fn haul(
 ) -> @tree.Doc? {
   let taken = []
   guard take(doc, [id], taken) is Some(rest) else { return None }
-  let mut next = fresh(doc)
-  let mut wrapped = taken[0]
-  if !(@tree.sign_of(wrapped) is Some(Item)) {
-    for _ in 0..<(depth - 2) {
-      wrapped = {
-        id: next,
-        label: "",
-        fold: None,
-        body: [],
-        children: [wrapped],
-        mark: None,
-      }
-      next = next + 1
+  let x = taken[0]
+  let next : Ref[Int] = { val: fresh(doc), }
+  for i, t in rest.roots {
+    guard t.node.id == r.node.id else { continue }
+    guard last_filled(t.node) is Some(j) && side_at(t, j) == side else { break }
+    let kids = t.node.children.copy()
+    kids[j] = sink(kids[j], 2, x, depth, next)
+    let roots = rest.roots.copy()
+    roots[i] = { ..t, node: { ..t.node, children: kids, }, }
+    return Some({ ..rest, roots, })
+  }
+  append(rest, node=r.node.id, side~, [gaps(x, depth - 2, next)])
+}
+
+///|
+/// 子を持つ最後の子の添字。抜き取りで空になった Implicit の鎖（`hollow`）は数えない —
+/// 門が消すので、行き先の隣にはならない
+fn last_filled(n : @tree.Node) -> Int? {
+  for i = n.children.length() - 1; i >= 0; i = i - 1 {
+    if !hollow(n.children[i]) {
+      return Some(i)
     }
   }
-  append(rest, node=r.node.id, side~, [wrapped])
+  None
+}
+
+///|
+/// 行が 1 つも無い Implicit の鎖か。
+fn hollow(n : @tree.Node) -> Bool {
+  n.mark is None && n.children.iter().all(hollow)
+}
+
+///|
+/// 深さ `at` のノード `n` の部分木の尻へ、深さ `depth` のまま `x` を入れる。md に
+/// 書けば読みが置く親 — 尻の鎖で深さ `depth - 1` の行。鎖が浅く尽きれば、見出しは
+/// 足りない段を Implicit が埋め、項目は尽きた所の子になる（項目の深さは入れ物が決める）
+fn sink(
+  n : @tree.Node,
+  at : Int,
+  x : @tree.Node,
+  depth : Int,
+  next : Ref[Int],
+) -> @tree.Node {
+  if at >= depth - 1 {
+    return { ..n, children: [..n.children, x], }
+  }
+  match n.children.last() {
+    Some(k) => {
+      let kids = n.children.copy()
+      kids[kids.length() - 1] = sink(k, at + 1, x, depth, next)
+      { ..n, children: kids, }
+    }
+    None if @tree.sign_of(x) is Some(Item) => { ..n, children: [x], }
+    None => { ..n, children: [gaps(x, depth - 1 - at, next)], }
+  }
+}
+
+///|
+/// `x` を `count` 枚の Implicit で包む（深さを保つ足場）。
+fn gaps(x : @tree.Node, count : Int, next : Ref[Int]) -> @tree.Node {
+  let mut wrapped = x
+  for _ in 0..<count {
+    wrapped = {
+      id: next.val,
+      label: "",
+      fold: None,
+      body: [],
+      children: [wrapped],
+      mark: None,
+    }
+    next.val = next.val + 1
+  }
+  wrapped
 }
 
 ///|

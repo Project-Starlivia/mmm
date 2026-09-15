@@ -693,7 +693,7 @@ test "MoveNode は空・中身・知らない id・動かすものの中へ、�
 }
 
 ///|
-test "FlipSide の 3 段: 根は鏡像、根の子は 1 つ、深いものは反対側へ引き出す" {
+test "FlipSide の 3 段: 根は鏡像、根の子は 1 つ、深いものは深さを保って反対側へ" {
   let d = doc([
     root(
       h(2, "r", children=[
@@ -754,8 +754,9 @@ test "FlipSide の 3 段: 根は鏡像、根の子は 1 つ、深いものは反
 }
 
 ///|
-/// 項目は相対記法で深さを持たないので、Implicit で包まず直に深さ 2 へ。
-test "FlipSide の深い項目は Implicit で包まず引き出す" {
+/// 項目も見出しと同じく深さを保つ。行き先に境界が書かれるので、Implicit が深さを埋める
+/// （書くときは手前の兄弟 `i` の尻に `---` と `- j`）。
+test "FlipSide の深い項目も、深さを保って Implicit の下へ" {
   let d = doc([
     root(h(2, "r", children=[item(3, "i", children=[item(4, "j")])]), sides=[
       Right,
@@ -765,7 +766,7 @@ test "FlipSide の深い項目は Implicit で包まず引き出す" {
     apply(d, FlipSide(id=4)),
     Some({
       doc: doc([
-        root(h(2, "r", children=[item(3, "i"), item(4, "j")]), sides=[
+        root(h(2, "r", children=[item(3, "i"), gap(5, [item(4, "j")])]), sides=[
           Right,
           Left,
         ]),
@@ -776,9 +777,10 @@ test "FlipSide の深い項目は Implicit で包まず引き出す" {
 }
 
 ///|
-/// 深いノードを引き出した先が、直前の兄弟と同じ側なら境界が無く、
-/// Implicit はその兄弟に飲み込まれる（check が言う）ので、外の 1 枚が綴られる。
-test "FlipSide の深いノードは、引き出す先に境界が無ければ Implicit が綴られる" {
+/// **動くのは選んだノードだけ。** 行き先の最後の子 `b` が同じ側なら境界は書かれないので、
+/// Implicit は立てず、深さのまま `b` の部分木の尻へ入る（md に書けば読みが置く親）。
+/// 見出しの `y` は深さ 4 なので、`b` の下の段は Implicit が埋める。
+test "FlipSide の深いノードは、行き先に境界が無ければ隣の部分木の尻へ深さのまま入る" {
   let d = doc([
     root(
       h(2, "r", children=[
@@ -795,15 +797,44 @@ test "FlipSide の深いノードは、引き出す先に境界が無ければ I
         root(
           h(2, "r", children=[
             h(3, "a", children=[h(4, "x")]),
-            h(6, "b"),
-            h(8, "", children=[gap(7, [h(5, "y")])]),
+            h(6, "b", children=[gap(7, [h(5, "y")])]),
           ]),
-          sides=[Right, Left, Left],
+          sides=[Right, Left],
         ),
       ]),
       focus: Some(5),
     }),
   )
+}
+
+///|
+/// 左へ出して右へ戻せば元の木。出したときに立った Implicit は、子が尽きて門が消す。
+test "FlipSide の深い項目を出して戻すと元の木" {
+  let d = doc([
+    root(
+      item(2, "r", children=[
+        item(3, "b", children=[item(4, "y"), item(5, "x")]),
+      ]),
+      sides=[Right],
+    ),
+  ])
+  guard apply(d, FlipSide(id=5)) is Some(out) else { fail("出せない") }
+  assert_eq(
+    out.doc,
+    doc([
+      root(
+        item(2, "r", children=[
+          item(3, "b", children=[item(4, "y")]),
+          gap(6, [item(5, "x")]),
+        ]),
+        sides=[Right, Left],
+      ),
+    ]),
+  )
+  guard apply(out.doc, FlipSide(id=5)) is Some(back) else {
+    fail("戻せない")
+  }
+  assert_eq(back.doc, d)
 }
 
 ///|
@@ -1421,7 +1452,7 @@ test "apply の結果は check を通る（境界は md が決めるので除く
   inspect(
     some,
     content=(
-      #|516
+      #|518
     ),
   )
   json_inspect(bad, content=[])

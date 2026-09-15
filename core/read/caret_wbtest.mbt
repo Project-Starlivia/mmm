@@ -248,14 +248,33 @@ test "carry — 位置を写す。点も並びも基点も同じ写像で" {
   assert_eq(carry(CardAt(at=11), shift), CardAt(at=14))
 }
 
+///|
+/// 境界は中身の持ち主を変えないので、野菜の メモ は、境界で置き直された肉より下に
+/// 書かれている。野菜の文は肉の手前で割れ、メモ の塊が別の区間になる
+test "自身の文と薄塗り — 置き直された行を跨ぐ持ち主は区間が割れる" {
+  let md = "- 買い物\n  - 野菜\n\n    ---\n\n    - 肉\n\n    メモ\n\n    - 魚\n"
+  let s = survey(md)
+  let veg = s.find("野菜").unwrap()
+  let meat = s.find("肉").unwrap()
+  let at_meat = s.spots.get(meat).unwrap().label.unwrap()
+  let at_memo = md.find("メモ").unwrap()
+  assert_eq(ids_at(owns(s), point(at_meat)), [meat])
+  assert_eq(ids_at(owns(s), point(at_memo)), [veg])
+  let painted = ranges(s, nodes([veg], Some(veg)))
+  assert_eq(painted.length(), 2)
+  assert_true(painted.all(r => !(r.from <= at_meat && at_meat < r.to)))
+  assert_true(painted.any(r => r.from <= at_memo && at_memo < r.to))
+}
+
 // ---- 二分探索の前提（#55） ----
 
 ///|
-/// 位置の試験に使う見本。入れ子・項目・中身・畳み・頭を混ぜる
+/// 位置の試験に使う見本。入れ子・項目・中身・畳み・頭・境界で置き直された行を混ぜる
 let placed : Array[String] = [
   "# r\n", "# r\n\nhello\n", "# r\n\n## a\n\n## b\n", "# r\n\n## a\n\n### x\n\n## b\n",
   "- a\n- b\n", "- a\n  - b\n    - c\n", "# r\n\n```\nx\n```\n\n## a\n", "---\nk: v\n---\n\n# r\n\n## a\n",
   "intro\n\n# a\n\n## b\n", "# r\n\n![](./x.webp)\n\n## a\n", "- # head\n\n  body\n",
+  "- 買い物\n  - 野菜\n\n    ---\n\n    - 肉\n\n    メモ\n\n    - 魚\n",
   "# r\n\n<details>\n<summary>s</summary>\n\n## a\n\n</details>\n",
   // #204 — 列 0 の塊は項目を閉じるので、中身が子より後ろに書かれる
    "# r\n\n- head\n\ntext\n", "# r\n\n- a\n\ntext\n\n- b\n",

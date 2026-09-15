@@ -444,7 +444,7 @@ fn fold_of(s : Spell) -> Fold {
 /// 領域が、1 つのノードの body・children とその body を過不足なく覆っているか。
 ///
 /// 深さは md の `#` の数ではなく **build が実際に積んだ深さ**（`depths`）で測る。
-/// 境界の `---` は部分木を深さ 2 へ引き出し、飛びは Implicit で埋まるので、
+/// 境界の `---` は後ろの行を根の下へ置き直し、飛びは Implicit で埋まるので、
 /// `#` の数で測ると「領域の外に出た子」を覆っているつもりになる。
 fn covers(
   blocks : Array[@markdown.Block],
@@ -471,7 +471,7 @@ fn covers(
     // 領域の中に書いた水平線が領域の外の骨格の境界なら、その水平線は
     // 部分木のものではない（書き戻すと領域の外に出る）。行き先が中なら、
     // 置き直された骨格は上の深さで弾かれるか、飾りとして中身に残る。
-    // **行き先は直後の塊だけ** — 水平線が続けば手前は飾りに落ちる（#178）
+    // **行き先は直後の塊だけ** — 水平線が続けば手前は装飾になる（#178）
     if blocks[k] is ThematicBreak(..) {
       let w = beyond(blocks, gone, k)
       guard !(w > last && borders(blocks, depth, w)) else { return false }
@@ -485,7 +485,7 @@ fn covers(
   guard z < blocks.length() else { return true }
   // 水平線は単体では中身ではない。**境界なら**部分木の外で、そうでなければ
   // 飾り＝このノードの中身なので、領域が狭い
-  // （水平線が続けば手前は飾り。境界を取るのは最後の 1 本だけ。#178）
+  // （水平線が続けば手前は装飾。境界を取るのは最後の 1 本だけ。#178）
   if blocks[z] is ThematicBreak(..) {
     return borders(blocks, depth, beyond(blocks, gone, z))
   }

@@ -4,6 +4,7 @@
 // 2. 持ち主がノード・直後が骨格の行・その行が同じ木、の 3 つを満たす水平線だけが境界
 // 3. 境界は、後ろの行を前の行（根を除く）の子にせず、深さのまま根の下へ置き直すだけ
 //
+// 記法（`---` `***` `___`）も本数も判定に使わない。
 // 決めは docs/spec.md「水平線」と docs/superpowers/specs/2026-09-15-border-design.md。
 // 表は設計書の例そのもの。木を 1 行の形にして比べる。
 
@@ -58,6 +59,7 @@ let border_cases : Array[(String, String)] = [
   ),
   ("# r\n\n## a\n\n---\n\n- b\n- c\n", "r → [a, 左:() → [b, c]]"),
   ("# r\n\n## a\n\n---\n\n---\n\n## b\n", "r → [a{---}, 左:b]"),
+  ("# r\n\n## a\n\n---\n", "r → [a{---}]"),
   ("# r\n\n---\n\n# s\n", "r{---} ; s"),
   ("# H\n\n- r\n\n---\n\n- c\n", "H → [r, 左:c]"),
   ("# r\n\n---\n\n## b\n\ntext\n", "r → [左:b{text}]"),
@@ -65,6 +67,12 @@ let border_cases : Array[(String, String)] = [
   (
     "## 野菜\n\n---\n\n- 肉\n\nメモ\n", "() → [野菜{メモ}, 左:() → [肉]]",
   ),
+  (
+    "# root\n\n---\n\n## h1\n\n---\n\n* i1\n\n---\n\n## h2\n", "root → [左:h1, () → [i1], 左:h2]",
+  ),
+  // 直前が中身でも、直後が骨格の行なら境界。直後が中身なら装飾
+  ("# a\n\nbody\n\n---\n\n## b\n", "a{body} → [左:b]"),
+  ("# a\n\nbody\n\n---\n\nbody\n\n## b\n", "a{body, ---, body} → [b]"),
   // ---- 文書の body ----
   ("---\n\n## a\n", "文書{---} () → [a]"),
   ("---\n\n- a\n", "文書{---} a"),
@@ -76,6 +84,7 @@ let border_cases : Array[(String, String)] = [
   ("- r\n\n  ---\n\n  - a\n", "r → [左:a]"),
   ("- r\n\n  ---\n\n  # head\n", "r → [左:head]"),
   ("- r\n\n  ---\n\n  - a\n\n  ---\n\n  # b\n", "r → [左:a, b]"),
+  ("- # x\n\n  ---\n\n  # y\n", "\"\" → [x, 左:y]"),
   ("- r\n  - b\n\n    ---\n\n  - c\n", "r → [b, 左:c]"),
   ("- r\n  - b\n\n    ---\n\n    - x\n", "r → [b, 左:() → [x]]"),
   (
@@ -88,6 +97,7 @@ let border_cases : Array[(String, String)] = [
   ("- r\n\n  ---\n", "r{---}"),
   ("- r\n\n  ---\n\n  memo\n", "r{---, memo}"),
   ("- r\n\n  ---\n\n- s\n", "r{---} ; s"),
+  ("- a\n\n  ---\n\n# h\n", "a{---} ; h"),
   ("- r\n\n---\n", "文書{---} r"),
   ("- r\n  ---\n", "\"\" → [() → [r]]"),
   // ---- 根でない項目 ----
@@ -122,4 +132,18 @@ test "境界 — 設計書の例" {
       "\{bad.length()} / \{border_cases.length()} が違う\n" + bad.join("\n"),
     )
   }
+}
+
+///|
+/// `***` も `___` も同じ意味。記法で差別しないが、**読んだ綴りは残る**（`rules`）。
+test "境界 — 記法は差別しない。形は同じで、綴りだけ残る" {
+  let dash = parse("# r\n\n---\n\n## a\n")
+  let star = parse("# r\n\n***\n\n## a\n")
+  let under = parse("# r\n\n___\n\n## a\n")
+  assert_eq(shape(dash), shape(star))
+  assert_eq(shape(dash), shape(under))
+  json_inspect(
+    [dash.roots[0].rules, star.roots[0].rules, under.roots[0].rules],
+    content=[["---"], ["***"], ["___"]],
+  )
 }
