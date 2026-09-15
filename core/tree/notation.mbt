@@ -59,12 +59,11 @@ priv enum Verdict {
   FoldOpen(open~ : Bool, summary~ : String?)
   /// 立った畳みの閉じ。**その部分木が終わったという宣言**
   FoldClose
-  /// 中身。持ち主は手前の `Line`。`source` は読んだ原文で、切り出しの流儀が
-  /// 塊ごとに違う（`verbatim` / `carve` / `strip`）ので字で持ち出す
-  /// 骨格でない塊。`under` は**持ち主の枠の深さ**（0 なら文書）で、
-  /// `Line` の同じ名の欄と同じ意味 — 列 0 の塊は開いている項目を閉じるので、
-  /// 積んである高さそのままとは限らない（#204）
-  Card(content~ : Content?, source~ : String?, under~ : Int)
+  /// 骨格でない塊。`source` は読んだ原文で、切り出しの流儀が塊ごとに違う
+  /// （`verbatim` / `carve` / `strip`）ので字で持ち出す。`owner` は**持ち主の行の頭**
+  /// （その `Line` のひと切れの from）で、None は文書。深さで指さない — 境界は
+  /// 行を閉じても持ち主を変えないので、持ち主は積みから降りていることがある
+  Card(content~ : Content?, source~ : String?, owner~ : Int?)
 }
 
 ///|

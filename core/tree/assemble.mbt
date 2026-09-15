@@ -39,6 +39,9 @@ let no_line : Int = -1
 priv struct Lay {
   roots : Array[Frame]
   stack : Array[Frame]
+  /// 書かれた行の枠を、行の頭で引く。**中身の持ち主はこれで指す** — 境界が行を
+  /// 閉じても持ち主は変わらないので、積みから降りた枠にも中身が届く
+  lines : Map[Int, Frame]
   body : Array[Block]
   body_at : Array[Spot]
   mut body_to : Int
@@ -54,7 +57,7 @@ priv struct Lay {
 
 ///|
 /// これから座る枠の側と、その手前で側を変えた水平線の原文。
-/// **側を持つのは深さ 2 の枠だけ**（根の子）。deem.mbt の `border` と同じ規則
+/// **側を持つのは深さ 2 の枠だけ**（根の子）。境界の綴りは、その次に座る深さ 2 の枠が受け取る
 fn Lay::born(self : Lay) -> (Side, String) {
   guard self.stack.length() == 1 else { return (Right, "") }
   guard self.rule != "" else { return (self.side, "") }
@@ -90,6 +93,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
   let l : Lay = {
     roots: [],
     stack: [],
+    lines: Map([]),
     body: [],
     body_at: [],
     body_to: 0,
@@ -104,23 +108,24 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
       Some(Border(rule~)) => l.rule = rule
       Some(FoldOpen(..)) => l.opening = true
       Some(FoldClose) => shut(l.stack, l.fold_roots)
-      Some(Card(content~, source~, under~)) => {
+      Some(Card(content~, source~, owner~)) => {
         let block : Block = { id: 0, content, source, }
         let at : Spot = { from: p.at.from, label: None, to: p.at.to, }
         // **持ち主は裁定が言う**（`holder`）。積んである頂上とは限らない —
-        // 列 0 の塊は開いている項目を閉じるので、見出しの背骨の底のものになる。
-        // 枠は降ろさない — 降ろすのは骨格の行の仕事（`under`）で、ここで降ろすと
-        // 続く行の深さが読みと食い違う
-        if under == 0 {
-          l.body.push(block)
-          l.body_at.push(at)
-          if at.to > l.body_to {
-            l.body_to = at.to
+        // 字下げの戻った塊は開いている項目を閉じ、境界は行を閉じても持ち主を変えない。
+        // 枠は降ろさない — 降ろすのは骨格の行の仕事（`under`）
+        match owner.bind(from => l.lines.get(from)) {
+          Some(f) => {
+            f.body.push(block)
+            f.body_at.push(at)
           }
-        } else {
-          let f = l.stack[under - 1]
-          f.body.push(block)
-          f.body_at.push(at)
+          None => {
+            l.body.push(block)
+            l.body_at.push(at)
+            if at.to > l.body_to {
+              l.body_to = at.to
+            }
+          }
         }
       }
       Some(Line(depth~, under~, label~, at_label~, mark~, fold~, at~)) => {
@@ -151,7 +156,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
           })
         }
         let (side, rule) = l.born()
-        l.seat({
+        let f : Frame = {
           mark,
           label,
           fold,
@@ -163,7 +168,9 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
           to: at.to,
           at_label,
           body_at: [],
-        })
+        }
+        l.seat(f)
+        l.lines[p.at.from] = f
         if l.opening {
           l.fold_roots.push(l.stack.length())
           l.opening = false

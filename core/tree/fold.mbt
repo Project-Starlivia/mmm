@@ -468,15 +468,13 @@ fn covers(
   let mut k = head + 1
   while k <= last {
     guard depth[k].top > level else { return false }
-    // 領域の中に書いた水平線の行き先が領域の外の骨格なら、その水平線は
+    // 領域の中に書いた水平線が領域の外の骨格の境界なら、その水平線は
     // 部分木のものではない（書き戻すと領域の外に出る）。行き先が中なら、
-    // 引き出された骨格は上の深さで弾かれるか、飾りとして中身に残る。
+    // 置き直された骨格は上の深さで弾かれるか、飾りとして中身に残る。
     // **行き先は直後の塊だけ** — 水平線が続けば手前は飾りに落ちる（#178）
     if blocks[k] is ThematicBreak(..) {
       let w = beyond(blocks, gone, k)
-      guard !(w > last && w < blocks.length() && depth[w].own < deep) else {
-        return false
-      }
+      guard !(w > last && borders(blocks, depth, w)) else { return false }
     }
     k = k + 1
   }
@@ -485,14 +483,21 @@ fn covers(
   // 骨格でなければ、その中身はこのノードの body ＝ 領域が狭いということ
   let z = beyond(blocks, gone, last)
   guard z < blocks.length() else { return true }
-  // 水平線は単体では中身ではない。**直後が骨格なら境界**（部分木の外）で、
-  // そうでなければ飾り＝このノードの中身なので、領域が狭い
+  // 水平線は単体では中身ではない。**境界なら**部分木の外で、そうでなければ
+  // 飾り＝このノードの中身なので、領域が狭い
   // （水平線が続けば手前は飾り。境界を取るのは最後の 1 本だけ。#178）
   if blocks[z] is ThematicBreak(..) {
-    let w = beyond(blocks, gone, z)
-    return w < blocks.length() && depth[w].top < deep
+    return borders(blocks, depth, beyond(blocks, gone, z))
   }
   depth[z].top < deep
+}
+
+///|
+/// 水平線の直後の塊 `w` が、その水平線を境界にするか。**同じ木に座る骨格の行**
+/// （深さ 2 以上）のときだけ — 新しい木（深さ 1）の手前の水平線は飾り。
+/// 持ち主がノードであることは問わない — 領域は畳んだノードの後ろなので、持ち主は必ずノード
+fn borders(blocks : Array[@markdown.Block], depth : Array[Depth], w : Int) -> Bool {
+  w < blocks.length() && depth[w].own >= 2 && depth[w].own < deep
 }
 
 // ══════════════════════════════════════════════════════════════════
