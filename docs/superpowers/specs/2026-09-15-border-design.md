@@ -134,8 +134,8 @@
 
 | 所 | 捨てるもの |
 |---|---|
-| `docs/spec.md` | 「水平線」の口の判定図と「境界になれない場所」、「項目の中」の「側は無い」と例 2 行、Mindmap 側の表の #319 の但し書き 2 つ、「レイアウト規則」の側の行 |
-| `docs/core.md` | `ListSide`、`BorderBreak` の「項目の外だけ」、`Swallowed` の「逃げ道も根の子の列だけ」、「隙間」の「側の `---` はどのノードのものでもない」 |
+| `docs/spec.md` | 「水平線」の口の判定図と「境界になれない場所」の口の説明、「項目の中」の「側は無い」と例 2 行、Mindmap 側の表の #319 の但し書き 2 つ |
+| `docs/core.md` | `ListSide`、`BorderBreak` の「項目の外だけ」、`Swallowed` の「逃げ道も根の子の列だけ」 |
 | 読み `core/tree/deem.mbt` | 項目の中の水平線をその場で中身にする枝、項目を先に深さ 2 と決める `seat_level`、`clear` の口の判定、持ち主を深さで指す `under : Int`（境界が枠を降ろすと、降ろした枠を指せない） |
 | 組み立て `core/tree/assemble.mbt` | 深さで持ち主を引く `l.stack[under - 1]` |
 | 畳み `core/tree/fold.mbt` | `covers` の「直後が骨格なら境界」の写し（境界の条件を 1 か所から引く） |
