@@ -402,7 +402,8 @@ fn App::update_dirty(self : App) -> Unit {
   let unsaved = self.disk.unsaved()
   if self.text() == self.disk_text {
     (self.write_soon.cancel)()
-    if unsaved.written() is Some(_) {
+    // 書いている途中も捨てる相手 — 捨てた後に着く書き込みは台帳が自分で捨てる
+    if unsaved.held() {
       @web.spawn(async fn() {
         unsaved.discard()
         self.refresh_recent()
@@ -442,11 +443,15 @@ fn App::load_text(
   // 人が何も押していないのにピッカーを開きに行く（`showSaveFilePicker` は
   // 押した直後にしか開けない）
   (self.write_soon.cancel)()
-  // **未保存の字の件もここで入れ替わる。** 続きを同じ件に書くと、別の文書の字が
-  // 混ざる。開き直した文書なら元の件を引き受ける（開き直すたびに同じ字の件を増やさない）
+  // **前の文書の件はここで捨てる。** 入れ替えに来るのは、保存した・Don't Save を選んだ・
+  // ディスクと同じ字だった、のどれかで、どれでも件は役目を終えている。捨てるのは入れ替えが
+  // 決まったここ — たずねの時点で捨てると、開く相手に断られたときに汚れた文書だけが残る。
+  // 鍵は待つ前に替わる。開き直した文書なら元の件を引き受ける（同じ字の件を増やさない）
+  let unsaved = self.disk.unsaved()
+  @web.spawn(async fn() { unsaved.discard() })
   match adopt {
-    Some(d) => self.disk.unsaved().adopt(d)
-    None => self.disk.unsaved().start()
+    Some(d) => unsaved.adopt(d)
+    None => ()
   }
   self.saved_name = name
   self.images.clear() // 画像のパスは（新しい）md からの相対
@@ -508,11 +513,9 @@ async fn App::confirm_discard(self : App) -> Bool {
       self.save_file(false)
       self.text() == self.disk_text
     }
-    Alt => {
-      // **Don't Save は未保存の字も捨てる。** 人が捨てると選んだ（docs/unsaved.md）
-      self.disk.unsaved().discard()
-      true
-    }
+    // **Don't Save は未保存の字も捨てる**（docs/unsaved.md）。ただし捨てるのは入れ替えが
+    // 決まってから（`load_text`）— 開く相手に断られて入れ替わらなければ、件は残す
+    Alt => true
     No => false
   }
 }
@@ -562,6 +565,11 @@ async fn App::rename_file(self : App) -> Unit {
       Some(next) => {
         self.saved_name = Some(next)
         self.show_name()
+        // 件が持つ名前と札も改名後に合わせる（Chromium は札をパスで持つので、古い札の
+        // まま戻すと保存先が消えている）
+        if self.disk.unsaved().held() {
+          self.keep_unsaved()
+        }
       }
       None => ()
     }
@@ -671,7 +679,13 @@ async fn App::keep_unsaved(self : App) -> Unit {
   }
   let kept = self.disk
     .unsaved()
-    .keep(@web.now(), self.doc_name(), self.text(), self.disk.current_file())
+    .keep(
+      @web.now(),
+      self.doc_name(),
+      self.text(),
+      self.disk.current_file(),
+      stamp=self.disk.stamp(),
+    )
   // **書けなければ黙らない。ただし 1 度だけ** — 置き場が壊れているあいだ（private mode・
   // 容量あふれ）は書くたびに失敗するので、そのたびに鳴らすと打つ手を止める
   if !kept && !self.keep_failed {
@@ -687,26 +701,26 @@ async fn App::keep_unsaved(self : App) -> Unit {
 /// 人が `Mod+S` を押した所で印が落ちる。元の件を引き受けるので、開き直すたびに
 /// 同じ字の件は増えない。
 ///
-/// ディスクは読み直さない。未保存の字のほうが新しいので、読めば戻した字を上書きする
+/// 本文は戻した字のまま（未保存の字のほうが新しい）。**ディスクの字は比べるためだけに
+/// 読む** — 比べる相手を空の字にすると、全部消したときに印が落ちて件も捨てる。
+/// 同じなら、その件はもう役目を終えている（ほかで保存された）
 async fn App::open_unsaved(self : App, at : Int) -> Unit {
   guard self.unsaved.get(at) is Some(d) else { return }
   (async fn() -> Unit {
     guard self.confirm_discard() else { return }
-    let name = match d.doc {
+    let (name, on_disk) = match d.doc {
       // 許可はここで取り直す（押されたことがその資格。Recent と同じ作法）
       Some(file) =>
-        if self.disk.adopt(file) {
-          Some(file.name())
-        } else {
-          return
+        match self.disk.adopt(file, d.stamp) {
+          Some(text) => (Some(file.name()), text)
+          None => return
         }
       None => {
         self.disk.close()
-        None
+        (None, "")
       }
     }
-    // **ディスクに何が在るかは分からない。** 印を立てたまま出す
-    self.disk_text = ""
+    self.disk_text = on_disk
     self.load_text(d.text, name, adopt=Some(d))
     (self.ed.focus)()
   })() catch {
@@ -715,10 +729,10 @@ async fn App::open_unsaved(self : App, at : Int) -> Unit {
 }
 
 ///|
-/// 未保存の字を全部捨てる。**1 件ごとに捨てる道は持たない** — Recent の行が持たないので、
-/// 同じ器の中に 2 通りの行ができる
+/// 並んでいる未保存の字を全部捨てる。**いまの文書の件は並んでいないので残す**。
+/// 1 件ごとに捨てる道は持たない — Recent の行が持たないので、同じ器の中に 2 通りの行ができる
 async fn App::discard_unsaved(self : App) -> Unit {
-  self.disk.unsaved().discard_all()
+  self.disk.unsaved().discard_others()
   self.unsaved = []
 }
 

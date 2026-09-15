@@ -136,7 +136,9 @@ pub extern "js" fn idb_open(
   #| })
 
 ///|
-/// 1 つの取引を走らせて、結果をそのまま。`op` は store を受けて request を返す
+/// 1 つの取引を走らせて、結果をそのまま。`op` は store を受けて request を返す。
+/// **済むのは取引が閉じたとき** — request が成功しても、容量あふれは後から取引の
+/// abort で届く。request の成功で済ませると、書けていないのに書けたと答える
 pub extern "js" fn idb_run(
   db : @core.Any,
   store : String,
@@ -144,9 +146,11 @@ pub extern "js" fn idb_run(
   op : (@core.Any) -> @core.Any,
 ) -> @js_async.Promise[@core.Any] =
   #| (db, store, mode, op) => new Promise((ok, err) => {
-  #|   const req = op(db.transaction(store, mode).objectStore(store));
-  #|   req.onsuccess = () => ok(req.result);
-  #|   req.onerror = () => err(req.error);
+  #|   const tx = db.transaction(store, mode);
+  #|   const req = op(tx.objectStore(store));
+  #|   tx.oncomplete = () => ok(req.result);
+  #|   tx.onabort = () => err(tx.error ?? req.error);
+  #|   tx.onerror = () => err(tx.error ?? req.error);
   #| })
 
 ///|

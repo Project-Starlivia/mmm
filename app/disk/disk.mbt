@@ -89,6 +89,13 @@ pub fn Disk::current_file(self : Disk) -> @web.FileHandle? {
 }
 
 ///|
+/// いまのファイルを最後に読んだ・書いたときの、ディスクの時刻。未保存の字はこれを
+/// 一緒に持ち、開き直したときの上書きの確かめの基準にする
+pub fn Disk::stamp(self : Disk) -> Double? {
+  self.stamp
+}
+
+///|
 /// 覚えている文書を開く。**許可はここで取り直す** — 札は残っていても
 /// 触ってよいかは別の台帳で、押した瞬間しか聞けない（押されたことが
 /// その資格になる）。断られたら None
@@ -100,19 +107,26 @@ pub async fn Disk::open_known(self : Disk, file : @web.FileHandle) -> Doc? {
 }
 
 ///|
-/// 札を引き受けて、**中身は読まない**。自動保存から戻すときの道 — ディスクの字より
-/// 自動保存のほうが新しいので、読めば戻した字を上書きしてしまう。
-/// 許可はここでも取り直す（押されたことがその資格）
-pub async fn Disk::adopt(self : Disk, file : @web.FileHandle) -> Bool {
+/// 札を引き受け、**ディスクの字を比べるためだけに読んで返す**。未保存の字から戻すときの
+/// 道 — 本文は戻した字のまま（未保存の字のほうが新しい）。同じなら、その件はもう役目を
+/// 終えている。読めなければ（消えた・動いた）空の字を返し、ディスクに無いものとして扱う。
+/// 許可はここでも取り直す（押されたことがその資格）。断られたら None。
+///
+/// `stamp` はその件が持っていたディスクの時刻。**上書きの確かめの基準をそこへ戻す** —
+/// 開いた時刻にすると、件の後にほかで保存された版を、保存したときに黙って上書きする
+pub async fn Disk::adopt(
+  self : Disk,
+  file : @web.FileHandle,
+  stamp : Double?,
+) -> String? {
   guard @web.request_permission(file.as_any(), "readwrite").wait() == "granted" else {
-    return false
+    return None
   }
   self.current = Some(file)
   self.recent.opened(file)
-  // 戻すと決めたのは人。**いまのディスクの字を知ったうえで**自動保存を選んだので、
-  // ここから先の上書きは聞かない
-  self.stamp = stamp_of(file)
-  true
+  self.stamp = stamp
+  let on_disk = read_doc(file) catch { _ => return Some("") }
+  Some(on_disk.text)
 }
 
 ///|

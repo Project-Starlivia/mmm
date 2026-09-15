@@ -37,7 +37,7 @@ pub struct Disk {
   mut current : @web.FileHandle?
   mut stamp : Double?
 }
-pub async fn Disk::adopt(Self, @web.FileHandle) -> Bool
+pub async fn Disk::adopt(Self, @web.FileHandle, Double?) -> String?
 pub async fn Disk::changed_elsewhere(Self) -> Bool
 pub fn Disk::close(Self) -> Unit
 pub fn Disk::current_file(Self) -> @web.FileHandle?
@@ -49,6 +49,7 @@ pub async fn Disk::remembered(Self) -> Array[Known]
 pub async fn Disk::rename(Self, String) -> String?
 pub async fn Disk::save(Self, String) -> Unit
 pub async fn Disk::save_as(Self, String, String) -> Doc?
+pub fn Disk::stamp(Self) -> Double?
 pub fn Disk::unsaved(Self) -> Unsaved
 
 pub(all) struct Doc {
@@ -115,15 +116,16 @@ pub struct Unsaved {
   store : Store
   mut id : String
   mut written : String?
+  mut writing : Int
 }
 pub fn Unsaved::adopt(Self, UnsavedDoc) -> Unit
 pub async fn Unsaved::discard(Self) -> Unit
-pub async fn Unsaved::discard_all(Self) -> Unit
-pub async fn Unsaved::keep(Self, Double, String, String, @web.FileHandle?) -> Bool
+pub async fn Unsaved::discard_others(Self) -> Unit
+pub fn Unsaved::held(Self) -> Bool
+pub async fn Unsaved::keep(Self, Double, String, String, @web.FileHandle?, stamp? : Double?) -> Bool
 pub async fn Unsaved::list(Self) -> Array[UnsavedDoc]
 pub fn Unsaved::new(Store) -> Self
 pub async fn Unsaved::others(Self) -> Array[UnsavedDoc]
-pub fn Unsaved::start(Self) -> Unit
 pub fn Unsaved::written(Self) -> String?
 
 pub(all) struct UnsavedDoc {
@@ -132,6 +134,7 @@ pub(all) struct UnsavedDoc {
   at : Double
   text : String
   doc : @web.FileHandle?
+  stamp : Double?
 }
 
 // Type aliases
