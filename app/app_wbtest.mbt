@@ -101,11 +101,14 @@ fn Fake::editor(self : Fake) -> Editor {
 /// その名前の文書を覚えている台帳として立つ（立ち上がりの一覧。#277）。
 /// 並びは最後に触れた順なので、先に渡したものが新しい。
 /// `unsaved` を渡せば、その名前の未保存の文書を 1 件ずつ持って立つ（本文は `# 名前`）。
-/// `broken` なら未保存の字の棚に書けない
+/// 組の 2 つ目がディスクの字で、在ればその札を持つ（無ければ保存していない文書）。
+/// `broken` なら未保存の字の棚に書けない。`gate` を渡せば、その棚への書き込みは
+/// それが解けるまで終わらない
 fn memo_disk(
   known : Array[String],
-  unsaved : Array[String],
+  unsaved : Array[(String, String?)],
   broken : Bool,
+  gate : @js_async.Promise[@core.Any]?,
 ) -> @disk.Disk {
   let table : Map[String, @core.Any] = Map([])
   if known.length() > 0 {
@@ -122,33 +125,45 @@ fn memo_disk(
     )
   }
   let docs : Map[String, @core.Any] = Map([])
-  for i, name in unsaved {
+  for i, entry in unsaved {
+    let (name, on_disk) = entry
     let id = "unsaved" + i.to_string()
     docs[id] = @web.record([
       ("id", @core.any(id)),
       ("name", @core.any(name)),
       ("at", @core.any(@web.now())),
       ("text", @core.any("# " + name + "\n")),
-      ("doc", @core.null()),
+      (
+        "doc",
+        match on_disk {
+          Some(text) => paper(name, text, _ => ()).as_any()
+          None => @core.null()
+        },
+      ),
     ])
   }
   @disk.Disk::new(
     @disk.Recent::new(memo_shelf(table)),
-    @disk.Unsaved::new(memo_shelf(docs, broken~)),
+    @disk.Unsaved::new(memo_shelf(docs, broken~, gate~)),
   )
 }
 
 ///|
 /// 手元の棚 1 つ。実物は IndexedDB の objectStore で、札も未保存の字も同じ形で並ぶ。
-/// `broken` なら書けない
+/// `broken` なら書けない。`gate` を渡せば、書き込みはそれが解けるまで終わらない
 fn memo_shelf(
   table : Map[String, @core.Any],
   broken? : Bool = false,
+  gate? : @js_async.Promise[@core.Any]? = None,
 ) -> @disk.Store {
   {
     read: fn(key) { table.get(key).unwrap_or(@core.null()) },
-    write: fn(key, value) {
+    write: async fn(key, value) {
       guard !broken else { return false }
+      match gate {
+        Some(g) => g.wait() |> ignore
+        None => ()
+      }
       table[key] = value
       true
     },
@@ -188,8 +203,9 @@ fn mount(
 /// `hash` を渡せば、そのフラグメントの付いたページとして立ち上がる（共有リンク）
 fn stand(
   known? : Array[String] = [],
-  unsaved? : Array[String] = [],
+  unsaved? : Array[(String, String?)] = [],
   broken? : Bool = false,
+  gate? : @js_async.Promise[@core.Any]? = None,
   hash? : String = "",
 ) -> Stand {
   let win = @test_utils.create_happy_window()
@@ -225,10 +241,12 @@ fn stand(
     log: [],
     hint: false,
   }
-  let app = App::new(doc, fake.editor(), memo_disk(known, unsaved, broken), measure=(
-    _,
-    text,
-  ) => text.char_length().to_double() * 7.0)
+  let app = App::new(
+    doc,
+    fake.editor(),
+    memo_disk(known, unsaved, broken, gate),
+    measure=(_, text) => text.char_length().to_double() * 7.0,
+  )
   fake.app = Some(app)
   app.boot()
   { win, doc, fake, app, }
@@ -416,6 +434,11 @@ extern "js" fn paper(
   #|   requestPermission: async () => "granted",
   #|   getFile: async () => ({ text: async () => text }),
   #|   createWritable: async () => ({ write: (t) => into(t), close: () => {} }) })
+
+///|
+/// 触らせてもらえない札（許可を断られた）
+extern "js" fn refused(name : String) -> @web.FileHandle =
+  #| (name) => ({ name, requestPermission: async () => "denied" })
 
 ///|
 /// `ms` 経つまで返らない。**時計そのものを待つ** — 自動保存は手が止まるのを
@@ -710,6 +733,88 @@ async test "未保存の字: Save を選んで進めば、前の文書の件は�
 }
 
 ///|
+/// **保存と最初の書き込みが重なっても、ディスクと同じ字の件は残らない。** 書き込みを
+/// 待つあいだに保存が済むと、捨てた後に書き込みが着いて件が蘇る
+async test "未保存の字: 最初の書き込みの途中で保存しても、件は残らない" {
+  let release : Ref[(@core.Any) -> Unit] = { val: _ => (), }
+  let gate = @web.promise_of(k => release.val = k)
+  let s = stand(gate=Some(gate))
+  defer s.win.close()
+  s.app.open_known(paper("notes.md", "# r\n", _ => ()))
+  s.fake.change("# r\n\n## a\n")
+  // 手が止まって書きに行き、門の手前で待っている
+  rest(s.doc, quiet + 100)
+  @js_async.Promise::from_async(async fn() { s.app.save_file(false) }).wait()
+  (release.val)(@core.any(0))
+  rest(s.doc, 5)
+  assert_eq(s.app.disk.unsaved().list().length(), 0)
+}
+
+///|
+/// **捨てるのは入れ替わるときだけ。** Don't Save を選んでも、開く相手に断られて文書が
+/// 入れ替わらなければ、汚れた文書は画面に残る — その件を捨てれば、落ちたら戻せない
+async test "未保存の字: Don't Save を選んでも開けなければ、いまの件は残る" {
+  let s = stand()
+  defer s.win.close()
+  s.fake.change("# kept\n")
+  rest(s.doc, quiet * 2)
+  assert_eq(s.app.disk.unsaved().list().length(), 1)
+  // 許可を断られる文書を開こうとして、たずねで Don't Save（`[1]`）を押す
+  let asked = @js_async.Promise::from_async(async fn() {
+    s.app.open_known(refused("other.md"))
+  })
+  @web.click(
+    s.doc.querySelector("dialog.ask").unwrap().querySelectorAll(".row button")[1],
+  )
+  asked.wait()
+  rest(s.doc, 5)
+  assert_eq(s.fake.md, "# kept\n")
+  assert_eq(s.app.disk.unsaved().list().map(d => d.text), ["# kept\n"])
+}
+
+///|
+/// **札付きの件は、ディスクの字と比べて開く。** 同じなら、もう役目を終えている（ほかで
+/// 保存された）ので件を捨てる。比べる相手を空の字にすると、全部消したときに印が落ちる
+async test "未保存の字: 札付きの件を開くとディスクと比べ、同じなら件を捨てる" {
+  let s = stand(unsaved=[("notes.md", Some("# notes.md\n"))])
+  defer s.win.close()
+  rest(s.doc, 5)
+  @js_async.Promise::from_async(async fn() { s.app.open_unsaved(0) }).wait()
+  assert_eq(s.fake.md, "# notes.md\n")
+  assert_eq(s.app.disk_text, "# notes.md\n")
+  rest(s.doc, 5)
+  assert_eq(s.app.disk.unsaved().list().length(), 0)
+}
+
+///|
+/// ディスクと違えば、比べる相手はディスクの字で、件は残る
+async test "未保存の字: 札付きの件を開くとディスクと比べ、違えば件を残す" {
+  let s = stand(unsaved=[("notes.md", Some("# older\n"))])
+  defer s.win.close()
+  rest(s.doc, 5)
+  @js_async.Promise::from_async(async fn() { s.app.open_unsaved(0) }).wait()
+  assert_eq(s.fake.md, "# notes.md\n")
+  assert_eq(s.app.disk_text, "# older\n")
+  rest(s.doc, quiet * 2)
+  assert_eq(s.app.disk.unsaved().list().length(), 1)
+}
+
+///|
+/// **Discard all unsaved は並んでいるものだけを捨てる。** いま開いている文書の件は並んで
+/// いないので残す — 汚れたまま画面に居るのに、落ちたら戻せなくなる
+async test "未保存の字: 全部捨てるのは並んでいるものだけで、いまの文書の件は残る" {
+  let s = stand(unsaved=[("sketch.md", None)])
+  defer s.win.close()
+  rest(s.doc, 5)
+  s.fake.change("# now\n")
+  rest(s.doc, quiet * 2)
+  assert_eq(s.app.disk.unsaved().list().length(), 2)
+  @js_async.Promise::from_async(async fn() { s.app.discard_unsaved() }).wait()
+  assert_eq(s.app.disk.unsaved().list().map(d => d.text), ["# now\n"])
+  assert_eq(s.app.unsaved.length(), 0)
+}
+
+///|
 /// **書けなければ黙らない。ただし 1 度だけ。** 置き場が壊れているあいだ（private mode・
 /// 容量あふれ）は書くたびに失敗するので、そのたびに鳴らすと打つ手を止める（docs/unsaved.md）
 async test "未保存の字: 書けなければ 1 度だけ言う" {
@@ -802,7 +907,7 @@ test "覚えているものの行: 名前と、見分けに使えるもの" {
 /// **立ち上がりに並べるのは覚えているものだけ。** ここは「また開きたいもの」を
 /// 選ぶ場所で、未保存の文書の入口は Files ▸ Open Unsaved（#359）
 async test "立ち上がり: 未保存の文書があっても、並べるのは覚えているものだけ" {
-  let s = stand(known=["ideas.md"], unsaved=["sketch.md"])
+  let s = stand(known=["ideas.md"], unsaved=[("sketch.md", None)])
   defer s.win.close()
   rest(s.doc, 5)
   assert_eq(s.app.unsaved.length(), 1)
@@ -818,7 +923,7 @@ async test "立ち上がり: 未保存の文書があっても、並べるのは
 ///|
 /// 未保存の文書しか無ければ出さない（並べるものが無い）
 async test "立ち上がり: 未保存の文書しか無ければ挨拶は出ない" {
-  let s = stand(unsaved=["sketch.md"])
+  let s = stand(unsaved=[("sketch.md", None)])
   defer s.win.close()
   rest(s.doc, 5)
   assert_eq(s.app.unsaved.length(), 1)
@@ -826,11 +931,11 @@ async test "立ち上がり: 未保存の文書しか無ければ挨拶は出な
 }
 
 ///|
-/// **開き直せば本文が戻り、ディスクとは違う字のまま。** 元の件を引き継ぐので、開き直す
+/// **開き直せば本文が戻り、ディスクとは違う字のまま。** 元の件を引き受けるので、開き直す
 /// たびに同じ字の件は増えない。いま開いている文書の件は一覧に並ばない。
-/// 全部捨てる道は 1 つ（1 件ごとの × は置かない）
-async test "未保存の字: 開き直すと戻り、件は増えず、いまの件は並ばない。全部捨てれば消える" {
-  let s = stand(unsaved=["sketch.md"])
+/// 捨てる道は 1 つで（1 件ごとの × は置かない）、捨てるのは並んでいるものだけ
+async test "未保存の字: 開き直すと戻り、件は増えず、いまの件は並ばない。捨てても、いまの件は残る" {
+  let s = stand(unsaved=[("sketch.md", None)])
   defer s.win.close()
   rest(s.doc, 5)
   assert_eq(s.app.unsaved.length(), 1)
@@ -842,9 +947,9 @@ async test "未保存の字: 開き直すと戻り、件は増えず、いまの
   assert_eq(s.app.disk.unsaved().list().length(), 1)
   s.app.refresh_recent()
   assert_eq(s.app.unsaved.length(), 0)
-  // 全部捨てる
+  // 並んでいるものを全部捨てる — 並んでいない、いまの文書の件は残る
   @js_async.Promise::from_async(async fn() { s.app.discard_unsaved() }).wait()
-  assert_eq(s.app.disk.unsaved().list().length(), 0)
+  assert_eq(s.app.disk.unsaved().list().length(), 1)
   assert_eq(s.app.unsaved.length(), 0)
 }
 

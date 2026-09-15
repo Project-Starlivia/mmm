@@ -4,9 +4,10 @@
 // 未保存の字は正を名乗らない — 開くのは常に人で、勝手には開き直さず、書き戻さない。
 // 開き直した文書は印が立ったまま出るので、どちらが正かを人が読める。
 //
-// **1 文書 1 件。** 文書を入れ替えるたびに id を振り、同じ文書のあいだはその件を
-// 上書きする。捨てるかどうか（ディスクと同じ字になった・Don't Save）は呼ぶ側が決める。
-// 一覧を丸ごと 1 つの鍵に入れると読みと書きが食い合う（#300 と同じ形）ので、1 件が 1 レコード。
+// **1 文書 1 件。** 文書を入れ替えるたびに件を捨てて鍵を振り直し、同じ文書のあいだは
+// その件を上書きする。捨てるかどうか（ディスクと同じ字になった・入れ替えた）は呼ぶ側が
+// 決める。一覧を丸ごと 1 つの鍵に入れると読みと書きが食い合う（#300 と同じ形）ので、
+// 1 件が 1 レコード。
 
 ///|
 /// 未保存の文書 1 つ
@@ -43,18 +44,14 @@ pub struct Unsaved {
   /// その件に最後に書いた字。まだ書いていなければ None。
   /// 同じ字を二度書かないための照合で、真実ではない
   mut written : String?
+  /// 書いている途中の数。**書き終える前に捨てられることがある** — 保存が最初の書き込みと
+  /// 重なると、捨てた後に書き込みが着く
+  mut writing : Int
 }
 
 ///|
 pub fn Unsaved::new(store : Store) -> Unsaved {
-  { store, id: @web.unique_id(), written: None, }
-}
-
-///|
-/// 新しい文書を始める。**前の文書の件は残る**（捨てるのは呼ぶ側）
-pub fn Unsaved::start(self : Unsaved) -> Unit {
-  self.id = @web.unique_id()
-  self.written = None
+  { store, id: @web.unique_id(), written: None, writing: 0, }
 }
 
 ///|
@@ -72,6 +69,12 @@ pub fn Unsaved::written(self : Unsaved) -> String? {
 }
 
 ///|
+/// いまの件が在るか、書いている途中か。**捨てる相手が居るか**を呼ぶ側が問う口
+pub fn Unsaved::held(self : Unsaved) -> Bool {
+  self.written is Some(_) || self.writing > 0
+}
+
+///|
 /// いまの件に書く（上書き）。**書けたかを返す。** 書けなければ書いた字も覚えない —
 /// 覚えると同じ字は二度書かない照合に引っかかり、置き場が戻っても書き直さない
 pub async fn Unsaved::keep(
@@ -81,29 +84,40 @@ pub async fn Unsaved::keep(
   text : String,
   doc : @web.FileHandle?,
 ) -> Bool {
+  // **柵より大きい 1 件は書かない。** 書いた直後に柵で捨てるのに「書けた」と言うと、
+  // 人は残っていると思ったまま打ち続ける
+  guard text.length() <= keep_chars else { return false }
   let id = self.id
-  guard (self.store.write)(
+  self.writing = self.writing + 1
+  let ok = (self.store.write)(
     id,
     unsaved_doc_of({ id, name, at: now, text, doc, }),
-  ) else {
-    return false
+  )
+  self.writing = self.writing - 1
+  guard ok else { return false }
+  // 書いているあいだに捨てられた（入れ替えた・ディスクと同じ字になった）なら、
+  // 書いた件は役目を終えている — 着いた件をそのまま捨てる
+  if self.id != id {
+    (self.store.remove)(id)
+    return true
   }
-  // 待つあいだに文書が入れ替わっていれば、覚えるのは入れ替わった後の件の話ではない
-  if self.id == id {
-    self.written = Some(text)
-  }
+  self.written = Some(text)
   self.trim()
   true
 }
 
 ///|
-/// いまの件を捨てる。**鍵と印は待つ前に取る** — 待っているあいだに文書が入れ替われば、
-/// 捨てるのは入れ替わる前の件でなければならない
+/// いまの件を捨て、鍵を振り直す。**鍵は待つ前に替える** — 書いている途中の書き込みは
+/// 着いたときに鍵が違うと気づいて自分を捨てる（`keep`）。待っているあいだに文書が
+/// 入れ替わっても、捨てるのは入れ替わる前の件
 pub async fn Unsaved::discard(self : Unsaved) -> Unit {
-  guard self.written is Some(_) else { return }
   let id = self.id
+  let held = self.held()
+  self.id = @web.unique_id()
   self.written = None
-  (self.store.remove)(id)
+  if held {
+    (self.store.remove)(id)
+  }
 }
 
 ///|
@@ -129,22 +143,23 @@ pub async fn Unsaved::others(self : Unsaved) -> Array[UnsavedDoc] {
 }
 
 ///|
-/// 人が全部捨てる。**1 件ごとの × は置かない** — Recent の行が持たないので、
-/// 同じ器の中に 2 通りの行ができる
-pub async fn Unsaved::discard_all(self : Unsaved) -> Unit {
-  for d in self.list() {
+/// 人が捨てる。**捨てるのは並んでいるもの（ほかの件）だけ** — いまの文書の件は並んで
+/// いないので残す。汚れたまま画面に居るのに、落ちたら戻せなくなる。
+/// 1 件ごとの × は置かない — Recent の行が持たないので、同じ器の中に 2 通りの行ができる
+pub async fn Unsaved::discard_others(self : Unsaved) -> Unit {
+  for d in self.others() {
     (self.store.remove)(d.id)
   }
-  self.written = None
 }
 
 ///|
-/// あふれたぶんを捨てる。新しいものから数えて、件数か字数を超えたものを
+/// あふれたぶんを捨てる。新しいものから数えて、件数か字数を超えたものを。
+/// **いまの件は捨てない** — 書けたと答えた直後に消すことになる
 async fn Unsaved::trim(self : Unsaved) -> Unit {
   let mut chars = 0
   for i, d in self.list() {
     chars = chars + d.text.length()
-    if i >= keep_docs || chars > keep_chars {
+    if d.id != self.id && (i >= keep_docs || chars > keep_chars) {
       (self.store.remove)(d.id)
     }
   }

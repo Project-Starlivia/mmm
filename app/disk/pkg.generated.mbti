@@ -37,7 +37,7 @@ pub struct Disk {
   mut current : @web.FileHandle?
   mut stamp : Double?
 }
-pub async fn Disk::adopt(Self, @web.FileHandle) -> Bool
+pub async fn Disk::adopt(Self, @web.FileHandle) -> String?
 pub async fn Disk::changed_elsewhere(Self) -> Bool
 pub fn Disk::close(Self) -> Unit
 pub fn Disk::current_file(Self) -> @web.FileHandle?
@@ -115,15 +115,16 @@ pub struct Unsaved {
   store : Store
   mut id : String
   mut written : String?
+  mut writing : Int
 }
 pub fn Unsaved::adopt(Self, UnsavedDoc) -> Unit
 pub async fn Unsaved::discard(Self) -> Unit
-pub async fn Unsaved::discard_all(Self) -> Unit
+pub async fn Unsaved::discard_others(Self) -> Unit
+pub fn Unsaved::held(Self) -> Bool
 pub async fn Unsaved::keep(Self, Double, String, String, @web.FileHandle?) -> Bool
 pub async fn Unsaved::list(Self) -> Array[UnsavedDoc]
 pub fn Unsaved::new(Store) -> Self
 pub async fn Unsaved::others(Self) -> Array[UnsavedDoc]
-pub fn Unsaved::start(Self) -> Unit
 pub fn Unsaved::written(Self) -> String?
 
 pub(all) struct UnsavedDoc {
