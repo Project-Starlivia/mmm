@@ -18,6 +18,8 @@ pub(all) struct Spot {
   from : Int
   label : Int?
   to : Int
+  /// 手前に書かれた、側を変えた境界の水平線の頭。境界の直後に座る根の子だけが持つ
+  border : Int?
 } derive(Eq, Debug, ToJson)
 
 ///|

@@ -150,6 +150,7 @@ pub(all) struct Spot {
   from : Int
   label : Int?
   to : Int
+  border : Int?
 } derive(Eq, ToJson, @debug.Debug)
 
 // Type aliases

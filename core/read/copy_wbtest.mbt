@@ -19,7 +19,7 @@ test "copy: 複数は文書順に空行で継ぐ。選んだ祖先の中の子�
 test "copy: 項目は入れ子ごと。容器の字下げは頭に残らない" {
   // a(2) → b(3) → c(4)
   let s = survey("- a\n  - b\n    - c\n")
-  assert_eq(s.copy([3]), "- b\n    - c\n")
+  assert_eq(s.copy([3]), "- b\n  - c\n")
 }
 
 ///|
@@ -28,8 +28,53 @@ test "copy: 項目は入れ子ごと。容器の字下げは頭に残らない" 
 test "copy: 置き直された行を跨ぐ持ち主は、跨いだ所を抜いて空行で継ぐ" {
   let md = "- 買い物\n  - 野菜\n\n    ---\n\n    - 肉\n\n    メモ\n\n    - 魚\n"
   let s = survey(md)
-  assert_eq(s.copy([s.find("野菜").unwrap()]), "- 野菜\n\n    メモ\n")
+  assert_eq(s.copy([s.find("野菜").unwrap()]), "- 野菜\n\n  メモ\n")
   assert_eq(s.copy([s.find("買い物").unwrap()]), md)
+}
+
+///|
+/// #384 — 部分木の尻は最後の子とは限らない。a の text は、境界で置き直された b より
+/// 下に書かれていても a のもの（根 r を写せば一緒に来る）。**外の持ち主の中身は抜く** —
+/// 肉と魚を抱える Implicit を写しても、間の野菜の メモ は来ない
+test "copy: 置き直された行の後ろの子孫の中身も写し、外の持ち主の中身は抜く" {
+  let tail = "# r\n\n## a\n\n---\n\n- b\n\ntext\n"
+  let t = survey(tail)
+  inspect(
+    t.copy([t.find("r").unwrap()]),
+    content=(
+      #|# r
+      #|
+      #|## a
+      #|
+      #|---
+      #|
+      #|- b
+      #|
+      #|text
+      #|
+    ),
+  )
+  inspect(
+    t.copy([t.find("a").unwrap()]),
+    content=(
+      #|## a
+      #|
+      #|text
+      #|
+    ),
+  )
+  let md = "- 買い物\n  - 野菜\n\n    ---\n\n    - 肉\n\n    メモ\n\n    - 魚\n"
+  let s = survey(md)
+  let gap = s.doc.roots[0].node.children[1].id
+  inspect(
+    s.copy([gap]),
+    content=(
+      #|- 肉
+      #|
+      #|- 魚
+      #|
+    ),
+  )
 }
 
 ///|

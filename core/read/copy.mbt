@@ -4,7 +4,9 @@
 ///|
 /// 選んだノードの原文を文書順に空行で継ぐ。部分木の原文（`cover`）を丸ごと写す
 /// （子の中身まで）ので、選んだ祖先の中の子孫には降りない（core の Delete /
-/// MoveNode と同じ決め）。部分木の外の行を跨いで割れた範囲も空行で継ぐ。
+/// MoveNode と同じ決め）。部分木の外の物を跨いで割れた範囲も空行で継ぐ。
+/// **切れはどれも行の頭から切り、継いだ後で共通の左余白を落とす** — 頭の切れだけ字下げを
+/// 落とすと、割れた後ろの切れが手前の行の子に読まれる（肉と魚が兄弟でなくなる）。
 /// 末尾は改行 1 つ。何も選んでいなければ空
 pub fn Survey::copy(self : Survey, ids : Array[Int]) -> String {
   let chosen : Set[Int] = Set::from_array(ids)
@@ -13,7 +15,13 @@ pub fn Survey::copy(self : Survey, ids : Array[Int]) -> String {
     if chosen.contains(n.id) && self.spots.get(n.id) is Some(_) {
       for r in self.cover(n.id) {
         let text = trim_eol(
-          trim_bol(String::unsafe_substring(self.md, start=r.from, end=r.to)),
+          trim_bol(
+            String::unsafe_substring(
+              self.md,
+              start=line_head(self.md, r.from),
+              end=r.to,
+            ),
+          ),
         )
         if text != "" {
           parts.push(text)
@@ -32,7 +40,7 @@ pub fn Survey::copy(self : Survey, ids : Array[Int]) -> String {
   if parts.length() == 0 {
     ""
   } else {
-    parts.join("\n\n") + "\n"
+    @tree.dedent(parts.join("\n\n")) + "\n"
   }
 }
 

@@ -311,14 +311,11 @@ fn turned(
 }
 
 ///|
-/// 前の木で子 `id` の手前に書かれた境界の行と、その手前の空行。境界の行は子の隙間の
-/// すぐ上の行。水平線でなければ None（消さない）
+/// 前の木で子 `id` の手前に書かれた境界の行と、その手前の空行。**行の頭は読みが控えた**
+/// （`Spot.border`）— 原文を読み直して水平線を探さない。境界が無ければ None（消さない）
 fn border_line(r : Merge, id : Int) -> (Int, Int)? {
-  let end = r.gap.get(id).unwrap()
-  guard end > 0 else { return None }
-  let head = line_start(r.md, end - 1)
-  guard ruled(slice(r.md, head, end)) else { return None }
-  Some((blank_start(r.md, head), end))
+  guard spot(r, id).border is Some(at) else { return None }
+  Some((blank_start(r.md, line_start(r.md, at)), r.gap.get(id).unwrap()))
 }
 
 ///|
