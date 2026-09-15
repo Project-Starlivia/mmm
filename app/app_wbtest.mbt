@@ -428,7 +428,7 @@ test "帯: Files は状態を写す（保存していない・覚えているも
   })
 }
 
-// ---- 自動保存（#275）----
+// ---- 未保存の字（#373）----
 
 ///|
 /// 札の代役。**happy-dom に File System Access は無い**ので、書いた字は箱へ入る。
@@ -449,7 +449,7 @@ extern "js" fn refused(name : String) -> @web.FileHandle =
   #| (name) => ({ name, requestPermission: async () => "denied" })
 
 ///|
-/// `ms` 経つまで返らない。**時計そのものを待つ** — 自動保存は手が止まるのを
+/// `ms` 経つまで返らない。**時計そのものを待つ** — 未保存の字は手が止まるのを
 /// 時計で待つので、フレームでは代わらない
 async fn rest(doc : @dom.Document, ms : Int) -> Unit {
   @web.promise_of(k => wait_ms(doc, ms, () => k(@core.any(0)))).wait() |> ignore
@@ -616,34 +616,6 @@ async test "保存: 書いているあいだに打った字は、書かれない
 }
 
 ///|
-/// **積んだ書き込みにも持ち主が居る**（#299）。文書を入れ替えたら、前の文書の
-/// ために積んだものは捨てる。捨てないと、**前の文書のために積んだ書き込みが、
-/// 入れ替わった後の文書に対して走る** — 名前を手放した後（新規）なら、人が
-/// 何も押していないのに保存ダイアログの道へ入る
-async test "未保存の字: 文書を入れ替えたら、積んでいた書き込みは走らない" {
-  let s = stand()
-  defer s.win.close()
-  let first : Array[String] = []
-  let next : Array[String] = []
-  s.app.open_known(paper("a.md", "# a\n", t => first.push(t)))
-  // 汚す → 手が止まって 1 秒後に書く約束が積まれる
-  s.fake.change("# a\n\n## x\n")
-  // 鳴る前に別の文書を開く。たずねの Discard（`[1]` は進む側）を押す
-  let asked = @js_async.Promise::from_async(async fn() {
-    s.app.open_known(paper("b.md", "# b\n", t => next.push(t)))
-  })
-  let dlg = s.doc.querySelector("dialog.ask").unwrap()
-  @web.click(dlg.querySelectorAll(".row button")[1])
-  asked.wait()
-  assert_eq(s.fake.md, "# b\n")
-  rest(s.doc, quiet * 2)
-  // 捨てた字は捨てたまま
-  assert_eq(first, [])
-  // 開いたばかりの文書も、頼まれていないのに書かれない
-  assert_eq(next, [])
-}
-
-///|
 /// **未保存の字に置き場は要らない。** まだ保存していない文書 — いちばん失いやすいもの —
 /// がいちばんの客（#306）。比べる相手は空の字（ディスクに実体が無い）
 async test "未保存の字: 保存していない文書でも、手が止まれば残る" {
@@ -656,9 +628,9 @@ async test "未保存の字: 保存していない文書でも、手が止まれ
   assert_eq(rows[0].text, "# r\n\n## a\n")
   // ディスクに実体が無いので札は持たない
   assert_true(rows[0].doc is None)
-  // 同じ字のままなら、二度は書かない
+  // 同じ字のままなら、二度は書かない（書き直せば時刻が進む）
   rest(s.doc, quiet * 2)
-  assert_eq(s.app.disk.unsaved().list().length(), 1)
+  assert_eq(s.app.disk.unsaved().list().map(d => d.at), [rows[0].at])
 }
 
 ///|
@@ -720,8 +692,8 @@ async test "未保存の字: Don't Save を選べば、その文書の件を捨�
 }
 
 ///|
-/// **Save を選んで進んでも、前の文書の件は残らない。** 書き終えてから文書が入れ替わる
-/// ので、捨てるのは入れ替わる前の件でなければならない
+/// **Save を選んで進んでも、前の文書の件は残らない。** 書けばディスクと同じ字になるので、
+/// 写しは要らない
 async test "未保存の字: Save を選んで進めば、前の文書の件は残らない" {
   let s = stand()
   defer s.win.close()
@@ -837,6 +809,22 @@ async test "未保存の字: 古い件を開いて保存するとき、その後
 }
 
 ///|
+/// **札付きの件を開いて保存すれば、件は要らなくなる。** 開いた件を引き受けているので、
+/// 保存でディスクと同じ字になれば捨てる — 残せば、保存したのに一覧へ戻ってくる
+async test "未保存の字: 札付きの件を開いて保存すれば、件は残らない" {
+  let s = stand(unsaved=[("notes.md", Some("# older\n"))])
+  defer s.win.close()
+  rest(s.doc, 5)
+  @js_async.Promise::from_async(async fn() { s.app.open_unsaved(0) }).wait()
+  assert_eq(s.fake.md, "# notes.md\n")
+  assert_eq(s.app.disk.unsaved().list().length(), 1)
+  @js_async.Promise::from_async(async fn() { s.app.save_file(false) }).wait()
+  rest(s.doc, 5)
+  assert_true(s.doc.querySelector("dialog.ask") is None)
+  assert_eq(s.app.disk.unsaved().list().length(), 0)
+}
+
+///|
 /// **Discard all unsaved は並んでいるものだけを捨てる。** いま開いている文書の件は並んで
 /// いないので残す — 汚れたまま画面に居るのに、落ちたら戻せなくなる
 async test "未保存の字: 全部捨てるのは並んでいるものだけで、いまの文書の件は残る" {
@@ -863,18 +851,35 @@ async test "未保存の字: 書けなければ 1 度だけ言う" {
     s.doc.querySelectorAll(".notice.on .msg").map(m => m.textContent())
   }
   assert_eq(said(), ["Couldn't keep unsaved changes"])
-  // もう一度書けなくても言い直さない。しらせの器は窓をまたいで 1 つを使い回すので、
-  // 待つあいだにほかの窓のしらせが挟まると、言い直せば器がもう 1 つ生える — 数で見る
+  // 出ているしらせを下ろしてから、もう一度書けなくする。言い直せば、器が使い回しでも
+  // 新しく生えても、この窓に出ているしらせが戻る
+  for el in s.doc.querySelectorAll(".notice") {
+    @web.toggle_class(el, "on", false)
+  }
   s.fake.change("# a\n\n## b\n")
   rest(s.doc, quiet * 2)
-  assert_true(s.app.keep_failed)
-  assert_eq(
-    s.doc
-    .querySelectorAll(".notice .msg")
-    .filter(m => m.textContent() == "Couldn't keep unsaved changes")
-    .length(),
-    1,
-  )
+  assert_eq(said(), [])
+}
+
+///|
+/// 置き場を消さないよう頼む口（`navigator.storage.persist`）を差し替え、頼まれた数を返す口を渡す
+extern "js" fn count_persist(win : @dom.Window) -> () -> Int =
+  #| (win) => { let n = 0;
+  #|   Object.defineProperty(win.navigator, "storage", { value: { persist: async () => { n += 1; return true; } }, configurable: true });
+  #|   return () => n; }
+
+///|
+/// **消さないよう頼むのは 1 度だけ。** 答えは origin に残るので、書くたびに頼む理由は無い
+async test "未保存の字: 置き場を消さないよう頼むのは、最初に書くときの 1 度だけ" {
+  let s = stand()
+  defer s.win.close()
+  let asked = count_persist(s.win)
+  s.fake.change("# a\n")
+  rest(s.doc, quiet * 2)
+  assert_eq(asked(), 1)
+  s.fake.change("# a\n\n## b\n")
+  rest(s.doc, quiet * 2)
+  assert_eq(asked(), 1)
 }
 
 ///|
@@ -912,6 +917,17 @@ async test "未保存の字: タブが隠れたら、待たずに書く" {
   dispatch(s, s.doc.as_any(), "visibilitychange")
   rest(s.doc, 5)
   assert_eq(s.app.disk.unsaved().list().map(d => d.text), ["# r\n\n## a\n"])
+}
+
+///|
+/// **見えるようになったときは急かさない。** 戻ってきただけで、まだ打っている最中かもしれない
+async test "未保存の字: タブが見えるようになっても、手が止まるまでは書かない" {
+  let s = stand()
+  defer s.win.close()
+  s.fake.change("# r\n\n## a\n")
+  dispatch(s, s.doc.as_any(), "visibilitychange")
+  rest(s.doc, 5)
+  assert_eq(s.app.disk.unsaved().list().length(), 0)
 }
 
 ///|

@@ -1,4 +1,5 @@
-// フレームの束ね。窓は happy-dom のものを文書から辿る
+// 時間の束ね — 次のフレームを待つもの（per_frame）と、手が止まるのを待つもの（after_quiet）。
+// 窓は happy-dom のものを文書から辿る
 
 ///|
 /// **同じフレームの中で何回頼まれても 1 回。** 画像が N 枚読めれば N 回頼まれる
@@ -84,18 +85,19 @@ async test "after_quiet: 打ち続けても、上限の間が経てば走る" {
   defer w.close()
   let doc = w.document()
   let count = Ref::{ val: 0, }
-  let ask = after_quiet(doc, 30, () => count.val += 1, max_wait=Some(60))
-  // 静まる間（30ms）より短い間合いで打ち続ける
-  for _ in 0..<15 {
+  // 静まる間は長く（5 秒）、上限は短く（50ms）。試験のあいだに静まる間は来ないので、
+  // 走ったなら上限のおかげ — 機械が重くて待ちが延びても、取り違えない
+  let ask = after_quiet(doc, 5000, () => count.val += 1, max_wait=Some(50))
+  for _ in 0..<12 {
     (ask.call)()
     rest(doc, 10)
   }
   // 手は一度も止まっていないが、上限が来たので走っている
   assert_true(count.val >= 1)
-  // 打つのをやめれば、待っているものは静まって尽きる（走り続けない）
-  rest(doc, 150)
+  // 打つのをやめて捨てれば、それ以上は走らない
+  (ask.cancel)()
   let settled = count.val
-  rest(doc, 150)
+  rest(doc, 100)
   assert_eq(count.val, settled)
 }
 

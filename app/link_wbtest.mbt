@@ -104,6 +104,18 @@ async fn opened(s : Stand) -> Unit {
 }
 
 ///|
+/// **リンクで開いた字も、未保存の字として残る。** ディスクに実体が無いので比べる相手は
+/// 空の字 — 開いたまま落ちても、リンクを探し直さずに戻せる
+async test "立ち上がり: リンクで開いた字は、手が止まれば未保存の字として残る" {
+  let text = "# a\n\n## b\n"
+  let s = stand(hash=to_hash(text))
+  defer s.win.close()
+  opened(s)
+  rest(s.doc, quiet * 2)
+  assert_eq(s.app.disk.unsaved().list().map(d => d.text), [text])
+}
+
+///|
 async test "立ち上がり: 上限までのリンクは丸ごと開き、しらせは出ない" {
   let text = "# a\n\n## b\n"
   let s = stand(hash=to_hash(text))
