@@ -99,8 +99,9 @@ fn Fake::editor(self : Fake) -> Editor {
 ///|
 /// 手元の置き場（ディスクの代わり）。既定は何も覚えていない。`known` を渡せば
 /// その名前の文書を覚えている台帳として立つ（立ち上がりの一覧。#277）。
-/// 並びは最後に触れた順なので、先に渡したものが新しい
-fn memo_disk(known : Array[String]) -> @disk.Disk {
+/// 並びは最後に触れた順なので、先に渡したものが新しい。
+/// `drafted` を渡せば、その名前の控えを 1 流れずつ持って立つ
+fn memo_disk(known : Array[String], drafted : Array[String]) -> @disk.Disk {
   let table : Map[String, @core.Any] = Map([])
   if known.length() > 0 {
     table["docs"] = @core.any(
@@ -115,9 +116,21 @@ fn memo_disk(known : Array[String]) -> @disk.Disk {
       }),
     )
   }
+  let drafts : Map[String, @core.Any] = Map([])
+  for i, name in drafted {
+    let flow = "flow" + i.to_string()
+    drafts[flow + "/0"] = @web.record([
+      ("flow", @core.any(flow)),
+      ("seq", @core.any(0.0)),
+      ("name", @core.any(name)),
+      ("at", @core.any(@web.now())),
+      ("text", @core.any("# " + name + "\n")),
+      ("doc", @core.null()),
+    ])
+  }
   @disk.Disk::new(
     @disk.Recent::new(memo_shelf(table)),
-    @disk.Drafts::new(memo_shelf(Map([]))),
+    @disk.Drafts::new(memo_shelf(drafts)),
   )
 }
 
@@ -161,7 +174,11 @@ fn mount(
 /// index.html と同じ器を立て、App を組んで動かす。非同期の試験は閉じる閉包を
 /// 通れないので、これを手で持って `defer s.win.close()`。それ以外は `with_stand`。
 /// `hash` を渡せば、そのフラグメントの付いたページとして立ち上がる（共有リンク）
-fn stand(known? : Array[String] = [], hash? : String = "") -> Stand {
+fn stand(
+  known? : Array[String] = [],
+  drafted? : Array[String] = [],
+  hash? : String = "",
+) -> Stand {
   let win = @test_utils.create_happy_window()
   visit(win, "https://mmm.example/" + hash)
   let doc = win.document()
@@ -194,9 +211,10 @@ fn stand(known? : Array[String] = [], hash? : String = "") -> Stand {
     log: [],
     hint: false,
   }
-  let app = App::new(doc, fake.editor(), memo_disk(known), measure=(_, text) => {
-    text.char_length().to_double() * 7.0
-  })
+  let app = App::new(doc, fake.editor(), memo_disk(known, drafted), measure=(
+    _,
+    text,
+  ) => text.char_length().to_double() * 7.0)
   fake.app = Some(app)
   app.boot()
   { win, doc, fake, app, }
@@ -646,21 +664,30 @@ test "覚えているものの行: 名前と、見分けに使えるもの" {
 }
 
 ///|
-/// **控えは Recent の上。** Recent は「また開きたいもの」、控えは「まだ失われうる
-/// もの」で、急ぐのは後者（#306）
-async test "立ち上がり: 控えと覚えているものを、2 つの塊で並べる" {
-  let s = stand(known=["ideas.md"])
+/// **立ち上がりに並べるのは覚えているものだけ。** ここは「また開きたいもの」を
+/// 選ぶ場所で、控えの入口は Files ▸ Drafts（#359）
+async test "立ち上がり: 控えがあっても、並べるのは覚えているものだけ" {
+  let s = stand(known=["ideas.md"], drafted=["sketch.md"])
   defer s.win.close()
-  s.app.disk.drafts().keep(@web.now(), "sketch.md", "# sketch\n", None)
-  s.app.refresh_recent()
-  s.app.greet()
+  rest(s.doc, 5)
+  assert_eq(s.app.drafts.length(), 1)
   let box = shown_menu(s)
   assert_eq(box.querySelectorAll(".caption").map(c => c.textContent()), [
-    "Drafts", "Recent",
+    "Recent",
   ])
-  let rows = box.querySelectorAll("[role=menuitem]").map(r => r.textContent())
-  assert_eq(rows[0], "sketch.md · just now")
-  assert_eq(rows[1], "ideas.md · just now")
+  assert_eq(box.querySelectorAll("[role=menuitem]").map(r => r.textContent()), [
+    "ideas.md · just now",
+  ])
+}
+
+///|
+/// 控えしか無ければ出さない（並べるものが無い）
+async test "立ち上がり: 控えしか無ければ挨拶は出ない" {
+  let s = stand(drafted=["sketch.md"])
+  defer s.win.close()
+  rest(s.doc, 5)
+  assert_eq(s.app.drafts.length(), 1)
+  assert_false(s.app.greeting.is_open())
 }
 
 ///|

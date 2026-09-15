@@ -72,7 +72,7 @@ pub struct App {
   /// 覚えている文書。Files の Recent に並ぶ。IndexedDB の向こうに在るので、
   /// 開く・保存するたびに引き直して手元に置く
   mut recent : Array[@disk.Known]
-  /// 控え。Files の Drafts と立ち上がりの真ん中に並ぶ。Recent と同じく
+  /// 控え。Files の Drafts に並ぶ。Recent と同じく
   /// IndexedDB の向こうに在るので、控えるたびに引き直して手元に置く
   mut drafts : Array[@disk.Draft]
   /// お絵描きの窓が開いているか。二重に開かせない
@@ -592,40 +592,23 @@ async fn App::new_file(self : App) -> Unit {
 ///|
 /// 覚えているものを真ん中に並べる。**開くのは人** — 一覧を出すだけで、
 /// 触れば許可を取り直して開き、ほかを触れば消える（#277）。
-/// 並びは Files の `Recent ▸` と同じ口から引く（同じものが 2 通りに見えない）
+/// 並びは Files の `Recent ▸` と同じ口から引く（同じものが 2 通りに見えない）。
+/// **控えは並べない** — ここは「また開きたいもの」を選ぶ場所で、控えの入口は
+/// Files の `Drafts ▸`（#359）
 fn App::greet(self : App) -> Unit {
   self.greeting.show_middle(() => {
     let now = @web.now()
-    // **控えが先。** Recent は「また開きたいもの」、控えは「まだ失われうるもの」で、
-    // 急ぐのは後者
-    let drafts : Array[@parts.Entry] = if self.drafts.is_empty() {
-      []
-    } else {
-      [
-        Caption("Drafts", Some("history")),
-        ..self.drafts.mapi((i, d) => {
-          @parts.Entry::Run(@parts.row(draft_label(d, now)), () => {
-            @web.spawn(async fn() { self.open_draft(i) })
-          })
-        }),
-      ]
-    }
-    let recent : Array[@parts.Entry] = if self.recent.is_empty() {
-      []
-    } else {
-      [
-        Caption("Recent", Some("clock")),
-        ..self.recent.mapi((i, row) => {
-          @parts.Entry::Run(@parts.row(recent_label(row, now)), () => {
-            match self.recent.get(i) {
-              Some(r) => @web.spawn(async fn() { self.open_known(r.doc) })
-              None => ()
-            }
-          })
-        }),
-      ]
-    }
-    [..drafts, ..recent]
+    [
+      Caption("Recent", Some("clock")),
+      ..self.recent.mapi((i, row) => {
+        @parts.Entry::Run(@parts.row(recent_label(row, now)), () => {
+          match self.recent.get(i) {
+            Some(r) => @web.spawn(async fn() { self.open_known(r.doc) })
+            None => ()
+          }
+        })
+      }),
+    ]
   })
 }
 
@@ -1071,9 +1054,7 @@ pub fn App::boot(self : App) -> Unit {
   // IndexedDB の向こうなので、届くまでに一拍ある）
   @web.spawn(async fn() {
     self.refresh_recent()
-    if self.gen == boot_gen &&
-      self.text() == "" &&
-      (self.recent.length() > 0 || self.drafts.length() > 0) {
+    if self.gen == boot_gen && self.text() == "" && self.recent.length() > 0 {
       self.greet()
     }
   })
