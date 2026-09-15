@@ -19,7 +19,8 @@ let corpus : Array[String] = [
   "# r\r\n\r\n## a\r\n\r\n### x\r\n", "# r\n\n<details open>\n<summary>s</summary>\n\n## a\n\nx\n\n</details>\n\n## b\n",
   "hello\n\n- a\n- b\n\n<!-- c -->\n", "# r\n\n## a\n\nhello", "# a\n\n#### deep\n\n## b\n",
   "# a\r\n\r\n#### deep\r\n\r\n## b\r\n", "# a\n  \n#### deep\n\n## b\n", "# r\n\n- a\n- b\n",
-  "- x\n\n  y\n\n  - a\n  - b\n",
+  "- x\n\n  y\n\n  - a\n  - b\n", "---\n\n- item\n\ntail\n", "***\n\n- a\n  - b\n\ntail\n",
+  "- a\n\n---\n", "1. a\n\n---\n\n- b\n", "- # h\n\n---\n\n- t\n", "# a\n\n- i\n\n---\n",
 ]
 
 ///|
@@ -208,7 +209,7 @@ test "法則 — 形が一致すれば focus は同じ部分木を指し、一�
   inspect(
     some,
     content=(
-      #|2458
+      #|3064
     ),
   )
   // md が形を決めた回数。0 なら法則の 2 つ目の道が死んでいる。
@@ -216,7 +217,7 @@ test "法則 — 形が一致すれば focus は同じ部分木を指し、一�
   inspect(
     decided,
     content=(
-      #|46
+      #|66
     ),
   )
 }
@@ -295,7 +296,7 @@ test "法則 — Delete の focus は消えていない兄弟か祖先（中身�
   inspect(
     n,
     content=(
-      #|44
+      #|52
     ),
   )
 }
@@ -342,7 +343,7 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   inspect(
     n,
     content=(
-      #|2372
+      #|2959
     ),
   )
 }
@@ -399,7 +400,12 @@ test "法則 — 触っていない字は変わらない" {
   }
   json_inspect(bad, content=[])
   // 網の広さ。corpus を触れば動く
-  inspect(n, content="40")
+  inspect(
+    n,
+    content=(
+      #|51
+    ),
+  )
 }
 
 ///|

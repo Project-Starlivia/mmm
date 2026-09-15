@@ -233,6 +233,51 @@ test "中身の尻の水平線に骨格が続けば見つける" {
 }
 
 ///|
+/// 子が項目だけなら、中身の尻の水平線は子の後ろに書かれる（項目の列を閉じた所）。
+/// 続くのは部分木の次の骨格 — 無ければ飾り、同じ木の行なら破れ（a の尻の 4 に b が続く）。
+test "子が項目だけなら、尻の水平線は部分木の次の骨格を見る" {
+  json_inspect(check(parse("# a\n\n- i\n\n---\n")), content=[])
+  json_inspect(check(parse("- r\n  - i\n\n  ---\n")), content=[])
+  let i : Node = {
+    id: 5,
+    label: "i",
+    fold: None,
+    body: [],
+    children: [],
+    mark: Some(bullet),
+  }
+  let doc : Doc = {
+    frontmatter: None,
+    body: [],
+    roots: [
+      {
+        node: {
+          id: 2,
+          label: "r",
+          fold: None,
+          body: [],
+          children: [
+            {
+              id: 3,
+              label: "a",
+              fold: None,
+              body: [tb(4)],
+              children: [i],
+              mark: Some(atx),
+            },
+            leaf(6, "b"),
+          ],
+          mark: Some(atx),
+        },
+        sides: [Right, Right],
+        rules: [],
+      },
+    ],
+  }
+  json_inspect(check(doc), content=[["BorderBreak", 4]])
+}
+
+///|
 /// 見出し（Implicit も）の直後の項目はその見出しの子に読まれ、Implicit は飛びを
 /// その見出しから測られる。間に境界（側の変わり目）があれば別 — 根の下へ置き直される。
 /// 項目の後ろなら何でも置ける（項目の枠は見出しの親になれず、落ちる）。

@@ -240,10 +240,7 @@ fn Part::node(self : Part, x : Laid) -> Unit {
     Some(Heading(..)) =>
       self.wrap(x.node, () => {
         self.place(Some(x.node.id))
-        for b in x.node.body {
-          self.content(b)
-        }
-        self.nodes(x.kids)
+        self.body(x)
       })
     // 飛び（Implicit）は行を持たないので、隙間は最初の要素のもの
     None => {
@@ -289,12 +286,22 @@ fn Part::bullets(self : Part, run : Array[Laid]) -> Unit {
     // **項目の中は、その項目の深さを 0 とした文書。** ラベルが無ければ中身は
     // マーカーの行に乗るので、隙間は項目自身のもの
     self.next = if l.node.label == "" { mine } else { !tight }
-    for b in l.node.body {
-      self.content(b)
-    }
-    self.nodes(l.kids)
+    self.body(l)
   }
   self.next = true
+}
+
+///|
+/// 中身と子の列。`ahead` と同じ順。
+fn Part::body(self : Part, x : Laid) -> Unit {
+  let cut = ahead(x)
+  for b in x.node.body[:cut] {
+    self.content(b)
+  }
+  self.nodes(x.kids)
+  for b in x.node.body[cut:] {
+    self.content(b)
+  }
 }
 
 ///|
@@ -369,13 +376,38 @@ fn node(out : Array[@markdown.Block], x : Laid, depth : Int) -> Unit {
     Some(Heading(setext~, closing~)) =>
       wrap(out, x.node.fold, () => {
         out.push(heading(depth, x.node.label, setext, closing))
-        for b in x.node.body {
-          content(out, b)
-        }
-        nodes(out, x.kids, depth + 1)
+        body(out, x, depth + 1)
       })
     None => nodes(out, x.kids, depth + 1)
   }
+}
+
+///|
+/// 中身と子の列。**中身は子の手前**、ただし尻に続く水平線は子が項目だけなら子の後ろ
+/// （`trails`）。`depth` は子の深さ。
+fn body(out : Array[@markdown.Block], x : Laid, depth : Int) -> Unit {
+  let cut = ahead(x)
+  for b in x.node.body[:cut] {
+    content(out, b)
+  }
+  nodes(out, x.kids, depth)
+  for b in x.node.body[cut:] {
+    content(out, b)
+  }
+}
+
+///|
+/// 子の手前に書く中身の枚数。尻に続く水平線を後ろへ回すなら、1 本残らず回す —
+/// 手前に 1 本でも残れば、子の行が境界に読む。
+fn ahead(x : Laid) -> Int {
+  let bs = x.node.body
+  let mut cut = bs.length()
+  if trails(x.node) {
+    while cut > 0 && bs[cut - 1].content is Some(ThematicBreak) {
+      cut = cut - 1
+    }
+  }
+  cut
 }
 
 ///|
@@ -473,13 +505,10 @@ fn underlined(l : Laid) -> Bool {
 /// ラベルも中身も無ければマーカーだけの行。
 fn list_item(l : Laid, tight : Bool) -> String {
   let kids = []
-  for b in l.node.body {
-    content(kids, b)
-  }
   // **項目の中は、その項目の深さを 0 とした文書。** 子の見出しは項目からの
   // 深さぶんの `#` で書く（docs/spec.md「項目の中」）。項目の根の側の境界も
   // 項目の段に書く
-  nodes(kids, l.kids, 1)
+  body(kids, l, 1)
   let inner = StringBuilder()
   if l.node.label != "" {
     inner.write_string(l.node.label)

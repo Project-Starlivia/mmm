@@ -138,13 +138,18 @@ fn walk(
     note(c, barren(s))
     note(c, unmarked(s))
     note(c, gapped_item(s))
-    // 中身の尻の水平線は、見出しでも項目でも次の骨格を境界にする。Implicit は
+    // 中身の尻の水平線は、見出しでも項目でも次の骨格を境界にする。子が項目だけなら
+    // 部分木の後ろに書かれる（`trails`）ので、部分木の次の骨格へ持ち回る。Implicit は
     // 行が無いので中身を書けない（`Unmarked`）— 綴られてから咎める
-    c.border = if x.mark is Some(_) { trailing(x.body) } else { None }
+    let trail = if x.mark is Some(_) { trailing(x.body) } else { None }
+    c.border = if trails(x) { None } else { trail }
     let under = if x.mark is None { s.lead } else { None }
     // 項目の中は、その項目の深さを 0 とした文書。側は見出しの根も項目の根も持つ
     let inner = if sign_of(x) is Some(Item) { depth } else { base }
     walk(c, x.children, depth + 1, inner, kids(i), _ => [], lead=under)
+    if trails(x) {
+      c.border = trail
+    }
   }
 }
 
@@ -176,6 +181,16 @@ fn trailing(bs : Array[Block]) -> Int? {
     Some({ id, content: Some(ThematicBreak), .. }) => Some(id)
     _ => None
   }
+}
+
+///|
+/// 中身の尻の水平線を、子の後ろに書くか — **子が項目だけのとき**。子の手前に書けば
+/// 続く骨格の行が境界に読むが、項目の列を閉じた後ろの塊は持ち主が自分に戻る
+/// （docs/spec.md「水平線」）。見出しの子は後ろの塊を自分の中身にするので戻らない
+fn trails(x : Node) -> Bool {
+  trailing(x.body) is Some(_) &&
+  x.children is [_, ..] &&
+  x.children.iter().all(k => k.mark is Some(Item(..)))
 }
 
 ///|

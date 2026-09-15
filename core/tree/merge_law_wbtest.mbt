@@ -15,7 +15,8 @@ let corpus : Array[String] = [
   "# r\n\n## a\n\n---\n\n## b\n\n***\n\n## c\n", "---\nk: v\n---\n\nhello\n\n# a\n\n[q]: /r\n",
   "# r\r\n\r\n## a\r\n\r\n### x\r\n", "# r\n\n<details>\n<summary>s</summary>\n\n## a\n\nx\n\n</details>\n\n## b\n",
   "# a\n\n### x\n\n# b", "- a\n\n  text\n\n  - b\n- c\n", "# r\n\n- i\n  - j\n\n## a\n",
-  "hello\n\n- a\n- b\n", "aaa\n\nbbb\n\n# h\n",
+  "hello\n\n- a\n- b\n", "aaa\n\nbbb\n\n# h\n", "---\n\n- item\n\ntail\n", "***\n\n- a\n  - b\n\ntail\n",
+  "- a\n\n---\n", "1. a\n\n---\n\n- b\n", "- # h\n\n---\n\n- t\n", "# a\n\n- i\n\n---\n",
 ]
 
 ///|
@@ -163,7 +164,7 @@ fn grain(
     let old = spans.get(id).unwrap()
     guard x.mark is Some(_) && !under_fold(before, id) else { continue }
     guard same_line(olds.get(id).unwrap(), x) else { continue }
-    let line_to = line_end(md, old.from)
+    let line_to = label_end(md, spans, olds.get(id).unwrap())
     for e in edits {
       if e.from < line_to && e.to > old.from {
         fail(
@@ -365,6 +366,10 @@ test "法則 — 全ノードに子を足す" {
     let (before, spans) = build(md)
     for id in all_ids(before) {
       let after = changed(before, id, Adopt)
+      // 書けない木（`- # h` の項目に項目の子を足すと、見出しに飲み込まれる）は check が断る
+      if !check(after).is_empty() {
+        continue
+      }
       ignore(law(md, before, spans, after, "adopt \{id} in \{md}"))
     }
   }

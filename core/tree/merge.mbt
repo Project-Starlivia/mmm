@@ -207,13 +207,15 @@ fn merge_node(
         Some(_) => {
           let line_to = line_end(r.md, s.from)
           if !same_line(old, x) {
+            let inner = label_end(r.md, r.spans, old)
             r.out.push({
               from: s.from,
-              to: line_to,
+              to: inner,
               insert: indent(
                 fragment({ ..x, body: [], children: [], }, depth, [], []),
                 column(r.md, s.from),
-              ),
+              ) +
+              (if inner < line_to { pad(column(r.md, inner)) } else { "" }),
             })
           }
           merge_body(r, old.body, x.body, line_to, col)
@@ -239,7 +241,12 @@ fn merge_node(
         col,
         old.children,
         x.children,
-        depth + 1,
+        // 項目の中は、その項目の深さを 0 とした文書（書く側の `list_item` と同じ）
+        if x.mark is Some(Item(..)) {
+          1
+        } else {
+          depth + 1
+        },
         Map([]),
         Map([]),
         rule=id => wants.get(id),
@@ -247,6 +254,22 @@ fn merge_node(
     }
     _ => replace(r, x, depth, sides, rules)
   }
+}
+
+///|
+/// ノードの行の尻（改行の次）。**名前の無い項目は、中身か子がマーカーの行に乗る**
+/// （`- # h`）ので、行はその手前まで。
+fn label_end(md : String, spans : Map[Int, Spot], x : Node) -> Int {
+  [..x.body.map(b => b.id), ..x.children.map(k => k.id)]
+  .iter()
+  .filter_map(id => spans.get(id).map(sp => sp.from))
+  .fold(init=line_end(md, spans.get(x.id).unwrap().from), (a, b) => {
+    if b < a {
+      b
+    } else {
+      a
+    }
+  })
 }
 
 ///|
@@ -383,12 +406,27 @@ fn dropped(r : Merge, q : Seq) -> Int? {
       )
     } else if head && head_born {
       (line_start(r.md, spot(r, first).from), last)
+    } else if head &&
+      r.gap.get(first) == Some(spot(r, doc_id).from) &&
+      stale_head(r, last) {
+      // 文書の頭の列が丸ごと消え、後ろに続く物（列の外）が頭になる。その物の隙間は
+      // 誰も書き換えないので、列の境目を引き継がせ、消す物の後ろの空行ごと消す
+      (line_start(r.md, spot(r, first).from), blank_end(r.md, last))
     } else {
       (r.gap.get(first).unwrap(), last)
     }
     r.out.push({ from, to, insert: "", })
   }
   inherited
+}
+
+///|
+/// 位置 `at` のすぐ後ろに書かれた物を、base がもう文書の頭と言うか。**中身が根の
+/// 後ろに書かれた文書**（`- a / ---`）では、正規形は中身を先に書くので base は頭と言うが、
+/// ours では前に物が居る。そのとき base と theirs は同じなので、`gapped` は隙間を書き換えない
+fn stale_head(r : Merge, at : Int) -> Bool {
+  let next = if column(r.md, at) == 0 { at } else { line_end(r.md, at) }
+  r.gap.iter().any(p => p.1 == next && r.base.get(p.0) == Some(false))
 }
 
 ///|
@@ -667,9 +705,10 @@ fn settle(r : Merge) -> Array[Edit] {
 }
 
 ///|
-/// その位置が行の途中か（行頭の字下げの後ろは行頭と同じ — 項目のマーカーの手前がそこ）。
+/// その位置が行の途中か — 直前が空白でない字。行頭の字下げの後ろ（項目のマーカーの
+/// 手前）も、マーカーの後ろ（`- # h` の見出しの頭）も、書いてよい行の頭。
 fn mid_line(md : String, at : Int) -> Bool {
-  skip_space(md, line_start(md, at), at) < at
+  at > line_start(md, at) && md[at - 1] != ' ' && md[at - 1] != '\t'
 }
 
 ///|

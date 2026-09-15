@@ -332,6 +332,57 @@ test "見出しの下の項目" {
 }
 
 ///|
+/// 中身は子の手前。ただし子が項目だけなら、尻に続く水平線は子の後ろ — 手前に書くと
+/// 続く項目が境界に読む。項目の列を閉じた塊は持ち主に戻る（docs/spec.md「水平線」）。
+/// 見出しの子は後ろの塊を自分の中身にするので、手前のまま（書けない形。check の `BorderBreak`）
+test "子が項目だけなら、尻の水平線は子の後ろ" {
+  let rules = [made(ThematicBreak), made(ThematicBreak)]
+  inspect(
+    serialize(
+      doc([root(h("r", body=[raw("text"), ..rules], children=[item("a")]))]),
+    ),
+    content=(
+      #|# r
+      #|
+      #|text
+      #|
+      #|- a
+      #|
+      #|---
+      #|
+      #|---
+      #|
+    ),
+  )
+  inspect(
+    serialize(
+      doc([root(item("r", body=[made(ThematicBreak)], children=[item("a")]))]),
+    ),
+    content=(
+      #|- r
+      #|
+      #|  - a
+      #|
+      #|  ---
+      #|
+    ),
+  )
+  inspect(
+    serialize(
+      doc([root(h("r", body=[made(ThematicBreak)], children=[h("a")]))]),
+    ),
+    content=(
+      #|# r
+      #|
+      #|---
+      #|
+      #|## a
+      #|
+    ),
+  )
+}
+
+///|
 /// 順序法則 — 兄弟は項目が先、見出しが後。
 test "項目と見出しの兄弟" {
   inspect(
