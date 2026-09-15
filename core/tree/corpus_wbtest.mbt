@@ -287,3 +287,20 @@ test "見本 — id の順 = 文書順" {
   }
   json_inspect(bad, content=[])
 }
+
+///|
+/// #386 — 書き戻しで記法が化けていた小さな形。どれも読み直すと同じ木で、もう一度書いても同じ字
+test "往復 — 遅延継続行・名前の無い項目の段落・文末の空白行・字下げした畳みの中身" {
+  let cases = [
+    "- a\n===\n", "  1. a\n    ***\n", " a\n    ***\n", "- - a\n\n  b\n", "+ a\n\n      ---\n ",
+    "  <details>\n  <summary>s</summary>\n\n      ---\n\n    # a\n\n    ---\n\n  </details>\n",
+  ]
+  let bad = []
+  for md in cases {
+    let once = serialize(parse(md))
+    if parse(once) != parse(md) || serialize(parse(once)) != once {
+      bad.push("\{md.escape()} → \{once.escape()}")
+    }
+  }
+  json_inspect(bad, content=[])
+}

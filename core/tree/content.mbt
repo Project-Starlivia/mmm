@@ -140,6 +140,34 @@ fn verbatim(md : String, block : @markdown.Block) -> String {
 }
 
 ///|
+/// 段落の字を、読み直しても 1 つの段落のままの形にする。**続きの行が別の塊の頭に読まれるなら、
+/// 続きの行を 4 桁下げる** — 段落の続きの行は頭の空白を落として読まれ、字下げコードは段落を
+/// 割れないので、4 桁下げた行は必ず続きのまま。容器の外にあった遅延継続行（`- a / ===`）や、
+/// 容器の字下げを剥がして 4 桁を割った行が、書く段で setext の下線や水平線に化けない。
+/// 続きの行がどれも字で始まれば読み直さない
+fn paragraphed(text : String) -> String {
+  let lines = text.split("\n").collect()
+  guard lines[1:]
+    .iter()
+    .any(l => {
+      let t = l.trim_start(chars=" \t")
+      t.length() > 0 &&
+      "=-*_#>`~+|<0123456789".contains_char(t[0].unsafe_to_char())
+    }) &&
+    !(read(text).children is [Paragraph(..)]) else {
+    return text
+  }
+  let out = StringBuilder()
+  for i, l in lines {
+    if i > 0 {
+      out.write_string("\n    ")
+    }
+    out.write_string(l.to_owned())
+  }
+  out.to_string()
+}
+
+///|
 /// この範囲に書かれた定義行だけ。定義は文書ぜんぶで 1 列なので、入れ子の中を
 /// 読み解くときは切り出して渡す（そうしないと手前の定義が中へ紛れ込む）。
 fn defs_in(

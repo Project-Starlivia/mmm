@@ -12,32 +12,52 @@
 /// そのまま返す道（記法構造の書き戻し、地番）は `slice` を使うので影響しない。
 fn carve(md : String, from : Int, to : Int) -> String {
   let mut z = to
-  while z > from && (md[z - 1] == '\n' || md[z - 1] == '\r') {
-    z = z - 1
+  // 尻の改行と、空白だけの尻の行は記法の外（塊の後ろの空行。文書の尻の空白だけの行も）
+  for ;; {
+    if z > from && (md[z - 1] == '\n' || md[z - 1] == '\r') {
+      z = z - 1
+      continue
+    }
+    let head = line_start(md, z)
+    if head > from && head < z && skip_space(md, head, z) == z {
+      z = head
+      continue
+    }
+    break
   }
-  let indent = column(md, from)
-  if indent == 0 {
-    return lf(slice(md, from, z))
-  }
+  lf(unindent(slice(md, from, z), column(md, from)))
+}
+
+///|
+/// 段落の字の、2 行目以降の行頭の空白を全部落とす。**段落の続きの行の頭の空白は md では
+/// 字ではない** — 書き戻しが続きの行を下げても（`paragraphed`）、読み直した名前は変わらない
+fn lines_of(text : String) -> String {
+  unindent(text, text.length())
+}
+
+///|
+/// 2 行目以降の行頭の空白を `n` 桁まで落とす — 容器の字下げを剥がす。
+fn unindent(text : String, n : Int) -> String {
+  guard n > 0 else { return text }
   let out = StringBuilder()
-  let mut i = from
+  let mut i = 0
   let mut head = false
-  while i < z {
+  while i < text.length() {
     if head {
-      let mut n = 0
-      while n < indent && i < z && (md[i] == ' ' || md[i] == '\t') {
+      let mut k = 0
+      while k < n && i < text.length() && (text[i] == ' ' || text[i] == '\t') {
         i = i + 1
-        n = n + 1
+        k = k + 1
       }
       head = false
       continue
     }
-    let c = md[i]
+    let c = text[i]
     out.write_char(c.unsafe_to_char())
     head = c == '\n'
     i = i + 1
   }
-  lf(out.to_string())
+  out.to_string()
 }
 
 ///|
