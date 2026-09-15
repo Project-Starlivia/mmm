@@ -223,13 +223,17 @@ test "中身の尻の水平線に骨格が続けば見つける" {
           ],
           mark: Some(atx),
         },
-        // 項目 i は見出し a の直後なので、境界（側の変わり目）が要る
+        // 項目 i は見出し a の直後なので、境界が在っても飲み込まれる（`Swallowed`）
         sides: [Right, Left, Left, Left],
         rules: [],
       },
     ],
   }
-  json_inspect(check(doc), content=[["BorderBreak", 4], ["BorderBreak", 8]])
+  json_inspect(check(doc), content=[
+    ["BorderBreak", 4],
+    ["Swallowed", 7],
+    ["BorderBreak", 8],
+  ])
 }
 
 ///|
@@ -238,6 +242,10 @@ test "中身の尻の水平線に骨格が続けば見つける" {
 test "子が項目だけなら、尻の水平線は部分木の次の骨格を見る" {
   json_inspect(check(parse("# a\n\n- i\n\n---\n")), content=[])
   json_inspect(check(parse("- r\n  - i\n\n  ---\n")), content=[])
+  // 項目の列の尻の線に見出しの子が続くなら、中身が間に挟まる（`middle`）
+  let mid = "# a\n\n- b\n\n  ---\n\ntext\n\n## c\n"
+  json_inspect(check(parse(mid)), content=[])
+  inspect(serialize(parse(mid)) == mid, content="true")
   let i : Node = {
     id: 5,
     label: "i",
@@ -279,7 +287,8 @@ test "子が項目だけなら、尻の水平線は部分木の次の骨格を�
 
 ///|
 /// 見出し（Implicit も）の直後の項目はその見出しの子に読まれ、Implicit は飛びを
-/// その見出しから測られる。間に境界（側の変わり目）があれば別 — 根の下へ置き直される。
+/// その見出しから測られる。間に境界（側の変わり目）があれば Implicit は別 — 根の下へ
+/// 置き直される（15）。**項目は境界が在っても飲み込まれる**（18）— 深さは入れ物から測る。
 /// 項目の後ろなら何でも置ける（項目の枠は見出しの親になれず、落ちる）。
 test "見出しに境界なしで続く項目・Implicit を見つける" {
   let item = (id : Int, label : String) => {
@@ -330,6 +339,7 @@ test "見出しに境界なしで続く項目・Implicit を見つける" {
     ["Swallowed", 7],
     ["Swallowed", 9],
     ["Swallowed", 14],
+    ["Swallowed", 18],
     ["Swallowed", 20],
   ])
 }

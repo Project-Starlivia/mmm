@@ -80,8 +80,8 @@ fn cap(doc : @tree.Doc) -> @tree.Doc {
 /// check の破れのうち、Implicit で直るものを直して通し直す。子が尽きた Implicit
 /// （`BarrenImplicit`）は消す — 道具は途中で席が消えないように残しておくので、
 /// 掃除はここ。見出しの直後に来た Implicit（`Swallowed`）と、先頭の子が項目の
-/// Implicit（`GappedItem` の親）と、行の要るものを持った Implicit（`Unmarked`）は
-/// 綴る。消すものは綴らないので、消す回は綴らない。
+/// Implicit（`GappedItem` の親）と、行の要るものを持った Implicit（`Unmarked`）と、
+/// 最初の子が左の行の無い根（`Ownerless`）は綴る。消すものは綴らないので、消す回は綴らない。
 /// 一回ごとに Implicit は減るので止まる。残った破れは None。
 fn mend(doc : @tree.Doc) -> @tree.Doc? {
   let mut cur = doc
@@ -96,7 +96,7 @@ fn mend(doc : @tree.Doc) -> @tree.Doc? {
       match f {
         BarrenImplicit(id) => barren.push(id)
         Swallowed(id) => ids.push(id)
-        Unmarked(id) => ids.push(id)
+        Unmarked(id) | Ownerless(id) => ids.push(id)
         GappedItem(id) => ids.push(parent(cur, id).unwrap())
         _ => ()
       }
@@ -537,7 +537,8 @@ fn reside(doc : @tree.Doc, at : Int, sides : Array[@tree.Side]) -> @tree.Doc {
 /// （読みの境界と同じ形。docs/spec.md「水平線」）。
 ///
 /// - 行き先の側の最後の子が同じ側なら、間に境界は書かれない。その子の部分木の尻へ
-///   深さのまま入る — md に書けば読みが置く親（`sink`）。左へ出して右へ戻せば元の木
+///   深さのまま入る — md に書けば読みが置く親（`sink`）。戻すときも同じ規則なので、
+///   元の親が右の最後の枝でなければ元の木にはならない（元の位置へは D&D か undo）
 /// - そうでなければ境界が書かれるので、根の子の席から Implicit が深さを埋める
 ///
 /// 元の側に残った Implicit は子が尽きていれば門（`mend`）が消す

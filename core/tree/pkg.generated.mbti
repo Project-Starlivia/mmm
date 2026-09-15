@@ -89,6 +89,7 @@ pub(all) enum Flaw {
   DupeId(Int)
   BarrenImplicit(Int)
   SideCount(root~ : Int, sides~ : Int, children~ : Int)
+  Ownerless(Int)
   BorderBreak(Int)
   Swallowed(Int)
   GappedItem(Int)
