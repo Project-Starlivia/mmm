@@ -122,10 +122,8 @@ test "save_changes: 3 つのボタンが 断り・もう 1 つ・進む の順�
       form.querySelector(".title").unwrap().textContent(),
       "Do you want to save the changes you made to notes.md?",
     )
-    assert_eq(
-      form.querySelector(".note").unwrap().textContent(),
-      "Unsaved changes are autosaved.",
-    )
+    // Don't Save は未保存の字も捨てるので、「残る」とは言わない
+    assert_true(form.querySelector(".note") is None)
     let buttons = form.querySelectorAll(".row button")
     assert_eq(buttons.map(b => b.textContent()), [
       "Cancel", "Don't Save", "Save",

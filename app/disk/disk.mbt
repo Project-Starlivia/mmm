@@ -8,13 +8,13 @@ pub(all) struct Doc {
 }
 
 ///|
-/// いま開いているファイルと、覚えている札と、自動保存。
+/// いま開いているファイルと、覚えている札と、未保存の字。
 ///
-/// 自動保存（`autosaves`）はディスクではなくブラウザの中に置くが、**覚えているものと
+/// 未保存の字（`unsaved`）はディスクではなくブラウザの中に置くが、**覚えているものと
 /// 同じ置き場（IndexedDB）に同じ流儀で並ぶ**ので、口も 1 つにまとめる
 pub struct Disk {
   recent : Recent
-  autosaves : Autosaves
+  unsaved : Unsaved
   mut current : @web.FileHandle?
   /// いまのファイルを最後に読んだ / 書いたときの、ディスク側の時刻。
   /// **書く直前に 1 度だけ比べる**（#318）。見張りではないので「外部変更は追わない」は
@@ -23,14 +23,14 @@ pub struct Disk {
 }
 
 ///|
-pub fn Disk::new(recent : Recent, autosaves : Autosaves) -> Disk {
-  { recent, autosaves, current: None, stamp: None, }
+pub fn Disk::new(recent : Recent, unsaved : Unsaved) -> Disk {
+  { recent, unsaved, current: None, stamp: None, }
 }
 
 ///|
-/// 自動保存の台帳
-pub fn Disk::autosaves(self : Disk) -> Autosaves {
-  self.autosaves
+/// 未保存の字の台帳
+pub fn Disk::unsaved(self : Disk) -> Unsaved {
+  self.unsaved
 }
 
 ///|

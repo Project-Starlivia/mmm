@@ -53,6 +53,7 @@ function context(label: string | null): HTMLDivElement {
 const SAVED: core.Files = {
   savedName: "notes.md",
   recent: ["ideas.md", "todo.md"],
+  unsaved: ["sketch.md"],
   canOpen: true,
   canSave: true,
   canRename: true,
@@ -67,6 +68,8 @@ const FILES_ACTS: core.FileActs = {
   saveAs: nothing,
   rename: nothing,
   chooseFolder: nothing,
+  openUnsaved: nothing,
+  discardUnsaved: nothing,
 };
 const MORE_ACTS: core.MoreActs = {
   undo: nothing,

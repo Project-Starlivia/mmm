@@ -100,8 +100,8 @@ fn Fake::editor(self : Fake) -> Editor {
 /// 手元の置き場（ディスクの代わり）。既定は何も覚えていない。`known` を渡せば
 /// その名前の文書を覚えている台帳として立つ（立ち上がりの一覧。#277）。
 /// 並びは最後に触れた順なので、先に渡したものが新しい。
-/// `autosaved` を渡せば、その名前の自動保存を 1 流れずつ持って立つ
-fn memo_disk(known : Array[String], autosaved : Array[String]) -> @disk.Disk {
+/// `unsaved` を渡せば、その名前の未保存の文書を 1 件ずつ持って立つ（本文は `# 名前`）
+fn memo_disk(known : Array[String], unsaved : Array[String]) -> @disk.Disk {
   let table : Map[String, @core.Any] = Map([])
   if known.length() > 0 {
     table["docs"] = @core.any(
@@ -116,12 +116,11 @@ fn memo_disk(known : Array[String], autosaved : Array[String]) -> @disk.Disk {
       }),
     )
   }
-  let autosaves : Map[String, @core.Any] = Map([])
-  for i, name in autosaved {
-    let flow = "flow" + i.to_string()
-    autosaves[flow + "/0"] = @web.record([
-      ("flow", @core.any(flow)),
-      ("seq", @core.any(0.0)),
+  let docs : Map[String, @core.Any] = Map([])
+  for i, name in unsaved {
+    let id = "unsaved" + i.to_string()
+    docs[id] = @web.record([
+      ("id", @core.any(id)),
       ("name", @core.any(name)),
       ("at", @core.any(@web.now())),
       ("text", @core.any("# " + name + "\n")),
@@ -130,7 +129,7 @@ fn memo_disk(known : Array[String], autosaved : Array[String]) -> @disk.Disk {
   }
   @disk.Disk::new(
     @disk.Recent::new(memo_shelf(table)),
-    @disk.Autosaves::new(memo_shelf(autosaves)),
+    @disk.Unsaved::new(memo_shelf(docs)),
   )
 }
 
@@ -176,7 +175,7 @@ fn mount(
 /// `hash` を渡せば、そのフラグメントの付いたページとして立ち上がる（共有リンク）
 fn stand(
   known? : Array[String] = [],
-  autosaved? : Array[String] = [],
+  unsaved? : Array[String] = [],
   hash? : String = "",
 ) -> Stand {
   let win = @test_utils.create_happy_window()
@@ -211,7 +210,7 @@ fn stand(
     log: [],
     hint: false,
   }
-  let app = App::new(doc, fake.editor(), memo_disk(known, autosaved), measure=(
+  let app = App::new(doc, fake.editor(), memo_disk(known, unsaved), measure=(
     _,
     text,
   ) => text.char_length().to_double() * 7.0)
@@ -416,7 +415,7 @@ extern "js" fn wait_ms(doc : @dom.Document, ms : Int, f : () -> Unit) -> Unit =
 
 ///|
 /// **ディスクへ勝手に書く道は持たない**（#306）。
-/// 手が止まっても、書くのは自動保存（ブラウザの中）だけ。ディスクの .md は
+/// 手が止まっても、書くのは未保存の字（ブラウザの中）だけ。ディスクの .md は
 /// 他のアプリや git からも見えるものなので、人が押さないかぎり触らない
 async test "手が止まっても、ディスクへは自分で書かない" {
   let s = stand()
@@ -428,8 +427,8 @@ async test "手が止まっても、ディスクへは自分で書かない" {
   rest(s.doc, quiet * 2)
   // ディスクには 1 字も書かれていない
   assert_eq(written, [])
-  // 自動保存のほうには残っている
-  assert_eq(s.app.disk.autosaves().list().map(d => d.text), ["# r\n\n## a\n"])
+  // 未保存の字のほうには残っている
+  assert_eq(s.app.disk.unsaved().list().map(d => d.text), ["# r\n\n## a\n"])
   // 印も立ったまま（ディスクの字とは違う）
   assert_true(s.doc.querySelector("#dirty[hidden]") is None)
 }
@@ -518,7 +517,7 @@ async test "捨てる確認: 汚れていなければ、たずねは開かず、
   done.wait()
   // 保存してから打っていない文書も同じ（保存済みの字と一致している）
   s.fake.change("# r\n")
-  s.app.saved_text = "# r\n"
+  s.app.disk_text = "# r\n"
   let again = @js_async.Promise::from_async(async fn() { s.app.new_file() })
   assert_true(s.doc.querySelector("dialog.ask") is None)
   again.wait()
@@ -566,7 +565,7 @@ async test "保存: 書いているあいだに打った字は、書かれない
   // ディスクに載ったのは打つ前の字
   assert_eq(written, ["# r\n\n## a\n"])
   // 記した字もそれと同じ。印は立ったまま
-  assert_eq(s.app.saved_text, "# r\n\n## a\n")
+  assert_eq(s.app.disk_text, "# r\n\n## a\n")
   assert_true(s.doc.querySelector("#dirty[hidden]") is None)
 }
 
@@ -575,7 +574,7 @@ async test "保存: 書いているあいだに打った字は、書かれない
 /// ために積んだものは捨てる。捨てないと、**前の文書のために積んだ書き込みが、
 /// 入れ替わった後の文書に対して走る** — 名前を手放した後（新規）なら、人が
 /// 何も押していないのに保存ダイアログの道へ入る
-async test "自動保存: 文書を入れ替えたら、積んでいた書き込みは走らない" {
+async test "未保存の字: 文書を入れ替えたら、積んでいた書き込みは走らない" {
   let s = stand()
   defer s.win.close()
   let first : Array[String] = []
@@ -599,42 +598,137 @@ async test "自動保存: 文書を入れ替えたら、積んでいた書き込
 }
 
 ///|
-/// **自動保存に置き場は要らない。** まだ保存していない文書 — いちばん失いやすいもの —
-/// がいちばんの客（#306）。行き先はディスクではなく、ブラウザの中
-async test "自動保存: 保存していない文書でも、手が止まれば自動保存が残る" {
+/// **未保存の字に置き場は要らない。** まだ保存していない文書 — いちばん失いやすいもの —
+/// がいちばんの客（#306）。比べる相手は空の字（ディスクに実体が無い）
+async test "未保存の字: 保存していない文書でも、手が止まれば残る" {
   let s = stand()
   defer s.win.close()
   s.fake.change("# r\n\n## a\n")
   rest(s.doc, quiet * 2)
-  let rows = s.app.disk.autosaves().list()
+  let rows = s.app.disk.unsaved().list()
   assert_eq(rows.length(), 1)
   assert_eq(rows[0].text, "# r\n\n## a\n")
   // ディスクに実体が無いので札は持たない
   assert_true(rows[0].doc is None)
   // 同じ字のままなら、二度は書かない
   rest(s.doc, quiet * 2)
-  assert_eq(s.app.disk.autosaves().list().length(), 1)
+  assert_eq(s.app.disk.unsaved().list().length(), 1)
 }
 
 ///|
-/// **文書を入れ替えたら自動保存の流れも切れる。** 前の文書の字は残るが、
-/// 続きは別の系列になる（1 つの流れに 2 つの文書の字が混ざらない）
-async test "自動保存: 新規にすると、前の文書の自動保存は残り、次は別の流れになる" {
+/// **ディスクと同じ字は取らない。** 開いただけの文書を写すと、開くたびに同じ字の件が
+/// 増える（#359）。写すのはディスクより新しい字だけ（docs/unsaved.md）
+async test "未保存の字: 開いただけでは取らない" {
+  let s = stand()
+  defer s.win.close()
+  s.app.open_known(paper("notes.md", "# r\n", _ => ()))
+  rest(s.doc, quiet * 2)
+  assert_eq(s.app.disk.unsaved().list().length(), 0)
+}
+
+///|
+/// **保存すれば役目を終える。** ディスクに届いた字を、ブラウザの中に残す理由は無い
+async test "未保存の字: 保存すれば捨てる" {
+  let s = stand()
+  defer s.win.close()
+  s.app.open_known(paper("notes.md", "# r\n", _ => ()))
+  s.fake.change("# r\n\n## a\n")
+  rest(s.doc, quiet * 2)
+  assert_eq(s.app.disk.unsaved().list().length(), 1)
+  @js_async.Promise::from_async(async fn() { s.app.save_file(false) }).wait()
+  rest(s.doc, 5)
+  assert_eq(s.app.disk.unsaved().list().length(), 0)
+}
+
+///|
+/// **ディスクと同じ字に戻れば、それも役目を終える**（undo で打つ前へ戻したときなど）
+async test "未保存の字: ディスクと同じ字に戻せば捨てる" {
+  let s = stand()
+  defer s.win.close()
+  s.app.open_known(paper("notes.md", "# r\n", _ => ()))
+  s.fake.change("# r\n\n## a\n")
+  rest(s.doc, quiet * 2)
+  assert_eq(s.app.disk.unsaved().list().length(), 1)
+  s.fake.change("# r\n")
+  rest(s.doc, quiet * 2)
+  assert_eq(s.app.disk.unsaved().list().length(), 0)
+}
+
+///|
+/// **Don't Save を選べば捨てる。** 人が「捨てる」を選んだのだから残さない（VS Code・Word と
+/// 同じ）。残すのは、選ばずに消えたとき（落ちた・閉じた）だけ
+async test "未保存の字: Don't Save を選べば、その文書の件を捨てる" {
   let s = stand()
   defer s.win.close()
   s.fake.change("# first\n")
   rest(s.doc, quiet * 2)
-  // 汚れているので、新規はたずねを開く。Discard（`[1]`）を押す
+  assert_eq(s.app.disk.unsaved().list().length(), 1)
+  // 汚れているので、新規はたずねを開く。Don't Save（`[1]`）を押す
   let asked = @js_async.Promise::from_async(async fn() { s.app.new_file() })
   @web.click(
     s.doc.querySelector("dialog.ask").unwrap().querySelectorAll(".row button")[1],
   )
   asked.wait()
-  s.fake.change("# second\n")
+  rest(s.doc, 5)
+  assert_eq(s.app.disk.unsaved().list().length(), 0)
+}
+
+///|
+/// **Save を選んで進んでも、前の文書の件は残らない。** 書き終えてから文書が入れ替わる
+/// ので、捨てるのは入れ替わる前の件でなければならない
+async test "未保存の字: Save を選んで進めば、前の文書の件は残らない" {
+  let s = stand()
+  defer s.win.close()
+  s.app.open_known(paper("notes.md", "# r\n", _ => ()))
+  s.fake.change("# r\n\n## a\n")
   rest(s.doc, quiet * 2)
-  let rows = s.app.disk.autosaves().list()
-  assert_eq(rows.map(d => d.text), ["# second\n", "# first\n"])
-  assert_true(rows[0].flow != rows[1].flow)
+  assert_eq(s.app.disk.unsaved().list().length(), 1)
+  // Save（`[2]`）
+  let asked = @js_async.Promise::from_async(async fn() { s.app.new_file() })
+  @web.click(
+    s.doc.querySelector("dialog.ask").unwrap().querySelectorAll(".row button")[2],
+  )
+  asked.wait()
+  rest(s.doc, 5)
+  assert_eq(s.fake.md, "")
+  assert_eq(s.app.disk.unsaved().list().length(), 0)
+}
+
+///|
+/// 窓か文書に、名前だけの出来事を送る
+fn dispatch(s : Stand, target : @core.Any, name : String) -> Unit {
+  let ev = @core.new(s.win.as_any()._get("Event"), [@core.any(name)])
+  target._call("dispatchEvent", [ev]) |> ignore
+}
+
+///|
+/// ページを隠れた状態にする（happy-dom は常に visible なので、読み口だけ差し替える）
+extern "js" fn hide_page(doc : @dom.Document) -> Unit =
+  #| (doc) => Object.defineProperty(doc, "visibilityState", { value: "hidden", configurable: true })
+
+///|
+/// **ページを離れるときは待たずに書く。** 手が止まる 1 秒を待つあいだに閉じられると、
+/// その字は残らない。モバイルでタブを閉じると `beforeunload` は鳴らない（docs/unsaved.md）
+async test "未保存の字: ページを離れる（pagehide）ときは、待たずに書く" {
+  let s = stand()
+  defer s.win.close()
+  s.fake.change("# r\n\n## a\n")
+  // 手が止まる間を待たずに離れる
+  dispatch(s, s.win.as_any(), "pagehide")
+  rest(s.doc, 5)
+  assert_eq(s.app.disk.unsaved().list().map(d => d.text), ["# r\n\n## a\n"])
+}
+
+///|
+/// **タブが隠れたときも待たずに書く。** 隠れたまま閉じられると pagehide も来ないことがある
+async test "未保存の字: タブが隠れたら、待たずに書く" {
+  let s = stand()
+  defer s.win.close()
+  s.fake.change("# r\n\n## a\n")
+  hide_page(s.doc)
+  dispatch(s, s.doc.as_any(), "visibilitychange")
+  rest(s.doc, 5)
+  assert_eq(s.app.disk.unsaved().list().map(d => d.text), ["# r\n\n## a\n"])
 }
 
 ///|
@@ -665,12 +759,12 @@ test "覚えているものの行: 名前と、見分けに使えるもの" {
 
 ///|
 /// **立ち上がりに並べるのは覚えているものだけ。** ここは「また開きたいもの」を
-/// 選ぶ場所で、自動保存の入口は Files ▸ Open Autosave（#359）
-async test "立ち上がり: 自動保存があっても、並べるのは覚えているものだけ" {
-  let s = stand(known=["ideas.md"], autosaved=["sketch.md"])
+/// 選ぶ場所で、未保存の文書の入口は Files ▸ Open Unsaved（#359）
+async test "立ち上がり: 未保存の文書があっても、並べるのは覚えているものだけ" {
+  let s = stand(known=["ideas.md"], unsaved=["sketch.md"])
   defer s.win.close()
   rest(s.doc, 5)
-  assert_eq(s.app.autosaves.length(), 1)
+  assert_eq(s.app.unsaved.length(), 1)
   let box = shown_menu(s)
   assert_eq(box.querySelectorAll(".caption").map(c => c.textContent()), [
     "Recent",
@@ -681,42 +775,36 @@ async test "立ち上がり: 自動保存があっても、並べるのは覚え
 }
 
 ///|
-/// 自動保存しか無ければ出さない（並べるものが無い）
-async test "立ち上がり: 自動保存しか無ければ挨拶は出ない" {
-  let s = stand(autosaved=["sketch.md"])
+/// 未保存の文書しか無ければ出さない（並べるものが無い）
+async test "立ち上がり: 未保存の文書しか無ければ挨拶は出ない" {
+  let s = stand(unsaved=["sketch.md"])
   defer s.win.close()
   rest(s.doc, 5)
-  assert_eq(s.app.autosaves.length(), 1)
+  assert_eq(s.app.unsaved.length(), 1)
   assert_false(s.app.greeting.is_open())
 }
 
 ///|
-/// **自動保存から開けば、本文が戻り、印は立ったまま。** 自動保存はディスクに届いて
-/// いない字なので、開いた瞬間から「ディスクとは違う」と言えているのが正しい。
-/// 全部忘れる道は 1 つ（1 件ごとの × は置かない）
-async test "自動保存: 押せば戻る。印は立ったまま。全部忘れれば消える" {
-  let s = stand()
+/// **開き直せば本文が戻り、ディスクとは違う字のまま。** 元の件を引き継ぐので、開き直す
+/// たびに同じ字の件は増えない。いま開いている文書の件は一覧に並ばない。
+/// 全部捨てる道は 1 つ（1 件ごとの × は置かない）
+async test "未保存の字: 開き直すと戻り、件は増えず、いまの件は並ばない。全部捨てれば消える" {
+  let s = stand(unsaved=["sketch.md"])
   defer s.win.close()
-  s.fake.change("# kept\n")
+  rest(s.doc, 5)
+  assert_eq(s.app.unsaved.length(), 1)
+  @js_async.Promise::from_async(async fn() { s.app.open_unsaved(0) }).wait()
+  assert_eq(s.fake.md, "# sketch.md\n")
+  // ディスクに届いていない字なので、比べる相手は空のまま
+  assert_eq(s.app.disk_text, "")
   rest(s.doc, quiet * 2)
-  // 新規へ移る。汚れているのでたずねが開く — Discard（`[1]`）を押す
-  let asked = @js_async.Promise::from_async(async fn() { s.app.new_file() })
-  @web.click(
-    s.doc.querySelector("dialog.ask").unwrap().querySelectorAll(".row button")[1],
-  )
-  asked.wait()
-  assert_eq(s.fake.md, "")
-  // 自動保存から戻す
+  assert_eq(s.app.disk.unsaved().list().length(), 1)
   s.app.refresh_recent()
-  assert_eq(s.app.autosaves.length(), 1)
-  @js_async.Promise::from_async(async fn() { s.app.open_autosave(0) }).wait()
-  assert_eq(s.fake.md, "# kept\n")
-  // ディスクに届いていない字なので、印は立ったまま
-  assert_eq(s.app.saved_text, "")
-  // 全部忘れる
-  @js_async.Promise::from_async(async fn() { s.app.forget_autosaves() }).wait()
-  assert_eq(s.app.disk.autosaves().list().length(), 0)
-  assert_eq(s.app.autosaves.length(), 0)
+  assert_eq(s.app.unsaved.length(), 0)
+  // 全部捨てる
+  @js_async.Promise::from_async(async fn() { s.app.discard_unsaved() }).wait()
+  assert_eq(s.app.disk.unsaved().list().length(), 0)
+  assert_eq(s.app.unsaved.length(), 0)
 }
 
 ///|

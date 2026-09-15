@@ -1,17 +1,21 @@
-# Auto Save が守るもの — 退避と履歴
+# 未保存の字 — 落ちて失わないために
 
-mmm の Auto Save（Files ▸ Open Autosave）は、ブラウザの中（IndexedDB）に本文の写しを取る。
-ディスクの `.md` が正であることは変わらない（`spec.md`）。この文書は、**写しが何を守るのか**の
-線と、その線を引いた根拠になった先例を残す。
+mmm はブラウザの中（IndexedDB）に、**ディスクに届いていない字**を残す。ディスクの `.md` が
+正であることは変わらない（`spec.md`）。この文書は、残すものの線と決め、名前、その根拠に
+なった先例を置く。
 
-2026-09-15 に先例を調べた。確認は各製品の公式文書と、公開されているソース・issue。
-第三者の資料しか無かったものと、確かめられなかったものは【未確認】と書く。
+2026-09-15 に先例を調べ、同じ日に作者と決めた。確認は各製品の公式文書と、公開されている
+ソース・issue。第三者の資料しか無かったものと、確かめられなかったものは【未確認】と書く。
 
-## 線 — いまは退避だけ
+コードは #373 の段でこの決めに寄せている。名前と中身（1 文書 1 件・ディスクと同じ字なら捨てる・
+Don't Save で捨てる・開き直した件を引き受ける）と、いつ書くか（打ち続けても最長 10 秒・隠れる・
+離れるときは待たずに）は入った。**まだ無いのは、書けなかったときに言うこと**。今の動きは `spec.md`。
 
-**Auto Save は「落ちて失う」を防ぐ退避に絞る。** 前の版に戻る履歴は別の機能で、いまは持たない。
+## 線 — 退避だけ
 
-調べたどの製品も、この 2 つを**別の仕組み**として持っていた。
+**守るのは「落ちて失う」だけ。** 前の版に戻る履歴は別の機能で、いまは持たない。
+
+調べたどの製品も、この 2 つを**別の仕組み**として持っていた（Blender も、Auto Save と `.blend1` の 2 本立て）。
 
 | | 退避 | 履歴 |
 |---|---|---|
@@ -28,11 +32,76 @@ mmm の Auto Save（Files ▸ Open Autosave）は、ブラウザの中（Indexed
 当時の理由「間違いに気づくのは保存の直後」は、先例では退避ではなく**保存を起点にした履歴**が
 受け持っている（Blender の `.blend1`、VS Code の Local History）。必要になったら、その形で別に足す。
 
+## 決め
+
+| 何 | 決め |
+|---|---|
+| 何を | **ディスクと違う字だけ**、全文を**1 文書 1 件**（書くたびに上書き）。版は持たない。保存していない文書は空の字（`""`）と比べる |
+| いつ | 手が止まって 1 秒。**打ち続けても最長 10 秒**で必ず。**タブが隠れる（`visibilitychange` の hidden）・閉じる（`pagehide`）とき**に待ちをすぐ書く。保存を聞く前にも書く |
+| 捨てる | **ディスクと同じ字になった**とき（保存・別名で保存・undo で戻る・空に戻す）／**Don't Save を選んだ**とき／20 件を超えた古いもの／Discard all unsaved |
+| 残す | **選ばずに消えた**とき（タブやブラウザが落ちた・閉じた・再読み込みした）。閉じるときのブラウザの「離れますか」は、mmm にはどちらを押したか分からないので残す |
+| 見せる | Files の `Open Unsaved ▸` に新しい順。**いま開いている文書自身の件は出さない**。開くと `●` を立てたまま戻し、**元の件を引き継ぐ**（同じ字の件を増やさない） |
+| 保持 | 件数で 20。巨大な文書 1 つが棚を食い尽くさないよう、合計 20 MB の柵は残す。日数の期限は置かない |
+| 書けなかったとき | 1 度だけ `Couldn't keep unsaved changes` と言う。最初に書くときに 1 度、`navigator.storage.persist()` を頼む（結果は問わない） |
+
+Don't Save で捨てるのは VS Code・Word（既定）と同じ。人が「捨てる」を選んだのだから残さない。
+そのぶん、たずねの補足（いまの `Unsaved changes are autosaved.`）は消す。
+**保存を聞く前に書くのは残す** — たずねを開いたまま落ちても、字が残るように。
+
+「ディスクと同じ字になったら消す」は、未保存でなくなった瞬間に消す VS Code の backup と同じ形。
+保存で消すのは VS Code・Emacs・Word・draw.io に共通する。
+
+## 名前 — Unsaved
+
+| 語 | 見る場所 | 退けた理由 |
+|---|---|---|
+| **Unsaved**（とる） | Word（Recover Unsaved Documents）、Typora | — 状態の名前そのもので、比喩を足さない。保存した版の履歴とは意味の上で重ならない |
+| Draft | メールの下書き、draw.io、Typora | 身近で挙動も重なるが、文章を書く道具では `.md` そのものが下書きに見える |
+| Auto Save | Blender | VS Code・macOS・Word では本物のファイルに書く機能の名前。自動で取る履歴とも区別がつかない |
+| Backup | VS Code（Hot Exit） | Emacs などで履歴の意味。ファイルの予備を広く指す |
+| Recover / Restore | Word、Blender、ブラウザ | 将来の履歴（前の版を戻す）も同じ動詞で呼べてしまう |
+
+作者の判断は「身近さ（Draft）より、指すものの正確さ」。
+
+### 用語の表
+
+| 指すもの | 日本語（docs・コメント） | コード | 画面 |
+|---|---|---|---|
+| 機能 | 未保存の字 | — | Unsaved |
+| 1 件 | 未保存の文書（1 件） | `UnsavedDoc`（字だけでなく名前・時刻・札を持つので Text ではなく Doc。`disk.mbt` の `Doc` に id・時刻・札を足した形。Word の Recover Unsaved Documents と同じ言い方） | 一覧の 1 行 `notes.md · 2 min ago` |
+| 台帳 | 未保存の字の台帳 | `Unsaved`（`Recent` と同じく、台帳を中身で呼ぶ） | — |
+| ファイル | — | `app/disk/unsaved.mbt` | — |
+| 1 件の鍵 | id | `id`（`Recent` の `Known.id` と同じ語） | — |
+| 置き場 | 未保存の字の棚 | `unsaved_shelf = "unsaved"`（DB の版を上げる。前の棚 `autosaves` の中身は移さない） | — |
+| 比べる相手 | ディスクの字（保存していなければ空） | `disk_text`（前の `saved_text`） | — |
+| 最後に書いた字 | 書いた字（同じ字を二度書かないため） | `written`（前の `kept`） | — |
+| 書く | 書く（いまの件を上書き） | `keep` | — |
+| 新しい件 | 始める（文書を入れ替えたとき） | `start` | — |
+| 引き受ける | 開き直した件を引き受ける | `adopt`（`Disk::adopt` と同じ語。`resume` は MoonBit の予約語） | — |
+| いまの件のほか | — | `others` | `Open Unsaved ▸` に並ぶ行 |
+| 開く | 未保存の文書から開く | `open_unsaved` | `Open Unsaved ▸` |
+| 1 件を捨てる | 捨てる | `discard` | —（人が押す口は Don't Save） |
+| 全部捨てる | 全部捨てる | `discard_all` | `Discard all unsaved` |
+| 無いとき | — | — | `Nothing unsaved` |
+| 書けなかった | — | — | `Couldn't keep unsaved changes` |
+| 未保存の印 | 未保存の印 | — | `●`（読み上げ名 `Unsaved changes`） |
+
+消える語: `Autosave` / `Autosaves`、`flow`（流れ）、`seq`（版）、`born`、`span`、`keep_seqs`、`kept`、
+`Forget all autosaves`、`Nothing autosaved yet`、`Unsaved changes are autosaved.`
+
+## 決めていないこと
+
+| 何 | いまの考え |
+|---|---|
+| 開いた `.md` に未保存の字があるとき言うか（Emacs / Vim の形） | 後回し。札の同一性が脆い（下記） |
+| 複数のタブ（ほかのタブで開いている件を一覧から隠す、draw.io の形） | 後回し。鍵をタブごとに持つので、上書きで消える形は起きない |
+| 保存した版の履歴（Blender の `.blend1` の形） | 持たない。要るときに別の機能として決める |
+
 ## 先例 — 退避
 
 | 製品 | いつ取る | 保存・破棄したら | 復元の出し方 |
 |---|---|---|---|
-| VS Code（Hot Exit の backup） | 変わってから 1 秒（auto save が有効なら 2 秒） | 未保存でなくなった瞬間に消す | 次に開いたとき黙って戻す |
+| VS Code（Hot Exit の backup） | 変わってから 1 秒（auto save が有効なら 2 秒） | 未保存でなくなった瞬間に消す（保存でも、戻して一致しても） | 次に開いたとき黙って戻す |
 | Emacs（`#file#`） | 300 打鍵か 30 秒の無入力 | 保存で消す | 開いたとき、写しのほうが新しければ言う（`recover-file`） |
 | Vim（swap） | 200 文字か 4 秒の無入力 | 保存しても消えない（編集をやめるまで） | 開くときに ATTENTION。別の Vim が編集中かの判定も兼ねる |
 | Word（AutoRecover） | 既定 10 分 | 保存せず閉じれば消す。一度も保存していない文書だけ 4 日残す | 次の起動で、元と復元を並べて選ばせる |
@@ -55,7 +124,7 @@ mmm の Auto Save（Files ▸ Open Autosave）は、ブラウザの中（Indexed
 日数で消す方式には、「10 日前に消した字が、保持 10 日のせいで戻せなかった」という報告があり、
 件数で残す要望が出ている（Obsidian）。
 
-## mmm に効く事実
+## 決めの根拠になった事実
 
 ### いつ取るか
 
@@ -69,9 +138,9 @@ mmm の Auto Save（Files ▸ Open Autosave）は、ブラウザの中（Indexed
 
 ### 何を取るか
 
-- **ディスクと同じ字は写さない。** 写しは「ディスクより新しい差分」のためにある。draw.io は
+- **ディスクと同じ字は写さない。** 写しは「ディスクより新しい字」のためにある。draw.io は
   空の図を写さない処理を後から足した（復元の候補に意味の無い行が並ぶと紛らわしい）
-- **ディスクと同じ字になったら消す**（VS Code は保存でも、元に戻して一致したときでも消す）
+- 退避で差分を持つ例は見当たらない。どれも全文
 
 ### 置き場は消えうる
 
@@ -84,7 +153,7 @@ mmm の Auto Save（Files ▸ Open Autosave）は、ブラウザの中（Indexed
 ### 複数のタブ
 
 - 1 つの鍵を後から書いたほうが勝つ作りは、他のタブの字を消す（Excalidraw #10770、未解決）。
-  mmm は写しの鍵にタブごとの流れの id を含むので、この形は起きない
+  mmm は 1 件の鍵を開くたびに振るので、この形は起きない
 - draw.io は「いま生きているタブの写しは一覧に出さない」を localStorage の合図で持つ
 
 ### 札の同一性
@@ -100,19 +169,6 @@ mmm の Auto Save（Files ▸ Open Autosave）は、ブラウザの中（Indexed
   「最後に開いた版 / 保存した版に戻す」が戻った。mmm の「ディスクへ書くのは人が押したときだけ」
   （#306）はこの批判を避けた形になっている
 
-## 決めていないこと（推し）
-
-線（退避だけ）以外はまだ決めていない。推しとして置く。
-
-| 何 | 推し |
-|---|---|
-| いつ取るか | 手が止まって 1 秒のまま。打ち続けても 10 秒で必ず取る。hidden / pagehide で書き切る |
-| 何を取るか | ディスクと違う字だけを、1 文書 1 件で上書き。同じ字になったら消す。5 分ごとの版はやめる |
-| Don't Save のとき | 写しは残す（ディスクと違う字なので「違う字だけ」とも矛盾しない） |
-| 保持 | 件数で。日数の期限は置かない |
-| 書けなかったとき | 言う（`spec.md` が約束しているが未実装）。`persist()` を人の操作の中で頼む |
-| 復元の出し方 | Open Autosave から人が開くまま。開いた `.md` に写しがあるときに言う形（Emacs / Vim）は、札の同一性が脆いので後回し |
-
 ## 出典
 
 退避
@@ -124,6 +180,7 @@ mmm の Auto Save（Files ▸ Open Autosave）は、ブラウザの中（Indexed
 - draw.io — [DrawioFile.js](https://github.com/jgraph/drawio/blob/dev/src/main/webapp/js/diagramly/DrawioFile.js)、[App.js](https://github.com/jgraph/drawio/blob/dev/src/main/webapp/js/diagramly/App.js)
 - Excalidraw — [excalidraw-app/App.tsx](https://github.com/excalidraw/excalidraw/blob/master/excalidraw-app/App.tsx)、[#8395](https://github.com/excalidraw/excalidraw/issues/8395)、[#10770](https://github.com/excalidraw/excalidraw/issues/10770)
 - tldraw — [TLLocalSyncClient.ts](https://github.com/tldraw/tldraw/blob/main/packages/editor/src/lib/utils/sync/TLLocalSyncClient.ts)、[PR #10102](https://github.com/tldraw/tldraw/pull/10102)
+- Typora — [Auto Save](https://support.typora.io/Auto-Save/)
 
 履歴
 - VS Code Local History — [v1.66 release notes](https://code.visualstudio.com/updates/v1_66)、[workingCopyHistoryService.ts](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/services/workingCopy/common/workingCopyHistoryService.ts)
