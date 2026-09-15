@@ -29,31 +29,50 @@ fn Laid::of(n : Node) -> Laid {
 }
 
 ///|
-/// 根の書く形。**側の変わり目は、変わる子の行の手前に書く境界**（綴りは読んだ字、
-/// 無ければ `---`）。
+/// 根の子ごとの、手前に書く境界の綴り。**側が直前の兄弟と変わる子だけ**（先頭の子は
+/// Right から比べる）。綴りは読んだ字、無ければ `---`。書く形（`laid`）と合流
+/// （`turned`）が同じ表を引く
+fn turns(r : Root) -> Array[String?] {
+  let out : Array[String?] = []
+  let mut prev = Right
+  for i, _ in r.node.children {
+    let side = r.sides.get(i).unwrap_or(prev)
+    if side == prev {
+      out.push(None)
+      continue
+    }
+    prev = side
+    out.push(
+      match r.rules.get(i) {
+        Some(s) if s != "" => Some(s)
+        _ => Some("---")
+      },
+    )
+  }
+  out
+}
+
+///|
+/// 根の書く形。**側の変わり目は、変わる子の行の手前に書く境界**（`turns`）。
 ///
 /// **境界の直後の Implicit は、手前の兄弟の尻へ移す。** Implicit は深さを保って
 /// 置き直された行の足場で、行が無いので、手前の兄弟の尻の同じ深さの行の中に
 /// 書くしか深さを保つ道が無い（docs/spec.md「水平線」）。移せなければそのまま書き、
 /// 読み直しが形を決める
 fn laid(r : Root) -> Laid {
+  let rules = turns(r)
   let out : Array[Laid] = []
-  let mut prev = Right
   for i, k in r.node.children {
-    let side = r.sides.get(i).unwrap_or(prev)
-    if side == prev {
-      out.push(Laid::of(k))
-      continue
-    }
-    prev = side
-    let rule = match r.rules.get(i) {
-      Some(s) if s != "" => s
-      _ => "---"
-    }
-    if k.mark is None && out.last() is Some(p) && tuck(p, k, rule) is Some(q) {
-      out[out.length() - 1] = q
-    } else {
-      out.push({ ..Laid::of(k), rule: Some(rule), })
+    match rules[i] {
+      None => out.push(Laid::of(k))
+      Some(rule) =>
+        if k.mark is None &&
+          out.last() is Some(p) &&
+          tuck(p, k, rule) is Some(q) {
+          out[out.length() - 1] = q
+        } else {
+          out.push({ ..Laid::of(k), rule: Some(rule), })
+        }
     }
   }
   { node: r.node, rule: None, kids: out, }

@@ -321,7 +321,7 @@ pub fn ranges(s : Survey, c : Choice) -> Array[Range] {
 /// （`- 野菜` / `(野菜) ---` / `(野菜) - 肉` / `(野菜) メモ` の、野菜と メモ の間の肉。
 /// docs/spec.md「水平線」）。抜くのは跨いだ書かれた行の範囲と、その手前の境界の水平線。
 /// Implicit の地番は子の和なので、跨いだ持ち主の中身まで覆う — 抜く物には数えない
-pub fn Survey::cover(self : Survey, id : Int) -> Array[Range] {
+fn Survey::cover(self : Survey, id : Int) -> Array[Range] {
   guard self.spots.get(id) is Some(sp) else { return [] }
   let inside : Set[Int] = Set([])
   fn mark(n : @tree.Node) -> Unit {
