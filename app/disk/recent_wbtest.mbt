@@ -27,10 +27,6 @@ fn is_handle(v : @core.Any, dir : Bool) -> Bool {
 ///|
 fn memo_store(m : Memo) -> Store {
   {
-    read: fn(key) {
-      m.log.push("read " + key)
-      m.table.get(key).unwrap_or(@core.null())
-    },
     write: fn(key, value) {
       m.log.push("write " + key)
       m.table[key] = value
@@ -100,51 +96,20 @@ async test "あふれたら古いものから捨てる（20 行）" {
 }
 
 ///|
-async test "前の版の鍵（file / assets）を 1 行に読み替え、古い鍵は捨てる。読み替えは 1 度だけ" {
-  let m : Memo = { table: Map([]), log: [], }
-  m.table["file"] = handle(3, "old.md", false)
-  let old = @core.new_object()
-  old._set("directory", handle(7, "pics", true))
-  m.table["assets"] = old
-  let h = Recent::new(memo_store(m))
-  let rows = h.rows()
-  assert_eq(names(rows), ["old.md"])
-  assert_true(rows[0].directory is Some(_))
-  assert_false(m.table.contains("file"))
-  assert_false(m.table.contains("assets"))
-  // 行は自分の鍵へ移っている
-  assert_eq(row_keys(m).length(), 1)
-  // 2 度目は棚を読むだけ
-  m.log.clear()
-  h.rows() |> ignore
-  assert_eq(m.log, ["all"])
-}
-
-///|
-/// 前の版の行（id を持たない）
-fn old_row(id : Int, name : String, seen : Double) -> @core.Any {
-  let o = @core.new_object()
-  o._set("doc", handle(id, name, false))
-  o._set("directory", @core.null())
-  o._set("seen", @core.any(seen))
-  o
-}
-
-///|
-/// 行の鍵だけ
+/// 棚に在る鍵
 fn row_keys(m : Memo) -> Array[String] {
-  m.table.keys().filter(k => k.has_prefix("docs/")).collect()
+  m.table.keys().collect()
 }
 
 ///|
-/// **一覧を丸ごと 1 つの鍵に入れていた版**（`docs`）も、行ごとの鍵へ移す
-async test "前の版の docs（一覧を丸ごと）を、行ごとの鍵へ読み替える" {
+/// **鍵は行の id そのもの。** 頭は付かない（未保存の字の棚と同じ形）
+async test "鍵は行の id。読むのは棚ぜんぶで、鍵で引かない" {
   let m : Memo = { table: Map([]), log: [], }
-  m.table["docs"] = @core.any([old_row(1, "a.md", 2.0), old_row(2, "b.md", 1.0)])
   let h = Recent::new(memo_store(m))
-  assert_eq(names(h.rows()), ["a.md", "b.md"])
-  assert_false(m.table.contains("docs"))
-  assert_eq(row_keys(m).length(), 2)
+  h.opened(file(1, "a.md"))
+  let rows = h.rows()
+  assert_eq(row_keys(m), [rows[0].id])
+  assert_eq(m.log.filter(l => l.has_prefix("write ")), ["write " + rows[0].id])
 }
 
 ///|
@@ -174,15 +139,20 @@ async test "行ごとに鍵。文書が違えば書く鍵も違う" {
 }
 
 ///|
-async test "壊れた行は落とす（型は名乗らせず確かめる）。読めない置き場は空" {
+async test "壊れた行は落とす（型は名乗らせず確かめる）" {
   let m : Memo = { table: Map([]), log: [], }
   let bad = @core.new_object()
+  bad._set("id", @core.any("bad"))
   bad._set("doc", @core.any("not a handle"))
+  m.table["bad"] = bad
+  // 鍵は在るが中身が行の形をしていない（前の版の残り・書き損じ）
+  m.table["junk"] = @core.any(42)
   let good = @core.new_object()
+  good._set("id", @core.any("good"))
   good._set("doc", handle(1, "ok.md", false))
   good._set("directory", @core.null())
   good._set("seen", @core.any(1.0))
-  m.table["docs"] = @core.any([bad, good, @core.any(42)])
+  m.table["good"] = good
   let h = Recent::new(memo_store(m))
   let rows = h.rows()
   assert_eq(names(rows), ["ok.md"])

@@ -159,14 +159,13 @@ pub extern "js" fn idb_ensure_store(db : @core.Any, store : String) -> Unit =
   #| (db, store) => { if (!db.objectStoreNames.contains(store)) db.createObjectStore(store); }
 
 ///|
-pub extern "js" fn idb_close(db : @core.Any) -> Unit =
-  #| (db) => db.close()
+/// 棚を作り直す。**在れば中身ごと捨てる** — 前の版の形を読み替える道を持たない棚に使う
+pub extern "js" fn idb_reset_store(db : @core.Any, store : String) -> Unit =
+  #| (db, store) => { if (db.objectStoreNames.contains(store)) db.deleteObjectStore(store); db.createObjectStore(store); }
 
 ///|
-/// `idb_run` に渡す手 — 1 つ読む
-pub fn idb_get(key : String) -> (@core.Any) -> @core.Any {
-  s => s._call("get", [@core.any(key)])
-}
+pub extern "js" fn idb_close(db : @core.Any) -> Unit =
+  #| (db) => db.close()
 
 ///|
 /// 1 つ置く（あれば書き換える）

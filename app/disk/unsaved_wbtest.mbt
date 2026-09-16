@@ -11,7 +11,6 @@ fn shelf(
   gate? : @js_async.Promise[@core.Any]? = None,
 ) -> Store {
   {
-    read: fn(key) { table.get(key).unwrap_or(@core.null()) },
     write: async fn(key, value) {
       guard !broken else { return false }
       match gate {

@@ -9,10 +9,14 @@
 // 覚えるのは**知っている文書の一覧**だけ。1 行が 1 つの .md で、
 // その文書の画像フォルダを一緒に持つ。
 //
-// **1 行が 1 つの鍵**（`docs/<id>`）。一覧を丸ごと 1 つの鍵に入れると、読みと書きが
+// **1 行が 1 つの鍵**（鍵は行の id）。一覧を丸ごと 1 つの鍵に入れると、読みと書きが
 // 別の取引になり、タブが 2 つあると後の書きが相手の行ごと消す。行を分けておけば、
 // 触るのは自分の行だけで済む。id をこちらで振るのは、**札が鍵にできない**から
 // （中が覗けず、綴りも取れない）。
+//
+// **前の版の形は読み替えない。** 覚えているのは高速化であって真実ではないので、
+// 置き場の版が上がったらこの棚は作り直す — 人は Open で選び直せる（未保存の字の棚は別で、
+// そちらは失うと戻せないので触らない）。
 //
 // **「いま開いているのはこれ」は覚えない。** 起動時に勝手に開き直さないので、
 // 持っていても使い道が無い — 開くのは常に人が選んだとき（Open か、この一覧）。
@@ -37,27 +41,10 @@ pub(all) struct Known {
 let keep = 20
 
 ///|
-/// 行の鍵の頭。後ろに行の id が付く
-let row_prefix = "docs/"
-
-///|
-/// 前の版の鍵。読み替えたら消す（`carry_over`）。
-/// `file` は「いまのファイル」、`assets` は枠 1 つの画像フォルダだった。
-/// `docs` は一覧を丸ごと 1 つの鍵に入れていたときの形
-let legacy_docs = "docs"
-
-///|
-let legacy_file = "file"
-
-///|
-let legacy_assets = "assets"
-
-///|
 /// 置き場。実物は IndexedDB（`idb_store`）、試験は手元の表。
 /// 読み書きの失敗は諦めて null に倒す — private mode でのブロックやスキーマのずれで
 /// 壊れても、開く・新規・保存という本体機能を道連れにしない
 pub(all) struct Store {
-  read : async (String) -> @core.Any
   /// 書く。**書けたかを返す** — 未保存の字は書けなかったことを言う（docs/unsaved.md）
   write : async (String, @core.Any) -> Bool
   remove : async (String) -> Unit
@@ -72,29 +59,19 @@ pub(all) struct Store {
 ///|
 pub struct Recent {
   store : Store
-  /// 読み替えは済んだか。**1 セッションに 1 度でいい** — 済んだ後も毎回
-  /// 古い鍵を読みに行くと、`list` を呼ぶたびに無駄な往復が 4 回増える
-  mut inherited : Bool
 }
 
 ///|
 pub fn Recent::new(store : Store) -> Recent {
-  { store, inherited: false, }
+  { store, }
 }
 
 ///|
-/// 覚えていたものが、いまも期待の形をしているか（型は名乗らせず確かめる）。
-/// id を持たないものは前の版の行なので、読み替えの側（`carry_over`）が id を振る
+/// 覚えていたものが、いまも期待の形をしているか（型は名乗らせず確かめる）
 fn Recent::known_of(self : Recent, v : @core.Any) -> Known? {
-  let id = @web.field(v, "id")
-  guard @core.is_object(v) && @core.typeof_(id) == "string" else { return None }
-  self.row_at(v, id.cast())
-}
-
-///|
-/// 行の中身（id 以外）を確かめる
-fn Recent::row_at(self : Recent, v : @core.Any, id : String) -> Known? {
   guard @core.is_object(v) else { return None }
+  let id = @web.field(v, "id")
+  guard @core.typeof_(id) == "string" else { return None }
   let doc = @web.field(v, "doc")
   guard (self.store.is_file)(doc) else { return None }
   let dir = @web.field(v, "directory")
@@ -107,44 +84,7 @@ fn Recent::row_at(self : Recent, v : @core.Any, id : String) -> Known? {
   }
   let seen = @web.field(v, "seen")
   guard @core.typeof_(seen) == "number" else { return None }
-  Some({ id, doc: doc.cast(), directory, seen: seen.cast(), })
-}
-
-///|
-/// 前の版が残したものを、行ごとの鍵へ読み替える。**版が上がっただけで
-/// 開き直しをさせない。** 読み替えたら古い鍵は捨てる。
-///
-/// 読み替える形は 2 つ。一覧を丸ごと入れていた `docs` と、その前の
-/// `file`（いまのファイル）+ `assets`（枠 1 つの画像フォルダ）
-async fn Recent::carry_over(self : Recent) -> Unit {
-  guard !self.inherited else { return }
-  self.inherited = true
-  let bulk = (self.store.read)(legacy_docs)
-  if @core.is_array(bulk) {
-    for v in @core.array_from(bulk) {
-      guard self.row_at(v, @web.unique_id()) is Some(row) else { continue }
-      self.put(row)
-    }
-    (self.store.remove)(legacy_docs)
-  }
-  let file = (self.store.read)(legacy_file)
-  if (self.store.is_file)(file) {
-    let old = (self.store.read)(legacy_assets)
-    let dir = if @core.is_object(old) &&
-      (self.store.is_dir)(@web.field(old, "directory")) {
-      Some((@web.field(old, "directory").cast() : @web.DirHandle))
-    } else {
-      None
-    }
-    self.put({
-      id: @web.unique_id(),
-      doc: file.cast(),
-      directory: dir,
-      seen: @web.now(),
-    })
-  }
-  (self.store.remove)(legacy_file)
-  (self.store.remove)(legacy_assets)
+  Some({ id: id.cast(), doc: doc.cast(), directory, seen: seen.cast(), })
 }
 
 ///|
@@ -163,7 +103,6 @@ fn row_of(k : Known) -> @core.Any {
 /// 知っている文書。**最後に触れた順** — Files の並びがそのままこれ。
 /// 並べるのは読むとき（書くのは自分の行 1 つだけなので、並びを書き戻す口が無い）
 async fn Recent::rows(self : Recent) -> Array[Known] {
-  self.carry_over()
   by_recent((self.store.all)().filter_map(x => self.known_of(x)))
 }
 
@@ -202,7 +141,7 @@ fn by_recent(rows : Array[Known]) -> Array[Known] {
 /// 行を 1 つ置く。**触るのは自分の行だけ** — 隣の行は読みもしない
 async fn Recent::put(self : Recent, row : Known) -> Unit {
   // 書けなくても言わない — 覚えているのは高速化であって、真実ではない（冒頭）
-  (self.store.write)(row_prefix + row.id, row_of(row)) |> ignore
+  (self.store.write)(row.id, row_of(row)) |> ignore
 }
 
 ///|
@@ -210,7 +149,7 @@ async fn Recent::put(self : Recent, row : Known) -> Unit {
 async fn Recent::trim(self : Recent) -> Unit {
   let rows = self.rows()
   for i in keep..<rows.length() {
-    (self.store.remove)(row_prefix + rows[i].id)
+    (self.store.remove)(rows[i].id)
   }
 }
 
@@ -322,9 +261,9 @@ pub let handles_shelf = "handles"
 pub let unsaved_shelf = "unsaved"
 
 ///|
-/// 置き場の版。**棚を増やしたら上げる** — 上げないと、前から在るタブの DB に
-/// 新しい棚が生えない。前の版の棚（`autosaves` など）の中身は移さない
-let db_version = 4
+/// 置き場の版。**棚を増やしたら・形を変えたら上げる** — 上げないと、前から在るタブの
+/// DB に新しい棚が生えない。前の版の中身は移さない
+let db_version = 5
 
 ///|
 /// 実物の置き場（IndexedDB）。1 つの取引ごとに開いて閉じる。失敗は null に倒す
@@ -334,7 +273,9 @@ pub fn idb_store(shelf : String) -> Store {
     op : (@core.Any) -> @core.Any,
   ) -> @core.Any {
     let db = @web.idb_open(db_name, db_version, d => {
-      @web.idb_ensure_store(d, handles_shelf)
+      // 札の棚は版が上がったら作り直す（読み替えない。冒頭）。
+      // 未保存の字は失うと戻せないので、棚ごと残す
+      @web.idb_reset_store(d, handles_shelf)
       @web.idb_ensure_store(d, unsaved_shelf)
     }).wait() catch {
       _ => return @core.null()
@@ -346,7 +287,6 @@ pub fn idb_store(shelf : String) -> Store {
     out
   }
   {
-    read: async fn(key) { run("readonly", @web.idb_get(key)) },
     // put が済めば鍵が返る。null は開けなかった・書けなかった（`run` が倒した）
     write: async fn(key, value) {
       !@core.is_nullish(run("readwrite", @web.idb_put(key, value)))

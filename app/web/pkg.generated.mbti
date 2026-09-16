@@ -106,11 +106,11 @@ pub fn idb_delete(String) -> (@core.Any) -> @core.Any
 
 pub fn idb_ensure_store(@core.Any, String) -> Unit
 
-pub fn idb_get(String) -> (@core.Any) -> @core.Any
-
 pub fn idb_open(String, Int, (@core.Any) -> Unit) -> @js_async.Promise[@core.Any]
 
 pub fn idb_put(String, @core.Any) -> (@core.Any) -> @core.Any
+
+pub fn idb_reset_store(@core.Any, String) -> Unit
 
 pub fn idb_run(@core.Any, String, String, (@core.Any) -> @core.Any) -> @js_async.Promise[@core.Any]
 
