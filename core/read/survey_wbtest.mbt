@@ -1,4 +1,4 @@
-// Survey — 打鍵 1 回ぶんの読み。木と地番への問い合わせを md の字で固定する。
+// Survey — 打鍵 1 回ぶんの読み。木と場所への問い合わせを md の字で固定する。
 
 ///|
 test "is_node / empty / find / blocks" {

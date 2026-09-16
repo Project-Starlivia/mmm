@@ -84,7 +84,7 @@ pub(all) struct Rung {
 ///
 /// **桁は原文から測る。** 塊が持つ原文（`Block.source`）では測れない — `carve` が
 /// 1 行目の桁を引いて塊ごとに基準を戻すので、1 行目より浅い行は 1 行目と同じ桁に
-/// 見え、空行の後の塊は左余白を失う。原文と地番から測れば、空行も塊の境も桁に
+/// 見え、空行の後の塊は左余白を失う。原文と場所から測れば、空行も塊の境も桁に
 /// 効かない（#118）
 pub fn rungs(md : String, spot : Spot) -> Array[Rung]? {
   let blocks = read(slice(md, spot.from, spot.to)).children.filter(b => {

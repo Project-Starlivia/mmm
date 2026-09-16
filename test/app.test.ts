@@ -7,11 +7,11 @@ import assert from "node:assert/strict";
 import * as core from "../src/app.ts";
 import { survey } from "../src/app.ts";
 
-test("survey は持ち手 — 問い合わせで読む。地番の label が無ければ null、無い id は null", () => {
+test("survey は持ち手 — 問い合わせで読む。場所の label が無ければ null、無い id は null", () => {
   const s = survey("# r\n\n## a\n\n```\nx\n```\n");
   assert.equal(core.empty(s), false);
   assert.equal(core.empty(survey("")), true);
-  assert.deepEqual(core.spot(s, 3), { from: 5, label: 8, to: 21 }); // 地番は中身まで
+  assert.deepEqual(core.spot(s, 3), { from: 5, label: 8, to: 21 }); // 場所は中身まで
   assert.deepEqual(core.spot(s, 4), { from: 11, label: null, to: 21 });
   assert.equal(core.spot(s, 9), null);
   assert.equal(core.find(s, "a"), 3);

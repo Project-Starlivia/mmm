@@ -99,7 +99,7 @@ test("highlightRanges — 薄塗りは地図が持つ間だけ。ノードは子
   const s = make(md, 8);
   assert.deepEqual(highlightRanges(s), []); // md が持つ間は塗らない
   const held = s.update({ effects: [setHolder.of("map"), setAnchors.of(core.nodeAt([8], 8))] }).state;
-  assert.deepEqual(highlightRanges(held), [{ from: 5, to: 10 }]); // a の地番
+  assert.deepEqual(highlightRanges(held), [{ from: 5, to: 10 }]); // a の場所
   const root = s.update({ effects: [setHolder.of("map"), setAnchors.of(core.nodeAt([2], 2))] }).state;
   assert.deepEqual(highlightRanges(root), [{ from: 0, to: 16 }]); // 根は子孫まで
   const card = make("# r\n\n## a\n\n```\nx\n```\n")

@@ -1,8 +1,8 @@
 // md のカーソル、または地図の選択の位置が、どのノード（かカード）に掛かっているか。
 // DOM も文書の意味も知らない、区間の重なりだけの層。選択の規則はここにしか無い。
 //
-// 自身の文 = 地番の頭から最初の子の頭まで、**と子の後ろに書かれた中身**（列 0 の
-// 塊は開いている項目を閉じるので、子より後ろに書かれることがある。#204）。地番は
+// 自身の文 = 場所の頭から最初の子の頭まで、**と子の後ろに書かれた中身**（列 0 の
+// 塊は開いている項目を閉じるので、子より後ろに書かれることがある。#204）。場所は
 // 入れ子なので、これで「最も深いノード」が出る。子孫まで含む `to` で見ると、
 // カーソル 1 つでも根までの祖先が全部光り、選択と見分けが付かない（spec.md
 // 「選択の持ち主」）。
@@ -272,7 +272,7 @@ pub fn carry(a : Anchors, at : (Int) -> Int) -> Anchors {
 }
 
 ///|
-/// focus の id をその木の地番で位置に。ノードならラベルの頭、中身なら原文の頭。無ければ None
+/// focus の id をその木の場所で位置に。ノードならラベルの頭、中身なら原文の頭。無ければ None
 pub fn anchors_of(s : Survey, id : Int?) -> Anchors? {
   guard id is Some(id) else { return None }
   guard s.spots.get(id) is Some(sp) else { return None }
@@ -281,7 +281,7 @@ pub fn anchors_of(s : Survey, id : Int?) -> Anchors? {
 }
 
 ///|
-/// 選択（id）をその木の地番で位置に。地図で選んだときの setAnchors の値。Implicit は行が無いので入らない
+/// 選択（id）をその木の場所で位置に。地図で選んだときの setAnchors の値。Implicit は行が無いので入らない
 pub fn anchors_for(s : Survey, c : Choice) -> Anchors? {
   match c {
     Card(id~) => s.spots.get(id).map(sp => CardAt(at=sp.from))
@@ -295,7 +295,7 @@ pub fn anchors_for(s : Survey, c : Choice) -> Anchors? {
 
 ///|
 /// md 側で薄く塗る範囲。ノードは部分木の原文（`Survey::cover`）、カードは中身の原文。
-/// 無い地番は落とす。「地図が持つ間だけ」は呼ぶ側（state.ts）が見る
+/// 無い場所は落とす。「地図が持つ間だけ」は呼ぶ側（state.ts）が見る
 pub fn ranges(s : Survey, c : Choice) -> Array[Range] {
   match c {
     Card(id~) =>
@@ -314,14 +314,14 @@ pub fn ranges(s : Survey, c : Choice) -> Array[Range] {
 }
 
 ///|
-/// ノードの部分木が原文に書かれた範囲、原文の順。ふつうは地番 1 本。
+/// ノードの部分木が原文に書かれた範囲、原文の順。ふつうは場所 1 本。
 ///
 /// **部分木の外の物を跨げば、そこを抜いて割る。** 境界は中身の持ち主を変えないので、
 /// 持ち主の中身が、境界で置き直された行より下に書かれていることがある
 /// （`- 野菜` / `(野菜) ---` / `(野菜) - 肉` / `(野菜) メモ` の、野菜と メモ の間の肉。
 /// docs/spec.md「水平線」）。抜くのは跨いだ**外の書かれた行**（手前の境界の水平線から —
 /// 読みが控えた `Spot.border`）と、**外の持ち主の中身**（肉と魚を抱える Implicit の間の メモ）。
-/// Implicit は行を持たないので抜く物には数えない（地番は子の和）
+/// Implicit は行を持たないので抜く物には数えない（場所は子の和）
 fn Survey::cover(self : Survey, id : Int) -> Array[Range] {
   guard self.spots.get(id) is Some(sp) else { return [] }
   let inside : Set[Int] = Set([])
@@ -333,7 +333,7 @@ fn Survey::cover(self : Survey, id : Int) -> Array[Range] {
   }
 
   each_node(self.doc, n => if n.id == id { mark(n) })
-  // 置き直された行の手前の境界の頭を、その行の頭で引く（Implicit の地番も最初の行から始まる）
+  // 置き直された行の手前の境界の頭を、その行の頭で引く（Implicit の場所も最初の行から始まる）
   let borders : Map[Int, Int] = Map([])
   for _, o in self.spots {
     if o.border is Some(b) {

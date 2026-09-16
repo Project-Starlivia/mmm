@@ -151,7 +151,7 @@ export class MdEditor {
     this.view.dispatch({ changes, effects: focus === undefined ? [] : [focused.of(focus)] });
   }
 
-  /** 地図で選び直した。位置は core が地番で写してから渡す（無ければ null） */
+  /** 地図で選び直した。位置は core が場所で写してから渡す（無ければ null） */
   select(a: core.Anchors | null): void {
     this.view.dispatch({ effects: setAnchors.of(a) });
   }

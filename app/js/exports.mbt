@@ -87,7 +87,7 @@ fn selection_of(o : @core.Any) -> @map.Selection {
 // 1 トランザクションごとに写す・導くのに要る問い合わせだけがここに残る
 
 ///|
-/// 打鍵 1 回ぶんの読み。返るのは読み（木・地番・原文）の持ち手 — 木は出さない
+/// 打鍵 1 回ぶんの読み。返るのは読み（木・場所・原文）の持ち手 — 木は出さない
 #export_name("mmmSurvey")
 pub fn mmm_survey(md : String) -> @core.Any {
   @core.any(@read.survey(md))
@@ -172,7 +172,7 @@ pub fn mmm_card(choice : @core.Any) -> Int? {
 }
 
 ///|
-/// focus の id をその木の地番で位置に（持ち手。無ければ null）
+/// focus の id をその木の場所で位置に（持ち手。無ければ null）
 #export_name("mmmAnchorsOf")
 pub fn mmm_anchors_of(survey : @core.Any, id : Int?) -> @core.Any {
   @core.from_option(@read.anchors_of(read(survey), id))

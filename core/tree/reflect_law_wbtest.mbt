@@ -1,7 +1,7 @@
 // 反映の法則を総当たりで固定する。
 //
 //   法則 — 編集を当てて読み直せば、後の木と形が一致する（id は見ない）
-//   比例性 — ラベルを変えただけなら、編集はそのノードの地番の中に 1 つ
+//   比例性 — ラベルを変えただけなら、編集はそのノードの場所の中に 1 つ
 //   行の不可侵 — 行（ラベル・畳み・種類）が同じノードの行は、どの編集の範囲にも入らない
 //   隙間の保存 — 編集を当てた md に、元に無かった連続空行は無い
 //
@@ -135,7 +135,7 @@ fn whole(md : String, edits : Array[Edit]) -> Bool {
 fn grain(
   md : String,
   before : Doc,
-  spans : Map[Int, Spot],
+  spots : Map[Int, Spot],
   after : Doc,
   edits : Array[Edit],
   what : String,
@@ -161,10 +161,10 @@ fn grain(
   }
   for id in all_ids(before) {
     guard news.get(id) is Some(x) else { continue }
-    let old = spans.get(id).unwrap()
+    let old = spots.get(id).unwrap()
     guard x.mark is Some(_) && !under_fold(before, id) else { continue }
     guard same_line(olds.get(id).unwrap(), x) else { continue }
-    let line_to = label_end(md, spans, olds.get(id).unwrap())
+    let line_to = label_end(md, spots, olds.get(id).unwrap())
     for e in edits {
       if e.from < line_to && e.to > old.from {
         fail(
@@ -302,11 +302,11 @@ fn[T] fit(xs : Array[T], node : Node, pad : T) -> Array[T] {
 fn law(
   md : String,
   before : Doc,
-  spans : Map[Int, Spot],
+  spots : Map[Int, Spot],
   after : Doc,
   what : String,
 ) -> Array[Edit] raise {
-  let { edits, same_shape, } = reflect(md, before, spans, after)
+  let { edits, same_shape, } = reflect(md, before, spots, after)
   let out = patched(md, edits)
   guard shape(parse(out)) == shape(after) else {
     fail("\{what}: 形が違う\n--- md\n\{md}\n--- out\n\{out}")
@@ -328,12 +328,12 @@ fn law(
 ///|
 test "法則 — 全ノードのラベルを変える。比例性も見る" {
   for md in corpus {
-    let (before, spans) = build(md)
+    let (before, spots) = build(md)
     for id in all_ids(before) {
       let after = changed(before, id, Relabel)
-      let edits = law(md, before, spans, after, "relabel \{id} in \{md}")
-      let s = spans.get(id).unwrap()
-      // Implicit はラベルが無いので変わらない。それ以外は 1 つ、地番の中
+      let edits = law(md, before, spots, after, "relabel \{id} in \{md}")
+      let s = spots.get(id).unwrap()
+      // Implicit はラベルが無いので変わらない。それ以外は 1 つ、場所の中
       if after == before {
         guard edits.is_empty() else {
           fail("relabel \{id}: 変わっていないのに編集がある")
@@ -343,7 +343,7 @@ test "法則 — 全ノードのラベルを変える。比例性も見る" {
           edits[0].from >= s.from &&
           edits[0].to <= s.to else {
           fail(
-            "relabel \{id} in \{md}: 地番の外に及ぶ \{edits.to_json().stringify()}",
+            "relabel \{id} in \{md}: 場所の外に及ぶ \{edits.to_json().stringify()}",
           )
         }
       }
@@ -354,10 +354,10 @@ test "法則 — 全ノードのラベルを変える。比例性も見る" {
 ///|
 test "法則 — 全ノードを消す" {
   for md in corpus {
-    let (before, spans) = build(md)
+    let (before, spots) = build(md)
     for id in all_ids(before) {
       let after = changed(before, id, Delete)
-      ignore(law(md, before, spans, after, "delete \{id} in \{md}"))
+      ignore(law(md, before, spots, after, "delete \{id} in \{md}"))
     }
   }
 }
@@ -365,14 +365,14 @@ test "法則 — 全ノードを消す" {
 ///|
 test "法則 — 全ノードに子を足す" {
   for md in corpus {
-    let (before, spans) = build(md)
+    let (before, spots) = build(md)
     for id in all_ids(before) {
       let after = changed(before, id, Adopt)
       // 書けない木（`- # h` の項目に項目の子を足すと、見出しに飲み込まれる）は check が断る
       if !check(after).is_empty() {
         continue
       }
-      ignore(law(md, before, spans, after, "adopt \{id} in \{md}"))
+      ignore(law(md, before, spots, after, "adopt \{id} in \{md}"))
     }
   }
 }
@@ -380,15 +380,15 @@ test "法則 — 全ノードに子を足す" {
 ///|
 test "法則 — 根を足す・消す" {
   for md in corpus {
-    let (before, spans) = build(md)
+    let (before, spots) = build(md)
     let more : Doc = {
       ..before,
       roots: before.roots + [{ node: newborn(false), sides: [], rules: [], }],
     }
-    ignore(law(md, before, spans, more, "add root to \{md}"))
+    ignore(law(md, before, spots, more, "add root to \{md}"))
     if !before.roots.is_empty() {
       let less : Doc = { ..before, roots: before.roots[1:].to_owned(), }
-      ignore(law(md, before, spans, less, "drop root of \{md}"))
+      ignore(law(md, before, spots, less, "drop root of \{md}"))
     }
   }
 }
@@ -396,7 +396,7 @@ test "法則 — 根を足す・消す" {
 ///|
 test "法則 — 行の不可侵と隙間の保存。全ノード × 全部の変え方" {
   for md in corpus {
-    let (before, spans) = build(md)
+    let (before, spots) = build(md)
     for id in all_ids(before) {
       for how in [Relabel, Delete, Adopt, AddBlock, DropBlock, SetBlock, Swap] {
         let after = changed(before, id, how)
@@ -405,8 +405,8 @@ test "法則 — 行の不可侵と隙間の保存。全ノード × 全部の�
           continue
         }
         let what = "\{name(how)} \{id} in \{md}"
-        let edits = law(md, before, spans, after, what)
-        grain(md, before, spans, after, edits, what)
+        let edits = law(md, before, spots, after, what)
+        grain(md, before, spots, after, edits, what)
       }
     }
   }

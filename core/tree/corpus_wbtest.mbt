@@ -175,7 +175,7 @@ test "見本 — 読んで書き戻した字" {
 /// 例外 — 混ざったまま持つと、書き戻した md の中で改行が 2 通りになる。
 ///
 /// 揃えるのは木へ渡す所だけ（`carve` / `strip` と、ライブラリから来る字）。**原文その
-/// ものは 1 バイトも変えない** — 地番は原文の位置を指し、記法構造の書き戻しは
+/// ものは 1 バイトも変えない** — 場所は原文の位置を指し、記法構造の書き戻しは
 /// `slice` で切るので、どちらも CR をそのまま返す（`見本 — 触っていない記法構造を…`）。
 /// 木を JSON に落として見るので、**字を持つ欄を 1 つも取りこぼさない**
 /// （label / source / content / rules / frontmatter / summary）。
@@ -273,7 +273,7 @@ fn ids_in_reading_order(doc : Doc) -> Array[Int] {
 /// 歩き方が「ノード → その中身 → 子」なので、この 1 本が 2 つの法則を同時に言う。
 ///
 /// 頼る側: `core/map/select.mbt` の並べ替えと `Layout.order`（id の大小で文書順）、
-/// `core/read/caret.mbt` の `owns`（自身の文は地番の頭から最初の子の頭まで）。
+/// `core/read/caret.mbt` の `owns`（自身の文は場所の頭から最初の子の頭まで）。
 test "見本 — id の順 = 文書順" {
   let bad : Array[String] = []
   for md in read_corpus {

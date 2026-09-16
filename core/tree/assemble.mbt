@@ -7,7 +7,7 @@
 
 ///|
 /// 組み立て中のノード。深さは stack の高さが持つので、自分では持たない。
-/// 番号と地番は導けるので持たず、`to_node` が配る。
+/// 番号と場所は導けるので持たず、`to_node` が配る。
 priv struct Frame {
   /// 行に書かれていた綴り。飛び（Implicit）は None
   mark : Mark?
@@ -27,7 +27,7 @@ priv struct Frame {
   to : Int
   /// ラベルの頭（マーカーの後ろ）。飛び（Implicit）は行を持たないので -1
   at_label : Int
-  /// 中身（body）と並走する地番。`to_node` が番号と付き合わせて spans に写す
+  /// 中身（body）と並走する場所。`to_node` が番号と付き合わせて spots に写す
   body_at : Array[Spot]
 }
 
@@ -195,14 +195,14 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
       }
     }
   }
-  let spans : Map[Int, Spot] = Map([])
+  let spots : Map[Int, Spot] = Map([])
   // 番号を配る箱。木を歩きながら文書順に振る
   let next : Ref[Int] = { val: doc_id + 1, }
   let from = match n.frontmatter {
     Some(f) => f.span.to
     None => 0
   }
-  spans[doc_id] = {
+  spots[doc_id] = {
     from,
     label: None,
     border: None,
@@ -214,41 +214,41 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
   }
   number_blocks(l.body, next)
   for i, at in l.body_at {
-    spans[l.body[i].id] = at
+    spots[l.body[i].id] = at
   }
   let doc : Doc = {
     // frontmatter の字もライブラリから来る。木が抱える字は LF だけ
     frontmatter: n.frontmatter.map(f => lf(f.raw)),
     body: l.body,
-    roots: l.roots.map(f => to_root(f, next, spans)),
+    roots: l.roots.map(f => to_root(f, next, spots)),
   }
-  (doc, spans)
+  (doc, spots)
 }
 
 ///|
 /// 森の 1 本を根にする。子の側と境界の綴りは積むときに決まっている。
-fn to_root(f : Frame, next : Ref[Int], spans : Map[Int, Spot]) -> Root {
+fn to_root(f : Frame, next : Ref[Int], spots : Map[Int, Spot]) -> Root {
   {
-    node: to_node(f, next, spans),
+    node: to_node(f, next, spots),
     sides: f.kids.map(k => k.side),
     rules: f.kids.map(k => k.rule),
   }
 }
 
 ///|
-/// 枠をノードにし、番号と地番を配る。綴りはそのまま運ぶ。
-/// **番号は文書順**（自分 → 中身 → 子）なので行きがけに振り、**地番は子が
+/// 枠をノードにし、番号と場所を配る。綴りはそのまま運ぶ。
+/// **番号は文書順**（自分 → 中身 → 子）なので行きがけに振り、**場所は子が
 /// 揃ってからでないと決まらない**ので帰りがけに置く。
-fn to_node(f : Frame, next : Ref[Int], spans : Map[Int, Spot]) -> Node {
+fn to_node(f : Frame, next : Ref[Int], spots : Map[Int, Spot]) -> Node {
   let id = next.val
   next.val = id + 1
   // 中身は子より前に書かれているので、先に振る
   number_blocks(f.body, next)
   for i, at in f.body_at {
-    spans[f.body[i].id] = at
+    spots[f.body[i].id] = at
   }
-  let children = f.kids.map(k => to_node(k, next, spans))
-  spans[id] = frame_at(f, children, spans)
+  let children = f.kids.map(k => to_node(k, next, spots))
+  spots[id] = frame_at(f, children, spots)
   { id, label: f.label, fold: f.fold, body: f.body, children, mark: f.mark, }
 }
 
@@ -263,12 +263,12 @@ fn number_blocks(body : Array[Block], next : Ref[Int]) -> Unit {
 }
 
 ///|
-/// 枠の地番。骨格の行の頭から、**自分と子孫の中身の一番後ろの尻まで**。
+/// 枠の場所。骨格の行の頭から、**自分と子孫の中身の一番後ろの尻まで**。
 /// **尻は最後の子とは限らない** — 境界は中身の持ち主を変えないので、子の中身が後ろの子
 /// （置き直された行）より下に書かれていることがある（`## a / --- / - b / text` の text）。
 /// 行を持たない飛びは範囲ごと子の和。畳みの尻（`</details>`）は子より後ろに
 /// 在るので、大きいほうを採れば保たれる。
-fn frame_at(f : Frame, children : Array[Node], spans : Map[Int, Spot]) -> Spot {
+fn frame_at(f : Frame, children : Array[Node], spots : Map[Int, Spot]) -> Spot {
   let mut from = f.from
   let mut to = f.to
   for at in f.body_at {
@@ -277,7 +277,7 @@ fn frame_at(f : Frame, children : Array[Node], spans : Map[Int, Spot]) -> Spot {
     }
   }
   for k in children {
-    let at = spans[k.id]
+    let at = spots[k.id]
     if from == no_line {
       from = at.from
     }

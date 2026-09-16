@@ -9,7 +9,7 @@
 /// 末尾の改行も記法なので落とす。
 ///
 /// **改行は LF に揃える**（`lf`）— 「木が抱える字は LF だけ」という不変量。原文を
-/// そのまま返す道（記法構造の書き戻し、地番）は `slice` を使うので影響しない。
+/// そのまま返す道（記法構造の書き戻し、場所）は `slice` を使うので影響しない。
 fn carve(md : String, from : Int, to : Int) -> String {
   let mut z = to
   // 尻の改行と、空白だけの尻の行は記法の外（塊の後ろの空行。文書の尻の空白だけの行も）
@@ -61,7 +61,7 @@ fn unindent(text : String, n : Int) -> String {
 }
 
 ///|
-/// 原文の切り出し。**1 バイトも変えない** — 記法構造の書き戻しと地番はこれを使う。
+/// 原文の切り出し。**1 バイトも変えない** — 記法構造の書き戻しと場所はこれを使う。
 fn slice(md : String, from : Int, to : Int) -> String {
   String::unsafe_substring(md, start=from, end=to)
 }

@@ -22,7 +22,7 @@ pub(all) struct Editor {
   set_text : (String) -> Unit
   /// 編集列を順に当てる（undo は 1 手）。`held` なら同じトランザクションで focus の effect が乗る
   apply : (Array[Array[@tree.Edit]], Bool, Int?) -> Unit
-  /// 地図で選び直した。位置は地番で写してから渡す
+  /// 地図で選び直した。位置は場所で写してから渡す
   select : (@read.Anchors?) -> Unit
   /// フォーカスがペインに入った。md → map なら引き継ぐ位置も一緒に
   hold : (@read.Holder, @read.Anchors?) -> Unit
@@ -251,7 +251,7 @@ fn App::choice(self : App) -> @read.Choice {
 }
 
 ///|
-/// 選択（id）をいまの木の地番で位置に。CodeMirror へ渡すのはこの形
+/// 選択（id）をいまの木の場所で位置に。CodeMirror へ渡すのはこの形
 fn App::anchors_for(self : App, c : @read.Choice) -> @read.Anchors? {
   @read.anchors_for(self.survey(), c)
 }
@@ -263,7 +263,7 @@ fn App::declared_folder(self : App) -> String? {
 }
 
 ///|
-/// その中身の原文。地番で md から切り出す（無ければ空）
+/// その中身の原文。場所で md から切り出す（無ければ空）
 fn App::block_text(self : App, id : Int) -> String {
   match self.survey().spots.get(id) {
     Some(sp) => String::unsafe_substring(self.text(), start=sp.from, end=sp.to)

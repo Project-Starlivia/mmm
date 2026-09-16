@@ -252,13 +252,13 @@ test "見本 — 階層が言う隙間は、正規形の字と一致する" {
 /// 並ばなければ None — 反映もそこは全文へ落ちるので、突き合わせる相手が居ない。
 fn spelt(doc : Doc) -> Map[Int, Bool]? {
   let canon = serialize(doc)
-  let (read, spans) = build(canon)
+  let (read, spots) = build(canon)
   let mine = spelt_elements(doc)
   let read_ids = spelt_elements(read)
   guard mine.length() == read_ids.length() else { return None }
   let out : Map[Int, Bool] = Map([])
   for i, id in mine {
-    let s = spans.get(read_ids[i]).unwrap()
+    let s = spots.get(read_ids[i]).unwrap()
     let head = line_start(canon, s.from)
     out[id] = blank_start(canon, head) < head
   }

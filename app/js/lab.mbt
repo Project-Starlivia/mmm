@@ -72,7 +72,7 @@ pub fn mmm_empty(survey : @core.Any) -> Bool {
 }
 
 ///|
-/// その id の地番（from, label, to）。label が無ければ -1。id が無ければ undefined
+/// その id の場所（from, label, to）。label が無ければ -1。id が無ければ undefined
 #export_name("mmmSpot")
 pub fn mmm_spot(survey : @core.Any, id : Int) -> FixedArray[Int]? {
   read(survey).spots.get(id).map(sp => [sp.from, sp.label.unwrap_or(-1), sp.to])
