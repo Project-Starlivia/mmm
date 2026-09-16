@@ -24,7 +24,7 @@ import type { Token } from "./highlight.ts";
 // ---- 読み ----
 
 declare const surveyBrand: unique symbol;
-/** 打鍵 1 回ぶんの読み（持ち手）。木と地番と原文は core にしか無い */
+/** 打鍵 1 回ぶんの読み（持ち手）。木と場所と原文は core にしか無い */
 export interface Survey {
   readonly [surveyBrand]: never;
 }
@@ -105,13 +105,13 @@ export const chosen = (s: Survey, holder: Holder, caret: Caret, a: Anchors | nul
     ),
   );
 
-/** focus の id をその木の地番で位置に。無ければ null */
+/** focus の id をその木の場所で位置に。無ければ null */
 export const anchorsOf = (s: Survey, id: number | null): Anchors | null => handle(mbt.mmmAnchorsOf(s, id ?? undefined));
 
 /** 位置を編集で写す。`at` は点の写し（CodeMirror の `changes.mapPos`） */
 export const carry = (a: Anchors, at: (p: number) => number): Anchors => Object(mbt.mmmCarry(a, at));
 
-/** md 側で薄く塗る範囲。ノードは地番そのもの（子孫込み）、カードは中身の原文 */
+/** md 側で薄く塗る範囲。ノードは場所そのもの（子孫込み）、カードは中身の原文 */
 export const ranges = (s: Survey, c: Choice): Range[] => {
   const flat = mbt.mmmRanges(s, c);
   const out: Range[] = [];
@@ -143,7 +143,7 @@ interface Editor {
   setText(text: string): void;
   /** 編集列を順に当てる（undo は 1 手）。`held` なら同じトランザクションで focus の effect が乗る */
   apply(sets: Edit[][], held: boolean, focus: number | null): void;
-  /** 地図で選び直した。位置は地番で写してある（無ければ null） */
+  /** 地図で選び直した。位置は場所で写してある（無ければ null） */
   select(a: Anchors | null): void;
   /** フォーカスがペインに入った。md → map なら引き継ぐ位置も一緒に（md へなら null） */
   hold(h: Holder, a: Anchors | null): void;
@@ -254,14 +254,14 @@ export const isNode = (s: Survey, id: number): boolean => mbt.mmmIsNode(s, id);
 /** 木が 1 つも無い（白紙） */
 export const empty = (s: Survey): boolean => mbt.mmmEmpty(s);
 
-/** 地番。from..to が原文の範囲、label はラベルの頭（無いノードは null） */
+/** 場所。from..to が原文の範囲、label はラベルの頭（無いノードは null） */
 interface Spot {
   from: number;
   label: number | null;
   to: number;
 }
 
-/** その id の地番。無い id は null */
+/** その id の場所。無い id は null */
 export const spot = (s: Survey, id: number): Spot | null =>
   opt(mbt.mmmSpot(s, id), (v) => {
     const [from, label, to] = nums(v, 3);

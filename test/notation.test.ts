@@ -48,7 +48,7 @@ const SIZES: Array<{ name: string; nodes: number }> = [
   { name: "rich.md", nodes: 301 },
 ];
 
-/** 木のノードの数。地番の在る id を頭から辿って数える */
+/** 木のノードの数。場所の在る id を頭から辿って数える */
 function nodeCount(md: string): number {
   const s = survey(md);
   let n = 0;

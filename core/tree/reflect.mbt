@@ -1,11 +1,11 @@
 // 反映 — 前後の木を比べ、変わった所だけを原文 md に映す。
 //
-// 受け取るのは原文・前の Doc とその地番・後の Doc の 4 つで、返すのは編集列と
+// 受け取るのは原文・前の Doc とその場所・後の Doc の 4 つで、返すのは編集列と
 // その検証の答え。後の Doc が誰にどう作られたか（操作・undo のスナップショット）は知らない。
 //
 // 突き合わせるのは 3 つ:
 //
-//   原文     ユーザーが書いた md（書き方の流儀はここに在る）。要素ごとの居場所は地番
+//   原文     ユーザーが書いた md（書き方の流儀はここに在る）。要素ごとの居場所は場所
 //   前の木   操作の前。要素ごとに、手前が空行で分かれるか（`parted`）
 //   後の木   操作の後。同上
 //
@@ -65,13 +65,13 @@ pub(all) struct Reflected {
 pub fn reflect(
   md : String,
   before : Doc,
-  spans : Map[Int, Spot],
+  spots : Map[Int, Spot],
   after : Doc,
 ) -> Reflected {
   let planned = if before == after {
     Some([])
   } else {
-    plan(md, before, spans, after)
+    plan(md, before, spots, after)
   }
   if planned is Some(edits) && verified(md, edits, after) is Some(same_shape) {
     return { edits, same_shape, }
@@ -104,7 +104,7 @@ fn verified(md : String, edits : Array[Edit], after : Doc) -> Bool? {
 /// 比較の途中。
 priv struct Reflect {
   md : String
-  spans : Map[Int, Spot]
+  spots : Map[Int, Spot]
   /// 前の木のノードを id で引く
   old : Map[Int, Node]
   /// 前の木の根を、根のノードの id で引く。根かどうかを見る
@@ -130,7 +130,7 @@ priv struct Reflect {
 fn plan(
   md : String,
   before : Doc,
-  spans : Map[Int, Spot],
+  spots : Map[Int, Spot],
   after : Doc,
 ) -> Array[Edit]? {
   guard before.frontmatter == after.frontmatter else { return None }
@@ -144,13 +144,13 @@ fn plan(
   }
   let r : Reflect = {
     md,
-    spans,
+    spots,
     old: Map([]),
     roots_before: Map::from_array(before.roots.map(x => (x.node.id, x))),
     roots_after: Map::from_array(after.roots.map(x => (x.node.id, x))),
     turns_before: turn_table(before.roots),
     turns_after: turn_table(after.roots),
-    gaps: gaps_of(md, spans),
+    gaps: gaps_of(md, spots),
     parted_before,
     parted_after,
     out: [],
@@ -159,8 +159,8 @@ fn plan(
     index(r.old, root.node)
   }
   // 文書の散文。容器の自分の尻は散文の頭（frontmatter の尻）
-  reflect_body(r, before.body, after.body, spans.get(doc_id).unwrap().from, 0)
-  reflect_children(r, spans.get(doc_id).unwrap().to, 0, olds_n, news_n, 1)
+  reflect_body(r, before.body, after.body, spots.get(doc_id).unwrap().from, 0)
+  reflect_children(r, spots.get(doc_id).unwrap().to, 0, olds_n, news_n, 1)
   Some(settle(r))
 }
 
@@ -189,13 +189,13 @@ fn subtree(r : Reflect, x : Node, depth : Int) -> String {
 }
 
 ///|
-/// 原文の隙間 — 地番を持つものごとに、手前に続く空行の頭。**境界の直後の根の子は、
+/// 原文の隙間 — 場所を持つものごとに、手前に続く空行の頭。**境界の直後の根の子は、
 /// 手前の境界の水平線ごと隙間**（`Spot.border`）— その線は子の側の綴りなので、子を消せば
 /// 一緒に消え、子の手前に差す要素は線より前に入る。Implicit の範囲の頭は最初の子の頭なので、
 /// Implicit の隙間はその子の隙間（境界は Implicit が持つ）。
-fn gaps_of(md : String, spans : Map[Int, Spot]) -> Map[Int, Int] {
+fn gaps_of(md : String, spots : Map[Int, Spot]) -> Map[Int, Int] {
   let out : Map[Int, Int] = Map([])
-  for id, s in spans {
+  for id, s in spots {
     out[id] = blank_start(md, line_start(md, s.border.unwrap_or(s.from)))
   }
   out
@@ -222,7 +222,7 @@ fn reflect_node(r : Reflect, x : Node, depth : Int) -> Unit {
         !(old.fold is Some(_) || x.fold is Some(_)) ||
         (same_self(old, x) && ids(old.children) == ids(x.children))
       ) => {
-      let s = r.spans.get(x.id).unwrap()
+      let s = r.spots.get(x.id).unwrap()
       // 項目の中身と子は容器のラベルの桁（読んだ字下げ幅の右）に居る
       let col = match x.mark {
         Some(Item(offset~, ..)) => column(r.md, s.from) + offset
@@ -234,7 +234,7 @@ fn reflect_node(r : Reflect, x : Node, depth : Int) -> Unit {
         Some(_) => {
           let line_to = line_end(r.md, s.from)
           if !same_line(old, x) {
-            let inner = label_end(r.md, r.spans, old)
+            let inner = label_end(r.md, r.spots, old)
             r.out.push({
               from: s.from,
               to: inner,
@@ -253,7 +253,7 @@ fn reflect_node(r : Reflect, x : Node, depth : Int) -> Unit {
       if r.roots_before.contains(x.id) {
         turned(r, col, old, x)
       }
-      // 元から子の無い容器に差す位置は前の木の自分の尻。そのとき地番の尻は
+      // 元から子の無い容器に差す位置は前の木の自分の尻。そのとき場所の尻は
       // 自分の尻そのもの（setext の 2 行目も含む）
       reflect_children(
         r,
@@ -296,11 +296,11 @@ fn reflect_node(r : Reflect, x : Node, depth : Int) -> Unit {
 ///|
 /// ノードの行の尻（改行の次）。**名前の無い項目は、中身か子がマーカーの行に乗る**
 /// （`- # h`）ので、行はその手前まで。
-fn label_end(md : String, spans : Map[Int, Spot], x : Node) -> Int {
+fn label_end(md : String, spots : Map[Int, Spot], x : Node) -> Int {
   [..x.body.map(b => b.id), ..x.children.map(k => k.id)]
   .iter()
-  .filter_map(id => spans.get(id).map(sp => sp.from))
-  .fold(init=line_end(md, spans.get(x.id).unwrap().from), (a, b) => {
+  .filter_map(id => spots.get(id).map(sp => sp.from))
+  .fold(init=line_end(md, spots.get(x.id).unwrap().from), (a, b) => {
     if b < a {
       b
     } else {
@@ -570,9 +570,9 @@ fn headless(r : Reflect, id : Int) -> Bool {
 }
 
 ///|
-/// その要素の地番。
+/// その要素の場所。
 fn spot(r : Reflect, id : Int) -> Spot {
-  r.spans.get(id).unwrap()
+  r.spots.get(id).unwrap()
 }
 
 ///|
@@ -675,7 +675,7 @@ fn reflect_body(
       let old = was.get(id).unwrap()
       // 書き戻す字は意味と原文の両方で決まるので、両方を見る
       if old.content != b.content || old.source != b.source {
-        let s = r.spans.get(id).unwrap()
+        let s = r.spots.get(id).unwrap()
         r.out.push({
           from: s.from,
           to: s.to,
@@ -729,17 +729,17 @@ fn mid_line(md : String, at : Int) -> Bool {
 }
 
 ///|
-/// 部分木ごと断片にして、地番に差す。
+/// 部分木ごと断片にして、場所に差す。
 fn replace(r : Reflect, x : Node, depth : Int) -> Unit {
   r.out.push(patch(r, x.id, subtree(r, x, depth)))
 }
 
 ///|
-/// 地番 id の範囲を text で置き換える編集。項目の入れ子は列 0 で出るので、
+/// 場所 id の範囲を text で置き換える編集。項目の入れ子は列 0 で出るので、
 /// 容器の桁に揃える（1 行目はもう容器が字下げしている）。
 fn patch(r : Reflect, id : Int, text : String) -> Edit {
   // 前の木に無い id はここへ来ない — 親の子 id 列が違うので親が書かれる
-  let s = r.spans.get(id).unwrap()
+  let s = r.spots.get(id).unwrap()
   { from: s.from, to: s.to, insert: indent(text, column(r.md, s.from)), }
 }
 

@@ -1,7 +1,8 @@
-// md を木にする入口と、木の住所（id・番号・地番）。
+// md を木にする入口と、木のどこに何が在るかを言う 3 つ — id（同じものか）・
+// 番号（文書順）・場所（原文のどこに書かれているか）。
 //
 // **裁定は `deem.mbt`、組み立ては `assemble.mbt`。** ここに在るのは 2 つを繋ぐ 1 行と、
-// 出てきた木のどこに何が在るかを言う型。地番は Doc に載せず並べて返す — 載せると
+// 出てきた木のどこに何が在るかを言う型。場所は Doc に載せず並べて返す — 載せると
 // Doc が特定の原文に縛られ、手で組む木に在り得ない欄が生える。
 
 ///|
@@ -11,7 +12,7 @@ pub fn parse(md : String) -> Doc {
 }
 
 ///|
-/// 地番。ノードが原文のどこに書かれているか。`label` はラベルの頭（マーカーの後ろ）で、
+/// 場所。ノードが原文のどこに書かれているか。`label` はラベルの頭（マーカーの後ろ）で、
 /// 地図の選択の位置（ts の anchors）に使うラベルの頭。位置は CodeMirror が編集で写す。
 /// Implicit と文書の散文は行を持たないので None。
 pub(all) struct Spot {
@@ -29,14 +30,14 @@ pub fn build(md : String) -> (Doc, Map[Int, Spot]) {
 }
 
 ///|
-/// 地番の指紋。`id[from,label,to]` を id 順に並べる。
-pub fn spans_sig(md : String) -> String {
-  let (_, spans) = build(md)
-  let ids = spans.keys().collect()
+/// 場所の指紋。`id[from,label,to]` を id 順に並べる。
+pub fn spots_sig(md : String) -> String {
+  let (_, spots) = build(md)
+  let ids = spots.keys().collect()
   ids.sort()
   ids
   .map(id => {
-    match spans.get(id) {
+    match spots.get(id) {
       Some(s) => {
         let label = match s.label {
           Some(l) => l.to_string()

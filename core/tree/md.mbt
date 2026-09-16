@@ -422,7 +422,7 @@ pub fn serialize(doc : Doc) -> String {
 }
 
 ///|
-/// 部分木 1 つ → 正規形の md（断片）。反映が dirty の地番に差す。
+/// 部分木 1 つ → 正規形の md（断片）。反映が dirty の場所に差す。
 fn fragment(
   x : Node,
   depth : Int,

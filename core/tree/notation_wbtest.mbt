@@ -33,11 +33,11 @@ test "見本 — ひと切れは原文を隙間なく覆う" {
 /// 木の側でも飛ばす。**ひと切れの列から組み直した木が裁定と食い違えば、ここが鳴る。**
 test "見本 — 骨格の裁定は、いまの木と同じ" {
   for md in read_corpus {
-    let (doc, spans) = build(md)
+    let (doc, spots) = build(md)
     let want = StringBuilder()
     fn walk(n : Node, depth : Int) {
       if n.mark is Some(_) {
-        let label = match spans.get(n.id) {
+        let label = match spots.get(n.id) {
           Some({ label: Some(l), .. }) => l.to_string()
           _ => "-"
         }

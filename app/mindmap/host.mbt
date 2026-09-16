@@ -23,7 +23,7 @@ pub(all) struct Host {
   picked : () -> Int?
   /// カードを選び直した（None で外す）
   set_picked : (Int?) -> Unit
-  /// その中身の原文。地番で md から切り出す（無ければ空）
+  /// その中身の原文。場所で md から切り出す（無ければ空）
   block_text : (Int) -> String
   /// 操作を md に映す。edit なら、映した後の focus をそのまま編集開始
   /// （ノードのときだけ — 中身の focus はカードとして選ぶ）。返り値は映した focus

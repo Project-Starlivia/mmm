@@ -1,9 +1,9 @@
 // md と操作の境界。操作（Doc → Doc）と反映（前後の木 → 編集列）を繋ぐ
 // 唯一の場所で、core はここでも状態を持たない — 操作 1 回ごとに md を読み直す。
 //
-//   (before, spans) = build(md)
+//   (before, spots) = build(md)
 //   done            = apply(before, op)           None なら編集は無い
-//   merged          = reflect(md, before, spans, done.doc)
+//   merged          = reflect(md, before, spots, done.doc)
 //   focus           = done.focus を、読み直したときの番号に読み替える
 //                     反映が形の一致を言えば。言わなければ無い
 
@@ -18,13 +18,13 @@ pub(all) struct Edited {
 
 ///|
 pub fn edit(md : String, op : Op) -> Edited {
-  let (before, spans) = @tree.build(md)
+  let (before, spots) = @tree.build(md)
   match apply(before, op) {
     Some(done) => {
       // 書いた md を読み直して形が合わなければ focus は無い — focus は文書順の
       // 番号なので、形がずれたまま返すと別のノードを指す（`- ---` が水平線になる等）。
       // 読み直しは反映がもう済ませているので、答え（same_shape）をそのまま貰う
-      let { edits, same_shape, } = @tree.reflect(md, before, spans, done.doc)
+      let { edits, same_shape, } = @tree.reflect(md, before, spots, done.doc)
       let focus = if same_shape {
         done.focus.bind(id => @tree.number(done.doc, id))
       } else {

@@ -2,7 +2,7 @@
 // トランザクションに編集を足す 1 つの filter**（`followImageFolder`）。
 //
 // CodeMirror が構文木を `syntaxTree(state)` の StateField で持つのと同じ位置に、
-// core の読み（木 + 地番の持ち手）を置く。地図の選択の位置・持ち主・選択もここ。
+// core の読み（木 + 場所の持ち手）を置く。地図の選択の位置・持ち主・選択もここ。
 // 1 トランザクション = 1 サイクルで、位置は CodeMirror が編集で写す（`mapPos`）。
 // 選択がどのノードかは core が決める（`core.chosen`）。選択も位置も持ち手のまま持つ。
 // DOM を知らない — node の試験でトランザクションを流して固定する（test/state.test.ts）。
@@ -14,7 +14,7 @@
 import { EditorState, type Extension, StateEffect, StateField, type Transaction } from "@codemirror/state";
 import * as core from "./app.ts";
 
-/** core が読んだ木と地番（持ち手）。doc が変わったときだけ読み直す */
+/** core が読んだ木と場所（持ち手）。doc が変わったときだけ読み直す */
 export const tree = StateField.define<core.Survey>({
   create: (s) => core.survey(s.doc.toString()),
   update: (v, tr) => (tr.docChanged ? core.survey(tr.newDoc.toString()) : v),
@@ -119,7 +119,7 @@ export const followImageFolder = EditorState.transactionFilter.of((tr) => {
 
 /**
  * md 側で薄く塗る範囲。**地図が持つ間だけ**（md が持つ間はカーソルそのものが在る）。
- * ノードは地番そのもの（子孫込み）、カードは中身の原文。無い地番は落とす
+ * ノードは場所そのもの（子孫込み）、カードは中身の原文。無い場所は落とす
  */
 export function highlightRanges(s: EditorState): core.Range[] {
   if (s.field(holder) !== "map") return [];

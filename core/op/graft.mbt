@@ -34,7 +34,7 @@ fn shift(n : @tree.Node, by : Int) -> @tree.Node {
 fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
   // 断片の左余白は切り出した先の容器なので落とす（`@tree.dedent`）。
   // 落とさないと 4 桁以上入った枝の写しが字下げコードとして読まれ、ノードが
-  // 1 つも生えない。桁を原文から測るので、読むのは地番付きの `build`
+  // 1 つも生えない。桁を原文から測るので、読むのは場所付きの `build`
   let md = @tree.dedent(md)
   let (sub, spots) = @tree.build(md)
   guard !(sub.roots.is_empty() && sub.body.is_empty()) else { return None }
@@ -81,8 +81,8 @@ priv enum Piece {
 }
 
 ///|
-/// 一番外の中身を、順のまま切る。桁は原文と地番から測る（`@tree.rungs`）。
-/// 地番の無い塊（`bordered` が足した水平線は根の中身に入るので、ここには来ない）は
+/// 一番外の中身を、順のまま切る。桁は原文と場所から測る（`@tree.rungs`）。
+/// 場所の無い塊（`bordered` が足した水平線は根の中身に入るので、ここには来ない）は
 /// 中身として通す
 fn pieces(
   md : String,

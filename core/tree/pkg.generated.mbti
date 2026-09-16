@@ -50,7 +50,7 @@ pub fn shape(Doc) -> Doc
 
 pub fn sign_of(Node) -> Sign?
 
-pub fn spans_sig(String) -> String
+pub fn spots_sig(String) -> String
 
 pub fn unbuild(Doc) -> @markdown.Document
 

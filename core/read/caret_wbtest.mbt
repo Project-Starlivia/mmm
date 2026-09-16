@@ -1,5 +1,5 @@
 // md のカーソルと地図の位置が、どのノード（またはカード）に掛かっているか。
-// 区間の重なりだけの層。木と地番は手で組む（読みは tree の wbtest が固定済み）。
+// 区間の重なりだけの層。木と場所は手で組む（読みは tree の wbtest が固定済み）。
 
 ///|
 /// 綴りは既定で `#`。`mark=None` で Implicit（綴りの無いノード）
@@ -26,7 +26,7 @@ fn tree(roots : Array[@tree.Node]) -> @tree.Doc {
 }
 
 ///|
-/// (id, from, label, to) の並びから地番の表
+/// (id, from, label, to) の並びから場所の表
 fn spots(rows : Array[(Int, Int, Int?, Int)]) -> Map[Int, @tree.Spot] {
   let out : Map[Int, @tree.Spot] = Map([])
   for r in rows {
@@ -71,7 +71,7 @@ fn nodes(ids : Array[Int], anchor : Int?) -> Choice {
 }
 
 ///|
-test "最も深いノードだけ。自身の文は地番の頭から最初の子の頭まで" {
+test "最も深いノードだけ。自身の文は場所の頭から最初の子の頭まで" {
   let d = sample()
   assert_eq(ids_at(owns(d), point(1)), [2])
   assert_eq(ids_at(owns(d), point(7)), [3])
@@ -175,7 +175,7 @@ test "地図が持つ間は選択は位置から。点はラベルの頭、カ�
   )
   // 無ければ何も選んでいない
   assert_eq(chosen(d, Map, caret(1), None), nothing)
-  // カード: a(3) の中身 code(4) が [10, 18) に書かれている（地番は手で組む）
+  // カード: a(3) の中身 code(4) が [10, 18) に書かれている（場所は手で組む）
   let card : @tree.Block = {
     id: 4,
     source: None,
