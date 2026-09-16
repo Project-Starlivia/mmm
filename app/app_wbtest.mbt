@@ -112,18 +112,16 @@ fn memo_disk(
   gate : @js_async.Promise[@core.Any]?,
 ) -> @disk.Disk {
   let table : Map[String, @core.Any] = Map([])
-  if known.length() > 0 {
-    table["docs"] = @core.any(
-      known.mapi((i, name) => {
-        @web.record([
-          ("doc", paper(name, "", _ => ()).as_any()),
-          ("directory", @core.null()),
-          // i 分前に触れたことにする（先に渡したものが新しい）。
-          // 行の字は「名前 · 古さ」なので、時刻が並びと綴りの両方を決める
-          ("seen", @core.any(@web.now() - i.to_double() * 60_000.0)),
-        ])
-      }),
-    )
+  for i, name in known {
+    let id = "known" + i.to_string()
+    table[id] = @web.record([
+      ("id", @core.any(id)),
+      ("doc", paper(name, "", _ => ()).as_any()),
+      ("directory", @core.null()),
+      // i 分前に触れたことにする（先に渡したものが新しい）。
+      // 行の字は「名前 · 古さ」なので、時刻が並びと綴りの両方を決める
+      ("seen", @core.any(@web.now() - i.to_double() * 60_000.0)),
+    ])
   }
   let docs : Map[String, @core.Any] = Map([])
   for i, entry in unsaved {
@@ -165,7 +163,6 @@ fn memo_shelf(
   gate? : @js_async.Promise[@core.Any]? = None,
 ) -> @disk.Store {
   {
-    read: fn(key) { table.get(key).unwrap_or(@core.null()) },
     write: async fn(key, value) {
       guard !broken else { return false }
       match gate {

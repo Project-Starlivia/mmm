@@ -98,12 +98,10 @@ pub(all) struct Known {
 
 pub struct Recent {
   store : Store
-  mut inherited : Bool
 }
 pub fn Recent::new(Store) -> Self
 
 pub(all) struct Store {
-  read : async (String) -> @core.Any
   write : async (String, @core.Any) -> Bool
   remove : async (String) -> Unit
   all : async () -> Array[@core.Any]
