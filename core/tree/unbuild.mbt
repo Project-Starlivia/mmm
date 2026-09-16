@@ -67,7 +67,7 @@ fn unbuild_prose(body : Array[Block]) -> @markdown.Document {
 
 ///|
 /// 階層が言う隙間 — 正規形で、要素ごとに手前が空行で分かれるか。
-/// 合流の base と theirs はこれで、**正規形を書いて読み直す道は要らない**。
+/// 反映の「前の木の隙間 / 後の木の隙間」はこれで、**正規形を書いて読み直す道は要らない**。
 ///
 /// **書く歩きそのもの（`penned`）を、字を組まずに走らせる。** 正規形の塊はライブラリが
 /// 必ず空行で分けるので、分かれないのは 3 か所だけ:
@@ -78,7 +78,7 @@ fn unbuild_prose(body : Array[Block]) -> @markdown.Document {
 ///   行に乗るので、項目自身の答えを継ぐ
 ///
 /// 書く字が無い中身（check の `Wordless`）が在れば None — 正規形に塊が出ず要素が
-/// 並ばないので、合流は全文へ落ちる。
+/// 並ばないので、反映は全文へ落ちる。
 fn parted(doc : Doc) -> Map[Int, Bool]? {
   let pen = penned(doc, dry=true)
   if pen.gaps.torn {
@@ -90,7 +90,7 @@ fn parted(doc : Doc) -> Map[Int, Bool]? {
 
 ///|
 /// 書く途中。**書く字（`blocks`）と、階層が言う隙間（`gaps`）を 1 本の歩きで出す** —
-/// 書き戻し（`unbuild`）と合流の base / theirs（`parted`）が同じ順を歩くので、書き方の
+/// 書き戻し（`unbuild`）と反映の隙間（`parted`）が同じ順を歩くので、書き方の
 /// 規則を二度書かない。項目の中は別の文書として書くので、字は子のペン（`sub`）が持ち、
 /// 隙間の答えは共有する。
 priv struct Pen {
@@ -210,7 +210,7 @@ fn Pen::node(self : Pen, x : Laid, depth : Int) -> Unit {
 /// 「開き + 名前」、閉じは閉じだけ。どちらも塊なので、中の頭も次の兄弟も必ず空行で分かれる。
 ///
 /// **畳まれた行の隙間は、開きの手前のもの。** 地番が `<details>` から始まる
-/// （`put`）ので、合流が測る隙間もそこの手前。中で付いた答え（開きの塊で
+/// （`put`）ので、反映が測る隙間もそこの手前。中で付いた答え（開きの塊で
 /// 分かれている）を、開き自身の答えで上書きする
 fn Pen::wrap(self : Pen, x : Node, inner : () -> Unit) -> Unit {
   guard x.fold is Some({ open, summary, }) else { return inner() }

@@ -1,4 +1,4 @@
-// 操作と合流の結合を法則で固定する。
+// 操作と反映の結合を法則で固定する。
 //
 //   法則 — edit の編集を md に当てて読み直した形が apply の後の木と一致すれば、
 //          読み替えた focus は後の木で focus だったのと同じ部分木を指す。
@@ -224,7 +224,7 @@ test "法則 — 形が一致すれば focus は同じ部分木を指し、一�
 
 ///|
 /// 畳まれた部分木の中に居るか（自分も含む）。
-/// （merge_law_wbtest.mbt にも同じものが在る）
+/// （reflect_law_wbtest.mbt にも同じものが在る）
 fn under_fold(doc : @tree.Doc, id : Int) -> Bool {
   fn go(x : @tree.Node, fold : Bool) -> Bool {
     let here = fold || x.fold is Some(_)

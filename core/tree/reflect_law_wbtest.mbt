@@ -1,4 +1,4 @@
-// 合流の法則を総当たりで固定する。
+// 反映の法則を総当たりで固定する。
 //
 //   法則 — 編集を当てて読み直せば、後の木と形が一致する（id は見ない）
 //   比例性 — ラベルを変えただけなら、編集はそのノードの地番の中に 1 つ
@@ -306,13 +306,15 @@ fn law(
   after : Doc,
   what : String,
 ) -> Array[Edit] raise {
-  let { edits, same, } = merge(md, before, spans, after)
+  let { edits, same_shape, } = reflect(md, before, spans, after)
   let out = patched(md, edits)
   guard shape(parse(out)) == shape(after) else {
     fail("\{what}: 形が違う\n--- md\n\{md}\n--- out\n\{out}")
   }
-  // 合流の答えは、ここで測り直した形の一致そのもの
-  guard same else { fail("\{what}: 合流が形の一致を否と言う") }
+  // 反映の答えは、ここで測り直した形の一致そのもの
+  guard same_shape else {
+    fail("\{what}: 反映が形の一致を否と言う")
+  }
   let mut last = 0
   for e in edits {
     guard e.from >= last && e.to >= e.from else {
