@@ -8,7 +8,7 @@
 //
 // 方言はライブラリの癖を mmm の決めに揃える所で、**意味は 1 つも足さない** —
 // やるのは span を直すことだけ。尻を行末まで伸ばし（`stretch`）、読み落とされた
-// 塊の尻を原文から測り直す（`measured`）。build / content / fold / merge は
+// 塊の尻を原文から測り直す（`measured`）。build / content / fold / reflect は
 // 方言の mdAst だけを見る。直した癖は docs/core.md「方言」、直していないものも含めた
 // 一覧は ai-docs/markdown.md。書く側に方言は要らない
 // — 読んだ原文は生の塊で渡すので、ライブラリが綴るのは並びと字下げだけ。
@@ -416,13 +416,13 @@ pub fn serialize(doc : Doc) -> String {
   match doc.frontmatter {
     None => body
     // frontmatter と本文の間は空行 1 つ。読みは frontmatter の後ろの空行を落とすので、書く側で置く
-    // （置かないと、合流の base が「頭の要素に隙間は無い」と言って原文の空行を消す）
+    // （置かないと、反映の「前の木の隙間」が「頭の要素に隙間は無い」と言って原文の空行を消す）
     Some(raw) => "---\n" + raw + "---\n\n" + body
   }
 }
 
 ///|
-/// 部分木 1 つ → 正規形の md（断片）。合流が dirty の地番に差す。
+/// 部分木 1 つ → 正規形の md（断片）。反映が dirty の地番に差す。
 fn fragment(
   x : Node,
   depth : Int,

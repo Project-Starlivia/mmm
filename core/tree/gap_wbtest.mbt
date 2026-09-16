@@ -191,13 +191,13 @@ test "見本 — 隙間は階層で決まる。決まらないのは 7 つの関
 }
 
 ///|
-/// **正規形の隙間も、階層だけで言える。** 合流の base / theirs は `parted` が木から
+/// **正規形の隙間も、階層だけで言える。** 反映の「前の木の隙間 / 後の木の隙間」は `parted` が木から
 /// 直に答え、正規形を書いて読み直さない。ここはその答えを、実際に書いて読み直した
 /// 字（`spelt`）と突き合わせる — 我々が塊を分ける規則を変えても、ライブラリが
 /// 変えても鳴る。
 ///
-/// 見本 166 通りと、**合流が実際に使う後の木** — 見本 11 通り × 全ノード × 全部の
-/// 変え方（`merge_law_wbtest` と同じ総当たり）。
+/// 見本 166 通りと、**反映が実際に使う後の木** — 見本 11 通り × 全ノード × 全部の
+/// 変え方（`reflect_law_wbtest` と同じ総当たり）。
 test "見本 — 階層が言う隙間は、正規形の字と一致する" {
   let bad : Array[String] = []
   let mut trees = 0
@@ -249,16 +249,16 @@ test "見本 — 階層が言う隙間は、正規形の字と一致する" {
 ///|
 /// 正規形の隙間を**字で**測る（試験の物差し）。木を正規形に書いて読み直し、要素ごとに
 /// 手前に空行が有るかを見る。要素は文書順に 1 対 1 で並ぶので順に組にする。
-/// 並ばなければ None — 合流もそこは全文へ落ちるので、突き合わせる相手が居ない。
+/// 並ばなければ None — 反映もそこは全文へ落ちるので、突き合わせる相手が居ない。
 fn spelt(doc : Doc) -> Map[Int, Bool]? {
   let canon = serialize(doc)
   let (read, spans) = build(canon)
   let mine = spelt_elements(doc)
-  let theirs = spelt_elements(read)
-  guard mine.length() == theirs.length() else { return None }
+  let read_ids = spelt_elements(read)
+  guard mine.length() == read_ids.length() else { return None }
   let out : Map[Int, Bool] = Map([])
   for i, id in mine {
-    let s = spans.get(theirs[i]).unwrap()
+    let s = spans.get(read_ids[i]).unwrap()
     let head = line_start(canon, s.from)
     out[id] = blank_start(canon, head) < head
   }

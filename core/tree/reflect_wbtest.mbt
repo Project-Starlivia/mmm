@@ -1,17 +1,17 @@
 // 「前後の木がこう違えば、md はここだけ変わる」を固定する。
 //
 // 前の木は原文から読む（地番がそこから出るので、ここだけは読みに依る）。
-// 後の木はその写しを手で変えたもの — 誰が変えたか（操作）は合流の外。
+// 後の木はその写しを手で変えたもの — 誰が変えたか（操作）は反映の外。
 
 ///|
-/// 合流の編集列。検証の答え（`same`）は focus の可否に使うもので、edit の試験が見る。
+/// 反映の編集列。検証の答え（`same_shape`）は focus の可否に使うもので、edit の試験が見る。
 fn changes(
   md : String,
   before : Doc,
   spans : Map[Int, Spot],
   after : Doc,
 ) -> Array[Edit] {
-  merge(md, before, spans, after).edits
+  reflect(md, before, spans, after).edits
 }
 
 ///|
@@ -390,16 +390,16 @@ test "根が無い文書に最初の根を差す" {
 /// 深さ 3 に setext は無いので、改行を含むラベルは ATX で書くしかなく、
 /// 2 行目が段落に落ちる。**読み直した形は後の木と違うが、後の木の正規形と同じ** —
 /// 全文へ落としても同じ字に読まれるのだから落とさない（検証の 2 枝目）。
-/// 形が一致しないので `same` は偽で、そのとき文書順の番号は別のものを指す
+/// 形が一致しないので `same_shape` は偽で、そのとき文書順の番号は別のものを指す
 test "読み直して形が違っても、正規形と同じ形なら断片のまま" {
   let md = "# r\n\n## a\n\n### c\n"
   let (before, spans) = build(md)
   let after = change(before, 0, [0, 0], relabel("a\nb"))
-  let got = merge(md, before, spans, after)
+  let got = reflect(md, before, spans, after)
   json_inspect(got.edits, content=[
     { "from": 11, "to": 17, "insert": "### a\nb\n" },
   ])
-  inspect(got.same, content="false")
+  inspect(got.same_shape, content="false")
   // 断片で済んでも、出る字は全文の正規形と同じ
   inspect(patched(md, got.edits) == serialize(after), content="true")
 }

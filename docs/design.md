@@ -10,7 +10,7 @@
 | md が真実、木は派生 | 打鍵 → parse → 木 → 描画。読みは書かない | LSP / IDE の「テキストが真実、AST は派生」 |
 | 方言（md.mbt） | ライブラリの mdAst を mmm の決めに揃える層。読みは `stretch ∘ parse`（span の尻を伸ばすだけで、意味は 1 つも足さない）、書きは `serialize` そのまま（読んだ原文は生の塊で通す）。癖を知るのはここだけ | 腐敗防止層（anti-corruption layer）。アダプタ |
 | Op → apply → check | 操作は値。木に当てるのは純粋関数。書けない木は check が断る | Command + 不変条件で弾く |
-| merge | 正規形を base にした 3-way merge。base → theirs（操作の差）だけを ours（原文）に写し、流儀の差は写さない。要素は手前の隙間を持つ。最後に読み直して形を検証 | 3-way merge（git）。recast（変わっていないノードは元の原文を再利用）。React の keyed diff |
+| reflect | 木に起きた変化を原文に写す。突き合わせるのは原文・前の木・後の木の 3 つで、**前の木 → 後の木の差（操作の差）だけを原文に写し**、流儀の差は写さない。隙間は階層が言う。要素は手前の隙間を持つ。最後に読み直して形を検証 | 3-way merge（git。ただし枝分かれも共通祖先も無い）。recast（変わっていないノードは元の原文を再利用）。React の keyed diff |
 | focus | 操作が「次に選ぶもの」を返す。ノードを消せば次の兄弟 → 前の兄弟 → 親 | ProseMirror の transaction が selection を運ぶ。Lexical の `$removeNode` |
 | Intent の表 | キー・右クリック・ドラッグ・貼り付けを純粋な表で Intent にし、`apply` 1 本へ | エディタの keymap → command |
 | 状態と拍（state.ts） | doc・カーソル・履歴と並べて、core の読み（持ち手）・地図の選択の位置・持ち主・選択を EditorState の field に置く。1 トランザクション = 1 サイクル。位置は CodeMirror が編集で写す | Lezer の `syntaxTree`（構文木が StateField）。Redux 型の単一 store |
@@ -27,13 +27,13 @@ map と同じ表から出す。棚卸しは [ai-docs/codemirror.md](../ai-docs/c
 
 ## 段の間の法則
 
-段ごとに閉じた法則（op × check、op × 合流、読み × 書き）は各 wbtest が持つ。
+段ごとに閉じた法則（op × check、op × 反映、読み × 書き）は各 wbtest が持つ。
 段をまたぐ前提は、頼る側の段の試験に書く。
 
-- **行の不可侵**（merge） — 行（ラベル・畳み・種類）が同じノードの行は、どの編集の範囲にも入らない。
+- **行の不可侵**（reflect） — 行（ラベル・畳み・種類）が同じノードの行は、どの編集の範囲にも入らない。
   地図の選択の位置（ラベルの頭）はこれに頼る
-- **隙間の保存**（merge / edit） — 編集を当てた md に、元に無かった連続空行と頭の空行は無い。
-  merge の変え方と、edit の全操作の両方で回す
+- **隙間の保存**（reflect / edit） — 編集を当てた md に、元に無かった連続空行と頭の空行は無い。
+  reflect の変え方と、edit の全操作の両方で回す
 - **形の一致**（edit） — edit の編集を md に当てて読み直せば、apply の後の木と形が一致する
 - **focus**（edit） — 読み替えた focus は、後の木で focus だったのと同じ部分木を指す
 - **Delete の focus**（edit） — 消した後の focus は消えていない兄弟か祖先（中身なら持ち主）で、

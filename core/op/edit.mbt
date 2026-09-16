@@ -1,11 +1,11 @@
-// md と操作の境界。操作（Doc → Doc）と合流（前後の木 → 編集列）を繋ぐ
+// md と操作の境界。操作（Doc → Doc）と反映（前後の木 → 編集列）を繋ぐ
 // 唯一の場所で、core はここでも状態を持たない — 操作 1 回ごとに md を読み直す。
 //
 //   (before, spans) = build(md)
 //   done            = apply(before, op)           None なら編集は無い
-//   merged          = merge(md, before, spans, done.doc)
+//   merged          = reflect(md, before, spans, done.doc)
 //   focus           = done.focus を、読み直したときの番号に読み替える
-//                     合流が形の一致を言えば。言わなければ無い
+//                     反映が形の一致を言えば。言わなければ無い
 
 ///|
 /// 操作を md に映した結果。edits は CodeMirror の changes の形。
@@ -23,9 +23,9 @@ pub fn edit(md : String, op : Op) -> Edited {
     Some(done) => {
       // 書いた md を読み直して形が合わなければ focus は無い — focus は文書順の
       // 番号なので、形がずれたまま返すと別のノードを指す（`- ---` が水平線になる等）。
-      // 読み直しは合流がもう済ませているので、答え（same）をそのまま貰う
-      let { edits, same, } = @tree.merge(md, before, spans, done.doc)
-      let focus = if same {
+      // 読み直しは反映がもう済ませているので、答え（same_shape）をそのまま貰う
+      let { edits, same_shape, } = @tree.reflect(md, before, spans, done.doc)
+      let focus = if same_shape {
         done.focus.bind(id => @tree.number(done.doc, id))
       } else {
         None

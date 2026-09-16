@@ -24,18 +24,18 @@ core/   MoonBit — module `mmm/core`。文書モデルと地図の判断。**DO
                 （build.mbt はこの 2 つを繋ぐ入口と、木の住所）。
                 measure.mbt は記法がどこまでかの測り、
                 check.mbt が md に書けない並びを見つけ、
-                unbuild.mbt が木 → mdAst、merge.mbt が前後の木の差を原文 md への
+                unbuild.mbt が木 → mdAst、reflect.mbt が前後の木の差を原文 md への
                 編集列にする。content.mbt は塊 1 枚の意味、text.mbt は md の意味を
                 知らない字と行の算術。md_wbtest.mbt が
                 ライブラリの読みを指紋で固定し、build_wbtest.mbt 以降が
                 「この md はこう読まれる」、unbuild_wbtest.mbt が
-                「この木はこう書かれる」、merge_wbtest.mbt が
+                「この木はこう書かれる」、reflect_wbtest.mbt が
                 「木がこう違えば md はここだけ変わる」を固定する
   op/           操作。apply(doc, op) が Doc を Doc にする。席は隣の id で言う
                 （NodePlace / BlockPlace）。道具（splice / append / body）が
                 型の異種性を幽閉する。決めは core.md「操作」。edit.mbt が境界 —
-                edit(md, op) が 読み → apply → merge を繋ぎ、編集列と読み直した木での
-                focus を返す。law_wbtest.mbt が操作 × 合流の結合を総当たりで固定する
+                edit(md, op) が 読み → apply → reflect を繋ぎ、編集列と読み直した木での
+                focus を返す。law_wbtest.mbt が操作 × 反映の結合を総当たりで固定する
   map/          Mindmap の配置と判断。DOM を知らない — geometry(座標系。側 → 符号はここだけ) /
                 card(Block → Card。分類だけ。カードにならない中身があるので、
                 1 枚ずつが出どころの中身の id を持つ — 描く側は `data-card` にこれを出す) /

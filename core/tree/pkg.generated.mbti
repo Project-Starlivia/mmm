@@ -30,8 +30,6 @@ pub let doc_id : Int
 
 pub fn md_ast_sig(String) -> String
 
-pub fn merge(String, Doc, Map[Int, Spot], Doc) -> Merged
-
 pub fn notation_back(String) -> String
 
 pub fn notation_sig(String) -> String
@@ -41,6 +39,8 @@ pub fn number(Doc, Int) -> Int?
 pub fn parse(String) -> Doc
 
 pub fn patched(String, Array[Edit]) -> String
+
+pub fn reflect(String, Doc, Map[Int, Spot], Doc) -> Reflected
 
 pub fn rungs(String, Spot) -> Array[Rung]?
 
@@ -111,11 +111,6 @@ pub(all) enum Mark {
   Item(marker~ : String, offset~ : Int, loose~ : Bool)
 } derive(Eq, ToJson, @debug.Debug)
 
-pub(all) struct Merged {
-  edits : Array[Edit]
-  same : Bool
-} derive(Eq, ToJson, @debug.Debug)
-
 pub(all) struct Node {
   id : Int
   label : String
@@ -123,6 +118,11 @@ pub(all) struct Node {
   body : Array[Block]
   children : Array[Node]
   mark : Mark?
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Reflected {
+  edits : Array[Edit]
+  same_shape : Bool
 } derive(Eq, ToJson, @debug.Debug)
 
 pub(all) struct Root {

@@ -31,7 +31,7 @@ fn Laid::last(self : Laid) -> Laid? {
 
 ///|
 /// 根の子ごとの、手前に書く境界の綴り。**側が直前の兄弟と変わる子だけ**（先頭の子は
-/// Right から比べる）。綴りは読んだ字、無ければ `---`。書く形（`laid`）と合流
+/// Right から比べる）。綴りは読んだ字、無ければ `---`。書く形（`laid`）と反映
 /// （`turned`）が同じ表を引く
 fn turns(r : Root) -> Array[String?] {
   let out : Array[String?] = []
