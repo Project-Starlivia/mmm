@@ -22,9 +22,10 @@ priv struct Frame {
   /// その水平線の頭。変えていなければ None
   border : Int?
   /// **骨格の行だけ**の原文の範囲。中身と子の尻は `to_node` が足す。
+  /// 畳んだ枠は `<details>` 〜 `</details>`（尻は閉じが伸ばす）。
   /// 飛び（Implicit）は行を持たないので -1
   from : Int
-  to : Int
+  mut to : Int
   /// ラベルの頭（マーカーの後ろ）。飛び（Implicit）は行を持たないので -1
   at_label : Int
   /// 中身（body）と並走する場所。`to_node` が番号と付き合わせて spots に写す
@@ -55,8 +56,11 @@ priv struct Lay {
   mut border : Int?
   /// まだ閉じていない畳みの、畳んだノードの深さ
   fold_roots : Array[Int]
-  /// 直前に畳みの開きを跨いだ。次に座る枠が畳みの根
-  mut opening : Bool
+  /// まだ閉じていない畳みの、畳んだ枠。閉じがその尻を `</details>` まで伸ばす
+  folded : Array[Frame]
+  /// 跨いだばかりの畳みの開きの綴りと頭。**次に座る枠が畳みの根** —
+  /// 畳みを言うのは開きのひと切れだけで、骨格の行は畳みを持たない
+  mut opening : (Fold, Int)?
 }
 
 ///|
@@ -107,7 +111,8 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
     rule: "",
     border: None,
     fold_roots: [],
-    opening: false,
+    folded: [],
+    opening: None,
   }
   for p in n.pieces {
     match p.verdict {
@@ -116,8 +121,14 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
         l.rule = rule
         l.border = Some(p.at.from)
       }
-      Some(FoldOpen(..)) => l.opening = true
-      Some(FoldClose) => shut(l.stack, l.fold_roots)
+      Some(FoldOpen(open~, summary~)) =>
+        l.opening = Some(({ open, summary, }, p.at.from))
+      Some(FoldClose) => {
+        shut(l.stack, l.fold_roots)
+        if l.folded.pop() is Some(f) {
+          f.to = p.at.to
+        }
+      }
       Some(Block(content~, source~, owner~)) => {
         let block : Block = { id: 0, content, source, }
         let at : Spot = {
@@ -143,7 +154,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
           }
         }
       }
-      Some(Node(depth~, under~, label~, at_label~, mark~, fold~, at~)) => {
+      Some(Node(depth~, under~, label~, at_label~, mark~, at~)) => {
         while l.stack.length() > under {
           ignore(l.stack.unsafe_pop())
         }
@@ -175,22 +186,26 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
         let f : Frame = {
           mark,
           label,
-          fold,
+          fold: l.opening.map(o => o.0),
           body: [],
           kids: [],
           side,
           rule,
           border,
-          from: at.from,
+          from: match l.opening {
+            Some((_, from)) => from
+            None => at.from
+          },
           to: at.to,
           at_label,
           body_at: [],
         }
         l.seat(f)
         l.owners[p.at.from] = f
-        if l.opening {
+        if l.opening is Some(_) {
           l.fold_roots.push(l.stack.length())
-          l.opening = false
+          l.folded.push(f)
+          l.opening = None
         }
       }
     }

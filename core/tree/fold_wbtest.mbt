@@ -48,7 +48,7 @@ test "summary が無くても畳み" {
   inspect(
     notation_sig("# r\n\n<details>\n\n## h\n\n</details>\n"),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,15](-) Blank[15,16] Line[16,21](2,19,#0) Blank[21,22] Shut[22,33]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,15](-) Blank[15,16] Node[16,21](2,19,#0) Blank[21,22] FoldClose[22,33]
     ),
   )
 }
@@ -61,7 +61,7 @@ test "summary はラベルと違ってもよい" {
       "# r\n\n<details>\n<summary>x</summary>\n\n## h\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"x") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Shut[43,54]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"x") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] FoldClose[43,54]
     ),
   )
 }
@@ -72,7 +72,7 @@ test "中身だけ包んでいれば中身の 1 枚" {
   inspect(
     notation_sig("# r\n\n## h\n\n<details>\n\nbody\n\n</details>\n"),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Card[11,39]["Details",{"open":false,"body":"body"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Node[5,10](2,8,#0) Blank[10,11] Block[11,39]["Details",{"open":false,"body":"body"}]
     ),
   )
 }
@@ -83,7 +83,7 @@ test "2 ノード分を包んでいれば中身" {
   inspect(
     notation_sig("# r\n\n<details>\n\n## h\n\n## h2\n\n</details>\n"),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,40]["Details",{"open":false,"body":"## h\n\n## h2"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,40]["Details",{"open":false,"body":"## h\n\n## h2"}]
     ),
   )
 }
@@ -93,7 +93,7 @@ test "最初が段落なら中身" {
   inspect(
     notation_sig("# r\n\n<details>\n\nbodya\n\n# head\n\n</details>\n"),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,42]["Details",{"open":false,"body":"bodya\n\n# head"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,42]["Details",{"open":false,"body":"bodya\n\n# head"}]
     ),
   )
 }
@@ -104,7 +104,7 @@ test "空行なしで 1 塊なら中身" {
   inspect(
     notation_sig("# r\n\n<details>\n## h\n</details>\n"),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,31]["Details",{"open":false,"body":"## h"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,31]["Details",{"open":false,"body":"## h"}]
     ),
   )
 }
@@ -115,7 +115,7 @@ test "閉じの無い開きはただの文字" {
   inspect(
     notation_sig("# r\n\n<details>\n\n## h\n"),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,15] Blank[15,16] Line[16,21](2,19,#0)
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,15] Blank[15,16] Node[16,21](2,19,#0)
     ),
   )
 }
@@ -125,7 +125,7 @@ test "相手の居ない閉じもただの文字" {
   inspect(
     notation_sig("# r\n\n</details>\n"),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,16]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,16]
     ),
   )
 }
@@ -138,7 +138,7 @@ test "畳みの後ろは元の深さに戻る" {
       "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n## b\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"h") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Shut[43,54] Blank[54,55] Line[55,60](2,58,#0)
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"h") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] FoldClose[43,54] Blank[54,55] Node[55,60](2,58,#0)
     ),
   )
 }
@@ -150,7 +150,7 @@ test "項目も定義ごと包める" {
       "# r\n\n<details>\n<summary>a</summary>\n\n- a\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"a") Blank[36,37] Line[37,41](2,39,-,2,tight) Blank[41,42] Shut[42,53]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"a") Blank[36,37] Node[37,41](2,39,-,2,tight) Blank[41,42] FoldClose[42,53]
     ),
   )
 }
@@ -163,7 +163,7 @@ test "開きに飲み込まれた行があれば中身" {
   inspect(
     notation_sig("# r\n\n<details>\n### x\n\n## y\n</details>\n"),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,38]["Details",{"open":false,"body":"### x\n\n## y"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,38]["Details",{"open":false,"body":"### x\n\n## y"}]
     ),
   )
 }
@@ -185,7 +185,7 @@ test "入れ子の畳みも畳み" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<details>\n<summary>a1</summary>\n\n### a1\n\n</details>\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"a") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Fold[43,75](-,"a1") Blank[75,76] Line[76,83](3,80,#0) Blank[83,84] Shut[84,95] Blank[95,96] Shut[96,107]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"a") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] FoldOpen[43,75](-,"a1") Blank[75,76] Node[76,83](3,80,#0) Blank[83,84] FoldClose[84,95] Blank[95,96] FoldClose[96,107]
     ),
   )
 }
@@ -200,7 +200,7 @@ test "重なった閉じはほどいて読む" {
       "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n</details>\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"x") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Fold[43,74](-,"y") Blank[74,75] Line[75,81](3,79,#0) Shut[81,103]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"x") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] FoldOpen[43,74](-,"y") Blank[74,75] Node[75,81](3,79,#0) FoldClose[81,103]
     ),
   )
 }
@@ -214,7 +214,7 @@ test "open は畳みに持つ" {
       "# r\n\n<details open>\n<summary>h</summary>\n\n## h\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,41](open,"h") Blank[41,42] Line[42,47](2,45,#0) Blank[47,48] Shut[48,59]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,41](open,"h") Blank[41,42] Node[42,47](2,45,#0) Blank[47,48] FoldClose[48,59]
     ),
   )
 }
@@ -228,7 +228,7 @@ test "知らない属性が付いていれば中身" {
       "# r\n\n<details class=\"x\">\n<summary>h</summary>\n\n## h\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,64]["Details",{"open":false,"summary":"h","body":"## h"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,64]["Details",{"open":false,"summary":"h","body":"## h"}]
     ),
   )
 }
@@ -242,7 +242,7 @@ test "重なった開きは中身" {
       "# r\n\n<details>\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,76]["Details",{"open":false,"body":"<details>\n<summary>h</summary>\n\n## h\n\n</details>"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,76]["Details",{"open":false,"body":"<details>\n<summary>h</summary>\n\n## h\n\n</details>"}]
     ),
   )
 }
@@ -255,7 +255,7 @@ test "項目の畳みにも open が付く" {
       "# r\n\n<details open>\n<summary>a</summary>\n\n- a\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,41](open,"a") Blank[41,42] Line[42,46](2,44,-,2,tight) Blank[46,47] Shut[47,58]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,41](open,"a") Blank[41,42] Node[42,46](2,44,-,2,tight) Blank[46,47] FoldClose[47,58]
     ),
   )
 }
@@ -268,7 +268,7 @@ test "内側だけ open" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<details open>\n<summary>a1</summary>\n\n### a1\n\n</details>\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"a") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Fold[43,80](open,"a1") Blank[80,81] Line[81,88](3,85,#0) Blank[88,89] Shut[89,100] Blank[100,101] Shut[101,112]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"a") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] FoldOpen[43,80](open,"a1") Blank[80,81] Node[81,88](3,85,#0) Blank[88,89] FoldClose[89,100] Blank[100,101] FoldClose[101,112]
     ),
   )
 }
@@ -281,7 +281,7 @@ test "同じ行に重なった閉じもほどく" {
       "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n</details></details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"x") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Fold[43,74](-,"y") Blank[74,75] Line[75,81](3,79,#0) Shut[81,102]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"x") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] FoldOpen[43,74](-,"y") Blank[74,75] Node[75,81](3,79,#0) FoldClose[81,102]
     ),
   )
 }
@@ -293,7 +293,7 @@ test "3 段の重なりもほどく" {
       "# r\n\n<details>\n<summary>x</summary>\n\n## x\n\n<details>\n<summary>y</summary>\n\n### y\n\n<details>\n<summary>z</summary>\n\n#### z\n</details>\n</details>\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"x") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Fold[43,74](-,"y") Blank[74,75] Line[75,81](3,79,#0) Blank[81,82] Fold[82,113](-,"z") Blank[113,114] Line[114,121](4,119,#0) Shut[121,154]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"x") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] FoldOpen[43,74](-,"y") Blank[74,75] Node[75,81](3,79,#0) Blank[81,82] FoldOpen[82,113](-,"z") Blank[113,114] Node[114,121](4,119,#0) FoldClose[121,154]
     ),
   )
 }
@@ -307,7 +307,7 @@ test "落とせない閉じに頼る畳みは立たない" {
       "# r\n\n<details>\n<summary>y</summary>\n\n## y\n</details>\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,64]["Details",{"open":false,"summary":"y","body":"## y"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,64]["Details",{"open":false,"summary":"y","body":"## y"}]
     ),
   )
 }
@@ -320,7 +320,7 @@ test "summary は原文のまま持つ" {
       "# r\n\n<details>\n<summary>**h**</summary>\n\n## **h**\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,40](-,"**h**") Blank[40,41] Line[41,50](2,44,#0) Blank[50,51] Shut[51,62]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,40](-,"**h**") Blank[40,41] Node[41,50](2,44,#0) Blank[50,51] FoldClose[51,62]
     ),
   )
 }
@@ -332,7 +332,7 @@ test "記法つきのラベルと違う summary も持つ" {
       "# r\n\n<details>\n<summary>h</summary>\n\n## **h**\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"h") Blank[36,37] Line[37,46](2,40,#0) Blank[46,47] Shut[47,58]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"h") Blank[36,37] Node[37,46](2,40,#0) Blank[46,47] FoldClose[47,58]
     ),
   )
 }
@@ -343,7 +343,7 @@ test "1 行に書いた開きと名前も畳み" {
   inspect(
     notation_sig("# r\n\n<details><summary>a</summary>\n\n## a\n\n</details>\n"),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,35](-,"a") Blank[35,36] Line[36,41](2,39,#0) Blank[41,42] Shut[42,53]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,35](-,"a") Blank[35,36] Node[36,41](2,39,#0) Blank[41,42] FoldClose[42,53]
     ),
   )
 }
@@ -356,7 +356,7 @@ test "兄弟の畳みは両方立つ" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"a") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Shut[43,54] Blank[54,55] Fold[55,86](-,"b") Blank[86,87] Line[87,92](2,90,#0) Blank[92,93] Shut[93,104]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"a") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] FoldClose[43,54] Blank[54,55] FoldOpen[55,86](-,"b") Blank[86,87] Node[87,92](2,90,#0) Blank[92,93] FoldClose[93,104]
     ),
   )
 }
@@ -368,7 +368,7 @@ test "名前が違うタグは畳みの開きではない" {
   inspect(
     notation_sig("# r\n\n<details-x>\n\n## a\n\n</details>\n"),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,17] Blank[17,18] Line[18,23](2,21,#0) Blank[23,24] Card[24,35]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,17] Blank[17,18] Node[18,23](2,21,#0) Blank[23,24] Block[24,35]
     ),
   )
 }
@@ -382,7 +382,7 @@ test "summary が 2 枚なら中身" {
       "# r\n\n<details>\n<summary>h</summary>\n<summary>ZZZ</summary>\n\n## h\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,77]["Details",{"open":false,"summary":"h","body":"<summary>ZZZ</summary>\n\n## h"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,77]["Details",{"open":false,"summary":"h","body":"<summary>ZZZ</summary>\n\n## h"}]
     ),
   )
 }
@@ -395,7 +395,7 @@ test "閉じの塊に地の文が続けば中身" {
       "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n</details>\ntail\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,59]["Details",{"open":false,"summary":"h","body":"## h"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,59]["Details",{"open":false,"summary":"h","body":"## h"}]
     ),
   )
 }
@@ -408,7 +408,7 @@ test "項目の畳みも領域の後ろを見る" {
       "# r\n\n<details>\n<summary>a</summary>\n\n- a\n\n</details>\n\nx\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,53]["Details",{"open":false,"summary":"a","body":"- a"}] Blank[53,54] Card[54,56]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,53]["Details",{"open":false,"summary":"a","body":"- a"}] Blank[53,54] Block[54,56]
     ),
   )
 }
@@ -422,7 +422,7 @@ test "script の中の閉じは綴りではない" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<script>\nvar x = \"</details>\";\n</script>\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"a") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Card[43,84] Blank[84,85] Shut[85,96]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"a") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] Block[43,84] Blank[84,85] FoldClose[85,96]
     ),
   )
 }
@@ -435,7 +435,7 @@ test "コメントの中の閉じは綴りではない" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n<!-- </details> -->\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"a") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Card[43,63] Blank[63,64] Shut[64,75]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"a") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] Block[43,63] Blank[63,64] FoldClose[64,75]
     ),
   )
 }
@@ -450,7 +450,7 @@ test "境界の水平線が領域の中にあれば中身" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n---\n\n### x\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,66]["Details",{"open":false,"summary":"a","body":"## a\n\n---\n\n### x"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,66]["Details",{"open":false,"summary":"a","body":"## a\n\n---\n\n### x"}]
     ),
   )
 }
@@ -463,7 +463,7 @@ test "飾りの水平線が領域の中なら畳み" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n---\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"a") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Card[43,48] Blank[48,49] Card[49,53]"ThematicBreak" Blank[53,54] Shut[54,65]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"a") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] Block[43,48] Blank[48,49] Block[49,53]"ThematicBreak" Blank[53,54] FoldClose[54,65]
     ),
   )
 }
@@ -476,7 +476,7 @@ test "境界の水平線が閉じの直後なら畳み" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n---\n\n## b\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"a") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Shut[43,54] Blank[54,55] Border[55,59] Blank[59,60] Line[60,65](2,63,#0)
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"a") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] FoldClose[43,54] Blank[54,55] Border[55,59] Blank[59,60] Node[60,65](2,63,#0)
     ),
   )
 }
@@ -489,7 +489,7 @@ test "飾りの水平線が閉じの直後なら中身" {
       "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\n</details>\n\n---\n\nsome text\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,54]["Details",{"open":false,"summary":"a","body":"## a"}] Blank[54,55] Card[55,59]"ThematicBreak" Blank[59,60] Card[60,70]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,54]["Details",{"open":false,"summary":"a","body":"## a"}] Blank[54,55] Block[55,59]"ThematicBreak" Blank[59,60] Block[60,70]
     ),
   )
 }
@@ -553,7 +553,7 @@ test "後ろの領域が立たなければ跨がない" {
       "# a\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n\n<details class=\"z\">\n<summary>c</summary>\n\n## c\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,54]["Details",{"open":false,"summary":"b","body":"## b"}] Blank[54,55] Card[55,114]["Details",{"open":false,"summary":"c","body":"## c"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,54]["Details",{"open":false,"summary":"b","body":"## b"}] Blank[54,55] Block[55,114]["Details",{"open":false,"summary":"c","body":"## c"}]
     ),
   )
 }
@@ -565,7 +565,7 @@ test "後ろの迷子のタグは跨がない" {
       "# a\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n\n<details>\n\n## c\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,54]["Details",{"open":false,"summary":"b","body":"## b"}] Blank[54,55] Card[55,65] Blank[65,66] Line[66,71](2,69,#0)
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,54]["Details",{"open":false,"summary":"b","body":"## b"}] Blank[54,55] Block[55,65] Blank[65,66] Node[66,71](2,69,#0)
     ),
   )
 }
@@ -579,7 +579,7 @@ test "末尾の飾りの水平線は跨がない" {
       "# a\n\n<details>\n<summary>b</summary>\n\n## b\n\n</details>\n\n---\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,54]["Details",{"open":false,"summary":"b","body":"## b"}] Blank[54,55] Card[55,59]"ThematicBreak"
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,54]["Details",{"open":false,"summary":"b","body":"## b"}] Blank[54,55] Block[55,59]"ThematicBreak"
     ),
   )
 }
@@ -654,7 +654,7 @@ test "svg の中のタグは綴りではない" {
   inspect(
     notation_sig("# r\n\n## h\n\n<svg><details>a</details></svg>\n"),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Card[11,43]["Svg","<svg><details>a</details></svg>\n"]
+      #|Node[0,4](1,2,#0) Blank[4,5] Node[5,10](2,8,#0) Blank[10,11] Block[11,43]["Svg","<svg><details>a</details></svg>\n"]
     ),
   )
 }
@@ -667,7 +667,7 @@ test "擬似コメントの中の閉じは綴りではない" {
       "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n<?x </details> ?>\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"h") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Card[43,61] Blank[61,62] Shut[62,73]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"h") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] Block[43,61] Blank[61,62] FoldClose[62,73]
     ),
   )
 }
@@ -681,7 +681,7 @@ test "pre は生テキストではない" {
       "# r\n\n<details>\n<summary>h</summary>\n\n## h\n\n<pre><details></pre>\n\n</details>\n\n## h2\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,36] Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Card[43,76]["Details",{"open":false,"body":"</pre>"}] Blank[76,77] Line[77,83](2,80,#0)
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,36] Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] Block[43,76]["Details",{"open":false,"body":"</pre>"}] Blank[76,77] Node[77,83](2,80,#0)
     ),
   )
 }
@@ -695,7 +695,7 @@ test "= の後ろでない引用符は囲みを始めない" {
       "# r\n\n<details \"x>\n<summary>h</summary>\n\n## h\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,57]["Details",{"open":false,"summary":"h","body":"## h"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,57]["Details",{"open":false,"summary":"h","body":"## h"}]
     ),
   )
 }
@@ -850,7 +850,7 @@ test "領域の中の境界が外の骨格を置き直すなら中身" {
   inspect(
     notation_sig("# r\n\n<details>\n\n## a\n\n---\n\n</details>\n\n## b\n"),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Card[5,38]["Details",{"open":false,"body":"## a\n\n---"}] Blank[38,39] Line[39,44](2,42,#0)
+      #|Node[0,4](1,2,#0) Blank[4,5] Block[5,38]["Details",{"open":false,"body":"## a\n\n---"}] Blank[38,39] Node[39,44](2,42,#0)
     ),
   )
 }
@@ -911,7 +911,7 @@ test "タブで繋いだ開きと名前も畳み" {
       "# r\n\n<details>\t<summary>s</summary>\n\n## a\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Fold[5,36](-,"s") Blank[36,37] Line[37,42](2,40,#0) Blank[42,43] Shut[43,54]
+      #|Node[0,4](1,2,#0) Blank[4,5] FoldOpen[5,36](-,"s") Blank[36,37] Node[37,42](2,40,#0) Blank[42,43] FoldClose[43,54]
     ),
   )
 }
@@ -925,7 +925,7 @@ test "中身の Details は open と summary と中身を読む" {
       "# r\n\n## h\n\n<details open>\n<summary>s</summary>\n\nbody\n\nmore\n\n</details>\n",
     ),
     content=(
-      #|Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Card[11,71]["Details",{"open":true,"summary":"s","body":"body\n\nmore"}]
+      #|Node[0,4](1,2,#0) Blank[4,5] Node[5,10](2,8,#0) Blank[10,11] Block[11,71]["Details",{"open":true,"summary":"s","body":"body\n\nmore"}]
     ),
   )
 }
@@ -939,7 +939,7 @@ test "項目の中の畳みは、兄弟の項目が続いても立つ" {
       "- a\n\n  <details>\n  <summary>b</summary>\n\n  - b\n\n  </details>\n\n  - c\n",
     ),
     content=(
-      #|Line[0,4](1,2,-,2,tight) Blank[4,7] Fold[7,40](-,"b") Blank[40,43] Line[43,47](2,45,-,2,tight) Blank[47,50] Shut[50,61] Blank[61,64] Line[64,68](2,66,-,2,tight)
+      #|Node[0,4](1,2,-,2,tight) Blank[4,7] FoldOpen[7,40](-,"b") Blank[40,43] Node[43,47](2,45,-,2,tight) Blank[47,50] FoldClose[50,61] Blank[61,64] Node[64,68](2,66,-,2,tight)
     ),
   )
 }
@@ -1055,7 +1055,7 @@ test "閉じの後ろが中身なら畳みは立たない" {
       "# root\n\n<details>\n<summary>head</summary>\n\n## head\n\n</details>\n\ntext\n",
     ),
     content=(
-      #|Line[0,7](1,2,#0) Blank[7,8] Card[8,63]["Details",{"open":false,"summary":"head","body":"## head"}] Blank[63,64] Card[64,69]
+      #|Node[0,7](1,2,#0) Blank[7,8] Block[8,63]["Details",{"open":false,"summary":"head","body":"## head"}] Blank[63,64] Block[64,69]
     ),
   )
 }

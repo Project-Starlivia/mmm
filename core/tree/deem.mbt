@@ -3,7 +3,8 @@
 // 骨格（見出しと項目）を深さで積み上げ、深さが飛んだら間を Implicit が埋める —
 // 飛びは構造なので保存し、綴りが無いことだけを型で表す。
 //
-// **積みは 2 つ。** `read` は `---` で左右が変わらないものとしての読みで、深さと中身の
+// **積みは 2 つ。** `outline` は md が書いたとおりの見出しと項目の入れ子（`---` で
+// 左右が変わらないものとしての読み）で、深さと中身の
 // 持ち主はここから測る。`tree` は木そのもので、境界が根より深い行を閉じる。境界は
 // 置き場を変えるだけで、深さも持ち主も変えない（docs/spec.md「水平線」）。
 //
@@ -28,13 +29,11 @@ priv struct Deem {
   /// 文書ぜんぶのリンクの定義行。項目の中を読み解くときに切り出して渡す
   defs : Array[@markdown.Span]
   /// `---` で左右が変わらないものとしての積み。**高さが深さ**で、深さと中身の持ち主はここから測る
-  read : Array[Seat]
-  /// 木の積み。境界が根より深い行を閉じるので `read` とは親が違いうるが、同じ行の深さは同じ
+  outline : Array[Seat]
+  /// 木の積み。境界が根より深い行を閉じるので `outline` とは親が違いうるが、同じ行の深さは同じ
   tree : Array[Seat]
   /// 行き先待ちの水平線。**本数に意味は無い**ので 1 本しか持たない
   mut pend : Pend?
-  /// いま積む骨格が畳まれているなら、その `<details>` 〜 `</details>` の範囲
-  mut fold_at : @markdown.Span?
   /// まだ閉じていない畳みの、畳んだノードの深さ。**閉じは部分木の終わり** —
   /// 閉じで枠を降ろせば、続く骨格は畳んだノードの兄弟から測る
   fold_roots : Array[Int]
@@ -61,10 +60,9 @@ fn Deem::new(
   {
     md,
     defs,
-    read: [],
+    outline: [],
     tree: [],
     pend: None,
-    fold_at: None,
     fold_roots: [],
     top: deep,
     own: deep,
@@ -115,18 +113,18 @@ fn open_height(stack : Array[Seat], base : Int) -> Int {
 }
 
 ///|
-/// 塊の持ち主の行。`---` が無かったものとしての読み（`read`）で決める —
+/// 塊の持ち主の行。`---` が無かったものとしての読み（`outline`）で決める —
 /// 段の中で開いている一番深い、**書かれた**行（見出しの節）。無ければ段の項目自身、
 /// 文書の段なら文書（None）。Implicit は書かれた行ではないので持ち主にならない
 fn owner(d : Deem) -> Int? {
-  let h = open_height(d.read, d.base)
+  let h = open_height(d.outline, d.base)
   for i = h - 1; i >= d.base; i = i - 1 {
-    if d.read[i].from is Some(from) {
+    if d.outline[i].from is Some(from) {
       return Some(from)
     }
   }
   if d.base > 0 {
-    d.read[d.base - 1].from
+    d.outline[d.base - 1].from
   } else {
     None
   }
@@ -200,11 +198,11 @@ fn depths(
 fn deem(d : Deem, cut : Cut, nest : Int) -> Unit {
   match cut {
     Plain(block) => take(d, block, nest)
-    Folded(block, fold~, at~, open_at~) => {
+    Folded(block, fold~, open_at~) => {
+      // **畳みを言うのは開きのひと切れだけ。** 次に座る骨格が畳みの根で、
+      // 場所を `<details>` まで伸ばすのも組み立て（`assemble`）の仕事
       keep(d, open_at, FoldOpen(open=fold.open, summary=fold.summary))
-      d.fold_at = Some(at)
-      take(d, block, nest, fold=Some(fold))
-      d.fold_at = None
+      take(d, block, nest)
       d.fold_roots.push(d.tree.length())
     }
     FoldClose(from~, to~) => {
@@ -232,12 +230,7 @@ fn deem(d : Deem, cut : Cut, nest : Int) -> Unit {
 
 ///|
 /// ブロック 1 枚を積む。`nest` は項目の入れ子段数（ふるいに渡す）。
-fn take(
-  d : Deem,
-  block : @markdown.Block,
-  nest : Int,
-  fold? : Fold? = None,
-) -> Unit {
+fn take(d : Deem, block : @markdown.Block, nest : Int) -> Unit {
   match block {
     Heading(level~, style~, children~, closing_hashes~, span~, ..) =>
       // **項目の中は、その項目の深さを 0 とした文書。** `#` の本数はそこから
@@ -252,12 +245,11 @@ fn take(
           ),
         ),
         label=head_label(d.md, span, style, children),
-        fold~,
         at=span,
         at_label=head_start(d.md, span, style),
       )
-    BulletList(items~, ..) => items_take(d, items, nest, fold)
-    OrderedList(items~, ..) => items_take(d, items, nest, fold)
+    BulletList(items~, ..) => items_take(d, items, nest)
+    OrderedList(items~, ..) => items_take(d, items, nest)
     // 記法(`---` `***` `___`)も本数も、項目の中か外かも差別しない。行き先は
     // **直後のブロックが何か**で決まるので、ここでは持ち主を控えて保留するだけ
     ThematicBreak(span~, ..) => {
@@ -290,17 +282,12 @@ fn take(
 
 ///|
 /// 項目の列。**最初の段落がラベル**で、残りは中身か入れ子の項目。
-fn items_take(
-  d : Deem,
-  items : Array[@markdown.ListItem],
-  nest : Int,
-  fold : Fold?,
-) -> Unit {
+fn items_take(d : Deem, items : Array[@markdown.ListItem], nest : Int) -> Unit {
   let loose = item_gaps(d.md, items)
   // **項目の深さは、書かれた入れ物の 1 つ下。** `<li>` の中ならその項目、文書の段なら
   // 見出しの節 — 段より深い項目は字下げが戻って閉じている。同じ列の項目は兄弟なので
   // 深さは列に 1 つ（境界が置き場を変えても深さは変わらない）
-  let level = open_height(d.read, d.base) + 1
+  let level = open_height(d.outline, d.base) + 1
   for i, it in items {
     let face = face_of(d.md, it)
     put(
@@ -314,7 +301,6 @@ fn items_take(
         ),
       ),
       label=face.label,
-      fold~,
       at=it.span,
       at_label=face.at,
       line=Some({
@@ -402,31 +388,28 @@ fn inside(
 
 ///|
 /// 深さ `depth` のノードを置く。`at` はその骨格の行（項目なら入れ子込み）の
-/// 原文の範囲で、畳まれていれば `<details>` 〜 `</details>`（部分木を過不足なく覆う）。
-/// `line` は行そのものの範囲（項目の行は入れ子を含まない）。
+/// 原文の範囲。`line` は行そのものの範囲（項目の行は入れ子を含まない）。
 fn put(
   d : Deem,
   depth : Int,
   mark : Mark?,
   label~ : String,
-  fold~ : Fold?,
   at~ : @markdown.Span,
   at_label~ : Int,
   line? : @markdown.Span? = None,
 ) -> Unit {
-  // 控えるのは**行そのものの範囲**。場所（`at`）は項目なら部分木ぜんぶ、
-  // 畳まれた行なら `<details>` の範囲まで伸びるが、記法構造ではその外側は
-  // 別のひと切れなので、行は行の字だけを持つ
+  // 控えるのは**行そのものの範囲**。場所（`at`）は項目なら部分木ぜんぶだが、
+  // 記法構造ではその外側は別のひと切れなので、行は行の字だけを持つ
   let own_at = line.unwrap_or(at)
   // **字下げが戻った見出しは、段より深い項目を閉じる**（列 0 なら全部）
   if mark is Some(Heading(..)) {
-    close(d.read, d.base)
+    close(d.outline, d.base)
     close(d.tree, d.base)
   }
-  lower(d.read, depth)
+  lower(d.outline, depth)
   // 閉じた後に読みの根が残っていれば、この行は水平線と同じ木に入る
-  let flip = resolve(d, joins=!d.read.is_empty())
-  fill(d.read, depth, s => d.read.push(s))
+  let flip = resolve(d, joins=!d.outline.is_empty())
+  fill(d.outline, depth, s => d.outline.push(s))
   // **境界は根より深い行を閉じる。** 深さは変えないので、足りない段は Implicit が埋める
   if flip {
     lower(d.tree, 2)
@@ -436,28 +419,14 @@ fn put(
   // 開いている項目を閉じたか、境界が行を閉じたかは、ここでしか分からない
   let under = d.tree.length()
   fill(d.tree, depth, s => d.seat(s))
-  // 畳まれた行の場所は `<details>` の範囲まで伸びる。**伸びるのは畳んだ行 1 本だけ** —
-  // 項目は部分木ぜんぶが 1 枚の塊なので、下って積む子まで伸ばすと子の行が
-  // 見失われる（隙間も畳みの手前のものになる）
-  let extent = match d.fold_at {
-    Some(s) => {
-      d.fold_at = None
-      s
-    }
-    None => at
-  }
-  keep(
-    d,
-    own_at,
-    Node(depth~, under~, label~, at_label~, mark~, fold~, at=extent),
-  )
+  keep(d, own_at, Node(depth~, under~, label~, at_label~, mark~, at~))
   // **そのブロック自身のノードは、最初に座る綴られた枠。** 手前の穴埋めは足場、
   // 後ろに続くのは入れ子の子（1 つの塊が項目を何段も積むことがある）
   if d.own == deep {
     d.own = depth
   }
   let seat : Seat = { mark, from: Some(own_at.from), }
-  d.read.push(seat)
+  d.outline.push(seat)
   d.seat(seat)
 }
 
@@ -522,7 +491,7 @@ fn Deem::seat(d : Deem, s : Seat) -> Unit {
 /// 埋める。側は裏返らない — 裏返すのは `---` だけ。
 fn Deem::shut(d : Deem) -> Unit {
   guard d.fold_roots.pop() is Some(root) else { return }
-  lower(d.read, root)
+  lower(d.outline, root)
   lower(d.tree, root)
 }
 

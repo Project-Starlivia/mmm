@@ -43,15 +43,17 @@ priv enum Verdict {
   ///
   /// `label` と `at` は**組み立てに要るぶんだけ**の持ち出し。字は本来 `md` に 1 か所
   /// だが、ラベルの切り出しには測りの但し書き（`head_label` の定義行の穴）が在り、
-  /// 場所は畳まれた行なら `<details>` の範囲まで伸びる。**どちらもひと切れの範囲
-  /// には畳めない** — 行の字とラベルと場所が、それぞれ別の所で終わる
+  /// 場所は項目なら入れ子まで伸びる。**どちらもひと切れの範囲には畳めない** —
+  /// 行の字とラベルと場所が、それぞれ別の所で終わる。
+  ///
+  /// **畳みは持たない** — 畳みを言うのは手前の `FoldOpen` のひと切れで、
+  /// その直後の `Node` が畳みの根（組み立てが付ける）
   Node(
     depth~ : Int,
     under~ : Int,
     label~ : String,
     at_label~ : Int,
     mark~ : Mark?,
-    fold~ : Fold?,
     at~ : @markdown.Span
   )
   /// 側の変わり目になった水平線。`rule` は書き戻しに要る綴り
@@ -152,7 +154,7 @@ fn piece_sig(md : String, p : Piece) -> String {
   match p.verdict {
     None => if blank_span(md, p.at) { "Blank\{at}" } else { "Rest\{at}" }
     Some(Node(depth~, at_label~, mark~, ..)) =>
-      "Line\{at}(\{depth},\{at_label},\{mark_sig(mark)})"
+      "Node\{at}(\{depth},\{at_label},\{mark_sig(mark)})"
     Some(Border(..)) => "Border\{at}"
     Some(FoldOpen(open~, summary~)) => {
       let flag = if open { "open" } else { "-" }
@@ -160,13 +162,13 @@ fn piece_sig(md : String, p : Piece) -> String {
         Some(s) => ",\{s.escape()}"
         None => ""
       }
-      "Fold\{at}(\{flag}\{name})"
+      "FoldOpen\{at}(\{flag}\{name})"
     }
-    Some(FoldClose) => "Shut\{at}"
+    Some(FoldClose) => "FoldClose\{at}"
     Some(Block(content~, ..)) =>
       match content {
-        None => "Card\{at}"
-        Some(c) => "Card\{at}\{c.to_json().stringify()}"
+        None => "Block\{at}"
+        Some(c) => "Block\{at}\{c.to_json().stringify()}"
       }
   }
 }
