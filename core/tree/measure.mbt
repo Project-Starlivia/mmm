@@ -68,6 +68,26 @@ fn head_end(
 }
 
 ///|
+/// setext の下線の本数。下線は span の最後の行で、`=` か `-` だけが続く
+/// （前後の空白は記法、間に空白は挟めない）。ATX は下線が無いので 0。
+fn underline(
+  md : String,
+  span : @markdown.Span,
+  style : @markdown.HeadingStyle,
+) -> Int {
+  guard style is Setext else { return 0 }
+  let mut z = span.to
+  while z > span.from && space(md[z - 1]) {
+    z = z - 1
+  }
+  let mut a = z
+  while a > span.from && md[a - 1] == md[z - 1] {
+    a = a - 1
+  }
+  z - a
+}
+
+///|
 /// 見出しの中身が原文で始まる位置。ATX は飾りの字下げと `#` とその後ろの
 /// 空白を飛ばす。setext には `#` が無いので飛ばさない（`#hashtag` を
 /// 食べてしまうため）。

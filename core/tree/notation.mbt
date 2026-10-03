@@ -170,12 +170,12 @@ fn piece_sig(md : String, p : Piece) -> String {
 }
 
 ///|
-/// 綴りの指紋。見出しは `#` と閉じの本数（setext は `=`）、項目はマーカー・桁・詰め。
+/// 綴りの指紋。見出しは `#` と閉じの本数（setext は `=` と下線の本数）、項目はマーカー・桁・詰め。
 /// 飛び（Implicit）は行を持たないのでひと切れにならないが、型の上では在りうる
 fn mark_sig(m : Mark?) -> String {
   match m {
     None => "-"
-    Some(Heading(setext=true, ..)) => "="
+    Some(Heading(underline~, ..)) if underline > 0 => "=\{underline}"
     Some(Heading(closing~, ..)) => "#\{closing}"
     Some(Item(marker~, offset~, loose~)) => {
       let gap = if loose { "loose" } else { "tight" }

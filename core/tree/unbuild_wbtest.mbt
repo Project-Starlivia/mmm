@@ -56,7 +56,7 @@ fn h(
   children? : Array[Node] = [],
   body? : Array[Block] = [],
   fold? : Fold? = None,
-  setext? : Bool = false,
+  underline? : Int = 0,
   closing? : Int = 0,
 ) -> Node {
   {
@@ -65,7 +65,7 @@ fn h(
     fold,
     body,
     children,
-    mark: Some(Heading(setext~, closing~)),
+    mark: Some(Heading(underline~, closing~)),
   }
 }
 
@@ -400,18 +400,18 @@ test "項目と見出しの兄弟" {
 
 ///|
 /// #85 — 書き方は木が持つ。setext は深さ 1〜2 でだけ書けるので、深ければ ATX。
-/// 閉じの `#` は読んだ本数。
+/// 下線と閉じの `#` は読んだ本数（#316）。下線は名前の長さに揃えない。
 test "見出しの書き方は読んだ綴り — setext と閉じの #" {
-  inspect(serialize(doc([root(h("a", setext=true))])), content="a\n===\n")
+  inspect(serialize(doc([root(h("a", underline=6))])), content="a\n======\n")
   inspect(
-    serialize(doc([root(h("a", children=[h("b", setext=true)]))])),
-    content="# a\n\nb\n---\n",
+    serialize(doc([root(h("a", children=[h("b", underline=1)]))])),
+    content="# a\n\nb\n-\n",
   )
   inspect(serialize(doc([root(h("a", closing=2))])), content="# a ##\n")
   // 深さ 3 は setext を書けない → ATX
   inspect(
     serialize(
-      doc([root(h("a", children=[h("b", children=[h("c", setext=true)])]))]),
+      doc([root(h("a", children=[h("b", children=[h("c", underline=3)])]))]),
     ),
     content="# a\n\n## b\n\n### c\n",
   )
@@ -419,9 +419,13 @@ test "見出しの書き方は読んだ綴り — setext と閉じの #" {
 
 ///|
 /// #85 — 改行を含む名前は setext でしか書けない（深さ 1〜2）ので、読んだ綴りが
-/// setext でなくても setext で書く。深さ 3 以上では書けないので check が `DeepSetext` で断る
+/// setext でなくても setext で書く。下線は新しく綴るので 3 本。
+/// 深さ 3 以上では書けないので check が `DeepSetext` で断る
 test "改行を含む名前は setext で書く" {
-  inspect(serialize(doc([root(h("a\nb", setext=true))])), content="a\nb\n===\n")
+  inspect(
+    serialize(doc([root(h("a\nb", underline=5))])),
+    content="a\nb\n=====\n",
+  )
   inspect(serialize(doc([root(h("a\nb"))])), content="a\nb\n===\n")
 }
 

@@ -107,7 +107,7 @@ pub(all) struct Fold {
 } derive(Eq, ToJson, @debug.Debug)
 
 pub(all) enum Mark {
-  Heading(setext~ : Bool, closing~ : Int)
+  Heading(underline~ : Int, closing~ : Int)
   Item(marker~ : String, offset~ : Int, loose~ : Bool)
 } derive(Eq, ToJson, @debug.Debug)
 

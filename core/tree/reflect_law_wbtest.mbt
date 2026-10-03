@@ -17,6 +17,7 @@ let corpus : Array[String] = [
   "# a\n\n### x\n\n# b", "- a\n\n  text\n\n  - b\n- c\n", "# r\n\n- i\n  - j\n\n## a\n",
   "hello\n\n- a\n- b\n", "aaa\n\nbbb\n\n# h\n", "---\n\n- item\n\ntail\n", "***\n\n- a\n  - b\n\ntail\n",
   "- a\n\n---\n", "1. a\n\n---\n\n- b\n", "- # h\n\n---\n\n- t\n", "# a\n\n- i\n\n---\n",
+  "Setext\n======\n\nSub\n-----\n\nbody\n", "a\nb\n=\n\nc\n-\n",
 ]
 
 ///|

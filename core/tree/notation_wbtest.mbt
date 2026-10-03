@@ -178,7 +178,7 @@ test "見本 — 記法構造の指紋" {
       #|"- item\n\n  ## h\n"
       #|  → Line[0,7](1,2,-,2,tight) Blank[7,10] Line[10,15](3,13,#0)
       #|"aaa\r\nbbb\r\n===\r\n"
-      #|  → Line[0,15](1,0,=)
+      #|  → Line[0,15](1,0,=3)
       #|"body\n\n---\n\n# a\n"
       #|  → Card[0,5] Blank[5,6] Card[6,10]"ThematicBreak" Blank[10,11] Line[11,15](1,13,#0)
       #|"# a\n\nx\n\n## b\n\ny\n"
@@ -194,7 +194,7 @@ test "見本 — 記法構造の指紋" {
       #|"- a\n\n  ---\n\n# h\n"
       #|  → Line[0,4](1,2,-,2,tight) Blank[4,7] Card[7,11]"ThematicBreak" Blank[11,12] Line[12,16](1,14,#0)
       #|"[q]: /r\nZZZ\n---\n"
-      #|  → Line[0,16](2,0,=)
+      #|  → Line[0,16](2,0,=3)
       #|"# r\n\n## a\n\n### x\n"
       #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Line[11,17](3,15,#0)
       #|"- x\n  # n\n  ## s\n"
@@ -268,7 +268,7 @@ test "見本 — 記法構造の指紋" {
       #|"# r\n\n:::note\n- a\n  ***\n:::\n"
       #|  → Line[0,4](1,2,#0) Blank[4,5] Card[5,27]
       #|"# r\n\n## a\n\n---\n\nZZZ\nWWW\n---\n"
-      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Line[16,28](2,16,=)
+      #|  → Line[0,4](1,2,#0) Blank[4,5] Line[5,10](2,8,#0) Blank[10,11] Border[11,15] Blank[15,16] Line[16,28](2,16,=3)
       #|"# r\n\n$$\nx\n$$\n\n:::note\ny\n:::\n"
       #|  → Line[0,4](1,2,#0) Blank[4,5] Card[5,13] Blank[13,14] Card[14,28]
       #|"# r\n\n## a\n\n### x\n\n---\n\n### y\n"
