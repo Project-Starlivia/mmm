@@ -654,12 +654,11 @@ fn App::greet(self : App) -> Unit {
     let now = @web.now()
     [
       Caption("Recent", Some("clock")),
-      ..self.recent.mapi((i, row) => {
+      // 押せば**並べた行**を開く — 並びは裏で引き直されるので、番号で引き直すと
+      // 見ていた名前と違う文書が開く（#358）
+      ..self.recent.map(row => {
         @parts.Entry::Run(@parts.row(recent_label(row, now)), () => {
-          match self.recent.get(i) {
-            Some(r) => @web.spawn(async fn() { self.open_known(r.doc) })
-            None => ()
-          }
+          @web.spawn(async fn() { self.open_known(row.doc) })
         })
       }),
     ]
@@ -982,10 +981,12 @@ fn App::wire_holder(self : App) -> Unit {
 fn App::wire_bar(self : App) -> Unit {
   let doc = self.doc
   @parts.open_on_click(el(doc, "files"), () => {
+    // 押された番号は**開いたときの並び**で引く — 並びは裏で引き直される（#358）
+    let recent = self.recent
     @bar.files_menu(
       {
         saved_name: self.saved_name,
-        recent: self.recent.map(row => recent_label(row, @web.now())),
+        recent: recent.map(row => recent_label(row, @web.now())),
         unsaved: self.unsaved.map(d => unsaved_label(d, @web.now())),
         can_open: @web.can_open(),
         can_save: @web.can_save_as(),
@@ -1000,7 +1001,7 @@ fn App::wire_bar(self : App) -> Unit {
         new_file: () => @web.spawn(async fn() { self.new_file() }),
         open: () => @web.spawn(async fn() { self.open_file() }),
         open_recent: i => {
-          match self.recent.get(i) {
+          match recent.get(i) {
             Some(row) => @web.spawn(async fn() { self.open_known(row.doc) })
             None => ()
           }

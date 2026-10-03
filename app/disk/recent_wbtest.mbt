@@ -1,5 +1,5 @@
 // 札の台帳を、手元の表を置き場にして固定する。札は `{ id, name }` の object で代用し、
-// 同じ実体かは id で決める（実物の `isSameEntry` の代わり）。
+// 同じ実体かは id で決める（実物の `isSameEntry` の代わり）。照合は実物と同じく一拍待つ。
 
 ///|
 /// 手元の置き場。読み書きした鍵を覚える
@@ -40,7 +40,11 @@ fn memo_store(m : Memo) -> Store {
       m.log.push("all")
       m.table.values().collect()
     },
-    same: fn(a, b) { (a._get("id").cast() : Int) == b._get("id").cast() },
+    // 照合は待つ（実物の `isSameEntry` は Promise）。待たなければ重なりが起きない
+    same: async fn(a, b) {
+      @web.promise_of(k => k(@core.null())).wait() |> ignore
+      (a._get("id").cast() : Int) == b._get("id").cast()
+    },
     is_file: v => is_handle(v, false),
     is_dir: v => is_handle(v, true),
   }
@@ -136,6 +140,63 @@ async test "行ごとに鍵。文書が違えば書く鍵も違う" {
   assert_eq(again, [writes[0]])
   assert_eq(row_keys(m).length(), 3)
   assert_eq(names(h.rows()), ["a.md", "c.md", "b.md"])
+}
+
+///|
+/// 棚に行を直に置く（前の版や重なった書き込みが残した形）
+fn seed(m : Memo, row : Known) -> Unit {
+  m.table[row.id] = row_of(row)
+}
+
+///|
+/// **読んでから書くまでは 1 本ずつ。** 照合は行の数だけ待つので、重なると 2 本とも
+/// 見つけられず、同じ文書に鍵を 2 つ振っていた（#358）
+async test "重なって触れても、1 文書 1 行" {
+  let m : Memo = { table: Map([]), log: [], }
+  let h = Recent::new(memo_store(m))
+  // 照合が待つよう、ほかの文書の行を先に置く
+  h.opened(file(2, "b.md"))
+  let opening = @js_async.Promise::from_async(async fn() {
+    h.opened(file(1, "a.md"))
+  })
+  let linking = @js_async.Promise::from_async(async fn() {
+    h.remember_folder(file(1, "a.md"), dir(9))
+  })
+  opening.wait()
+  linking.wait()
+  assert_eq(names(h.rows()), ["a.md", "b.md"])
+  assert_true(h.folder_for(file(1, "a.md")) is Some(_))
+}
+
+///|
+/// **重なった行は、触れたときに 1 行へ畳む。** 画像フォルダは覚えている行のものを継ぐ —
+/// どちらの行から開くかで結び付きが戻ったり戻らなかったりしない
+async test "重なった行は、触れたときに 1 行へ畳む" {
+  let m : Memo = { table: Map([]), log: [], }
+  seed(m, {
+    id: "old",
+    doc: file(1, "a.md"),
+    directory: Some(dir(9)),
+    seen: 1.0,
+  })
+  seed(m, { id: "new", doc: file(1, "a.md"), directory: None, seen: 2.0, })
+  seed(m, { id: "b", doc: file(2, "b.md"), directory: None, seen: 3.0, })
+  let h = Recent::new(memo_store(m))
+  h.opened(file(1, "a.md"))
+  assert_eq(names(h.rows()), ["a.md", "b.md"])
+  assert_true(h.folder_for(file(1, "a.md")) is Some(_))
+}
+
+///|
+/// **いま開いている文書は、何行あっても並べない**（外すのが 1 行だけだと、重なった
+/// もう 1 行が Recent に出る）
+async test "list_besides: 同じ文書の行はすべて外す" {
+  let m : Memo = { table: Map([]), log: [], }
+  seed(m, { id: "x", doc: file(1, "a.md"), directory: None, seen: 1.0, })
+  seed(m, { id: "y", doc: file(1, "a.md"), directory: None, seen: 2.0, })
+  seed(m, { id: "b", doc: file(2, "b.md"), directory: None, seen: 3.0, })
+  let h = Recent::new(memo_store(m))
+  assert_eq(names(h.list_besides(Some(file(1, "a.md")))), ["b.md"])
 }
 
 ///|
