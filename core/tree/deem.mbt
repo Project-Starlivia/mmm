@@ -17,8 +17,8 @@
 priv struct Seat {
   /// 行の綴り。飛び（Implicit）は None
   mark : Mark?
-  /// 行の頭（`Line` のひと切れの from）。中身の持ち主はこれで指す。Implicit は None
-  line : Int?
+  /// 行の頭（`Node` のひと切れの from）。中身の持ち主はこれで指す。Implicit は None
+  from : Int?
 }
 
 ///|
@@ -99,7 +99,7 @@ fn card(
   content~ : Content?,
   source~ : String?,
 ) -> Unit {
-  keep(d, at, Card(content~, source~, owner=owner(d)))
+  keep(d, at, Block(content~, source~, owner=owner(d)))
 }
 
 ///|
@@ -121,12 +121,12 @@ fn open_height(stack : Array[Seat], base : Int) -> Int {
 fn owner(d : Deem) -> Int? {
   let h = open_height(d.read, d.base)
   for i = h - 1; i >= d.base; i = i - 1 {
-    if d.read[i].line is Some(line) {
-      return Some(line)
+    if d.read[i].from is Some(from) {
+      return Some(from)
     }
   }
   if d.base > 0 {
-    d.read[d.base - 1].line
+    d.read[d.base - 1].from
   } else {
     None
   }
@@ -207,7 +207,7 @@ fn deem(d : Deem, cut : Cut, nest : Int) -> Unit {
       d.fold_at = None
       d.fold_roots.push(d.tree.length())
     }
-    Closed(from~, to~) => {
+    FoldClose(from~, to~) => {
       keep(d, { from, to, }, FoldClose)
       d.shut()
     }
@@ -449,14 +449,14 @@ fn put(
   keep(
     d,
     own_at,
-    Line(depth~, under~, label~, at_label~, mark~, fold~, at=extent),
+    Node(depth~, under~, label~, at_label~, mark~, fold~, at=extent),
   )
   // **そのブロック自身のノードは、最初に座る綴られた枠。** 手前の穴埋めは足場、
   // 後ろに続くのは入れ子の子（1 つの塊が項目を何段も積むことがある）
   if d.own == deep {
     d.own = depth
   }
-  let seat : Seat = { mark, line: Some(own_at.from), }
+  let seat : Seat = { mark, from: Some(own_at.from), }
   d.read.push(seat)
   d.seat(seat)
 }
@@ -500,7 +500,7 @@ fn[T] lower(stack : Array[T], depth : Int) -> Unit {
 /// 木の積みは `Deem::seat` で積み、一番浅い深さを控えさせる
 fn fill(stack : Array[Seat], depth : Int, push : (Seat) -> Unit) -> Unit {
   while stack.length() < depth - 1 {
-    push({ mark: None, line: None, })
+    push({ mark: None, from: None, })
   }
 }
 
@@ -542,7 +542,7 @@ fn spill(d : Deem) -> Unit {
   keep(
     d,
     at,
-    Card(
+    Block(
       content=Some(ThematicBreak),
       source=Some(carve(d.md, at.from, at.to)),
       owner~,

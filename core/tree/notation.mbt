@@ -29,10 +29,11 @@ priv struct Piece {
 ///|
 /// mmm がその範囲に見た意味。
 ///
-/// 同じ `---` が `Border` にも `Card` にもなり、同じ `<details>` が `FoldOpen` にも
-/// `Card` にもなる。**どちらに読んだかを裁定が言う。**
+/// 同じ `---` が `Border` にも `Block` にもなり、同じ `<details>` が `FoldOpen` にも
+/// `Block` にもなる。**どちらに読んだかを裁定が言う。**
 priv enum Verdict {
-  /// 骨格の行。`depth` は**積まれた深さ**（`#` の本数でも入れ子の段数でもない）。
+  /// ここにノードが書かれている（骨格）。**1 行とは限らない** — setext の下線、
+  /// 続きの行を持つ名前、畳んだ `<details>` まで伸びる。`depth` は**積まれた深さ**（`#` の本数でも入れ子の段数でもない）。
   /// `under` は**どの深さの下に付くか** — 0 なら新しい木。深さだけでは足りない：
   /// 字下げの戻った見出しは開いている項目を閉じ（`- a` の後の `### x` は新しい木）、
   /// 境界は根より深い行を閉じる。閉じた分と、飛び（Implicit）で埋める分は
@@ -44,7 +45,7 @@ priv enum Verdict {
   /// だが、ラベルの切り出しには測りの但し書き（`head_label` の定義行の穴）が在り、
   /// 場所は畳まれた行なら `<details>` の範囲まで伸びる。**どちらもひと切れの範囲
   /// には畳めない** — 行の字とラベルと場所が、それぞれ別の所で終わる
-  Line(
+  Node(
     depth~ : Int,
     under~ : Int,
     label~ : String,
@@ -59,11 +60,12 @@ priv enum Verdict {
   FoldOpen(open~ : Bool, summary~ : String?)
   /// 立った畳みの閉じ。**その部分木が終わったという宣言**
   FoldClose
-  /// 骨格でない塊。`source` は読んだ原文で、切り出しの流儀が塊ごとに違う
+  /// ここに中身が書かれている（骨格でない塊）。地図のカードになるとは限らない —
+  /// 読み解かない散文もここ。`source` は読んだ原文で、切り出しの流儀が塊ごとに違う
   /// （`verbatim` / `carve` / `strip`）ので字で持ち出す。`owner` は**持ち主の行の頭**
-  /// （その `Line` のひと切れの from）で、None は文書。深さで指さない — 境界は
+  /// （その `Node` のひと切れの from）で、None は文書。深さで指さない — 境界は
   /// 行を閉じても持ち主を変えないので、持ち主は積みから降りていることがある
-  Card(content~ : Content?, source~ : String?, owner~ : Int?)
+  Block(content~ : Content?, source~ : String?, owner~ : Int?)
 }
 
 ///|
@@ -149,7 +151,7 @@ fn piece_sig(md : String, p : Piece) -> String {
   let at = "[\{p.at.from},\{p.at.to}]"
   match p.verdict {
     None => if blank_span(md, p.at) { "Blank\{at}" } else { "Rest\{at}" }
-    Some(Line(depth~, at_label~, mark~, ..)) =>
+    Some(Node(depth~, at_label~, mark~, ..)) =>
       "Line\{at}(\{depth},\{at_label},\{mark_sig(mark)})"
     Some(Border(..)) => "Border\{at}"
     Some(FoldOpen(open~, summary~)) => {
@@ -161,7 +163,7 @@ fn piece_sig(md : String, p : Piece) -> String {
       "Fold\{at}(\{flag}\{name})"
     }
     Some(FoldClose) => "Shut\{at}"
-    Some(Card(content~, ..)) =>
+    Some(Block(content~, ..)) =>
       match content {
         None => "Card\{at}"
         Some(c) => "Card\{at}\{c.to_json().stringify()}"

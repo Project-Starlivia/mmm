@@ -16,7 +16,7 @@
 fn sig_of(p : Piece) -> String {
   match p.verdict {
     None => "gap"
-    Some(Line(depth~, mark~, ..)) =>
+    Some(Node(depth~, mark~, ..)) =>
       match mark {
         Some(Heading(..)) => "H\{depth}"
         Some(Item(loose~, ..)) =>
@@ -30,7 +30,7 @@ fn sig_of(p : Piece) -> String {
     Some(Border(..)) => "B"
     Some(FoldOpen(..)) => "F"
     Some(FoldClose) => "S"
-    Some(Card(..)) => "C"
+    Some(Block(..)) => "C"
   }
 }
 
