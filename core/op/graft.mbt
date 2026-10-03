@@ -77,7 +77,7 @@ fn graft(doc : @tree.Doc, at : NodePlace, md : String) -> Done? {
 /// 行になりうるのは読み解かなかった中身の原文（段落）だけで、1 行が 1 ノード。
 priv enum Piece {
   Lines(Array[@tree.Rung])
-  Card(@tree.Block)
+  Block(@tree.Block)
 }
 
 ///|
@@ -100,7 +100,7 @@ fn pieces(
     }
     match rs {
       Some(rs) => Lines(rs)
-      None => Card(b)
+      None => Block(b)
     }
   })
 }
@@ -110,7 +110,7 @@ fn count_lines(cut : Array[Piece]) -> Int {
   cut.fold(init=0, (n, p) => {
     match p {
       Lines(ls) => n + ls.length()
-      Card(_) => n
+      Block(_) => n
     }
   })
 }
@@ -153,7 +153,7 @@ fn grow(
           }
           open.push({ col: r.col, node, })
         }
-      Card(b) => {
+      Block(b) => {
         let blk : @tree.Block = {
           id: b.id + by,
           content: b.content,

@@ -40,7 +40,7 @@ priv enum Cut {
   Text(String, from~ : Int, to~ : Int)
   /// 立った畳みの閉じ。**その部分木が終わったという宣言**で、字は持たない
   /// （綴りは落ちている）。積む側が枠を降ろす目印
-  Closed(from~ : Int, to~ : Int)
+  FoldClose(from~ : Int, to~ : Int)
 }
 
 ///|
@@ -290,7 +290,7 @@ priv struct Found {
 }
 
 ///|
-/// 開きと閉じの組。どちらも `spots` の添字。
+/// 開きと閉じの組。どちらも `found` の添字。
 priv struct Pair {
   open : Int
   close : Int
@@ -299,7 +299,7 @@ priv struct Pair {
 ///|
 /// 全部のタグを、居た塊と一緒に 1 列に並べる。**対は塊の境目を数えない**ので、
 /// 対にする前に列を平らにする。
-fn found(spells : Array[Spell]) -> Array[Found] {
+fn found_in(spells : Array[Spell]) -> Array[Found] {
   let out = []
   for i, s in spells {
     for t in s.tags {
@@ -315,24 +315,24 @@ fn found(spells : Array[Spell]) -> Array[Found] {
 /// 原文。**読み解かない裁定は変えない**（body は切り出すだけで、意味は付けない）。
 fn capsule(
   md : String,
-  spots : Array[Found],
+  found : Array[Found],
   head : Int,
   tail : Int,
   from : Int,
   upto : Int,
 ) -> Cut {
-  let open = spots[head].tag.mark is Open(open=true)
+  let open = found[head].tag.mark is Open(open=true)
   let mut summary = None
-  let mut inner = spots[head].tag.to
-  if head + 1 < tail && spots[head + 1].tag.mark is Name(text) {
+  let mut inner = found[head].tag.to
+  if head + 1 < tail && found[head + 1].tag.mark is Name(text) {
     summary = Some(text)
-    inner = spots[head + 1].tag.to
+    inner = found[head + 1].tag.to
   }
   Capsule(
     text=carve(md, from, upto),
     open~,
     summary~,
-    body=strip(md, inner, spots[tail].tag.from, column(md, from)),
+    body=strip(md, inner, found[tail].tag.from, column(md, from)),
     from~,
     to=upto,
   )
@@ -356,10 +356,10 @@ fn strip(md : String, from : Int, to : Int, indent : Int) -> String {
 
 ///|
 /// 開きと閉じの対。相手の居ないタグは対にならず、ただの文字のまま残る。
-fn paired(spots : Array[Found]) -> Array[Pair] {
+fn paired(found : Array[Found]) -> Array[Pair] {
   let stack = []
   let out = []
-  for k, s in spots {
+  for k, s in found {
     match s.tag.mark {
       Open(..) => stack.push(k)
       Close =>
@@ -522,7 +522,7 @@ priv struct Sift {
   /// 塊ごとの綴りの読み
   spells : Array[Spell]
   /// 全部のタグ。塊の境目は数えない
-  spots : Array[Found]
+  found : Array[Found]
   /// 開きと閉じの対
   pairs : Array[Pair]
   /// 塊ごと、手前に塊にならない中身が在るか
@@ -542,13 +542,13 @@ fn sift(
   nest : Int,
 ) -> Array[Cut] {
   let spells = blocks.map(b => spell_of(md, b))
-  let spots = found(spells)
-  let pairs = paired(spots)
+  let found = found_in(spells)
+  let pairs = paired(found)
   let opens = Array::make(blocks.length(), false)
   let closes = Array::make(blocks.length(), false)
   for p in pairs {
-    opens[spots[p.open].block] = true
-    closes[spots[p.close].block] = true
+    opens[found[p.open].block] = true
+    closes[found[p.close].block] = true
   }
   let s : Sift = {
     md,
@@ -556,14 +556,14 @@ fn sift(
     defs,
     nest,
     spells,
-    spots,
+    found,
     pairs,
     ahead: ahead_of(blocks, defs),
     opens,
     closes,
   }
   let v = standing(s)
-  restore(s, arrange(s, v, marks(s, v), raws(s, v)))
+  restore(s, arrange(s, v, marks(s, v), capsules(s, v)))
 }
 
 ///|
@@ -606,7 +606,7 @@ fn standing(s : Sift) -> Stand {
   // 落とせない塊に頼る畳みは立てない（同じタグが綴りと文字の両方になる）
   for k, p in s.pairs {
     if folded[k] &&
-      !(gone[s.spots[p.open].block] && gone[s.spots[p.close].block]) {
+      !(gone[s.found[p.open].block] && gone[s.found[p.close].block]) {
       folded[k] = false
     }
   }
@@ -618,13 +618,13 @@ fn standing(s : Sift) -> Stand {
 /// 立っていない綴りが 1 つでも混じっていたら落とせない（その文字が消える）。
 fn fallen(s : Sift, folded : Array[Bool]) -> Array[Bool] {
   let n = s.blocks.length()
-  let claimed = Array::make(s.spots.length(), false)
+  let claimed = Array::make(s.found.length(), false)
   for k, p in s.pairs {
     if folded[k] {
       // 開きの塊は綴りだけで出来ている（`stands` が確かめた）ので、
       // その塊のタグは名前ごと全部落ちる
-      for j, x in s.spots {
-        if x.block == s.spots[p.open].block {
+      for j, x in s.found {
+        if x.block == s.found[p.open].block {
           claimed[j] = true
         }
       }
@@ -633,7 +633,7 @@ fn fallen(s : Sift, folded : Array[Bool]) -> Array[Bool] {
   }
   let held = Array::make(n, false)
   let free = Array::make(n, true)
-  for k, x in s.spots {
+  for k, x in s.found {
     held[x.block] = true
     if !claimed[k] {
       free[x.block] = false
@@ -646,8 +646,8 @@ fn fallen(s : Sift, folded : Array[Bool]) -> Array[Bool] {
 /// 対 1 つが畳みとして立つか。**mmm がこのノードを畳んだら書く形**と
 /// 一致するかを見るだけ。
 fn stands(s : Sift, depth : Array[Depth], gone : Array[Bool], p : Pair) -> Bool {
-  let ob = s.spots[p.open].block
-  let cb = s.spots[p.close].block
+  let ob = s.found[p.open].block
+  let cb = s.found[p.close].block
   // 開きの塊は「開き」か「開き + 名前」だけ。他の文字が混じっていたら
   // 塊ごと落とせないので畳みにできない
   let os = s.spells[ob]
@@ -686,11 +686,11 @@ fn marks(s : Sift, v : Stand) -> Array[(Fold, @markdown.Span, @markdown.Span)?] 
   )
   for k, p in s.pairs {
     if v.folded[k] {
-      let ob = s.spots[p.open].block
+      let ob = s.found[p.open].block
       let open_at = block_span(s.blocks[ob])
       let at : @markdown.Span = {
         from: open_at.from,
-        to: block_span(s.blocks[s.spots[p.close].block]).to,
+        to: block_span(s.blocks[s.found[p.close].block]).to,
       }
       out[next(s.blocks, ob)] = Some((fold_of(s.spells[ob]), at, open_at))
     }
@@ -700,12 +700,12 @@ fn marks(s : Sift, v : Stand) -> Array[(Fold, @markdown.Span, @markdown.Span)?] 
 
 ///|
 /// 綴りとして読めなかった領域。原文のまま 1 枚の中身になる。
-priv struct Raw {
+priv struct Capsule {
   /// 終わりの塊
   last : Int
   from : Int
   to : Int
-  /// 開きと閉じの綴り（`spots` の添字）。中身としての読み取りに要る
+  /// 開きと閉じの綴り（`found` の添字）。中身としての読み取りに要る
   head : Int
   tail : Int
 }
@@ -713,14 +713,14 @@ priv struct Raw {
 ///|
 /// 立たなかった対が原文のまま持つ領域 → 始まりの塊で引く。
 /// 同じ塊から複数の対が始まるときは、**一番外**を採る。
-fn raws(s : Sift, v : Stand) -> Array[Raw?] {
-  let out : Array[Raw?] = Array::make(s.blocks.length(), None)
+fn capsules(s : Sift, v : Stand) -> Array[Capsule?] {
+  let out : Array[Capsule?] = Array::make(s.blocks.length(), None)
   for k, p in s.pairs {
     if v.folded[k] {
       continue
     }
-    let ob = s.spots[p.open].block
-    let cb = s.spots[p.close].block
+    let ob = s.found[p.open].block
+    let cb = s.found[p.close].block
     let had = match out[ob] {
       Some(r) => r.last
       None => -1
@@ -748,14 +748,14 @@ fn arrange(
   s : Sift,
   v : Stand,
   folds : Array[(Fold, @markdown.Span, @markdown.Span)?],
-  raws : Array[Raw?],
+  capsules : Array[Capsule?],
 ) -> Array[Cut] {
   let out = []
   let mut i = 0
   while i < s.blocks.length() {
-    match raws[i] {
+    match capsules[i] {
       Some(r) => {
-        out.push(capsule(s.md, s.spots, r.head, r.tail, r.from, r.to))
+        out.push(capsule(s.md, s.found, r.head, r.tail, r.from, r.to))
         i = r.last + 1
       }
       None => {
@@ -763,7 +763,7 @@ fn arrange(
           // 立った畳みの閉じは、字は落ちても**部分木の終わり**は残す
           if closing(s, v, i) {
             let at = block_span(s.blocks[i])
-            out.push(Closed(from=at.from, to=at.to))
+            out.push(FoldClose(from=at.from, to=at.to))
           }
         } else {
           out.push(
@@ -786,7 +786,7 @@ fn arrange(
 /// **どれか 1 本でも立った対の閉じなら**その塊で部分木が終わる。
 fn closing(s : Sift, v : Stand, block : Int) -> Bool {
   for k, p in s.pairs {
-    if v.folded[k] && s.spots[p.close].block == block {
+    if v.folded[k] && s.found[p.close].block == block {
       return true
     }
   }
@@ -839,6 +839,6 @@ fn cut_span(c : Cut) -> @markdown.Span {
     Folded(b, ..) => block_span(b)
     Capsule(from~, to~, ..) => { from, to, }
     Text(_, from~, to~) => { from, to, }
-    Closed(from~, to~) => { from, to, }
+    FoldClose(from~, to~) => { from, to, }
   }
 }

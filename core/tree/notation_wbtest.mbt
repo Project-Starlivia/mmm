@@ -53,7 +53,7 @@ test "見本 — 骨格の裁定は、いまの木と同じ" {
     }
     let got = StringBuilder()
     for p in notation(md).pieces {
-      guard p.verdict is Some(Line(depth~, at_label~, mark~, ..)) else {
+      guard p.verdict is Some(Node(depth~, at_label~, mark~, ..)) else {
         continue
       }
       got.write_string("\{depth} \{at_label} \{mark_sig(mark)}\n")
@@ -459,7 +459,7 @@ test "見本 — 記法構造の指紋" {
 ///|
 /// **畳みの中に書かれた `---` は、畳みの中に残る。** 前の読みは畳みの外へ出していた
 /// （保留した水平線を吐き出すのが `</details>` で枠を降ろした後になるため）。
-/// 記法構造は「中身は直前の `Line` が持つ」で位置のまま置くので、書き戻すと
+/// 記法構造は「中身は直前の `Node` が持つ」で位置のまま置くので、書き戻すと
 /// **入力と 1 バイトも違わない**。corpus の往復で崩れていた最後の 1 通りがこれ。
 test "畳みの中の水平線は、畳みの中に残る" {
   let md = "# r\n\n<details>\n<summary>a</summary>\n\n## a\n\nbody\n\n---\n\n</details>\n"

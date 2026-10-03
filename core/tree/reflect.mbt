@@ -106,7 +106,7 @@ priv struct Reflect {
   md : String
   spots : Map[Int, Spot]
   /// 前の木のノードを id で引く
-  old : Map[Int, Node]
+  nodes_before : Map[Int, Node]
   /// 前の木の根を、根のノードの id で引く。根かどうかを見る
   roots_before : Map[Int, Root]
   /// 後の木の根を、根のノードの id で引く。断片に側と境界の綴りを書くのに要る
@@ -145,7 +145,7 @@ fn plan(
   let r : Reflect = {
     md,
     spots,
-    old: Map([]),
+    nodes_before: Map([]),
     roots_before: Map::from_array(before.roots.map(x => (x.node.id, x))),
     roots_after: Map::from_array(after.roots.map(x => (x.node.id, x))),
     turns_before: turn_table(before.roots),
@@ -156,7 +156,7 @@ fn plan(
     out: [],
   }
   for root in before.roots {
-    index(r.old, root.node)
+    index(r.nodes_before, root.node)
   }
   // 文書の散文。容器の自分の尻は散文の頭（frontmatter の尻）
   reflect_body(r, before.body, after.body, spots.get(doc_id).unwrap().from, 0)
@@ -214,7 +214,7 @@ fn lead(r : Reflect, id : Int) -> Int {
 /// そうでなければ、行（ラベル）・中身・子の 3 つの列をそれぞれ差分にする —
 /// 行が同じなら行には触らない（そこに選択の目印が在る）。
 fn reflect_node(r : Reflect, x : Node, depth : Int) -> Unit {
-  match r.old.get(x.id) {
+  match r.nodes_before.get(x.id) {
     // 畳みは `<details>` が部分木を包むので、自分か子列が変わればそこから丸ごと
     Some(old) if sign_of(old) == sign_of(x) &&
       aligned(ids(old.children), ids(x.children)) &&

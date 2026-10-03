@@ -43,7 +43,7 @@ priv struct Lay {
   stack : Array[Frame]
   /// 書かれた行の枠を、行の頭で引く。**中身の持ち主はこれで指す** — 境界が行を
   /// 閉じても持ち主は変わらないので、積みから降りた枠にも中身が届く
-  lines : Map[Int, Frame]
+  owners : Map[Int, Frame]
   body : Array[Block]
   body_at : Array[Spot]
   mut body_to : Int
@@ -99,7 +99,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
   let l : Lay = {
     roots: [],
     stack: [],
-    lines: Map([]),
+    owners: Map([]),
     body: [],
     body_at: [],
     body_to: 0,
@@ -118,7 +118,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
       }
       Some(FoldOpen(..)) => l.opening = true
       Some(FoldClose) => shut(l.stack, l.fold_roots)
-      Some(Card(content~, source~, owner~)) => {
+      Some(Block(content~, source~, owner~)) => {
         let block : Block = { id: 0, content, source, }
         let at : Spot = {
           from: p.at.from,
@@ -129,7 +129,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
         // **持ち主は裁定が言う**（`owner`）。積んである頂上とは限らない —
         // 字下げの戻った塊は開いている項目を閉じ、境界は行を閉じても持ち主を変えない。
         // 枠は降ろさない — 降ろすのは骨格の行の仕事（`under`）
-        match owner.bind(from => l.lines.get(from)) {
+        match owner.bind(from => l.owners.get(from)) {
           Some(f) => {
             f.body.push(block)
             f.body_at.push(at)
@@ -143,7 +143,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
           }
         }
       }
-      Some(Line(depth~, under~, label~, at_label~, mark~, fold~, at~)) => {
+      Some(Node(depth~, under~, label~, at_label~, mark~, fold~, at~)) => {
         while l.stack.length() > under {
           ignore(l.stack.unsafe_pop())
         }
@@ -187,7 +187,7 @@ fn assemble(n : Notation) -> (Doc, Map[Int, Spot]) {
           body_at: [],
         }
         l.seat(f)
-        l.lines[p.at.from] = f
+        l.owners[p.at.from] = f
         if l.opening {
           l.fold_roots.push(l.stack.length())
           l.opening = false
