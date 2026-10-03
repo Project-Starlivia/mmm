@@ -14,6 +14,11 @@
 // 触るのは自分の行だけで済む。id をこちらで振るのは、**札が鍵にできない**から
 // （中が覗けず、綴りも取れない）。
 //
+// **1 文書 1 行。** 鍵が文書と結び付かないので、同じ文書かは行を端から照合するしかなく、
+// 照合は待つ。読んでから書くまでを 1 本ずつ通し（`in_turn`）、書くたびに同じ文書の
+// ほかの行を畳む — 重なりが残っていても、次に触れたときに消える。タブをまたぐ錠は
+// 持たない（覚えているのは高速化であって、真実ではない）。
+//
 // **前の版の形は読み替えない。** 覚えているのは高速化であって真実ではないので、
 // 置き場の版が上がったらこの棚は作り直す — 人は Open で選び直せる（未保存の字の棚は別で、
 // そちらは失うと戻せないので触らない）。
@@ -59,11 +64,31 @@ pub(all) struct Store {
 ///|
 pub struct Recent {
   store : Store
+  /// 最後に並んだ書き換え。次の書き換えはこれが済んでから走る
+  mut last : @js_async.Promise[Unit]?
 }
 
 ///|
 pub fn Recent::new(store : Store) -> Recent {
-  { store, }
+  { store, last: None, }
+}
+
+///|
+/// 読んでから書くまでの 1 手を、前の手が済んでから走らせる。**照合は行の数だけ待つ** —
+/// 2 手が重なると、どちらも相手の書いた行を見つけられず、同じ文書に 2 つ目の行を作る（#358）
+async fn Recent::in_turn(self : Recent, f : async () -> Unit) -> Unit {
+  let before = self.last
+  let mine = @js_async.Promise::from_async(async fn() {
+    // 前の手のしくじりは前の手のもの。待つだけで、引き継がない
+    if before is Some(b) {
+      b.wait() catch {
+        _ => ()
+      }
+    }
+    f()
+  })
+  self.last = Some(mine)
+  mine.wait()
 }
 
 ///|
@@ -107,19 +132,47 @@ async fn Recent::rows(self : Recent) -> Array[Known] {
 }
 
 ///|
-/// その文書の行を探す。**札どうしは `same` でしか比べられない** —
-/// 中身が覗けないので、鍵で引くのではなく端から照合する（だから `keep` 行）
-async fn Recent::find(
+/// その文書の行を、最後に触れた順に。**札どうしは `same` でしか比べられない** —
+/// 中身が覗けないので、鍵で引くのではなく端から照合する（だから `keep` 行）。
+/// 1 行とは限らない — 重なった書き込みの名残は、次に触れるまで残る
+async fn Recent::matches(
   self : Recent,
   rows : Array[Known],
   file : @web.FileHandle,
-) -> Int {
-  for i, row in rows {
+) -> Array[Known] {
+  let out = []
+  for row in rows {
     if (self.store.same)(row.doc.as_any(), file.as_any()) {
-      return i
+      out.push(row)
     }
   }
-  -1
+  out
+}
+
+///|
+/// 行たちが覚えている画像フォルダ。**重なった行は片方にしか持っていないことがある**ので、
+/// 新しい行から探す — どちらの行から開いても、結び付きが戻る
+fn folder_of(rows : Array[Known]) -> @web.DirHandle? {
+  for row in rows {
+    if row.directory is Some(_) {
+      return row.directory
+    }
+  }
+  None
+}
+
+///|
+/// 同じ文書の行のうち、`id` のほかを捨てる。**1 文書 1 行に戻す**
+async fn Recent::drop_besides(
+  self : Recent,
+  rows : Array[Known],
+  id : String,
+) -> Unit {
+  for row in rows {
+    if row.id != id {
+      (self.store.remove)(row.id)
+    }
+  }
 }
 
 ///|
@@ -162,35 +215,46 @@ async fn Recent::list_besides(
   file : @web.FileHandle?,
 ) -> Array[Known] {
   let rows = self.rows()
-  let skip = match file {
-    Some(f) => self.find(rows, f)
-    None => -1
-  }
-  let out = []
-  for i, row in rows {
-    if i != skip {
-      out.push(row)
-    }
-  }
-  out
+  guard file is Some(f) else { return rows }
+  // 外すのは**一致した行すべて** — 1 行だけだと、重なったもう 1 行が並ぶ
+  let skip = self.matches(rows, f).map(row => row.id)
+  rows.filter(row => !skip.contains(row.id))
 }
 
 ///|
 /// 開いた / 保存した。行が無ければ作り、あれば触れた印を新しくする。
 /// **画像フォルダは保つ** — 同じ文書に戻れば結び付きも戻る
 async fn Recent::opened(self : Recent, file : @web.FileHandle) -> Unit {
-  let rows = self.rows()
-  let was = rows.get(self.find(rows, file))
-  self.put({
-    id: match was {
+  self.touch(file, None)
+}
+
+///|
+/// 触れた印を新しくして、その文書の行を 1 つ書く。`directory` が None なら
+/// 覚えていたものを保つ。同じ文書のほかの行は畳む
+async fn Recent::touch(
+  self : Recent,
+  file : @web.FileHandle,
+  directory : @web.DirHandle?,
+) -> Unit {
+  self.in_turn(async fn() {
+    let rows = self.rows()
+    let same = self.matches(rows, file)
+    let id = match same.get(0) {
       Some(w) => w.id
       None => @web.unique_id()
-    },
-    doc: file,
-    directory: was.bind(w => w.directory),
-    seen: next_seen(rows),
+    }
+    self.put({
+      id,
+      doc: file,
+      directory: match directory {
+        Some(_) => directory
+        None => folder_of(same)
+      },
+      seen: next_seen(rows),
+    })
+    self.drop_besides(same, id)
+    self.trim()
   })
-  self.trim()
 }
 
 ///|
@@ -206,19 +270,12 @@ fn next_seen(rows : Array[Known]) -> Double {
 }
 
 ///|
-/// その文書の行。無ければ None
-async fn Recent::row_for(self : Recent, file : @web.FileHandle) -> Known? {
-  let rows = self.rows()
-  rows.get(self.find(rows, file))
-}
-
-///|
 /// その文書の画像フォルダ。覚えていなければ None
 async fn Recent::folder_for(
   self : Recent,
   file : @web.FileHandle,
 ) -> @web.DirHandle? {
-  self.row_for(file).bind(r => r.directory)
+  folder_of(self.matches(self.rows(), file))
 }
 
 ///|
@@ -228,25 +285,18 @@ async fn Recent::remember_folder(
   file : @web.FileHandle,
   directory : @web.DirHandle,
 ) -> Unit {
-  let rows = self.rows()
-  let was = rows.get(self.find(rows, file))
-  self.put({
-    id: match was {
-      Some(w) => w.id
-      None => @web.unique_id()
-    },
-    doc: file,
-    directory: Some(directory),
-    seen: next_seen(rows),
-  })
-  self.trim()
+  self.touch(file, Some(directory))
 }
 
 ///|
 /// 画像フォルダだけ忘れる（触って失敗した・指し先が消えた）。行は残す
 async fn Recent::forget_folder(self : Recent, file : @web.FileHandle) -> Unit {
-  guard self.row_for(file) is Some(row) else { return }
-  self.put({ id: row.id, doc: row.doc, directory: None, seen: row.seen, })
+  self.in_turn(async fn() {
+    let same = self.matches(self.rows(), file)
+    guard same.get(0) is Some(row) else { return }
+    self.put({ ..row, directory: None, })
+    self.drop_besides(same, row.id)
+  })
 }
 
 ///|
