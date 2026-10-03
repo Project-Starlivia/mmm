@@ -159,6 +159,9 @@ pub async fn Disk::save(self : Disk, text : String) -> Unit {
   // 自分の書き込みも時刻を進める。**書いた後に読み直して控える** —
   // 控えなければ、次の保存で自分の書き込みを「他所の変更」と取り違える
   self.stamp = stamp_of(file)
+  // Recent の時刻は「最後に開いた / 保存した」。上書き保存も進める — 進めなければ、
+  // 朝に開いて 1 日書いた文書が朝の時刻で並ぶ
+  self.recent.opened(file)
 }
 
 ///|
