@@ -446,6 +446,12 @@ extern "js" fn refused(name : String) -> @web.FileHandle =
   #| (name) => ({ name, requestPermission: async () => "denied" })
 
 ///|
+/// 許してはもらえたが読めない札（消えた・動いた）
+extern "js" fn unreadable(name : String) -> @web.FileHandle =
+  #| (name) => ({ name, requestPermission: async () => "granted",
+  #|   getFile: async () => { throw new Error("gone"); } })
+
+///|
 /// `ms` 経つまで返らない。**時計そのものを待つ** — 未保存の字は手が止まるのを
 /// 時計で待つので、フレームでは代わらない
 async fn rest(doc : @dom.Document, ms : Int) -> Unit {
@@ -538,6 +544,70 @@ async test "立ち上がり: 文書が入れ替われば挨拶は引っ込む" {
   s.app.open_known(paper("ideas.md", "# i\n", _ => ()))
   assert_eq(s.fake.md, "# i\n")
   assert_false(s.app.greeting.is_open())
+}
+
+///|
+/// **押した行は、並べたときの文書を開く。** 並びは文書を開く・保存するたびに裏で
+/// 引き直されるので、押された番号で引き直すと、見ていた名前と違う文書が開く（#358）
+async test "立ち上がり: 並びが引き直されても、押した行の文書を開く" {
+  let s = stand(known=["ideas.md", "todo.md"])
+  defer s.win.close()
+  rest(s.doc, 5)
+  let box = shown_menu(s)
+  s.app.recent = s.app.recent.rev()
+  @web.click(box.querySelectorAll("[role=menuitem]")[0])
+  rest(s.doc, 5)
+  assert_eq(s.app.disk.current_file().map(f => f.name()), Some("ideas.md"))
+}
+
+///|
+/// Files の `Open Recent ▸` も同じ — 押した行は、開いたときに並べた文書
+async test "帯: 並びが引き直されても、Open Recent は押した行の文書を開く" {
+  let s = stand(known=["ideas.md", "todo.md"])
+  defer s.win.close()
+  rest(s.doc, 5)
+  // 挨拶は畳む（同じ名前の行が 2 か所に出ないように）
+  fire(s, s.doc.documentElement(), "PointerEvent", "pointerdown")
+  @web.click(s.doc.getElementById("files").unwrap())
+  let shown = () => {
+    s.doc
+    .querySelectorAll(".menu")
+    .filter(m => {
+      m.getAttribute("style").unwrap_or("").contains("display: block")
+    })
+    .map(m => m.querySelectorAll("[role=menuitem]"))
+    .flatten()
+  }
+  @web.click(shown().filter(r => r.textContent().has_prefix("Open Recent"))[0])
+  let rows = shown().filter(r => r.textContent().contains(" · "))
+  assert_eq(rows.map(r => r.textContent()), [
+    "ideas.md · just now", "todo.md · 1 min ago",
+  ])
+  s.app.recent = s.app.recent.rev()
+  @web.click(rows[0])
+  rest(s.doc, 5)
+  assert_eq(s.app.disk.current_file().map(f => f.name()), Some("ideas.md"))
+}
+
+///|
+/// **開けなければ、何も入れ替わらない。** 画面は前の文書のままなので、いまのファイルも
+/// 前のまま — 先に移すと、次の保存が前の文書の字を開けなかったファイルへ書く（#358）
+async test "開けなければ、いまのファイルは前のまま。次の保存は前の文書へ" {
+  let s = stand()
+  defer s.win.close()
+  let written : Array[String] = []
+  s.app.open_known(paper("notes.md", "# r\n", t => written.push(t)))
+  s.app.open_known(unreadable("other.md"))
+  rest(s.doc, 5)
+  assert_eq(
+    s.doc.querySelectorAll(".notice.on .msg").map(m => m.textContent()),
+    ["Couldn't open the file"],
+  )
+  assert_eq(s.fake.md, "# r\n")
+  assert_eq(s.app.disk.current_file().map(f => f.name()), Some("notes.md"))
+  s.fake.change("# r\n\n## a\n")
+  s.app.save_file(false)
+  assert_eq(written, ["# r\n\n## a\n"])
 }
 
 ///|

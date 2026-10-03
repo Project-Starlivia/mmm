@@ -5,6 +5,7 @@ import {
   "mizchi/js/core",
   "mizchi/js_browser/dom",
   "mmm/app/web",
+  "moonbitlang/async/js_async",
   "moonbitlang/core/set",
 }
 
@@ -98,6 +99,7 @@ pub(all) struct Known {
 
 pub struct Recent {
   store : Store
+  mut last : @js_async.Promise[Unit]?
 }
 pub fn Recent::new(Store) -> Self
 

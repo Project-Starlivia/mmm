@@ -51,12 +51,26 @@ async fn read_doc(file : @web.FileHandle) -> Doc {
 }
 
 ///|
-/// このファイルをいまのものにして、覚えて、読む
+/// 読んで、このファイルをいまのものにする
 async fn Disk::use_(self : Disk, file : @web.FileHandle) -> Doc {
-  self.current = Some(file)
+  let stamp = stamp_of(file)
+  let doc = read_doc(file)
+  self.take(file, stamp)
+  doc
+}
+
+///|
+/// このファイルを引き取る — 覚えて、いまのものにして、ディスクの時刻を控える。
+/// **読めた・書けた後でだけ呼ぶ** — 先に移すと、読めずに落ちたとき画面は前の文書の
+/// まま `current` だけが移り、次の保存が前の文書の字をそのファイルへ書く（#358）
+async fn Disk::take(
+  self : Disk,
+  file : @web.FileHandle,
+  stamp : Double?,
+) -> Unit {
   self.recent.opened(file)
-  self.stamp = stamp_of(file)
-  read_doc(file)
+  self.current = Some(file)
+  self.stamp = stamp
 }
 
 ///|
@@ -122,11 +136,9 @@ pub async fn Disk::adopt(
   guard @web.request_permission(file.as_any(), "readwrite").wait() == "granted" else {
     return None
   }
-  self.current = Some(file)
-  self.recent.opened(file)
-  self.stamp = stamp
-  let on_disk = read_doc(file) catch { _ => return Some("") }
-  Some(on_disk.text)
+  let on_disk = read_doc(file).text catch { _ => "" }
+  self.take(file, stamp)
+  Some(on_disk)
 }
 
 ///|
@@ -176,9 +188,7 @@ pub async fn Disk::save_as(
   guard !@core.is_nullish(picked) else { return None }
   let file : @web.FileHandle = picked.cast()
   @web.write_text(file, text).wait()
-  self.current = Some(file)
-  self.recent.opened(file)
-  self.stamp = stamp_of(file)
+  self.take(file, stamp_of(file))
   Some({ name: file.name(), text, })
 }
 
