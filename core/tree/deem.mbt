@@ -245,7 +245,12 @@ fn take(
       put(
         d,
         d.base + level,
-        Some(Heading(setext=style is Setext, closing=closing_hashes)),
+        Some(
+          Heading(
+            underline=underline(d.md, span, style),
+            closing=closing_hashes,
+          ),
+        ),
         label=head_label(d.md, span, style, children),
         fold~,
         at=span,

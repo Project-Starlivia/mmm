@@ -409,7 +409,7 @@ fn after_newline(md : String, at : Int) -> Int {
 
 ///|
 /// 木 → 正規形の md。mdAst に戻す（unbuild.mbt）のが我々の仕事で、綴りは木が持つ
-/// 読んだ字（`source` / `rules` / `marker` / `offset` / `loose` / `setext`）から出る。
+/// 読んだ字（`source` / `rules` / `marker` / `offset` / `loose` / `underline` / `closing`）から出る。
 /// ライブラリがやるのはブロックの並べ方と字下げだけ。
 pub fn serialize(doc : Doc) -> String {
   let body = write(unbuild({ ..doc, frontmatter: None, }))

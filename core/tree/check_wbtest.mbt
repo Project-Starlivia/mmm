@@ -623,7 +623,7 @@ test "深さ 3 以上の改行を含む名前は書けない" {
                   fold: None,
                   body: [],
                   children: [],
-                  mark: Some(Heading(setext=true, closing=0)),
+                  mark: Some(Heading(underline=3, closing=0)),
                 },
               ],
               mark: Some(atx),

@@ -270,7 +270,7 @@ fn wrap(doc : @tree.Doc, id : Int, label : String) -> Done? {
   guard find(doc, id) is Some(n) else { return None }
   let nid = fresh(doc)
   // id の席に座るので、項目なら綴りも id のもの。見出しは新しく作る綴り
-  // （読んだ setext や閉じの `#` は運ばない。飛びは行が無いので見出しで綴る）
+  // （読んだ下線や閉じの `#` は運ばない。飛びは行が無いので見出しで綴る）
   let mark = match n.mark {
     Some(Item(..)) as m => m.unwrap()
     _ => @tree.atx

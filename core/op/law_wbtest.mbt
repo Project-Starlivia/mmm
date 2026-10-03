@@ -21,6 +21,7 @@ let corpus : Array[String] = [
   "# a\r\n\r\n#### deep\r\n\r\n## b\r\n", "# a\n  \n#### deep\n\n## b\n", "# r\n\n- a\n- b\n",
   "- x\n\n  y\n\n  - a\n  - b\n", "---\n\n- item\n\ntail\n", "***\n\n- a\n  - b\n\ntail\n",
   "- a\n\n---\n", "1. a\n\n---\n\n- b\n", "- # h\n\n---\n\n- t\n", "# a\n\n- i\n\n---\n",
+  "Setext\n======\n\nSub\n-----\n\nbody\n", "a\nb\n=\n\nc\n-\n",
 ]
 
 ///|
@@ -82,7 +83,7 @@ fn shape_of(doc : @tree.Doc, id : Int) -> Json? {
 /// **綴りは形ではない** — 詰め（`loose`）は列 1 本のもので、操作が列を割れば
 /// 1 つの項目に空行は書けず、読み直しは詰まった列になる。
 fn strip(x : @tree.Node) -> Json {
-  let spelling = ["id", "setext", "closing", "marker", "offset", "loose"]
+  let spelling = ["id", "underline", "closing", "marker", "offset", "loose"]
   fn go(j : Json) -> Json {
     match j {
       Object(o) => {
@@ -209,7 +210,7 @@ test "法則 — 形が一致すれば focus は同じ部分木を指し、一�
   inspect(
     some,
     content=(
-      #|3064
+      #|3261
     ),
   )
   // md が形を決めた回数。0 なら法則の 2 つ目の道が死んでいる。
@@ -217,7 +218,7 @@ test "法則 — 形が一致すれば focus は同じ部分木を指し、一�
   inspect(
     decided,
     content=(
-      #|66
+      #|72
     ),
   )
 }
@@ -296,7 +297,7 @@ test "法則 — Delete の focus は消えていない兄弟か祖先（中身�
   inspect(
     n,
     content=(
-      #|52
+      #|55
     ),
   )
 }
@@ -343,7 +344,7 @@ test "法則 — 隙間の保存。どの操作の後も、続く空行は増え
   inspect(
     n,
     content=(
-      #|2959
+      #|3149
     ),
   )
 }
@@ -388,7 +389,7 @@ test "法則 — 触っていない字は変わらない" {
       let edits = edit(doc, Rename(id~, label="z")).edits
       guard !edits.is_empty() else { continue }
       n = n + 1
-      let (head, tail) = line_of(doc, at)
+      let (head, tail) = rows_of(doc, at, find(before, id).unwrap())
       for e in edits {
         if e.from < head || e.to > tail {
           bad.push(
@@ -403,23 +404,31 @@ test "法則 — 触っていない字は変わらない" {
   inspect(
     n,
     content=(
-      #|51
+      #|55
     ),
   )
 }
 
 ///|
-/// その位置の行の頭と尻（改行の次。末尾に改行が無ければ文書の尻）。
-fn line_of(md : String, at : Int) -> (Int, Int) {
+/// 名前が at から始まるノードの、名前の行の頭と尻（改行の次。末尾に改行が無ければ
+/// 文書の尻）。名前の改行の数だけ行が続き、setext は下線の行まで（#316）。
+fn rows_of(md : String, at : Int, x : @tree.Node) -> (Int, Int) {
   let mut head = at
   while head > 0 && md[head - 1] != '\n' {
     head = head - 1
   }
+  let underlined = x.mark is Some(Heading(underline~, ..)) && underline > 0
+  let rows = x.label.split("\n").count() + (if underlined { 1 } else { 0 })
   let mut tail = at
-  while tail < md.length() && md[tail] != '\n' {
-    tail = tail + 1
+  for _ in 0..<rows {
+    while tail < md.length() && md[tail] != '\n' {
+      tail = tail + 1
+    }
+    if tail < md.length() {
+      tail = tail + 1
+    }
   }
-  (head, if tail < md.length() { tail + 1 } else { tail })
+  (head, tail)
 }
 
 ///|

@@ -232,7 +232,7 @@ fn reflect_node(r : Reflect, x : Node, depth : Int) -> Unit {
       match x.mark {
         None => ()
         Some(_) => {
-          let line_to = line_end(r.md, s.from)
+          let line_to = row_end(r.md, s.from, old)
           if !same_line(old, x) {
             let inner = label_end(r.md, r.spots, old)
             r.out.push({
@@ -300,13 +300,26 @@ fn label_end(md : String, spots : Map[Int, Spot], x : Node) -> Int {
   [..x.body.map(b => b.id), ..x.children.map(k => k.id)]
   .iter()
   .filter_map(id => spots.get(id).map(sp => sp.from))
-  .fold(init=line_end(md, spots.get(x.id).unwrap().from), (a, b) => {
+  .fold(init=row_end(md, spots.get(x.id).unwrap().from, x), (a, b) => {
     if b < a {
       b
     } else {
       a
     }
   })
+}
+
+///|
+/// 原文で from から始まるノードの行の尻（改行の次）。**行は名前の行ぜんぶ** — 名前の
+/// 改行の数だけ行が続き、setext はその下の下線の行まで（#316）。
+fn row_end(md : String, from : Int, x : Node) -> Int {
+  let underlined = x.mark is Some(Heading(underline~, ..)) && underline > 0
+  let rows = x.label.split("\n").count() + (if underlined { 1 } else { 0 })
+  let mut at = from
+  for _ in 0..<rows {
+    at = line_end(md, at)
+  }
+  at
 }
 
 ///|

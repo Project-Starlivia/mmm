@@ -188,10 +188,10 @@ fn Pen::nodes(self : Pen, xs : Array[Laid], depth : Int) -> Unit {
 fn Pen::node(self : Pen, x : Laid, depth : Int) -> Unit {
   match x.node.mark {
     Some(Item(..)) => self.wrap(x.node, () => self.bullets([x]))
-    Some(Heading(setext~, closing~)) =>
+    Some(Heading(underline~, closing~)) =>
       self.wrap(x.node, () => {
         self.put(Some(x.node.id), () => {
-          heading(depth, x.node.label, setext, closing)
+          heading(depth, x.node.label, underline, closing)
         })
         self.body(x, depth + 1)
       })
@@ -538,18 +538,21 @@ fn content(b : Block) -> @markdown.Block? {
 /// 空の名前は `##` だけ（Implicit を綴った空の見出しと同じ）。
 ///
 /// setext は深さ 2 までしか無いので、深ければ ATX。名前が空でも ATX —
-/// 下線だけの行は下線にならず、見出しごと段落に落ちる。閉じの `#` は読んだ数。
+/// 下線だけの行は下線にならず、見出しごと段落に落ちる。下線と閉じの `#` は読んだ数
+/// （下線の字は深さが決める。名前の長さには揃えない）。
 ///
 /// **改行を含む名前は setext でしか書けない**ので、読んだ綴りが setext でなくても
-/// setext で綴る（ATX に落とすと 2 行目が名前から千切れる）。書けない深さは check が断る。
+/// setext で綴る（ATX に落とすと 2 行目が名前から千切れる）。下線は新しく綴るので 3 本。
+/// 書けない深さは check が断る。
 fn heading(
   depth : Int,
   label : String,
-  setext : Bool,
+  underline : Int,
   closing : Int,
 ) -> @markdown.Block {
-  if (setext || label.contains("\n")) && depth <= 2 && label != "" {
-    let line = String::make(3, if depth == 1 { '=' } else { '-' })
+  if (underline > 0 || label.contains("\n")) && depth <= 2 && label != "" {
+    let n = if underline > 0 { underline } else { 3 }
+    let line = String::make(n, if depth == 1 { '=' } else { '-' })
     return html(label + "\n" + line)
   }
   let sharps = String::make(depth, '#')

@@ -60,10 +60,11 @@ pub(all) struct Node {
 ///|
 /// 骨格の行の綴り。**種類はこれが持つ唯一の在り処。**
 pub(all) enum Mark {
-  /// 見出し（`# a`）。setext（`a` の次の行が `===`）は深さ 1〜2 でだけ書ける。
+  /// 見出し（`# a`）。underline は読んだ setext の下線の本数（`a` の次の行が `======`
+  /// なら 6）で、0 なら ATX。setext は深さ 1〜2 でだけ書ける。
   /// closing は読んだ閉じの `#` の本数（`# a ##` なら 2）で、飾りなので 0 は付けない。
   /// 新しく作るときは ATX で閉じ無し
-  Heading(setext~ : Bool, closing~ : Int)
+  Heading(underline~ : Int, closing~ : Int)
   /// 項目（`- a`）。marker は読んだ字（`-` `*` `+`、または `3.` `3)` — 数字ごと）、
   /// offset は読んだラベルの桁（マーカーの頭からラベルの頭まで。中身と入れ子も
   /// この桁に座る）、loose は読んだ列が loose だった（項目の間に空行）。
@@ -73,7 +74,7 @@ pub(all) enum Mark {
 
 ///|
 /// 新しく作る見出しの綴り。読んだ書き方は持ち込まない。
-pub let atx : Mark = Heading(setext=false, closing=0)
+pub let atx : Mark = Heading(underline=0, closing=0)
 
 ///|
 /// 新しく作る項目の綴り。マーカーとラベルの桁は席が決め直す（`spell_at`）。

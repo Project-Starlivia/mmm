@@ -298,6 +298,19 @@ test "改行を含む名前は setext のまま — 触っても 2 行目は消�
 }
 
 ///|
+/// #316 — 下線は読んだ本数のまま。名前の長さには揃えず、触っていない見出しの下線も
+/// 縮まない。編集は改名した見出しの行（名前と下線）だけ
+test "Rename — setext の下線は読んだ本数のまま" {
+  let md = "Setext\n======\n\nSub\n-----\n\nbody\n"
+  let r = edit(md, Rename(id=3, label="longer name"))
+  assert_eq(
+    @tree.patched(md, r.edits),
+    "Setext\n======\n\nlonger name\n-----\n\nbody\n",
+  )
+  assert_eq(r.edits, [{ from: 15, to: 25, insert: "longer name\n-----\n", }])
+}
+
+///|
 /// 深さ 3 へ改行入りの名前を持ち込む操作は断る
 test "改行を含む名前を深さ 3 へ — できない操作" {
   let md = "# a\n\n## b\n\nc\nd\n---\n"
